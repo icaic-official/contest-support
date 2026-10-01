@@ -1,44 +1,65 @@
-# minsky -- ICAIC Contest Observability Dashboard
+# Minsky
 
-## Problem
-During past contests, when contestants face a technical problem, they usually raise a card to get the attention of an on-site competition volunteer. The volunteer will come and assist the contestant, while also: noting down the time taken to address and resolve the problem, taking down photos of the problems faced, and describing the problem.
+Minsky explores a calmer way to handle technical problems during a contest: report an issue, dispatch help, track the handoff, and record a discretionary time award.
 
-If the volunteer cannot solve the problem, the volunteer escalates to a secondary team -- e.g., the scientific committee or the campus network administrator. 
-The entire process of this for past contests was very hectic, as the duration of a contest can generate upwards of 600 issues surfaced by contestants. 
-While attempts were made to make this easier, such as submitting a Google form and then noting the problem down in a Google spreadsheet, a better solution needs to be proposed.
+**This is a local workflow demo**, built with React, TypeScript and Vite. It uses fictional data and four simulated personas in one group-contest session. No cloud account or paid service is required.
 
-## Proposed Solution
-When an issue is surfaced, a timer will be started that records down how long a contestant's issue gets triaged and resolved. 
-The contestant jury / scientific committee will then make a recommendation, based on the time taken and type of problem faced, to give a discretionary time extension using the dashboard. 
+## Run locally
 
-The solution should be a live dashboard that handles the triage of contestants' technical issues and the dispatch of volunteers to the contestant. 
+Use Node.js 22.12 or newer and npm. From the repository root:
 
-It should be modular in that volunteers have different roles, e.g., a volunteer can hold a single role or multiple roles.
-- Helpers will be able to log into their accounts during the contestant, and depending on their roles, perform certain tasks in relation to solving their problem / triaging. 
-- Helpers can also include members of the scientific committee.  
-- Roles should be readily modifiable (e.g., created, updated, deleted) because the names of the roles have not been confirmed. 
+```sh
+npm ci
+npm run dev
+```
 
+Open the local URL printed by Vite (normally `http://127.0.0.1:5173`). Use one browser tab for the demo. Select a persona at the top of the page to explore the same local dataset.
 
-### Process
-1. During the contest, a contestant (in the individual contest) or contestants (in the group contest), came across some problems.
-The problems they commonly faced could be tagged as:
-    - Problem Statement -- related to the question
-    - Devices -- Related to their laptop
-    - Backend -- Related to the cloud environment that they run their solutions on
-    - Other -- Other problems faced 
-However, the tags of common problems are tentative and subject to change. This means that they need to be modular and not hard-coded. 
-2. The contestant will submit a ticket, which will: 
-    - start a timer that indicates that the problem is being triaged 
-    - show up on our dashboard and the volunteers' dashboard as a problem surfaced.
-3. Volunteers will be able to click on the problem surfaced and assign themselves to it first, which will mark the problem as being "attended to".
-    - The volunteer will then dispatch themselves to the contestant / group to attempt to solve their technical issue.
-    - If the problem is related to the problem statement, the scientific committee will have the ability to answer the contestant's question via the dashboard.
-    - If the scope of the problem is beyond the volunteer's ability, they will be able to click on "escalate" to escalate the problem to secondary helpers, such as the networking / IT staff, scientific committee, and so on.
-4. Once the problem is marked resolved, the timer will stop. 
-    - The problem will be marked as resolved on the dashboard, and the jury / scientific committee will be able to see a summary of the problem.
-    - The jury / scientific committee can award the contestant / group a discretionary time extension with the dashboard. 
+| Command             | Purpose                                                             |
+| ------------------- | ------------------------------------------------------------------- |
+| `npm run dev`       | Start the local development server                                  |
+| `npm run build`     | Type check and build to `dist/`                                     |
+| `npm run preview`   | Serve the production build locally                                  |
+| `npm run typecheck` | Check TypeScript without emitting files                             |
+| `npm run lint`      | Run ESLint                                                          |
+| `npm test`          | Run focused domain and persistence tests                            |
+| `npm run test:e2e`  | Run Chromium browser tests; starts its own Vite server on port 4173 |
 
-### Hosting
-- The dashboard will be hosted on cloud in production. 
-- Testing done locally, subject to changes
-- Tentatively, it will have a Supabase backend handler with a cloudflare workers frontend.
+Install the test browser once before running browser tests:
+
+```sh
+npx playwright install chromium
+```
+
+Playwright shares browser revisions across projects in `~/.cache/ms-playwright` on Linux. For headless-only testing, `npx playwright install chromium --only-shell` downloads only the headless shell; the full Chromium install also supports interactive debugging. Different Playwright versions may need different browser revisions.
+
+On Linux hosts missing browser system libraries, use `npx playwright install --with-deps chromium` (may require administrator privileges). Dependency and browser installation require internet access.
+
+## Try the journey
+
+1. As **Team contestant · Team Aurora**, submit a Backend issue.
+2. As **Volunteer · Sam Chen**, claim it, send a public reply and an internal note, then escalate.
+3. As **Technical specialist · Dr. Maya Rao**, accept the handoff and resolve with a summary.
+4. As **Jury · Alex Morgan**, record a whole-minute award with a public explanation.
+5. As any staff persona, confirm the award was applied externally in the simulation.
+6. Return to the contestant to see the decision and application status. Refresh to check persistence; use **Reset demo** to restore the fictional scenario.
+
+Timers start at submission, record first assignment separately, and stop at resolution. Escalation retains the current owner until acceptance. Awards do not change an external contest clock.
+
+## Demo limitations
+
+Persona switching and hidden controls are not authentication or authorization. Data is stored under `minsky.demo.v1` in this browser's local storage, scoped to its origin. Use fictional information only. Clearing browser data removes progress. Persona selection and filters reset on reload. Concurrent tabs, devices, or users are not synchronized; keep one demo tab open. Storage failures are shown in the UI; unavailable or incompatible saved data requires an explicit reset.
+
+There are no real accounts, uploads, notifications, cloud synchronization, CSV imports, shared-incident actions, or administration interfaces. Seed categories are configurable in `src/domain.ts`, with no category editor. This demo does not validate production security, offline operation, or capacity for 800 simultaneous users.
+
+## Project guidance
+
+- [Initial agreed plan](PLAN.md) — scope baseline; its historical run report describes that planning run only.
+- [Agent working rules](AGENTS.md)
+- [Demo specification](docs/demo-spec.md)
+- [Longer-term product direction](docs/product-direction.md)
+- [Development tickets](docs/tickets.md)
+- [Current implementation and verification](docs/current-state.md)
+- [Repeatable manual walkthrough](docs/manual-verification.md)
+
+Development ticket T0001 uses `feature/t0001-local-demo`. The user reviews and merges the PR before the next ticket begins. Outage handling remains unresolved and must be revisited before scoping a connected backend.

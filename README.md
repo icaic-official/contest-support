@@ -1,6 +1,5 @@
 # minsky -- ICAIC Contest Observability Dashboard
 
-
 # Plan
 
 ## Problem
@@ -30,14 +29,16 @@ The problems they commonly faced could be tagged as:
     - Backend -- Related to the cloud environment that they run their solutions on
     - Other -- Other problems faced 
 However, the tags of common problems are tentative and subject to change. This means that they need to be modular and not hard-coded. 
-2. The contestant will submit a ticket, which will a) start a timer that indicates that the problem is being triaged b) show up on our dashboard and the volunteers' dashboard as a problem surfaced.
+2. The contestant will submit a ticket, which will: 
+    - start a timer that indicates that the problem is being triaged 
+    - show up on our dashboard and the volunteers' dashboard as a problem surfaced.
 3. Volunteers will be able to click on the problem surfaced and assign themselves to it first, which will mark the problem as being "attended to".
-The volunteer will then dispatch themselves to the contestant / group to attempt to solve their technical issue.
-If the problem is related to the problem statement, the scientific committee will have the ability to answer the contestant's question via the dashboard.
-If the scope of the problem is beyond the volunteer's ability, they will be able to click on "escalate" to escalate the problem to secondary helpers, such as the networking / IT staff, scientific committee, and so on.
+    - The volunteer will then dispatch themselves to the contestant / group to attempt to solve their technical issue.
+    - If the problem is related to the problem statement, the scientific committee will have the ability to answer the contestant's question via the dashboard.
+    - If the scope of the problem is beyond the volunteer's ability, they will be able to click on "escalate" to escalate the problem to secondary helpers, such as the networking / IT staff, scientific committee, and so on.
 4. Once the problem is marked resolved, the timer will stop. 
-The problem will be marked as resolved on the dashboard, and the jury / scientific committee will be able to see a summary of the problem.
-The jury / scientific committee can award the contestant / group a discretionary time extension with the dashboard. 
+    - The problem will be marked as resolved on the dashboard, and the jury / scientific committee will be able to see a summary of the problem.
+    - The jury / scientific committee can award the contestant / group a discretionary time extension with the dashboard. 
 
 ### Hosting
 - The dashboard will be hosted on cloud in production. 

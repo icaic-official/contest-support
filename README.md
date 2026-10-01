@@ -1,8 +1,8 @@
 # Minsky
 
-Minsky explores a calmer way to handle technical problems during a contest: report an issue, dispatch help, track the handoff, and record a discretionary time award.
+Minsky explores a calmer way to handle technical problems during a contest. Teams report issues. Staff dispatch help, track handoffs, and record discretionary time awards.
 
-**This is a local workflow demo**, built with React, TypeScript and Vite. It uses fictional data and four simulated personas in one group-contest session. No cloud account or paid service is required.
+**This is a local workflow demo**, built with React, TypeScript and Vite. It uses fictional data and five simulated personas in one group-contest session. The demo requires no cloud account or paid service.
 
 ## Run locally
 
@@ -23,7 +23,7 @@ Open the local URL printed by Vite (normally `http://127.0.0.1:5173`). Use one b
 | `npm run typecheck` | Check TypeScript without emitting files                             |
 | `npm run lint`      | Run ESLint                                                          |
 | `npm test`          | Run focused domain and persistence tests                            |
-| `npm run test:e2e`  | Run Chromium browser tests; starts its own Vite server on port 4173 |
+| `npm run test:e2e`  | Run Chromium browser tests. Starts its own Vite server on port 4173 |
 
 Install the test browser once before running browser tests:
 
@@ -31,7 +31,7 @@ Install the test browser once before running browser tests:
 npx playwright install chromium
 ```
 
-Playwright shares browser revisions across projects in `~/.cache/ms-playwright` on Linux. For headless-only testing, `npx playwright install chromium --only-shell` downloads only the headless shell; the full Chromium install also supports interactive debugging. Different Playwright versions may need different browser revisions.
+Playwright shares browser revisions across projects in `~/.cache/ms-playwright` on Linux. For headless-only testing, `npx playwright install chromium --only-shell` downloads only the headless shell. The full Chromium install also supports interactive debugging. Different Playwright versions may need different browser revisions.
 
 On Linux hosts missing browser system libraries, use `npx playwright install --with-deps chromium` (may require administrator privileges). Dependency and browser installation require internet access.
 
@@ -42,19 +42,23 @@ On Linux hosts missing browser system libraries, use `npx playwright install --w
 3. As **Technical specialist · Dr. Maya Rao**, accept the handoff and resolve with a summary.
 4. As **Jury · Alex Morgan**, record a whole-minute award with a public explanation.
 5. As any staff persona, confirm the award was applied externally in the simulation.
-6. Return to the contestant to see the decision and application status. Refresh to check persistence; use **Reset demo** to restore the fictional scenario.
+6. Return to the contestant to see the decision and application status. Refresh to check persistence. Use **Reset demo** to restore the fictional scenario.
 
-Timers start at submission, record first assignment separately, and stop at resolution. Escalation retains the current owner until acceptance. Awards do not change an external contest clock.
+Timers start at submission, record first assignment separately, and stop at resolution. Reopening resumes accumulated unresolved time and excludes time spent resolved. Escalation retains the current owner until acceptance. Awards do not change an external contest clock.
+
+Specialists can also claim open issues directly. **Volunteer + Technical specialist · Robin Ellis** has both roles under one identity and can accept another person's handoff. Owners cannot accept their own handoffs. A support role combined with jury membership has both capabilities; the five seeded personas do not include that combination.
+
+Contestants can reopen their own team's resolved issues; any support helper can reopen a session issue. Enter a public reopening reason. The same issue and previous owner remain, earlier summaries stay visible, and a new resolution needs a new summary. Existing awards and application confirmations remain unchanged. The demo still permits only one award per issue.
 
 ## Demo limitations
 
-Persona switching and hidden controls are not authentication or authorization. Data is stored under `minsky.demo.v1` in this browser's local storage, scoped to its origin. Use fictional information only. Clearing browser data removes progress. Persona selection and filters reset on reload. Concurrent tabs, devices, or users are not synchronized; keep one demo tab open. Storage failures are shown in the UI; unavailable or incompatible saved data requires an explicit reset.
+Persona switching and hidden controls are not authentication or authorization. The demo stores data under `minsky.demo.v2` in this browser's local storage. Valid v1 progress migrates when v2 is absent; the v1 source remains untouched. Existing v2 data takes priority, including after reset. The browser scopes this storage to its origin. Use fictional information only. Clearing browser data removes progress. Persona selection and filters reset on reload. The demo does not synchronize concurrent tabs, devices, or users. Keep one demo tab open. The interface shows storage failures. Unavailable or incompatible saved data requires an explicit reset.
 
 There are no real accounts, uploads, notifications, cloud synchronization, CSV imports, shared-incident actions, or administration interfaces. Seed categories are configurable in `src/domain.ts`, with no category editor. This demo does not validate production security, offline operation, or capacity for 800 simultaneous users.
 
 ## Project guidance
 
-- [Initial agreed plan](PLAN.md) — scope baseline; its historical run report describes that planning run only.
+- [Initial agreed plan](PLAN.md) — scope baseline. Its historical run report describes that planning run only.
 - [Agent working rules](AGENTS.md)
 - [Demo specification](docs/demo-spec.md)
 - [Longer-term product direction](docs/product-direction.md)
@@ -62,4 +66,4 @@ There are no real accounts, uploads, notifications, cloud synchronization, CSV i
 - [Current implementation and verification](docs/current-state.md)
 - [Repeatable manual walkthrough](docs/manual-verification.md)
 
-Development ticket T0001 uses `feature/t0001-local-demo`. The user reviews and merges the PR before the next ticket begins. Outage handling remains unresolved and must be revisited before scoping a connected backend.
+Development tickets T0001 and T0002 share `feature/t0001-local-demo` at the user's request. The user accepted the T0001 proof of concept. [T0002](docs/tickets.md#t0002--multiple-staff-roles-triage-and-reopening) implements multiple staff roles, support-staff triage, reopening by contestants/helpers, and validated v1 migration. UI redesign is deferred. The user still reviews and merges. Later tickets return to the normal workflow in [AGENTS.md](AGENTS.md). Outage handling remains unresolved and must be revisited before scoping a connected backend.

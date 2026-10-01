@@ -51,22 +51,25 @@ Create a compact documentation package alongside the demo:
 | `docs/demo-spec.md` | The demo’s screens, behavior, scope, and acceptance criteria. |
 | `docs/product-direction.md` | Decisions from this discussion, clearly separated into agreed direction, provisional choices, and deferred questions. |
 | `docs/tickets.md` | One actionable demo ticket and a small uncommitted follow-up queue. |
-| `docs/current-state.md` | What actually exists, what has been verified, and current limitations. |
+| `docs/current-state.md` | Existing capabilities, completed checks, and current limitations. |
 | `docs/manual-verification.md` | Repeatable walkthrough of the complete demo journey. |
 
 Preserve these longer-term decisions in the product-direction document:
 
 - Each event has one contest type: individual or group. Sessions have separate rosters, schedules, issues, and awards.
-- Organizers provision email/password accounts; group contestants share a team account. Staff have individual accounts.
-- Configurable roles combine fixed capabilities; issue categories are configurable.
+- Organizers provision email/password accounts. Group contestants share a team account. Staff have individual accounts.
+- Configurable roles combine fixed capabilities. Issue categories are configurable.
 - Contestants and staff can submit reports. Staff manually open and close contestant intake.
-- Ownership persists during escalation until handoff. Timers run continuously; recurrences create linked new reports, and duplicates link to a canonical report.
-- Public replies, private notes, photos, session announcements, in-app alerts, and opt-in browser push are intended.
+- Ownership persists during escalation until handoff. Timers run continuously. Recurrences create linked new reports, and duplicates link to a canonical report.
+- The agreed direction includes public replies, private notes, photos, session announcements, in-app alerts, and opt-in browser push.
 - Shared incidents support explicit affected rosters, selective closure of linked reports, and bulk awards with recipient exceptions.
 - Awards use a separate ledger, with one authorized decision and separate confirmation of external application. Contestants see decisions and application status.
-- CSV roster imports and editing forms are intended. Reporting is dashboard-only. Archived events are read-only with no automatic purge.
-- Cloudflare and Supabase remain the intended stack, beginning with free-tier experiments. Production targets are 800 simultaneous users, 95% of ordinary actions within two seconds, and live updates within three seconds on a healthy connection.
-- **Outage handling remains unresolved.** Remind you before the connected-backend ticket is scoped; revisit the architecture if venue-local operation is required.
+- The agreed direction includes CSV roster imports and editing forms. Reporting uses dashboards only. Archived events permit reading only. The application does not automatically purge archived events.
+- Cloudflare and Supabase remain the intended stack, beginning with free-tier experiments. Production targets on a healthy connection are:
+  - 800 simultaneous users.
+  - 95% of ordinary actions within two seconds.
+  - Live updates within three seconds.
+- **Outage handling remains unresolved.** Remind you before we scope the connected-backend ticket. Revisit the architecture if you require venue-local operation.
 
 **Ticket workflow**
 
@@ -76,6 +79,8 @@ Implement → verify → update documentation → prepare a pull request → **y
 
 Future work stays as short candidate items until your demo feedback determines the next ticket. Do not generate a large implementation backlog now.
 
+**Decision after demo review (2026-10-02):** The user accepted the local proof of concept and selected T0002 planning on the existing `feature/t0001-local-demo` branch, without waiting for T0001 to merge. T0002 will support people with multiple staff roles, allow any support staff member to begin triage, and let contestants and helpers reopen resolved issues. UI redesign, including possible Figma references, is deferred. See [T0002 in the development tickets](docs/tickets.md#t0002--multiple-staff-roles-triage-and-reopening) for the scope and recorded defaults. This exception supersedes the next-ticket branch and merge prerequisite above for T0002 only. T0002 is now implemented; current verification is recorded in [docs/current-state.md](docs/current-state.md).
+
 ## 4. Verification and acceptance
 
 Use npm with a committed lockfile. Provide scripts for development, build, type checking, linting, and focused automated tests.
@@ -84,16 +89,16 @@ Verify:
 
 - The complete journey works across all four personas.
 - Escalation preserves ownership until acceptance.
-- Refreshing preserves state; timers remain correct and stop on resolution.
+- Refreshing preserves state. Timers remain correct and stop on resolution.
 - Contestant views omit staff-only notes.
 - An award stays pending until explicitly marked applied.
 - Repeated clicks do not create duplicate awards or repeat completed transitions.
 - Reset restores the seed scenario.
-- Volunteer screens work at phone width; controls support keyboard navigation.
+- Volunteer screens work at phone width. Controls support keyboard navigation.
 
-Use focused tests for lifecycle transitions, timing, persistence, and award state, plus one browser test of the complete journey. Build, lint, type checking, and tests must pass before the pull request is presented.
+Use focused tests for lifecycle transitions, timing, persistence, and award state, plus one browser test of the complete journey. Build, lint, type checking, and tests must pass before we present the pull request.
 
-The manual guide will cover the same journey and identify anything automated checks cannot establish. Production load testing is deferred; the local demo is not evidence for the 800-user target.
+The manual guide will cover the same journey and identify anything automated checks cannot establish. The plan defers production load testing. The local demo is not evidence for the 800-user target.
 
 ## 5. Required reporting and this planning run
 
@@ -102,10 +107,10 @@ The manual guide will cover the same journey and identify anything automated che
 | Required field | This planning run |
 |---|---|
 | **Summary of changes** | Read the repository, gathered requirements, compared architectures, and narrowed the immediate scope to a local demo. |
-| **Files changed** | None; this run remained in Plan mode. |
-| **Commands run** | Repository inspection using `pwd`, `rg --files`, `cat README.md`, `ls -la`, `git status`, `git log`, and `git remote`; checked ancestor guidance and tool availability. Consulted official platform documentation. |
-| **Build/test results** | Not run; the repository currently contains only the README. |
-| **Manual verification steps** | No application exists to exercise yet. The proposed walkthrough is specified above. |
+| **Files changed** | None. This run remained in Plan mode. |
+| **Commands run** | Repository inspection using `pwd`, `rg --files`, `cat README.md`, `ls -la`, `git status`, `git log`, and `git remote`. Checked ancestor guidance and tool availability. Consulted official platform documentation. |
+| **Build/test results** | Not run. The repository currently contains only the README. |
+| **Manual verification steps** | No application exists to exercise yet. The sections above specify the proposed walkthrough. |
 | **Risks** | Simulated permissions and local state do not establish production correctness. Outage requirements remain unresolved. |
-| **Follow-up tickets** | First implement T0001; then use your feedback to select a refinement or free-tier integration experiment. |
+| **Follow-up tickets** | First implement T0001. Then use your feedback to select a refinement or free-tier integration experiment. |
 | **Docs that need updating** | Update the README and create the documentation package listed above during T0001. |

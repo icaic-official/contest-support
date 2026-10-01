@@ -1,0 +1,131 @@
+{
+  "version": 1,
+  "awards": [
+    {
+      "id": "AWD-ISS-003",
+      "issueId": "ISS-003",
+      "minutes": 3,
+      "explanation": "Lost time",
+      "at": 1000002,
+      "actor": "jury",
+      "appliedAt": 1000003,
+      "appliedBy": "specialist"
+    }
+  ],
+  "issues": [
+    {
+      "id": "ISS-001",
+      "teamId": "aurora",
+      "category": "Devices",
+      "description": "Our display flickers when we connect the external monitor.",
+      "status": "open",
+      "createdAt": 640000,
+      "history": [
+        {
+          "id": "ISS-001-1",
+          "at": 640000,
+          "actor": "contestant",
+          "text": "Issue submitted. Timer started.",
+          "visibility": "public"
+        }
+      ]
+    },
+    {
+      "id": "ISS-002",
+      "teamId": "cedar",
+      "category": "Backend",
+      "description": "The practice environment is not responding.",
+      "status": "escalated",
+      "createdAt": 760000,
+      "history": [
+        {
+          "id": "ISS-002-1",
+          "at": 760000,
+          "actor": "contestant",
+          "text": "Issue submitted. Timer started.",
+          "visibility": "public"
+        },
+        {
+          "id": "ISS-002-2",
+          "at": 820000,
+          "actor": "volunteer",
+          "text": "Volunteer claimed the issue.",
+          "visibility": "public"
+        },
+        {
+          "id": "ISS-002-3",
+          "at": 880000,
+          "actor": "volunteer",
+          "text": "Escalated to Technical specialist. Volunteer remains responsible until acceptance.",
+          "visibility": "public"
+        },
+        {
+          "id": "ISS-002-4",
+          "at": 1000000,
+          "actor": "volunteer",
+          "text": "Internal note: Private diagnostic",
+          "visibility": "internal"
+        },
+        {
+          "id": "ISS-002-5",
+          "at": 1000001,
+          "actor": "specialist",
+          "text": "Public reply: Investigating",
+          "visibility": "public"
+        }
+      ],
+      "owner": "volunteer",
+      "firstAssignedAt": 820000,
+      "escalation": "specialist"
+    },
+    {
+      "id": "ISS-003",
+      "teamId": "orbit",
+      "category": "Problem statement",
+      "description": "Please clarify the units used in question 2.",
+      "status": "resolved",
+      "createdAt": 100000,
+      "history": [
+        {
+          "id": "ISS-003-1",
+          "at": 100000,
+          "actor": "contestant",
+          "text": "Issue submitted. Timer started.",
+          "visibility": "public"
+        },
+        {
+          "id": "ISS-003-2",
+          "at": 160000,
+          "actor": "volunteer",
+          "text": "Volunteer claimed the issue.",
+          "visibility": "public"
+        },
+        {
+          "id": "ISS-003-3",
+          "at": 400000,
+          "actor": "volunteer",
+          "text": "Resolved: Confirmed that all distances are measured in metres.",
+          "visibility": "public"
+        },
+        {
+          "id": "ISS-003-4",
+          "at": 1000002,
+          "actor": "jury",
+          "text": "Jury awarded 3 minutes: Lost time. Pending external application.",
+          "visibility": "public"
+        },
+        {
+          "id": "ISS-003-5",
+          "at": 1000003,
+          "actor": "specialist",
+          "text": "Staff confirmed the award was applied externally (simulated).",
+          "visibility": "public"
+        }
+      ],
+      "owner": "volunteer",
+      "firstAssignedAt": 160000,
+      "summary": "Confirmed that all distances are measured in metres.",
+      "resolvedAt": 400000
+    }
+  ]
+}

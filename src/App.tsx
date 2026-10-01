@@ -1,6 +1,15 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import {
   assignmentDelay,
+  canAccept,
+  canAward,
+  canClaim,
+  canEscalate,
+  canReopen,
+  canResolve,
+  canView,
+  isJuryOnly,
+  roleLabel,
   categories,
   duration,
   elapsed,
@@ -43,7 +52,7 @@ export default function App() {
   const [storageError, setStorageError] = useState<string>();
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
-  const [persona, setPersona] = useState<Persona>("contestant");
+  const [persona, setPersona] = useState<Persona>("aurora");
   const [selected, setSelected] = useState<string>("ISS-001");
   const [filter, setFilter] = useState("all");
   const [now, setNow] = useState(Date.now);
@@ -67,6 +76,10 @@ export default function App() {
       if (action.type === "submit") {
         setSelected(next.issues[0].id);
         setNotice(`${next.issues[0].id} submitted. Timer started.`);
+      }
+      if (action.type === "reopen") {
+        setSelected(action.issueId);
+        if (filter === "resolved") setFilter("claimed");
       }
       return true;
     } catch (cause) {
@@ -92,10 +105,8 @@ export default function App() {
     setFilter("all");
     setNotice("Demo reset to fictional seed data.");
   }
-  const visible = state.issues.filter(
-    (issue) =>
-      (persona !== "contestant" || issue.teamId === "aurora") &&
-      (persona !== "jury" || issue.status === "resolved"),
+  const visible = state.issues.filter((issue) =>
+    canView(issue, personas[persona]),
   );
   const filtered = visible.filter(
     (issue) => filter === "all" || issue.status === filter,
@@ -134,7 +145,7 @@ export default function App() {
           >
             {Object.entries(personas).map(([id, actor]) => (
               <option key={id} value={id}>
-                {actor.role} · {actor.name}
+                {roleLabel(actor)} · {actor.name}
               </option>
             ))}
           </select>
@@ -151,19 +162,19 @@ export default function App() {
         <div className="page-heading">
           <div>
             <p className="eyebrow">
-              {personas[persona].name} / {personas[persona].role}
+              {personas[persona].name} / {roleLabel(personas[persona])}
             </p>
             <h1>
-              {persona === "contestant"
+              {persona === "aurora"
                 ? "A little help, right here."
-                : persona === "jury"
+                : isJuryOnly(personas[persona])
                   ? "Review. Decide. Record."
                   : "Keep the contest moving."}
             </h1>
             <p>
-              {persona === "contestant"
+              {persona === "aurora"
                 ? "Report a problem and follow your team’s progress."
-                : persona === "jury"
+                : isJuryOnly(personas[persona])
                   ? "Review resolved issues and record discretionary time awards."
                   : "Claim an issue, help a team, and keep everyone informed."}
             </p>
@@ -196,7 +207,7 @@ export default function App() {
         </p>
         <fieldset className="workspace" disabled={!!loadError}>
           <legend className="sr-only">Contest workflow</legend>
-          {persona === "contestant" && (
+          {persona === "aurora" && (
             <section className="panel submission">
               <div>
                 <p className="eyebrow">NEED A HAND?</p>
@@ -245,15 +256,21 @@ export default function App() {
             <div>
               <strong>{visible.length}</strong>
               <span>
-                {persona === "jury" ? "Resolved issues" : "Issues in view"}
+                {isJuryOnly(personas[persona])
+                  ? "Resolved issues"
+                  : "Issues in view"}
               </span>
             </div>
             <div>
               <strong>
-                {persona === "jury" ? state.awards.length : openCount}
+                {isJuryOnly(personas[persona])
+                  ? state.awards.length
+                  : openCount}
               </strong>
               <span>
-                {persona === "jury" ? "Awards recorded" : "Awaiting resolution"}
+                {isJuryOnly(personas[persona])
+                  ? "Awards recorded"
+                  : "Awaiting resolution"}
               </span>
             </div>
             <div>
@@ -273,15 +290,15 @@ export default function App() {
             <section className="panel queue" aria-label="Issue queue">
               <div className="panel-heading">
                 <h2>
-                  {persona === "contestant"
+                  {persona === "aurora"
                     ? "Your team’s issues"
-                    : persona === "jury"
+                    : isJuryOnly(personas[persona])
                       ? "Resolved issues"
                       : "Support queue"}
                 </h2>
                 <span className="count">{filtered.length}</span>
               </div>
-              {persona !== "jury" && (
+              {!isJuryOnly(personas[persona]) && (
                 <label className="filter">
                   Status filter
                   <select
@@ -349,7 +366,7 @@ export default function App() {
         </fieldset>
         <footer>
           Minsky / Local workflow demo{" "}
-          <span>T0001 · Built for exploration</span>
+          <span>T0001 + T0002 · Built for exploration</span>
         </footer>
       </main>
     </>
@@ -393,8 +410,8 @@ function IssueDetail({
         <div>
           <dt>
             {issue.status === "resolved"
-              ? "Total elapsed · stopped"
-              : "Elapsed · running"}
+              ? "Unresolved time · stopped"
+              : "Unresolved time · running"}
           </dt>
           <dd>{duration(elapsed(issue, now))}</dd>
         </div>
@@ -414,21 +431,17 @@ function IssueDetail({
         </p>
       )}
       <div className="actions">
-        {persona === "volunteer" && issue.status === "open" && (
+        {canClaim(issue, personas[persona]) && (
           <button onClick={() => act({ type: "claim", issueId: issue.id })}>
             Claim issue
           </button>
         )}
-        {persona === "volunteer" &&
-          issue.owner === "volunteer" &&
-          issue.status === "claimed" && (
-            <button
-              onClick={() => act({ type: "escalate", issueId: issue.id })}
-            >
-              Escalate to specialist
-            </button>
-          )}
-        {persona === "specialist" && issue.status === "escalated" && (
+        {canEscalate(issue, persona) && (
+          <button onClick={() => act({ type: "escalate", issueId: issue.id })}>
+            Escalate to specialist
+          </button>
+        )}
+        {canAccept(issue, persona) && (
           <button onClick={() => act({ type: "accept", issueId: issue.id })}>
             Accept handoff
           </button>
@@ -456,7 +469,7 @@ function IssueDetail({
             }}
           >
             <h3>Conversation</h3>
-            {persona !== "contestant" && (
+            {persona !== "aurora" && (
               <label>
                 Message visibility
                 <select name="visibility">
@@ -468,14 +481,14 @@ function IssueDetail({
               </label>
             )}
             <label>
-              {persona === "contestant" ? "Reply to staff" : "Message"}
+              {persona === "aurora" ? "Reply to staff" : "Message"}
               <textarea name="message" required maxLength={2000} />
             </label>
             <button className="secondary" type="submit">
               Send message
             </button>
           </form>
-          {issue.owner === persona && (
+          {canResolve(issue, persona) && (
             <form
               className="section-form"
               onSubmit={(event) => {
@@ -497,12 +510,47 @@ function IssueDetail({
           )}
         </>
       )}
-      {issue.status === "resolved" && (
-        <section className="resolution">
-          <h3>Resolution summary</h3>
-          <p>{issue.summary}</p>
-          <small>Resolved {date(issue.resolvedAt!)}</small>
+      {issue.resolutions.map((resolution) => (
+        <section className="resolution" key={resolution.id}>
+          <h3>
+            {resolution.reopened ? "Previous resolution" : "Resolution summary"}
+          </h3>
+          <p>{resolution.summary}</p>
+          <small>
+            Resolved by {personas[resolution.actor].name} ·{" "}
+            {date(resolution.at)}
+          </small>
+          {resolution.reopened && (
+            <p>
+              Reopened by {personas[resolution.reopened.actor].name} ·{" "}
+              {date(resolution.reopened.at)}: {resolution.reopened.reason}
+            </p>
+          )}
         </section>
+      ))}
+      {canReopen(issue, personas[persona]) && (
+        <form
+          className="section-form"
+          onSubmit={(event) => {
+            const data = fields(event);
+            act({
+              type: "reopen",
+              issueId: issue.id,
+              reason: String(data.get("reason")),
+            });
+          }}
+        >
+          <h3>Reopen this issue</h3>
+          <p>
+            The current owner stays responsible. Unresolved time resumes,
+            excluding time spent resolved.
+          </p>
+          <label>
+            Public reopening reason
+            <textarea name="reason" required maxLength={2000} />
+          </label>
+          <button type="submit">Reopen issue</button>
+        </form>
       )}
       {issue.status === "resolved" && !award && (
         <section className="section-form">
@@ -511,7 +559,7 @@ function IssueDetail({
             No award recorded. Awards are discretionary and separate from
             elapsed time.
           </p>
-          {persona === "jury" && (
+          {canAward(issue, personas[persona]) && (
             <form
               onSubmit={(event) => {
                 const data = fields(event);
@@ -543,6 +591,16 @@ function IssueDetail({
           </p>
           <h3>{award.minutes} minutes awarded</h3>
           <p>{award.explanation}</p>
+          {issue.resolutions.some(
+            (resolution) =>
+              resolution.id === award.resolutionId && resolution.reopened,
+          ) && (
+            <p>
+              This award relates to an earlier resolution. Reopening preserves
+              its decision and application status. This demo allows one award
+              per issue.
+            </p>
+          )}
           <strong>
             {award.appliedAt === undefined
               ? "Pending external application"
@@ -557,7 +615,7 @@ function IssueDetail({
               {date(award.appliedAt)}
             </p>
           )}
-          {persona !== "contestant" && award.appliedAt === undefined && (
+          {persona !== "aurora" && award.appliedAt === undefined && (
             <form
               onSubmit={(event) => {
                 fields(event);
@@ -579,9 +637,7 @@ function IssueDetail({
       )}
       <section className="activity">
         <h3>
-          {persona === "contestant"
-            ? "Team activity"
-            : "Local activity history"}
+          {persona === "aurora" ? "Team activity" : "Local activity history"}
         </h3>
         <ol>
           {visibleHistory(issue, persona)
@@ -591,7 +647,7 @@ function IssueDetail({
               <li key={entry.id}>
                 <div>
                   <strong>
-                    {entry.actor === "contestant"
+                    {entry.actor === "aurora"
                       ? teamFor(issue).name
                       : personas[entry.actor].name}
                   </strong>

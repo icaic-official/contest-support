@@ -1,12 +1,72 @@
 import { z } from "zod";
 
-export const personas = {
-  contestant: { name: "Team Aurora", role: "Team contestant" },
-  volunteer: { name: "Sam Chen", role: "Volunteer" },
-  specialist: { name: "Dr. Maya Rao", role: "Technical specialist" },
-  jury: { name: "Alex Morgan", role: "Jury" },
-} as const;
-export type Persona = keyof typeof personas;
+export type Role = "volunteer" | "specialist" | "jury";
+export interface Person {
+  name: string;
+  roles: readonly Role[];
+  teamId?: string;
+}
+export type Persona = "aurora" | "sam" | "maya" | "alex" | "robin";
+export const personas: Record<Persona, Person> = {
+  aurora: { name: "Team Aurora", roles: [], teamId: "aurora" },
+  sam: { name: "Sam Chen", roles: ["volunteer"] },
+  maya: { name: "Dr. Maya Rao", roles: ["specialist"] },
+  alex: { name: "Alex Morgan", roles: ["jury"] },
+  robin: { name: "Robin Ellis", roles: ["volunteer", "specialist"] },
+};
+const roleNames: Record<Role, string> = {
+  volunteer: "Volunteer",
+  specialist: "Technical specialist",
+  jury: "Jury",
+};
+export function roleLabel(person: Person): string {
+  return person.teamId
+    ? "Team contestant"
+    : person.roles.map((role) => roleNames[role]).join(" + ");
+}
+export function isSupport(person: Person): boolean {
+  return (
+    person.roles.includes("volunteer") || person.roles.includes("specialist")
+  );
+}
+export function isJuryOnly(person: Person): boolean {
+  return person.roles.includes("jury") && !isSupport(person);
+}
+export function canView(issue: Issue, person: Person): boolean {
+  return person.teamId
+    ? issue.teamId === person.teamId
+    : !isJuryOnly(person) || issue.status === "resolved";
+}
+export function canClaim(issue: Issue, person: Person): boolean {
+  return isSupport(person) && issue.status === "open";
+}
+export function canResolve(issue: Issue, id: Persona): boolean {
+  return (
+    isSupport(personas[id]) &&
+    issue.owner === id &&
+    (issue.status === "claimed" || issue.status === "escalated")
+  );
+}
+export function canEscalate(issue: Issue, id: Persona): boolean {
+  return canResolve(issue, id) && issue.status === "claimed";
+}
+export function canAccept(issue: Issue, id: Persona): boolean {
+  const person: Person = personas[id];
+  return (
+    person.roles.includes("specialist") &&
+    issue.status === "escalated" &&
+    issue.owner !== id
+  );
+}
+export function canReopen(issue: Issue, person: Person): boolean {
+  return (
+    issue.status === "resolved" &&
+    (isSupport(person) || person.teamId === issue.teamId)
+  );
+}
+export function canAward(issue: Issue, person: Person): boolean {
+  return person.roles.includes("jury") && issue.status === "resolved";
+}
 export const teams = [
   { id: "aurora", name: "Team Aurora", location: "Hall A · Desk 12" },
   { id: "cedar", name: "Team Cedar", location: "Hall A · Desk 18" },
@@ -15,7 +75,19 @@ export const teams = [
 // Seed configuration: edit here and reset the demo to try different categories.
 export const categories = ["Problem statement", "Devices", "Backend", "Other"];
 const timestamp = z.number().finite().nonnegative();
-const actor = z.enum(["contestant", "volunteer", "specialist", "jury"]);
+const actor = z.enum(["aurora", "sam", "maya", "alex", "robin"]);
+const publicContent = z
+  .string()
+  .refine((value) => value.trim().length > 0 && value.trim().length <= 2000);
+const resolutionSchema = z.object({
+  id: z.string(),
+  at: timestamp,
+  actor,
+  summary: publicContent,
+  reopened: z
+    .object({ at: timestamp, actor, reason: publicContent })
+    .optional(),
+});
 const entrySchema = z.object({
   id: z.string(),
   at: timestamp,
@@ -32,7 +104,8 @@ const issueSchema = z.object({
   createdAt: timestamp,
   firstAssignedAt: timestamp.optional(),
   resolvedAt: timestamp.optional(),
-  owner: z.enum(["volunteer", "specialist"]).optional(),
+  owner: actor.optional(),
+  resolutions: z.array(resolutionSchema),
   escalation: z.literal("specialist").optional(),
   summary: z.string().optional(),
   history: z.array(entrySchema),
@@ -43,13 +116,14 @@ const awardSchema = z.object({
   minutes: z.number().int().positive(),
   explanation: z.string(),
   at: timestamp,
-  actor: z.literal("jury"),
+  actor,
+  resolutionId: z.string(),
   appliedAt: timestamp.optional(),
   appliedBy: actor.optional(),
 });
 export const stateSchema = z
   .object({
-    version: z.literal(1),
+    version: z.literal(2),
     issues: z.array(issueSchema),
     awards: z.array(awardSchema),
   })
@@ -83,7 +157,7 @@ export const stateSchema = z
         invalid();
       if (
         issue.status === "escalated"
-          ? issue.owner !== "volunteer" || issue.escalation !== "specialist"
+          ? issue.escalation !== "specialist"
           : issue.escalation !== undefined
       )
         invalid();
@@ -93,6 +167,44 @@ export const stateSchema = z
           : issue.resolvedAt !== undefined || issue.summary !== undefined
       )
         invalid();
+      if (issue.owner && !isSupport(personas[issue.owner])) invalid();
+      if (issue.status === "open" && issue.resolutions.length) invalid();
+      if (
+        new Set(issue.resolutions.map((record) => record.id)).size !==
+        issue.resolutions.length
+      )
+        invalid();
+      let previous = issue.firstAssignedAt ?? issue.createdAt;
+      for (const resolution of issue.resolutions) {
+        if (!isSupport(personas[resolution.actor]) || resolution.at < previous)
+          invalid();
+        const reopened = resolution.reopened;
+        if (reopened) {
+          const person: Person = personas[reopened.actor];
+          if (
+            reopened.at < resolution.at ||
+            (!isSupport(person) && person.teamId !== issue.teamId)
+          )
+            invalid();
+        } else if (
+          resolution !== issue.resolutions.at(-1) ||
+          issue.status !== "resolved"
+        ) {
+          invalid();
+        }
+        previous = reopened?.at ?? resolution.at;
+      }
+      const latest = issue.resolutions.at(-1);
+      if (
+        issue.status === "resolved" &&
+        (!latest ||
+          latest.reopened ||
+          latest.at !== issue.resolvedAt ||
+          latest.summary !== issue.summary ||
+          latest.actor !== issue.owner)
+      )
+        invalid();
+      if ((issue.history.at(-1)?.at ?? -1) < previous) invalid();
       if (
         issue.firstAssignedAt !== undefined &&
         issue.firstAssignedAt < issue.createdAt
@@ -118,8 +230,13 @@ export const stateSchema = z
       const issue = state.issues.find((item) => item.id === award.issueId);
       if (
         !issue ||
-        issue.status !== "resolved" ||
-        award.at < issue.resolvedAt! ||
+        !issue.resolutions.some(
+          (resolution) =>
+            resolution.id === award.resolutionId &&
+            award.at >= resolution.at &&
+            (!resolution.reopened || award.at <= resolution.reopened.at),
+        ) ||
+        !personas[award.actor].roles.some((role) => role === "jury") ||
         !award.explanation.trim()
       )
         invalid();
@@ -127,7 +244,7 @@ export const stateSchema = z
         award.appliedAt === undefined
           ? award.appliedBy !== undefined
           : !award.appliedBy ||
-            award.appliedBy === "contestant" ||
+            award.appliedBy === "aurora" ||
             award.appliedAt < award.at
       )
         invalid();
@@ -145,6 +262,7 @@ export type Action =
       visibility: "public" | "internal";
     }
   | { type: "resolve"; issueId: string; summary: string }
+  | { type: "reopen"; issueId: string; reason: string }
   | { type: "award"; issueId: string; minutes: number; explanation: string };
 
 function requireThat(condition: unknown, message: string): asserts condition {
@@ -158,8 +276,16 @@ function content(value: string) {
   );
   return text;
 }
-export const elapsed = (issue: Issue, now: number) =>
-  Math.max(0, (issue.resolvedAt ?? now) - issue.createdAt);
+export function elapsed(issue: Issue, now: number): number {
+  let total = 0;
+  let activeFrom = issue.createdAt;
+  for (const resolution of issue.resolutions) {
+    total += resolution.at - activeFrom;
+    if (!resolution.reopened) return total;
+    activeFrom = resolution.reopened.at;
+  }
+  return total + Math.max(0, now - activeFrom);
+}
 export const assignmentDelay = (issue: Issue) =>
   issue.firstAssignedAt === undefined
     ? undefined
@@ -170,7 +296,7 @@ export function duration(ms: number) {
 }
 export const visibleHistory = (issue: Issue, persona: Persona) =>
   issue.history.filter(
-    (entry) => persona !== "contestant" || entry.visibility === "public",
+    (entry) => persona !== "aurora" || entry.visibility === "public",
   );
 
 export function transition(
@@ -183,7 +309,7 @@ export function transition(
   const next = structuredClone(state);
   if (action.type === "submit") {
     requireThat(
-      persona === "contestant",
+      persona === "aurora",
       "Switch to the contestant to submit an issue.",
     );
     requireThat(
@@ -198,6 +324,7 @@ export function transition(
       description: content(action.description),
       status: "open",
       createdAt: now,
+      resolutions: [],
       history: [
         {
           id: `${id}-1`,
@@ -213,7 +340,7 @@ export function transition(
   const issue = next.issues.find((i) => i.id === action.issueId);
   requireThat(issue, "Issue not found.");
   requireThat(
-    persona !== "contestant" || issue.teamId === "aurora",
+    persona !== "aurora" || issue.teamId === "aurora",
     "This issue belongs to another team.",
   );
   requireThat(
@@ -231,33 +358,31 @@ export function transition(
   switch (action.type) {
     case "claim":
       requireThat(
-        persona === "volunteer" && issue.status === "open",
-        "Only a volunteer can claim an open issue.",
+        canClaim(issue, personas[persona]),
+        "Only support staff can claim an open issue.",
       );
       issue.owner = persona;
       issue.status = "claimed";
       issue.firstAssignedAt = now;
-      log("Volunteer claimed the issue.");
+      log("Support staff claimed the issue.");
       break;
     case "escalate":
       requireThat(
-        persona === issue.owner &&
-          persona === "volunteer" &&
-          issue.status === "claimed",
-        "Only the assigned volunteer can escalate this issue.",
+        canEscalate(issue, persona),
+        "Only the current support owner can escalate this issue.",
       );
       issue.status = "escalated";
       issue.escalation = "specialist";
       log(
-        "Escalated to Technical specialist. Volunteer remains responsible until acceptance.",
+        "Escalated to Technical specialist. Current owner remains responsible until acceptance.",
       );
       break;
     case "accept":
       requireThat(
-        persona === "specialist" && issue.status === "escalated",
-        "Only a specialist can accept a pending handoff.",
+        canAccept(issue, persona),
+        "Only a different specialist can accept a pending handoff.",
       );
-      issue.owner = "specialist";
+      issue.owner = persona;
       issue.status = "claimed";
       delete issue.escalation;
       log("Specialist accepted the handoff and ownership.");
@@ -265,7 +390,7 @@ export function transition(
     case "message":
       requireThat(issue.status !== "resolved", "This issue is resolved.");
       requireThat(
-        action.visibility === "public" || persona !== "contestant",
+        action.visibility === "public" || persona !== "aurora",
         "Contestants cannot add internal notes.",
       );
       log(
@@ -275,19 +400,43 @@ export function transition(
       break;
     case "resolve":
       requireThat(
-        persona === issue.owner &&
-          (issue.status === "claimed" || issue.status === "escalated"),
+        canResolve(issue, persona),
         "Only the current owner can resolve an active issue.",
       );
       issue.summary = content(action.summary);
       issue.status = "resolved";
       issue.resolvedAt = now;
+      issue.resolutions.push({
+        id: `${issue.id}-resolution-${issue.resolutions.length + 1}`,
+        at: now,
+        actor: persona,
+        summary: issue.summary,
+      });
       delete issue.escalation;
       log(`Resolved: ${issue.summary}`);
       break;
+    case "reopen": {
+      requireThat(
+        canReopen(issue, personas[persona]),
+        "Only the team or support staff can reopen a resolved issue.",
+      );
+      const reason = content(action.reason);
+      const resolution = issue.resolutions.at(-1);
+      requireThat(
+        resolution && !resolution.reopened,
+        "A current resolution is required.",
+      );
+      resolution.reopened = { at: now, actor: persona, reason };
+      issue.status = "claimed";
+      delete issue.resolvedAt;
+      delete issue.summary;
+      delete issue.escalation;
+      log(`Reopened: ${reason}`);
+      break;
+    }
     case "award":
       requireThat(
-        persona === "jury" && issue.status === "resolved",
+        canAward(issue, personas[persona]),
         "Only the jury can award time on a resolved issue.",
       );
       requireThat(
@@ -304,7 +453,8 @@ export function transition(
         minutes: action.minutes,
         explanation: content(action.explanation),
         at: now,
-        actor: "jury",
+        actor: persona,
+        resolutionId: issue.resolutions.at(-1)!.id,
       });
       log(
         `Jury awarded ${action.minutes} minutes: ${content(action.explanation)}. Pending external application.`,
@@ -313,7 +463,7 @@ export function transition(
     case "apply": {
       const award = next.awards.find((a) => a.issueId === issue.id);
       requireThat(
-        persona !== "contestant" && award && award.appliedAt === undefined,
+        persona !== "aurora" && award && award.appliedAt === undefined,
         "A pending award is required; only staff can confirm application.",
       );
       award.appliedAt = now;
@@ -339,18 +489,19 @@ export function seed(now = Date.now()): State {
     description,
     status: "open",
     createdAt: now - age,
+    resolutions: [],
     history: [
       {
         id: `${id}-1`,
         at: now - age,
-        actor: "contestant",
+        actor: "aurora",
         text: "Issue submitted. Timer started.",
         visibility: "public",
       },
     ],
   });
   let state: State = {
-    version: 1,
+    version: 2,
     awards: [],
     issues: [
       draft(
@@ -379,19 +530,19 @@ export function seed(now = Date.now()): State {
   state = transition(
     state,
     { type: "claim", issueId: "ISS-002" },
-    "volunteer",
+    "sam",
     now - 180000,
   );
   state = transition(
     state,
     { type: "escalate", issueId: "ISS-002" },
-    "volunteer",
+    "sam",
     now - 120000,
   );
   state = transition(
     state,
     { type: "claim", issueId: "ISS-003" },
-    "volunteer",
+    "sam",
     now - 840000,
   );
   state = transition(
@@ -401,7 +552,7 @@ export function seed(now = Date.now()): State {
       issueId: "ISS-003",
       summary: "Confirmed that all distances are measured in metres.",
     },
-    "volunteer",
+    "sam",
     now - 600000,
   );
   return state;

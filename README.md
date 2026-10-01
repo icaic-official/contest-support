@@ -1,7 +1,5 @@
 # minsky -- ICAIC Contest Observability Dashboard
 
-# Plan
-
 ## Problem
 During past contests, when contestants face a technical problem, they usually raise a card to get the attention of an on-site competition volunteer. The volunteer will come and assist the contestant, while also: noting down the time taken to address and resolve the problem, taking down photos of the problems faced, and describing the problem.
 

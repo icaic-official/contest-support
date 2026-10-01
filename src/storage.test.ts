@@ -278,3 +278,25 @@ it.each(["actor", "time", "summary", "reopen", "award"])(
     expect(loadState(memory(JSON.stringify(state))).error).toBeDefined();
   },
 );
+
+it("reloads a zero-minute decision without confusing it with an absent award", () => {
+  const storage = memory();
+  const state = transition(
+    seed(1000000),
+    {
+      type: "award",
+      issueId: "ISS-003",
+      minutes: 0,
+      explanation: "No extra time needed",
+    },
+    "alex",
+    1000000,
+  );
+  saveState(storage, state);
+  expect(loadState(storage).error).toBeUndefined();
+  expect(loadState(storage).state).toEqual(state);
+  const invalid = structuredClone(state);
+  invalid.awards[0].minutes = -1;
+  saveState(storage, invalid);
+  expect(loadState(storage).error).toBeDefined();
+});

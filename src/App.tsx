@@ -36,6 +36,12 @@ const statusName = {
   escalated: "Awaiting specialist",
   resolved: "Resolved",
 };
+const resolutionChoices = [
+  "Resolved without comment",
+  "Service restored",
+  "Device issue resolved",
+  "Problem statement clarified",
+];
 const date = (timestamp: number) => new Date(timestamp).toLocaleString();
 const teamFor = (issue: Issue) =>
   teams.find((team) => team.id === issue.teamId)!;
@@ -386,6 +392,8 @@ function IssueDetail({
   now: number;
   act: (action: Action) => boolean;
 }) {
+  const [awardChoice, setAwardChoice] = useState("");
+  const [resolutionChoice, setResolutionChoice] = useState("");
   const award = state.awards.find((item) => item.issueId === issue.id);
   const delay = assignmentDelay(issue);
   return (
@@ -493,18 +501,43 @@ function IssueDetail({
               className="section-form"
               onSubmit={(event) => {
                 const data = fields(event);
-                act({
-                  type: "resolve",
-                  issueId: issue.id,
-                  summary: String(data.get("summary")),
-                });
+                if (
+                  act({
+                    type: "resolve",
+                    issueId: issue.id,
+                    summary:
+                      resolutionChoice === "custom"
+                        ? String(data.get("summary") ?? "")
+                        : resolutionChoice,
+                  })
+                ) {
+                  setResolutionChoice("");
+                }
               }}
             >
               <h3>Resolve this issue</h3>
               <label>
                 Resolution summary · visible to the team
-                <textarea name="summary" required maxLength={2000} />
+                <select
+                  value={resolutionChoice}
+                  onChange={(event) => setResolutionChoice(event.target.value)}
+                  required
+                >
+                  <option value="" disabled>
+                    Choose a response
+                  </option>
+                  {resolutionChoices.map((summary) => (
+                    <option key={summary}>{summary}</option>
+                  ))}
+                  <option value="custom">Custom</option>
+                </select>
               </label>
+              {resolutionChoice === "custom" && (
+                <label>
+                  Custom resolution summary · visible to the team
+                  <textarea name="summary" required maxLength={2000} />
+                </label>
+              )}
               <button type="submit">Resolve issue</button>
             </form>
           )}
@@ -566,15 +599,44 @@ function IssueDetail({
                 act({
                   type: "award",
                   issueId: issue.id,
-                  minutes: Number(data.get("minutes")),
+                  minutes:
+                    awardChoice === "custom"
+                      ? Number(data.get("minutes") || NaN)
+                      : Number(awardChoice || NaN),
                   explanation: String(data.get("explanation")),
                 });
               }}
             >
               <label>
                 Award minutes
-                <input name="minutes" type="number" min="1" step="1" required />
+                <select
+                  value={awardChoice}
+                  onChange={(event) => setAwardChoice(event.target.value)}
+                  required
+                >
+                  <option value="" disabled>
+                    Choose minutes
+                  </option>
+                  {[0, 5, 10, 15, 30, 60].map((minutes) => (
+                    <option key={minutes} value={minutes}>
+                      {minutes} minutes
+                    </option>
+                  ))}
+                  <option value="custom">Custom</option>
+                </select>
               </label>
+              {awardChoice === "custom" && (
+                <label>
+                  Custom award minutes
+                  <input
+                    name="minutes"
+                    type="number"
+                    min="0"
+                    step="1"
+                    required
+                  />
+                </label>
+              )}
               <label>
                 Public award explanation
                 <textarea name="explanation" required maxLength={2000} />

@@ -60,14 +60,23 @@ test("complete contestant → volunteer → specialist → jury journey with per
   await page.getByRole("button", { name: "Accept handoff" }).click();
   await expect(details(page).locator("dd").first()).toHaveText("Dr. Maya Rao");
   await page
-    .getByLabel("Resolution summary")
+    .getByRole("combobox", {
+      name: "Resolution summary · visible to the team",
+      exact: true,
+    })
+    .selectOption("custom");
+  await page
+    .getByLabel("Custom resolution summary", { exact: false })
     .fill("Restored the network connection and verified access.");
   await page
     .getByRole("button", { name: "Resolve issue", exact: true })
     .click();
   const stopped = await details(page).locator("dd").nth(1).textContent();
   await persona(page, "alex");
-  await page.getByLabel("Award minutes").fill("7");
+  await page
+    .getByRole("combobox", { name: "Award minutes", exact: true })
+    .selectOption("custom");
+  await page.getByLabel("Custom award minutes").fill("7");
   await page
     .getByLabel("Public award explanation")
     .fill("Seven minutes lost to the connection interruption.");
@@ -167,7 +176,13 @@ for (const actor of ["maya", "robin"]) {
       .getByRole("button", { name: "Claim issue", exact: true })
       .click();
     await page
-      .getByLabel("Resolution summary")
+      .getByRole("combobox", {
+        name: "Resolution summary · visible to the team",
+        exact: true,
+      })
+      .selectOption("custom");
+    await page
+      .getByLabel("Custom resolution summary", { exact: false })
       .fill("Fixed during direct triage.");
     await page
       .getByRole("button", { name: "Resolve issue", exact: true })
@@ -209,7 +224,15 @@ for (const width of [390, 320]) {
     await persona(page, "robin");
     await page.getByRole("button", { name: "Accept handoff" }).focus();
     await page.keyboard.press("Enter");
-    await page.getByLabel("Resolution summary").fill("Connection restored.");
+    await page
+      .getByRole("combobox", {
+        name: "Resolution summary · visible to the team",
+        exact: true,
+      })
+      .selectOption("custom");
+    await page
+      .getByLabel("Custom resolution summary", { exact: false })
+      .fill("Connection restored.");
     await page
       .getByRole("button", { name: "Resolve issue", exact: true })
       .click();
@@ -248,12 +271,22 @@ test("contestant and helper reopening preserves cycles, privacy and an existing 
     .fill("Private cable diagnostic");
   await page.getByRole("button", { name: "Send message" }).click();
   await page.clock.fastForward(5 * 60000);
-  await page.getByLabel("Resolution summary").fill("First fix");
+  await page
+    .getByRole("combobox", {
+      name: "Resolution summary · visible to the team",
+      exact: true,
+    })
+    .selectOption("custom");
+  await page
+    .getByLabel("Custom resolution summary", { exact: false })
+    .fill("First fix");
   await page
     .getByRole("button", { name: "Resolve issue", exact: true })
     .click();
   await persona(page, "alex");
-  await page.getByLabel("Award minutes").fill("5");
+  await page
+    .getByRole("combobox", { name: "Award minutes", exact: true })
+    .selectOption("5");
   await page
     .getByLabel("Public award explanation")
     .fill("Initial interruption");
@@ -284,7 +317,15 @@ test("contestant and helper reopening preserves cycles, privacy and an existing 
     .getByRole("button", { name: "Confirm applied externally" })
     .click();
   await page.clock.fastForward(2 * 60000);
-  await page.getByLabel("Resolution summary").fill("Second fix");
+  await page
+    .getByRole("combobox", {
+      name: "Resolution summary · visible to the team",
+      exact: true,
+    })
+    .selectOption("custom");
+  await page
+    .getByLabel("Custom resolution summary", { exact: false })
+    .fill("Second fix");
   await page
     .getByRole("button", { name: "Resolve issue", exact: true })
     .click();
@@ -302,7 +343,15 @@ test("contestant and helper reopening preserves cycles, privacy and an existing 
   await expect(details(page)).toContainText("Helper confirmed recurrence");
   await expect(details(page)).not.toContainText("Private cable diagnostic");
   await persona(page, "sam");
-  await page.getByLabel("Resolution summary").fill("Third fix");
+  await page
+    .getByRole("combobox", {
+      name: "Resolution summary · visible to the team",
+      exact: true,
+    })
+    .selectOption("custom");
+  await page
+    .getByLabel("Custom resolution summary", { exact: false })
+    .fill("Third fix");
   await page
     .getByRole("button", { name: "Resolve issue", exact: true })
     .click();
@@ -330,11 +379,22 @@ test("support plus jury fixture keeps the active queue and award controls", asyn
     page.getByRole("heading", { name: "Support queue" }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Claim issue", exact: true }).click();
-  await page.getByLabel("Resolution summary").fill("Support and jury fix");
+  await page
+    .getByRole("combobox", {
+      name: "Resolution summary · visible to the team",
+      exact: true,
+    })
+    .selectOption("custom");
+  await page
+    .getByLabel("Custom resolution summary", { exact: false })
+    .fill("Support and jury fix");
   await page
     .getByRole("button", { name: "Resolve issue", exact: true })
     .click();
-  await page.getByLabel("Award minutes").fill("2");
+  await page
+    .getByRole("combobox", { name: "Award minutes", exact: true })
+    .selectOption("custom");
+  await page.getByLabel("Custom award minutes").fill("2");
   await page.getByLabel("Public award explanation").fill("Lost time");
   await page.getByRole("button", { name: "Record award" }).click();
   await expect(details(page)).toContainText("Recorded by Alex Morgan");
@@ -378,3 +438,130 @@ test("v1 migration persists v2, preserves source and reset overrides legacy prog
     ),
   ).toEqual([]);
 });
+
+for (const choice of ["0", "5", "10", "15", "30", "60", "custom"]) {
+  test(`award choice ${choice} records a decision that survives refresh`, async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await persona(page, "maya");
+    await page
+      .getByRole("button", { name: "Claim issue", exact: true })
+      .click();
+    await page
+      .getByRole("combobox", {
+        name: "Resolution summary · visible to the team",
+        exact: true,
+      })
+      .selectOption("custom");
+    await page
+      .getByLabel("Custom resolution summary", { exact: false })
+      .fill("Fixed");
+    await page
+      .getByRole("button", { name: "Resolve issue", exact: true })
+      .click();
+    await persona(page, "alex");
+    const choices = page.getByRole("combobox", {
+      name: "Award minutes",
+      exact: true,
+    });
+    await expect(choices).toHaveValue("");
+    await choices.selectOption("custom");
+    await page.getByLabel("Custom award minutes").fill("99");
+    await choices.selectOption(choice);
+    if (choice === "custom") {
+      const custom = page.getByLabel("Custom award minutes");
+      await page
+        .getByLabel("Public award explanation")
+        .fill("No extra time needed");
+      for (const invalid of ["", "-1", "1.5"]) {
+        await custom.fill(invalid);
+        await page.getByRole("button", { name: "Record award" }).click();
+        expect(
+          await custom.evaluate((input: HTMLInputElement) =>
+            input.checkValidity(),
+          ),
+        ).toBe(false);
+        await expect(
+          page.getByRole("heading", { name: /minutes awarded/ }),
+        ).toHaveCount(0);
+      }
+      await custom.fill("99");
+      // A preset must replace a previously typed custom value.
+      await choices.selectOption("15");
+      await expect(custom).toHaveCount(0);
+      await choices.selectOption("custom");
+      await custom.fill("0");
+    } else {
+      await expect(page.getByLabel("Custom award minutes")).toHaveCount(0);
+      await page.getByLabel("Public award explanation").fill("Jury decision");
+    }
+    const minutes = choice === "custom" ? "0" : choice;
+    await page.getByRole("button", { name: "Record award" }).click();
+    await expect(details(page)).toContainText(`${minutes} minutes awarded`);
+    await expect(
+      page.getByRole("button", { name: "Record award" }),
+    ).toHaveCount(0);
+    await page.reload();
+    await expect(details(page)).toContainText(`${minutes} minutes awarded`);
+    await expect(details(page)).toContainText("Pending external application");
+    await expect(details(page)).not.toContainText("No award recorded");
+  });
+}
+
+for (const summary of [
+  "Resolved without comment",
+  "Service restored",
+  "Device issue resolved",
+  "Problem statement clarified",
+]) {
+  test(`common resolution: ${summary}`, async ({ page }) => {
+    await page.goto("/");
+    await persona(page, "maya");
+    await page
+      .getByRole("button", { name: "Claim issue", exact: true })
+      .click();
+    const choices = page.getByRole("combobox", {
+      name: "Resolution summary · visible to the team",
+      exact: true,
+    });
+    await expect(choices).toHaveValue("");
+    await page
+      .getByRole("button", { name: "Resolve issue", exact: true })
+      .click();
+    await expect(choices).toBeVisible();
+    await choices.selectOption("custom");
+    await page
+      .getByLabel("Custom resolution summary")
+      .fill("Discarded custom draft");
+    await choices.selectOption(summary);
+    await expect(page.getByLabel("Custom resolution summary")).toHaveCount(0);
+    await choices.focus();
+    await page.keyboard.press("Tab");
+    await page.keyboard.press("Enter");
+    await expect(details(page)).toContainText(summary);
+    await expect(details(page)).not.toContainText("Discarded custom draft");
+    await page.getByLabel("Public reopening reason").fill("Another check");
+    await page
+      .getByRole("button", { name: "Reopen issue", exact: true })
+      .click();
+    await expect(choices).toHaveValue("");
+    await choices.selectOption("custom");
+    await page.getByLabel("Custom resolution summary").fill("  ");
+    await page
+      .getByRole("button", { name: "Resolve issue", exact: true })
+      .click();
+    await expect(page.getByRole("alert")).toContainText(
+      "Enter between 1 and 2,000",
+    );
+    await page
+      .getByLabel("Custom resolution summary")
+      .fill("Fresh custom resolution");
+    await page
+      .getByRole("button", { name: "Resolve issue", exact: true })
+      .click();
+    await page.reload();
+    await expect(details(page)).toContainText(summary);
+    await expect(details(page)).toContainText("Fresh custom resolution");
+  });
+}

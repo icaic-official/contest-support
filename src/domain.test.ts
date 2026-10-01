@@ -224,7 +224,7 @@ describe("award ledger", () => {
       ),
     ).toThrow();
   });
-  it.each([0, -1, 1.5, NaN, Infinity])(
+  it.each([-1, 1.5, NaN, Infinity, Number.MAX_SAFE_INTEGER + 1])(
     "rejects invalid minutes %s",
     (minutes) => {
       expect(() =>
@@ -232,6 +232,31 @@ describe("award ledger", () => {
       ).toThrow();
     },
   );
+  it("records zero as a decision, preserving the one-award rule and separate application", () => {
+    const decision = { ...award, minutes: 0 };
+    let state = transition(seed(start), decision, "alex", start);
+    expect(state.awards[0]).toMatchObject({ minutes: 0, actor: "alex" });
+    expect(state.awards[0].appliedAt).toBeUndefined();
+    expect(() => transition(state, award, "alex", start + 1)).toThrow();
+    state = transition(
+      state,
+      { type: "reopen", issueId: "ISS-003", reason: "Recheck" },
+      "sam",
+      start + 2,
+    );
+    state = transition(
+      state,
+      { type: "apply", issueId: "ISS-003" },
+      "maya",
+      start + 3,
+    );
+    expect(state.awards[0]).toMatchObject({
+      minutes: 0,
+      appliedBy: "maya",
+      appliedAt: start + 3,
+    });
+    expect(stateSchema.safeParse(state).success).toBe(true);
+  });
   it("requires a resolved issue, jury, explanation and an existing award to apply", () => {
     const state: State = seed(start);
     expect(() =>

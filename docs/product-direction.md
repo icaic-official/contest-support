@@ -14,7 +14,7 @@ These requirements preserve the agreed direction from [PLAN.md](../PLAN.md). Onl
 - The user confirmed that reopening resumes accumulated unresolved time and excludes time spent resolved. First-assignment delay remains separate. Awards remain discretionary.
 - Public replies and private notes are separate. The agreed direction includes photos, session announcements, in-app alerts, and opt-in browser push.
 - Shared incidents use explicit affected rosters, selective closure of linked reports, and bulk awards with recipient exceptions.
-- Awards use a separate ledger: one authorized decision followed by separate confirmation of external application. Contestants see the decision and application state.
+- Awards use a separate ledger: one authorized decision followed by separate confirmation of external application. Contestants see the decision and application state. The demo permits explicit zero-minute decisions with a public explanation, alongside preset and custom award amounts.
 - The agreed direction includes CSV roster imports and editing forms. Reporting uses dashboards only. Archived events permit reading only. The application does not automatically purge archived events.
 
 ## Provisional architecture and milestones

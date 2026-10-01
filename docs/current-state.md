@@ -14,7 +14,17 @@ T0001 contains the demo implemented and verified in the earlier run on `feature/
 - Responsive layouts, native labeled controls, keyboard focus styles and a skip link.
 - Domain/storage tests and a browser journey plus phone/keyboard and recovery cases.
 
-## T0002 verification — 2026-10-02
+## Review refinements — 2026-10-02
+
+Implemented zero-minute award decisions and award choices of 0, 5, 10, 15, 30, 60 and Custom. The required public explanation, one-award rule and separate application confirmation also apply to zero. The v2 schema now accepts non-negative whole minutes without changing the stored representation; existing v2 data remains compatible and the v1 migration validator stays frozen.
+
+Resolution now offers Resolved without comment, Service restored, Device issue resolved, Problem statement clarified and Custom. Custom preserves free-text validation. The no-comment choice stores its explicit text. Reopening requires a fresh resolution choice.
+
+After these refinements, type checking, lint, all **51 focused tests**, the production build, all **21 Chromium browser tests**, whitespace checks and local documentation links passed. The existing two Zod annotation warnings remain non-blocking. The first browser run used an exact label-text locator that included the dropdown options; switching that test locator to the accessible combobox name fixed the failure. All final browser cases passed, including every preset, custom zero/non-preset values, invalid custom values, preset/custom switching, fresh choices after reopening and refresh persistence.
+
+An agent-driven walkthrough and screenshot review checked custom resolution fields at 390 × 844 and 320 × 740, the desktop award controls, keyboard resolution submission, and persistence of both a zero-minute award and the no-comment resolution. No horizontal overflow or browser page errors occurred. Temporary scripts, screenshots and generated build/test artifacts were removed; maintained regression tests remain. The earlier style exceptions and unverified real-device/accessibility checks below still apply.
+
+## Initial T0002 verification — 2026-10-02
 
 Observed on Node.js 22.22.1, npm 11.12.0 and Playwright Chromium:
 

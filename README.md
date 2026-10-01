@@ -39,8 +39,8 @@ On Linux hosts missing browser system libraries, use `npx playwright install --w
 
 1. As **Team contestant · Team Aurora**, submit a Backend issue.
 2. As **Volunteer · Sam Chen**, claim it, send a public reply and an internal note, then escalate.
-3. As **Technical specialist · Dr. Maya Rao**, accept the handoff and resolve with a summary.
-4. As **Jury · Alex Morgan**, record a whole-minute award with a public explanation.
+3. As **Technical specialist · Dr. Maya Rao**, accept the handoff and choose a common resolution summary or Custom. “Resolved without comment” records that explicit public summary.
+4. As **Jury · Alex Morgan**, choose 0, 5, 10, 15, 30 or 60 award minutes, or Custom for another non-negative whole number. A public explanation is required, including for zero-minute decisions.
 5. As any staff persona, confirm the award was applied externally in the simulation.
 6. Return to the contestant to see the decision and application status. Refresh to check persistence. Use **Reset demo** to restore the fictional scenario.
 

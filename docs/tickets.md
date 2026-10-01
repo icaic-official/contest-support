@@ -16,7 +16,7 @@ Acceptance criteria:
 
 - [x] Complete submission → claim → escalation → specialist acceptance → resolution → jury award → separate application confirmation.
 - [x] Submission/assignment/resolution timestamps, ownership during handoff, public/internal visibility and actor history.
-- [x] Resolved-issue jury view, positive whole-minute award, public explanation and duplicate transition prevention.
+- [x] Resolved-issue jury view, whole-minute award (now including zero per review feedback), public explanation and duplicate transition prevention.
 - [x] Seed scenario, reset, status filters, roster locations and local persistence.
 - [x] Labeled keyboard controls and a phone-width volunteer layout.
 - [x] README and all five supporting documents.
@@ -96,6 +96,16 @@ Requested for T0002 on 2026-10-02. “Helper” means any staff member with a su
 - [x] `npm run typecheck`, `npm run lint`, `npm test`, `npm run build`, `npm run test:e2e`, `git diff --check` and documentation link checks pass. Any blocked check remains explicitly unverified.
 - [x] Manually check combined-role labels/actions at 390 × 844 and 320 × 740, keyboard claiming/handoff/reopening, contestant and helper reopening forms, desktop jury controls, refresh, reset and contestant omission of internal notes.
 - [x] README, demo specification, current state and manual guide describe the implemented behavior and observed checks. Record any deliberate Google TypeScript Style Guide exceptions. Shared branch PR is ready for user review.
+
+### Review refinements — 2026-10-02
+
+The user requested these refinements on the open shared PR, within T0002:
+
+- Award zero minutes as an explicit decision; retain the required public explanation, one-award rule and separate application confirmation. Offer 0, 5, 10, 15, 30, 60 and Custom in a dropdown. Custom accepts non-negative whole minutes.
+- Offer common public resolution summaries in a dropdown: Resolved without comment, Service restored, Device issue resolved, Problem statement clarified, and Custom. The no-comment choice stores its explicit text. Custom retains the existing required 1–2,000-character validation. Reopening clears the current selection so another resolution needs a fresh choice.
+- Preserve saved v2 data without resetting or adding a schema version: this extends the accepted minute range and keeps the existing summary representation. Keep the frozen v1 migration validator unchanged.
+
+Verification is recorded in [current-state.md](current-state.md).
 
 ## Candidate queue (not yet development tickets)
 

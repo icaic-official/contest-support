@@ -59,7 +59,7 @@ Expected: Maya becomes the owner. The first-assignment delay does not change.
 
 ### 6. Resolve the issue
 
-1. Resolve the issue with “Restored the network connection and verified access.”
+1. Choose Custom in **Resolution summary**, then enter “Restored the network connection and verified access.” in **Custom resolution summary** and resolve.
 2. Check that the demo retains the summary and stops unresolved time.
 3. Refresh the page.
 4. Select the issue again.
@@ -69,7 +69,7 @@ Expected: Maya becomes the owner. The first-assignment delay does not change.
 
 1. Select **Jury · Alex Morgan**.
 2. Select `ISS-004`.
-3. Enter 7 minutes.
+3. Choose Custom in **Award minutes**, then enter 7 in **Custom award minutes**.
 4. Enter the explanation “Seven minutes lost to the connection interruption.”
 5. Record the award.
 6. Select the contestant persona.
@@ -127,7 +127,7 @@ Expected: the page needs no horizontal scrolling. Owner, location, and timer rem
 
 1. Try blank messages and messages that contain only whitespace.
 2. Try blank summaries and summaries that contain only whitespace.
-3. Try fractional award minutes and zero award minutes.
+3. Choose Custom award minutes and try negative, fractional and empty values.
 
 Expected: browser validation or a visible error prevents the action. The demo records no completed transition or invalid award.
 
@@ -198,3 +198,15 @@ Focused tests verify the exact 10:00 → 10:05 → 10:08 → 10:10 seven-minute 
 5. The focused tests cover invalid v1/v2, preference for existing v2, unsupported versions, failed reads/writes and source preservation. The browser recovery test covers an invalid v2 value and explicit reset.
 
 Record completed checks and remaining manual work in [current-state.md](current-state.md).
+
+## Common resolutions and award amounts
+
+When another walkthrough asks for a specific resolution message, choose Custom first. When it asks for a non-preset award such as 7 minutes, choose Custom first.
+
+1. Reset and claim Aurora's `ISS-001` as Maya. The resolution dropdown starts with **Choose a response**; an explicit choice is required.
+2. Choose **Resolved without comment** and resolve. Check that this exact public summary appears for Aurora and survives refresh.
+3. Reopen as Aurora with a public reason. Return to Maya: the resolution choice must be empty. Try each other common response on later cycles: **Service restored**, **Device issue resolved**, **Problem statement clarified**. Earlier summaries must remain visible.
+4. Choose Custom and enter your own summary. Whitespace-only custom summaries must fail; a valid custom summary must be retained. Switching back to a common response hides the custom field and uses the selected response.
+5. On an unawarded resolved issue, select Alex. Check the award dropdown offers **0, 5, 10, 15, 30, 60, Custom** and requires a selection. Custom reveals the whole-minute input; negative, fractional and empty values fail.
+6. Record **0 minutes** with explanation “No extra time needed.” Refresh as Aurora and verify **0 minutes awarded**, the explanation and pending application status. The award must not revert to “No award recorded.” Confirm application as staff separately; reopening must preserve the zero-minute decision and still prevent a second award.
+7. Reset between checks of other preset amounts. Check a custom amount such as 7 and custom zero. Verify switching from Custom to a preset uses the preset, then check keyboard access to both dropdowns and conditional fields on desktop and phone widths.

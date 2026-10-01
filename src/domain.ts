@@ -113,7 +113,7 @@ const issueSchema = z.object({
 const awardSchema = z.object({
   id: z.string(),
   issueId: z.string(),
-  minutes: z.number().int().positive(),
+  minutes: z.number().int().nonnegative(),
   explanation: z.string(),
   at: timestamp,
   actor,
@@ -444,8 +444,8 @@ export function transition(
         "An award is already recorded for this issue.",
       );
       requireThat(
-        Number.isSafeInteger(action.minutes) && action.minutes > 0,
-        "Award a positive whole number of minutes.",
+        Number.isSafeInteger(action.minutes) && action.minutes >= 0,
+        "Award zero or a positive whole number of minutes.",
       );
       next.awards.push({
         id: `AWD-${issue.id}`,

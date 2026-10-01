@@ -23,6 +23,13 @@ The immediate objective is an interactive demo that helps the user decide where 
 
 Use simple components and domain logic appropriate to the demo. Avoid speculative infrastructure or abstractions for features that have not been selected for implementation.
 
+## TypeScript style
+
+- Read and follow the [Google TypeScript Style Guide](https://google.github.io/styleguide/tsguide.html) when writing or changing TypeScript, including TSX.
+- Agents may depart from individual rules when they have a good reason appropriate to this project, such as framework requirements, correctness, readability, or maintainability. Otherwise, follow the guide.
+- Briefly explain deliberate exceptions in the PR description or run report; use a code comment when the reason helps future maintainers understand the code. Exceptions do not require separate user approval.
+- Explicit user instructions and project requirements take precedence over the guide. Apply it to future work without unrelated style-only rewrites.
+
 ## Behavior to preserve
 
 - Start the issue timer on submission and record first assignment separately. Calculate elapsed time from persisted timestamps so refreshes do not reset it.

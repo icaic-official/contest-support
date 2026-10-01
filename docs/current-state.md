@@ -14,6 +14,10 @@ T0001 is implemented and verified on `feature/t0001-local-demo`, prepared for us
 
 ## Verification
 
+The T0001 tooling update upgraded ESLint to 10.11.0, `@eslint/js` to 10.0.1 and React Hooks to 7.1.1, and raised the TypeScript ESLint minimum to 8.71.0. Node now requires 22.13+ within 22.x or 24+. The two existing Hooks rules remain explicit; the new React Compiler diagnostics are not enabled as part of this dependency update.
+
+After this update, lint, type checking, all 20 focused tests, the build, all 3 Chromium browser tests and `git diff --check` passed. Installation reported zero vulnerabilities. The first lint run exposed a newly added Compiler diagnostic before the existing Hooks policy was made explicit. The sandbox again blocked browser server startup; the approved run passed. Existing Zod annotation warnings remain. No new manual browser walkthrough was performed for this tooling-only update.
+
 Observed on Node.js 22.22.1, npm 11.12.0 and Playwright Chromium:
 
 | Check | Result |

@@ -10,6 +10,8 @@ Status: implemented and verified; prepared for PR review. User review and merge 
 
 Scope: React, TypeScript, Vite, npm lockfile, fictional group session, simulated contestant/volunteer/specialist/jury personas, versioned local persistence, and supporting project guidance. No cloud or deferred production features.
 
+Tooling follow-up within this branch: upgraded to ESLint 10 and compatible plugins, preserved the existing Hooks checks, refreshed the lockfile and Node requirements, and reran all required automated checks successfully.
+
 Acceptance criteria:
 
 - [x] Complete submission → claim → escalation → specialist acceptance → resolution → jury award → separate application confirmation.

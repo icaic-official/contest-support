@@ -6,7 +6,7 @@ Minsky explores a calmer way to handle technical problems during a contest: repo
 
 ## Run locally
 
-Use Node.js 22.12 or newer and npm. From the repository root:
+Use Node.js 22.13+ within the 22.x release line, or Node.js 24 or newer, and npm. ESLint 10 requires this updated Node version range. From the repository root:
 
 ```sh
 npm ci

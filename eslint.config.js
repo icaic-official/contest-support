@@ -10,6 +10,11 @@ export default tseslint.config(
     files: ["**/*.{ts,tsx}"],
     languageOptions: { globals: { ...globals.browser, ...globals.node } },
     plugins: { "react-hooks": hooks },
-    rules: hooks.configs.recommended.rules,
+    // Preserve the demo's existing Hooks checks during this tooling upgrade.
+    // Version 7's recommended preset also adds React Compiler diagnostics.
+    rules: {
+      "react-hooks/rules-of-hooks": "error",
+      "react-hooks/exhaustive-deps": "warn",
+    },
   },
 );

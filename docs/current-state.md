@@ -34,7 +34,7 @@ Hosted tests exercised organizer creation, case-insensitive username login, forc
 
 Screenshot inspection checked the redesigned desktop admin workspace and phone layout. Browser layout checks passed at 390px and 320px; prior keyboard skip/form/refresh coverage remains. Real-device, assistive-technology and other-browser checks remain manual. The user should refresh the hosted app, optionally assign their own username, then create a development team/staff account and securely distribute its temporary credentials.
 
-Initial verification issues were resolved: ESLint’s account-effect dependency warning, an explicit Node console import for the maintainer script, and a documentation-edit script’s formatting anchor. The Supabase CLI initially failed because the sandbox prevented telemetry writes; approved execution applied the migrations. No checks are counted as passing from those failed attempts. Provider plan/ownership and the protected separate cloud CI environment remain pending; no paid service was enabled.
+Initial verification issues were resolved: ESLint’s account-effect dependency warning, an explicit Node console import for the maintainer script, and a documentation-edit script’s formatting anchor. The Supabase CLI initially failed because the sandbox prevented telemetry writes; approved execution applied the migrations. No checks are counted as passing from those failed attempts. The first PR secret scan flagged the public development-user UUID in newly compact onboarding wording. The wording was clarified, and `.gitleaksignore` records only that exact historical fingerprint; no broad UUID, path or rule exclusion was added. Full history scanning remains enabled, now with verbose redacted diagnostics. Provider plan/ownership and the protected separate cloud CI environment remain pending; no paid service was enabled.
 
 Style keeps repository double quotes, React component capitalization, concise JSX callbacks and inferred component/Zod types. Shared logic uses named exports. Unchanged workflow code and historical tests were restored after formatting to avoid unrelated rewrites.
 
@@ -42,7 +42,7 @@ Files changed in this revision:
 
 - Application: `src/connected/ConnectedApp.tsx`, `src/connected/client.ts`, `src/connected/model.ts`, `src/styles.css`.
 - Backend/recovery: `supabase/functions/admin/index.ts`, `supabase/functions/.env.example`, `supabase/migrations/202610020004_usernames.sql`, `supabase/migrations/202610020005_admin_recovery.sql`, `scripts/recover-admin.mjs`, `package.json`.
-- Tests/CI: `src/connected/client.test.ts`, `src/connected/database.test.ts`, `tests/cloud/fixture.ts`, `tests/cloud/setup.ts`, `tests/cloud/journey.spec.ts`, `.github/workflows/checks.yml`.
+- Tests/CI: `.gitleaksignore`, `.github/workflows/security.yml`, `src/connected/client.test.ts`, `src/connected/database.test.ts`, `tests/cloud/fixture.ts`, `tests/cloud/setup.ts`, `tests/cloud/journey.spec.ts`, `.github/workflows/checks.yml`.
 - Guidance: `AGENTS.md`, `PLAN.md`, `README.md`, `docs/cloud-onboarding.md`, `docs/current-state.md`, `docs/manual-verification.md`, `docs/product-direction.md`, `docs/tickets.md`.
 
 Original email-flow results below are historical; they do not describe current onboarding requirements.

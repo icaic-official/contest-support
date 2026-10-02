@@ -639,3 +639,13 @@ footer {
     transition: background 0.15s;
   }
 }
+
+.auth-panel { max-width: 34rem; margin: 3rem auto; }
+.auth-panel fieldset, .submission fieldset, .admin-panel fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
+.admin-panel { margin-bottom: 1.5rem; }
+.admin-panel details { margin: 1rem 0; padding: 1rem; border: 1px solid var(--border, #d8dfdb); border-radius: .5rem; }
+.admin-panel summary { cursor: pointer; overflow-wrap: anywhere; }
+.admin-panel form { margin: 1rem 0; }
+.app-header > span { overflow-wrap: anywhere; }
+
+.detail-actions { border: 0; padding: 0; margin: 0; min-width: 0; }

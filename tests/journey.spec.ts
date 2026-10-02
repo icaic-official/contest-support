@@ -125,6 +125,7 @@ test("complete contestant → volunteer → specialist → jury journey with per
 test("phone volunteer queue and keyboard entry points", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
+  await expect(page.getByLabel("Demo persona")).toBeVisible();
   await page.keyboard.press("Tab");
   await expect(
     page.getByRole("link", { name: "Skip to main content" }),

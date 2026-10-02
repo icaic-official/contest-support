@@ -1,0 +1,53 @@
+name: Checks
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm run check:functions
+      - run: npm test
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
+  cloud:
+    if: github.event_name == 'workflow_dispatch'
+    needs: checks
+    runs-on: ubuntu-latest
+    environment: cloud-test
+    env:
+      MINSKY_TEST_PROJECT_REF: ${{ vars.MINSKY_TEST_PROJECT_REF }}
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Validate isolated test target
+        run: |
+          test -n "$MINSKY_TEST_PROJECT_REF"
+          test "$MINSKY_TEST_PROJECT_REF" != ovymmobupzowotvrywek
+      - run: npx supabase link --project-ref "$MINSKY_TEST_PROJECT_REF"
+      - run: npx supabase db push --linked
+      - run: npx supabase functions deploy admin --project-ref "$MINSKY_TEST_PROJECT_REF" --use-api
+      - run: npx supabase secrets set APP_URL=http://127.0.0.1:4174/ ALLOWED_ORIGINS=http://127.0.0.1:4174 --project-ref "$MINSKY_TEST_PROJECT_REF"
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:cloud

@@ -109,11 +109,13 @@ Verification is recorded in [current-state.md](current-state.md).
 
 ## T0003 — Cloud onboarding and authenticated shared product
 
-Status: scoped on 2026-10-02 at the user's request; implementation and provider onboarding have not started. Planning changes are on updated `main` as requested, uncommitted. Implementation branch: `feature/t0003-cloud-product`, created from updated `main` when implementation begins. The user reviews and merges the implementation PR.
+Status: implementation in progress on `feature/t0003-cloud-product`, started from updated `main` on 2026-10-02. Supabase schema and trusted first-admin/session bootstrap have been applied to the development project. Connected frontend, account administration, cloud contributor commands and embedded database tests are implemented. The initial hosted workflow/authorization/browser checks passed; final privacy/archival verification is recorded in current-state.md; custom SMTP remains blocked by unavailable sender-domain access. The user reviews and merges the PR.
+
+Updated contributor decision (2026-10-02): contributors may be assumed to have full cloud credential access. Docker is optional, not required for development, migrations, function deployment or the embedded database checks. Cloud integration CI uses a protected isolated test project; untrusted PR checks run without provider credentials. This supersedes the local-stack prerequisite below; the connected workflow and authorization requirements remain in scope.
 
 ### Outcome and recommended boundary
 
-Different people can sign in to a hosted Minsky deployment and complete the existing issue journey against shared data. Another developer can clone the repository, run the connected application locally with fictional fixtures, make a migration and submit a tested PR without access to hosted secrets.
+Different people can sign in to a hosted Minsky deployment and complete the existing issue journey against shared data. Another developer with authorized cloud access can clone the repository, run the connected frontend locally, make a migration and submit a tested PR. Fast checks run without cloud credentials or Docker; full integration tests provision isolated cloud fixtures.
 
 Include real authentication and the contestant/support/jury dashboards now: they are necessary to make shared workflows useful. Include only the account and session controls needed to operate the first group-contest pilot. Recommend broader organizer administration and configurable uploads for the next ticket (candidate T0004). Do not add every long-term product requirement to this ticket.
 
@@ -122,11 +124,12 @@ Cloud first, features first: connectivity is assumed. Offline queues, synchroniz
 ### Provider onboarding and deployment
 
 - Walk the user through Cloudflare and Supabase account/organization setup, project ownership, developer access and billing visibility. Distinguish provider-console membership from Minsky application accounts. The user completes provider login, verification and any payment entry in the provider UI.
-- Start with one Supabase Free development project and Workers Free on a `workers.dev` address. Use a local Supabase stack for contributors and CI. Avoid requiring paid hosted database branches, a purchased application domain, R2 or AWS merely to begin.
+- Start with one Supabase Free development project and Workers Free on a `workers.dev` address. Use shared cloud access for contributors and an isolated cloud test project for privileged CI; Docker is optional. Avoid requiring paid hosted database branches, a purchased application domain, R2 or AWS merely to begin.
 - Follow [cloud-onboarding.md](cloud-onboarding.md), completing it with the actual region, non-secret project identifiers, deployment URL, tested commands and setup results. Explain any required spend, recurring costs and usage limits; use available cost controls and retain billing records for reimbursement.
-- Add repository-owned Workers/Vite configuration, pinned npm tooling, environment examples and ignored secret files. Use Supabase Auth/Postgres; serve the React application and privileged account-management endpoints on Workers. Keep service credentials out of frontend builds and public CI logs.
+- Add repository-owned Vite build/Workers Static Assets configuration, pinned npm tooling, environment examples and ignored secret files. Cloudflare serves the frontend only; all backend functionality lives in Supabase. Use Supabase Auth, Postgres policies/transactional database functions and Realtime, with Supabase Edge Functions for privileged account administration. Version and deploy those functions with the repository. Keep service credentials out of frontend builds and public CI logs; no custom Cloudflare backend endpoints are needed.
 - Configure authentication redirect URLs and custom SMTP for invitation/password-recovery delivery beyond Supabase project-team addresses. Test delivery to a real pilot recipient; local mail capture is not proof of hosted delivery. An unavailable provider dependency remains an explicit incomplete acceptance item.
-- Produce a hosted development deployment and repeatable deployment instructions. CI checks PRs; deployment credentials belong only in trusted deployment jobs. Untrusted PRs use local data, and previews must not mutate the shared hosted database. First hosted release is an explicit maintainer action after checks.
+- Sender-domain access is currently unavailable (user report, 2026-10-02). Continue independent implementation using trusted provisioning of known development accounts, with optional local email capture as described in [the onboarding guide](cloud-onboarding.md#development-while-sender-setup-is-pending). Keep hosted email delivery acceptance pending; domain access is not a prerequisite for building the connected workflows.
+- Produce a hosted development deployment and repeatable deployment instructions. CI checks PRs; deployment credentials belong only in trusted deployment jobs. Untrusted PRs use embedded fictional data, and previews must not mutate the shared hosted database. First hosted release is an explicit maintainer action after checks.
 
 ### Accounts and authorization
 
@@ -134,7 +137,7 @@ Cloud first, features first: connectivity is assumed. Offline queues, synchroniz
 - Use stable authenticated user/person IDs, session/team membership and combined staff capabilities. Never trust a client-selected role, person ID or team ID as authorization. Users with no membership see an access message and no contest data.
 - Minimal admin view: list and invite accounts, assign/revoke session membership and the fixed volunteer/specialist/jury roles, assign a contestant account to a team, and resend an invitation or initiate recovery. Admin membership is a distinct capability, not automatically jury/support membership. Bootstrap the first admin through a documented trusted command; prevent removing the last admin. Passwords are managed by Supabase Auth, never displayed in the admin panel.
 - Removing membership must deny subsequent data access even with an existing login session. Account administration is restricted to admins; record its actor and time. Use current database membership for permission checks, not only long-lived token claims.
-- Enforce authorization in Postgres row-level policies and transactional operations, and in privileged Worker endpoints. Contestants cannot fetch another team's data or internal notes through direct API calls, history, counts or live-update payloads. Ordinary data operations retain the caller's identity; broad service credentials are reserved for narrowly authorized administration.
+- Enforce authorization in Postgres row-level policies and transactional operations, and in privileged Supabase Edge Functions. Each privileged function authenticates the caller and checks current admin membership before using service credentials. Contestants cannot fetch another team's data or internal notes through direct API calls, history, counts or live-update payloads. Ordinary data operations retain the caller's identity; broad service credentials are reserved for narrowly authorized administration.
 
 ### Shared workflow and dashboards
 
@@ -147,7 +150,7 @@ Cloud first, features first: connectivity is assumed. Offline queues, synchroniz
 
 ### Contributor setup and verification
 
-- Commit migrations, fictional local seeds, local Auth test-account setup, environment examples and exact setup/check/deploy commands. Document Node, npm, a Docker-compatible runtime, CLI setup and local email inspection. A fresh clone must not require shared provider credentials to run tests.
+- Commit migrations, isolated cloud fixture/account setup, environment examples and exact setup/check/deploy commands. Document Node, npm, CLI login, shared cloud setup and isolated cloud test fixtures. Docker and local email capture are optional; hosted SMTP delivery remains its own acceptance item. A fresh clone must not require shared provider credentials to run tests.
 - Add CI for type checking, lint, build, focused tests, database policies/transactions and a browser journey across real test accounts. Keep existing domain semantics covered as persistence changes. Include two simultaneous clients, cross-team/session denial, internal-note exclusion, combined roles, account revocation, admin-only operations and claim/award races.
 - Document and execute a hosted smoke test of login, invitation/recovery, shared updates and the complete workflow. Verify phone widths, keyboard navigation and refresh against the connected app. Record commands and results; do not reuse demo results as backend verification.
 - Update README, current state and manual verification to describe actual connected behavior. Keep the demo specification as historical scope and explain its replacement. Expand the onboarding guide with observed setup outcomes.
@@ -157,10 +160,10 @@ Cloud first, features first: connectivity is assumed. Offline queues, synchroniz
 - [ ] User can identify project ownership, URLs, environment settings, usage dashboards and any actual recurring charges; account setup and contributor access are documented.
 - [ ] App is deployed on Workers with a shared Supabase database and working email/password invitation, login, logout and recovery flows.
 - [ ] Admin can onboard a team and individual staff, assign combined roles, revoke access and operate contestant intake without editing source code. First-admin bootstrap is reproducible.
-- [ ] Separate authenticated contestant/support/jury/admin views work; demo controls and client-supplied identity cannot bypass permissions.
-- [ ] Full submit → claim → handoff → resolve → award → external confirmation journey and repeated reopening work across distinct signed-in browsers. Staff can submit for a roster team.
-- [ ] Server timestamps, transactional transitions and a unique award constraint preserve history and reject concurrent/duplicate actions. Unauthorized API access and private-note leakage are tested.
-- [ ] Local migrations/seeds and documented commands reproduce the connected environment from a fresh clone; CI runs without hosted secrets for PR contributions.
+- [x] Separate authenticated contestant/support/jury/admin views work; demo controls and client-supplied identity cannot bypass permissions.
+- [x] Full submit → claim → handoff → resolve → award → external confirmation journey and repeated reopening work across distinct signed-in browsers. Staff can submit for a roster team.
+- [x] Server timestamps, transactional transitions and a unique award constraint preserve history and reject concurrent/duplicate actions. Unauthorized API access and private-note leakage are tested.
+- [ ] Cloud migrations, isolated fixtures and documented commands reproduce the connected environment from a fresh clone; fast PR checks run without hosted secrets or Docker.
 - [ ] Build, lint, type checking, focused/database/browser tests and hosted/manual checks pass, with actual evidence recorded. Provider/email blockers are marked incomplete.
 
 ### Explicit exclusions and later decisions

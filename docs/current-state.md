@@ -1,6 +1,58 @@
 # Current state
 
-T0001 and T0002 are implemented and verified; the user merged their shared [PR #1](https://github.com/notbowen/minsky/pull/1) into `main` on 2026-10-02. T0003 is scoped, not implemented. No production backend exists. The historical run report in PLAN.md is not a statement of current repository contents.
+T0001/T0002 merged in PR #1. T0003 is implemented on `feature/t0003-cloud-product` and deployed as a development app; the review PR will remain a draft while hosted email delivery and provider/CI setup acceptance items are pending. The user reviews and merges. The initial PLAN.md run report and the demo results below are historical.
+
+## Connected implementation (T0003, 2026-10-02)
+
+- Cloudflare Workers Static Assets at https://minsky-dev.icaic-minsky.workers.dev; all backend operations use Supabase project `ovymmobupzowotvrywek`, region `ap-southeast-1`, PostgreSQL 17. Final deployed Worker version: `dcbba8b9-39af-4528-8fda-70ce61534ddf` (after private signals and archived-read refinement).
+- Supabase email/password sign-in, logout, session restoration and password change. Invitation/password-setup and recovery UI/function paths are implemented; hosted delivery remains unverified without custom SMTP. Public signup/anonymous access settings are user-reported disabled. The user confirmed the deployed Site URL and exact local/deployed redirects.
+- Three repository-owned migrations for group events/sessions, teams, people/memberships, issues, resolutions/reopening, separate history/awards, admin audit, request receipts and private/public live signals. All were applied without seeds. Server timestamps, issue locks/revisions and one-award constraints preserve the existing semantics. Persisted request IDs make retries safe, including submission/message retries.
+- Contestant own-team dashboard, support triage/handoff/reopening, jury awards and combined-role capabilities. Support reports retain the actual reporter and affected roster team. Admin is separate from support/jury.
+- Current-membership RLS protects direct reads, history, counts and snapshots. Internal notes use staff-only signals and do not increment public issue/team counters. Realtime refetches authorized snapshots, with serialized reads to prevent old responses restoring a stale revision. Current membership is also checked on focus/reconnect and every ten seconds. Database access is denied immediately after revocation, even for existing login sessions.
+- Admin UI for invitations, existing-account assignments, fixed role unions, revocation, resend/recovery and intake. Transactional administration prevents removing the last admin and records actor/time. Privileged account operations use a caller-verified Edge Function and check current admin membership before using service credentials.
+- Explicit trusted bootstrap created the initial development group event/session, three roster teams, and admin membership for the existing user-selected Auth account. Its password was not requested or changed. Intake starts closed. No first-login auto-promotion, hosted reset, persona impersonation or demo-data import exists.
+- Archived records permit queue navigation/read access while disabling writes. The server also rejects archived writes.
+- Cloud contributor setup assumes full authorized cloud access per the user's latest instruction. Docker is optional. Functions deploy with `--use-api`; embedded PostgreSQL checks run without cloud credentials or Docker. Cloud tests provision isolated temporary accounts/sessions and clean up their own rows. The historical local demo stays available through `dev:demo` and is excluded from production assets.
+- PR CI is implemented for secret-free checks. Protected, manually dispatched cloud integration CI requires a separate test project and owner-configured environment secrets; it has not run yet. No preview/deployment automation writes to the shared project.
+
+## Observed T0003 verification
+
+| Check | Observed result |
+| --- | --- |
+| `npm run typecheck` | Passed |
+| `npm run lint` | Passed, no warnings on final implementation |
+| `npm run check:functions` | Deno check passed |
+| `npm test` | 66 focused tests passed, including actual migrations/RLS on embedded PostgreSQL with an Auth-context stub |
+| `npm run test:e2e` | All 21 historical demo Chromium tests passed |
+| `npm run test:cloud` | Five real-cloud cases passed with staff-only signals and unchanged public counters; the final hosted suite also exercises repeated cycles |
+| `npm run test:hosted` | All five final cases passed on Worker version `dcbba8b9-39af-4528-8fda-70ce61534ddf`, including repeated reopening and private counters |
+| `npm run cloud:plan`, `cloud:migrate`, `cloud:bootstrap` | Dry run, all migrations and explicit first-admin bootstrap succeeded |
+| `npm run cloud:functions` | Final formatted source redeployed successfully with server-side bundling |
+| `npm run deploy` | Workers Static Assets deployment succeeded |
+| `git diff --check`, local documentation path scan | Passed |
+
+The hosted browser suite covers multiple real Auth accounts, live updates, private replies, retained handoffs, zero award/external confirmation, reopening, refresh persistence, concurrent claims/awards, cross-team/session/anonymous denials, current revocation, last-admin guard, admin UI role assignment, password change/logout and phone/keyboard checks. The added archive case checks that read navigation remains enabled while writes are disabled. The final privacy case additionally checks staff-only live signals and unchanged contestant-visible counters.
+
+Screenshot inspection checked the connected support screen at 320px and the desktop admin membership form. Browser actions exercised support at 390px, layout/no-overflow at 320px, keyboard skip navigation and refresh. These are agent-driven Chromium checks, not real-device, screen-reader, other-engine or 200% zoom verification. Those remain manual steps in the guide.
+
+Initial failures were resolved: two embedded test-fixture assertions, a demo keyboard wait after dynamic module loading, an award-dropdown locator that included option text, an older Realtime snapshot restoring a stale revision, and a duplicate test sign-in after adding a second live staff observer. Action errors now remain visible across background refreshes. The initial CLI function deployment tried local container bundling and was interrupted; the committed command uses server-side bundling. A formatter invocation inside the sandbox stalled and was interrupted; approved cache/network access completed it. No database/test Docker stack was started.
+
+The build passes with two existing Zod annotation warnings and a 563 kB main-bundle warning (about 161 kB gzip). This is not capacity/performance certification. New npm installs reported zero audit vulnerabilities at installation time.
+
+Style: preserve repository double quotes, React component capitalization, concise JSX callbacks, inferred component returns and Zod-inferred data types for framework readability and repository consistency. New shared logic uses named exports. These are deliberate exceptions to individual Google TypeScript style rules; no unrelated style rewrites were made.
+
+
+Final hosted result: `npm run test:hosted` passed all five cases (30.2 seconds), including three resolutions/two reopenings across real clients, preserved external application, staff-only note signals, unchanged public revisions, direct private-note exclusion, concurrent claim/award winners, admin role assignment, password changes/logout, current revocation and archived navigation. Test fixture cleanup completed successfully. The user confirmed saving Site URL and exact redirect URLs; real mail delivery is still not verified.
+
+## Pending acceptance and known limits
+
+- Custom SMTP/sender access and hosted invitation, password setup, resend and recovery delivery to a non-provider-team recipient are incomplete. No local mail capture was run or counted as hosted proof.
+- Selected billing plans, billing contact/receipt record and protected cloud CI environment setup remain owner tasks. No paid upgrade was selected or payment information handled by the agent.
+- Clean-checkout contributor verification is in progress; results will be recorded before the final PR report.
+- Membership revocation preserves historical ownership. If an active owner loses support membership, restore it to continue owner-only work or have another specialist accept an already pending handoff. General reassignment tools are not in T0003.
+- Group contests and one award per issue only. Uploads, broader organizer editors, shared incidents, imports, alerts/push, offline/resilience and 800-user capacity testing remain deferred. Candidate T0004 is not started.
+
+## Historical local-demo implementation and verification
 
 ## Implemented
 

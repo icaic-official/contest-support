@@ -1,3 +1,5 @@
+> Historical T0001/T0002 scope. T0003 replaces the hosted product with authenticated shared workflows; the local demo remains available through `npm run dev:demo`. See [current state](current-state.md).
+
 # Local demo specification
 
 Status: implemented. [current-state.md](current-state.md) records verification results. Development tickets (`T0001`, `T0002`) are separate from contestant issues (`ISS-001`).

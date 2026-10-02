@@ -10,6 +10,8 @@
 
 ## Current scope and completed demo baseline
 
+**Latest user decision (2026-10-02):** remove the old local demo, its command, persona/reset/storage code, demo-only tests/fixtures and obsolete walkthrough/specification. Maintain the connected app, public login landing page, sidebar and real-account workflow/authorization tests. Requirements below about the completed demo are historical; do not restore its runtime or reset tooling.
+
 T0001 and T0002 were merged in PR #1 on 2026-10-02. T0003 is scoped in `docs/tickets.md` for cloud onboarding and an authenticated shared product. Its implementation must start from updated `main` on `feature/t0003-cloud-product`. The demo requirements below describe the completed baseline; they do not exclude the connected features explicitly selected for T0003. Keep planning separate from implemented capabilities.
 
 The initial objective was an interactive demo that helped the user decide where the application should go. T0001 and T0002 completed that baseline. Keep subsequent tickets small and driven by the user's feedback.
@@ -39,9 +41,9 @@ Use simple components and domain logic appropriate to the demo. Avoid speculativ
 - Stop the timer on resolution. Reopening resumes accumulated unresolved time, excluding resolved intervals. Retain every resolution summary, actor and timestamp.
 - Identify staff owners and activity actors by person, combining all assigned role capabilities. Reopening retains the prior owner and any existing award/application status.
 - Separate contestant-visible replies from internal staff notes. Omit internal notes from contestant views.
-- Record an award separately from confirmation that it was applied externally. The demo does not change an external contest clock.
-- Keep a local activity history that identifies the simulated actor. Prevent repeated actions from producing duplicate awards or invalid transitions.
-- Preserve the fictional reset in local demo/test tooling. Do not expose a shared-data reset or persona impersonation control in the connected product.
+- Record an award separately from confirmation that it was applied externally. Minsky does not change an external contest clock.
+- Keep shared activity history that identifies the authenticated actor. Prevent repeated actions from producing duplicate awards or invalid transitions.
+- Use isolated verification fixtures with cleanup limited to their own records. Do not expose a shared-data reset or persona impersonation control in the connected product.
 
 ## Ticket and Git workflow
 
@@ -59,12 +61,21 @@ Use simple components and domain logic appropriate to the demo. Avoid speculativ
 - Keep future work as a short candidate queue until feedback determines the next ticket. Do not create a large speculative backlog.
 - Routine implementation and verification within the active ticket do not require repeated confirmation. Ask only for missing decisions that materially affect scope or behavior.
 
+## Cloud development and deployment workflow
+
+- Keep development, CI and future production databases and credentials separate. The hosted `minsky-dev` app uses the `Minsky` development project; it is not production. `Minsky CI` is for isolated automated fixtures. No production project has been created.
+- For each ticket: create the ticket branch from updated `main`, develop against the development project, add repository-owned migrations, run fast checks, prepare the PR, and run cloud integration checks on the reviewed revision. The user reviews and merges; explicitly deploy approved changes afterward. Do not imply that merging deploys automatically.
+- Privileged GitHub cloud checks use the protected `cloud-test` environment and the separate CI project. Ordinary PR checks run without cloud credentials. Record a local cloud run separately from a protected GitHub Actions run; neither substitutes for the other.
+- CI fixtures create temporary accounts and UUID-scoped records and delete only their own data. Never point CI at development or production, copy real accounts into CI, or reset a shared project. Confirm the target before applying migrations or deploying functions.
+- Once production is selected and provisioned, validate the approved revision on development and CI before applying its migrations, deploying its account function/configuration, and deploying its frontend to production. Verify the production deployment afterward. Production setup is future work, not permission to create or upgrade provider resources now.
+- Use [cloud-onboarding.md](docs/cloud-onboarding.md) for project references, commands, environment protection requirements and current setup results. T0003 retains protected cloud CI; ownership/billing records, remote merge enforcement/vulnerability alerts and remaining user/manual acceptance checks are deferred to T0004 by user decision.
+
 ## Verification
 
 - Inspect available scripts before invoking them. During T0001, provide npm scripts for development, production build, type checking, linting, and focused tests. Document their exact names in the README.
 - Test meaningful behavior: lifecycle transitions, ownership during handoff, timestamp calculations, persistence, and award/application state.
-- Include one browser test covering the complete journey across personas.
-- Manually check phone-width volunteer screens, keyboard navigation, refresh persistence, reset, and separation of public replies from internal notes.
+- Include one browser test covering the complete journey across authenticated test accounts.
+- Manually check phone-width volunteer screens, keyboard navigation, refresh persistence, and separation of public replies from internal notes.
 - Build, lint, type checking, and required tests must pass before presenting an implementation PR as ready. If a check cannot run, report the reason. Leave its result unverified.
 - For documentation-only changes, check content, paths, and whitespace. Do not add application tests merely to test prose.
 - Never describe local demo testing as evidence of production security, offline operation, or capacity for 800 simultaneous users.
@@ -76,7 +87,6 @@ Create the remaining documentation during T0001, and keep it concise and consist
 | Document | Responsibility |
 |---|---|
 | `README.md` | Project introduction, exact setup/run/check commands, demo limitations, and documentation links. |
-| `docs/demo-spec.md` | Demo screens, behaviors, boundaries, and acceptance criteria. |
 | `docs/product-direction.md` | Agreed longer-term requirements, provisional architecture, and unresolved decisions. |
 | `docs/tickets.md` | Active development ticket, status, acceptance criteria, and a small follow-up queue. |
 | `docs/current-state.md` | Implemented and verified capabilities, limitations, and next work. |
@@ -88,6 +98,8 @@ Update the relevant documents in the same change as behavior or workflow changes
 ## Deferred decisions and production direction
 
 - **Cloud first, features first (2026-10-02).** The user explicitly deferred outage handling and resilience until after the cloud features. Assume connectivity for the developer phase; do not block backend work on manual fallback, offline capture or venue-local operation. Ordinary error reporting and shared-data correctness still belong in the product.
+- **Authentication revision (2026-10-02).** Use organizer-created usernames/passwords, temporary credentials and organizer-assisted recovery. Enforce temporary-password changes at the database boundary. SMTP and personal email addresses are not prerequisites. Preserve existing account IDs/history during the transition.
+- **Cloud contributor access (2026-10-02).** The user permits assuming contributors have full cloud credential access. Docker is optional, not a setup prerequisite. Use hosted Supabase for connected development, embedded PostgreSQL for fast policy/transaction checks, and isolated cloud fixtures for integration tests. Use `supabase functions deploy --use-api` for server-side bundling. Keep privileged credentials out of Git and frontend builds; privileged CI uses a protected separate test project.
 - Use Cloudflare Workers and Supabase, preferring free tiers. The user is willing to pay when necessary; document the concrete need and cost before a paid upgrade. Do not treat free tier as a hard constraint or enable speculative paid services.
 - Future attachments must link helpers' images to issues. Record configurable upload permissions, including enabling/disabling volunteer image submission, as future work. Contestant-visible versus staff-only attachments and the configuration scope remain undecided; do not silently choose a policy.
 - A free-tier pilot and production capacity validation are separate milestones. Future targets on a healthy venue connection are:

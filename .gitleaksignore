@@ -1,0 +1,3 @@
+# Public user UUID in the original onboarding wording; this is not a credential.
+# Ignore only this historical finding. All other files/values remain scanned.
+b34c3a34e4869f74587d1d51753aeb1c8e2bc27d:docs/cloud-onboarding.md:generic-api-key:83

@@ -109,11 +109,23 @@ Verification is recorded in [current-state.md](current-state.md).
 
 ## T0003 — Cloud onboarding and authenticated shared product
 
-Status: scoped on 2026-10-02 at the user's request; implementation and provider onboarding have not started. Planning changes are on updated `main` as requested, uncommitted. Implementation branch: `feature/t0003-cloud-product`, created from updated `main` when implementation begins. The user reviews and merges the implementation PR.
+Status: implementation in progress on `feature/t0003-cloud-product`, started from updated `main` on 2026-10-02. Supabase schema and trusted first-admin/session bootstrap have been applied to the development project. Connected frontend, account administration, cloud contributor commands and embedded database tests are implemented. The initial hosted workflow/authorization/browser checks passed; final privacy/archival verification is recorded in current-state.md; the user has replaced email onboarding with username/password provisioning and organizer-assisted recovery. The user reviews and merges [draft PR #2](https://github.com/notbowen/minsky/pull/2). Username-flow verification is recorded in current-state.md. Protected cloud CI environment setup and its first successful run remain incomplete.
+
+Updated completion boundary (2026-10-02): the user retained protected cloud integration CI in T0003 and deferred provider ownership/billing records, GitHub merge enforcement/vulnerability alerts and remaining user/manual acceptance checks to T0004. Previously completed automated and browser checks remain evidence; deferred checks are not claimed as completed. The user still reviews and merges. No T0004 implementation has started.
+
+Updated authentication decision (2026-10-02): organizer-created usernames/passwords replace email invitations and recovery. Users must change temporary passwords before contest access. Organizers verify identity and issue new temporary credentials for recovery. SMTP/personal email addresses are not prerequisites. Existing Auth IDs and history are preserved.
+
+Updated contributor decision (2026-10-02): contributors may be assumed to have full cloud credential access. Docker is optional, not required for development, migrations, function deployment or the embedded database checks. Cloud integration CI uses a protected isolated test project; untrusted PR checks run without provider credentials. This supersedes the local-stack prerequisite below; the connected workflow and authorization requirements remain in scope.
+
+Selected quality improvements (2026-10-02): require CI and independent review before merging, add a short PR review checklist, and scan secrets/dependencies with routine update PRs. Implementation and owner setup are described in [code-quality.md](code-quality.md). Remote merge rules and vulnerability alerts require repository administration access; they are not inferred from committed workflow files.
+
+Selected interface refinement (2026-10-02): the user requested temporarily installing Anthropic's `frontend-design` skill, applying it to the repository, pushing the changes and deploying the frontend to Cloudflare, then removing the skill. This refinement stays on the active T0003 branch and covers sign-in, shared styles, responsive reporting/queue/detail layouts and administration. It preserves existing workflow and authorization rules; no new backend features are included. Verification and deployment evidence are recorded in [current-state.md](current-state.md).
+
+Selected navigation/demo retirement (2026-10-02): the user requested a main login landing page and sidebar, then explicitly requested removing the old local demo and unnecessary old tests and pushing the changes. This remains a T0003 refinement. Retain real-account journey/authorization checks and credential-free connected landing/login checks. Remove demo runtime, personas/reset/storage migration, demo-only tests/fixtures, command and walkthrough/specification. Historical T0001/T0002 records below/above refer to their original commits.
 
 ### Outcome and recommended boundary
 
-Different people can sign in to a hosted Minsky deployment and complete the existing issue journey against shared data. Another developer can clone the repository, run the connected application locally with fictional fixtures, make a migration and submit a tested PR without access to hosted secrets.
+Different people can sign in to a hosted Minsky deployment and complete the existing issue journey against shared data. Another developer with authorized cloud access can clone the repository, run the connected frontend locally, make a migration and submit a tested PR. Fast checks run without cloud credentials or Docker; full integration tests provision isolated cloud fixtures.
 
 Include real authentication and the contestant/support/jury dashboards now: they are necessary to make shared workflows useful. Include only the account and session controls needed to operate the first group-contest pilot. Recommend broader organizer administration and configurable uploads for the next ticket (candidate T0004). Do not add every long-term product requirement to this ticket.
 
@@ -121,20 +133,21 @@ Cloud first, features first: connectivity is assumed. Offline queues, synchroniz
 
 ### Provider onboarding and deployment
 
-- Walk the user through Cloudflare and Supabase account/organization setup, project ownership, developer access and billing visibility. Distinguish provider-console membership from Minsky application accounts. The user completes provider login, verification and any payment entry in the provider UI.
-- Start with one Supabase Free development project and Workers Free on a `workers.dev` address. Use a local Supabase stack for contributors and CI. Avoid requiring paid hosted database branches, a purchased application domain, R2 or AWS merely to begin.
-- Follow [cloud-onboarding.md](cloud-onboarding.md), completing it with the actual region, non-secret project identifiers, deployment URL, tested commands and setup results. Explain any required spend, recurring costs and usage limits; use available cost controls and retain billing records for reimbursement.
-- Add repository-owned Workers/Vite configuration, pinned npm tooling, environment examples and ignored secret files. Use Supabase Auth/Postgres; serve the React application and privileged account-management endpoints on Workers. Keep service credentials out of frontend builds and public CI logs.
-- Configure authentication redirect URLs and custom SMTP for invitation/password-recovery delivery beyond Supabase project-team addresses. Test delivery to a real pilot recipient; local mail capture is not proof of hosted delivery. An unavailable provider dependency remains an explicit incomplete acceptance item.
-- Produce a hosted development deployment and repeatable deployment instructions. CI checks PRs; deployment credentials belong only in trusted deployment jobs. Untrusted PRs use local data, and previews must not mutate the shared hosted database. First hosted release is an explicit maintainer action after checks.
+- Walk the user through Cloudflare and Supabase account/organization setup and developer access. Distinguish provider-console membership from Minsky application accounts. Ownership/billing records are deferred to T0004; the user completes provider login, verification and any payment entry in the provider UI.
+- Start with one Supabase Free development project and Workers Free on a `workers.dev` address. Use shared cloud access for contributors and an isolated cloud test project for privileged CI; Docker is optional. Avoid requiring paid hosted database branches, a purchased application domain, R2 or AWS merely to begin.
+- Follow [cloud-onboarding.md](cloud-onboarding.md), completing it with the actual region, non-secret project identifiers, deployment URL, tested commands and setup results. Explain any required spend before selecting a paid service. Recording selected plans, recurring charges and receipt handling is deferred to T0004.
+- Add repository-owned Vite build/Workers Static Assets configuration, pinned npm tooling, environment examples and ignored secret files. Cloudflare serves the frontend only; all backend functionality lives in Supabase. Use Supabase Auth, Postgres policies/transactional database functions and Realtime, with Supabase Edge Functions for privileged account administration. Version and deploy those functions with the repository. Keep service credentials out of frontend builds and public CI logs; no custom Cloudflare backend endpoints are needed.
+- Provision username/password accounts using Supabase Auth behind internal email-format identifiers. Show temporary credentials for each create/reset action; distribute them securely outside the app. Enforce mandatory password changes in database policies and RPCs. Verify first login, password change, reset and prior-session denial against hosted Auth.
+- Sender-domain access is no longer a T0003 blocker. SMTP/email invitations and email recovery were explicitly replaced by the user; do not silently reintroduce email sending.
+- Produce a hosted development deployment and repeatable deployment instructions. CI checks PRs; deployment credentials belong only in trusted deployment jobs. Untrusted PRs use embedded fictional data, and previews must not mutate the shared hosted database. First hosted release is an explicit maintainer action after checks.
 
 ### Accounts and authorization
 
-- Supabase email/password login, logout, session restoration, invitation/password setup, password change and forgotten-password recovery. No public self-registration. Group contestants share a team account; each staff member has an individual account.
+- Username/password login backed by Supabase, logout, session restoration, mandatory temporary-password change, ordinary password change and organizer-assisted recovery. No public self-registration. Group contestants share a team account; each staff member has an individual account.
 - Use stable authenticated user/person IDs, session/team membership and combined staff capabilities. Never trust a client-selected role, person ID or team ID as authorization. Users with no membership see an access message and no contest data.
-- Minimal admin view: list and invite accounts, assign/revoke session membership and the fixed volunteer/specialist/jury roles, assign a contestant account to a team, and resend an invitation or initiate recovery. Admin membership is a distinct capability, not automatically jury/support membership. Bootstrap the first admin through a documented trusted command; prevent removing the last admin. Passwords are managed by Supabase Auth, never displayed in the admin panel.
+- Minimal admin view: list and create accounts, assign/revoke session membership and the fixed volunteer/specialist/jury roles, assign a contestant account to a team, and issue replacement temporary passwords after verifying the requester’s identity. Admin membership is a distinct capability, not automatically jury/support membership. Bootstrap the first admin through a documented trusted command; prevent removing the last admin. Passwords are managed by Supabase Auth. Only a newly generated temporary password is shown for that create/reset action; existing passwords are never retrievable. Account-wide resets/username assignment require admin access to every affected session; archived identities cannot be changed.
 - Removing membership must deny subsequent data access even with an existing login session. Account administration is restricted to admins; record its actor and time. Use current database membership for permission checks, not only long-lived token claims.
-- Enforce authorization in Postgres row-level policies and transactional operations, and in privileged Worker endpoints. Contestants cannot fetch another team's data or internal notes through direct API calls, history, counts or live-update payloads. Ordinary data operations retain the caller's identity; broad service credentials are reserved for narrowly authorized administration.
+- Enforce authorization in Postgres row-level policies and transactional operations, and in privileged Supabase Edge Functions. Each privileged function authenticates the caller and checks current admin membership before using service credentials. Contestants cannot fetch another team's data or internal notes through direct API calls, history, counts or live-update payloads. Ordinary data operations retain the caller's identity; broad service credentials are reserved for narrowly authorized administration.
 
 ### Shared workflow and dashboards
 
@@ -143,31 +156,41 @@ Cloud first, features first: connectivity is assumed. Offline queues, synchroniz
 - Contestant dashboard: submit and view own-team issues, public replies, resolution/reopening history, unresolved time and award/application status. Support dashboard: active queue, ownership, specialist handoffs, public replies/internal notes and resolution/reopening. Jury dashboard: resolved issues and award/application state. Combined memberships expose all applicable work without a simulated persona switch.
 - Support staff can submit a report on behalf of a roster team; record both the affected team and actual staff reporter. Minimal admin session view shows issue counts by status and pending award applications, and can open/close contestant intake. Intake closure blocks new contestant submissions, not staff work or reopening existing issues.
 - Use Supabase Realtime to refresh authorized views across signed-in clients on a healthy connection; refetch permitted data after relevant events and on reconnect. Reconnect refetch is not an offline-write system. Retain phone usability for support staff and desktop usability for contestant/jury/admin views.
-- Remove demo reset, persona switching, fictional auto-seeding and browser-local issue persistence from the hosted product. Keep fictional data/reset tooling local to development and tests. Do not import browser demo data into the hosted database automatically. Identify the hosted environment as development without claiming event readiness.
+- Remove demo reset, persona switching, fictional auto-seeding and browser-local issue persistence from the hosted product. The user subsequently removed the old local demo and its reset tooling. Keep only isolated verification fixtures, with cleanup restricted to their own records. Do not import browser demo data into the hosted database automatically. Identify the hosted environment as development without claiming event readiness.
 
 ### Contributor setup and verification
 
-- Commit migrations, fictional local seeds, local Auth test-account setup, environment examples and exact setup/check/deploy commands. Document Node, npm, a Docker-compatible runtime, CLI setup and local email inspection. A fresh clone must not require shared provider credentials to run tests.
+- Commit migrations, isolated cloud fixture/account setup, environment examples and exact setup/check/deploy commands. Document Node, npm, CLI login, shared cloud setup and isolated cloud test fixtures. Docker and local email capture are optional; SMTP is not needed for the selected account flow. A fresh clone must not require shared provider credentials to run tests.
 - Add CI for type checking, lint, build, focused tests, database policies/transactions and a browser journey across real test accounts. Keep existing domain semantics covered as persistence changes. Include two simultaneous clients, cross-team/session denial, internal-note exclusion, combined roles, account revocation, admin-only operations and claim/award races.
-- Document and execute a hosted smoke test of login, invitation/recovery, shared updates and the complete workflow. Verify phone widths, keyboard navigation and refresh against the connected app. Record commands and results; do not reuse demo results as backend verification.
+- Document and execute a hosted smoke test of username login, forced password change/reset, shared updates and the complete workflow. Verify phone widths, keyboard navigation and refresh against the connected app. Record commands and results; do not reuse demo results as backend verification.
 - Update README, current state and manual verification to describe actual connected behavior. Keep the demo specification as historical scope and explain its replacement. Expand the onboarding guide with observed setup outcomes.
 
 ### Acceptance criteria
 
-- [ ] User can identify project ownership, URLs, environment settings, usage dashboards and any actual recurring charges; account setup and contributor access are documented.
-- [ ] App is deployed on Workers with a shared Supabase database and working email/password invitation, login, logout and recovery flows.
-- [ ] Admin can onboard a team and individual staff, assign combined roles, revoke access and operate contestant intake without editing source code. First-admin bootstrap is reproducible.
-- [ ] Separate authenticated contestant/support/jury/admin views work; demo controls and client-supplied identity cannot bypass permissions.
-- [ ] Full submit → claim → handoff → resolve → award → external confirmation journey and repeated reopening work across distinct signed-in browsers. Staff can submit for a roster team.
-- [ ] Server timestamps, transactional transitions and a unique award constraint preserve history and reject concurrent/duplicate actions. Unauthorized API access and private-note leakage are tested.
-- [ ] Local migrations/seeds and documented commands reproduce the connected environment from a fresh clone; CI runs without hosted secrets for PR contributions.
-- [ ] Build, lint, type checking, focused/database/browser tests and hosted/manual checks pass, with actual evidence recorded. Provider/email blockers are marked incomplete.
+- [x] Development URLs, environment settings, account setup and contributor access are documented. Provider ownership/billing records are deferred to T0004.
+- [x] App is deployed on Workers with a shared Supabase database and working username/password provisioning, mandatory password changes, login, logout and organizer-assisted resets.
+- [x] Admin can onboard a team and individual staff, assign combined roles, revoke access and operate contestant intake without editing source code. First-admin bootstrap is reproducible.
+- [x] Separate authenticated contestant/support/jury/admin views work; demo controls and client-supplied identity cannot bypass permissions.
+- [x] Full submit → claim → handoff → resolve → award → external confirmation journey and repeated reopening work across distinct signed-in browsers. Staff can submit for a roster team.
+- [x] Server timestamps, transactional transitions and a unique award constraint preserve history and reject concurrent/duplicate actions. Unauthorized API access and private-note leakage are tested.
+- [x] Cloud migrations, isolated fixtures and documented commands reproduce the connected environment from a fresh clone; fast PR checks run without hosted secrets or Docker.
+- [x] Build, lint, type checking, focused/database/browser tests and hosted automated checks pass, with actual evidence recorded in current-state.md. Remaining user/manual acceptance checks are deferred to T0004.
+- [ ] The separate Supabase test project is prepared; configure the protected GitHub `cloud-test` environment and record the first passing manually dispatched cloud integration job. Owner access and workflow availability on the default branch remain setup dependencies.
 
 ### Explicit exclusions and later decisions
 
 No offline/resilience project, 800-user load certification, individual-contest UI, shared incidents, CSV imports, push notifications, full event/category/role editors, advanced reporting or award adjustments. Image uploads and upload-setting UI are deferred to the next candidate so visibility rules can be settled first; this does not discard the user's attachment requirement.
 
+### Deferred to T0004 (not started)
+
+- Record provider ownership, selected billing plans, billing contact, recurring charges and receipt handling.
+- Configure and verify GitHub merge enforcement and vulnerability alerts with repository owner access.
+- Complete the remaining user/manual acceptance checks for the connected app.
+
+These items are user-selected follow-up work. Broader organizer tools and attachments below remain candidates whose implementation scope must still be agreed.
+
 ## Candidate queue (not yet development tickets)
 
 1. **Recommended T0004: organizer tools and configurable issue attachments.** Event/session/roster/category editing and permission settings, prioritized after the cloud workflow is reviewed. Helpers' uploaded photos/screenshots must be linked to an issue with uploader/time metadata. Include enable/disable controls for volunteer image submission, enforced by the backend. Decide configuration scope, defaults, and contestant-visible versus staff-only access before implementation; do not infer that the uploader chooses visibility. Supabase Storage is recommended initially, with file records in Postgres and private bucket access. Choose file types/size limits and deletion rules when scoping. This is a candidate, not a created or started T0004.
-2. Visual refinement after the user selects design references. Resilience and event-capacity work remain deferred until feature feedback warrants them.
+
+Resilience and event-capacity work remain deferred until feature feedback warrants them.

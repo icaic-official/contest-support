@@ -1,4 +1,8 @@
-# Minsky: a local demo first
+# Minsky planning record
+
+**Current decision (2026-10-02):** T0003 is the connected Supabase/Cloudflare development app. The user requested a public login landing page and sidebar, then removed the old local demo and its unnecessary tests. Keep connected workflow/authorization tests and isolated cloud fixtures. The original demo plan below is historical and does not authorize restoring demo runtime, reset, personas or browser-local issue persistence.
+
+## Original demo plan
 
 ## 1. Immediate goal
 
@@ -48,7 +52,6 @@ Create a compact documentation package alongside the demo:
 |---|---|
 | `README.md` | Project introduction, demo setup and commands, limitations, and documentation links. |
 | `AGENTS.md` | Working rules, ticket workflow, verification expectations, documentation upkeep, and required run report. |
-| `docs/demo-spec.md` | The demo’s screens, behavior, scope, and acceptance criteria. |
 | `docs/product-direction.md` | Decisions from this discussion, clearly separated into agreed direction, provisional choices, and deferred questions. |
 | `docs/tickets.md` | One actionable demo ticket and a small uncommitted follow-up queue. |
 | `docs/current-state.md` | Existing capabilities, completed checks, and current limitations. |
@@ -57,7 +60,7 @@ Create a compact documentation package alongside the demo:
 Preserve these longer-term decisions in the product-direction document:
 
 - Each event has one contest type: individual or group. Sessions have separate rosters, schedules, issues, and awards.
-- Organizers provision email/password accounts. Group contestants share a team account. Staff have individual accounts.
+- Organizers provision username/password accounts (updated 2026-10-02). Group contestants share a team account. Staff have individual accounts.
 - Configurable roles combine fixed capabilities. Issue categories are configurable.
 - Contestants and staff can submit reports. Staff manually open and close contestant intake.
 - Ownership persists during escalation until handoff. Timers run continuously. Recurrences create linked new reports, and duplicates link to a canonical report.
@@ -116,3 +119,5 @@ The manual guide will cover the same journey and identify anything automated che
 | **Risks** | Simulated permissions and local state do not establish production correctness. Outage requirements remain unresolved. |
 | **Follow-up tickets** | First implement T0001. Then use your feedback to select a refinement or free-tier integration experiment. |
 | **Docs that need updating** | Update the README and create the documentation package listed above during T0001. |
+
+**Authentication revision (2026-10-02):** The user selected organizer-created usernames/passwords for T0003. Team contestants share a team account; staff keep individual accounts. Organizers distribute temporary credentials securely and verify identity before password resets. Users must change temporary passwords before contest access. This replaces email invitations and email recovery in T0003; SMTP and personal email addresses are not prerequisites. Supabase still manages passwords and sessions. Existing development email logins remain valid until a username is assigned.

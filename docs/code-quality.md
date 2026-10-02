@@ -45,7 +45,7 @@ AGENTS.md still apply.
 
 ## Owner setup for mandatory merges
 
-The user deferred remote merge enforcement and vulnerability-alert setup to T0004 on 2026-10-02. The existing checks and prepared configuration remain in T0003; the owner steps below have not been completed. Protected cloud integration CI environment setup remains a separate T0003 requirement.
+The user deferred remote merge enforcement and vulnerability-alert setup on 2026-10-02 and moved these scope notes from T0004 to T0005 on 2026-10-03. The existing checks and prepared configuration remain in T0003; the owner steps below have not been completed. Protected cloud integration CI environment setup remains a separate T0003 requirement.
 
 Repository inspection on 2026-10-02 confirmed that the available account,
 `GiftedNovaHD`, has write access but no administration access. No repository

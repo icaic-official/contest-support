@@ -2,7 +2,9 @@
 
 These requirements preserve the agreed direction from [PLAN.md](../PLAN.md). Only requirements listed in [current-state.md](current-state.md) describe implemented behavior. The user selects subsequent scope after demo feedback.
 
-Latest interface decision (2026-10-02): provide a public login landing page and a sidebar for the authenticated workspace. The user removed the old local demo, its commands and demo-only tests. Supabase accounts/shared data remain the only application mode; isolated fixtures remain for verification. This does not complete the broader organizer tools listed below.
+Latest ticket decision (2026-10-03): implement [T0004](tickets.md#t0004--ui-makeover) from the user's dark green workspace and centered amber-button sign-in references. Use real authenticated data and preserve workflow and permissions; sample text and values are placeholders. Previous T0004 scope notes move to [T0005](tickets.md#t0005--follow-up-scope-notes): agreed operational follow-ups plus candidate organizer tools/configurable issue attachments. T0005 implementation has not started.
+
+Implemented interface decision (2026-10-02): provide a public login landing page and a sidebar for the authenticated workspace. The user removed the old local demo, its commands and demo-only tests. Supabase accounts/shared data remain the only application mode; isolated fixtures remain for verification. This does not complete the broader organizer tools listed below.
 
 ## Agreed direction
 
@@ -26,7 +28,7 @@ Cloudflare Workers and Supabase are the selected cloud direction. On 2026-10-02 
 
 Architecture clarification (2026-10-02): Cloudflare serves the React frontend as static assets; all backend functionality lives in Supabase. Use managed Auth, Postgres, Realtime and future Storage, with database functions for transactional workflows and Edge Functions for privileged account administration. This replaces the earlier proposal for privileged Worker endpoints. Supabase manages the services, but Minsky's schema, authorization policies and business rules must still be implemented and tested in repository-owned migrations/functions.
 
-[T0003](tickets.md#t0003--cloud-onboarding-and-authenticated-shared-product) is being implemented: guide account/service setup, replace simulated personas with Supabase authentication behind username/password login, move workflows into shared Postgres data, provide role dashboards and minimal account administration, and make local contribution reproducible. Broader organizer configuration and attachments are the recommended next candidate, not an active T0004. See the [cloud onboarding guide](cloud-onboarding.md) for setup stages and cost considerations.
+[T0003](tickets.md#t0003--cloud-onboarding-and-authenticated-shared-product) merged in PR #2: cloud onboarding, Supabase authentication behind username/password login, shared Postgres workflows, role dashboards, minimal account administration and reproducible local contribution. Protected cloud CI setup remains unverified. T0004 implements the selected UI makeover; broader organizer configuration and attachments remain candidate T0005 scope. See the [cloud onboarding guide](cloud-onboarding.md) for setup stages and cost considerations.
 
 Production targets on a healthy venue connection are:
 

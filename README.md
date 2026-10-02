@@ -55,6 +55,8 @@ Install Chromium once with `npx playwright install chromium`. Deno and the provi
 
 PR CI runs build/lint/type/function/database/landing-page checks without hosted secrets. The protected, manually dispatched `cloud-test` environment requires a separate Supabase test project and credentials. It refuses the shared development project. Preview deployments do not automatically use or mutate the shared database. See [contributor setup](docs/cloud-onboarding.md#contributor-setup) and [protected cloud CI](docs/cloud-onboarding.md#verification-and-protected-cloud-ci).
 
+The development process is ticket branch → develop and add migrations → fast checks → PR review and isolated cloud integration checks → user review/merge → explicit deployment of approved changes. `Minsky` serves development and trial accounts; `Minsky CI` contains temporary automated fixtures. Production has not been provisioned. Once it exists, validate changes on development and CI before deploying them to its separate database and frontend. The rules are in [AGENTS.md](AGENTS.md#cloud-development-and-deployment-workflow), with practical commands in [cloud onboarding](docs/cloud-onboarding.md#development-and-release-process).
+
 PR security checks scan Git history for secrets with redacted Gitleaks output and audit locked npm dependencies, blocking high/critical vulnerabilities. Dependabot proposes weekly dependency/action updates. The [code-quality guide](docs/code-quality.md) describes the review checklist and prepared mandatory merge rules; the repository owner must enable those remote rules and vulnerability alerts.
 
 ## Connected workflow

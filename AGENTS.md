@@ -61,6 +61,15 @@ Use simple components and domain logic appropriate to the demo. Avoid speculativ
 - Keep future work as a short candidate queue until feedback determines the next ticket. Do not create a large speculative backlog.
 - Routine implementation and verification within the active ticket do not require repeated confirmation. Ask only for missing decisions that materially affect scope or behavior.
 
+## Cloud development and deployment workflow
+
+- Keep development, CI and future production databases and credentials separate. The hosted `minsky-dev` app uses the `Minsky` development project; it is not production. `Minsky CI` is for isolated automated fixtures. No production project has been created.
+- For each ticket: create the ticket branch from updated `main`, develop against the development project, add repository-owned migrations, run fast checks, prepare the PR, and run cloud integration checks on the reviewed revision. The user reviews and merges; explicitly deploy approved changes afterward. Do not imply that merging deploys automatically.
+- Privileged GitHub cloud checks use the protected `cloud-test` environment and the separate CI project. Ordinary PR checks run without cloud credentials. Record a local cloud run separately from a protected GitHub Actions run; neither substitutes for the other.
+- CI fixtures create temporary accounts and UUID-scoped records and delete only their own data. Never point CI at development or production, copy real accounts into CI, or reset a shared project. Confirm the target before applying migrations or deploying functions.
+- Once production is selected and provisioned, validate the approved revision on development and CI before applying its migrations, deploying its account function/configuration, and deploying its frontend to production. Verify the production deployment afterward. Production setup is future work, not permission to create or upgrade provider resources now.
+- Use [cloud-onboarding.md](docs/cloud-onboarding.md) for project references, commands, environment protection requirements and current setup results. T0003 retains protected cloud CI; ownership/billing records, remote merge enforcement/vulnerability alerts and remaining user/manual acceptance checks are deferred to T0004 by user decision.
+
 ## Verification
 
 - Inspect available scripts before invoking them. During T0001, provide npm scripts for development, production build, type checking, linting, and focused tests. Document their exact names in the README.

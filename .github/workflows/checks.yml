@@ -55,6 +55,7 @@ jobs:
           test -n "$MINSKY_TEST_PROJECT_REF"
           test "$MINSKY_TEST_PROJECT_REF" != ovymmobupzowotvrywek
       - run: npx supabase link --project-ref "$MINSKY_TEST_PROJECT_REF"
+      - run: npx supabase config push --project-ref "$MINSKY_TEST_PROJECT_REF" --yes
       - run: npx supabase db push --linked
       - run: npx supabase functions deploy admin --project-ref "$MINSKY_TEST_PROJECT_REF" --use-api
       - run: npx supabase secrets set ALLOWED_ORIGINS=http://127.0.0.1:4174 --project-ref "$MINSKY_TEST_PROJECT_REF"

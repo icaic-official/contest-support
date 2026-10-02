@@ -13,8 +13,11 @@ enabled = false
 site_url = "http://127.0.0.1:5173"
 additional_redirect_urls = ["http://127.0.0.1:5173/", "http://127.0.0.1:4173/"]
 enable_signup = false
+enable_anonymous_sign_ins = false
 [auth.email]
-enable_signup = false
+# Keep the email/password provider enabled for internal username identifiers.
+# auth.enable_signup above blocks public self-registration.
+enable_signup = true
 enable_confirmations = true
 [functions.admin]
 # Supabase publishable keys are not JWTs. The handler validates every caller.

@@ -107,6 +107,8 @@ export default async function setup() {
     }
   } catch (cause) {
     await cleanup(state);
+    // Playwright can still invoke teardown after setup has cleaned this run.
+    save({ event: "", sessions: [], teams: [], accounts: {} });
     throw cause;
   }
 }

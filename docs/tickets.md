@@ -109,7 +109,9 @@ Verification is recorded in [current-state.md](current-state.md).
 
 ## T0003 — Cloud onboarding and authenticated shared product
 
-Status: implementation in progress on `feature/t0003-cloud-product`, started from updated `main` on 2026-10-02. Supabase schema and trusted first-admin/session bootstrap have been applied to the development project. Connected frontend, account administration, cloud contributor commands and embedded database tests are implemented. The initial hosted workflow/authorization/browser checks passed; final privacy/archival verification is recorded in current-state.md; the user has replaced email onboarding with username/password provisioning and organizer-assisted recovery. The user reviews and merges [draft PR #2](https://github.com/notbowen/minsky/pull/2). Username-flow verification is recorded in current-state.md. Billing/ownership records and protected cloud CI environment setup remain incomplete.
+Status: implementation in progress on `feature/t0003-cloud-product`, started from updated `main` on 2026-10-02. Supabase schema and trusted first-admin/session bootstrap have been applied to the development project. Connected frontend, account administration, cloud contributor commands and embedded database tests are implemented. The initial hosted workflow/authorization/browser checks passed; final privacy/archival verification is recorded in current-state.md; the user has replaced email onboarding with username/password provisioning and organizer-assisted recovery. The user reviews and merges [draft PR #2](https://github.com/notbowen/minsky/pull/2). Username-flow verification is recorded in current-state.md. Protected cloud CI environment setup and its first successful run remain incomplete.
+
+Updated completion boundary (2026-10-02): the user retained protected cloud integration CI in T0003 and deferred provider ownership/billing records, GitHub merge enforcement/vulnerability alerts and remaining user/manual acceptance checks to T0004. Previously completed automated and browser checks remain evidence; deferred checks are not claimed as completed. The user still reviews and merges. No T0004 implementation has started.
 
 Updated authentication decision (2026-10-02): organizer-created usernames/passwords replace email invitations and recovery. Users must change temporary passwords before contest access. Organizers verify identity and issue new temporary credentials for recovery. SMTP/personal email addresses are not prerequisites. Existing Auth IDs and history are preserved.
 
@@ -131,9 +133,9 @@ Cloud first, features first: connectivity is assumed. Offline queues, synchroniz
 
 ### Provider onboarding and deployment
 
-- Walk the user through Cloudflare and Supabase account/organization setup, project ownership, developer access and billing visibility. Distinguish provider-console membership from Minsky application accounts. The user completes provider login, verification and any payment entry in the provider UI.
+- Walk the user through Cloudflare and Supabase account/organization setup and developer access. Distinguish provider-console membership from Minsky application accounts. Ownership/billing records are deferred to T0004; the user completes provider login, verification and any payment entry in the provider UI.
 - Start with one Supabase Free development project and Workers Free on a `workers.dev` address. Use shared cloud access for contributors and an isolated cloud test project for privileged CI; Docker is optional. Avoid requiring paid hosted database branches, a purchased application domain, R2 or AWS merely to begin.
-- Follow [cloud-onboarding.md](cloud-onboarding.md), completing it with the actual region, non-secret project identifiers, deployment URL, tested commands and setup results. Explain any required spend, recurring costs and usage limits; use available cost controls and retain billing records for reimbursement.
+- Follow [cloud-onboarding.md](cloud-onboarding.md), completing it with the actual region, non-secret project identifiers, deployment URL, tested commands and setup results. Explain any required spend before selecting a paid service. Recording selected plans, recurring charges and receipt handling is deferred to T0004.
 - Add repository-owned Vite build/Workers Static Assets configuration, pinned npm tooling, environment examples and ignored secret files. Cloudflare serves the frontend only; all backend functionality lives in Supabase. Use Supabase Auth, Postgres policies/transactional database functions and Realtime, with Supabase Edge Functions for privileged account administration. Version and deploy those functions with the repository. Keep service credentials out of frontend builds and public CI logs; no custom Cloudflare backend endpoints are needed.
 - Provision username/password accounts using Supabase Auth behind internal email-format identifiers. Show temporary credentials for each create/reset action; distribute them securely outside the app. Enforce mandatory password changes in database policies and RPCs. Verify first login, password change, reset and prior-session denial against hosted Auth.
 - Sender-domain access is no longer a T0003 blocker. SMTP/email invitations and email recovery were explicitly replaced by the user; do not silently reintroduce email sending.
@@ -165,18 +167,27 @@ Cloud first, features first: connectivity is assumed. Offline queues, synchroniz
 
 ### Acceptance criteria
 
-- [ ] User can identify project ownership, URLs, environment settings, usage dashboards and any actual recurring charges; account setup and contributor access are documented.
+- [x] Development URLs, environment settings, account setup and contributor access are documented. Provider ownership/billing records are deferred to T0004.
 - [x] App is deployed on Workers with a shared Supabase database and working username/password provisioning, mandatory password changes, login, logout and organizer-assisted resets.
 - [x] Admin can onboard a team and individual staff, assign combined roles, revoke access and operate contestant intake without editing source code. First-admin bootstrap is reproducible.
 - [x] Separate authenticated contestant/support/jury/admin views work; demo controls and client-supplied identity cannot bypass permissions.
 - [x] Full submit → claim → handoff → resolve → award → external confirmation journey and repeated reopening work across distinct signed-in browsers. Staff can submit for a roster team.
 - [x] Server timestamps, transactional transitions and a unique award constraint preserve history and reject concurrent/duplicate actions. Unauthorized API access and private-note leakage are tested.
 - [x] Cloud migrations, isolated fixtures and documented commands reproduce the connected environment from a fresh clone; fast PR checks run without hosted secrets or Docker.
-- [ ] Build, lint, type checking, focused/database/browser tests and hosted/manual checks pass, with actual evidence recorded. Provider setup blockers are marked incomplete.
+- [x] Build, lint, type checking, focused/database/browser tests and hosted automated checks pass, with actual evidence recorded in current-state.md. Remaining user/manual acceptance checks are deferred to T0004.
+- [ ] The separate Supabase test project is prepared; configure the protected GitHub `cloud-test` environment and record the first passing manually dispatched cloud integration job. Owner access and workflow availability on the default branch remain setup dependencies.
 
 ### Explicit exclusions and later decisions
 
 No offline/resilience project, 800-user load certification, individual-contest UI, shared incidents, CSV imports, push notifications, full event/category/role editors, advanced reporting or award adjustments. Image uploads and upload-setting UI are deferred to the next candidate so visibility rules can be settled first; this does not discard the user's attachment requirement.
+
+### Deferred to T0004 (not started)
+
+- Record provider ownership, selected billing plans, billing contact, recurring charges and receipt handling.
+- Configure and verify GitHub merge enforcement and vulnerability alerts with repository owner access.
+- Complete the remaining user/manual acceptance checks for the connected app.
+
+These items are user-selected follow-up work. Broader organizer tools and attachments below remain candidates whose implementation scope must still be agreed.
 
 ## Candidate queue (not yet development tickets)
 

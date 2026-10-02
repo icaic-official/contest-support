@@ -3,6 +3,26 @@ import { account, fixture, anonKey, url, service, save } from "./fixture";
 import { createClient } from "@supabase/supabase-js";
 import {execFileSync} from "node:child_process";
 
+test("public signup is disabled while organizer-created accounts can log in", async () => {
+  const client = createClient(url, anonKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+  const { data, error } = await client.auth.signUp({
+    email: `test-signup-${crypto.randomUUID()}@accounts.minsky.invalid`,
+    password: crypto.randomUUID() + "A9!",
+  });
+  // Clean up an unexpected account before assertions report the misconfiguration.
+  if (data.user) {
+    const removed = await service().auth.admin.deleteUser(data.user.id);
+    if (removed.error) throw removed.error;
+  }
+  expect(error?.code).toBe("signup_disabled");
+  expect(data.user).toBeNull();
+  const contestant = await account("contestant");
+  const signedOut = await contestant.auth.signOut();
+  expect(signedOut.error).toBeNull();
+});
+
 async function login(page: Page, name: string) {
   const details = fixture().accounts[name];
   await page.goto("/");

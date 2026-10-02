@@ -1,8 +1,13 @@
 # Minsky
+Minsky is a platform to help competition organizers triage technical problems during programming contests. Moreover, it also includes other helpful features such as:
+- handing over to or bringing in other people/parties to provide extra assistance  
+- ability to record time taken for problem resolution and award discretionary time extensions
 
-Minsky explores a calmer way to handle technical problems during a contest. Teams report issues. Staff dispatch help, track handoffs, and record discretionary time awards.
-
-**This is a local workflow demo**, built with React, TypeScript and Vite. It uses fictional data and five simulated personas in one group-contest session. The demo requires no cloud account or paid service.
+## Problem
+During previous iterations of international AI contests, when contestants face a technical problem, they usually raise a card or fill up a Google Form to alert an on-site competition volunteer to attend to them. 
+While assisting the contestant(s), the volunteers also have to note down the problem, the time taken to triage and resolve the problem, and also additional information like photos. 
+This is tedious and slows down the process of solving problems. 
+Hence, Minsky was created in hopes of addressing some of these challenges. 
 
 ## Run locally
 

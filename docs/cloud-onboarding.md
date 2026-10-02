@@ -1,58 +1,46 @@
 # Cloud onboarding for T0003
 
-Status: T0003 implementation and guided onboarding are in progress on 2026-10-02. The connected frontend, Supabase migrations and admin function are implemented. The development schema and first-admin/session bootstrap have been applied; server-side function deployment succeeded. All five final hosted browser cases passed; detailed verification is recorded in current-state.md. No paid upgrade is selected. SMTP delivery remains pending sender access. See [current verification](current-state.md) and [ticket scope](tickets.md#t0003--cloud-onboarding-and-authenticated-shared-product).
+The connected development app is deployed at https://minsky-dev.icaic-minsky.workers.dev. Supabase hosts authentication, Postgres and Realtime; Cloudflare Workers Static Assets serves the frontend. Docker is optional. The user permits contributors to have full authorized cloud credential access.
 
-The user explicitly allows assuming that contributors have full cloud credential access. **Docker is not required** for the main development/setup path. Use cloud migrations and `--use-api` function bundling. Embedded PostgreSQL verifies database rules without containers; real integration tests run against isolated cloud sessions/accounts. The optional local Supabase path is no longer a contributor prerequisite.
+## Authentication decision (2026-10-02)
 
-## 1. Accounts and ownership
+The user replaced email invitations and email recovery with organizer-created **usernames/passwords**. SMTP and personal email addresses are not prerequisites. Team contestants share a team account; staff have individual accounts. Supabase manages passwords and sessions behind internal email-format identifiers; those identifiers are not mailboxes and must not receive mail.
 
-Create or select the Supabase organization and Cloudflare account that will own Minsky. Use individual provider logins and invite maintainers through the provider's membership controls; do not share an owner's password. Record the project owner and billing contact. Most contributors should work locally without provider-console access. Provider membership and Minsky contestant/staff/admin accounts are separate.
+### Create and recover accounts
 
-The user completes provider sign-in, account verification and any card entry directly on the provider website. Keep passwords, recovery codes, database credentials and API secrets out of chat, committed files and issue reports. Store billing receipts for reimbursement if a paid service becomes necessary.
+1. Sign into Minsky as admin. Existing development accounts can use their original email and password until a username is assigned.
+2. Under **Session accounts**, expand the existing account and use **Assign username → Set username**. Usernames contain 3–32 letters, digits, underscores or hyphens and are stored lowercase. The existing password, Auth UUID, memberships and history stay unchanged. Username assignment replaces that account’s email login; do not distribute its old email as future login instructions.
+3. Under **Create an account**, enter a display name and unique username. Select a roster team for a contestant, or choose staff permissions for an individual. Click **Create account**.
+4. Share the displayed username and newly generated temporary password through an agreed secure channel. Dismiss credentials once recorded privately. The app does not retain a recoverable copy; losing the response requires a new reset, not viewing an old password.
+5. Users sign in and must change their temporary password before reading or changing contest data. Refresh or direct API calls cannot bypass this requirement.
+6. For forgotten passwords, organizers verify the requester’s identity outside the application, expand the account and choose **Reset password**. Share the replacement temporary password securely. Existing sessions/refresh tokens lose access; the user must sign in again and change the replacement password.
+7. Use **Change password** for your own account, entering the current password. Account-wide resets/username assignment require admin access to every session where the target has membership and reject archived memberships. Ordinary session permission editing remains scoped to its session.
 
-## 2. Start with free plans
+If the sole admin loses their password, a trusted provider maintainer can run this in a **private terminal** after linking the intended project:
 
-| Service | Initial choice | When to consider paying |
-| --- | --- | --- |
-| Cloudflare Workers Static Assets | Free, with the supplied `workers.dev` hostname; frontend hosting only | No paid Worker runtime is currently needed for this static frontend architecture. Revisit only if hosting requirements change. |
-| Supabase | One Free development project; shared cloud development for authorized contributors; isolated cloud project for CI | Database, bandwidth or active-project limits become restrictive, or project inactivity pausing disrupts development. Pro starts at USD 25/month; extras may cost more. |
-| Authentication email | Custom SMTP with a suitable free allowance and a verified sender | Recipient volume, sender requirements or delivery needs exceed the provider's free offering. Select the provider during onboarding. |
-| Uploaded images | No bucket needed for T0003; Supabase Storage recommended for the attachment ticket | Review actual file volume and downloads when attachments are scoped. No R2 or AWS account is required now. |
+```sh
+npm run cloud:recover-admin -- --user EXISTING_ADMIN_AUTH_UUID
+```
 
-Static-asset requests are free and unlimited when served without invoking Worker code. Minsky's backend runs in Supabase, so dynamic Worker request/CPU quotas are not the application's backend budget. See [Workers pricing](https://developers.cloudflare.com/workers/platform/pricing/).
+The command captures service credentials in memory, verifies an existing active-event admin, issues a temporary password, invalidates previous sessions and requires password change on next login. The temporary password is intentionally displayed in that terminal only; never run this command in CI, paste its output into chat or commit it. Its service-only recovery RPC is unavailable to ordinary app accounts. Recovery audit entries identify this as a provider operation, not an action performed by the locked-out person.
 
-Supabase Free currently includes a 500 MB database per project, 1 GB file storage, 5 GB uncached plus 5 GB cached egress, and up to two active projects. Free projects can pause after one week of inactivity. These allowances do not establish capacity for a live contest. See [Supabase pricing](https://supabase.com/pricing).
+No public signup, email confirmation links, invitation links or email recovery are used by this flow. Keep signup and anonymous sign-in disabled. Internal accounts are explicitly confirmed by the trusted creation function; this is account provisioning, not mailbox verification. Previously configured redirect URLs may remain, but no sender/domain/SMTP setup is required for T0003.
 
-Record the selected plans and review usage dashboards after initial testing. Before any paid upgrade, identify the actual blocker, current price, expected monthly cost and applicable usage controls. The user accepts necessary spending, but no paid upgrade is currently selected. A custom application domain is optional; authentication email may separately require a sender domain. Do not assume a spending control is an absolute bill cap.
+## Ownership and costs
 
-## 3. Supabase setup
+Use individual provider logins and membership controls for Supabase and Cloudflare. Provider access and Minsky app membership are separate. The user completes provider account verification and payment entry privately. Keep passwords, database credentials, recovery codes and API secrets out of Git, chat and public logs.
 
-1. Create a development project on the Free plan. Choose a region close to the pilot users; Singapore is a candidate if the pilot is based there. Save the database password securely. Record the project reference and URL, not its secrets.
-2. Enable email/password authentication and disable public signup for this organizer-provisioned product. Once URLs are known, configure the site URL and exact local/deployed invitation and recovery redirect URLs. Use the [password authentication guide](https://supabase.com/docs/guides/auth/passwords).
-3. Configure custom SMTP and verify its sender. Supabase's default email service sends only to project-team addresses and currently allows two messages/hour. It cannot support normal pilot-user invitations/recovery. Test invitation, password setup and recovery with a recipient outside that provider team. See [SMTP setup](https://supabase.com/docs/guides/auth/auth-smtp).
-4. During implementation, apply reviewed, repository-owned migrations, access policies and transactional database functions using the Supabase CLI. Deploy Supabase Edge Functions for privileged account administration, with caller authentication and explicit admin checks. Keep privileged credentials in Supabase's server-side environment. Document the exact target selection, migration and function deployment commands. Keep changes reproducible rather than relying on unrecorded dashboard edits. See [migration workflow](https://supabase.com/docs/guides/local-development/database-migrations) and [Edge Functions](https://supabase.com/docs/guides/functions).
-5. Bootstrap the first application admin through the ticket's trusted command. Invite pilot accounts through the minimal admin UI after deployment. Local fixtures must never run automatically against the hosted database.
-6. Test team/session isolation and private-note access through direct API requests as well as the UI. Row-level policies and transactional operations must enforce access independently of hidden controls. See [row-level security](https://supabase.com/docs/guides/database/postgres/row-level-security).
+Record these non-secret details in the completion record below:
 
-## 4. Cloudflare setup
+- Organization/account owner and maintainer access.
+- Billing contact and selected plan for each provider.
+- Current recurring charges, usage-dashboard location and receipt/reimbursement handling.
 
-### Development while sender setup is pending
+Start with Supabase Free and Workers Free. No SMTP provider, image bucket, custom application domain, R2 or AWS account is needed for this ticket. Static assets served without invoking Worker code are free/unlimited; Supabase Free limits and inactivity pausing still apply. Review usage before a pilot. Before any paid upgrade, record the concrete blocker, current cost and expected monthly spend. Free tiers are not proof of capacity for 800 users. See [Workers pricing](https://developers.cloudflare.com/workers/platform/pricing/) and [Supabase pricing](https://supabase.com/pricing).
 
-The user reported on 2026-10-02 that a sender domain is not yet accessible. This does not block database, login, dashboard or deployment implementation. Recommended interim path: create only known development accounts through Supabase's trusted admin tools/API with a password and explicit per-account email confirmation. Keep public signup disabled and the project-wide email-confirmation setting enabled. This manual confirmation is development provisioning, not evidence that the mailbox was verified. Do not send passwords through repository files or chat.
+## Contributor setup
 
-Optional local Supabase mail capture can test invitation/recovery handling if a contributor chooses a container stack; it is not required by the cloud setup path and was not run during this implementation. Ordinary email/password login for provisioned accounts does not require sending email. Hosted invitation/recovery delivery remains incomplete until a suitable sender is configured and tested; do not mark T0003's email acceptance complete based on local tests. See [admin account creation](https://supabase.com/docs/reference/javascript/auth-admin-createuser) and [local development](https://supabase.com/docs/guides/local-development/cli/getting-started).
-
-### Hosting setup
-
-1. Select Workers Free and a `workers.dev` subdomain in the owning account. Keep the React/Vite build; `wrangler.jsonc` serves `dist/` directly through Workers Static Assets. No Worker runtime or Cloudflare backend endpoint is needed. See [React on Workers](https://developers.cloudflare.com/workers/framework-guides/web-apps/react/).
-2. Authenticate the deployment CLI as a maintainer. Use a scoped deployment credential for trusted CI only if automated deployment is configured. Do not give contributors the account owner's credentials.
-3. Configure only the Supabase URL and publishable key for the frontend build. Backend secrets belong in Supabase Edge Functions, never a `VITE_` variable or the frontend hosting configuration. Ignore local function secret files and commit a placeholder example.
-4. Run the implemented checks, apply compatible Supabase migrations/functions and deploy the reviewed frontend build to Workers Static Assets. No custom Cloudflare backend is required. Record the tested commands, URL and revision. Update Supabase authentication redirects to the actual URL, then run the hosted smoke test.
-5. Verify that refresh on application routes works, Supabase privileged functions reject unauthorized callers, and two different logged-in browsers see shared updates. Keep the hosted environment visibly identified as development.
-
-## 5. Contributor onboarding
-
-Use Node.js 22.13+ within 22.x, or 24+, and npm. Docker is optional. The primary fresh-clone sequence is:
+Use Node.js 22.13+ within 22.x, or 24+, and npm. The primary fresh-clone sequence is:
 
 ```sh
 npm ci
@@ -62,52 +50,39 @@ npm run cloud:link
 npm run dev
 ```
 
-Fill `.env.local` with the project's public URL and publishable key. Obtain provider access through individual logins and authorized credential sharing. Enter the database password at the CLI prompt. Get a Minsky membership from an application admin; provider access alone does not grant app permissions.
+Fill `.env.local` with the project's public URL and publishable key. Obtain authorized provider access and enter the database password privately at the CLI prompt. An application admin must separately grant Minsky session membership. Never put privileged credentials in `VITE_` variables or frontend builds.
 
-For a migration, create a timestamped file under `supabase/migrations/`. Run `npm run typecheck`, `npm run lint`, `npm run check:functions`, `npm test`, and `npm run build`; run `npm run cloud:plan` before `npm run cloud:migrate`. The embedded tests execute every migration against PostgreSQL with Auth-context stubs. They do not test managed Supabase Auth or Realtime. Run `npm run test:cloud` for those real-account checks. Its fixtures use unique UUID sessions and temporary confirmed test accounts, then delete only their own data. It does not reset or seed the shared product. Do not interrupt it during cleanup. Privileged test credentials are captured in process memory and never put in a Vite build or printed.
-
-First setup and deployment:
+Use timestamped repository-owned migrations. Run `npm run cloud:plan` before `cloud:migrate`. Migrations never seed the shared product. The first setup uses an explicitly chosen existing Auth account:
 
 ```sh
 npm run cloud:plan
 npm run cloud:migrate
 npm run cloud:bootstrap -- --admin-user EXISTING_AUTH_UUID
 npm run cloud:functions
-npx supabase secrets set APP_URL=https://minsky-dev.icaic-minsky.workers.dev/ ALLOWED_ORIGINS=http://127.0.0.1:5173,http://127.0.0.1:4174,https://minsky-dev.icaic-minsky.workers.dev --project-ref ovymmobupzowotvrywek
+npx supabase secrets set ALLOWED_ORIGINS=http://127.0.0.1:5173,http://127.0.0.1:4174,https://minsky-dev.icaic-minsky.workers.dev --project-ref ovymmobupzowotvrywek
 npm run cloud:hosting-login
 npm run deploy
 ```
 
-Review `scripts/bootstrap.sql` before the trusted first bootstrap. It creates the initial group event/session/roster and assigns one already provisioned Auth account; it refuses an existing admin. It does not know or change that account's password. Subsequent membership and intake changes use the admin UI. `cloud:functions` passes `--use-api`, which bundles remotely without Docker. Supabase supplies the function's service credentials; the two settings above are public application configuration.
+Review `scripts/bootstrap.sql` before first setup; it refuses an existing admin. Do not rerun it against the already bootstrapped development project. The initial intake is closed until an admin opens it. `cloud:functions` bundles remotely with `--use-api`, without Docker. Supabase supplies the function’s service credentials; only `ALLOWED_ORIGINS` is required as custom function configuration. The previous `APP_URL` setting is unused.
 
-In Supabase **Authentication → URL Configuration**, set Site URL to the deployed root URL and allow these exact redirects: `http://127.0.0.1:5173/` and `https://minsky-dev.icaic-minsky.workers.dev/`. Keep Email enabled, public signup disabled, anonymous sign-in disabled and email confirmation enabled. Invitation and recovery links arrive at `/`, establish a session and open the password form. Hosted mail must still be configured and tested.
+## Verification and protected cloud CI
 
-PR CI (`.github/workflows/checks.yml`) runs type/lint/function/build, 66 focused tests including actual migration/RLS execution, and historical demo browser checks without hosted secrets. The manually dispatched cloud job uses a protected GitHub environment named `cloud-test`. Configure `MINSKY_TEST_PROJECT_REF` as its variable and `SUPABASE_ACCESS_TOKEN`, `SUPABASE_DB_PASSWORD`, `SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY` as environment secrets. Choose a separate free test project; CI refuses the shared development reference. Add required reviewers to the environment so privileged integration tests only run on trusted revisions. No automatic deployment or preview writes to shared data are configured. Cloud integration CI is implemented but requires this owner configuration before its first run.
+Run `npm run typecheck`, `npm run lint`, `npm run check:functions`, `npm test` and `npm run build`. Embedded PostgreSQL executes the actual migrations/policies with Auth-context/session/password-hash stubs; it does not prove managed Auth behavior. `npm run test:e2e` retains the historical local demo regression suite. `npm run test:cloud` exercises managed Auth/database/Realtime against a local frontend. `npm run test:hosted` repeats the real-account suite against the deployed app. Install Chromium with `npx playwright install chromium`.
 
-`npm run test:cloud` tests a local frontend against hosted Supabase. To smoke-test the deployed frontend with the same temporary real accounts, use `npm run test:hosted`. Configure redirect/CORS settings first. Fixture cleanup is explicit; no shared reset or auto-import of old browser demo data exists.
+Cloud tests create unique temporary sessions/accounts, change their temporary passwords, verify the shared workflow and creation/reset behavior, and explicitly clean up their own rows. They never reset the shared project. Credentials are held in memory and an ignored temporary fixture file. Do not interrupt cleanup. No screenshots should contain live temporary credentials; tests dismiss them before capture.
 
-The selected quality controls add secret scanning, dependency audits and a PR checklist. See [code-quality.md](code-quality.md) for required check names and the prepared merge-protection payload. The available contributor account cannot administer this repository; the owner must apply remote merge rules and enable vulnerability alerts. No paid security feature is selected.
+PR CI runs secret-free checks. The manually dispatched cloud job uses a protected GitHub environment named **cloud-test** and a **separate Supabase test project**. CI refuses shared development reference `ovymmobupzowotvrywek`.
 
+Configure `MINSKY_TEST_PROJECT_REF` as an environment variable, and `SUPABASE_ACCESS_TOKEN`, `SUPABASE_DB_PASSWORD`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` as environment secrets. Restrict execution to trusted revisions and configure required reviewers where the repository’s GitHub plan supports them; verify plan availability before treating protection as enabled. Then manually dispatch **Checks** for the reviewed branch and record the cloud job result. No automatic deployment or preview writes to shared data are configured. See [GitHub environment documentation](https://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/manage-environments).
 
-## Completion record to fill during implementation
+## Completion record
 
-- Cloudflare account access: independently verified through `wrangler whoami` for account `458ad6a930b0fb717796dfa19ca6a2b1`. Supabase organization reference `gayymsuhfqsboksikzwx` and project access were confirmed through CLI login/project listing. Organization owner, billing contact and plan selection remain for the user to record.
-- Supabase project URL: `https://ovymmobupzowotvrywek.supabase.co`; project reference: `ovymmobupzowotvrywek`. User confirmed reaching the project dashboard on 2026-10-02. Region `ap-southeast-1` and project name `Minsky` were independently verified through the CLI during implementation. The selected billing plan remains unconfirmed.
-- Supabase Auth: user confirmed saving Email enabled, public signup disabled, anonymous sign-ins disabled and email confirmation enabled on 2026-10-02. These are user-reported settings, not independently inspected or tested by the agent. The schema/app connection implementation is now present; the user confirmed saving the exact local/deployed redirect configuration. SMTP delivery verification remains pending.
-- Frontend connection settings: user supplied the publishable key on 2026-10-02. Project URL and publishable key are saved in Git-ignored `.env.local` under `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY`. The connected app now consumes these public settings. Cloud browser verification is recorded in current-state.md. No privileged key was requested or saved.
-- Cloudflare account ID: `458ad6a930b0fb717796dfa19ca6a2b1`. User confirmed the account-level Workers subdomain `icaic-minsky.workers.dev` on 2026-10-02. These identifiers were originally user-reported; CLI account access was independently verified during implementation.
-- Worker `minsky-dev` is deployed at `https://minsky-dev.icaic-minsky.workers.dev`. Final verified deployment version: `dcbba8b9-39af-4528-8fda-70ce61534ddf`. Workflow verification is recorded in current-state.md. Selected Workers billing plan remains unconfirmed; no paid upgrade was selected.
-- SMTP provider, sender and actual cost: not selected. User reported sender-domain access is unavailable for now (2026-10-02); known development accounts can be provisioned and assigned through the implemented path above; hosted mail remains pending.
-- Development Auth account: user confirmed creation on 2026-10-02 after the guided Create user / Auto Confirm User steps and supplied UUID `1b8c9cb2-f84c-4d13-92f9-b70088db38f8` for the intended first Minsky admin. The trusted bootstrap independently confirmed that this Auth UUID exists. Its password/login was not inspected. Minsky admin membership and the initial development event/session/roster were assigned using the trusted bootstrap during implementation. Login with this specific account remains for the user to check; its password was not requested or changed. Pass this UUID explicitly to the trusted hosted bootstrap; do not hardcode it into migrations or local fixtures or automatically promote the first person who signs in.
-- Trusted bootstrap: completed; account/membership authorization tested in embedded PostgreSQL. Non-team email delivery remains unverified.
-- Final hosted journey: all five real-account browser cases passed, including repeated reopening and private-note counters. Clean-checkout install/type/lint/test/function/build checks passed; final hosted refinement results appear in current-state.md; protected cloud CI is configured in source but has not run.
-- Spending: no paid upgrades or payment actions were performed by the agent. Provider usage charges and selected billing plans have not been independently checked.
-
-### Implementation outcomes (2026-10-02)
-
-- Supabase CLI login/link: completed by the user; `cloud:plan` verified the target and pending migration.
-- `202610020001_cloud.sql`, `202610020002_indexes.sql` and `202610020003_private_signals.sql`: applied successfully through `cloud:migrate`, without seeds.
-- Trusted bootstrap: completed for the explicitly recorded existing admin UUID. Initial intake remains closed until the admin opens it.
-- Admin Edge Function: Deno check passed and deployment succeeded with `--use-api`. `APP_URL` and `ALLOWED_ORIGINS` configured for local development and the intended Worker URL.
-- An initial default function deployment attempted local container bundling and was interrupted; the committed command now uses server-side bundling. Docker was not used for the database or tests.
-- Worker login/deployment and the first hosted Auth workflow/Realtime checks succeeded. SMTP delivery and protected cloud CI remain incomplete; neither is inferred from embedded tests.
+- Supabase project: `Minsky`, URL `https://ovymmobupzowotvrywek.supabase.co`, reference `ovymmobupzowotvrywek`, organization `gayymsuhfqsboksikzwx`, Singapore region `ap-southeast-1`, PostgreSQL 17. Provider access and CLI login/link were independently verified in the initial implementation.
+- Cloudflare account: `458ad6a930b0fb717796dfa19ca6a2b1`; Worker `minsky-dev` under `icaic-minsky.workers.dev`. Provider access and deployment were verified. Current deployment version and tests are in [current state](current-state.md).
+- Initial admin Auth UUID: `1b8c9cb2-f84c-4d13-92f9-b70088db38f8`. Trusted bootstrap verified existence and assigned the initial development event/session/three teams. The user subsequently confirmed signing into the hosted app. Their password was never requested or inspected. Assign a username through the app without recreating this account.
+- Authentication settings: user reported Email enabled, public signup and anonymous sign-in disabled, email confirmation enabled and exact local/hosted redirects saved. Keep these settings; the trusted function confirms organizer-created internal identities.
+- Historical migrations `202610020001_cloud.sql` through `202610020003_private_signals.sql` and the first bootstrap were applied without seeds. Both username/password migrations were applied without seeds, the account function was deployed, and all eight final hosted cases passed. Current deployment/version and detailed verification are recorded in current-state.md.
+- SMTP: deliberately removed from T0003 requirements by the user. No sender domain or paid mail service was configured; prior SMTP blockers are historical.
+- Ownership/billing: selected plans, organization owner, billing contact, recurring charges and receipt handling remain to be confirmed. No paid upgrade was selected or payment action performed by the agent.
+- Protected cloud CI: source is implemented; separate test project/environment setup and the first protected cloud run remain pending. Local runs against isolated development fixtures are separate evidence.

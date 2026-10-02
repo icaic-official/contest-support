@@ -1,8 +1,53 @@
 # Current state
 
-T0001/T0002 merged in PR #1. T0003 is implemented on `feature/t0003-cloud-product` and deployed as a development app; [PR #2](https://github.com/notbowen/minsky/pull/2) remains a draft while hosted email delivery and provider/CI setup acceptance items are pending. The user reviews and merges. The initial PLAN.md run report and the demo results below are historical.
+T0001/T0002 merged in PR #1. T0003 is implemented on `feature/t0003-cloud-product` and deployed as a development app; [PR #2](https://github.com/notbowen/minsky/pull/2) remains a draft while provider ownership/billing and protected cloud CI setup acceptance items are pending. The user replaced email onboarding with organizer-managed usernames/passwords; the revision below supersedes the original email requirements. The user reviews and merges. The initial PLAN.md run report and the demo results below are historical.
 
-## Connected implementation (T0003, 2026-10-02)
+## Username/password revision (2026-10-02)
+
+The user selected organizer-created usernames/passwords and organizer-assisted recovery. SMTP and personal email addresses are no longer T0003 prerequisites. The user also confirmed signing into the original hosted admin account.
+
+Implemented:
+
+- Username login backed by Supabase internal email-format identities. Existing email logins work until username assignment; assigning a username keeps the existing Auth UUID, password, memberships and history.
+- Admin account creation with server-generated temporary passwords, shown for that create/reset action only. Existing passwords cannot be retrieved. Forgot-password guidance sends users to organizers rather than email recovery.
+- Required first-login/reset password changes enforced by database policies and the workflow RPC, not only UI. Completion checks the actual Auth password hash; client metadata cannot bypass it.
+- Resets invalidate prior Auth sessions and refresh tokens. Database session cutoffs continue denying old JWTs even after the replacement password changes. Current password is requested for ordinary and required password changes.
+- Account-wide resets/username assignment require admin access to every affected session and reject archived memberships. Ordinary roles/intake remain session scoped. Own password changes use the signed-in flow; trusted provider recovery covers a lost sole-admin password.
+- Redesigned administration with padding, four status cards, a separate intake control, account creation/management columns, readable expandable rows, conditional staff permissions and collapsed advanced/audit sections. It stacks on phones; sign-in/password forms also have proper spacing.
+- Migrations `202610020004_usernames.sql` and `202610020005_admin_recovery.sql`; `cloud:recover-admin` is a private maintainer command. Service-only provisioning/recovery functions are unavailable to ordinary app accounts.
+
+Final verification:
+
+| Check | Observed result |
+| --- | --- |
+| Type checking, ESLint, Deno function check, production build | Passed; lint has no warnings |
+| `npm test` | 72 tests passed, including temporary-password RLS/RPC gates, stale-session denial, cross-session account administration and service-only admin recovery |
+| `npm run test:e2e` | All 21 historical demo browser tests passed |
+| `npm run test:cloud` | Seven final local-frontend/real-cloud cases passed (46.6 seconds), including the redesigned account controls and private maintainer recovery command |
+| `npm run test:hosted` | All eight hosted cases passed (49.0 seconds), additionally verifying existing-email account conversion without changing UUID/password/membership |
+| Migrations/function/deployment | Both new migrations applied without seeds; account function deployed with cloud bundling; frontend deployed successfully |
+| Documentation links and `git diff --check` | Passed |
+
+Current verified Worker version: `d0a04423-74fd-4a29-997e-f74c5b22f7db`; assets `index-BL2ghMjy.js` and `index-wMQJQd8C.css`. The build retains the two Zod annotation warnings and a 569 kB main-bundle warning (about 163 kB gzip).
+
+Hosted tests exercised organizer creation, case-insensitive username login, forced password change after refresh, denied pre-change reads/completion, reset/session/refresh-token invalidation, denied old-token Auth updates, replacement-password change, existing-account conversion, trusted provider recovery and the original complete shared journey/privacy/races/revocation/archive cases. Disposable fixtures were cleaned up. No real admin password was requested, inspected, changed or reset.
+
+Screenshot inspection checked the redesigned desktop admin workspace and phone layout. Browser layout checks passed at 390px and 320px; prior keyboard skip/form/refresh coverage remains. Real-device, assistive-technology and other-browser checks remain manual. The user should refresh the hosted app, optionally assign their own username, then create a development team/staff account and securely distribute its temporary credentials.
+
+Initial verification issues were resolved: ESLint’s account-effect dependency warning, an explicit Node console import for the maintainer script, and a documentation-edit script’s formatting anchor. The Supabase CLI initially failed because the sandbox prevented telemetry writes; approved execution applied the migrations. No checks are counted as passing from those failed attempts. Provider plan/ownership and the protected separate cloud CI environment remain pending; no paid service was enabled.
+
+Style keeps repository double quotes, React component capitalization, concise JSX callbacks and inferred component/Zod types. Shared logic uses named exports. Unchanged workflow code and historical tests were restored after formatting to avoid unrelated rewrites.
+
+Files changed in this revision:
+
+- Application: `src/connected/ConnectedApp.tsx`, `src/connected/client.ts`, `src/connected/model.ts`, `src/styles.css`.
+- Backend/recovery: `supabase/functions/admin/index.ts`, `supabase/functions/.env.example`, `supabase/migrations/202610020004_usernames.sql`, `supabase/migrations/202610020005_admin_recovery.sql`, `scripts/recover-admin.mjs`, `package.json`.
+- Tests/CI: `src/connected/client.test.ts`, `src/connected/database.test.ts`, `tests/cloud/fixture.ts`, `tests/cloud/setup.ts`, `tests/cloud/journey.spec.ts`, `.github/workflows/checks.yml`.
+- Guidance: `AGENTS.md`, `PLAN.md`, `README.md`, `docs/cloud-onboarding.md`, `docs/current-state.md`, `docs/manual-verification.md`, `docs/product-direction.md`, `docs/tickets.md`.
+
+Original email-flow results below are historical; they do not describe current onboarding requirements.
+
+## Original connected implementation (historical T0003 baseline, 2026-10-02)
 
 - Cloudflare Workers Static Assets at https://minsky-dev.icaic-minsky.workers.dev; all backend operations use Supabase project `ovymmobupzowotvrywek`, region `ap-southeast-1`, PostgreSQL 17. Final deployed Worker version: `dcbba8b9-39af-4528-8fda-70ce61534ddf` (after private signals and archived-read refinement).
 - Supabase email/password sign-in, logout, session restoration and password change. Invitation/password-setup and recovery UI/function paths are implemented; hosted delivery remains unverified without custom SMTP. Public signup/anonymous access settings are user-reported disabled. The user confirmed the deployed Site URL and exact local/deployed redirects.
@@ -15,7 +60,7 @@ T0001/T0002 merged in PR #1. T0003 is implemented on `feature/t0003-cloud-produc
 - Cloud contributor setup assumes full authorized cloud access per the user's latest instruction. Docker is optional. Functions deploy with `--use-api`; embedded PostgreSQL checks run without cloud credentials or Docker. Cloud tests provision isolated temporary accounts/sessions and clean up their own rows. The historical local demo stays available through `dev:demo` and is excluded from production assets.
 - PR CI is implemented for secret-free checks. Protected, manually dispatched cloud integration CI requires a separate test project and owner-configured environment secrets; it has not run yet. No preview/deployment automation writes to the shared project.
 
-## Observed T0003 verification
+## Original T0003 verification (historical baseline)
 
 | Check | Observed result |
 | --- | --- |
@@ -48,7 +93,7 @@ Clean-checkout verification: `/tmp/minsky-t0003-clean` at `bfe94e1` used a fresh
 
 ## Pending acceptance and known limits
 
-- Custom SMTP/sender access and hosted invitation, password setup, resend and recovery delivery to a non-provider-team recipient are incomplete. No local mail capture was run or counted as hosted proof.
+- Email invitations/recovery and SMTP were removed from T0003 by explicit user decision. Organizer credential delivery and identity checks before recovery are operational responsibilities.
 - Selected billing plans, billing contact/receipt record and protected cloud CI environment setup remain owner tasks. No paid upgrade was selected or payment information handled by the agent.
 - Membership revocation preserves historical ownership. If an active owner loses support membership, restore it to continue owner-only work or have another specialist accept an already pending handoff. General reassignment tools are not in T0003.
 - Group contests and one award per issue only. Uploads, broader organizer editors, shared incidents, imports, alerts/push, offline/resilience and 800-user capacity testing remain deferred. Candidate T0004 is not started.

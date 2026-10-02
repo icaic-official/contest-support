@@ -25,7 +25,8 @@
     "cloud:bootstrap": "node scripts/bootstrap.mjs",
     "check:functions": "deno check --node-modules-dir=none supabase/functions/admin/index.ts",
     "test:cloud": "node scripts/cloud-test.mjs",
-    "test:hosted": "node scripts/cloud-smoke.mjs"
+    "test:hosted": "node scripts/cloud-smoke.mjs",
+    "cloud:recover-admin": "node scripts/recover-admin.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "2.117.2",

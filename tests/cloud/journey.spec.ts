@@ -1,11 +1,12 @@
 import { test, expect, type Page } from "@playwright/test";
-import { account, fixture, anonKey, url, service } from "./fixture";
+import { account, fixture, anonKey, url, service, save } from "./fixture";
 import { createClient } from "@supabase/supabase-js";
+import {execFileSync} from "node:child_process";
 
 async function login(page: Page, name: string) {
   const details = fixture().accounts[name];
   await page.goto("/");
-  await page.getByLabel("Email", { exact: true }).fill(details.email);
+  await page.getByLabel("Username", { exact: true }).fill(details.username);
   await page.getByLabel("Password", { exact: true }).fill(details.password);
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await expect(
@@ -113,7 +114,7 @@ test("real accounts share the journey, private notes stay private, and phone/ref
       .getByRole("button", { name: "Sign out", exact: true })
       .click();
     const details = fixture().accounts.jury;
-    await specialist.getByLabel("Email", { exact: true }).fill(details.email);
+    await specialist.getByLabel("Username", { exact: true }).fill(details.username);
     await specialist
       .getByLabel("Password", { exact: true })
       .fill(details.password);
@@ -327,7 +328,7 @@ test("cloud policies isolate teams/sessions and reject real competing claims/awa
   ).not.toBeNull();
   const deniedAdmin = await helper.functions.invoke("admin", {
     body: {
-      action: "recovery",
+      action: "reset_password",
       session_id: state.sessions[0],
       user_id: state.accounts.contestant.id,
     },
@@ -418,6 +419,7 @@ test("admin UI assigns combined roles; password change, refresh and logout work"
   await expect(
     page.getByRole("heading", { name: "Session administration" }),
   ).toBeVisible();
+  await page.getByText("Assign an existing account by ID", {exact: true}).click();
   await page.getByLabel("Auth user UUID").fill(fixture().accounts.combined.id);
   const form = page
     .locator("form")
@@ -437,6 +439,7 @@ test("admin UI assigns combined roles; password change, refresh and logout work"
     .getByRole("button", { name: "Change password", exact: true })
     .click();
   const password = crypto.randomUUID() + "A9!";
+  await page.getByLabel("Current password", { exact: true }).fill(fixture().accounts.volunteer.password);
   await page.getByLabel("New password", { exact: true }).fill(password);
   await page.getByLabel("Confirm password", { exact: true }).fill(password);
   await page
@@ -457,13 +460,217 @@ test("admin UI assigns combined roles; password change, refresh and logout work"
     page.getByRole("heading", { name: "Support queue" }),
   ).toHaveCount(0);
   await page
-    .getByLabel("Email", { exact: true })
-    .fill(fixture().accounts.volunteer.email);
+    .getByLabel("Username", { exact: true })
+    .fill(fixture().accounts.volunteer.username);
   await page.getByLabel("Password", { exact: true }).fill(password);
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await expect(
     page.getByRole("heading", { name: "Keep the contest moving." }),
   ).toBeVisible();
+});
+
+test(
+  "organizer creates username accounts, mandatory changes and reset invalidate old access",
+  async ({ browser }, testInfo) => {
+    const adminContext = await browser.newContext();
+    const teamContext = await browser.newContext();
+    const page = await adminContext.newPage();
+    const team = await teamContext.newPage();
+    try {
+      await login(page, "admin");
+      const form = page.locator("form").filter({
+        has: page.getByRole("button", { name: "Create account", exact: true }),
+      });
+      const username = `new-${crypto.randomUUID().slice(0, 12)}`;
+      await form.getByLabel("Display name", { exact: true }).fill(
+        "Provisioned team",
+      );
+      await form.getByLabel("Username", { exact: true }).fill(username);
+      await form.getByLabel("Contestant team").selectOption(fixture().teams[0]);
+      await form.getByRole("button", { name: "Create account", exact: true })
+        .click();
+      const credentials = page.getByRole("region", {
+        name: "Temporary account credentials",
+      });
+      await expect(credentials).toBeVisible();
+      const temporary = await credentials.getByLabel("Temporary password", {
+        exact: true,
+      }).inputValue();
+      const state = fixture();
+      const record = await service().from("people").select("id").eq(
+        "username",
+        username,
+      ).single();
+      expect(record.error).toBeNull();
+      const userId = record.data!.id;
+      state.accounts.provisioned = {
+        id: userId,
+        username,
+        email: `${username}@accounts.minsky.invalid`,
+        password: temporary,
+      };
+      save(state);
+      const api = createClient(url, anonKey, {
+        auth: { persistSession: false, autoRefreshToken: false },
+      });
+      const signed = await api.auth.signInWithPassword({
+        email: state.accounts.provisioned.email,
+        password: temporary,
+      });
+      expect(signed.error).toBeNull();
+      expect((await api.from("sessions").select("*")).data).toEqual([]);
+      expect((await api.rpc("complete_password_change")).error).not.toBeNull();
+      await team.goto("/");
+      await team.getByLabel("Username", { exact: true }).fill(
+        username.toUpperCase(),
+      );
+      await team.getByLabel("Password", { exact: true }).fill(temporary);
+      await team.getByRole("button", { name: "Sign in", exact: true }).click();
+      await expect(
+        team.getByRole("heading", { name: "Change your temporary password" }),
+      ).toBeVisible();
+      await expect(team.getByRole("button", { name: "Return to dashboard" }))
+        .toHaveCount(0);
+      await team.reload();
+      await expect(
+        team.getByRole("heading", { name: "Change your temporary password" }),
+      ).toBeVisible();
+      const personal = crypto.randomUUID() + "A9!";
+      await team.getByLabel("Current password", { exact: true }).fill(
+        temporary,
+      );
+      await team.getByLabel("New password", { exact: true }).fill(personal);
+      await team.getByLabel("Confirm password", { exact: true }).fill(personal);
+      await team.getByRole("button", { name: "Save password", exact: true })
+        .click();
+      await expect(
+        team.getByRole("heading", { name: "A little help, right here." }),
+      ).toBeVisible();
+      const old = createClient(url, anonKey, {
+        auth: { persistSession: false, autoRefreshToken: false },
+      });
+      const oldLogin = await old.auth.signInWithPassword({
+        email: state.accounts.provisioned.email,
+        password: personal,
+      });
+      expect(oldLogin.error).toBeNull();
+      await page.getByRole("button", { name: "Dismiss credentials" }).click();
+      const member = page.locator("details").filter({
+        has: page.locator("summary").filter({ hasText: "Provisioned team" }),
+      });
+      await member.locator("summary").click();
+      page.once("dialog", (dialog) => dialog.accept());
+      await member.getByRole("button", { name: "Reset password", exact: true })
+        .click();
+      await expect(credentials).toBeVisible();
+      const replacement = await credentials.getByLabel("Temporary password", {
+        exact: true,
+      }).inputValue();
+      expect(replacement).not.toBe(temporary);
+      expect((await old.from("sessions").select("*")).data).toEqual([]);
+      expect(
+        (await old.auth.updateUser({ password: crypto.randomUUID() + "A9!" }))
+          .error,
+      ).not.toBeNull();
+      expect((await old.auth.refreshSession()).error).not.toBeNull();
+      await team.reload();
+      await expect(team.getByRole("heading", { name: /Sign in/ }))
+        .toBeVisible();
+      if (
+        await team.getByRole("button", { name: "Sign out", exact: true })
+          .count()
+      ) {
+        await team.getByRole("button", { name: "Sign out", exact: true })
+          .click();
+      }
+      await team.getByLabel("Username", { exact: true }).fill(username);
+      await team.getByLabel("Password", { exact: true }).fill(replacement);
+      await team.getByRole("button", { name: "Sign in", exact: true }).click();
+      await expect(
+        team.getByRole("heading", { name: "Change your temporary password" }),
+      ).toBeVisible();
+      const final = crypto.randomUUID() + "A9!";
+      await team.getByLabel("Current password", { exact: true }).fill(
+        replacement,
+      );
+      await team.getByLabel("New password", { exact: true }).fill(final);
+      await team.getByLabel("Confirm password", { exact: true }).fill(final);
+      await team.getByRole("button", { name: "Save password", exact: true })
+        .click();
+      await expect(
+        team.getByRole("heading", { name: "A little help, right here." }),
+      ).toBeVisible();
+      await page.getByRole("button", { name: "Dismiss credentials" }).click();
+      await page.screenshot({
+        path: testInfo.outputPath("admin-redesign-desktop.png"),
+        fullPage: true,
+      });
+      await page.setViewportSize({ width: 390, height: 844 });
+      expect(
+        await page.evaluate(() =>
+          document.documentElement.scrollWidth <= window.innerWidth
+        ),
+      ).toBe(true);
+      await page.screenshot({
+        path: testInfo.outputPath("admin-redesign-phone.png"),
+        fullPage: true,
+      });
+      await page.setViewportSize({ width: 320, height: 740 });
+      expect(
+        await page.evaluate(() =>
+          document.documentElement.scrollWidth <= window.innerWidth
+        ),
+      ).toBe(true);
+    } finally {
+      await adminContext.close();
+      await teamContext.close();
+    }
+  },
+);
+
+test("existing email accounts adopt a username without losing identity or password", async ({page}) => {
+  const state = fixture();
+  const username = `legacy-${crypto.randomUUID().slice(0,12)}`;
+  const email = `${username}@example.invalid`;
+  const password = crypto.randomUUID()+"A9!";
+  const created = await service().auth.admin.createUser({email,password,email_confirm:true,user_metadata:{name:"Legacy staff"}});
+  expect(created.error).toBeNull();
+  const id = created.data.user!.id;
+  state.accounts.legacy = {id,email,password,username:""}; save(state);
+  const assigned = await service().from("memberships").insert({session_id:state.sessions[0],user_id:id,roles:["volunteer"]});
+  expect(assigned.error).toBeNull();
+  await login(page,"admin");
+  const member = page.locator("details").filter({has:page.locator("summary").filter({hasText:"Legacy staff"})});
+  await member.locator("summary").click();
+  await member.getByLabel("Assign username",{exact:true}).fill(username);
+  await member.getByRole("button",{name:"Set username",exact:true}).click();
+  await expect(member.getByText(username,{exact:true})).toBeVisible();
+  const updated = await service().from("people").select("id,username").eq("id",id).single();
+  expect(updated.data).toEqual({id,username});
+  const api = createClient(url,anonKey,{auth:{persistSession:false,autoRefreshToken:false}});
+  const signed = await api.auth.signInWithPassword({email:`${username}@accounts.minsky.invalid`,password});
+  expect(signed.error).toBeNull();
+  expect(signed.data.user?.id).toBe(id);
+  expect((await api.from("memberships").select("*")).data?.[0]?.user_id).toBe(id);
+  expect((await api.rpc("account_status")).data.must_change).toBe(false);
+});
+
+test("trusted provider recovery restores a locked-out sole admin without email", async () => {
+  const state = fixture();
+  const old = await account("admin");
+  // Capture the private terminal output in memory; never print the temporary password.
+  const output = execFileSync("node",["scripts/recover-admin.mjs","--user",state.accounts.admin.id],{encoding:"utf8",stdio:["ignore","pipe","pipe"]});
+  const temporary = output.trim().split("\n").at(-1)!;
+  expect((await old.from("sessions").select("*")).data).toEqual([]);
+  const restored = createClient(url,anonKey,{auth:{persistSession:false,autoRefreshToken:false}});
+  const login = await restored.auth.signInWithPassword({email:state.accounts.admin.email,password:temporary});
+  expect(login.error).toBeNull();
+  expect((await restored.rpc("is_session_admin",{p_session:state.sessions[0]})).data).toBe(false);
+  expect((await restored.rpc("complete_password_change")).error).not.toBeNull();
+  const personal = crypto.randomUUID()+"A9!";
+  expect((await restored.auth.updateUser({password:personal,current_password:temporary})).error).toBeNull();
+  expect((await restored.rpc("complete_password_change")).error).toBeNull();
+  expect((await restored.rpc("is_session_admin",{p_session:state.sessions[0]})).data).toBe(true);
 });
 
 test("archived records allow queue navigation and disable writes", async ({

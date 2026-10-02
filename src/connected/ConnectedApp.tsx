@@ -1,25 +1,28 @@
 import {
+  type FormEvent,
   useCallback,
   useEffect,
   useRef,
   useState,
-  type FormEvent,
 } from "react";
 import type { User } from "@supabase/supabase-js";
 import {
+  type AccountStatus,
+  accountStatus,
   client,
   errorMessage,
   execute,
+  loginIdentifier,
   requireClient,
   snapshot,
 } from "./client";
 import {
-  isStaff,
-  isSupport,
-  membershipSchema,
   type Command,
+  isStaff,
   type Issue,
+  isSupport,
   type Membership,
+  membershipSchema,
   type Snapshot,
   unresolvedTime,
 } from "./model";
@@ -39,9 +42,6 @@ const resolutions = [
   "Problem statement clarified",
 ];
 const formatDate = (value: string) => new Date(value).toLocaleString();
-const initialPasswordSetup = /type=(invite|recovery)/.test(
-  window.location.hash,
-);
 function formData(event: FormEvent<HTMLFormElement>): FormData {
   event.preventDefault();
   return new FormData(event.currentTarget);
@@ -53,8 +53,12 @@ function text(data: FormData, name: string): string {
 export function ConnectedApp() {
   const [user, setUser] = useState<User>();
   const [loading, setLoading] = useState(true);
-  const [passwordSetup, setPasswordSetup] = useState(initialPasswordSetup);
+  const [passwordSetup, setPasswordSetup] = useState(false);
   const [error, setError] = useState("");
+  const [account, setAccount] = useState<AccountStatus>();
+  const [accountError, setAccountError] = useState("");
+  const [accountRetry, setAccountRetry] = useState(0);
+  const userId = user?.id;
   useEffect(() => {
     if (!client) {
       setLoading(false);
@@ -66,7 +70,6 @@ export function ConnectedApp() {
         if (!active) return;
         setUser(session?.user);
         setLoading(false);
-        if (event === "PASSWORD_RECOVERY") setPasswordSetup(true);
         if (event === "SIGNED_OUT") setPasswordSetup(false);
       },
     );
@@ -81,6 +84,31 @@ export function ConnectedApp() {
       subscription.subscription.unsubscribe();
     };
   }, []);
+  useEffect(() => {
+    if (!userId) return;
+    let active = true;
+    setAccount(undefined);
+    async function refreshAccount() {
+      try {
+        const next = await accountStatus();
+        if (!active) return;
+        setAccount(next);
+        setAccountError("");
+      } catch (cause) {
+        if (active) setAccountError(errorMessage(cause));
+      }
+    }
+    void refreshAccount();
+    const interval = window.setInterval(() => {
+      void refreshAccount();
+    }, 10000);
+    window.addEventListener("focus", refreshAccount);
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+      window.removeEventListener("focus", refreshAccount);
+    };
+  }, [userId, accountRetry]);
   return (
     <>
       <a className="skip-link" href="#main">
@@ -99,7 +127,7 @@ export function ConnectedApp() {
         </a>
         {user && (
           <>
-            <span>{user.email}</span>
+            <span>{account?.username ?? user.email}</span>
             <button className="quiet" onClick={() => setPasswordSetup(true)}>
               Change password
             </button>
@@ -124,20 +152,50 @@ export function ConnectedApp() {
             {error}
           </p>
         )}
-        {loading ? (
-          <p role="status">Restoring your session…</p>
-        ) : !client ? (
-          <p role="alert">
-            Set VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY in
-            .env.local. See docs/cloud-onboarding.md.
-          </p>
-        ) : !user ? (
-          <SignIn />
-        ) : passwordSetup ? (
-          <PasswordForm done={() => setPasswordSetup(false)} />
-        ) : (
-          <Dashboard key={user.id} user={user} />
-        )}
+        {loading
+          ? <p role="status">Restoring your session…</p>
+          : !client
+          ? (
+            <p role="alert">
+              Set VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY in
+              .env.local. See docs/cloud-onboarding.md.
+            </p>
+          )
+          : !user
+          ? <SignIn />
+          : accountError
+          ? (
+            <section className="panel auth-panel">
+              <p role="alert">{accountError}</p>
+              <button onClick={() => setAccountRetry((value) => value + 1)}>
+                Retry account check
+              </button>
+            </section>
+          )
+          : !account
+          ? <p role="status">Checking account access…</p>
+          : !account.session_valid
+          ? (
+            <section className="panel auth-panel">
+              <h1>Sign in again</h1>
+              <p>
+                Your password was reset. Sign out and use the new credentials
+                from your organizer.
+              </p>
+            </section>
+          )
+          : passwordSetup || account.must_change
+          ? (
+            <PasswordForm
+              required={account.must_change}
+              done={() => {
+                setPasswordSetup(false);
+                setAccount(undefined);
+                setAccountRetry((value) => value + 1);
+              }}
+            />
+          )
+          : <Dashboard key={user.id} user={user} />}
         <footer>
           Minsky · Development deployment
           <span>External contest clocks are managed separately.</span>
@@ -148,36 +206,26 @@ export function ConnectedApp() {
 }
 
 function SignIn() {
-  const [recovery, setRecovery] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState("");
+  const [help, setHelp] = useState(false);
   const [error, setError] = useState("");
   return (
     <section className="panel auth-panel">
-      <h1>{recovery ? "Recover your password" : "Sign in to Minsky"}</h1>
-      <p>Your organizer provides your account and session access.</p>
+      <p className="eyebrow">Welcome to Minsky</p>
+      <h1>Sign in to Minsky</h1>
+      <p>Use the username and password provided by your organizer.</p>
       <form
         onSubmit={(event) => {
           const data = formData(event);
           setBusy(true);
           setError("");
-          setMessage("");
           void (async () => {
             try {
-              const result = recovery
-                ? await requireClient().auth.resetPasswordForEmail(
-                    text(data, "email"),
-                    { redirectTo: window.location.origin + "/" },
-                  )
-                : await requireClient().auth.signInWithPassword({
-                    email: text(data, "email"),
-                    password: text(data, "password"),
-                  });
+              const result = await requireClient().auth.signInWithPassword({
+                email: loginIdentifier(text(data, "username")),
+                password: text(data, "password"),
+              });
               if (result.error) throw result.error;
-              if (recovery)
-                setMessage(
-                  "If this address has an account, check its mailbox for the recovery link.",
-                );
             } catch (cause) {
               setError(errorMessage(cause));
             } finally {
@@ -189,51 +237,58 @@ function SignIn() {
         <fieldset disabled={busy}>
           <legend className="sr-only">Account credentials</legend>
           <label>
-            Email
-            <input name="email" type="email" required autoComplete="username" />
+            Username<input
+              name="username"
+              required
+              autoComplete="username"
+              autoCapitalize="none"
+              spellCheck={false}
+            />
           </label>
-          {!recovery && (
-            <label>
-              Password
-              <input
-                name="password"
-                type="password"
-                required
-                autoComplete="current-password"
-              />
-            </label>
-          )}
-          <button type="submit">
-            {recovery ? "Send recovery email" : "Sign in"}
-          </button>
+          <p className="field-help">
+            Existing accounts can use their original email until a username is
+            assigned.
+          </p>
+          <label>
+            Password<input
+              name="password"
+              type="password"
+              required
+              autoComplete="current-password"
+            />
+          </label>
+          <button type="submit">{busy ? "Signing in…" : "Sign in"}</button>
         </fieldset>
       </form>
-      <button
-        className="quiet"
-        onClick={() => {
-          setRecovery(!recovery);
-          setMessage("");
-          setError("");
-        }}
-      >
-        {recovery ? "Back to sign in" : "Forgot password?"}
+      <button className="quiet" onClick={() => setHelp(!help)}>
+        Forgot password?
       </button>
-      {error && (
-        <p className="alert" role="alert">
-          {error}
+      {help && (
+        <p role="status">
+          Contact your contest organizer. They will verify your identity and
+          give you a new temporary password.
         </p>
       )}
-      <p role="status">{message}</p>
+      {error && <p className="alert" role="alert">{error}</p>}
     </section>
   );
 }
 
-function PasswordForm({ done }: { done: () => void }) {
+function PasswordForm(
+  { done, required }: { done: () => void; required: boolean },
+) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   return (
     <section className="panel auth-panel">
-      <h1>Set your password</h1>
+      <h1>
+        {required ? "Change your temporary password" : "Change your password"}
+      </h1>
+      <p>
+        {required
+          ? "Choose your own password before accessing the contest."
+          : "Enter your current password and choose a new one."}
+      </p>
       <form
         onSubmit={(event) => {
           const data = formData(event);
@@ -241,19 +296,42 @@ function PasswordForm({ done }: { done: () => void }) {
             setError("Passwords must match.");
             return;
           }
+          if (text(data, "current") === text(data, "password")) {
+            setError("Choose a different password.");
+            return;
+          }
           setBusy(true);
           setError("");
-          void requireClient()
-            .auth.updateUser({ password: text(data, "password") })
-            .then(({ error: cause }) => {
+          void (async () => {
+            try {
+              const updated = await requireClient().auth.updateUser({
+                password: text(data, "password"),
+                current_password: text(data, "current"),
+              });
+              if (updated.error) throw updated.error;
+              const completed = await requireClient().rpc(
+                "complete_password_change",
+              );
+              if (completed.error) throw completed.error;
+              done();
+            } catch (cause) {
+              setError(errorMessage(cause));
+            } finally {
               setBusy(false);
-              if (cause) setError(cause.message);
-              else done();
-            });
+            }
+          })();
         }}
       >
         <fieldset disabled={busy}>
           <legend className="sr-only">New password</legend>
+          <label>
+            Current password<input
+              name="current"
+              type="password"
+              required
+              autoComplete="current-password"
+            />
+          </label>
           <label>
             New password
             <input
@@ -282,9 +360,9 @@ function PasswordForm({ done }: { done: () => void }) {
           {error}
         </p>
       )}
-      <button className="quiet" onClick={done}>
-        Return to dashboard
-      </button>
+      {!required && (
+        <button className="quiet" onClick={done}>Return to dashboard</button>
+      )}
     </section>
   );
 }
@@ -520,7 +598,7 @@ function Dashboard({ user }: { user: User }) {
         <section className="panel">
           <h1>Session access</h1>
           <p>
-            No session data is available. If you have just been invited, ask an
+            No session data is available. If your account was just created, ask an
             organizer to assign your membership.
           </p>
           <button
@@ -1075,16 +1153,15 @@ function IssueDetail({
   );
 }
 
-function AdminPanel({
-  state,
-  refresh,
-}: {
-  state: Snapshot;
-  refresh: () => Promise<void>;
-}) {
+function AdminPanel(
+  { state, refresh }: { state: Snapshot; refresh: () => Promise<void> },
+) {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
+  const [credentials, setCredentials] = useState<
+    { username: string; password: string }
+  >();
   const guard = useRef(false);
   const session = state.session;
   if (!session) return null;
@@ -1094,6 +1171,7 @@ function AdminPanel({
     setBusy(true);
     setError("");
     setNotice("");
+    setCredentials(undefined);
     try {
       const result = await work();
       if (result.error) throw result.error;
@@ -1111,7 +1189,7 @@ function AdminPanel({
       body: {
         action,
         session_id: session?.id,
-        email: text(data, "email"),
+        username: text(data, "username"),
         user_id: text(data, "user"),
         name: text(data, "name"),
         team_id: text(data, "team") || null,
@@ -1120,40 +1198,76 @@ function AdminPanel({
       },
     });
     if (
-      result.error &&
-      "context" in result.error &&
+      result.error && "context" in result.error &&
       result.error.context instanceof Response
     ) {
       const body: unknown = await result.error.context.json();
-      if (body && typeof body === "object" && "error" in body)
+      if (body && typeof body === "object" && "error" in body) {
         return { error: { message: String(body.error) } };
+      }
+    }
+    if (!result.error && result.data?.temporary_password) {
+      const parsed = z.object({ temporary_password: z.string() }).parse(
+        result.data,
+      );
+      const target = state.members.find((m) =>
+        m.person.id === text(data, "user")
+      );
+      setCredentials({
+        username: text(data, "username") || target?.person.username ||
+          "Existing email login",
+        password: parsed.temporary_password,
+      });
     }
     return result;
   }
   return (
     <section className="panel admin-panel">
-      <h2>Session administration</h2>
+      <div className="admin-heading">
+        <div>
+          <p className="eyebrow">Organizer workspace</p>
+          <h2>Session administration</h2>
+          <p>Manage access and keep {session.name} running.</p>
+        </div>
+        <span
+          className={`intake-status ${session.intake_open ? "is-open" : ""}`}
+        >
+          Intake {session.intake_open ? "open" : "closed"}
+        </span>
+      </div>
+      {state.event?.archived && (
+        <p className="alert">
+          This event is archived. Account changes are disabled.
+        </p>
+      )}
+      {credentials && (
+        <section
+          className="credential-result"
+          aria-label="Temporary account credentials"
+        >
+          <h3>Share these credentials securely</h3>
+          <p>
+            This password is shown for this action only. If it’s lost, issue a
+            new one. The user must change it on login.
+          </p>
+          <label>
+            Account username<input readOnly value={credentials.username} />
+          </label>
+          <label>
+            Temporary password<input
+              readOnly
+              value={credentials.password}
+              autoComplete="off"
+            />
+          </label>
+          <button className="quiet" onClick={() => setCredentials(undefined)}>
+            Dismiss credentials
+          </button>
+        </section>
+      )}
       <fieldset disabled={busy || state.event?.archived}>
         <legend className="sr-only">Session administration</legend>
-        <p>
-          Contestant intake is {session.intake_open ? "open" : "closed"}. Staff
-          work and reopening remain available.
-        </p>
-        <button
-          onClick={() => {
-            void run(async () =>
-              requireClient().rpc("set_intake", {
-                p_session: session.id,
-                p_open: !session.intake_open,
-              }),
-            );
-          }}
-        >
-          {session.intake_open
-            ? "Close contestant intake"
-            : "Open contestant intake"}
-        </button>
-        <div className="metrics">
+        <div className="admin-stats" aria-label="Issue status counts">
           {Object.entries(statusNames).map(([key, value]) => (
             <div key={key}>
               <strong>
@@ -1163,136 +1277,235 @@ function AdminPanel({
             </div>
           ))}
         </div>
-        <h3>Invite an account</h3>
-        <form
-          onSubmit={(event) => {
-            const data = formData(event);
-            void run(() => account("invite", data));
-          }}
-        >
-          <label>
-            Name
-            <input name="name" required maxLength={200} />
-          </label>
-          <label>
-            Email
-            <input name="email" type="email" required />
-          </label>
-          <MembershipFields state={state} />
-          <button type="submit">Invite account</button>
-        </form>
-        <p>
-          Invitation and recovery delivery require configured SMTP. Passwords
-          are managed through Supabase Auth.
-        </p>
-        <h3>Session accounts</h3>
-        {state.members.map(({ membership: m, person }) => (
-          <details key={person.id}>
-            <summary>
-              {person.name} ·{" "}
-              {m.team_id
-                ? "Team contestant"
-                : [...m.roles, ...(m.is_admin ? ["admin"] : [])].join(" + ")}
-            </summary>
+        <div className="intake-controls">
+          <div>
+            <h3>Contestant submissions</h3>
+            <p>
+              Closing intake stops new contestant reports. Staff work and
+              reopening remain available.
+            </p>
+          </div>
+          <button
+            onClick={() => {
+              void run(async () =>
+                requireClient().rpc("set_intake", {
+                  p_session: session.id,
+                  p_open: !session.intake_open,
+                })
+              );
+            }}
+          >
+            {session.intake_open
+              ? "Close contestant intake"
+              : "Open contestant intake"}
+          </button>
+        </div>
+        <div className="admin-workspace">
+          <section className="admin-section">
+            <div className="admin-section-heading">
+              <h3>Create an account</h3>
+              <p>One account per team. Individual accounts for staff.</p>
+            </div>
             <form
               onSubmit={(event) => {
                 const data = formData(event);
-                void run(async () =>
-                  requireClient().rpc("manage_member", {
-                    p_session: session.id,
-                    p_user: person.id,
-                    p_team: text(data, "team") || null,
-                    p_roles: data.getAll("role"),
-                    p_admin: data.has("admin"),
-                    p_remove: false,
-                  }),
-                );
+                void run(() => account("create_account", data));
               }}
             >
-              <MembershipFields state={state} member={m} />
-              <button type="submit">Save membership</button>
+              <label>
+                Display name<input
+                  name="name"
+                  required
+                  maxLength={200}
+                  placeholder="Team Aurora or Alex Morgan"
+                />
+              </label>
+              <label>
+                Username<input
+                  name="username"
+                  required
+                  minLength={3}
+                  maxLength={32}
+                  pattern="[a-zA-Z0-9][a-zA-Z0-9_-]{2,31}"
+                  autoCapitalize="none"
+                  spellCheck={false}
+                  placeholder="team-aurora"
+                />
+              </label>
+              <p className="field-help">
+                3–32 letters, digits, underscores or hyphens. Usernames are
+                stored in lowercase.
+              </p>
+              <MembershipFields state={state} />
+              <button type="submit">
+                {busy ? "Working…" : "Create account"}
+              </button>
             </form>
-            <button
-              className="quiet"
-              onClick={() => {
-                if (
-                  window.confirm(
-                    `Revoke ${person.name}'s access to this session?`,
-                  )
-                )
-                  void run(async () =>
-                    requireClient().rpc("manage_member", {
-                      p_session: session.id,
-                      p_user: person.id,
-                      p_remove: true,
-                    }),
-                  );
-              }}
-            >
-              Revoke session access
-            </button>
-            <button
-              className="quiet"
-              onClick={() => {
-                const data = new FormData();
-                data.set("user", person.id);
-                void run(() => account("resend_invitation", data));
-              }}
-            >
-              Resend invitation
-            </button>
-            <button
-              className="quiet"
-              onClick={() => {
-                const data = new FormData();
-                data.set("user", person.id);
-                void run(() => account("recovery", data));
-              }}
-            >
-              Send password recovery
-            </button>
-          </details>
-        ))}
-        <h3>Assign an existing account</h3>
-        <form
-          onSubmit={(event) => {
-            const data = formData(event);
-            void run(async () =>
-              requireClient().rpc("manage_member", {
-                p_session: session.id,
-                p_user: text(data, "user"),
-                p_team: text(data, "team") || null,
-                p_roles: data.getAll("role"),
-                p_admin: data.has("admin"),
-                p_remove: false,
-              }),
-            );
-          }}
-        >
-          <label>
-            Auth user UUID
-            <input name="user" required />
-          </label>
-          <MembershipFields state={state} />
-          <button type="submit">Assign membership</button>
-        </form>
-        <h3>Recent administration activity</h3>
-        <ul>
-          {state.audit.map((a) => (
-            <li key={a.id}>
-              {a.action} ·{" "}
-              {state.members.find((m) => m.person.id === a.actor)?.person
-                .name ?? a.actor}{" "}
-              · {formatDate(a.at)}
-            </li>
-          ))}
-        </ul>
+            <p className="field-help">
+              You’ll receive a temporary password to share securely. The user
+              must change it before accessing the contest.
+            </p>
+          </section>
+          <section className="admin-section">
+            <div className="admin-section-heading">
+              <h3>
+                Session accounts{" "}
+                <span className="account-count">{state.members.length}</span>
+              </h3>
+              <p>Expand an account to update permissions or reset access.</p>
+            </div>
+            <div className="account-list">
+              {state.members.map(({ membership: m, person }) => (
+                <details key={person.id} className="account-entry">
+                  <summary>
+                    <span>
+                      <strong>{person.name}</strong>
+                      <small>
+                        {person.username ?? "Username not assigned"}
+                      </small>
+                    </span>
+                    <span className="account-role">
+                      {m.team_id
+                        ? state.teams.find((t) =>
+                          t.id === m.team_id
+                        )?.name ??
+                          "Team contestant"
+                        : [...m.roles, ...(m.is_admin ? ["admin"] : [])].join(
+                          " + ",
+                        )}
+                    </span>
+                  </summary>
+                  {!person.username && (
+                    <form
+                      onSubmit={(event) => {
+                        const data = formData(event);
+                        data.set("user", person.id);
+                        void run(() => account("set_username", data));
+                      }}
+                    >
+                      <label>
+                        Assign username<input
+                          name="username"
+                          required
+                          minLength={3}
+                          maxLength={32}
+                          pattern="[a-zA-Z0-9][a-zA-Z0-9_-]{2,31}"
+                          autoCapitalize="none"
+                          spellCheck={false}
+                        />
+                      </label>
+                      <button type="submit">Set username</button>
+                      <p className="field-help">
+                        The existing password stays the same. Use this username
+                        for future logins.
+                      </p>
+                    </form>
+                  )}
+                  <form
+                    onSubmit={(event) => {
+                      const data = formData(event);
+                      void run(async () =>
+                        requireClient().rpc("manage_member", {
+                          p_session: session.id,
+                          p_user: person.id,
+                          p_team: text(data, "team") || null,
+                          p_roles: data.getAll("role"),
+                          p_admin: data.has("admin"),
+                          p_remove: false,
+                        })
+                      );
+                    }}
+                  >
+                    <MembershipFields state={state} member={m} />
+                    <button type="submit">Save membership</button>
+                  </form>
+                  <div className="account-actions">
+                    {person.id !== state.membership?.user_id && (
+                      <button
+                        className="quiet"
+                        onClick={() => {
+                          if (
+                            !window.confirm(
+                              `Reset ${person.name}'s password? Verify their identity first. Existing sessions will lose access.`,
+                            )
+                          ) return;
+                          const data = new FormData();
+                          data.set("user", person.id);
+                          void run(() =>
+                            account("reset_password", data)
+                          );
+                        }}
+                      >
+                        Reset password
+                      </button>
+                    )}
+                    <button
+                      className="quiet danger"
+                      onClick={() => {
+                        if (
+                          window.confirm(
+                            `Revoke ${person.name}'s access to this session?`,
+                          )
+                        ) {
+                          void run(async () =>
+                            requireClient().rpc("manage_member", {
+                              p_session: session.id,
+                              p_user: person.id,
+                              p_remove: true,
+                            })
+                          );
+                        }
+                      }}
+                    >
+                      Revoke session access
+                    </button>
+                  </div>
+                </details>
+              ))}
+            </div>
+          </section>
+        </div>
+        <details className="admin-advanced">
+          <summary>Assign an existing account by ID</summary>
+          <p>
+            For trusted provisioning and accounts already created in Supabase.
+          </p>
+          <form
+            onSubmit={(event) => {
+              const data = formData(event);
+              void run(async () =>
+                requireClient().rpc("manage_member", {
+                  p_session: session.id,
+                  p_user: text(data, "user"),
+                  p_team: text(data, "team") || null,
+                  p_roles: data.getAll("role"),
+                  p_admin: data.has("admin"),
+                  p_remove: false,
+                })
+              );
+            }}
+          >
+            <label>
+              Auth user UUID<input name="user" required />
+            </label>
+            <MembershipFields state={state} />
+            <button type="submit">Assign membership</button>
+          </form>
+        </details>
+        <details className="admin-advanced">
+          <summary>Recent administration activity</summary>
+          <ul>
+            {state.audit.map((a) => (
+              <li key={a.id}>
+                {a.action.replaceAll("_", " ")} ·{" "}
+                {state.members.find((m) => m.person.id === a.actor)?.person
+                  .name ?? a.actor} · {formatDate(a.at)}
+              </li>
+            ))}
+          </ul>
+        </details>
       </fieldset>
-      {error && (
-        <p role="alert" className="alert">
-          {error}
-        </p>
-      )}
+      {error && <p role="alert" className="alert">{error}</p>}
       <p role="status">{notice}</p>
     </section>
   );
@@ -1305,11 +1518,12 @@ function MembershipFields({
   state: Snapshot;
   member?: Membership;
 }) {
+  const [team, setTeam] = useState(member?.team_id ?? "");
   return (
     <>
       <label>
         Contestant team
-        <select name="team" defaultValue={member?.team_id ?? ""}>
+        <select name="team" value={team} onChange={(event) => setTeam(event.target.value)}>
           <option value="">Staff account</option>
           {state.teams.map((t) => (
             <option key={t.id} value={t.id}>
@@ -1318,10 +1532,10 @@ function MembershipFields({
           ))}
         </select>
       </label>
-      <p>
-        Contestant accounts have a team. Staff accounts have roles or admin
-        membership.
+      <p className="field-help">
+        {team ? "This account can submit and view issues for the selected team." : "Choose the permissions this staff member needs."}
       </p>
+      {!team && <fieldset className="staff-options"><legend>Staff permissions</legend>
       {(["volunteer", "specialist", "jury"] as const).map((role) => (
         <label key={role} className="checkbox">
           <input
@@ -1337,6 +1551,7 @@ function MembershipFields({
         <input name="admin" type="checkbox" defaultChecked={member?.is_admin} />
         Admin
       </label>
+      </fieldset>}
     </>
   );
 }

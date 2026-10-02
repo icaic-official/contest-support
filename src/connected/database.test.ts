@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { PGlite } from "@electric-sql/pglite";
-import { readFileSync, readdirSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 
 // Embedded PostgreSQL runs the actual migration and RLS, with a small stand-in
 // for Supabase Auth's verified user context. Hosted Auth/Realtime need cloud tests.
@@ -18,9 +18,15 @@ const specialist = id(4);
 const jury = id(5);
 const combined = id(6);
 let request = 0;
-async function actor(user: string) {
+async function actor(
+  user: string,
+  authSession = id(Number(user.slice(-12)) + 300),
+) {
   await db.exec("reset role");
   await db.query("select set_config('request.jwt.claim.sub',$1,false)", [user]);
+  await db.query("select set_config('request.jwt.claims',$1,false)", [
+    JSON.stringify({ session_id: authSession }),
+  ]);
   await db.exec("set role authenticated");
 }
 async function workflow(
@@ -66,21 +72,31 @@ async function resolve(issueId: string) {
   await action(issueId, "resolve", { summary: "Service restored" });
 }
 beforeAll(async () => {
-  await db.exec(`create role anon; create role authenticated; create role service_role bypassrls;
-    create schema auth; create table auth.users(id uuid primary key, raw_user_meta_data jsonb default '{}');
+  await db.exec(
+    `create role anon; create role authenticated; create role service_role bypassrls;
+    create schema auth; create table auth.users(id uuid primary key, raw_user_meta_data jsonb default '{}', encrypted_password text default 'initial-hash');
+    create table auth.sessions(id uuid primary key,user_id uuid,created_at timestamptz default clock_timestamp());
+    create function auth.jwt() returns jsonb language sql stable as $$ select coalesce(nullif(current_setting('request.jwt.claims',true),''),'{}')::jsonb $$;
     create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$;
     grant usage on schema auth to authenticated; grant execute on function auth.uid() to authenticated;
-    create publication supabase_realtime;`);
-  for (const file of readdirSync("supabase/migrations")
-    .filter((f) => f.endsWith(".sql"))
-    .sort()) {
+    create publication supabase_realtime;`,
+  );
+  for (
+    const file of readdirSync("supabase/migrations")
+      .filter((f) => f.endsWith(".sql"))
+      .sort()
+  ) {
     await db.exec(readFileSync(`supabase/migrations/${file}`, "utf8"));
   }
-  for (let n = 1; n <= 8; n++)
-    await db.query("insert into auth.users values($1,$2::jsonb)", [
-      id(n),
-      JSON.stringify({ name: `Person ${n}` }),
-    ]);
+  for (let n = 1; n <= 8; n++) {
+    await db.query(
+      "insert into auth.users(id,raw_user_meta_data) values($1,$2::jsonb)",
+      [
+        id(n),
+        JSON.stringify({ name: `Person ${n}` }),
+      ],
+    );
+  }
   await db.query("insert into public.events(id,name) values($1,$2)", [
     id(90),
     "Test event",
@@ -99,18 +115,29 @@ beforeEach(async () => {
   await db.exec(
     "truncate public.admin_audit,public.history,public.awards,public.resolutions,public.issues,public.changes,public.staff_changes,app_private.receipts,public.memberships cascade",
   );
+  await db.exec("truncate app_private.account_credentials,auth.sessions");
+  await db.query("update public.people set username=null");
+  await db.query("update auth.users set encrypted_password='initial-hash'");
+  for (let n = 1; n <= 8; n++) {
+    await db.query("insert into auth.sessions(id,user_id) values($1,$2)", [
+      id(n + 300),
+      id(n),
+    ]);
+  }
   await db.query("update public.events set archived=false");
   await db.query("update public.sessions set intake_open=true");
-  for (const [user, team, roles, isAdmin, s] of [
-    [admin, null, [], true, session],
-    [contestant, aurora, [], false, session],
-    [volunteer, null, ["volunteer"], false, session],
-    [specialist, null, ["specialist"], false, session],
-    [jury, null, ["jury"], false, session],
-    [combined, null, ["volunteer", "specialist", "jury"], false, session],
-    [id(7), cedar, [], false, session],
-    [id(8), id(203), [], false, secondSession],
-  ] as const)
+  for (
+    const [user, team, roles, isAdmin, s] of [
+      [admin, null, [], true, session],
+      [contestant, aurora, [], false, session],
+      [volunteer, null, ["volunteer"], false, session],
+      [specialist, null, ["specialist"], false, session],
+      [jury, null, ["jury"], false, session],
+      [combined, null, ["volunteer", "specialist", "jury"], false, session],
+      [id(7), cedar, [], false, session],
+      [id(8), id(203), [], false, secondSession],
+    ] as const
+  ) {
     await db.query("insert into public.memberships values($1,$2,$3,$4,$5)", [
       s,
       user,
@@ -118,12 +145,167 @@ beforeEach(async () => {
       roles,
       isAdmin,
     ]);
+  }
 });
 afterAll(async () => {
   await db.close();
 });
 
 describe("cloud database authorization and workflow", () => {
+  it("blocks temporary-password reads and RPC writes until Auth records a changed password", async () => {
+    await db.query("select public.initialize_account($1,'team-aurora')", [
+      contestant,
+    ]);
+    await actor(contestant);
+    const status = await db.query<{ status: { must_change: boolean } }>(
+      "select public.account_status() as status",
+    );
+    expect(status.rows[0].status.must_change).toBe(true);
+    for (
+      const table of [
+        "sessions",
+        "memberships",
+        "people",
+        "teams",
+        "issues",
+        "history",
+        "admin_audit",
+      ]
+    ) {
+      expect((await db.query(`select * from public.${table}`)).rows).toEqual(
+        [],
+      );
+    }
+    await expect(submit()).rejects.toThrow("temporary password");
+    await expect(db.query("select public.complete_password_change()")).rejects
+      .toThrow("Change your temporary");
+    await expect(
+      db.query("select public.initialize_account($1,'attack')", [contestant]),
+    ).rejects.toThrow("permission denied");
+    await expect(
+      db.query("select public.finish_password_reset($1,$2,true)", [
+        contestant,
+        id(500),
+      ]),
+    ).rejects.toThrow("permission denied");
+    await db.exec("reset role");
+    await db.query(
+      "update auth.users set raw_user_meta_data='{\"must_change\":false}' where id=$1",
+      [contestant],
+    );
+    await actor(contestant);
+    await expect(db.query("select public.complete_password_change()")).rejects
+      .toThrow("temporary password");
+    await db.exec("reset role");
+    await db.query(
+      "update auth.users set encrypted_password='new-hash' where id=$1",
+      [contestant],
+    );
+    await actor(contestant);
+    await db.query("select public.complete_password_change()");
+    expect(await submit()).toBeTruthy();
+  });
+  it("reset invalidates old sessions even after the replacement password is changed", async () => {
+    const i = await submit();
+    await actor(admin);
+    const reset = await db.query<{ token: string }>(
+      "select public.begin_password_reset($1,$2) as token",
+      [session, contestant],
+    );
+    await expect(
+      db.query("select public.begin_password_reset($1,$2)", [
+        session,
+        contestant,
+      ]),
+    ).rejects.toThrow("already in progress");
+    await db.exec("reset role");
+    await db.query(
+      "update auth.users set encrypted_password='temporary-reset' where id=$1",
+      [contestant],
+    );
+    await db.query("select public.finish_password_reset($1,$2,true)", [
+      contestant,
+      reset.rows[0].token,
+    ]);
+    await actor(contestant);
+    expect((await db.query("select * from public.issues")).rows).toEqual([]);
+    await expect(db.query("select public.complete_password_change()")).rejects
+      .toThrow("Sign in again");
+    await db.exec("reset role");
+    await db.query("insert into auth.sessions(id,user_id) values($1,$2)", [
+      id(999),
+      contestant,
+    ]);
+    await db.query(
+      "update auth.users set encrypted_password='replacement-personal' where id=$1",
+      [contestant],
+    );
+    await actor(contestant, id(999));
+    await db.query("select public.complete_password_change()");
+    expect((await issue(i)).status).toBe("open");
+    await actor(contestant);
+    expect((await db.query("select * from public.issues")).rows).toEqual([]);
+    await expect(submit()).rejects.toThrow("sign in again");
+  });
+  it("limits account-wide resets and username assignment to admins of every affected session", async () => {
+    await actor(admin);
+    await expect(
+      db.query("select public.begin_password_reset($1,$2)", [session, admin]),
+    ).rejects.toThrow("own account");
+    await db.query("select public.register_username($1,$2,'organizer')", [
+      session,
+      admin,
+    ]);
+    await expect(
+      db.query("select public.register_username($1,$2,'organizer')", [
+        session,
+        contestant,
+      ]),
+    ).rejects.toThrow("unique");
+    await expect(
+      db.query("select public.register_username($1,$2,'two')", [
+        session,
+        admin,
+      ]),
+    ).rejects.toThrow("already has");
+    await db.exec("reset role");
+    await db.query(
+      "insert into public.memberships values($1,$2,null,'{volunteer}',false)",
+      [secondSession, volunteer],
+    );
+    await actor(admin);
+    await expect(
+      db.query("select public.begin_password_reset($1,$2)", [
+        session,
+        volunteer,
+      ]),
+    ).rejects.toThrow("all its active sessions");
+    await expect(
+      db.query("select public.register_username($1,$2,'helper')", [
+        session,
+        volunteer,
+      ]),
+    ).rejects.toThrow("all its active sessions");
+    await actor(contestant);
+    await expect(
+      db.query("select public.begin_password_reset($1,$2)", [
+        session,
+        volunteer,
+      ]),
+    ).rejects.toThrow("Admin membership");
+  });
+
+  it("keeps sole-admin recovery behind trusted provider credentials", async () => {
+    await actor(admin);
+    await expect(db.query("select public.begin_admin_recovery($1)", [admin])).rejects.toThrow("permission denied");
+    await db.exec("reset role");
+    await expect(db.query("select public.begin_admin_recovery($1)", [contestant])).rejects.toThrow("existing admin");
+    const reset = await db.query<{token: string}>("select public.begin_admin_recovery($1) as token", [admin]);
+    expect(reset.rows[0].token).toBeTruthy();
+    await actor(admin);
+    expect((await db.query("select * from public.sessions")).rows).toEqual([]);
+    await expect(db.query("select public.set_intake($1,false)", [session])).rejects.toThrow("Admin membership");
+  });
   it("does not expose private-note activity through public revisions or live signals", async () => {
     const i = await submit();
     const before = await issue(i);

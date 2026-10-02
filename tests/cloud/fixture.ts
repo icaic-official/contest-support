@@ -5,7 +5,7 @@ export interface Fixture {
   event: string;
   sessions: string[];
   teams: string[];
-  accounts: Record<string, { id: string; email: string; password: string }>;
+  accounts: Record<string, { id: string; email: string; password: string; username: string }>;
 }
 export const url = process.env.SUPABASE_URL ?? "";
 export const anonKey = process.env.SUPABASE_ANON_KEY ?? "";

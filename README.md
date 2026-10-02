@@ -2,7 +2,7 @@
 
 Minsky helps contest teams and staff report, triage, resolve and review technical problems. T0003 connects the existing workflow to Supabase Auth, Postgres and Realtime; Cloudflare Workers serves the static React frontend.
 
-The connected app is a **development deployment**, with connectivity assumed. Invitation/recovery delivery remains pending custom SMTP. It is not yet certified for a live contest or the 800-user target.
+The connected app is a **development deployment**, with connectivity assumed. Accounts use organizer-provided usernames/passwords. Temporary passwords must be changed before contest access; organizers handle recovery without SMTP. It is not yet certified for a live contest or the 800-user target.
 
 ## Connected development — no Docker required
 
@@ -29,7 +29,7 @@ npm run cloud:hosting-login
 npm run deploy
 ```
 
-`cloud:functions` uses server-side bundling (`--use-api`), so Docker is not required. The bootstrap refuses to run if an admin already exists. Review/edit `scripts/bootstrap.sql` for the initial event, session and roster. Once bootstrapped, use the admin view for account membership, roles and contestant intake. See [cloud onboarding](docs/cloud-onboarding.md) for redirect URLs, function configuration, provisioning while SMTP is pending, and tested setup outcomes.
+`cloud:functions` uses server-side bundling (`--use-api`), so Docker is not required. The bootstrap refuses to run if an admin already exists. Review/edit `scripts/bootstrap.sql` for the initial event, session and roster. Once bootstrapped, use the admin view for account membership, roles and contestant intake. See [cloud onboarding](docs/cloud-onboarding.md) for function configuration, username provisioning, password resets and tested setup outcomes.
 
 | Command | Purpose |
 | --- | --- |
@@ -46,6 +46,7 @@ npm run deploy
 | `npm run dev:demo` | Historical browser-local demo, development only |
 | `npm run cloud:plan` / `cloud:migrate` | Dry-run / apply linked cloud migrations |
 | `npm run cloud:bootstrap -- --admin-user UUID` | Trusted first-admin/session bootstrap |
+| `npm run cloud:recover-admin -- --user UUID` | Trusted provider recovery of an existing admin; prints a new temporary password in the private terminal |
 | `npm run cloud:functions` | Deploy account administration with cloud bundling |
 | `npm run deploy` | Build and explicitly deploy Workers Static Assets |
 
@@ -57,9 +58,9 @@ PR security checks scan Git history for secrets with redacted Gitleaks output an
 
 ## Connected workflow
 
-Sign in with an organizer-provided account. Team accounts see their own issues and public activity. Staff see their combined volunteer/specialist/jury capabilities; admin is a separate capability. Submit → claim → escalate → accept → resolve → award → confirm external application. Support can report for a roster team. Reopening preserves ownership, every previous resolution and the existing award, while excluding resolved intervals from unresolved time. Server timestamps, issue revisions, transactional locks and persisted request IDs protect writes. An award remains separate from the external contest clock.
+Sign in with an organizer-provided username and password. Existing development accounts can keep using their original email until the admin assigns a username. Team accounts see their own issues and public activity. Staff see their combined volunteer/specialist/jury capabilities; admin is a separate capability. Submit → claim → escalate → accept → resolve → award → confirm external application. Support can report for a roster team. Reopening preserves ownership, every previous resolution and the existing award, while excluding resolved intervals from unresolved time. Server timestamps, issue revisions, transactional locks and persisted request IDs protect writes. An award remains separate from the external contest clock.
 
-The admin view can invite accounts, assign existing Auth users to teams or staff roles, revoke membership, and open/close contestant intake. It cannot remove the last admin. Existing logins lose database access immediately when membership is removed; the UI refetches current membership on focus, reconnect and at ten-second intervals. Realtime uses team-scoped public and staff-only private invalidations followed by authorized reads. Private notes do not advance public counters. No notes or issue content are sent in the invalidation payload.
+The admin view can create username accounts, issue new temporary passwords, assign existing Auth users to teams or staff roles, revoke membership, and open/close contestant intake. Credentials are shown for the provisioning/reset action only, not stored as recoverable passwords. Users must change temporary passwords before reading or changing contest data. Resets invalidate prior sessions. Account-wide changes require admin access to every session of that identity and reject archived memberships. It cannot remove the last admin. Existing logins lose database access immediately when membership is removed; the UI refetches current membership on focus, reconnect and at ten-second intervals. Realtime uses team-scoped public and staff-only private invalidations followed by authorized reads. Private notes do not advance public counters. No notes or issue content are sent in the invalidation payload.
 
 Uploads, broader event/roster/category editors, CSV, notifications, shared incidents, offline operation and award adjustments remain deferred. This implementation supports group events and one award per issue.
 

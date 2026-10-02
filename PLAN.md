@@ -57,7 +57,7 @@ Create a compact documentation package alongside the demo:
 Preserve these longer-term decisions in the product-direction document:
 
 - Each event has one contest type: individual or group. Sessions have separate rosters, schedules, issues, and awards.
-- Organizers provision email/password accounts. Group contestants share a team account. Staff have individual accounts.
+- Organizers provision username/password accounts (updated 2026-10-02). Group contestants share a team account. Staff have individual accounts.
 - Configurable roles combine fixed capabilities. Issue categories are configurable.
 - Contestants and staff can submit reports. Staff manually open and close contestant intake.
 - Ownership persists during escalation until handoff. Timers run continuously. Recurrences create linked new reports, and duplicates link to a canonical report.
@@ -116,3 +116,5 @@ The manual guide will cover the same journey and identify anything automated che
 | **Risks** | Simulated permissions and local state do not establish production correctness. Outage requirements remain unresolved. |
 | **Follow-up tickets** | First implement T0001. Then use your feedback to select a refinement or free-tier integration experiment. |
 | **Docs that need updating** | Update the README and create the documentation package listed above during T0001. |
+
+**Authentication revision (2026-10-02):** The user selected organizer-created usernames/passwords for T0003. Team contestants share a team account; staff keep individual accounts. Organizers distribute temporary credentials securely and verify identity before password resets. Users must change temporary passwords before contest access. This replaces email invitations and email recovery in T0003; SMTP and personal email addresses are not prerequisites. Supabase still manages passwords and sessions. Existing development email logins remain valid until a username is assigned.

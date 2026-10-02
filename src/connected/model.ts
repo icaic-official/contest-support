@@ -93,7 +93,7 @@ export const snapshotSchema = z.object({
   members: z.array(
     z.object({
       membership: membershipSchema,
-      person: z.object({ id: uuid, name: z.string() }),
+      person: z.object({ id: uuid, name: z.string(), username: z.string().nullable() }),
     }),
   ),
   audit: z.array(

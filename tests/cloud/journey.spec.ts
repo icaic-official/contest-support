@@ -18,6 +18,48 @@ async function login(page: Page, name: string) {
     }),
   ).toBeVisible();
 }
+
+test("sign-in stays usable on phones and exposes recovery help by keyboard", async ({
+  page,
+}, testInfo) => {
+  await page.goto("/");
+  await expect(
+    page.getByRole("heading", { name: "Sign in to Minsky" }),
+  ).toBeVisible();
+  await page.evaluate(() => document.fonts.ready);
+  await page.screenshot({
+    path: testInfo.outputPath("sign-in-desktop.png"),
+    fullPage: true,
+  });
+  for (const width of [800, 390, 320]) {
+    await page.setViewportSize({ width, height: 844 });
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= window.innerWidth,
+      ),
+    ).toBe(true);
+    const username = await page.getByLabel("Username", { exact: true })
+      .boundingBox();
+    expect(username).not.toBeNull();
+    expect(username!.x).toBeGreaterThanOrEqual(0);
+    expect(username!.x + username!.width).toBeLessThanOrEqual(width);
+    expect(username!.height).toBeGreaterThanOrEqual(44);
+  }
+  const help = page.getByRole("button", { name: "Forgot password?" });
+  await help.focus();
+  await page.keyboard.press("Enter");
+  await expect(help).toHaveAttribute("aria-expanded", "true");
+  await expect(page.getByRole("status")).toContainText(
+    "Contact your contest organizer.",
+  );
+  await page.screenshot({
+    path: testInfo.outputPath("sign-in-320.png"),
+    fullPage: true,
+  });
+  await page.keyboard.press("Enter");
+  await expect(help).toHaveAttribute("aria-expanded", "false");
+});
+
 test("real accounts share the journey, private notes stay private, and phone/refresh/keyboard work", async ({
   browser,
 }, testInfo) => {
@@ -92,6 +134,15 @@ test("real accounts share the journey, private notes stay private, and phone/ref
     await expect(
       contestant.getByText("Private diagnostic", { exact: true }),
     ).toHaveCount(0);
+    const queue = await contestant.locator(".queue").boundingBox();
+    const detail = await contestant.locator(".detail").boundingBox();
+    expect(queue).not.toBeNull();
+    expect(detail).not.toBeNull();
+    expect(queue!.x + queue!.width).toBeLessThan(detail!.x);
+    await staff.screenshot({
+      path: testInfo.outputPath("support-390.png"),
+      fullPage: true,
+    });
     await staff.getByRole("button", { name: "Escalate to specialist" }).click();
     await expect(
       staff.getByText(/Test volunteer remains responsible/),
@@ -220,9 +271,13 @@ test("real accounts share the journey, private notes stay private, and phone/ref
       0,
     );
     await expect(staff.getByLabel("Demo persona")).toHaveCount(0);
-    await staff.screenshot({ path: testInfo.outputPath("support-320.png") });
+    await staff.screenshot({
+      path: testInfo.outputPath("support-320.png"),
+      fullPage: true,
+    });
     await contestant.screenshot({
       path: testInfo.outputPath("contestant-desktop.png"),
+      fullPage: true,
     });
   } catch (cause) {
     for (const [name, page] of [

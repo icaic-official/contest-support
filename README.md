@@ -4,6 +4,8 @@ Minsky helps contest teams and staff report, triage, resolve and review technica
 
 The connected app is a **development deployment**, with connectivity assumed. Accounts use organizer-provided usernames/passwords. Temporary passwords must be changed before contest access; organizers handle recovery without SMTP. It is not yet certified for a live contest or the 800-user target.
 
+The interface uses a responsive support workspace: queue and issue details sit side by side on desktop and stack on phones. Sign-in, reporting and account administration share an indigo/teal palette, visible keyboard focus and locally served Public Sans typography. The font license is in `public/fonts/OFL-Public-Sans.txt`. The historical demo shares these styles.
+
 ## Connected development — no Docker required
 
 Use Node.js 22.13+ within 22.x, or Node.js 24+, and npm. Contributors are assumed to have access to the shared cloud credentials, per the user's 2026-10-02 instruction. Provider-console permissions and Minsky session membership are separate.

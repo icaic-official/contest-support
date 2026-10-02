@@ -117,6 +117,8 @@ Updated contributor decision (2026-10-02): contributors may be assumed to have f
 
 Selected quality improvements (2026-10-02): require CI and independent review before merging, add a short PR review checklist, and scan secrets/dependencies with routine update PRs. Implementation and owner setup are described in [code-quality.md](code-quality.md). Remote merge rules and vulnerability alerts require repository administration access; they are not inferred from committed workflow files.
 
+Selected interface refinement (2026-10-02): the user requested temporarily installing Anthropic's `frontend-design` skill, applying it to the repository, pushing the changes and deploying the frontend to Cloudflare, then removing the skill. This refinement stays on the active T0003 branch and covers sign-in, shared styles, responsive reporting/queue/detail layouts and administration. It preserves existing workflow and authorization rules; no new backend features are included. Verification and deployment evidence are recorded in [current-state.md](current-state.md).
+
 ### Outcome and recommended boundary
 
 Different people can sign in to a hosted Minsky deployment and complete the existing issue journey against shared data. Another developer with authorized cloud access can clone the repository, run the connected frontend locally, make a migration and submit a tested PR. Fast checks run without cloud credentials or Docker; full integration tests provision isolated cloud fixtures.
@@ -177,4 +179,5 @@ No offline/resilience project, 800-user load certification, individual-contest U
 ## Candidate queue (not yet development tickets)
 
 1. **Recommended T0004: organizer tools and configurable issue attachments.** Event/session/roster/category editing and permission settings, prioritized after the cloud workflow is reviewed. Helpers' uploaded photos/screenshots must be linked to an issue with uploader/time metadata. Include enable/disable controls for volunteer image submission, enforced by the backend. Decide configuration scope, defaults, and contestant-visible versus staff-only access before implementation; do not infer that the uploader chooses visibility. Supabase Storage is recommended initially, with file records in Postgres and private bucket access. Choose file types/size limits and deletion rules when scoping. This is a candidate, not a created or started T0004.
-2. Visual refinement after the user selects design references. Resilience and event-capacity work remain deferred until feature feedback warrants them.
+
+Resilience and event-capacity work remain deferred until feature feedback warrants them.

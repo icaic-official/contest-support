@@ -2,6 +2,29 @@
 
 T0001/T0002 merged in PR #1. T0003 is implemented on `feature/t0003-cloud-product` and deployed as a development app; [PR #2](https://github.com/notbowen/minsky/pull/2) remains a draft while provider ownership/billing and protected cloud CI setup acceptance items are pending. The user replaced email onboarding with organizer-managed usernames/passwords; the revision below supersedes the original email requirements. The user reviews and merges. The initial PLAN.md run report and the demo results below are historical.
 
+## Interface refinement (2026-10-02)
+
+The user requested installing Anthropic's `frontend-design` skill temporarily, applying it to the existing application, pushing the changes and deploying to Cloudflare, then deleting the skill. This is a refinement of the active T0003 branch.
+
+Implemented:
+
+- Indigo/teal visual system, locally served variable Public Sans with its SIL Open Font License, and a handoff illustration on desktop sign-in. Phone sign-in keeps the introduction compact so credentials remain easy to reach. No external font request or new npm dependency is required.
+- Responsive account controls, reporting forms and administration sections. The connected queue now sits beside the selected issue on desktop and stacks on phones; its previous `columns` class had no corresponding style. Submission markup now matches the intended form layout. Status names, ownership, timing, privacy and award/application semantics are preserved.
+- Keyboard-visible focus, 44px minimum form/control heights, and recovery help with expanded/collapsed state. Empty queues explain where reports will appear or suggest changing the filter. The historical demo shares the visual styles and retains its local controls.
+- Browser coverage for sign-in at 800/390/320px, keyboard recovery help, and desktop queue/detail placement. Existing real-account journey checks still cover phone widths, refresh, private notes, handoffs, repeated resolutions, awards and organizer account operations.
+
+Verification before deployment: `npm run typecheck`, `npm run lint`, `npm run build` and `npm run check:functions` passed; `npm test` passed all 72 focused tests. All 21 demo browser tests passed on the final sequential run (9.0 seconds). All nine local-frontend/real-cloud cases passed (52.4 seconds), with fixture cleanup completed. `git diff --check` and local documentation-path checks passed.
+
+The initial restricted-network skill command was interrupted and the approved download succeeded using `npx --yes skills add https://github.com/anthropics/skills --skill frontend-design --agent codex --yes`. One verification attempt ran demo and cloud browser suites together; both use `test-results`, so cloud startup removed demo trace artifacts and eight demo cases failed during artifact cleanup. Running the final suites sequentially resolved that tool-level conflict. No failed run is counted as a passing check.
+
+Agent screenshot review checked desktop sign-in/contestant/admin views, support views at 390px/320px and hosted admin at 390px. It led to a more compact phone introduction and a corrected word break. Real-device, screen-reader, other-engine and 200% zoom checks remain manual steps in the guide. This work is not capacity or production-security certification.
+
+Cloudflare deployment succeeded with `npm run deploy`: Worker version `b0874359-0138-410e-b113-8e51061bb29e`, JavaScript `index-JCwcwqsc.js`, CSS `index-CzChhVyC.css`, at https://minsky-dev.icaic-minsky.workers.dev. All nine hosted cases passed (47.2 seconds), including the full workflow and new interface checks; test fixtures were cleaned up. HTTP checks confirmed the deployed JavaScript, CSS, font and license match the local build byte for byte. The temporary skill was removed with `npx --yes skills remove frontend-design --agent codex --yes`; its remaining downloaded source, lockfile and empty installation directories were deleted explicitly. The installation artifacts are absent from the final repository change.
+
+The build retains the existing two Zod annotation warnings and a 572 kB main-bundle warning (about 163 kB gzip). Style preserves repository double quotes, React component capitalization and inferred component returns; unchanged domain/administration logic was retained after formatting. These are the existing deliberate Google TypeScript Style Guide exceptions.
+
+Files changed: `src/connected/ConnectedApp.tsx`, `src/styles.css`, `tests/cloud/journey.spec.ts`, `public/fonts/public-sans-variable.woff2`, `public/fonts/OFL-Public-Sans.txt`, `README.md`, `docs/tickets.md`, `docs/manual-verification.md`, and this document. No schema or account-function change was needed. Candidate T0004 and pending provider/protected-CI acceptance items remain unchanged.
+
 ## Username/password revision (2026-10-02)
 
 The user selected organizer-created usernames/passwords and organizer-assisted recovery. SMTP and personal email addresses are no longer T0003 prerequisites. The user also confirmed signing into the original hosted admin account.

@@ -185,7 +185,7 @@ No offline/resilience project, 800-user load certification, individual-contest U
 
 Branch: `feature/t0004-ui-makeover`, created from updated `origin/main` after T0003 merged in PR #2 on 2026-10-02.
 
-Status: implemented and verified locally. The user selected the two attached visual references on 2026-10-03; evidence is in [current-state.md](current-state.md#t0004-ui-makeover-2026-10-03). PR preparation is in progress. The user reviews and merges; deployment remains an explicit step after approval.
+Status: implemented and verified locally; [PR #9](https://github.com/notbowen/minsky/pull/9) is open for review. The user selected the two attached visual references on 2026-10-03; evidence is in [current-state.md](current-state.md#t0004-ui-makeover-2026-10-03). The user reviews and merges; deployment remains an explicit step after approval.
 
 ### Selected scope
 
@@ -202,7 +202,7 @@ Status: implemented and verified locally. The user selected the two attached vis
 - [x] Keyboard navigation, focus, password visibility, report open/cancel, phone navigation and detail/queue return work.
 - [x] Real accounts complete submission → claim → escalation → acceptance → resolution → award → application and reopening; internal notes remain unavailable to contestants.
 - [x] Type checking, lint, build, focused/database tests and browser/cloud checks pass; screenshot review and remaining manual limitations are recorded in current-state.md.
-- [ ] Relevant documentation is current and a PR is prepared for user review.
+- [x] Relevant documentation is current and a PR is prepared for user review.
 
 The previous T0004 follow-up scope notes move to T0005 below.
 

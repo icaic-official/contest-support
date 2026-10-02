@@ -18,6 +18,7 @@ import {
 } from "./client";
 import {
   type Command,
+  duration,
   isStaff,
   type Issue,
   isSupport,
@@ -27,7 +28,6 @@ import {
   unresolvedTime,
 } from "./model";
 import { z } from "zod";
-import { duration } from "../domain";
 
 const statusNames = {
   open: "Open",
@@ -114,7 +114,7 @@ export function ConnectedApp() {
       <a className="skip-link" href="#main">
         Skip to main content
       </a>
-      <div className="demo-bar">
+      <div className="environment-banner">
         <strong>MINSKY · DEVELOPMENT</strong>
         <span>Shared contest support</span>
       </div>
@@ -147,8 +147,14 @@ export function ConnectedApp() {
             </button>
           </div>
         )}
+        {!user && !loading && (
+          <nav className="landing-nav" aria-label="Main navigation">
+            <a href="#how-it-works">How it works</a>
+            <a className="login-link" href="#sign-in">Sign in</a>
+          </nav>
+        )}
       </header>
-      <main id="main" tabIndex={-1}>
+      <main id="main" className="connected-main" tabIndex={-1}>
         {error && (
           <p role="alert" className="alert">
             {error}
@@ -197,7 +203,14 @@ export function ConnectedApp() {
               }}
             />
           )
-          : <Dashboard key={user.id} user={user} />}
+          : (
+            <Dashboard
+              key={user.id}
+              user={user}
+              username={account.username}
+              changePassword={() => setPasswordSetup(true)}
+            />
+          )}
         <footer>
           Minsky · Development deployment
           <span>External contest clocks are managed separately.</span>
@@ -212,137 +225,186 @@ function SignIn() {
   const [help, setHelp] = useState(false);
   const [error, setError] = useState("");
   return (
-    <div className="sign-in-layout">
-      <section className="sign-in-intro" aria-labelledby="welcome-heading">
-        <p className="eyebrow">Contest support</p>
-        <h2 id="welcome-heading">
-          Keep every team <br />in the running.
-        </h2>
-        <p>
-          A place for teams to ask for help and for staff to carry each issue
-          through to resolution.
-        </p>
-        <figure className="handoff-illustration">
-          <svg viewBox="0 40 480 180" fill="none" aria-hidden="true">
-            <path
-              className="route-guide"
-              d="M40 60H440M40 130H440M40 200H440"
-            />
-            <path
-              className="route-secondary"
-              d="M40 60H115Q145 60 145 90V170Q145 200 175 200H440"
-            />
-            <path
-              className="route-primary"
-              d="M40 130H205Q235 130 235 100V90Q235 60 265 60H315Q345 60 345 90V100Q345 130 375 130H440"
-            />
-            <circle className="route-node" cx="40" cy="60" r="9" />
-            <circle className="route-node" cx="40" cy="200" r="9" />
-            <rect
-              className="route-station"
-              x="17"
-              y="107"
-              width="46"
-              height="46"
-              rx="14"
-            />
-            <path className="station-symbol" d="M31 130H49M40 121V139" />
-            <rect
-              className="route-station"
-              x="217"
-              y="107"
-              width="46"
-              height="46"
-              rx="14"
-            />
-            <path
-              className="station-symbol"
-              d="M230 125H249M230 135H249M244 120L249 125L244 130M235 130L230 135L235 140"
-            />
-            <rect
-              className="route-finish"
-              x="417"
-              y="107"
-              width="46"
-              height="46"
-              rx="14"
-            />
-            <path className="finish-symbol" d="M429 130L437 138L452 122" />
-            <circle className="route-node" cx="440" cy="200" r="9" />
-          </svg>
-          <figcaption>
-            <span>Report a problem</span>
-            <span>Find the right help</span>
-            <span>Keep going</span>
-          </figcaption>
-        </figure>
-        <p className="sign-in-guidance">
-          Contestants, support staff and jury share one workflow, with the right
-          view for each role.
-        </p>
-      </section>
-      <section className="panel auth-panel">
-        <h1>Sign in to Minsky</h1>
-        <p>Use the username and password provided by your organizer.</p>
-        <form
-          onSubmit={(event) => {
-            const data = formData(event);
-            setBusy(true);
-            setError("");
-            void (async () => {
-              try {
-                const result = await requireClient().auth.signInWithPassword({
-                  email: loginIdentifier(text(data, "username")),
-                  password: text(data, "password"),
-                });
-                if (result.error) throw result.error;
-              } catch (cause) {
-                setError(errorMessage(cause));
-              } finally {
-                setBusy(false);
-              }
-            })();
-          }}
-        >
-          <fieldset disabled={busy}>
-            <legend className="sr-only">Account credentials</legend>
-            <label>
-              Username<input
-                name="username"
-                required
-                autoComplete="username"
-                autoCapitalize="none"
-                spellCheck={false}
+    <div className="landing-page">
+      <div className="sign-in-layout">
+        <section className="sign-in-intro" aria-labelledby="welcome-heading">
+          <p className="eyebrow">Contest support</p>
+          <h2 id="welcome-heading">
+            Keep every team <br />in the running.
+          </h2>
+          <p>
+            A place for teams to ask for help and for staff to carry each issue
+            through to resolution.
+          </p>
+          <figure className="handoff-illustration">
+            <svg viewBox="0 40 480 180" fill="none" aria-hidden="true">
+              <path
+                className="route-guide"
+                d="M40 60H440M40 130H440M40 200H440"
               />
-            </label>
-            <p className="field-help">
-              Existing accounts can use their original email until a username is
-              assigned.
+              <path
+                className="route-secondary"
+                d="M40 60H115Q145 60 145 90V170Q145 200 175 200H440"
+              />
+              <path
+                className="route-primary"
+                d="M40 130H205Q235 130 235 100V90Q235 60 265 60H315Q345 60 345 90V100Q345 130 375 130H440"
+              />
+              <circle className="route-node" cx="40" cy="60" r="9" />
+              <circle className="route-node" cx="40" cy="200" r="9" />
+              <rect
+                className="route-station"
+                x="17"
+                y="107"
+                width="46"
+                height="46"
+                rx="14"
+              />
+              <path className="station-symbol" d="M31 130H49M40 121V139" />
+              <rect
+                className="route-station"
+                x="217"
+                y="107"
+                width="46"
+                height="46"
+                rx="14"
+              />
+              <path
+                className="station-symbol"
+                d="M230 125H249M230 135H249M244 120L249 125L244 130M235 130L230 135L235 140"
+              />
+              <rect
+                className="route-finish"
+                x="417"
+                y="107"
+                width="46"
+                height="46"
+                rx="14"
+              />
+              <path className="finish-symbol" d="M429 130L437 138L452 122" />
+              <circle className="route-node" cx="440" cy="200" r="9" />
+            </svg>
+            <figcaption>
+              <span>Report a problem</span>
+              <span>Find the right help</span>
+              <span>Keep going</span>
+            </figcaption>
+          </figure>
+          <p className="sign-in-guidance">
+            Contestants, support staff and jury share one workflow, with the
+            right view for each role.
+          </p>
+        </section>
+        <section id="sign-in" className="panel auth-panel" tabIndex={-1}>
+          <p className="eyebrow">Welcome to Minsky</p>
+          <h1>Sign in to Minsky</h1>
+          <p>Use the username and password provided by your organizer.</p>
+          <form
+            onSubmit={(event) => {
+              const data = formData(event);
+              setBusy(true);
+              setError("");
+              void (async () => {
+                try {
+                  const result = await requireClient().auth.signInWithPassword({
+                    email: loginIdentifier(text(data, "username")),
+                    password: text(data, "password"),
+                  });
+                  if (result.error) throw result.error;
+                } catch (cause) {
+                  setError(errorMessage(cause));
+                } finally {
+                  setBusy(false);
+                }
+              })();
+            }}
+          >
+            <fieldset disabled={busy}>
+              <legend className="sr-only">Account credentials</legend>
+              <label>
+                Username<input
+                  name="username"
+                  required
+                  autoComplete="username"
+                  autoCapitalize="none"
+                  spellCheck={false}
+                />
+              </label>
+              <p className="field-help">
+                Existing accounts can use their original email until a username
+                is assigned.
+              </p>
+              <label>
+                Password<input
+                  name="password"
+                  type="password"
+                  required
+                  autoComplete="current-password"
+                />
+              </label>
+              <button type="submit">{busy ? "Signing in…" : "Sign in"}</button>
+            </fieldset>
+          </form>
+          <button
+            className="quiet"
+            aria-expanded={help}
+            aria-controls="sign-in-help"
+            onClick={() => setHelp(!help)}
+          >
+            Forgot password?
+          </button>
+          <p
+            id="sign-in-help"
+            role="status"
+            className="field-help"
+            hidden={!help}
+          >
+            Contact your contest organizer. They will verify your identity and
+            give you a new temporary password.
+          </p>
+          {error && <p className="alert" role="alert">{error}</p>}
+        </section>
+      </div>
+      <section
+        id="how-it-works"
+        className="landing-overview"
+        aria-labelledby="how-heading"
+        tabIndex={-1}
+      >
+        <div className="landing-overview-heading">
+          <p className="eyebrow">One place for contest support</p>
+          <h2 id="how-heading">From the first report to the final decision.</h2>
+          <p>
+            Your organizer provides your account. Sign in to see the workspace
+            for your team or staff permissions.
+          </p>
+        </div>
+        <div className="landing-steps">
+          <article>
+            <span className="step-number">01</span>
+            <h3>Report and follow up</h3>
+            <p>
+              Teams report problems and follow public replies, resolutions and
+              time awards.
             </p>
-            <label>
-              Password<input
-                name="password"
-                type="password"
-                required
-                autoComplete="current-password"
-              />
-            </label>
-            <button type="submit">{busy ? "Signing in…" : "Sign in"}</button>
-          </fieldset>
-        </form>
-        <button
-          className="quiet"
-          aria-expanded={help}
-          aria-controls="sign-in-help"
-          onClick={() => setHelp(!help)}
-        >
-          Forgot password?
-        </button>
-        <p id="sign-in-help" role="status" className="field-help" hidden={!help}>
-          Contact your contest organizer. They will verify your identity and
-          give you a new temporary password.
-        </p>
-        {error && <p className="alert" role="alert">{error}</p>}
+          </article>
+          <article>
+            <span className="step-number">02</span>
+            <h3>Coordinate the response</h3>
+            <p>
+              Support staff claim reports, keep internal notes and hand work
+              over to specialists.
+            </p>
+          </article>
+          <article>
+            <span className="step-number">03</span>
+            <h3>Record the outcome</h3>
+            <p>
+              Jury members record time awards. Staff separately confirm when
+              those awards have been applied.
+            </p>
+          </article>
+        </div>
       </section>
     </div>
   );
@@ -441,7 +503,13 @@ function PasswordForm(
   );
 }
 
-function Dashboard({ user }: { user: User }) {
+function Dashboard(
+  { user, username, changePassword }: {
+    user: User;
+    username: string | null;
+    changePassword: () => void;
+  },
+) {
   const [sessions, setSessions] = useState<Array<{ id: string; name: string }>>(
     [],
   );
@@ -453,6 +521,8 @@ function Dashboard({ user }: { user: User }) {
   const [busy, setBusy] = useState(false);
   const [selected, setSelected] = useState("");
   const [filter, setFilter] = useState("all");
+  const [view, setView] = useState<"issues" | "admin" | "account">("issues");
+  const [navigationOpen, setNavigationOpen] = useState(false);
   const [now, setNow] = useState(Date.now());
   const clockOffset = useRef(0);
   const inFlight = useRef(false);
@@ -492,8 +562,9 @@ function Dashboard({ user }: { user: User }) {
         setSessions(list);
         setSession(nextSession);
         setState(next?.membership ? next : undefined);
-        if (next)
+        if (next) {
           clockOffset.current = Date.parse(next.server_time) - Date.now();
+        }
         setRefreshError("");
       } catch (cause) {
         if (run !== generation.current) return;
@@ -580,10 +651,9 @@ function Dashboard({ user }: { user: User }) {
     setBusy(true);
     setNotice("");
     setError("");
-    const request =
-      retry && pending.current
-        ? pending.current
-        : { request: crypto.randomUUID(), command };
+    const request = retry && pending.current
+      ? pending.current
+      : { request: crypto.randomUUID(), command };
     pending.current = request;
     try {
       const id = await execute(session, request.request, request.command);
@@ -602,8 +672,9 @@ function Dashboard({ user }: { user: User }) {
         "code" in cause &&
         typeof cause.code === "string" &&
         cause.code
-      )
+      ) {
         pending.current = undefined;
+      }
       await refresh();
       setError(errorMessage(cause));
       return false;
@@ -613,316 +684,444 @@ function Dashboard({ user }: { user: User }) {
     }
   }
   const m = state?.membership;
-  const juryOnly =
-    m && m.roles.includes("jury") && !isSupport(m) && !m.is_admin;
+  const juryOnly = m && m.roles.includes("jury") && !isSupport(m) &&
+    !m.is_admin;
   const visible =
     state?.issues.filter((i) => !juryOnly || i.status === "resolved") ?? [];
   const filtered = visible.filter(
     (i) => filter === "all" || i.status === filter,
   );
   const issue = filtered.find((i) => i.id === selected) ?? filtered[0];
+  const activeView = view === "admin" && !m?.is_admin ? "issues" : view;
+  function navigate(next: typeof view) {
+    setView(next);
+    setNavigationOpen(false);
+    window.requestAnimationFrame(() =>
+      document.getElementById("workspace-heading")?.focus()
+    );
+  }
   return (
-    <>
-      {refreshError && (
-        <p role="alert" className="alert">
-          {refreshError}
-        </p>
-      )}
-      {error && (
-        <p role="alert" className="alert">
-          {error}
-        </p>
-      )}
-      <p role="status" className="notice">
-        {notice}
-      </p>
-      {pending.current && !busy && (
-        <button
-          onClick={() => {
-            const command = pending.current?.command;
-            if (command) void act(command, true);
-          }}
+    <div className="dashboard-layout">
+      <aside className="sidebar">
+        <div className="sidebar-heading">
+          <span className="eyebrow">Your workspace</span>
+          <button
+            className="quiet navigation-toggle"
+            aria-expanded={navigationOpen}
+            aria-controls="workspace-navigation"
+            onClick={() => setNavigationOpen(!navigationOpen)}
+          >
+            Menu
+          </button>
+        </div>
+        <nav
+          id="workspace-navigation"
+          className={`sidebar-navigation ${navigationOpen ? "is-open" : ""}`}
+          aria-label="Workspace navigation"
         >
-          Retry last request
-        </button>
-      )}
-      {sessions.length > 1 && (
-        <label>
-          Contest session
-          <select
-            value={session}
+          <button
             disabled={busy || !!pending.current}
-            onChange={(e) => {
-              generation.current++;
-              setState(undefined);
-              setSession(e.target.value);
-              setSelected("");
-              setFilter("all");
+            aria-current={activeView === "issues" ? "page" : undefined}
+            onClick={() => navigate("issues")}
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <rect x="4" y="3" width="16" height="18" rx="2" />
+              <path d="M8 8h8M8 12h8M8 16h5" />
+            </svg>
+            {m?.team_id
+              ? "My team’s issues"
+              : juryOnly
+              ? "Award review"
+              : "Issues"}
+          </button>
+          {m?.is_admin && (
+            <button
+              disabled={busy || !!pending.current}
+              aria-current={activeView === "admin" ? "page" : undefined}
+              onClick={() => navigate("admin")}
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M4 7h16M4 17h16" />
+                <circle cx="9" cy="7" r="3" />
+                <circle cx="15" cy="17" r="3" />
+              </svg>Administration
+            </button>
+          )}
+          <button
+            disabled={busy || !!pending.current}
+            aria-current={activeView === "account" ? "page" : undefined}
+            onClick={() => navigate("account")}
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="12" cy="8" r="4" />
+              <path d="M4 21v-2a8 8 0 0116 0v2" />
+            </svg>My account
+          </button>
+        </nav>
+        <div className="sidebar-context">
+          <span className="live-dot" />Shared cloud workspace<p>
+            {state?.session?.name ?? "Checking session access…"}
+          </p>
+        </div>
+      </aside>
+      <div className="workspace-content">
+        {refreshError && (
+          <p role="alert" className="alert">
+            {refreshError}
+          </p>
+        )}
+        {error && (
+          <p role="alert" className="alert">
+            {error}
+          </p>
+        )}
+        <p role="status" className="notice">
+          {notice}
+        </p>
+        {pending.current && !busy && (
+          <button
+            onClick={() => {
+              const command = pending.current?.command;
+              if (command) void act(command, true);
             }}
           >
-            {sessions.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
-        </label>
-      )}
-      {!state || !m || !state.session
-        ? (
-          <section className="panel access-panel">
-            <h1>Session access</h1>
-            <p>
-              No session data is available. If your account was just created,
-              ask an organizer to assign your membership.
-            </p>
-            <button
-              onClick={() => {
-                void refresh();
+            Retry last request
+          </button>
+        )}
+        {sessions.length > 1 && (
+          <label>
+            Contest session
+            <select
+              value={session}
+              disabled={busy || !!pending.current}
+              onChange={(e) => {
+                generation.current++;
+                setState(undefined);
+                setSession(e.target.value);
+                setSelected("");
+                setFilter("all");
               }}
             >
-              Refresh access
-            </button>
-          </section>
-        )
-        : (
-          <>
-            <div className="session">
-              <span>{state.event?.name}</span>
-              <span aria-hidden="true">/</span>
-              <span>{state.session.name}</span>
-            </div>
-            <div className="page-heading">
-              <div>
-                <p className="eyebrow">
-                  {m.team_id
-                    ? "Team contestant"
-                    : [...m.roles, ...(m.is_admin ? ["admin"] : [])].join(
-                      " + ",
-                    )}
-                </p>
-                <h1>
-                  {m.team_id
-                    ? "A little help, right here."
-                    : juryOnly
-                    ? "Review. Decide. Record."
-                    : "Keep the contest moving."}
-                </h1>
-                <p>
-                  {m.team_id
-                    ? "Report a problem, follow updates, and review your team’s time awards."
-                    : juryOnly
-                    ? "Review resolved reports and record time award decisions."
-                    : "Claim reports, coordinate handoffs, and keep teams informed."}
-                </p>
-              </div>
-              <span
-                className={`intake-status ${
-                  state.session.intake_open ? "is-open" : ""
-                }`}
-              >
-                Contestant intake{" "}
-                {state.session.intake_open ? "open" : "closed"}
-              </span>
-            </div>
-            {state.event?.archived && (
-              <p className="alert">
-                This event is archived. Records are read only.
-              </p>
-            )}
-            <fieldset
-              className="workspace"
-              disabled={busy || !!pending.current}
-            >
-              <legend className="sr-only">Contest workflow</legend>
-              {m.is_admin && <AdminPanel state={state} refresh={refresh} />}
-              {(m.team_id || isSupport(m)) && (
-                <section className="panel submission">
-                  <div className="submission-intro">
-                    <p className="eyebrow">
-                      {m.team_id ? "Ask for help" : "Report for a team"}
-                    </p>
-                    <h2>Report an issue</h2>
-                    <p>
-                      {state.session.intake_open
-                        ? "Contestant intake is open."
-                        : "Contestant intake is closed. Staff can still submit for a team."}
-                    </p>
-                    {m.team_id && (
-                      <p className="location">
-                        {state.teams.find((t) => t.id === m.team_id)?.name} ·
-                        {" "}
-                        {state.teams.find((t) => t.id === m.team_id)?.location}
-                      </p>
-                    )}
-                  </div>
-                  <form
-                    onSubmit={(event) => {
-                      const form = event.currentTarget;
-                      const data = formData(event);
-                      void act({
-                        type: "submit",
-                        category: text(data, "category"),
-                        description: text(data, "description"),
-                        ...(m.team_id ? {} : { team_id: text(data, "team") }),
-                      }).then((ok) => {
-                        if (ok) form.reset();
-                      });
-                    }}
-                  >
-                    <fieldset
-                      disabled={state.event?.archived ||
-                        (!!m.team_id && !state.session.intake_open)}
-                    >
-                      <legend className="sr-only">Issue submission</legend>
-                      {!m.team_id && (
-                        <label>
-                          Affected team
-                          <select name="team" required>
-                            {state.teams.map((t) => (
-                              <option key={t.id} value={t.id}>
-                                {t.name} · {t.location}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
-                      )}
-                      <label>
-                        Category
-                        <select name="category">
-                          {state.session.categories.map((c) => (
-                            <option key={c}>{c}</option>
-                          ))}
-                        </select>
-                      </label>
-                      <label>
-                        What’s happening?
-                        <textarea
-                          name="description"
-                          required
-                          maxLength={2000}
-                        />
-                      </label>
-                      <button type="submit">Submit issue</button>
-                    </fieldset>
-                  </form>
-                </section>
-              )}
-              <div className="metrics">
-                <div>
-                  <strong>{visible.length}</strong>
-                  <span>Issues in view</span>
-                </div>
-                <div>
-                  <strong>
-                    {visible.filter((i) => i.status !== "resolved").length}
-                  </strong>
-                  <span>Awaiting resolution</span>
-                </div>
-                <div>
-                  <strong>
-                    {state.awards.filter((a) => !a.applied_at).length}
-                  </strong>
-                  <span>Pending application</span>
-                </div>
-              </div>
-              <div className="work-grid">
-                <section className="panel queue">
-                  <div className="panel-heading">
-                    <h2>
-                      {m.team_id
-                        ? "Your team’s issues"
-                        : juryOnly
-                        ? "Resolved issues"
-                        : "Support queue"}
-                    </h2>
-                    <span
-                      className="count"
-                      aria-label={`${filtered.length} issues`}
-                    >
-                      {filtered.length}
-                    </span>
-                  </div>
-                  {!juryOnly && (
-                    <div className="filter">
-                      <label>
-                        Status filter
-                        <select
-                          value={filter}
-                          onChange={(e) => setFilter(e.target.value)}
-                        >
-                          <option value="all">All statuses</option>
-                          {Object.entries(statusNames).map(([value, label]) => (
-                            <option key={value} value={value}>
-                              {label}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                    </div>
-                  )}
-                  <div className="issue-list">
-                    {filtered.map((i) => (
-                      <button
-                        key={i.id}
-                        className={`issue-card ${
-                          issue?.id === i.id ? "selected" : ""
-                        }`}
-                        aria-pressed={issue?.id === i.id}
-                        onClick={() => setSelected(i.id)}
-                      >
-                        <span className="card-top">
-                          <span>
-                            ISS-{i.number} · {i.category}
-                          </span>
-                          <span className={`status ${i.status}`}>
-                            {statusNames[i.status]}
-                          </span>
-                        </span>
-                        <strong>{i.description}</strong>
-                        <span>
-                          {state.teams.find((t) => t.id === i.team_id)?.name} ·
-                          {" "}
-                          {state.teams.find((t) => t.id === i.team_id)
-                            ?.location}
-                        </span>
-                        <span className="card-bottom">
-                          <span>{i.owner_name ?? "Unassigned"}</span>
-                          <span>
-                            {duration(
-                              unresolvedTime(i, state.resolutions, now),
-                            )}
-                          </span>
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                  {!filtered.length && (
-                    <div className="empty">
-                      <h3>No issues in this view.</h3>
-                      <p>
-                        {visible.length
-                          ? "Choose another status to see more reports."
-                          : "Reports will appear here when they are submitted."}
-                      </p>
-                    </div>
-                  )}
-                </section>
-                {issue && (
-                  <IssueDetail
-                    key={issue.id}
-                    issue={issue}
-                    state={state}
-                    member={m}
-                    now={now}
-                    act={act}
-                  />
-                )}
-              </div>
-            </fieldset>
-          </>
+              {sessions.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+          </label>
         )}
-    </>
+        {!state || !m || !state.session
+          ? (
+            <section className="panel access-panel">
+              <h1>Session access</h1>
+              <p>
+                No session data is available. If your account was just created,
+                ask an organizer to assign your membership.
+              </p>
+              <button
+                onClick={() => {
+                  void refresh();
+                }}
+              >
+                Refresh access
+              </button>
+            </section>
+          )
+          : (
+            <>
+              <div className="session">
+                <span>{state.event?.name}</span>
+                <span aria-hidden="true">/</span>
+                <span>{state.session.name}</span>
+              </div>
+              <div className="page-heading">
+                <div>
+                  <p className="eyebrow">
+                    {m.team_id
+                      ? "Team contestant"
+                      : [...m.roles, ...(m.is_admin ? ["admin"] : [])].join(
+                        " + ",
+                      )}
+                  </p>
+                  <h1 id="workspace-heading" tabIndex={-1}>
+                    {activeView === "admin"
+                      ? "Administration"
+                      : activeView === "account"
+                      ? "My account"
+                      : m.team_id
+                      ? "A little help, right here."
+                      : juryOnly
+                      ? "Review. Decide. Record."
+                      : "Keep the contest moving."}
+                  </h1>
+                  <p>
+                    {activeView === "admin"
+                      ? "Manage session access, accounts and contestant intake."
+                      : activeView === "account"
+                      ? "Review your sign-in details and session permissions."
+                      : m.team_id
+                      ? "Report a problem, follow updates, and review your team’s time awards."
+                      : juryOnly
+                      ? "Review resolved reports and record time award decisions."
+                      : "Claim reports, coordinate handoffs, and keep teams informed."}
+                  </p>
+                </div>
+                <span
+                  className={`intake-status ${
+                    state.session.intake_open ? "is-open" : ""
+                  }`}
+                >
+                  Contestant intake{" "}
+                  {state.session.intake_open ? "open" : "closed"}
+                </span>
+              </div>
+              {state.event?.archived && (
+                <p className="alert">
+                  This event is archived. Records are read only.
+                </p>
+              )}
+              <fieldset
+                className="workspace"
+                disabled={busy || !!pending.current}
+              >
+                <legend className="sr-only">Contest workflow</legend>
+                {activeView === "admin" && m.is_admin && (
+                  <AdminPanel state={state} refresh={refresh} />
+                )}
+                {activeView === "account" && (
+                  <section className="panel account-panel">
+                    <h2>Sign-in and access</h2>
+                    <dl className="account-details">
+                      <div>
+                        <dt>Username</dt>
+                        <dd>{username ?? user.email}</dd>
+                      </div>
+                      <div>
+                        <dt>Session</dt>
+                        <dd>{state.session.name}</dd>
+                      </div>
+                      <div>
+                        <dt>Permissions</dt>
+                        <dd>
+                          {m.team_id
+                            ? `Contestant · ${
+                              state.teams.find((team) => team.id === m.team_id)
+                                ?.name ?? "Your team"
+                            }`
+                            : [...m.roles, ...(m.is_admin ? ["admin"] : [])]
+                              .join(" + ")}
+                        </dd>
+                      </div>
+                    </dl>
+                    <button onClick={changePassword}>Update password</button>
+                    <p className="field-help">
+                      Contact your organizer if your team assignment or
+                      permissions need to change.
+                    </p>
+                  </section>
+                )}
+                {activeView === "issues" && (
+                  <>
+                    {(m.team_id || isSupport(m)) && (
+                      <section className="panel submission">
+                        <div className="submission-intro">
+                          <p className="eyebrow">
+                            {m.team_id ? "Ask for help" : "Report for a team"}
+                          </p>
+                          <h2>Report an issue</h2>
+                          <p>
+                            {state.session.intake_open
+                              ? "Contestant intake is open."
+                              : "Contestant intake is closed. Staff can still submit for a team."}
+                          </p>
+                          {m.team_id && (
+                            <p className="location">
+                              {state.teams.find((t) => t.id === m.team_id)
+                                ?.name} · {state.teams.find((t) =>
+                                  t.id === m.team_id
+                                )?.location}
+                            </p>
+                          )}
+                        </div>
+                        <form
+                          onSubmit={(event) => {
+                            const form = event.currentTarget;
+                            const data = formData(event);
+                            void act({
+                              type: "submit",
+                              category: text(data, "category"),
+                              description: text(data, "description"),
+                              ...(m.team_id
+                                ? {}
+                                : { team_id: text(data, "team") }),
+                            }).then((ok) => {
+                              if (ok) {
+                                form.reset();
+                              }
+                            });
+                          }}
+                        >
+                          <fieldset
+                            disabled={state.event?.archived ||
+                              (!!m.team_id && !state.session.intake_open)}
+                          >
+                            <legend className="sr-only">
+                              Issue submission
+                            </legend>
+                            {!m.team_id && (
+                              <label>
+                                Affected team
+                                <select name="team" required>
+                                  {state.teams.map((t) => (
+                                    <option key={t.id} value={t.id}>
+                                      {t.name} · {t.location}
+                                    </option>
+                                  ))}
+                                </select>
+                              </label>
+                            )}
+                            <label>
+                              Category
+                              <select name="category">
+                                {state.session.categories.map((c) => (
+                                  <option key={c}>{c}</option>
+                                ))}
+                              </select>
+                            </label>
+                            <label>
+                              What’s happening?
+                              <textarea
+                                name="description"
+                                required
+                                maxLength={2000}
+                              />
+                            </label>
+                            <button type="submit">Submit issue</button>
+                          </fieldset>
+                        </form>
+                      </section>
+                    )}
+                    <div className="metrics">
+                      <div>
+                        <strong>{visible.length}</strong>
+                        <span>Issues in view</span>
+                      </div>
+                      <div>
+                        <strong>
+                          {visible.filter((i) => i.status !== "resolved")
+                            .length}
+                        </strong>
+                        <span>Awaiting resolution</span>
+                      </div>
+                      <div>
+                        <strong>
+                          {state.awards.filter((a) => !a.applied_at).length}
+                        </strong>
+                        <span>Pending application</span>
+                      </div>
+                    </div>
+                    <div className="work-grid">
+                      <section className="panel queue">
+                        <div className="panel-heading">
+                          <h2>
+                            {m.team_id
+                              ? "Your team’s issues"
+                              : juryOnly
+                              ? "Resolved issues"
+                              : "Support queue"}
+                          </h2>
+                          <span
+                            className="count"
+                            aria-label={`${filtered.length} issues`}
+                          >
+                            {filtered.length}
+                          </span>
+                        </div>
+                        {!juryOnly && (
+                          <div className="filter">
+                            <label>
+                              Status filter
+                              <select
+                                value={filter}
+                                onChange={(e) => setFilter(e.target.value)}
+                              >
+                                <option value="all">All statuses</option>
+                                {Object.entries(statusNames).map((
+                                  [value, label],
+                                ) => (
+                                  <option key={value} value={value}>
+                                    {label}
+                                  </option>
+                                ))}
+                              </select>
+                            </label>
+                          </div>
+                        )}
+                        <div className="issue-list">
+                          {filtered.map((i) => (
+                            <button
+                              key={i.id}
+                              className={`issue-card ${
+                                issue?.id === i.id ? "selected" : ""
+                              }`}
+                              aria-pressed={issue?.id === i.id}
+                              onClick={() => setSelected(i.id)}
+                            >
+                              <span className="card-top">
+                                <span>
+                                  ISS-{i.number} · {i.category}
+                                </span>
+                                <span className={`status ${i.status}`}>
+                                  {statusNames[i.status]}
+                                </span>
+                              </span>
+                              <strong>{i.description}</strong>
+                              <span>
+                                {state.teams.find((t) => t.id === i.team_id)
+                                  ?.name} ·{" "}
+                                {state.teams.find((t) => t.id === i.team_id)
+                                  ?.location}
+                              </span>
+                              <span className="card-bottom">
+                                <span>{i.owner_name ?? "Unassigned"}</span>
+                                <span>
+                                  {duration(
+                                    unresolvedTime(i, state.resolutions, now),
+                                  )}
+                                </span>
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                        {!filtered.length && (
+                          <div className="empty">
+                            <h3>No issues in this view.</h3>
+                            <p>
+                              {visible.length
+                                ? "Choose another status to see more reports."
+                                : "Reports will appear here when they are submitted."}
+                            </p>
+                          </div>
+                        )}
+                      </section>
+                      {issue && (
+                        <IssueDetail
+                          key={issue.id}
+                          issue={issue}
+                          state={state}
+                          member={m}
+                          now={now}
+                          act={act}
+                        />
+                      )}
+                    </div>
+                  </>
+                )}
+              </fieldset>
+            </>
+          )}
+      </div>
+    </div>
   );
 }
 

@@ -10,7 +10,7 @@ Pull requests and pushes to `main` run these check names:
 
 | Check | Required behavior |
 | --- | --- |
-| `checks` | Type checking, ESLint, Deno function checking, focused/database tests, build and historical demo browser tests must pass. |
+| `checks` | Type checking, ESLint, Deno function checking, focused/database tests, build and public landing/login browser tests must pass. |
 | `secrets` | Gitleaks scans fetched Git history, including secrets removed in later commits. Findings are redacted; any finding fails the check. |
 | `dependencies` | `npm audit --package-lock-only --audit-level=high` checks locked runtime and development dependencies. High/critical advisories fail the check; lower severities remain visible for review. Registry failures also fail the check. |
 

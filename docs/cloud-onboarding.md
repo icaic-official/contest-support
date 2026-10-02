@@ -68,7 +68,7 @@ Review `scripts/bootstrap.sql` before first setup; it refuses an existing admin.
 
 ## Verification and protected cloud CI
 
-Run `npm run typecheck`, `npm run lint`, `npm run check:functions`, `npm test` and `npm run build`. Embedded PostgreSQL executes the actual migrations/policies with Auth-context/session/password-hash stubs; it does not prove managed Auth behavior. `npm run test:e2e` retains the historical local demo regression suite. `npm run test:cloud` exercises managed Auth/database/Realtime against a local frontend. `npm run test:hosted` repeats the real-account suite against the deployed app. Install Chromium with `npx playwright install chromium`.
+Run `npm run typecheck`, `npm run lint`, `npm run check:functions`, `npm test` and `npm run build`. Embedded PostgreSQL executes the actual migrations/policies with Auth-context/session/password-hash stubs; it does not prove managed Auth behavior. `npm run test:e2e` checks the public connected landing/login page without cloud credentials. The old demo and its tests have been removed. `npm run test:cloud` exercises managed Auth/database/Realtime against a local frontend. `npm run test:hosted` repeats the real-account suite against the deployed app. Install Chromium with `npx playwright install chromium`.
 
 Cloud tests create unique temporary sessions/accounts, change their temporary passwords, verify the shared workflow and creation/reset behavior, and explicitly clean up their own rows. They never reset the shared project. Credentials are held in memory and an ignored temporary fixture file. Do not interrupt cleanup. No screenshots should contain live temporary credentials; tests dismiss them before capture.
 

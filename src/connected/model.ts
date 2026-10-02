@@ -156,3 +156,8 @@ export function unresolvedTime(
   }
   return total + Math.max(0, now - start);
 }
+
+export function duration(ms: number): string {
+  const seconds = Math.floor(Math.max(0, ms) / 1000);
+  return `${Math.floor(seconds / 60)}m ${String(seconds % 60).padStart(2, "0")}s`;
+}

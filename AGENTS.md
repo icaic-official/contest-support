@@ -10,6 +10,8 @@
 
 ## Current scope and completed demo baseline
 
+**Latest user decision (2026-10-02):** remove the old local demo, its command, persona/reset/storage code, demo-only tests/fixtures and obsolete walkthrough/specification. Maintain the connected app, public login landing page, sidebar and real-account workflow/authorization tests. Requirements below about the completed demo are historical; do not restore its runtime or reset tooling.
+
 T0001 and T0002 were merged in PR #1 on 2026-10-02. T0003 is scoped in `docs/tickets.md` for cloud onboarding and an authenticated shared product. Its implementation must start from updated `main` on `feature/t0003-cloud-product`. The demo requirements below describe the completed baseline; they do not exclude the connected features explicitly selected for T0003. Keep planning separate from implemented capabilities.
 
 The initial objective was an interactive demo that helped the user decide where the application should go. T0001 and T0002 completed that baseline. Keep subsequent tickets small and driven by the user's feedback.
@@ -39,9 +41,9 @@ Use simple components and domain logic appropriate to the demo. Avoid speculativ
 - Stop the timer on resolution. Reopening resumes accumulated unresolved time, excluding resolved intervals. Retain every resolution summary, actor and timestamp.
 - Identify staff owners and activity actors by person, combining all assigned role capabilities. Reopening retains the prior owner and any existing award/application status.
 - Separate contestant-visible replies from internal staff notes. Omit internal notes from contestant views.
-- Record an award separately from confirmation that it was applied externally. The demo does not change an external contest clock.
-- Keep a local activity history that identifies the simulated actor. Prevent repeated actions from producing duplicate awards or invalid transitions.
-- Preserve the fictional reset in local demo/test tooling. Do not expose a shared-data reset or persona impersonation control in the connected product.
+- Record an award separately from confirmation that it was applied externally. Minsky does not change an external contest clock.
+- Keep shared activity history that identifies the authenticated actor. Prevent repeated actions from producing duplicate awards or invalid transitions.
+- Use isolated verification fixtures with cleanup limited to their own records. Do not expose a shared-data reset or persona impersonation control in the connected product.
 
 ## Ticket and Git workflow
 
@@ -63,8 +65,8 @@ Use simple components and domain logic appropriate to the demo. Avoid speculativ
 
 - Inspect available scripts before invoking them. During T0001, provide npm scripts for development, production build, type checking, linting, and focused tests. Document their exact names in the README.
 - Test meaningful behavior: lifecycle transitions, ownership during handoff, timestamp calculations, persistence, and award/application state.
-- Include one browser test covering the complete journey across personas.
-- Manually check phone-width volunteer screens, keyboard navigation, refresh persistence, reset, and separation of public replies from internal notes.
+- Include one browser test covering the complete journey across authenticated test accounts.
+- Manually check phone-width volunteer screens, keyboard navigation, refresh persistence, and separation of public replies from internal notes.
 - Build, lint, type checking, and required tests must pass before presenting an implementation PR as ready. If a check cannot run, report the reason. Leave its result unverified.
 - For documentation-only changes, check content, paths, and whitespace. Do not add application tests merely to test prose.
 - Never describe local demo testing as evidence of production security, offline operation, or capacity for 800 simultaneous users.
@@ -76,7 +78,6 @@ Create the remaining documentation during T0001, and keep it concise and consist
 | Document | Responsibility |
 |---|---|
 | `README.md` | Project introduction, exact setup/run/check commands, demo limitations, and documentation links. |
-| `docs/demo-spec.md` | Demo screens, behaviors, boundaries, and acceptance criteria. |
 | `docs/product-direction.md` | Agreed longer-term requirements, provisional architecture, and unresolved decisions. |
 | `docs/tickets.md` | Active development ticket, status, acceptance criteria, and a small follow-up queue. |
 | `docs/current-state.md` | Implemented and verified capabilities, limitations, and next work. |

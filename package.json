@@ -14,7 +14,6 @@
     "lint": "eslint .",
     "test": "vitest run",
     "test:e2e": "playwright test",
-    "dev:demo": "vite --mode demo --host 127.0.0.1",
     "deploy": "npm run build && wrangler deploy",
     "cloud:login": "supabase login",
     "cloud:link": "supabase link --project-ref ovymmobupzowotvrywek",

@@ -17,6 +17,10 @@ async function login(page: Page, name: string) {
           : "Keep the contest moving.",
     }),
   ).toBeVisible();
+  if (name === "admin") {
+    await page.getByRole("navigation", {name: "Workspace navigation"})
+      .getByRole("button", {name: "Administration", exact: true}).click();
+  }
 }
 
 test("sign-in stays usable on phones and exposes recovery help by keyboard", async ({
@@ -58,6 +62,46 @@ test("sign-in stays usable on phones and exposes recovery help by keyboard", asy
   });
   await page.keyboard.press("Enter");
   await expect(help).toHaveAttribute("aria-expanded", "false");
+});
+
+test("sidebar navigation respects roles and remains usable by keyboard on phones", async ({page}, testInfo) => {
+  await login(page, "volunteer");
+  const navigation = page.getByRole("navigation", {name: "Workspace navigation"});
+  await expect(navigation.getByRole("button", {name: "Administration", exact: true})).toHaveCount(0);
+  await navigation.getByRole("button", {name: "My account", exact: true}).click();
+  await expect(page.getByRole("heading", {name: "My account", exact: true})).toBeFocused();
+  await expect(page.locator(".account-details")).toContainText(fixture().accounts.volunteer.username);
+  await expect(navigation.getByRole("button", {name: "My account", exact: true})).toHaveAttribute("aria-current", "page");
+  await expect(page.getByRole("heading", {name: "Report an issue"})).toHaveCount(0);
+  await page.screenshot({path: testInfo.outputPath("sidebar-account-desktop.png"), fullPage: true});
+  for (const width of [390, 320]) {
+    await page.setViewportSize({width, height: 844});
+    const menu = page.getByRole("button", {name: "Menu", exact: true});
+    await expect(menu).toHaveAttribute("aria-expanded", "false");
+    await expect(navigation).toBeHidden();
+    await menu.focus();
+    await page.keyboard.press("Enter");
+    await expect(menu).toHaveAttribute("aria-expanded", "true");
+    const issues = navigation.getByRole("button", {name: "Issues", exact: true});
+    await issues.focus();
+    await page.keyboard.press("Enter");
+    await expect(page.getByRole("heading", {name: "Keep the contest moving."})).toBeFocused();
+    await expect(menu).toHaveAttribute("aria-expanded", "false");
+    await expect(page.getByRole("heading", {name: "Report an issue"})).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  }
+  await page.screenshot({path: testInfo.outputPath("sidebar-support-320.png"), fullPage: true});
+  await page.setViewportSize({width: 1280, height: 900});
+  await page.getByRole("button", {name: "Sign out", exact: true}).click();
+  await expect(navigation).toHaveCount(0);
+  await login(page, "admin");
+  await expect(navigation.getByRole("button", {name: "Administration", exact: true})).toHaveAttribute("aria-current", "page");
+  await expect(page.getByRole("heading", {name: "Session administration"})).toBeVisible();
+  await navigation.getByRole("button", {name: "Issues", exact: true}).click();
+  await expect(page.getByRole("heading", {name: "Session administration"})).toHaveCount(0);
+  await expect(page.getByRole("heading", {name: "Support queue"})).toBeVisible();
+  await page.reload();
+  await expect(navigation.getByRole("button", {name: "Issues", exact: true})).toHaveAttribute("aria-current", "page");
 });
 
 test("real accounts share the journey, private notes stay private, and phone/refresh/keyboard work", async ({

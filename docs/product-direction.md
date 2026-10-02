@@ -2,6 +2,8 @@
 
 These requirements preserve the agreed direction from [PLAN.md](../PLAN.md). Only requirements listed in [current-state.md](current-state.md) describe implemented behavior. The user selects subsequent scope after demo feedback.
 
+Latest interface decision (2026-10-02): provide a public login landing page and a sidebar for the authenticated workspace. The user removed the old local demo, its commands and demo-only tests. Supabase accounts/shared data remain the only application mode; isolated fixtures remain for verification. This does not complete the broader organizer tools listed below.
+
 ## Agreed direction
 
 - Each event has one contest type: individual or group. Sessions have separate rosters, schedules, issues and awards.

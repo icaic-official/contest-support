@@ -1,4 +1,8 @@
-# Minsky: a local demo first
+# Minsky planning record
+
+**Current decision (2026-10-02):** T0003 is the connected Supabase/Cloudflare development app. The user requested a public login landing page and sidebar, then removed the old local demo and its unnecessary tests. Keep connected workflow/authorization tests and isolated cloud fixtures. The original demo plan below is historical and does not authorize restoring demo runtime, reset, personas or browser-local issue persistence.
+
+## Original demo plan
 
 ## 1. Immediate goal
 
@@ -48,7 +52,6 @@ Create a compact documentation package alongside the demo:
 |---|---|
 | `README.md` | Project introduction, demo setup and commands, limitations, and documentation links. |
 | `AGENTS.md` | Working rules, ticket workflow, verification expectations, documentation upkeep, and required run report. |
-| `docs/demo-spec.md` | The demo’s screens, behavior, scope, and acceptance criteria. |
 | `docs/product-direction.md` | Decisions from this discussion, clearly separated into agreed direction, provisional choices, and deferred questions. |
 | `docs/tickets.md` | One actionable demo ticket and a small uncommitted follow-up queue. |
 | `docs/current-state.md` | Existing capabilities, completed checks, and current limitations. |

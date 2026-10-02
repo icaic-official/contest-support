@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
+  duration,
   isStaff,
-  isSupport,
-  unresolvedTime,
   type Issue,
+  isSupport,
   type Membership,
   type Resolution,
+  unresolvedTime,
 } from "./model";
 
 const i: Issue = {
@@ -39,6 +40,11 @@ const resolution: Resolution = {
   reason: "Still broken",
 };
 describe("connected presentation", () => {
+  it("formats elapsed time without rounding up or displaying negative seconds", () => {
+    expect(duration(-1)).toBe("0m 00s");
+    expect(duration(59999)).toBe("0m 59s");
+    expect(duration(60100)).toBe("1m 00s");
+  });
   it("excludes resolved intervals and keeps the exact seven-minute example", () => {
     expect(
       unresolvedTime(i, [resolution], Date.parse("2026-10-02T10:10:00Z")),

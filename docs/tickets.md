@@ -113,6 +113,8 @@ Status: implementation in progress on `feature/t0003-cloud-product`, started fro
 
 Updated contributor decision (2026-10-02): contributors may be assumed to have full cloud credential access. Docker is optional, not required for development, migrations, function deployment or the embedded database checks. Cloud integration CI uses a protected isolated test project; untrusted PR checks run without provider credentials. This supersedes the local-stack prerequisite below; the connected workflow and authorization requirements remain in scope.
 
+Selected quality improvements (2026-10-02): require CI and independent review before merging, add a short PR review checklist, and scan secrets/dependencies with routine update PRs. Implementation and owner setup are described in [code-quality.md](code-quality.md). Remote merge rules and vulnerability alerts require repository administration access; they are not inferred from committed workflow files.
+
 ### Outcome and recommended boundary
 
 Different people can sign in to a hosted Minsky deployment and complete the existing issue journey against shared data. Another developer with authorized cloud access can clone the repository, run the connected frontend locally, make a migration and submit a tested PR. Fast checks run without cloud credentials or Docker; full integration tests provision isolated cloud fixtures.

@@ -53,6 +53,30 @@ Clean-checkout verification: `/tmp/minsky-t0003-clean` at `bfe94e1` used a fresh
 - Membership revocation preserves historical ownership. If an active owner loses support membership, restore it to continue owner-only work or have another specialist accept an already pending handoff. General reassignment tools are not in T0003.
 - Group contests and one award per issue only. Uploads, broader organizer editors, shared incidents, imports, alerts/push, offline/resilience and 800-user capacity testing remain deferred. Candidate T0004 is not started.
 
+## Selected code-quality controls (2026-10-02)
+
+T0003 now includes the user-selected CI/review/security improvements:
+
+- Existing quality CI uses pinned action commits, credential-free checkout and job timeouts. New pushes cancel obsolete ordinary checks; manual cloud runs are kept separate so automatic cancellation does not interrupt fixture cleanup.
+- A short PR template covers scope/readability, authorization/privacy, workflow invariants, compatible migrations, verification and documentation.
+- Secret-free security CI runs redacted Gitleaks history scanning and a lockfile audit that fails on high/critical runtime or development advisories. Both run on PRs, `main`, manual dispatch and a weekly default-branch schedule.
+- Weekly Dependabot npm/action update PRs are configured. Update scheduling begins after this configuration reaches `main`.
+- The prepared branch-protection payload requires up-to-date `checks`, `secrets` and `dependencies` from GitHub Actions, one independent approval, resolved threads and no administrator bypass, force pushes or branch deletion. **Remote merge protection and vulnerability alerts still require owner setup**: the available account has write permission, not administration access. Private-repository plan availability has not been verified. See [code-quality.md](code-quality.md).
+
+Local verification for this change: actionlint and YAML/JSON validation passed;
+documentation paths and whitespace passed; type checking, ESLint, Deno checking,
+all 66 focused tests, build and all 21 historical demo browser tests passed.
+The dependency audit found zero vulnerabilities. Gitleaks found no leaks in all
+16 existing commits or tracked/pending non-ignored files. A temporary synthetic
+token fixture was detected even after removal in a later commit, and output
+redaction was verified. No scanner exceptions were needed. PR #2 records remote
+CI results for the quality-control changes.
+
+Initial restricted GitHub/npm access and browser-server startup failed; approved
+network/browser execution succeeded. Existing Zod annotation and bundle-size
+warnings remain. No application behavior, cloud data or deployment changed;
+hosted tests were not repeated for these workflow/documentation changes.
+
 ## Historical local-demo implementation and verification
 
 ## Implemented

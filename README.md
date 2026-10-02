@@ -53,6 +53,8 @@ Install Chromium once with `npx playwright install chromium`. Deno and the provi
 
 PR CI runs build/lint/type/function/database/demo checks without hosted secrets. The protected, manually dispatched `cloud-test` environment requires a separate Supabase test project and credentials. It refuses the shared development project. Preview deployments do not automatically use or mutate the shared database. See [contributor and CI setup](docs/cloud-onboarding.md#5-contributor-onboarding).
 
+PR security checks scan Git history for secrets with redacted Gitleaks output and audit locked npm dependencies, blocking high/critical vulnerabilities. Dependabot proposes weekly dependency/action updates. The [code-quality guide](docs/code-quality.md) describes the review checklist and prepared mandatory merge rules; the repository owner must enable those remote rules and vulnerability alerts.
+
 ## Connected workflow
 
 Sign in with an organizer-provided account. Team accounts see their own issues and public activity. Staff see their combined volunteer/specialist/jury capabilities; admin is a separate capability. Submit → claim → escalate → accept → resolve → award → confirm external application. Support can report for a roster team. Reopening preserves ownership, every previous resolution and the existing award, while excluding resolved intervals from unresolved time. Server timestamps, issue revisions, transactional locks and persisted request IDs protect writes. An award remains separate from the external contest clock.
@@ -68,6 +70,7 @@ Uploads, broader event/roster/category editors, CSV, notifications, shared incid
 - [Cloud onboarding and costs](docs/cloud-onboarding.md)
 - [Current implementation and verification](docs/current-state.md)
 - [Manual walkthrough](docs/manual-verification.md)
+- [Code quality and review](docs/code-quality.md)
 - [Product direction](docs/product-direction.md)
 - [Historical demo specification](docs/demo-spec.md)
 

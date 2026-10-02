@@ -86,6 +86,8 @@ PR CI (`.github/workflows/checks.yml`) runs type/lint/function/build, 66 focused
 
 `npm run test:cloud` tests a local frontend against hosted Supabase. To smoke-test the deployed frontend with the same temporary real accounts, use `npm run test:hosted`. Configure redirect/CORS settings first. Fixture cleanup is explicit; no shared reset or auto-import of old browser demo data exists.
 
+The selected quality controls add secret scanning, dependency audits and a PR checklist. See [code-quality.md](code-quality.md) for required check names and the prepared merge-protection payload. The available contributor account cannot administer this repository; the owner must apply remote merge rules and enable vulnerability alerts. No paid security feature is selected.
+
 
 ## Completion record to fill during implementation
 

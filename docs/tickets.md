@@ -109,7 +109,7 @@ Verification is recorded in [current-state.md](current-state.md).
 
 ## T0003 — Cloud onboarding and authenticated shared product
 
-Status: implementation in progress on `feature/t0003-cloud-product`, started from updated `main` on 2026-10-02. Supabase schema and trusted first-admin/session bootstrap have been applied to the development project. Connected frontend, account administration, cloud contributor commands and embedded database tests are implemented. The initial hosted workflow/authorization/browser checks passed; final privacy/archival verification is recorded in current-state.md; custom SMTP remains blocked by unavailable sender-domain access. The user reviews and merges the PR.
+Status: implementation in progress on `feature/t0003-cloud-product`, started from updated `main` on 2026-10-02. Supabase schema and trusted first-admin/session bootstrap have been applied to the development project. Connected frontend, account administration, cloud contributor commands and embedded database tests are implemented. The initial hosted workflow/authorization/browser checks passed; final privacy/archival verification is recorded in current-state.md; custom SMTP remains blocked by unavailable sender-domain access. The user reviews and merges the draft PR. SMTP delivery, billing/ownership records and protected cloud CI environment setup remain incomplete.
 
 Updated contributor decision (2026-10-02): contributors may be assumed to have full cloud credential access. Docker is optional, not required for development, migrations, function deployment or the embedded database checks. Cloud integration CI uses a protected isolated test project; untrusted PR checks run without provider credentials. This supersedes the local-stack prerequisite below; the connected workflow and authorization requirements remain in scope.
 
@@ -163,7 +163,7 @@ Cloud first, features first: connectivity is assumed. Offline queues, synchroniz
 - [x] Separate authenticated contestant/support/jury/admin views work; demo controls and client-supplied identity cannot bypass permissions.
 - [x] Full submit → claim → handoff → resolve → award → external confirmation journey and repeated reopening work across distinct signed-in browsers. Staff can submit for a roster team.
 - [x] Server timestamps, transactional transitions and a unique award constraint preserve history and reject concurrent/duplicate actions. Unauthorized API access and private-note leakage are tested.
-- [ ] Cloud migrations, isolated fixtures and documented commands reproduce the connected environment from a fresh clone; fast PR checks run without hosted secrets or Docker.
+- [x] Cloud migrations, isolated fixtures and documented commands reproduce the connected environment from a fresh clone; fast PR checks run without hosted secrets or Docker.
 - [ ] Build, lint, type checking, focused/database/browser tests and hosted/manual checks pass, with actual evidence recorded. Provider/email blockers are marked incomplete.
 
 ### Explicit exclusions and later decisions

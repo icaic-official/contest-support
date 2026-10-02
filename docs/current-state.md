@@ -44,11 +44,12 @@ Style: preserve repository double quotes, React component capitalization, concis
 
 Final hosted result: `npm run test:hosted` passed all five cases (30.2 seconds), including three resolutions/two reopenings across real clients, preserved external application, staff-only note signals, unchanged public revisions, direct private-note exclusion, concurrent claim/award winners, admin role assignment, password changes/logout, current revocation and archived navigation. Test fixture cleanup completed successfully. The user confirmed saving Site URL and exact redirect URLs; real mail delivery is still not verified.
 
+Clean-checkout verification: `/tmp/minsky-t0003-clean` at `bfe94e1` used a fresh `node_modules` install and only public Supabase frontend settings. `npm ci`, type checking, lint, all 66 focused tests, Deno checking and the production build passed, producing the same `index-BwjV5kgP.js` asset as the deployed build. The install reported zero audit vulnerabilities. After installation, `cloud:link` succeeded and `cloud:plan` reported the remote database up to date with no pending migrations or seeds. An initial premature link attempt failed with `supabase: not found`; the sequential rerun passed.
+
 ## Pending acceptance and known limits
 
 - Custom SMTP/sender access and hosted invitation, password setup, resend and recovery delivery to a non-provider-team recipient are incomplete. No local mail capture was run or counted as hosted proof.
 - Selected billing plans, billing contact/receipt record and protected cloud CI environment setup remain owner tasks. No paid upgrade was selected or payment information handled by the agent.
-- Clean-checkout contributor verification is in progress; results will be recorded before the final PR report.
 - Membership revocation preserves historical ownership. If an active owner loses support membership, restore it to continue owner-only work or have another specialist accept an already pending handoff. General reassignment tools are not in T0003.
 - Group contests and one award per issue only. Uploads, broader organizer editors, shared incidents, imports, alerts/push, offline/resilience and 800-user capacity testing remain deferred. Candidate T0004 is not started.
 

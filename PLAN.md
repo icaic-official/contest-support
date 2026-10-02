@@ -69,7 +69,7 @@ Preserve these longer-term decisions in the product-direction document:
   - 800 simultaneous users.
   - 95% of ordinary actions within two seconds.
   - Live updates within three seconds.
-- **Outage handling remains unresolved.** Remind you before we scope the connected-backend ticket. Revisit the architecture if you require venue-local operation.
+- **Updated decision (2026-10-02): cloud first, features first.** Assume connectivity during development. Outage handling and resilience are deferred and do not block the connected backend; no offline or venue-local design has been selected.
 
 **Ticket workflow**
 
@@ -80,6 +80,8 @@ Implement → verify → update documentation → prepare a pull request → **y
 Future work stays as short candidate items until your demo feedback determines the next ticket. Do not generate a large implementation backlog now.
 
 **Decision after demo review (2026-10-02):** The user accepted the local proof of concept and selected T0002 planning on the existing `feature/t0001-local-demo` branch, without waiting for T0001 to merge. T0002 will support people with multiple staff roles, allow any support staff member to begin triage, and let contestants and helpers reopen resolved issues. UI redesign, including possible Figma references, is deferred. See [T0002 in the development tickets](docs/tickets.md#t0002--multiple-staff-roles-triage-and-reopening) for the scope and recorded defaults. This exception supersedes the next-ticket branch and merge prerequisite above for T0002 only. T0002 is now implemented; current verification is recorded in [docs/current-state.md](docs/current-state.md).
+
+**Cloud direction after merge (2026-10-02):** PR #1 merged T0001 and T0002. The user requested T0003 scoping on updated `main`: guided Cloudflare Workers/Supabase onboarding, real accounts, shared workflows and contributor setup. Prefer free tiers, with necessary paid services acceptable after identifying the need and cost. The recommended split puts authentication, role dashboards and minimal account administration in T0003, with broader organizer tools and configurable issue attachments as the next candidate. Helpers must eventually be able to attach images to issues; upload-permission toggles are required future direction, while attachment visibility remains undecided. See [T0003](docs/tickets.md#t0003--cloud-onboarding-and-authenticated-shared-product). This decision supersedes the former requirement to settle outage handling before backend scoping.
 
 ## 4. Verification and acceptance
 

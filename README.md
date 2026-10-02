@@ -69,7 +69,8 @@ There are no real accounts, uploads, notifications, cloud synchronization, CSV i
 - [Demo specification](docs/demo-spec.md)
 - [Longer-term product direction](docs/product-direction.md)
 - [Development tickets](docs/tickets.md)
+- [Cloud onboarding plan](docs/cloud-onboarding.md) — T0003 setup stages, costs and contributor requirements; not implemented yet.
 - [Current implementation and verification](docs/current-state.md)
 - [Repeatable manual walkthrough](docs/manual-verification.md)
 
-Development tickets T0001 and T0002 share `feature/t0001-local-demo` at the user's request. The user accepted the T0001 proof of concept. [T0002](docs/tickets.md#t0002--multiple-staff-roles-triage-and-reopening) implements multiple staff roles, support-staff triage, reopening by contestants/helpers, and validated v1 migration. UI redesign is deferred. The user still reviews and merges. Later tickets return to the normal workflow in [AGENTS.md](AGENTS.md). Outage handling remains unresolved and must be revisited before scoping a connected backend.
+T0001 and T0002 were merged into `main` in [PR #1](https://github.com/notbowen/minsky/pull/1) on 2026-10-02. The current application remains the local demo described above. [T0003](docs/tickets.md#t0003--cloud-onboarding-and-authenticated-shared-product) is scoped for Cloudflare Workers/Supabase onboarding, real email/password accounts, shared workflows, role dashboards, minimal administration and contributor setup. Cloud features come first; resilience and outage handling are explicitly deferred. Prefer free tiers, with necessary paid services acceptable after identifying the need and cost. Broader admin tools and configurable issue attachments are the recommended next candidate; attachment visibility remains undecided. Implementation follows [AGENTS.md](AGENTS.md), and the user reviews and merges.

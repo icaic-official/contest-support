@@ -1,6 +1,6 @@
 # Current state
 
-T0001 contains the demo implemented and verified in the earlier run on `feature/t0001-local-demo`. On 2026-10-02, the user accepted the proof of concept and requested T0002 on this same branch before merge. T0002 is implemented and verified; the shared [PR #1](https://github.com/notbowen/minsky/pull/1) covers both tickets. The user still merges. No production backend exists. The historical run report in PLAN.md is not a statement of current repository contents.
+T0001 and T0002 are implemented and verified; the user merged their shared [PR #1](https://github.com/notbowen/minsky/pull/1) into `main` on 2026-10-02. T0003 is scoped, not implemented. No production backend exists. The historical run report in PLAN.md is not a statement of current repository contents.
 
 ## Implemented
 
@@ -55,6 +55,6 @@ The demo uses one tab and one local dataset. It does not synchronize concurrent 
 
 Persona/filter selections reset on refresh. These checks establish no production security, offline operation, or 800-user capacity.
 
-T0002 retains one award per issue, even after reopening; award adjustments and role editors remain deferred. The next candidates are visual refinement and an outage decision before a free-tier backend experiment. No later ticket has been started. UI redesign is deferred.
+T0002 retains one award per issue, even after reopening; award adjustments and role editors remain deferred. [T0003](tickets.md#t0003--cloud-onboarding-and-authenticated-shared-product) now scopes cloud onboarding, authenticated shared workflows, role dashboards, minimal admin controls and contributor setup. Its planning changes were prepared on updated `main`; no application code or provider resources were changed. The [onboarding guide](cloud-onboarding.md) distinguishes setup tasks from completed work.
 
-The demo defers real accounts, uploads, notifications, connected services, CSV import, shared incidents, and administration. Outage behavior remains unresolved. Revisit this decision before you scope a backend ticket.
+The user explicitly chose cloud features first and deferred outage/resilience work. Free tiers are preferred; necessary paid services are acceptable after identifying the cost and reason. Helpers' issue-linked images and configurable volunteer upload permissions are recorded for the next candidate alongside broader admin tools. Attachment visibility and setting scope/defaults remain undecided. No T0004 is created. UI redesign, notifications, CSV imports and shared incidents remain deferred.

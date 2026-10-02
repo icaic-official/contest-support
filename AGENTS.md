@@ -8,9 +8,11 @@
 - Read the active ticket and relevant documents under `docs/` once they exist. Do not assume planned files or features already exist.
 - Treat historical run reports as records of that run, not as current repository state. Verify current state from the repository.
 
-## Immediate scope: a local demo
+## Current scope and completed demo baseline
 
-The immediate objective is an interactive demo that helps the user decide where the application should go. Implement the agreed demo before production infrastructure. Keep subsequent tickets small and driven by the user's feedback.
+T0001 and T0002 were merged in PR #1 on 2026-10-02. T0003 is scoped in `docs/tickets.md` for cloud onboarding and an authenticated shared product. Its implementation must start from updated `main` on `feature/t0003-cloud-product`. The demo requirements below describe the completed baseline; they do not exclude the connected features explicitly selected for T0003. Keep planning separate from implemented capabilities.
+
+The initial objective was an interactive demo that helped the user decide where the application should go. T0001 and T0002 completed that baseline. Keep subsequent tickets small and driven by the user's feedback.
 
 - Use React, TypeScript, Vite, and npm with a committed lockfile.
 - Use fictional seeded data, simulated personas, and versioned browser-local persistence. The demo requires no cloud account or paid service.
@@ -39,7 +41,7 @@ Use simple components and domain logic appropriate to the demo. Avoid speculativ
 - Separate contestant-visible replies from internal staff notes. Omit internal notes from contestant views.
 - Record an award separately from confirmation that it was applied externally. The demo does not change an external contest clock.
 - Keep a local activity history that identifies the simulated actor. Prevent repeated actions from producing duplicate awards or invalid transitions.
-- Provide a reset control that restores fictional data.
+- Preserve the fictional reset in local demo/test tooling. Do not expose a shared-data reset or persona impersonation control in the connected product.
 
 ## Ticket and Git workflow
 
@@ -79,13 +81,15 @@ Create the remaining documentation during T0001, and keep it concise and consist
 | `docs/tickets.md` | Active development ticket, status, acceptance criteria, and a small follow-up queue. |
 | `docs/current-state.md` | Implemented and verified capabilities, limitations, and next work. |
 | `docs/manual-verification.md` | Repeatable verification steps, expected outcomes, and required fictional personas/data. |
+| `docs/cloud-onboarding.md` | Provider setup, costs and contributor onboarding for T0003; distinguish planned steps from verified outcomes. |
 
 Update the relevant documents in the same change as behavior or workflow changes. Distinguish proposed, implemented, and verified capabilities. Use PLAN.md as the initial baseline. Keep later decisions explicit in the appropriate document rather than leaving conflicting instructions.
 
 ## Deferred decisions and production direction
 
-- **Outage handling is unresolved.** Remind the user before you scope the connected-backend ticket. Revisit outage handling before you scope that ticket. Do not assume the user selected manual fallback, offline capture, or venue-local operation.
-- Cloudflare and Supabase are the intended production direction, subject to the outage decision. The user wants free-tier experiments before considering paid subscriptions.
+- **Cloud first, features first (2026-10-02).** The user explicitly deferred outage handling and resilience until after the cloud features. Assume connectivity for the developer phase; do not block backend work on manual fallback, offline capture or venue-local operation. Ordinary error reporting and shared-data correctness still belong in the product.
+- Use Cloudflare Workers and Supabase, preferring free tiers. The user is willing to pay when necessary; document the concrete need and cost before a paid upgrade. Do not treat free tier as a hard constraint or enable speculative paid services.
+- Future attachments must link helpers' images to issues. Record configurable upload permissions, including enabling/disabling volunteer image submission, as future work. Contestant-visible versus staff-only attachments and the configuration scope remain undecided; do not silently choose a policy.
 - A free-tier pilot and production capacity validation are separate milestones. Future targets on a healthy venue connection are:
   - 800 simultaneous users.
   - 95% of ordinary actions within two seconds.

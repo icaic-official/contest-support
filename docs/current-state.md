@@ -1,6 +1,6 @@
 # Current state
 
-T0001/T0002 merged in PR #1. T0003 is implemented on `feature/t0003-cloud-product` and deployed as a development app; the review PR will remain a draft while hosted email delivery and provider/CI setup acceptance items are pending. The user reviews and merges. The initial PLAN.md run report and the demo results below are historical.
+T0001/T0002 merged in PR #1. T0003 is implemented on `feature/t0003-cloud-product` and deployed as a development app; [PR #2](https://github.com/notbowen/minsky/pull/2) remains a draft while hosted email delivery and provider/CI setup acceptance items are pending. The user reviews and merges. The initial PLAN.md run report and the demo results below are historical.
 
 ## Connected implementation (T0003, 2026-10-02)
 

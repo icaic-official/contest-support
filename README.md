@@ -2,6 +2,7 @@
 Minsky is a platform to help competition organizers triage technical problems during programming contests. Moreover, it also includes other helpful features such as:
 - handing over to or bringing in other people/parties to provide extra assistance  
 - ability to record time taken for problem resolution and award discretionary time extensions
+- supporting modular roles and events  
 
 ## Problem
 During previous iterations of international AI contests, when contestants face a technical problem, they usually raise a card or fill up a Google Form to alert an on-site competition volunteer to attend to them. 

@@ -78,6 +78,8 @@ Review `scripts/bootstrap.sql` before first setup; it refuses an existing admin.
 
 For each ticket, start its branch from updated `main`, develop against the development project and add versioned migrations. Run the fast README checks, prepare the PR, and run cloud integration checks against the reviewed revision. The user reviews and merges. Explicitly deploy the approved revision afterward; merging does not automatically deploy. Once production exists, validate changes on development and CI before applying them there. [AGENTS.md](../AGENTS.md#cloud-development-and-deployment-workflow) records these rules for future contributors and agents.
 
+T0004-specific exception (2026-10-03): the user's "Deploy first" instruction authorized deploying the completed frontend to the existing `minsky-dev` Worker before PR #9 merges. That deployment and all 12 hosted cases passed; [current-state.md](current-state.md#t0004-development-deployment-2026-10-03) records the revision, version and asset checks. No database migration or account-function deployment was needed. The PR remains open for user review and merge.
+
 Run CI project commands from a **separate checkout** linked with `npx supabase link --project-ref ghtztmovdkhuketcbjmq`. Keep the primary checkout linked to development. In that CI checkout:
 
 ```sh

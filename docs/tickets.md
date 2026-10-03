@@ -185,7 +185,7 @@ No offline/resilience project, 800-user load certification, individual-contest U
 
 Branch: `feature/t0004-ui-makeover`, created from updated `origin/main` after T0003 merged in PR #2 on 2026-10-02.
 
-Status: implemented and verified locally; [PR #9](https://github.com/notbowen/minsky/pull/9) is open for review. The user selected the two attached visual references on 2026-10-03; evidence is in [current-state.md](current-state.md#t0004-ui-makeover-2026-10-03). The user reviews and merges; deployment remains an explicit step after approval.
+Status: implemented, verified locally and deployed to [minsky-dev](https://minsky-dev.icaic-minsky.workers.dev) on 2026-10-03 at the user's explicit "Deploy first" instruction. All 12 hosted cases passed with fixture cleanup. [PR #9](https://github.com/notbowen/minsky/pull/9) remains open for user review and merge. The user selected the two attached visual references on 2026-10-03; [current-state.md](current-state.md#t0004-ui-makeover-2026-10-03) records implementation and [deployment evidence](current-state.md#t0004-development-deployment-2026-10-03). This development deployment precedes merge by the user's T0004-specific exception.
 
 ### Selected scope
 

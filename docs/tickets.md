@@ -243,7 +243,8 @@ Status: implemented and verified locally on 2026-10-11.
 Review pull request: [PR #19](https://github.com/notbowen/minsky/pull/19).
 On 2026-10-11, the user requested a Cloudflare preview before merge and approved using the existing development backend.
 The migration and account/attachment functions are deployed to `Minsky` development.
-The frontend preview is being verified at the `t0005` Worker version alias.
+The frontend preview is uploaded at https://t0005-minsky-dev.icaic-minsky.workers.dev.
+See the [preview record](current-state.md#t0005-development-preview-2026-10-11) for verification.
 `Minsky CI` and the main Worker deployment remain unchanged.
 The user reviews and merges.
 Deployment is a separate explicit step.

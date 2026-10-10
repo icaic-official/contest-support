@@ -33,7 +33,8 @@ test("hosted staff images upload, download, respect visibility, and can be remov
       name: `${visibility}.png`, mimeType: "image/png", buffer: png,
     });
     await images.getByRole("button", { name: "Add image", exact: true }).click();
-    await expect(images.getByRole("status")).toHaveText("Image added.");
+    // Hosted function startup and two Storage transfers can exceed five seconds.
+    await expect(images.getByRole("status")).toHaveText("Image added.", { timeout: 30000 });
   }
   await expect(images.locator(".image-thumb")).toHaveCount(2);
   await page.reload();

@@ -6,7 +6,8 @@ T0004's UI makeover merged in [PR #9](https://github.com/notbowen/minsky/pull/9)
 The documentation rewrite merged in [PR #13](https://github.com/notbowen/minsky/pull/13).
 The TypeScript major-update rule merged in [PR #14](https://github.com/notbowen/minsky/pull/14).
 The T0004 frontend remains deployed to development.
-T0005 adds issue images and is not deployed.
+T0005 adds issue images and has an approved frontend preview using the shared development backend.
+The main Worker frontend remains on the approved `main` revision.
 See [T0005 issue images](#t0005-issue-images-2026-10-11).
 
 These operational items stay deferred.
@@ -18,6 +19,82 @@ They are not part of T0005:
 
 Older reports below describe their recorded revisions.
 Use this status when an older report still says that T0005 is unimplemented or that PR #13 is open.
+
+## T0005 development preview (2026-10-11)
+
+The user requested a Cloudflare preview before merge and explicitly selected the existing `Minsky` development backend.
+Preview: https://t0005-minsky-dev.icaic-minsky.workers.dev.
+Frontend source revision: `da71d3a` (later verification/documentation changes do not change the frontend build).
+Worker version: `0140e7ae-8b52-434e-83c8-71f576ec4d84`.
+The main Worker stays on version `0384f2e5-7743-4ac1-9eb2-fbe6cea9aaef` at 100% traffic.
+Its JavaScript remains `index-D_rCfhHh.js`.
+PR #19 remains open for the user's review and merge.
+
+The first hosted migration attempt failed because `postgres` cannot alter the Supabase-owned `storage.objects` table.
+The corrected migration checks the existing Storage RLS prerequisite instead of changing ownership or re-enabling RLS.
+The embedded fixture now enables Storage RLS before application migrations, matching the managed service.
+The corrected migration applied successfully to development with no seeds.
+The `admin` and `attachments` functions deployed with `--use-api`.
+`ALLOWED_ORIGINS` retains the main and both local origins and adds the exact preview origin.
+No CI project, production resource, or paid plan changed.
+
+`npm run deploy:preview -- --preview-alias t0005` builds and uploads a version without deploying it to the main URL.
+No permanent preview Git branch or automatic preview build is configured.
+The preview uses existing development accounts, database, and Storage; its data is shared with the main app.
+
+Verification used Node.js 22.22.1 and the existing installed dependencies after confirming identical lockfile hashes.
+Build, lint, type checking, and Deno checking passed.
+All 29 focused/database tests and all five public/image browser tests passed.
+The preview HTML, JavaScript, CSS, font, and license returned HTTP 200 and matched the local build by SHA-256.
+CORS preflights passed for both functions from the preview origin.
+The build retains the existing Zod annotation and bundle-size warnings.
+
+The hosted attachment check covers actual uploads of staff-only and team-visible PNGs, persistence after refresh, phone-width layout, full-size preview, download, uploader removal, contestant rendering, private Storage denial, and cross-team denial.
+The fixture cleanup removes only the run's attachment paths and UUID-scoped rows before deleting its accounts.
+The first hosted run passed the 12 existing cases but exceeded the new upload assertion's five-second wait.
+That assertion now permits 30 seconds for function startup and two Storage transfers.
+The final hosted suite passed all 13 cases in 1.4 minutes and completed fixture teardown.
+Its temporary credential directory was removed.
+These hosted development checks are separate from protected GitHub cloud CI, which was not run.
+A hosted 320px support screenshot was reviewed; the images section and workflow controls fit the viewport.
+Real devices, screen readers, other browser engines, 200% zoom, and manual admin-limit acceptance remain unverified.
+
+Files changed in this preview follow-up: `package.json`, `wrangler.jsonc`, `deno.lock`, `src/connected/database.test.ts`, `supabase/migrations/202610110001_attachments.sql`, `tests/cloud/fixture.ts`, `tests/cloud/attachments.spec.ts`, `README.md`, `docs/cloud-onboarding.md`, `docs/tickets.md`, and this document.
+Commands included repository/GitHub inspection, build/lint/type/function checks, focused/public/hosted tests, Supabase link/dry-run/migration/function/allowed-origin commands, Worker version upload/deployment listing, asset/CORS verification, and documentation/whitespace checks.
+Sandbox restrictions required elevated retries for Git/network/provider operations.
+An initial asset check used incorrect font filename casing; the corrected check passed.
+Existing double quotes and inferred returns remain repository TypeScript style exceptions.
+Operational follow-up items remain deferred as listed above; automatic PR preview uploads are not implemented.
+
+## Main development deployment (2026-10-11)
+
+The user authorized deployment of `main` to the existing development Worker and requested removal of temporary files afterward.
+Deployed revision: `d1c36fdde9d5d61160688d12c330de59fca37ec3`.
+Worker version: `0384f2e5-7743-4ac1-9eb2-fbe6cea9aaef`.
+URL: https://minsky-dev.icaic-minsky.workers.dev.
+
+The source came from a fresh archive of fetched `origin/main` in a temporary directory.
+Both the frontend configuration and hosted-test target were confirmed as development project `ovymmobupzowotvrywek`.
+The exact revision's GitHub [Checks](https://github.com/notbowen/minsky/actions/runs/38071450262) and [Security](https://github.com/notbowen/minsky/actions/runs/38071450234) workflows passed before deployment.
+`npm ci` passed with zero reported vulnerabilities.
+`npm run deploy` passed its TypeScript/build steps and published the Worker.
+Cloudflare reported no changed static assets to upload.
+No backend source changes relative to the previously deployed revision required migrations or an account-function deployment.
+
+Hosted verification completed at approximately 01:27 SGT:
+
+- The HTML, JavaScript, CSS, Public Sans font, and license returned HTTP 200 and matched the local build by SHA-256.
+- `npm run test:hosted` passed all 12 real-account cases in 1.2 minutes, including the complete workflow, authorization, recovery, phone layouts, keyboard behavior, and archived access.
+- The suite completed teardown of its UUID-scoped records and temporary accounts. Its temporary credential directory was removed.
+- The temporary deployment checkout, copied local environment file, dependencies, build output, and test artifacts were removed after verification.
+
+The build retains the existing two Zod annotation warnings and bundle-size warning.
+Sandbox restrictions initially prevented Git fetch and GitHub access; elevated retries passed.
+The sandboxed dependency installation stalled and was interrupted; the elevated installation passed.
+A Python asset request received HTTP 403; the Node verification passed for all five public assets.
+No additional manual browser review or protected cloud CI run was performed for this deployment.
+T0005 retains the remaining manual acceptance work.
+Only this deployment record changed in the repository; no application code changed.
 
 ## T0005 issue images (2026-10-11)
 
@@ -43,10 +120,11 @@ Implemented on `feature/t0005-issue-attachments`:
 - At the default 120 MB issue total, about eight full issues use 1 GB.
 
 The migration is `supabase/migrations/202610110001_attachments.sql`.
-It is not applied to `Minsky` or `Minsky CI`.
+It is applied to `Minsky` development for the user-approved preview.
+`Minsky CI` is unchanged.
 Review pull request: [PR #19](https://github.com/notbowen/minsky/pull/19).
-The `attachments` function is not deployed.
-The frontend is not deployed.
+The `admin` and `attachments` functions are deployed to development.
+The frontend is uploaded at the `t0005` Worker version alias; the main Worker deployment is unchanged.
 Merging does not deploy this change.
 Apply the migration first, then deploy `admin` and `attachments`, then deploy the frontend.
 
@@ -62,7 +140,8 @@ The add and download controls stay amber.
 At 320×740, the contestant section has no file input and no staff-only image.
 The archived preview fits the screen, has no removal control, and does not overflow.
 A real phone, screen reader, other browser engines, and 200% zoom were not checked.
-A signed-in upload and the admin limit form were not checked because the migration is not applied.
+The original implementation run did not check a signed-in upload or the admin limit form.
+The later preview verification is recorded below.
 The build keeps the existing Zod annotation warnings.
 The main JavaScript bundle is 584.6 kB, or 167.3 kB gzip.
 
@@ -96,7 +175,8 @@ The user later merged [PR #13](https://github.com/notbowen/minsky/pull/13) into 
 [PR #14](https://github.com/notbowen/minsky/pull/14) then merged the TypeScript major-update rule.
 T0005 implements issue images.
 See [T0005 issue images](#t0005-issue-images-2026-10-11).
-The [2026-10-03 development deployment](#t0004-development-deployment-2026-10-03) remains the latest frontend deployment.
+At that point, the [2026-10-03 development deployment](#t0004-development-deployment-2026-10-03) was the latest frontend deployment.
+The later main deployment and T0005 preview are recorded above.
 Earlier reports retain the PR status and verification results from their recorded runs.
 
 ## T0004 UI makeover (2026-10-03)

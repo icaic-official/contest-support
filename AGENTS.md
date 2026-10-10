@@ -51,6 +51,8 @@ Use simple components and domain logic appropriate to the demo. Avoid speculativ
 
 ## Ticket and Git workflow
 
+- Include `Co-authored-by: PuR3Luck <aidan.ong822@gmail.com>` in every new commit Codex creates and pushes for this repository. Separate the co-author trailer from the commit body with a blank line.
+- Preserve the primary author and any other co-author trailers. Before each push, verify that every new Codex-created commit contains the required trailer exactly once.
 - Distinguish development tickets from contestant issues in code, documentation, and communication.
 - The first implementation ticket is **T0001 — Local workflow demo and project guidance**, using `feature/t0001-local-demo`.
 - Start each development ticket from updated `main`. Use `feature/tNNNN-description` for subsequent ticket branches.

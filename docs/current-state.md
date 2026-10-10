@@ -1,10 +1,33 @@
 # Current state
 
-T0001/T0002 merged in PR #1. T0003's connected cloud app merged in [PR #2](https://github.com/notbowen/minsky/pull/2) on 2026-10-02. T0004 implements the UI makeover on `feature/t0004-ui-makeover`, created from updated `origin/main` (`8abfef6`), and is deployed to development at the user's explicit "Deploy first" instruction. [PR #9](https://github.com/notbowen/minsky/pull/9) remains open for user review and merge. Provider ownership/billing records, GitHub merge enforcement/vulnerability alerts and remaining user/manual acceptance checks are deferred to T0005 by the user's 2026-10-03 ticket decision (previously T0004). The older implementation/deployment reports below describe their revisions, not this branch's current UI.
+T0001 and T0002 merged in PR #1.
+T0003's connected cloud app merged in [PR #2](https://github.com/notbowen/minsky/pull/2) on 2026-10-02.
+T0004 implements the UI makeover on `feature/t0004-ui-makeover`.
+The branch started from updated `origin/main` at `8abfef6`.
+The frontend is deployed to development under the user's explicit "Deploy first" instruction.
+
+The 2026-10-03 record identifies [PR #9](https://github.com/notbowen/minsky/pull/9) as open for user review and merge.
+That ticket decision defers these items to T0005, which previously formed the T0004 follow-up scope:
+
+- Provider ownership and billing records.
+- GitHub merge enforcement and vulnerability alerts.
+- Remaining user and manual acceptance checks.
+
+Older implementation and deployment reports below describe their recorded revisions.
+They do not describe this branch's current interface.
 
 ## Ticket allocation (2026-10-03)
 
-[T0004](tickets.md#t0004--ui-makeover) uses the user's dark green workspace and centered sign-in references. Previous T0004 scope notes move to [T0005](tickets.md#t0005--follow-up-scope-notes), including the operational follow-ups above and candidate organizer tools/configurable issue attachments. Attachment policy decisions remain unresolved. Protected cloud CI remains a recorded T0003 setup gap; repository inspection during this run found no GitHub environments. References to the earlier T0004 candidate in historical reports below record the scope at that time and are superseded by this decision.
+[T0004](tickets.md#t0004--ui-makeover) uses the user's dark green workspace and centered sign-in references.
+Previous T0004 scope notes move to [T0005](tickets.md#t0005--follow-up-scope-notes).
+They include the operational work above and candidate organizer tools and configurable issue attachments.
+Attachment policy decisions remain unresolved.
+
+Protected cloud CI remains a recorded T0003 setup gap.
+Repository inspection during the recorded run found no GitHub environments.
+Historical reports refer to the earlier T0004 candidate scope.
+Those references describe the scope at that time.
+The 2026-10-03 ticket decision replaces that scope.
 
 ## T0004 UI makeover (2026-10-03)
 

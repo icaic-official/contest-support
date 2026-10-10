@@ -183,43 +183,78 @@ No offline/resilience project, 800-user load certification, individual-contest U
 
 ## T0004 — UI makeover
 
-Branch: `feature/t0004-ui-makeover`, created from updated `origin/main` after T0003 merged in PR #2 on 2026-10-02.
+Branch: `feature/t0004-ui-makeover`.
+The branch started from updated `origin/main` after T0003 merged in PR #2 on 2026-10-02.
 
-Status: implemented, verified locally and deployed to [minsky-dev](https://minsky-dev.icaic-minsky.workers.dev) on 2026-10-03 at the user's explicit "Deploy first" instruction. All 12 hosted cases passed with fixture cleanup. [PR #9](https://github.com/notbowen/minsky/pull/9) remains open for user review and merge. The user selected the two attached visual references on 2026-10-03; [current-state.md](current-state.md#t0004-ui-makeover-2026-10-03) records implementation and [deployment evidence](current-state.md#t0004-development-deployment-2026-10-03). This development deployment precedes merge by the user's T0004-specific exception.
+Status recorded on 2026-10-03: implemented, verified locally, and deployed to [minsky-dev](https://minsky-dev.icaic-minsky.workers.dev).
+The user explicitly requested "Deploy first".
+All 12 hosted cases passed, and fixture deletion completed.
+[PR #9](https://github.com/notbowen/minsky/pull/9) remains open for user review and merge in that record.
+
+The user selected the two attached visual references on 2026-10-03.
+[Current state](current-state.md#t0004-ui-makeover-2026-10-03) records implementation.
+The [deployment record](current-state.md#t0004-development-deployment-2026-10-03) contains the hosted evidence.
+This development deployment precedes merge under the user's exception for T0004.
 
 ### Selected scope
 
-- Match the workspace reference's dark green surfaces, restrained borders, compact sidebar, green status/selection accents, desktop queue/detail columns, timing facts and chronological activity. Put specialist acceptance in an amber handoff panel; distinguish staff notes with a lock marker and separate surface.
-- Match the centered sign-in reference: green Minsky mark, username/password fields, keyboard-operable password visibility control, amber submit button and always-visible organizer access/recovery guidance. Replace the prior introductory landing-page sections with this sign-in composition.
-- Keep actual authenticated session, team, account, issue and history values. The screenshots' names, counts, descriptions and timestamps are examples, not product seed data or new capabilities.
-- Make the desktop queue tabular and adapt rows to cards on phones. Put reporting behind **Report an issue** / **Report for team**. Keep filters, all workflow actions, account controls and administration accessible in the same theme. On narrow screens, selection focuses details and **Back to queue** returns to the queue.
-- Preserve backend permissions, public/internal visibility, handoff ownership, timer accounting, resolution history, reopening and separate award/application semantics. No schema/account-function changes, new organizer features or uploads are included.
+- Match the workspace reference's dark green surfaces, restrained borders, and compact sidebar.
+- Use green status and selection accents.
+- Use desktop columns for the queue and details, timing facts, and chronological activity.
+- Put specialist acceptance in an amber handoff panel.
+- Identify staff notes with a lock marker and separate surface.
+- Match the centered sign-in reference. Include a green Minsky mark, username and password fields, an amber submit button, and organizer access and recovery guidance. Keep that guidance visible. Make the password visibility control operable with the keyboard. Replace the prior introductory landing-page sections with this sign-in layout.
+- Keep actual authenticated session, team, account, issue, and history values. Screenshot names, counts, descriptions, and timestamps are examples. They do not define product seed data or new capabilities.
+- Make the desktop queue tabular. Adapt rows to cards on phones. Use **Report an issue** and **Report for team** to open the reporting form. Keep filters, workflow actions, account controls, and administration accessible in the same theme. On narrow screens, move focus to details after selection. Make **Back to queue** return focus to the queue.
+- Preserve backend permissions, public and internal visibility, handoff ownership, timer calculations, resolution history, and reopening. Preserve separate award and external application records.
+- Exclude schema changes, account-function changes, new organizer features, and uploads.
 
 ### Acceptance criteria
 
-- [x] Sign-in and authenticated workspace reflect the supplied visual references, with locally served typography and no example data added to the runtime.
-- [x] Queue, details, reporting, accounts and administration remain usable at desktop, laptop and 320/390px phone widths, without horizontal overflow.
-- [x] Keyboard navigation, focus, password visibility, report open/cancel, phone navigation and detail/queue return work.
-- [x] Real accounts complete submission → claim → escalation → acceptance → resolution → award → application and reopening; internal notes remain unavailable to contestants.
-- [x] Type checking, lint, build, focused/database tests and browser/cloud checks pass; screenshot review and remaining manual limitations are recorded in current-state.md.
-- [x] Relevant documentation is current and a PR is prepared for user review.
+- [x] Sign-in and the authenticated workspace reflect the supplied visual references. Typography is served locally. No example data enters the runtime.
+- [x] Queue, details, reporting, accounts, and administration remain usable at desktop, laptop, and 320/390px phone widths. No horizontal overflow occurs.
+- [x] Keyboard navigation, focus, password visibility, report open and cancel actions, phone navigation, and return between details and queue work.
+- [x] Real accounts complete submission, claim, escalation, acceptance, resolution, award, external application, and reopening. Contestants cannot access internal notes.
+- [x] Type checking, lint, build, focused tests, database tests, and browser and cloud checks pass. Current-state.md records screenshot review and remaining manual limitations.
+- [x] Relevant documentation is current. A PR is prepared for user review.
 
-The previous T0004 follow-up scope notes move to T0005 below.
+Previous T0004 follow-up scope notes move to T0005 below.
 
 ## T0005 — Follow-up scope notes
 
-Status: scope notes moved from T0004 by user decision on 2026-10-03. Detailed specification and acceptance criteria remain pending; implementation has not started.
+Status: the user's 2026-10-03 decision moved these scope notes from T0004.
+Detailed specification and acceptance criteria remain pending.
+Implementation remains pending.
 
 ### Agreed deferred work
 
-- Record provider ownership, selected billing plans, billing contact, recurring charges and receipt handling.
-- Configure and verify GitHub merge enforcement and vulnerability alerts with repository owner access.
-- Complete the remaining user/manual acceptance checks for the connected app.
+- Record provider ownership, selected billing plans, billing contact, recurring charges, and receipt procedures.
+- Configure GitHub merge enforcement and vulnerability alerts with repository owner access.
+- Verify those settings.
+- Complete the remaining user and manual acceptance checks for the connected app.
 
-These items are user-selected follow-up work. Broader organizer tools and attachments below remain candidates whose implementation scope must still be agreed.
+The user selected these follow-up items.
+Broader organizer tools and attachments remain candidates.
+Their implementation scope still requires agreement.
 
 ### Candidate scope: organizer tools and configurable issue attachments
 
-Event/session/roster/category editing and permission settings, prioritized after the cloud workflow is reviewed. Helpers' uploaded photos/screenshots must be linked to an issue with uploader/time metadata. Include enable/disable controls for volunteer image submission, enforced by the backend. Decide configuration scope, defaults, and contestant-visible versus staff-only access before implementation; do not infer that the uploader chooses visibility. Supabase Storage is recommended initially, with file records in Postgres and private bucket access. Choose file types/size limits and deletion rules when scoping. These are T0005 candidate scope notes, not an agreed implementation specification.
+Candidate work includes event, session, roster, and category editors and permission settings.
+Prioritize this work after review of the cloud workflow.
+Helpers' uploaded photos and screenshots must link to an issue.
+Records must identify the uploader and upload time.
+Include controls to enable or disable volunteer image submission.
+The backend must enforce those controls.
 
+Before implementation, decide these rules:
+
+- Configuration scope.
+- Defaults.
+- Access for contestants and staff.
+
+Do not assume that the uploader chooses visibility.
+Supabase Storage is the initial recommendation, with file records in Postgres and private bucket access.
+Choose file types, size limits, and deletion rules when you define scope.
+These are T0005 candidate scope notes.
+They are not an agreed implementation specification.
 Resilience and event-capacity work remain deferred until feature feedback warrants them.

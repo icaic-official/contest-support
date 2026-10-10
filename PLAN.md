@@ -1,10 +1,39 @@
 # Minsky planning record
 
-**Latest ticket decision (2026-10-03):** implement T0004's UI makeover from the user's references: dark green surfaces, compact sidebar, desktop queue/detail columns, green status and selection accents, amber handoff actions, and a centered sign-in form with password visibility control. Use actual authenticated data; reference names, values and timestamps are placeholders. Previous T0004 follow-up scope notes move to T0005, including provider ownership/billing records, GitHub merge enforcement/vulnerability alerts, remaining manual acceptance checks, and candidate organizer tools/configurable issue attachments. T0005 implementation has not started. See [development tickets](docs/tickets.md#t0004--ui-makeover).
+**Latest ticket decision (2026-10-03):** implement T0004's UI makeover from the user's references.
+The references specify these elements:
 
-**T0004 deployment exception (2026-10-03):** the user requested "Deploy first", authorizing the completed frontend's deployment to `minsky-dev` before PR #9 merges. The user still reviews and merges. This is a development deployment exception for T0004; [current-state.md](docs/current-state.md#t0004-development-deployment-2026-10-03) records the deployed revision and hosted verification.
+- Dark green surfaces.
+- A compact sidebar.
+- Desktop columns for the queue and details.
+- Green status and selection accents.
+- Amber handoff actions.
+- A centered sign-in form with a password visibility control.
 
-**Current decision (2026-10-02):** T0003 is the connected Supabase/Cloudflare development app. The user requested a public login landing page and sidebar, then removed the old local demo and its unnecessary tests. Keep connected workflow/authorization tests and isolated cloud fixtures. The original demo plan below is historical and does not authorize restoring demo runtime, reset, personas or browser-local issue persistence.
+Use actual authenticated data.
+Reference names, values, and timestamps are placeholders.
+Previous T0004 follow-up scope notes move to T0005:
+
+- Provider ownership and billing records.
+- GitHub merge enforcement and vulnerability alerts.
+- Remaining manual acceptance checks.
+- Candidate organizer tools and configurable issue attachments.
+
+T0005 implementation remains pending.
+See [development tickets](docs/tickets.md#t0004--ui-makeover).
+
+**T0004 deployment exception (2026-10-03):** the user requested "Deploy first".
+This authorizes deployment of the completed frontend to `minsky-dev` before PR #9 merges.
+The user still reviews and merges.
+The exception applies to T0004's development deployment.
+[Current state](docs/current-state.md#t0004-development-deployment-2026-10-03) records the deployed revision and hosted verification.
+
+**Current decision (2026-10-02):** T0003 is the connected Supabase and Cloudflare development app.
+The user requested a public login landing page and sidebar.
+The user then removed the old local demo and its unnecessary tests.
+Keep connected workflow and authorization tests and isolated cloud fixtures.
+The original demo plan below is historical.
+It does not authorize restoration of the demo runtime, reset tooling, personas, or browser-local issue persistence.
 
 ## Original demo plan
 

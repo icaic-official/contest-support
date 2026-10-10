@@ -241,7 +241,10 @@ Branch: `feature/t0005-issue-attachments`, created from updated `main` after T00
 
 Status: implemented and verified locally on 2026-10-11.
 Review pull request: [PR #19](https://github.com/notbowen/minsky/pull/19).
-The migration, attachment function, and frontend are not applied to development or CI.
+On 2026-10-11, the user requested a Cloudflare preview before merge and approved using the existing development backend.
+The migration and account/attachment functions are deployed to `Minsky` development.
+The frontend preview is being verified at the `t0005` Worker version alias.
+`Minsky CI` and the main Worker deployment remain unchanged.
 The user reviews and merges.
 Deployment is a separate explicit step.
 

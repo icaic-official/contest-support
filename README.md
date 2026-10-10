@@ -99,6 +99,7 @@ See [cloud onboarding](docs/cloud-onboarding.md) for function configuration, use
 | `npm run cloud:recover-admin -- --user UUID` | Recover an existing admin through trusted provider access. Print a new temporary password in the private terminal. |
 | `npm run cloud:functions` | Deploy the account and attachment functions with cloud bundling. |
 | `npm run deploy` | Build and explicitly deploy Workers Static Assets. |
+| `npm run deploy:preview -- --preview-alias t0005` | Build and upload a Worker version at the `t0005` preview URL without changing the main deployment. |
 
 Install Chromium once:
 
@@ -118,6 +119,11 @@ The protected `cloud-test` environment supports manually dispatched cloud tests.
 It requires a separate Supabase test project and credentials.
 It refuses the shared development project.
 Preview deployments do not automatically use or change the shared database.
+The T0005 preview uses the existing `Minsky` development backend with the user's approval.
+It shares development accounts and data.
+Upload it from `feature/t0005-issue-attachments` with `npm run deploy:preview -- --preview-alias t0005`.
+The alias is `https://t0005-minsky-dev.icaic-minsky.workers.dev`.
+This is a manual upload; branch pushes do not automatically publish previews.
 See [contributor setup](docs/cloud-onboarding.md#contributor-setup) and [protected cloud CI](docs/cloud-onboarding.md#verification-and-protected-cloud-ci).
 
 Use this development sequence:

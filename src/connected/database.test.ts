@@ -94,6 +94,8 @@ beforeAll(async () => {
       name text,
       metadata jsonb
     );
+    -- Match the managed Storage table's security before application migrations.
+    alter table storage.objects enable row level security;
     create function storage.foldername(name text) returns text[] language plpgsql immutable as $$
     declare parts text[];
     begin

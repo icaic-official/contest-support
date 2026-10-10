@@ -131,12 +131,30 @@ It does not include image transformations.
 This ticket does not enable transformations or a paid plan.
 At the default 120 MB issue total, about eight full issues use 1 GB.
 
-The migration and `attachments` function are not applied to development or CI yet.
+The user authorized the T0005 preview and use of the existing development backend on 2026-10-11.
+The migration and `admin`/`attachments` functions are applied to `Minsky` development.
+`Minsky CI` remains unchanged.
 Apply the migration before you deploy functions.
 Then deploy `admin` and `attachments`.
 Then deploy the frontend.
 `npm run cloud:functions` deploys both functions to development.
 Merging does not deploy this change.
+
+### Manual Worker previews
+
+From the reviewed ticket branch, run `npm run deploy:preview -- --preview-alias t0005`.
+This builds the frontend and runs `wrangler versions upload`.
+It updates `https://t0005-minsky-dev.icaic-minsky.workers.dev` and leaves the main Worker deployment unchanged.
+No permanent `preview` Git branch is needed.
+PR pushes do not upload automatically.
+See [Cloudflare version URLs](https://developers.cloudflare.com/workers/versions-and-deployments/version-urls/).
+
+The frontend uses its build-time Supabase settings.
+The approved T0005 preview shares `Minsky` accounts, database, and Storage.
+The functions' `ALLOWED_ORIGINS` includes the exact preview origin alongside the existing main and local origins.
+A frontend preview does not isolate backend changes or data.
+Confirm the backend target before applying migrations or functions.
+The attachment migration checks that Supabase already enabled Storage RLS rather than altering its managed table.
 
 ## Contributor setup
 
@@ -234,7 +252,7 @@ npm run test:cloud
 Review the configuration diff before you apply it.
 Review the migration target before you apply migrations.
 Deploy `attachments` only from a checkout that contains that function.
-T0005 is not applied to `Minsky` or `Minsky CI`.
+T0005 is applied to `Minsky` for the approved preview; it is not applied to `Minsky CI`.
 The `cloud:link` and `cloud:functions` npm shortcuts target development.
 Use the explicit CI commands above in the separate checkout.
 

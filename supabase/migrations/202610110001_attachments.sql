@@ -357,7 +357,14 @@ on conflict (id) do update set
   public = false,
   file_size_limit = excluded.file_size_limit,
   allowed_mime_types = excluded.allowed_mime_types;
-alter table storage.objects enable row level security;
+-- Supabase owns this table and enables RLS. The migration role cannot alter it.
+-- Refuse to install policies if the managed security prerequisite is missing.
+do $$
+begin
+  if not (select relrowsecurity from pg_class where oid = 'storage.objects'::regclass) then
+    raise exception 'Row level security must already be enabled on storage.objects.';
+  end if;
+end $$;
 grant select, insert, update on storage.objects to authenticated;
 create policy attachment_object_select on storage.objects for select to authenticated
 using (bucket_id = 'issue-attachments' and app_private.can_read_attachment_object(name));

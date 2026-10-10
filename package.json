@@ -15,6 +15,7 @@
     "test": "vitest run",
     "test:e2e": "playwright test",
     "deploy": "npm run build && wrangler deploy",
+    "deploy:preview": "npm run build && wrangler versions upload",
     "cloud:login": "supabase login",
     "cloud:link": "supabase link --project-ref ovymmobupzowotvrywek",
     "cloud:plan": "supabase db push --linked --dry-run",

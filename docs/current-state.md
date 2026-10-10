@@ -44,6 +44,7 @@ Implemented on `feature/t0005-issue-attachments`:
 
 The migration is `supabase/migrations/202610110001_attachments.sql`.
 It is not applied to `Minsky` or `Minsky CI`.
+Review pull request: [PR #19](https://github.com/notbowen/minsky/pull/19).
 The `attachments` function is not deployed.
 The frontend is not deployed.
 Merging does not deploy this change.

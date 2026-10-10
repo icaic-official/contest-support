@@ -240,6 +240,7 @@ That development deployment preceded merge under the user's exception for T0004.
 Branch: `feature/t0005-issue-attachments`, created from updated `main` after T0004 merged.
 
 Status: implemented and verified locally on 2026-10-11.
+Review pull request: [PR #19](https://github.com/notbowen/minsky/pull/19).
 The migration, attachment function, and frontend are not applied to development or CI.
 The user reviews and merges.
 Deployment is a separate explicit step.

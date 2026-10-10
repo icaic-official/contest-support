@@ -2,6 +2,11 @@
 
 These tickets describe development work, not contestant issues.
 
+T0004 has two related pull requests: [PR #9](https://github.com/notbowen/minsky/pull/9) implements the UI makeover, and [PR #13](https://github.com/notbowen/minsky/pull/13) rewrites the documentation.
+The `feature/t0004-ste100-docs` branch is a documentation follow-up within T0004.
+T0005 remains follow-up scope notes with no implementation started.
+PR #13 targets PR #9's branch. After PR #9 merges, retarget PR #13 to `main` before merging it.
+
 ## T0001 — Local workflow demo and project guidance
 
 Branch: `feature/t0001-local-demo`

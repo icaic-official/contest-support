@@ -83,6 +83,7 @@ Use simple components and domain logic appropriate to the demo. Avoid speculativ
 - Include one browser test covering the complete journey across authenticated test accounts.
 - Manually check phone-width volunteer screens, keyboard navigation, refresh persistence, and separation of public replies from internal notes.
 - Build, lint, type checking, and required tests must pass before presenting an implementation PR as ready. If a check cannot run, report the reason. Leave its result unverified.
+- Dependabot may open weekly npm and GitHub Actions update pull requests. Review them with the same checks as other changes. Do not adopt a TypeScript major update while `.github/dependabot.yml` ignores those updates; the installed `typescript-eslint` release cannot install TypeScript 7.
 - For documentation-only changes, check content, paths, and whitespace. Do not add application tests merely to test prose.
 - Never describe local demo testing as evidence of production security, offline operation, or capacity for 800 simultaneous users.
 

@@ -49,6 +49,10 @@ No cloud suite or live deployment was run for this deployment-tooling patch. Pro
 
 Files changed: `package.json`, `package-lock.json`, `deno.lock`, `docs/tickets.md` and this document. Commands included Git/gh inspection, Node lockfile comparisons, the targeted npm lockfile update, `npm ci`, the checks above, `npm ls`, Wrangler help/dry-run and documentation validation. The sandbox blocked a read-only Node/Git comparison; its approved retry passed. No application verification check failed. This patch remains within T0004; it does not start another development ticket.
 
+## Dependabot TypeScript majors (2026-10-11)
+
+[PR #10](https://github.com/notbowen/minsky/pull/10) (`@types/node` 26.6.4) and [PR #11](https://github.com/notbowen/minsky/pull/11) (`typescript-eslint` 8.71.1) rebased onto the Wrangler pin and passed `checks`, `secrets` and `dependencies`. [PR #12](https://github.com/notbowen/minsky/pull/12) bumps TypeScript from 5.9.3 to 7.0.2. Its `dependencies` and `secrets` checks passed after that rebase, and `checks` failed in `npm ci`: `typescript-eslint` 8.71 requires TypeScript `>=4.8.4 <6.1.0`. The npm registry's latest `typescript-eslint` is still 8.71.1 with that same peer range. `.github/dependabot.yml` now ignores TypeScript major updates so that pull request does not keep occupying an update slot. Patch and minor TypeScript updates remain enabled. The ignore takes effect after this configuration reaches `main`.
+
 ## Login landing page, sidebar and demo retirement (2026-10-02)
 
 The user requested a main login landing page and side navigation, then explicitly requested removing the old local demo, unnecessary old tests and residue, and pushing the changes. This extends the current T0003 branch. The app has one runtime: real Supabase accounts/shared data. The original development event/roster remains configured data, not a persona simulation. Broader organizer editors and assignment tools are still missing; deployment completion does not imply a complete contest-management product.

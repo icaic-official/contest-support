@@ -17,9 +17,11 @@ Pull requests and pushes to `main` run these check names:
 Security checks also run weekly on the default branch and can be dispatched
 manually. The weekly schedule and Dependabot updates take effect after their
 configuration reaches `main`. Dependabot proposes weekly npm and GitHub Actions
-updates, with at most three open update PRs per ecosystem. Updates require the
-same checks and review as other changes. Nothing automatically applies upgrades
-or runs `npm audit fix`.
+updates, with at most three open update PRs per ecosystem. TypeScript major
+updates are ignored: `typescript-eslint` 8.71 accepts TypeScript `>=4.8.4 <6.1.0`
+only, and TypeScript 7 makes `npm ci` fail. Patch and minor TypeScript updates
+still open. Updates require the same checks and review as other changes. Nothing
+automatically applies upgrades or runs `npm audit fix`.
 
 Workflows use read-only repository permissions, pinned action commits, job timeouts
 and credential-free checkout. Gitleaks uses a pinned, checksum-verified binary.

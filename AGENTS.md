@@ -14,13 +14,17 @@
 
 ## Current scope and completed demo baseline
 
+**T0004 merge status (2026-10-11):** the user merged [PR #9](https://github.com/notbowen/minsky/pull/9) into `main` and deleted its branch.
+[PR #13](https://github.com/notbowen/minsky/pull/13) remains the documentation follow-up and now targets `main`.
+See [the merge record](docs/current-state.md#t0004-merge-and-documentation-follow-up-2026-10-11) for the revision and timestamp.
+
 **Latest ticket decision (2026-10-03):** implement T0004's UI makeover from the user's references.
 The references show a dark green workspace and a centered sign-in form with an amber button.
 Keep actual authenticated data, workflow behavior, and authorization.
 Reference values are placeholders.
 
-Start T0004 from updated `main` after T0003 merges.
-Use `feature/t0004-ui-makeover`.
+T0004 started from updated `main` after T0003 merged.
+It used `feature/t0004-ui-makeover`.
 Previous T0004 follow-up scope notes move to T0005:
 
 - Provider ownership and billing records.
@@ -32,10 +36,9 @@ T0005 implementation remains pending.
 See [docs/tickets.md](docs/tickets.md).
 
 **T0004 deployment exception (2026-10-03):** the user explicitly requested "Deploy first" while PR #9 was open.
-Deploy the completed T0004 frontend to the existing development Worker `minsky-dev` before merge.
-Verify it there.
+The completed T0004 frontend deployed to the existing development Worker `minsky-dev` before merge.
+Hosted verification passed there.
 This exception applies to T0004's development frontend.
-The user still reviews and merges the PR.
 See [deployment evidence](docs/current-state.md#t0004-development-deployment-2026-10-03).
 
 **Demo retirement decision (2026-10-02):** remove the old local demo and these related parts:
@@ -99,6 +102,10 @@ Use simple components and domain logic appropriate to the demo. Avoid speculativ
 
 ## Ticket and Git workflow
 
+- Include `Co-authored-by: PuR3Luck <aidan.ong822@gmail.com>` in every new commit Codex creates and pushes for this repository.
+- Separate the co-author trailer from the commit body with a blank line.
+- Preserve the primary author and any other co-author trailers.
+- Before each push, check that every new Codex-created commit contains the required trailer exactly once.
 - Distinguish development tickets from contestant issues in code, documentation, and communication.
 - The first implementation ticket is **T0001 — Local workflow demo and project guidance**. Its branch is `feature/t0001-local-demo`.
 - Start each development ticket from updated `main`.

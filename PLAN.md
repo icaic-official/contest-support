@@ -1,5 +1,9 @@
 # Minsky planning record
 
+**T0004 merge status (2026-10-11):** the user merged [PR #9](https://github.com/notbowen/minsky/pull/9) into `main` and deleted its branch.
+[PR #13](https://github.com/notbowen/minsky/pull/13) remains the documentation follow-up and now targets `main`.
+See [the merge record](docs/current-state.md#t0004-merge-and-documentation-follow-up-2026-10-11) for the revision and timestamp.
+
 **Latest ticket decision (2026-10-03):** implement T0004's UI makeover from the user's references.
 The references specify these elements:
 
@@ -23,8 +27,7 @@ T0005 implementation remains pending.
 See [development tickets](docs/tickets.md#t0004--ui-makeover).
 
 **T0004 deployment exception (2026-10-03):** the user requested "Deploy first".
-This authorizes deployment of the completed frontend to `minsky-dev` before PR #9 merges.
-The user still reviews and merges.
+This authorized deployment of the completed frontend to `minsky-dev` before PR #9 merged.
 The exception applies to T0004's development deployment.
 [Current state](docs/current-state.md#t0004-development-deployment-2026-10-03) records the deployed revision and hosted verification.
 

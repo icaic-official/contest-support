@@ -2,6 +2,15 @@
 
 These tickets describe development work, not contestant issues.
 
+T0004 has two related pull requests.
+[PR #9](https://github.com/notbowen/minsky/pull/9) implements the UI makeover.
+[PR #13](https://github.com/notbowen/minsky/pull/13) rewrites the documentation.
+
+The `feature/t0004-ste100-docs` branch is a documentation follow-up within T0004.
+The user merged PR #9 into `main` on 2026-10-11 (SGT) and deleted its UI branch.
+PR #13 now targets `main` and remains a draft.
+T0005 remains follow-up scope notes with no implementation started.
+
 ## T0001 — Local workflow demo and project guidance
 
 Branch: `feature/t0001-local-demo`
@@ -183,18 +192,22 @@ No offline/resilience project, 800-user load certification, individual-contest U
 
 ## T0004 — UI makeover
 
-Branch: `feature/t0004-ui-makeover`.
+Implementation branch: `feature/t0004-ui-makeover` (deleted after merge).
 The branch started from updated `origin/main` after T0003 merged in PR #2 on 2026-10-02.
 
-Status recorded on 2026-10-03: implemented, verified locally, and deployed to [minsky-dev](https://minsky-dev.icaic-minsky.workers.dev).
+Status: implemented and merged in [PR #9](https://github.com/notbowen/minsky/pull/9) on 2026-10-11 (SGT).
+Merge commit: `52ff99133bd727626b3589b40a507ab438f508da`.
+[The merge record](current-state.md#t0004-merge-and-documentation-follow-up-2026-10-11) gives the exact UTC timestamp and reviewed revision.
+[PR #13](https://github.com/notbowen/minsky/pull/13) remains the documentation follow-up within T0004.
+
+Deployment evidence (2026-10-03): verified locally and deployed to [minsky-dev](https://minsky-dev.icaic-minsky.workers.dev).
 The user explicitly requested "Deploy first".
 All 12 hosted cases passed, and fixture deletion completed.
-[PR #9](https://github.com/notbowen/minsky/pull/9) remains open for user review and merge in that record.
 
 The user selected the two attached visual references on 2026-10-03.
 [Current state](current-state.md#t0004-ui-makeover-2026-10-03) records implementation.
 The [deployment record](current-state.md#t0004-development-deployment-2026-10-03) contains the hosted evidence.
-This development deployment precedes merge under the user's exception for T0004.
+That development deployment preceded merge under the user's exception for T0004.
 
 ### Selected scope
 

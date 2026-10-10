@@ -186,11 +186,12 @@ Merge does not automatically deploy the app.
 When production exists, validate changes on development and CI before you apply them to production.
 See [AGENTS.md](../AGENTS.md#cloud-development-and-deployment-workflow).
 
-**T0004 exception (2026-10-03):** the user's "Deploy first" instruction authorized frontend deployment to the existing `minsky-dev` Worker before PR #9 merges.
+**T0004 exception (2026-10-03):** the user's "Deploy first" instruction authorized frontend deployment to the existing `minsky-dev` Worker before merge.
 That deployment and all 12 hosted cases passed.
 [Current state](current-state.md#t0004-development-deployment-2026-10-03) records the revision, version, and asset checks.
 No database migration or account-function deployment was necessary.
-The PR remains open for user review and merge in that record.
+The user merged [PR #9](https://github.com/notbowen/minsky/pull/9) on 2026-10-11 (SGT).
+The [merge record](current-state.md#t0004-merge-and-documentation-follow-up-2026-10-11) identifies its revision and exact timestamp.
 
 Run CI project commands from a **separate checkout**.
 Link that checkout with `npx supabase link --project-ref ghtztmovdkhuketcbjmq`.

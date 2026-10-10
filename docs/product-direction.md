@@ -4,15 +4,13 @@ This document preserves the agreed direction from [PLAN.md](../PLAN.md).
 Only requirements listed in [current-state.md](current-state.md) describe implemented behavior.
 The user selects later scope after demo feedback.
 
-Latest ticket decision (2026-10-03): implement [T0004](tickets.md#t0004--ui-makeover) from the user's dark green workspace and centered sign-in references.
-The sign-in reference uses an amber button.
-Use actual authenticated data.
-Preserve workflow behavior and permissions.
-Sample text and values are placeholders.
-
-Previous T0004 scope notes move to [T0005](tickets.md#t0005--follow-up-scope-notes).
-They include agreed operational work and candidate organizer tools and configurable issue attachments.
-T0005 implementation remains pending.
+Latest ticket decision (2026-10-11): [T0005](tickets.md#t0005--issue-images) adds issue images.
+Staff attach JPEG, PNG, and WebP images to an issue.
+The uploader chooses team-visible or staff-only visibility at upload.
+The default is staff-only, and the choice stays fixed.
+Session admins set the file size, image count, and combined size.
+Provider ownership records, GitHub merge enforcement, and remaining manual acceptance checks stay deferred.
+They are not part of T0005.
 
 Implemented interface decision (2026-10-02): provide a public login landing page and a sidebar for the authenticated workspace.
 The user removed the old local demo, its commands, and tests that applied only to the demo.
@@ -35,11 +33,7 @@ The broader organizer tools below remain incomplete.
 - Contestants and helpers must be able to reopen resolved issues. T0002 implements reopening on the same issue and retains its history. Reopening continues an issue whose resolution needs review. A separate recurrence may still use a linked new report in future work. Linked-report controls remain outside T0002. The ticket records the implemented demo rules for ownership, timing, and awards.
 - The user confirmed that reopening resumes accumulated unresolved time and excludes time spent resolved. First-assignment delay remains separate. Awards remain discretionary.
 - Public replies and private notes are separate. The agreed direction includes photos, session announcements, in-app alerts, and browser push that users explicitly enable.
-- Helpers must be able to upload images linked to a contestant issue. Records must identify the uploader and upload time. Future settings controlled by administrators must enable or disable image submission for volunteers and other applicable roles. Attachment visibility remains undecided.
-
-  The decision must cover access for contestants and staff, and any uploader choice. The scope of settings, per event or per session, also remains undecided. Define these rules before you implement uploads.
-
-  Supabase Storage is the initial recommendation. It is not an implemented integration or a final provider commitment.
+- Staff upload JPEG, PNG, or WebP images on an issue. Each image records its uploader and time. The uploader chooses team-visible or staff-only visibility, and the choice stays fixed. Every staff member can upload while the event is active. Only the uploader can remove an image during that time. Contestants can view team-visible images on their own team's issues. Session admins set the per-session size and count limits. Resolved issues keep their images. Archived events keep the files for preview and download. T0005 stores the files in a private Supabase Storage bucket. Contestant uploads remain out of scope.
 - Shared incidents use explicit affected rosters, selective closure of linked reports, and bulk awards with recipient exceptions.
 - Awards use a separate ledger. One authorized decision precedes separate confirmation of external application. Contestants see the decision and application status. The demo permits explicit zero-minute decisions with a public explanation. It also supports preset and custom award amounts.
 - The agreed direction includes CSV roster imports and editing forms. Reporting uses dashboards only. Archived events permit reading only. The app does not automatically delete archived events.
@@ -57,7 +51,7 @@ A developer pilot and production capacity validation are separate milestones.
 
 Architecture clarification (2026-10-02): Cloudflare serves the React frontend as static assets.
 All backend functionality resides in Supabase.
-Use managed Auth, Postgres, Realtime, and future Storage.
+Use managed Auth, Postgres, Realtime, and Storage.
 Use database functions for transactional workflows.
 Use Edge Functions for privileged account administration.
 This replaces the earlier proposal for privileged Worker endpoints.
@@ -72,7 +66,8 @@ It also includes reproducible local contribution.
 Protected cloud CI setup remains unverified.
 
 T0004 implements the selected UI makeover.
-Broader organizer configuration and attachments remain candidate T0005 scope.
+T0005 implements issue images.
+Event, roster, and category editors remain future work.
 See [cloud onboarding](cloud-onboarding.md) for setup stages and costs.
 
 Production targets on a healthy venue connection are:
@@ -89,7 +84,7 @@ Actual authorization, synchronization, deployment, capacity, and recovery behavi
 Outage handling remains deferred until after cloud feature development.
 Manual fallback, offline capture, and venue-local operation remain unselected.
 Do not make these decisions a prerequisite for T0003.
-Attachment visibility and the scope and defaults of upload settings remain decisions for the attachment ticket.
+T0005 records the attachment visibility and limit decisions.
 
 After accepting the proof of concept, the user selected T0002 for multiple staff roles, support triage, and reopening.
 The user authorized this work on the existing T0001 branch.

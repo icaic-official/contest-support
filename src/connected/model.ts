@@ -19,7 +19,22 @@ const sessionSchema = z.object({
   intake_open: z.boolean(),
   categories: z.array(z.string()),
   revision: z.number(),
+  max_image_bytes: z.number().int().positive(),
+  max_images_per_issue: z.number().int().positive(),
+  max_image_bytes_per_issue: z.number().int().positive(),
 });
+const attachmentSchema = z.object({
+  id: uuid,
+  issue_id: uuid,
+  uploader: uuid,
+  uploader_name: z.string(),
+  uploaded_at: time,
+  visibility: z.enum(["public", "internal"]),
+  byte_size: z.number().int().positive(),
+  content_type: z.string(),
+  original_name: z.string(),
+});
+export type Attachment = z.infer<typeof attachmentSchema>;
 const issueSchema = z.object({
   id: uuid,
   number: z.number(),
@@ -77,6 +92,7 @@ export const snapshotSchema = z.object({
       visibility: z.enum(["public", "internal"]),
     }),
   ),
+  attachments: z.array(attachmentSchema).default([]),
   awards: z.array(
     z.object({
       id: uuid,

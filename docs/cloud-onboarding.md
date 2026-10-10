@@ -89,7 +89,9 @@ T0003 does not require a sender, domain, or SMTP setup.
 ## Ownership and costs
 
 On 2026-10-02, the user deferred records of provider ownership and billing details.
-On 2026-10-03, the user moved these scope notes from T0004 to T0005.
+On 2026-10-03, the user moved these scope notes from T0004.
+They stay deferred.
+They are not part of the T0005 issue-image ticket.
 The guidance below still applies before any paid upgrade.
 No paid upgrade is selected.
 
@@ -115,6 +117,26 @@ Before any paid upgrade, record the concrete blocker, current cost, and expected
 
 Free tiers do not establish capacity for 800 users.
 See [Workers pricing](https://developers.cloudflare.com/workers/platform/pricing/) and [Supabase pricing](https://supabase.com/pricing).
+
+## Issue image storage (T0005)
+
+T0005 adds a private Storage bucket named `issue-attachments`.
+The bucket accepts JPEG, PNG, and WebP objects up to 50 MB.
+Each image uses two paths: `{session}/{issue}/{attachment}/original` and `{session}/{issue}/{attachment}/thumbnail`.
+The browser creates the JPEG thumbnail.
+Its longest edge is 480 pixels, and its maximum size is 512 KB.
+Thumbnails do not count toward the image count or the issue total.
+Supabase Free includes 1 GB of file storage.
+It does not include image transformations.
+This ticket does not enable transformations or a paid plan.
+At the default 120 MB issue total, about eight full issues use 1 GB.
+
+The migration and `attachments` function are not applied to development or CI yet.
+Apply the migration before you deploy functions.
+Then deploy `admin` and `attachments`.
+Then deploy the frontend.
+`npm run cloud:functions` deploys both functions to development.
+Merging does not deploy this change.
 
 ## Contributor setup
 
@@ -204,12 +226,15 @@ npx supabase config push --project-ref ghtztmovdkhuketcbjmq
 npx supabase db push --linked --dry-run
 npx supabase db push --linked
 npx supabase functions deploy admin --project-ref ghtztmovdkhuketcbjmq --use-api
+npx supabase functions deploy attachments --project-ref ghtztmovdkhuketcbjmq --use-api
 npx supabase secrets set ALLOWED_ORIGINS=http://127.0.0.1:4174 --project-ref ghtztmovdkhuketcbjmq
 npm run test:cloud
 ```
 
 Review the configuration diff before you apply it.
 Review the migration target before you apply migrations.
+Deploy `attachments` only from a checkout that contains that function.
+T0005 is not applied to `Minsky` or `Minsky CI`.
 The `cloud:link` and `cloud:functions` npm shortcuts target development.
 Use the explicit CI commands above in the separate checkout.
 
@@ -234,7 +259,7 @@ npm run build
 
 Embedded PostgreSQL executes the actual migrations and policies with stubs for Auth context, sessions, and password hashes.
 It does not establish managed Auth behavior.
-`npm run test:e2e` checks the public connected landing and login pages without cloud credentials.
+`npm run test:e2e` checks the public landing page, login page, and image-preview harness without cloud credentials.
 The old demo and its tests are removed.
 `npm run test:cloud` tests managed Auth, database, and Realtime behavior against a local frontend.
 `npm run test:hosted` repeats the suite with real accounts against the deployed app.
@@ -295,5 +320,5 @@ See [manual workflow requirements](https://docs.github.com/en/actions/how-tos/ma
 - Authentication settings: user reported Email enabled, public signup and anonymous sign-in disabled, email confirmation enabled and exact local/hosted redirects saved. Keep these settings; the trusted function confirms organizer-created internal identities.
 - Historical migrations `202610020001_cloud.sql` through `202610020003_private_signals.sql` and the first bootstrap were applied without seeds. Both username/password migrations were applied without seeds, the account function was deployed, and all eight final hosted cases passed. Current deployment/version and detailed verification are recorded in current-state.md.
 - SMTP: deliberately removed from T0003 requirements by the user. No sender domain or paid mail service was configured; prior SMTP blockers are historical.
-- Ownership/billing: selected plans, organization owner, billing contact, recurring charges and receipt handling remain unverified and are deferred to T0005 by the user's 2026-10-03 ticket decision. No paid upgrade was selected or payment action performed by the agent.
+- Ownership/billing: selected plans, organization owner, billing contact, recurring charges and receipt handling remain unverified. They stay deferred and are not part of the T0005 issue-image ticket. No paid upgrade was selected or payment action performed by the agent.
 - Protected cloud CI: remains in T0003. The separate test project is prepared; protected GitHub environment setup and the first protected cloud run remain pending, including owner access and default-branch workflow availability. Local runs against isolated fixtures are separate evidence.

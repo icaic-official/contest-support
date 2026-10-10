@@ -1,30 +1,22 @@
 # Minsky planning record
 
 **T0004 merge status (2026-10-11):** the user merged [PR #9](https://github.com/notbowen/minsky/pull/9) into `main` and deleted its branch.
-[PR #13](https://github.com/notbowen/minsky/pull/13) remains the documentation follow-up and now targets `main`.
+The user merged the documentation rewrite in [PR #13](https://github.com/notbowen/minsky/pull/13) on 2026-10-11 (SGT).
 See [the merge record](docs/current-state.md#t0004-merge-and-documentation-follow-up-2026-10-11) for the revision and timestamp.
 
-**Latest ticket decision (2026-10-03):** implement T0004's UI makeover from the user's references.
-The references specify these elements:
+**Latest ticket decision (2026-10-11):** T0005 adds issue images on `feature/t0005-issue-attachments`.
+Staff attach JPEG, PNG, and WebP images to an issue.
+The uploader chooses team-visible or staff-only visibility at upload.
+The default is staff-only, and the choice stays fixed.
+Session admins set the file size, image count, and combined size.
+See [T0005](docs/tickets.md#t0005--issue-images).
 
-- Dark green surfaces.
-- A compact sidebar.
-- Desktop columns for the queue and details.
-- Green status and selection accents.
-- Amber handoff actions.
-- A centered sign-in form with a password visibility control.
-
-Use actual authenticated data.
-Reference names, values, and timestamps are placeholders.
-Previous T0004 follow-up scope notes move to T0005:
+These items stay deferred and are not part of T0005:
 
 - Provider ownership and billing records.
 - GitHub merge enforcement and vulnerability alerts.
 - Remaining manual acceptance checks.
-- Candidate organizer tools and configurable issue attachments.
-
-T0005 implementation remains pending.
-See [development tickets](docs/tickets.md#t0004--ui-makeover).
+- Event, roster, and category editors.
 
 **T0004 deployment exception (2026-10-03):** the user requested "Deploy first".
 This authorized deployment of the completed frontend to `minsky-dev` before PR #9 merged.

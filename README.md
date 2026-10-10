@@ -30,6 +30,13 @@ It preserves the workflow and account permissions.
 The reference values are not product seed data.
 The old local demo and its commands are removed.
 
+T0005 lets staff attach JPEG, PNG, and WebP images to an issue.
+The uploader chooses **Staff only** or **Visible to the team**.
+**Staff only** is the default, and the choice stays fixed.
+Session admins set the size and count limits under **Administration**.
+Contestants can view team-visible images on their own team's issues.
+They cannot upload images.
+
 ## Connected development — no Docker required
 
 Use Node.js 22.13 or later within 22.x, or Node.js 24 or later.
@@ -82,15 +89,15 @@ See [cloud onboarding](docs/cloud-onboarding.md) for function configuration, use
 | `npm run preview` | Serve built assets locally. |
 | `npm run typecheck` | Check TypeScript in the frontend, scripts, and browser tests. |
 | `npm run lint` | Run ESLint for TypeScript and Node scripts. |
-| `npm run check:functions` | Run the Deno type check for the privileged Supabase function. |
-| `npm test` | Test connected timing, account identifiers, and migrations and RLS with embedded PostgreSQL. Cloud credentials and Docker are not required. |
-| `npm run test:e2e` | Run public landing and login browser checks without cloud credentials. |
+| `npm run check:functions` | Run the Deno type check for the account and attachment functions. |
+| `npm test` | Test connected timing, account identifiers, image rules, and migrations and RLS with embedded PostgreSQL. Cloud credentials and Docker are not required. |
+| `npm run test:e2e` | Run public landing, login, and image-preview browser checks without cloud credentials. |
 | `npm run test:hosted` | Run the smoke suite with real accounts against the deployed development frontend. |
 | `npm run test:cloud` | Test real Auth, database, and Realtime behavior against the linked project. The suite creates temporary accounts and isolated sessions, then deletes its fixtures. |
 | `npm run cloud:plan` / `cloud:migrate` | Preview or apply migrations to the linked cloud project. |
 | `npm run cloud:bootstrap -- --admin-user UUID` | Create the first admin and session through a trusted bootstrap. |
 | `npm run cloud:recover-admin -- --user UUID` | Recover an existing admin through trusted provider access. Print a new temporary password in the private terminal. |
-| `npm run cloud:functions` | Deploy account administration with cloud bundling. |
+| `npm run cloud:functions` | Deploy the account and attachment functions with cloud bundling. |
 | `npm run deploy` | Build and explicitly deploy Workers Static Assets. |
 
 Install Chromium once:
@@ -185,7 +192,8 @@ The app then reads the data that the account can access.
 Private notes do not advance public counters.
 Invalidation payloads contain no notes or issue content.
 
-Uploads, broader event, roster, and category editors, CSV, notifications, shared incidents, offline operation, and award adjustments remain deferred.
+Staff can attach JPEG, PNG, and WebP images to an issue.
+Broader event, roster, and category editors, CSV imports, notifications, shared incidents, offline operation, and award adjustments remain deferred.
 This implementation supports group events and one award per issue.
 
 ## Documentation

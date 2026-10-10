@@ -5,11 +5,15 @@ These tickets describe development work, not contestant issues.
 T0004 has two related pull requests.
 [PR #9](https://github.com/notbowen/minsky/pull/9) implements the UI makeover.
 [PR #13](https://github.com/notbowen/minsky/pull/13) rewrites the documentation.
+The user merged both into `main` on 2026-10-11 (SGT).
+[PR #14](https://github.com/notbowen/minsky/pull/14) records the TypeScript major-update rule.
 
-The `feature/t0004-ste100-docs` branch is a documentation follow-up within T0004.
-The user merged PR #9 into `main` on 2026-10-11 (SGT) and deleted its UI branch.
-PR #13 now targets `main` and remains a draft.
-T0005 remains follow-up scope notes with no implementation started.
+T0005 implements issue images on `feature/t0005-issue-attachments`.
+These items stay deferred and are not part of T0005:
+
+- Provider ownership and billing records.
+- GitHub merge enforcement and vulnerability alerts.
+- Remaining manual acceptance checks.
 
 ## T0001 — Local workflow demo and project guidance
 
@@ -198,7 +202,7 @@ The branch started from updated `origin/main` after T0003 merged in PR #2 on 202
 Status: implemented and merged in [PR #9](https://github.com/notbowen/minsky/pull/9) on 2026-10-11 (SGT).
 Merge commit: `52ff99133bd727626b3589b40a507ab438f508da`.
 [The merge record](current-state.md#t0004-merge-and-documentation-follow-up-2026-10-11) gives the exact UTC timestamp and reviewed revision.
-[PR #13](https://github.com/notbowen/minsky/pull/13) remains the documentation follow-up within T0004.
+[PR #13](https://github.com/notbowen/minsky/pull/13) merged the documentation rewrite on 2026-10-11 (SGT).
 
 Deployment evidence (2026-10-03): verified locally and deployed to [minsky-dev](https://minsky-dev.icaic-minsky.workers.dev).
 The user explicitly requested "Deploy first".
@@ -231,43 +235,70 @@ That development deployment preceded merge under the user's exception for T0004.
 - [x] Type checking, lint, build, focused tests, database tests, and browser and cloud checks pass. Current-state.md records screenshot review and remaining manual limitations.
 - [x] Relevant documentation is current. A PR is prepared for user review.
 
-Previous T0004 follow-up scope notes move to T0005 below.
+## T0005 — Issue images
 
-## T0005 — Follow-up scope notes
+Branch: `feature/t0005-issue-attachments`, created from updated `main` after T0004 merged.
 
-Status: the user's 2026-10-03 decision moved these scope notes from T0004.
-Detailed specification and acceptance criteria remain pending.
-Implementation remains pending.
+Status: implemented and verified locally on 2026-10-11.
+The migration, attachment function, and frontend are not applied to development or CI.
+The user reviews and merges.
+Deployment is a separate explicit step.
 
-### Agreed deferred work
+### Selected scope
 
-- Record provider ownership, selected billing plans, billing contact, recurring charges, and receipt procedures.
-- Configure GitHub merge enforcement and vulnerability alerts with repository owner access.
-- Verify those settings.
-- Complete the remaining user and manual acceptance checks for the connected app.
+- Staff add JPEG, PNG, or WebP images from the issue detail.
+- Each image belongs to that issue and records the uploader and upload time.
+- The uploader chooses **Staff only** or **Visible to the team**.
+- **Staff only** is the default.
+- The choice stays fixed.
+- Contestants can view team-visible images on their own team's issues.
+- Contestants cannot upload images, and they cannot see staff-only images.
+- Volunteers, specialists, jury members, and session admins can upload while the event is active.
+- There is no control that disables uploads.
+- Only the uploader can remove an image, and only while the event is active.
+- Removal deletes the stored file.
+- Activity records the actor and time at the same visibility.
+- Session admins set three limits for the session.
+- One image can be from 1 to 50 MB. The default is 10 MB.
+- One issue can have from 1 to 24 images. The default is 12.
+- The combined size can be from 1 to 120 MB. The default is 120 MB.
+- The combined limit must be at least the single-image limit.
+- One MB is 1,048,576 bytes.
+- A lower limit leaves images that are already attached.
+- The next upload must fit the current limits.
+- Resolved issues keep their images.
+- Authorized uploads still work on a resolved issue while the event is active.
+- Reopening does not change images, ownership, or awards.
+- Images do not change the issue timer.
+- An archived event keeps the files.
+- Authorized members can still preview and download them.
+- Uploads, removal, and limit changes stop.
+- Minsky does not delete archived images.
+- The interface shows thumbnails, upload progress, validation messages, and a retry control for a failed transfer.
+- Full-size preview and download use the signed-in member's storage access.
+- The controls use the dark green workspace.
+- They remain usable on phones and desktops.
+- Postgres and Storage enforce authorization.
+- Clients cannot insert attachment rows directly.
 
-The user selected these follow-up items.
-Broader organizer tools and attachments remain candidates.
-Their implementation scope still requires agreement.
+### Outside this ticket
 
-### Candidate scope: organizer tools and configurable issue attachments
+Contestant uploads, HEIC, GIF, SVG, PDF, video, extra captions, later visibility changes, event and roster editors, shared incidents, image transformations, a paid storage upgrade, and image deletion jobs are outside this ticket.
 
-Candidate work includes event, session, roster, and category editors and permission settings.
-Prioritize this work after review of the cloud workflow.
-Helpers' uploaded photos and screenshots must link to an issue.
-Records must identify the uploader and upload time.
-Include controls to enable or disable volunteer image submission.
-The backend must enforce those controls.
+These operational items stay deferred.
+They do not receive a new ticket number:
 
-Before implementation, decide these rules:
+- Provider ownership, selected billing plans, billing contact, recurring charges, and receipt procedures.
+- GitHub merge enforcement and vulnerability alerts.
+- The remaining user and manual acceptance checks.
 
-- Configuration scope.
-- Defaults.
-- Access for contestants and staff.
+Resilience and event-capacity work remain deferred.
 
-Do not assume that the uploader chooses visibility.
-Supabase Storage is the initial recommendation, with file records in Postgres and private bucket access.
-Choose file types, size limits, and deletion rules when you define scope.
-These are T0005 candidate scope notes.
-They are not an agreed implementation specification.
-Resilience and event-capacity work remain deferred until feature feedback warrants them.
+### Acceptance criteria
+
+- [x] Staff can upload from the issue detail. Each image links to the issue and records the uploader and time.
+- [x] Team-visible and staff-only images follow the same separation as public replies and internal notes. The uploader's choice stays fixed.
+- [x] Only a session admin can change limits. The limits stay inside the stated ranges. The next upload must fit. Existing images remain when a limit is lowered.
+- [x] Only the uploader can remove an image during an active event. An archived event stays readable and rejects uploads, removal, and limit changes.
+- [x] Embedded database tests cover roles, storage access, visibility, limits, resolved issues, and archival. Phone-width browser checks cover preview, validation, retry, contestant hiding, and archived read-only controls.
+- [x] Documentation matches this behavior. A pull request is prepared for review. Development and CI stay unchanged until an explicit deployment.

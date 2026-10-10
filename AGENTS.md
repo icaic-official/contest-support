@@ -15,25 +15,23 @@
 ## Current scope and completed demo baseline
 
 **T0004 merge status (2026-10-11):** the user merged [PR #9](https://github.com/notbowen/minsky/pull/9) into `main` and deleted its branch.
-[PR #13](https://github.com/notbowen/minsky/pull/13) remains the documentation follow-up and now targets `main`.
+The user merged the documentation rewrite in [PR #13](https://github.com/notbowen/minsky/pull/13) on 2026-10-11 (SGT).
 See [the merge record](docs/current-state.md#t0004-merge-and-documentation-follow-up-2026-10-11) for the revision and timestamp.
 
-**Latest ticket decision (2026-10-03):** implement T0004's UI makeover from the user's references.
-The references show a dark green workspace and a centered sign-in form with an amber button.
-Keep actual authenticated data, workflow behavior, and authorization.
-Reference values are placeholders.
+**Latest ticket decision (2026-10-11):** implement T0005 issue images on `feature/t0005-issue-attachments`.
+Start from updated `main` after T0004.
+Staff can attach JPEG, PNG, and WebP images to an issue.
+The uploader chooses team visibility or staff-only visibility at upload.
+Session admins set the image size and count limits.
+See [docs/tickets.md](docs/tickets.md#t0005--issue-images).
 
-T0004 started from updated `main` after T0003 merged.
-It used `feature/t0004-ui-makeover`.
-Previous T0004 follow-up scope notes move to T0005:
+These items stay deferred.
+They are not part of T0005:
 
 - Provider ownership and billing records.
 - GitHub merge enforcement and vulnerability alerts.
 - Remaining manual acceptance checks.
-- Candidate organizer tools and configurable issue attachments.
-
-T0005 implementation remains pending.
-See [docs/tickets.md](docs/tickets.md).
+- Event, roster, and category editors.
 
 **T0004 deployment exception (2026-10-03):** the user explicitly requested "Deploy first" while PR #9 was open.
 The completed T0004 frontend deployed to the existing development Worker `minsky-dev` before merge.
@@ -168,7 +166,7 @@ Confirm the target before you apply migrations or deploy functions.
 
 After production is selected and provisioned, validate the approved revision on development and CI.
 Then apply its migrations to production.
-Deploy its account function and configuration.
+Deploy its account and attachment functions and configuration.
 Deploy its frontend.
 Verify the production deployment afterward.
 Production setup remains future work.
@@ -176,7 +174,8 @@ Production setup remains future work.
 This future production work does not authorize provider resource creation or upgrades now.
 Use [cloud-onboarding.md](docs/cloud-onboarding.md) for project references, commands, environment protection requirements, and observed setup results.
 T0003 retains protected cloud CI.
-The user's 2026-10-03 decision defers these items to T0005:
+These operational items stay deferred.
+They are not part of the T0005 issue-image ticket:
 
 - Ownership and billing records.
 - Remote merge enforcement and vulnerability alerts.
@@ -253,12 +252,13 @@ Before a paid upgrade, document the concrete need and cost.
 Do not treat free tiers as a hard limit.
 Do not enable speculative paid services.
 
-Future attachments must link helpers' images to issues.
-Record configurable upload permissions as future work.
-These must include controls to enable or disable volunteer image submission.
-Attachment visibility for contestants and staff remains undecided.
-Configuration scope also remains undecided.
-Do not silently select either policy.
+T0005 links staff images to issues.
+The uploader chooses team-visible or staff-only visibility, and the choice stays fixed.
+Every staff member can upload while the event is active.
+Only the uploader can remove an image during that time.
+Session admins set the file size, image count, and combined size limits.
+Contestants can view team-visible images on their own team's issues.
+There is no control that disables uploads.
 
 A free-tier pilot and production capacity validation are separate milestones.
 Future targets on a healthy venue connection are:

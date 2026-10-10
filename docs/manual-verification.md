@@ -1,4 +1,4 @@
-# Connected manual verification (T0003/T0004)
+# Connected manual verification (T0003/T0004/T0005)
 
 Use the linked development project and organizer-provided username and password accounts.
 Create the first admin through the explicit bootstrap process.
@@ -180,6 +180,36 @@ Review the centered sign-in page at desktop, 800px, 390px, and 320px widths.
 
 The suite creates isolated test fixtures and deletes only those fixtures.
 It does not reset the shared project.
+
+## 10. Issue images
+
+Use an active event unless a step says the event is archived.
+
+1. As a volunteer, specialist, jury member, and admin, add a JPEG, PNG, or WebP image from the issue detail.
+2. Check the progress text, thumbnail, uploader, and time.
+3. Open the full-size preview with the keyboard.
+4. Download the image.
+5. Close the preview and check that focus returns to the thumbnail.
+6. Keep the default **Staff only** choice for one image.
+7. Choose **Visible to the team** for another image.
+8. As a contestant on that team, check that only the team-visible image appears.
+9. Check that the contestant has no image file control.
+10. As a contestant on another team, check that neither image appears.
+11. As a staff member who did not upload the image, check that removal is refused.
+12. As the uploader, remove the image.
+13. Check that activity records the removal at the same visibility.
+14. Retry a failed transfer with **Try the upload again**.
+15. Reject a file that is not a JPEG, PNG, or WebP image.
+16. Reject an image above the current size limit.
+17. As admin, save lower image limits.
+18. Check that existing images remain and that the next upload must fit.
+19. Resolve the issue.
+20. Check that the images remain and that an authorized upload still works.
+21. Archive the event.
+22. Check that preview and download still work.
+23. Check that upload, removal, and limit changes are refused.
+24. Repeat the image controls at 390×844 and 320×740.
+25. Check that the page does not scroll horizontally.
 
 Record observed results in [current-state.md](current-state.md).
 Suggested manual checks are not completed checks.

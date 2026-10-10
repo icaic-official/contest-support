@@ -3,25 +3,79 @@
 T0001 and T0002 merged in PR #1.
 T0003's connected cloud app merged in [PR #2](https://github.com/notbowen/minsky/pull/2) on 2026-10-02.
 T0004's UI makeover merged in [PR #9](https://github.com/notbowen/minsky/pull/9) on 2026-10-11 (SGT).
-The user deleted `feature/t0004-ui-makeover` after merge.
-[PR #13](https://github.com/notbowen/minsky/pull/13) now targets `main` for the documentation follow-up.
-The frontend remains deployed to development under the user's explicit "Deploy first" instruction.
+The documentation rewrite merged in [PR #13](https://github.com/notbowen/minsky/pull/13).
+The TypeScript major-update rule merged in [PR #14](https://github.com/notbowen/minsky/pull/14).
+The T0004 frontend remains deployed to development.
+T0005 adds issue images and is not deployed.
+See [T0005 issue images](#t0005-issue-images-2026-10-11).
 
-The 2026-10-03 ticket decision defers these items to T0005, which previously formed the T0004 follow-up scope:
+These operational items stay deferred.
+They are not part of T0005:
 
 - Provider ownership and billing records.
 - GitHub merge enforcement and vulnerability alerts.
 - Remaining user and manual acceptance checks.
 
-Older implementation and deployment reports below describe their recorded revisions.
-Use the current status above to determine which PR remains open.
+Older reports below describe their recorded revisions.
+Use this status when an older report still says that T0005 is unimplemented or that PR #13 is open.
+
+## T0005 issue images (2026-10-11)
+
+Implemented on `feature/t0005-issue-attachments`:
+
+- Staff add JPEG, PNG, or WebP images from the issue detail.
+- Each ready image records its uploader, time, visibility, size, and file name.
+- The uploader chooses **Staff only** or **Visible to the team**.
+- **Staff only** is the default, and the choice stays fixed.
+- Contestants see team-visible images on their own team's issues.
+- Volunteers, specialists, jury members, and session admins can upload while the event is active.
+- Only the uploader can remove an image, and only while the event is active.
+- Session admins set the file size, image count, and combined size inside the ranges in [T0005](tickets.md#t0005--issue-images).
+- Resolved issues keep their images and still accept authorized uploads.
+- Archived events keep the files for preview and download.
+- Uploads, removal, and limit changes stop after archive.
+- The private `issue-attachments` bucket stores the original and a browser-made JPEG thumbnail.
+- Thumbnails do not count toward the image count or the issue total.
+- Postgres and Storage enforce membership, visibility, and limits.
+- Clients cannot insert attachment rows directly.
+- Supabase Free includes 1 GB of file storage and does not include image transformations.
+- This ticket does not enable transformations or a paid plan.
+- At the default 120 MB issue total, about eight full issues use 1 GB.
+
+The migration is `supabase/migrations/202610110001_attachments.sql`.
+It is not applied to `Minsky` or `Minsky CI`.
+The `attachments` function is not deployed.
+The frontend is not deployed.
+Merging does not deploy this change.
+Apply the migration first, then deploy `admin` and `attachments`, then deploy the frontend.
+
+Verification on Node.js 24.11.0: `npm run typecheck`, `npm run lint`, `npm run check:functions`, and `npm run build` passed.
+`npm test` passed 29 tests.
+`npm run test:e2e` passed the three public sign-in cases and both image cases.
+The production build does not include `image-preview.html`.
+That page is a development harness for the image component.
+
+Chromium checks at 390×844 opened a thumbnail, showed the full-size preview, download, and removal control, and returned focus on close.
+The thumbnail uses the dark canvas.
+The add and download controls stay amber.
+At 320×740, the contestant section has no file input and no staff-only image.
+The archived preview fits the screen, has no removal control, and does not overflow.
+A real phone, screen reader, other browser engines, and 200% zoom were not checked.
+A signed-in upload and the admin limit form were not checked because the migration is not applied.
+The build keeps the existing Zod annotation warnings.
+The main JavaScript bundle is 584.6 kB, or 167.3 kB gzip.
+
+The [Google TypeScript Style Guide](https://google.github.io/styleguide/tsguide.html) was read before the changes.
+Existing double quotes and inferred component returns remain repository exceptions.
+The thumbnail effect omits the attachment array from its dependency list because that array is recreated on each render.
+The visible attachment ids are the dependency instead.
 
 ## Ticket allocation (2026-10-03)
 
 [T0004](tickets.md#t0004--ui-makeover) uses the user's dark green workspace and centered sign-in references.
-Previous T0004 scope notes move to [T0005](tickets.md#t0005--follow-up-scope-notes).
+Previous T0004 scope notes move to [T0005](tickets.md#t0005--issue-images).
 They include the operational work above and candidate organizer tools and configurable issue attachments.
-Attachment policy decisions remain unresolved.
+The [T0005 section](#t0005-issue-images-2026-10-11) records the later attachment decisions and implementation.
 
 Protected cloud CI remains a recorded T0003 setup gap.
 Repository inspection during the recorded run found no GitHub environments.
@@ -37,12 +91,10 @@ Merge commit: [`52ff99133bd727626b3589b40a507ab438f508da`](https://github.com/no
 Reviewed branch head: `601a0ab4bb31934fad4741647ac8a88b6c653a6c`.
 The user deleted `feature/t0004-ui-makeover` after merge.
 
-GitHub retargeted [PR #13](https://github.com/notbowen/minsky/pull/13) to `main`.
-That PR remains a draft.
-
-PR #13 now includes `main`'s dependency repair and required collaborator attribution rules.
-Its diff from `main` changes Markdown files only.
-T0005 implementation remains pending.
+The user later merged [PR #13](https://github.com/notbowen/minsky/pull/13) into `main` at `44677c7`.
+[PR #14](https://github.com/notbowen/minsky/pull/14) then merged the TypeScript major-update rule.
+T0005 implements issue images.
+See [T0005 issue images](#t0005-issue-images-2026-10-11).
 The [2026-10-03 development deployment](#t0004-development-deployment-2026-10-03) remains the latest frontend deployment.
 Earlier reports retain the PR status and verification results from their recorded runs.
 

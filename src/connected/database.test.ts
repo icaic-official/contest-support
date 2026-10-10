@@ -79,7 +79,35 @@ beforeAll(async () => {
     create function auth.jwt() returns jsonb language sql stable as $$ select coalesce(nullif(current_setting('request.jwt.claims',true),''),'{}')::jsonb $$;
     create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$;
     grant usage on schema auth to authenticated; grant execute on function auth.uid() to authenticated;
-    create publication supabase_realtime;`,
+    create publication supabase_realtime;
+    create schema if not exists storage;
+    create table storage.buckets (
+      id text primary key,
+      name text not null,
+      public boolean default false,
+      file_size_limit bigint,
+      allowed_mime_types text[]
+    );
+    create table storage.objects (
+      id uuid primary key default gen_random_uuid(),
+      bucket_id text,
+      name text,
+      metadata jsonb
+    );
+    create function storage.foldername(name text) returns text[] language plpgsql immutable as $$
+    declare parts text[];
+    begin
+      parts := string_to_array(name, '/');
+      return parts[1:array_length(parts,1)-1];
+    end $$;
+    create function storage.filename(name text) returns text language plpgsql immutable as $$
+    declare parts text[];
+    begin
+      parts := string_to_array(name, '/');
+      return parts[array_length(parts,1)];
+    end $$;
+    grant usage on schema storage to authenticated, service_role;
+    grant all on storage.buckets, storage.objects to authenticated, service_role;`,
   );
   for (
     const file of readdirSync("supabase/migrations")
@@ -113,7 +141,7 @@ beforeAll(async () => {
 beforeEach(async () => {
   await db.exec("reset role");
   await db.exec(
-    "truncate public.admin_audit,public.history,public.awards,public.resolutions,public.issues,public.changes,public.staff_changes,app_private.receipts,public.memberships cascade",
+    "truncate public.attachments,public.admin_audit,public.history,public.awards,public.resolutions,public.issues,public.changes,public.staff_changes,app_private.receipts,public.memberships,storage.objects cascade",
   );
   await db.exec("truncate app_private.account_credentials,auth.sessions");
   await db.query("update public.people set username=null");
@@ -125,7 +153,9 @@ beforeEach(async () => {
     ]);
   }
   await db.query("update public.events set archived=false");
-  await db.query("update public.sessions set intake_open=true");
+  await db.query(
+    "update public.sessions set intake_open=true, max_image_bytes=10485760, max_images_per_issue=12, max_image_bytes_per_issue=125829120",
+  );
   for (
     const [user, team, roles, isAdmin, s] of [
       [admin, null, [], true, session],
@@ -170,6 +200,7 @@ describe("cloud database authorization and workflow", () => {
         "issues",
         "history",
         "admin_audit",
+        "attachments",
       ]
     ) {
       expect((await db.query(`select * from public.${table}`)).rows).toEqual(
@@ -627,5 +658,262 @@ describe("cloud database authorization and workflow", () => {
     await expect(
       db.query("select public.set_intake($1,true)", [session]),
     ).rejects.toThrow("archived");
+  });
+});
+
+type StartedImage = {
+  id: string;
+  original_path: string;
+  thumbnail_path: string;
+};
+async function beginImage(
+  user: string,
+  issueId: string,
+  options: {
+    visibility?: string;
+    bytes?: number;
+    name?: string;
+    requestId?: string;
+    targetSession?: string;
+  } = {},
+): Promise<StartedImage> {
+  await actor(user);
+  const result = await db.query<{ image: StartedImage }>(
+    "select public.begin_attachment($1,$2,$3,$4,$5,$6) as image",
+    [
+      options.targetSession ?? session,
+      options.requestId ?? id(++request + 8000),
+      issueId,
+      options.visibility ?? "internal",
+      options.name ?? "board.jpg",
+      options.bytes ?? 2048,
+    ],
+  );
+  return result.rows[0].image;
+}
+async function finishImage(
+  uploader: string,
+  started: StartedImage,
+  size = 1024,
+  header = "ffd8ffe0",
+) {
+  await db.exec("reset role");
+  await db.query(
+    "insert into storage.objects(bucket_id,name,metadata) values('issue-attachments',$1,$2::jsonb),('issue-attachments',$3,$4::jsonb)",
+    [started.original_path, JSON.stringify({ size }), started.thumbnail_path, JSON.stringify({ size: 400 })],
+  );
+  await db.query("select public.finish_attachment($1,$2,$3,$4,400,'ffd8ffe1')", [
+    uploader,
+    started.id,
+    size,
+    header,
+  ]);
+}
+
+describe("issue image authorization and limits", () => {
+  it("lets every staff role upload and keeps contestant, cross-session and direct writes out", async () => {
+    const issueId = await submit();
+    for (const user of [volunteer, specialist, jury, admin, combined]) {
+      const started = await beginImage(user, issueId, { bytes: 1000 });
+      expect(started.original_path).toContain(issueId);
+    }
+    await actor(contestant);
+    await expect(beginImage(contestant, issueId)).rejects.toThrow(
+      "permission",
+    );
+    await expect(
+      beginImage(id(8), issueId, { targetSession: session }),
+    ).rejects.toThrow("No access");
+    await db.exec("reset role");
+    await db.query(
+      "insert into public.memberships(session_id,user_id,roles) values($1,$2,'{volunteer}')",
+      [secondSession, volunteer],
+    );
+    await expect(
+      beginImage(volunteer, issueId, { targetSession: secondSession }),
+    ).rejects.toThrow("Issue unavailable");
+    await actor(volunteer);
+    await expect(
+      db.query(
+        "insert into public.attachments(session_id,issue_id,uploader,uploader_name,visibility,declared_bytes,original_name) values($1,$2,$3,'V','internal',10,'a.jpg')",
+        [session, issueId, volunteer],
+      ),
+    ).rejects.toThrow("permission denied");
+    await expect(
+      db.query(
+        "select public.finish_attachment($1,$2,1,'ffd8ff',1,'ffd8ff')",
+        [volunteer, id(9)],
+      ),
+    ).rejects.toThrow("permission denied");
+  });
+
+  it("enforces visibility, storage access, uploader deletion and live-update signals", async () => {
+    const issueId = await submit();
+    const internal = await beginImage(volunteer, issueId);
+    await actor(volunteer);
+    await db.query(
+      "insert into storage.objects(bucket_id,name,metadata) values('issue-attachments',$1,'{\"size\":10}')",
+      [internal.original_path],
+    );
+    await actor(contestant);
+    await expect(
+      db.query("insert into storage.objects(bucket_id,name) values('issue-attachments',$1)", [
+        internal.original_path,
+      ]),
+    ).rejects.toThrow(/row-level security|permission denied/);
+    await actor(specialist);
+    await expect(
+      db.query("insert into storage.objects(bucket_id,name) values('issue-attachments',$1)", [
+        internal.original_path,
+      ]),
+    ).rejects.toThrow(/row-level security|permission denied/);
+    await db.exec("reset role");
+    await db.query("delete from storage.objects");
+    await finishImage(volunteer, internal);
+    await actor(contestant);
+    expect((await db.query("select * from public.attachments")).rows).toHaveLength(0);
+    expect(
+      (await db.query("select * from storage.objects where name=$1", [internal.original_path])).rows,
+    ).toHaveLength(0);
+    expect(
+      (await db.query("select * from public.history where text='Image added.'")).rows,
+    ).toHaveLength(0);
+    await actor(jury);
+    expect((await db.query("select * from public.attachments")).rows).toHaveLength(1);
+    expect(
+      (await db.query("select * from storage.objects where name=$1", [internal.original_path])).rows,
+    ).toHaveLength(1);
+    expect((await db.query<{ revision: number }>("select revision from public.changes")).rows[0].revision).toBe(1);
+    expect((await db.query<{ revision: number }>("select revision from public.staff_changes")).rows[0].revision).toBe(1);
+
+    const visible = await beginImage(specialist, issueId, { visibility: "public", bytes: 1500 });
+    await finishImage(specialist, visible, 1200, "89504e470d0a1a0a");
+    await actor(contestant);
+    const snapshot = (
+      await db.query<{ state: { attachments: Array<{ visibility: string }> } }>(
+        "select public.session_snapshot($1) as state",
+        [session],
+      )
+    ).rows[0].state;
+    expect(snapshot.attachments).toHaveLength(1);
+    expect(snapshot.attachments[0].visibility).toBe("public");
+    expect(
+      (await db.query("select * from storage.objects where name=$1", [visible.original_path])).rows,
+    ).toHaveLength(1);
+    await actor(id(7));
+    expect((await db.query("select * from public.attachments")).rows).toHaveLength(0);
+
+    await actor(volunteer);
+    await expect(
+      db.query("select public.delete_attachment($1,$2)", [session, visible.id]),
+    ).rejects.toThrow("Only the person");
+    await actor(specialist);
+    await db.query("select public.delete_attachment($1,$2)", [session, visible.id]);
+    await actor(contestant);
+    expect((await db.query("select * from public.attachments")).rows).toHaveLength(0);
+    expect(
+      (await db.query("select text from public.history where text='Image removed.'")).rows,
+    ).toHaveLength(1);
+    await db.exec("reset role");
+    expect(
+      (await db.query<{ status: string }>("select status from public.attachments where id=$1", [visible.id])).rows[0].status,
+    ).toBe("deleted");
+  });
+
+  it("applies session limits, keeps resolved and lowered-limit images, and blocks archived writes", async () => {
+    const issueId = await submit();
+    await actor(volunteer);
+    await expect(beginImage(volunteer, issueId, { bytes: 11 * 1048576 })).rejects.toThrow(
+      "larger than 10 MB",
+    );
+    await actor(admin);
+    await db.query("select public.set_image_limits($1,1,2,1)", [session]);
+    await beginImage(volunteer, issueId, { bytes: 600000 });
+    await expect(beginImage(specialist, issueId, { bytes: 600000 })).rejects.toThrow(
+      "1 MB limit",
+    );
+    await db.exec("reset role");
+    await db.query("update public.attachments set status='expired' where status='pending'");
+    await actor(admin);
+    await db.query("select public.set_image_limits($1,1,1,1)", [session]);
+    const kept = await beginImage(jury, issueId, { bytes: 1000 });
+    await finishImage(jury, kept, 1000);
+    await expect(beginImage(admin, issueId, { bytes: 1000 })).rejects.toThrow(
+      "already has 1",
+    );
+    await actor(contestant);
+    expect((await db.query("select id from public.attachments")).rows).toHaveLength(0);
+    await actor(admin);
+    expect((await db.query("select id from public.attachments where status='ready'")).rows).toHaveLength(1);
+
+    await resolve(issueId);
+    await actor(admin);
+    await db.query("select public.set_image_limits($1,10,12,120)", [session]);
+    await expect(beginImage(volunteer, issueId)).resolves.toMatchObject({ id: expect.any(String) });
+
+    const requestId = id(++request + 8000);
+    const first = await beginImage(volunteer, issueId, { requestId, bytes: 2222 });
+    const second = await beginImage(volunteer, issueId, { requestId, bytes: 2222 });
+    expect(second.id).toBe(first.id);
+
+    await db.exec("reset role");
+    await db.query(
+      "update public.attachments set created_at=clock_timestamp()-interval '2 hours' where id=$1",
+      [first.id],
+    );
+    const renewed = await beginImage(volunteer, issueId, { bytes: 2222 });
+    expect(renewed.id).not.toBe(first.id);
+    await db.exec("reset role");
+    expect(
+      (await db.query<{ status: string }>("select status from public.attachments where id=$1", [first.id])).rows[0].status,
+    ).toBe("expired");
+
+    await actor(volunteer);
+    await expect(
+      db.query("select public.set_image_limits($1,10,12,120)", [session]),
+    ).rejects.toThrow("Admin");
+    await actor(admin);
+    await expect(db.query("select public.set_image_limits($1,51,12,120)", [session])).rejects.toThrow(
+      "1 to 50 MB",
+    );
+    await expect(db.query("select public.set_image_limits($1,10,0,120)", [session])).rejects.toThrow(
+      "1 to 24",
+    );
+    await expect(db.query("select public.set_image_limits($1,20,12,10)", [session])).rejects.toThrow(
+      "at least the maximum",
+    );
+
+    const archived = await beginImage(volunteer, issueId, { visibility: "public" });
+    await finishImage(volunteer, archived, 1024, "524946460000000057454250");
+    await db.exec("reset role");
+    await db.query("update public.events set archived=true");
+    await actor(contestant);
+    expect((await db.query("select * from public.attachments")).rows).toHaveLength(1);
+    expect(
+      (await db.query("select name from storage.objects where name=$1", [archived.original_path])).rows,
+    ).toHaveLength(1);
+    await expect(beginImage(volunteer, issueId)).rejects.toThrow("archived");
+    await actor(volunteer);
+    await expect(
+      db.query("select public.delete_attachment($1,$2)", [session, archived.id]),
+    ).rejects.toThrow("archived");
+    await actor(admin);
+    await expect(
+      db.query("select public.set_image_limits($1,10,12,120)", [session]),
+    ).rejects.toThrow("archived");
+    await actor(volunteer);
+    await db.query("select public.abandon_attachment($1,$2)", [session, renewed.id]);
+  });
+
+  it("rejects a file whose stored bytes are not a JPEG, PNG, or WebP image", async () => {
+    const issueId = await submit();
+    const started = await beginImage(volunteer, issueId);
+    await expect(finishImage(volunteer, started, 1024, "474946383961")).rejects.toThrow(
+      "JPEG, PNG, or WebP",
+    );
+    await db.exec("reset role");
+    expect(
+      (await db.query<{ status: string }>("select status from public.attachments where id=$1", [started.id])).rows[0].status,
+    ).toBe("pending");
   });
 });

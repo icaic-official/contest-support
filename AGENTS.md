@@ -193,6 +193,9 @@ The user's 2026-10-03 decision defers these items to T0005:
 - Manually check keyboard navigation, persistence after refresh, and separation of public replies from internal notes.
 - Before you present an implementation PR as ready, build, lint, type checking, and required tests must pass.
 - If a check cannot run, report the reason. Leave the result unverified.
+- Dependabot may open weekly npm and GitHub Actions update pull requests.
+- Review Dependabot updates with the same checks as other changes.
+- Do not adopt TypeScript major updates while `.github/dependabot.yml` ignores them. The installed `typescript-eslint` release cannot install TypeScript 7.
 - For documentation-only changes, check content, paths, and whitespace.
 - Do not add application tests only to test prose.
 - Never present local demo tests as evidence of production security, offline operation, or capacity for 800 simultaneous users.

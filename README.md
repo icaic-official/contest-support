@@ -133,6 +133,7 @@ PR security checks scan Git history for secrets with redacted Gitleaks output.
 They also audit locked npm dependencies.
 High and critical vulnerabilities block the dependency check.
 Dependabot proposes weekly dependency and action updates.
+TypeScript major updates are ignored until the installed lint toolchain accepts them.
 The [code-quality guide](docs/code-quality.md) describes the review checklist and prepared mandatory merge rules.
 The repository owner must enable the remote rules and vulnerability alerts.
 

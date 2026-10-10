@@ -20,6 +20,10 @@ You can dispatch them manually.
 The weekly schedule and Dependabot updates take effect after their configuration reaches `main`.
 Dependabot proposes weekly npm and GitHub Actions updates.
 It permits at most three open update PRs per ecosystem.
+TypeScript major updates are ignored.
+`typescript-eslint` 8.71 accepts TypeScript `>=4.8.4 <6.1.0`.
+TypeScript 7 makes `npm ci` fail.
+Patch and minor TypeScript updates remain enabled.
 Updates require the same checks and review as other changes.
 
 No process automatically applies upgrades or runs `npm audit fix`.

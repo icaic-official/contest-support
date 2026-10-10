@@ -1,48 +1,126 @@
 # Cloud onboarding for T0003
 
-The connected development app is deployed at https://minsky-dev.icaic-minsky.workers.dev. Supabase hosts authentication, Postgres and Realtime; Cloudflare Workers Static Assets serves the frontend. Docker is optional. The user permits contributors to have full authorized cloud credential access.
+The connected development app runs at https://minsky-dev.icaic-minsky.workers.dev.
+Supabase hosts authentication, Postgres, and Realtime.
+Cloudflare Workers Static Assets serves the frontend.
+Docker is optional.
+The user permits full authorized cloud credential access for contributors.
 
 ## Authentication decision (2026-10-02)
 
-The user replaced email invitations and email recovery with organizer-created **usernames/passwords**. SMTP and personal email addresses are not prerequisites. Team contestants share a team account; staff have individual accounts. Supabase manages passwords and sessions behind internal email-format identifiers; those identifiers are not mailboxes and must not receive mail.
+The user replaced email invitations and email recovery with organizer-created **usernames and passwords**.
+SMTP and personal email addresses are not prerequisites.
+Team contestants share a team account.
+Staff have individual accounts.
+Supabase manages passwords and sessions through internal identifiers with email format.
+These identifiers are not mailboxes and must not receive mail.
 
 ### Create and recover accounts
 
-1. Sign into Minsky as admin. Existing development accounts can use their original email and password until a username is assigned.
-2. Under **Session accounts**, expand the existing account and use **Assign username → Set username**. Usernames contain 3–32 letters, digits, underscores or hyphens and are stored lowercase. The existing password, Auth UUID, memberships and history stay unchanged. Username assignment replaces that account’s email login; do not distribute its old email as future login instructions.
-3. Under **Create an account**, enter a display name and unique username. Select a roster team for a contestant, or choose staff permissions for an individual. Click **Create account**.
-4. Share the displayed username and newly generated temporary password through an agreed secure channel. Dismiss credentials once recorded privately. The app does not retain a recoverable copy; losing the response requires a new reset, not viewing an old password.
-5. Users sign in and must change their temporary password before reading or changing contest data. Refresh or direct API calls cannot bypass this requirement.
-6. For forgotten passwords, organizers verify the requester’s identity outside the application, expand the account and choose **Reset password**. Share the replacement temporary password securely. Existing sessions/refresh tokens lose access; the user must sign in again and change the replacement password.
-7. Use **Change password** for your own account, entering the current password. Account-wide resets/username assignment require admin access to every session where the target has membership and reject archived memberships. Ordinary session permission editing remains scoped to its session.
+To assign a username to an existing account:
 
-If the sole admin loses their password, a trusted provider maintainer can run this in a **private terminal** after linking the intended project:
+1. Sign in to Minsky as admin.
+2. Under **Session accounts**, expand the account.
+3. Select **Assign username → Set username**.
+
+Existing development accounts can use their original email and password until an admin assigns a username.
+Usernames contain 3–32 letters, digits, underscores, or hyphens.
+The app stores them in lowercase.
+Username assignment preserves the password, Auth UUID, memberships, and history.
+It replaces that account's email login.
+Do not distribute the old email as future login instructions.
+
+To create an account:
+
+1. Under **Create an account**, enter a display name.
+2. Enter a unique username.
+3. Select a roster team for a contestant, or staff permissions for an individual.
+4. Select **Create account**.
+5. Share the displayed username and generated temporary password through an agreed secure channel.
+6. Record the credentials privately.
+7. Dismiss the displayed credentials.
+
+The app does not retain a recoverable password copy.
+If you lose the response, reset the password.
+Users must change temporary passwords before they can read or change contest data.
+Refresh and direct API calls cannot bypass this requirement.
+
+To recover an account:
+
+1. Verify the requester's identity outside the app.
+2. Expand the account.
+3. Select **Reset password**.
+4. Share the replacement temporary password securely.
+
+Existing sessions and refresh tokens lose access.
+The user must sign in again and change the replacement password.
+For your own account, use **Change password** and enter the current password.
+Account-wide resets and username assignment require admin access to every session where the target has membership.
+These operations reject archived memberships.
+Ordinary session permission changes remain scoped to that session.
+
+If the sole admin loses their password, a trusted provider maintainer can use the recovery command below.
+First, link the intended project.
+Run the command in a **private terminal**:
 
 ```sh
 npm run cloud:recover-admin -- --user EXISTING_ADMIN_AUTH_UUID
 ```
 
-The command captures service credentials in memory, verifies an existing active-event admin, issues a temporary password, invalidates previous sessions and requires password change on next login. The temporary password is intentionally displayed in that terminal only; never run this command in CI, paste its output into chat or commit it. Its service-only recovery RPC is unavailable to ordinary app accounts. Recovery audit entries identify this as a provider operation, not an action performed by the locked-out person.
+The command holds service credentials in memory.
+It verifies an existing admin for an active event.
+It issues a temporary password and invalidates previous sessions.
+The next login requires a password change.
+The command displays the temporary password only in that terminal.
 
-No public signup, email confirmation links, invitation links or email recovery are used by this flow. Keep signup and anonymous sign-in disabled. Internal accounts are explicitly confirmed by the trusted creation function; this is account provisioning, not mailbox verification. Previously configured redirect URLs may remain, but no sender/domain/SMTP setup is required for T0003.
+Never run this command in CI.
+Never paste its output into chat or commit it.
+Ordinary app accounts cannot access its service-only recovery RPC.
+Recovery audit entries identify a provider operation.
+They do not attribute the operation to the person who lost access.
+
+This flow uses no public signup, email confirmation links, invitation links, or email recovery.
+Keep signup and anonymous sign-in disabled.
+The trusted creation function explicitly confirms internal accounts.
+This creates the account without verifying a mailbox.
+Previously configured redirect URLs may remain.
+T0003 does not require a sender, domain, or SMTP setup.
 
 ## Ownership and costs
 
-The user deferred recording provider ownership and billing details on 2026-10-02 and moved these scope notes from T0004 to T0005 on 2026-10-03. The guidance below still applies before any paid upgrade; no upgrade has been selected.
+On 2026-10-02, the user deferred records of provider ownership and billing details.
+On 2026-10-03, the user moved these scope notes from T0004 to T0005.
+The guidance below still applies before any paid upgrade.
+No paid upgrade is selected.
 
-Use individual provider logins and membership controls for Supabase and Cloudflare. Provider access and Minsky app membership are separate. The user completes provider account verification and payment entry privately. Keep passwords, database credentials, recovery codes and API secrets out of Git, chat and public logs.
+Use individual provider logins and membership controls for Supabase and Cloudflare.
+Provider access and Minsky app membership are separate.
+The user completes provider account verification and payment entry privately.
+Keep passwords, database credentials, recovery codes, and API secrets outside Git, chat, and public logs.
 
-Record these non-secret details in the completion record below:
+Record these non-secret details in the completion record:
 
-- Organization/account owner and maintainer access.
-- Billing contact and selected plan for each provider.
-- Current recurring charges, usage-dashboard location and receipt/reimbursement handling.
+- The organization or account owner and maintainer access.
+- The billing contact and selected plan for each provider.
+- Current recurring charges.
+- The location of the usage dashboard.
+- Receipt and reimbursement procedures.
 
-Start with Supabase Free and Workers Free. No SMTP provider, image bucket, custom application domain, R2 or AWS account is needed for this ticket. Static assets served without invoking Worker code are free/unlimited; Supabase Free limits and inactivity pausing still apply. Review usage before a pilot. Before any paid upgrade, record the concrete blocker, current cost and expected monthly spend. Free tiers are not proof of capacity for 800 users. See [Workers pricing](https://developers.cloudflare.com/workers/platform/pricing/) and [Supabase pricing](https://supabase.com/pricing).
+Start with Supabase Free and Workers Free.
+This ticket does not require an SMTP provider, image bucket, custom application domain, R2, or AWS account.
+Static assets served without Worker code invocation are free and unlimited.
+Supabase Free limits and inactivity pausing still apply.
+Review usage before a pilot.
+Before any paid upgrade, record the concrete blocker, current cost, and expected monthly spend.
+
+Free tiers do not establish capacity for 800 users.
+See [Workers pricing](https://developers.cloudflare.com/workers/platform/pricing/) and [Supabase pricing](https://supabase.com/pricing).
 
 ## Contributor setup
 
-Use Node.js 22.13+ within 22.x, or 24+, and npm. The primary fresh-clone sequence is:
+Use Node.js 22.13 or later within 22.x, or Node.js 24 or later.
+Use npm.
+For a fresh clone, run these commands in sequence:
 
 ```sh
 npm ci
@@ -52,9 +130,17 @@ npm run cloud:link
 npm run dev
 ```
 
-Fill `.env.local` with the project's public URL and publishable key. Obtain authorized provider access and enter the database password privately at the CLI prompt. An application admin must separately grant Minsky session membership. Never put privileged credentials in `VITE_` variables or frontend builds.
+Enter the project's public URL in `.env.local`.
+Enter its publishable key in `.env.local`.
+Obtain authorized provider access.
+Enter the database password privately at the CLI prompt.
+An application admin must separately grant Minsky session membership.
+Never put privileged credentials in `VITE_` variables or frontend builds.
 
-Use timestamped repository-owned migrations. Run `npm run cloud:plan` before `cloud:migrate`. Migrations never seed the shared product. The first setup uses an explicitly chosen existing Auth account:
+Use timestamped, repository-owned migrations.
+Run `npm run cloud:plan` before `cloud:migrate`.
+Migrations never seed the shared product.
+First setup uses an explicitly selected existing Auth account:
 
 ```sh
 npm run cloud:plan
@@ -66,21 +152,51 @@ npm run cloud:hosting-login
 npm run deploy
 ```
 
-Review `scripts/bootstrap.sql` before first setup; it refuses an existing admin. Do not rerun it against the already bootstrapped development project. The initial intake is closed until an admin opens it. `cloud:functions` bundles remotely with `--use-api`, without Docker. Supabase supplies the function’s service credentials; only `ALLOWED_ORIGINS` is required as custom function configuration. The previous `APP_URL` setting is unused.
+Before first setup, review `scripts/bootstrap.sql`.
+The bootstrap refuses to run if an admin already exists.
+Do not run it again against the development project, which already has an admin.
+Initial intake is closed until an admin opens it.
+`cloud:functions` bundles remotely with `--use-api`.
+Docker is not required.
+
+Supabase supplies the function's service credentials.
+Only `ALLOWED_ORIGINS` requires custom function configuration.
+The previous `APP_URL` setting is unused.
 
 ## Development and release process
 
 | Environment | Supabase project | Use |
 | --- | --- | --- |
-| Development | `Minsky` — `ovymmobupzowotvrywek` | Shared development app, contributor work and user trial accounts. |
-| CI | `Minsky CI` — `ghtztmovdkhuketcbjmq` | Temporary automated accounts and UUID-scoped workflow/authorization fixtures. |
-| Production | Not provisioned | Future real contest accounts and data; separate database, credentials and frontend. |
+| Development | `Minsky` — `ovymmobupzowotvrywek` | Shared development app, contributor work, and user trial accounts. |
+| CI | `Minsky CI` — `ghtztmovdkhuketcbjmq` | Temporary automated accounts and workflow and authorization fixtures scoped by UUID. |
+| Production | Not provisioned | Future real contest accounts and data. Use a separate database, credentials, and frontend. |
 
-For each ticket, start its branch from updated `main`, develop against the development project and add versioned migrations. Run the fast README checks, prepare the PR, and run cloud integration checks against the reviewed revision. The user reviews and merges. Explicitly deploy the approved revision afterward; merging does not automatically deploy. Once production exists, validate changes on development and CI before applying them there. [AGENTS.md](../AGENTS.md#cloud-development-and-deployment-workflow) records these rules for future contributors and agents.
+For each ticket, use this sequence:
 
-T0004-specific exception (2026-10-03): the user's "Deploy first" instruction authorized deploying the completed frontend to the existing `minsky-dev` Worker before PR #9 merges. That deployment and all 12 hosted cases passed; [current-state.md](current-state.md#t0004-development-deployment-2026-10-03) records the revision, version and asset checks. No database migration or account-function deployment was needed. The PR remains open for user review and merge.
+1. Create its branch from updated `main`.
+2. Develop against the development project.
+3. Add versioned migrations.
+4. Run the fast README checks.
+5. Prepare the PR.
+6. Run cloud integration checks against the reviewed revision.
+7. Let the user review and merge.
+8. Explicitly deploy the approved revision afterward.
 
-Run CI project commands from a **separate checkout** linked with `npx supabase link --project-ref ghtztmovdkhuketcbjmq`. Keep the primary checkout linked to development. In that CI checkout:
+Merge does not automatically deploy the app.
+When production exists, validate changes on development and CI before you apply them to production.
+See [AGENTS.md](../AGENTS.md#cloud-development-and-deployment-workflow).
+
+**T0004 exception (2026-10-03):** the user's "Deploy first" instruction authorized frontend deployment to the existing `minsky-dev` Worker before merge.
+That deployment and all 12 hosted cases passed.
+[Current state](current-state.md#t0004-development-deployment-2026-10-03) records the revision, version, and asset checks.
+No database migration or account-function deployment was necessary.
+The user merged [PR #9](https://github.com/notbowen/minsky/pull/9) on 2026-10-11 (SGT).
+The [merge record](current-state.md#t0004-merge-and-documentation-follow-up-2026-10-11) identifies its revision and exact timestamp.
+
+Run CI project commands from a **separate checkout**.
+Link that checkout with `npx supabase link --project-ref ghtztmovdkhuketcbjmq`.
+Keep the primary checkout linked to development.
+Use these commands in the CI checkout:
 
 ```sh
 npx supabase config diff --project-ref ghtztmovdkhuketcbjmq
@@ -92,21 +208,82 @@ npx supabase secrets set ALLOWED_ORIGINS=http://127.0.0.1:4174 --project-ref ght
 npm run test:cloud
 ```
 
-Review the configuration diff and migration target before applying them. The `cloud:link` and `cloud:functions` npm shortcuts target development; use the explicit CI commands above in the separate checkout. `auth.enable_signup = false` blocks public signup and anonymous sign-in is disabled. Keep `auth.email.enable_signup = true`: the hosted CLI maps this setting to the email/password provider needed by internal username identifiers. The cloud suite verifies that public signup fails while organizer-created accounts can log in. No personal mailbox or SMTP is required.
+Review the configuration diff before you apply it.
+Review the migration target before you apply migrations.
+The `cloud:link` and `cloud:functions` npm shortcuts target development.
+Use the explicit CI commands above in the separate checkout.
+
+`auth.enable_signup = false` blocks public signup.
+Anonymous sign-in is disabled.
+Keep `auth.email.enable_signup = true`.
+The hosted CLI maps this setting to the email and password provider required for internal username identifiers.
+The cloud suite checks that public signup fails while organizer-created accounts can sign in.
+Personal mailboxes and SMTP are not required.
 
 ## Verification and protected cloud CI
 
-Run `npm run typecheck`, `npm run lint`, `npm run check:functions`, `npm test` and `npm run build`. Embedded PostgreSQL executes the actual migrations/policies with Auth-context/session/password-hash stubs; it does not prove managed Auth behavior. `npm run test:e2e` checks the public connected landing/login page without cloud credentials. The old demo and its tests have been removed. `npm run test:cloud` exercises managed Auth/database/Realtime against a local frontend. `npm run test:hosted` repeats the real-account suite against the deployed app. Install Chromium with `npx playwright install chromium`.
+Run these checks:
 
-Cloud tests create unique temporary sessions/accounts, change their temporary passwords, verify the shared workflow and creation/reset behavior, and explicitly clean up their own rows. They never reset the shared project. Credentials are held in memory and an ignored temporary fixture file. Do not interrupt cleanup. No screenshots should contain live temporary credentials; tests dismiss them before capture.
+```sh
+npm run typecheck
+npm run lint
+npm run check:functions
+npm test
+npm run build
+```
 
-PR CI runs secret-free checks. The manually dispatched cloud job uses a protected GitHub environment named **cloud-test** and a **separate Supabase test project**. CI refuses shared development reference `ovymmobupzowotvrywek`.
+Embedded PostgreSQL executes the actual migrations and policies with stubs for Auth context, sessions, and password hashes.
+It does not establish managed Auth behavior.
+`npm run test:e2e` checks the public connected landing and login pages without cloud credentials.
+The old demo and its tests are removed.
+`npm run test:cloud` tests managed Auth, database, and Realtime behavior against a local frontend.
+`npm run test:hosted` repeats the suite with real accounts against the deployed app.
 
-Configure `MINSKY_TEST_PROJECT_REF` as an environment variable, and `SUPABASE_ACCESS_TOKEN`, `SUPABASE_DB_PASSWORD`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` as environment secrets. Restrict execution to trusted revisions and configure required reviewers where the repository’s GitHub plan supports them; verify plan availability before treating protection as enabled. Then manually dispatch **Checks** for the reviewed branch and record the cloud job result. No automatic deployment or preview writes to shared data are configured. See [GitHub environment documentation](https://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/manage-environments).
+Install Chromium with `npx playwright install chromium`.
+Cloud tests create unique temporary sessions and accounts.
+They change temporary passwords and check the shared workflow and account creation and reset behavior.
+They explicitly delete only their own rows.
+They never reset the shared project.
+Credentials remain in memory and an ignored temporary fixture file.
 
-Initial inspection on 2026-10-02 found no GitHub environments and no separate Supabase test project. The user subsequently created `Minsky CI`; its setup results are recorded below. The contributor has write access without repository administration access. This personal-account repository needs its owner to configure `cloud-test`; the private repository's plan must support environments and the selected protection rules. Do not replace environment protection with repository-wide privileged secrets.
+Do not interrupt fixture deletion.
+Do not capture live temporary credentials in screenshots.
+Tests dismiss the credentials before capture.
 
-The `Checks` workflow file is also absent from `main`. GitHub requires a manually dispatched workflow to exist on the default branch before it can be run, even when selecting another reviewed branch. The user must review and merge the workflow before the first dispatch; the agent must not merge it to bypass that step. See [manual workflow requirements](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/manually-run-a-workflow).
+PR CI runs checks without hosted secrets.
+The manually dispatched cloud job uses a protected GitHub environment named **cloud-test** and a **separate Supabase test project**.
+CI refuses the shared development reference `ovymmobupzowotvrywek`.
+
+Configure `MINSKY_TEST_PROJECT_REF` as an environment variable.
+Configure these environment secrets:
+
+- `SUPABASE_ACCESS_TOKEN`
+- `SUPABASE_DB_PASSWORD`
+- `SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY`
+
+Restrict execution to trusted revisions.
+Configure required reviewers where the repository's GitHub plan supports them.
+Verify plan availability before you treat protection as enabled.
+Then manually dispatch **Checks** for the reviewed branch.
+Record the cloud job result.
+No automatic deployment or preview writes to shared data are configured.
+
+See [GitHub environment documentation](https://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/manage-environments).
+Initial inspection on 2026-10-02 found no GitHub environments and no separate Supabase test project.
+The user later created `Minsky CI`.
+The completion record below describes its setup.
+The contributor has write access without repository administration access.
+The repository owner must configure `cloud-test` for this personal-account repository.
+
+The private repository's plan must support environments and the selected protection rules.
+Do not replace environment protection with repository-wide privileged secrets.
+
+The existing setup record also identifies the absence of the `Checks` workflow from `main`.
+GitHub requires a manually dispatched workflow on the default branch before execution, even when another reviewed branch is selected.
+The user must review and merge the workflow before the first dispatch.
+The agent must not merge it to bypass that step.
+See [manual workflow requirements](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/manually-run-a-workflow).
 
 ## Completion record
 

@@ -2,19 +2,58 @@
 
 ## Read first
 
-- Read [PLAN.md](PLAN.md) and [README.md](README.md) before starting work.
-- Follow the user's latest explicit instructions. Where the existing README differs from PLAN.md, PLAN.md records the newer agreed scope.
-- Inspect the working tree and existing implementation before making changes. Preserve unrelated user changes.
-- Read the active ticket and relevant documents under `docs/` once they exist. Do not assume planned files or features already exist.
-- Treat historical run reports as records of that run, not as current repository state. Verify current state from the repository.
+- Read [PLAN.md](PLAN.md) before you start work.
+- Read [README.md](README.md) before you start work.
+- Follow the user's latest explicit instructions. If README.md and PLAN.md differ, PLAN.md records the newer agreed scope.
+- Inspect the working tree and existing implementation before you change files.
+- Preserve unrelated user changes.
+- Read the active development ticket.
+- Read relevant documents under `docs/` when they exist.
+- Do not assume that planned files or features exist.
+- Treat historical run reports as records of those runs. Check the repository to establish current state.
 
 ## Current scope and completed demo baseline
 
-**Latest ticket decision (2026-10-03):** implement T0004's UI makeover using the user's dark green workspace and centered amber-button sign-in references. Keep actual authenticated data, workflow semantics and authorization; reference values are placeholders. T0004 starts from merged T0003 on updated `main`, on `feature/t0004-ui-makeover`. Previous T0004 follow-up scope notes move to T0005: provider ownership/billing records, GitHub merge enforcement/vulnerability alerts, remaining manual acceptance checks, and candidate organizer tools/configurable issue attachments. T0005 implementation has not started. See [docs/tickets.md](docs/tickets.md).
+**T0004 merge status (2026-10-11):** the user merged [PR #9](https://github.com/notbowen/minsky/pull/9) into `main` and deleted its branch.
+[PR #13](https://github.com/notbowen/minsky/pull/13) remains the documentation follow-up and now targets `main`.
+See [the merge record](docs/current-state.md#t0004-merge-and-documentation-follow-up-2026-10-11) for the revision and timestamp.
 
-**T0004 deployment exception (2026-10-03):** the user explicitly requested "Deploy first" while PR #9 was open. Deploy the completed T0004 frontend to the existing development Worker `minsky-dev` before merge and verify it there. This exception applies to T0004's development frontend; the user still reviews and merges the PR. See [deployment evidence](docs/current-state.md#t0004-development-deployment-2026-10-03).
+**Latest ticket decision (2026-10-03):** implement T0004's UI makeover from the user's references.
+The references show a dark green workspace and a centered sign-in form with an amber button.
+Keep actual authenticated data, workflow behavior, and authorization.
+Reference values are placeholders.
 
-**Demo retirement decision (2026-10-02):** remove the old local demo, its command, persona/reset/storage code, demo-only tests/fixtures and obsolete walkthrough/specification. Maintain the connected app, public login landing page, sidebar and real-account workflow/authorization tests. Requirements below about the completed demo are historical; do not restore its runtime or reset tooling.
+T0004 started from updated `main` after T0003 merged.
+It used `feature/t0004-ui-makeover`.
+Previous T0004 follow-up scope notes move to T0005:
+
+- Provider ownership and billing records.
+- GitHub merge enforcement and vulnerability alerts.
+- Remaining manual acceptance checks.
+- Candidate organizer tools and configurable issue attachments.
+
+T0005 implementation remains pending.
+See [docs/tickets.md](docs/tickets.md).
+
+**T0004 deployment exception (2026-10-03):** the user explicitly requested "Deploy first" while PR #9 was open.
+The completed T0004 frontend deployed to the existing development Worker `minsky-dev` before merge.
+Hosted verification passed there.
+This exception applies to T0004's development frontend.
+See [deployment evidence](docs/current-state.md#t0004-development-deployment-2026-10-03).
+
+**Demo retirement decision (2026-10-02):** remove the old local demo and these related parts:
+
+- Its command.
+- Persona, reset, and storage code.
+- Tests and fixtures that apply only to the demo.
+- The obsolete walkthrough and specification.
+
+Maintain the connected app, public login landing page, and sidebar.
+Maintain workflow and authorization tests that use real accounts.
+The demo requirements below are historical.
+Do not restore the demo runtime or reset tooling.
+
+### Historical demo baseline
 
 T0001 and T0002 were merged in PR #1 on 2026-10-02. T0003 is scoped in `docs/tickets.md` for cloud onboarding and an authenticated shared product. Its implementation must start from updated `main` on `feature/t0003-cloud-product`. The demo requirements below describe the completed baseline; they do not exclude the connected features explicitly selected for T0003. Keep planning separate from implemented capabilities.
 
@@ -33,97 +72,217 @@ Use simple components and domain logic appropriate to the demo. Avoid speculativ
 
 ## TypeScript style
 
-- Read the [Google TypeScript Style Guide](https://google.github.io/styleguide/tsguide.html) before you write or change TypeScript, including TSX. Follow the guide.
-- Agents may depart from individual rules for reasons appropriate to this project. Examples include framework requirements, correctness, readability, or maintainability. Otherwise, follow the guide.
-- Briefly explain deliberate exceptions in the PR description or run report. Use a code comment when the reason helps future maintainers understand the code. Exceptions do not require separate user approval.
-- Explicit user instructions and project requirements take precedence over the guide. Apply it to future work without unrelated style-only rewrites.
+- Before you write or change TypeScript or TSX, read the [Google TypeScript Style Guide](https://google.github.io/styleguide/tsguide.html).
+- Follow the guide unless project requirements justify an exception. Framework requirements, correctness, readability, and maintainability can justify exceptions.
+- Briefly explain deliberate exceptions in the PR description or run report.
+- Add a code comment when the reason helps future maintainers understand the code.
+- Exceptions do not require separate user approval.
+- Explicit user instructions and project requirements take precedence over the guide.
+- Apply the guide to future work. Do not make unrelated style changes.
 
 ## Behavior to preserve
 
-- Start the issue timer on submission. Record first assignment separately. Calculate elapsed time from persisted timestamps so refreshes do not reset it.
+- Start the issue timer on submission.
+- Record the first assignment separately.
+- Calculate elapsed time from persisted timestamps. Refresh must not reset the timer.
 - Retain the current owner during escalation until a specialist accepts the handoff.
-- Stop the timer on resolution. Reopening resumes accumulated unresolved time, excluding resolved intervals. Retain every resolution summary, actor and timestamp.
-- Identify staff owners and activity actors by person, combining all assigned role capabilities. Reopening retains the prior owner and any existing award/application status.
-- Separate contestant-visible replies from internal staff notes. Omit internal notes from contestant views.
-- Record an award separately from confirmation that it was applied externally. Minsky does not change an external contest clock.
-- Keep shared activity history that identifies the authenticated actor. Prevent repeated actions from producing duplicate awards or invalid transitions.
-- Use isolated verification fixtures with cleanup limited to their own records. Do not expose a shared-data reset or persona impersonation control in the connected product.
+- Stop the timer on resolution.
+- On reopening, resume accumulated unresolved time. Exclude resolved intervals.
+- Retain every resolution summary, actor, and timestamp.
+- Identify staff owners and activity actors by person. Combine all capabilities from their assigned roles.
+- On reopening, retain the prior owner and any existing award and external application status.
+- Separate contestant-visible replies from internal staff notes.
+- Omit internal notes from contestant views.
+- Record an award separately from confirmation of its external application. Minsky does not change an external contest clock.
+- Keep shared activity history that identifies the authenticated actor.
+- Prevent repeated actions from creating duplicate awards or invalid transitions.
+- Use isolated verification fixtures.
+- Delete only records that belong to those fixtures.
+- Do not expose a shared-data reset or persona impersonation control in the connected product.
 
 ## Ticket and Git workflow
 
-- Include `Co-authored-by: PuR3Luck <aidan.ong822@gmail.com>` in every new commit Codex creates and pushes for this repository. Separate the co-author trailer from the commit body with a blank line.
-- Preserve the primary author and any other co-author trailers. Before each push, verify that every new Codex-created commit contains the required trailer exactly once.
+- Include `Co-authored-by: PuR3Luck <aidan.ong822@gmail.com>` in every new commit Codex creates and pushes for this repository.
+- Separate the co-author trailer from the commit body with a blank line.
+- Preserve the primary author and any other co-author trailers.
+- Before each push, check that every new Codex-created commit contains the required trailer exactly once.
 - Distinguish development tickets from contestant issues in code, documentation, and communication.
-- The first implementation ticket is **T0001 — Local workflow demo and project guidance**, using `feature/t0001-local-demo`.
-- Start each development ticket from updated `main`. Use `feature/tNNNN-description` for subsequent ticket branches.
-- User-approved exception for T0002: plan and implement it on `feature/t0001-local-demo`, continuing from T0001 without waiting for its merge. The user still reviews and merges. Resume the normal branch workflow for later tickets unless instructed otherwise.
-- Work sequentially:
-  1. Implement the active ticket.
-  2. Verify the implementation.
-  3. Update relevant documentation.
-  4. Prepare a pull request for the user's review.
-- The user reviews and merges. Do not merge the current ticket unless the user explicitly changes this workflow. Do not start the next ticket before the user merges the current ticket, unless the user explicitly changes this workflow.
-- Testing and merging are workflow steps, not long-lived `test` or `merge` branches.
-- Keep future work as a short candidate queue until feedback determines the next ticket. Do not create a large speculative backlog.
-- Routine implementation and verification within the active ticket do not require repeated confirmation. Ask only for missing decisions that materially affect scope or behavior.
+- The first implementation ticket is **T0001 — Local workflow demo and project guidance**. Its branch is `feature/t0001-local-demo`.
+- Start each development ticket from updated `main`.
+- Use `feature/tNNNN-description` for later ticket branches.
+
+The user approved one branch exception for T0002.
+Plan and implement T0002 on `feature/t0001-local-demo` without waiting for the T0001 merge.
+The user still reviews and merges.
+Use the normal branch workflow for later tickets unless the user instructs otherwise.
+
+Complete these steps in sequence:
+
+1. Implement the active ticket.
+2. Verify the implementation.
+3. Update relevant documentation.
+4. Prepare a pull request for the user's review.
+
+The user reviews and merges.
+Do not merge the current ticket unless the user explicitly changes this workflow.
+Unless the user explicitly changes this workflow, wait for their merge before you start the next ticket.
+Testing and merging are workflow steps.
+Do not create long-lived `test` or `merge` branches for them.
+
+Keep future work in a short candidate queue until feedback determines the next ticket.
+Do not create a large speculative backlog.
+Routine implementation and verification within the active ticket do not require repeated confirmation.
+Ask only for missing decisions that materially affect scope or behavior.
 
 ## Cloud development and deployment workflow
 
-- Keep development, CI and future production databases and credentials separate. The hosted `minsky-dev` app uses the `Minsky` development project; it is not production. `Minsky CI` is for isolated automated fixtures. No production project has been created.
-- For each ticket: create the ticket branch from updated `main`, develop against the development project, add repository-owned migrations, run fast checks, prepare the PR, and run cloud integration checks on the reviewed revision. The user reviews and merges; explicitly deploy approved changes afterward. Do not imply that merging deploys automatically.
-- Privileged GitHub cloud checks use the protected `cloud-test` environment and the separate CI project. Ordinary PR checks run without cloud credentials. Record a local cloud run separately from a protected GitHub Actions run; neither substitutes for the other.
-- CI fixtures create temporary accounts and UUID-scoped records and delete only their own data. Never point CI at development or production, copy real accounts into CI, or reset a shared project. Confirm the target before applying migrations or deploying functions.
-- Once production is selected and provisioned, validate the approved revision on development and CI before applying its migrations, deploying its account function/configuration, and deploying its frontend to production. Verify the production deployment afterward. Production setup is future work, not permission to create or upgrade provider resources now.
-- Use [cloud-onboarding.md](docs/cloud-onboarding.md) for project references, commands, environment protection requirements and current setup results. T0003 retains protected cloud CI; ownership/billing records, remote merge enforcement/vulnerability alerts and remaining user/manual acceptance checks are deferred to T0005 by the user's 2026-10-03 ticket decision.
+Keep development, CI, and future production databases and credentials separate.
+The hosted `minsky-dev` app uses the `Minsky` development project.
+It is not production.
+`Minsky CI` is for isolated automated fixtures.
+No production project exists.
+
+For each ticket, use this sequence:
+
+1. Create the ticket branch from updated `main`.
+2. Develop against the development project.
+3. Add repository-owned migrations.
+4. Run fast checks.
+5. Prepare the PR.
+6. Run cloud integration checks on the reviewed revision.
+7. Let the user review and merge.
+8. Explicitly deploy approved changes afterward.
+
+Do not imply that merge automatically deploys the app.
+Privileged GitHub cloud checks use the protected `cloud-test` environment and the separate CI project.
+Ordinary PR checks run without cloud credentials.
+Record local cloud runs separately from protected GitHub Actions runs.
+Neither replaces the other.
+
+CI fixtures create temporary accounts and records scoped by UUID.
+They delete only their own data.
+Never point CI at development or production.
+Never copy real accounts into CI.
+Never reset a shared project.
+Confirm the target before you apply migrations or deploy functions.
+
+After production is selected and provisioned, validate the approved revision on development and CI.
+Then apply its migrations to production.
+Deploy its account function and configuration.
+Deploy its frontend.
+Verify the production deployment afterward.
+Production setup remains future work.
+
+This future production work does not authorize provider resource creation or upgrades now.
+Use [cloud-onboarding.md](docs/cloud-onboarding.md) for project references, commands, environment protection requirements, and observed setup results.
+T0003 retains protected cloud CI.
+The user's 2026-10-03 decision defers these items to T0005:
+
+- Ownership and billing records.
+- Remote merge enforcement and vulnerability alerts.
+- Remaining user and manual acceptance checks.
 
 ## Verification
 
-- Inspect available scripts before invoking them. During T0001, provide npm scripts for development, production build, type checking, linting, and focused tests. Document their exact names in the README.
-- Test meaningful behavior: lifecycle transitions, ownership during handoff, timestamp calculations, persistence, and award/application state.
-- Include one browser test covering the complete journey across authenticated test accounts.
-- Manually check phone-width volunteer screens, keyboard navigation, refresh persistence, and separation of public replies from internal notes.
-- Build, lint, type checking, and required tests must pass before presenting an implementation PR as ready. If a check cannot run, report the reason. Leave its result unverified.
-- Dependabot may open weekly npm and GitHub Actions update pull requests. Review them with the same checks as other changes. Do not adopt a TypeScript major update while `.github/dependabot.yml` ignores those updates; the installed `typescript-eslint` release cannot install TypeScript 7.
-- For documentation-only changes, check content, paths, and whitespace. Do not add application tests merely to test prose.
-- Never describe local demo testing as evidence of production security, offline operation, or capacity for 800 simultaneous users.
+- Inspect available scripts before you invoke them.
+- During T0001, provide npm scripts for development, production builds, type checking, linting, and focused tests.
+- Document their exact names in README.md.
+- Test lifecycle transitions, ownership during handoff, timestamp calculations, persistence, awards, and external application status.
+- Include one browser test for the complete journey across authenticated test accounts.
+- Manually check volunteer screens at phone widths.
+- Manually check keyboard navigation, persistence after refresh, and separation of public replies from internal notes.
+- Before you present an implementation PR as ready, build, lint, type checking, and required tests must pass.
+- If a check cannot run, report the reason. Leave the result unverified.
+- Dependabot may open weekly npm and GitHub Actions update pull requests.
+- Review Dependabot updates with the same checks as other changes.
+- Do not adopt TypeScript major updates while `.github/dependabot.yml` ignores them. The installed `typescript-eslint` release cannot install TypeScript 7.
+- For documentation-only changes, check content, paths, and whitespace.
+- Do not add application tests only to test prose.
+- Never present local demo tests as evidence of production security, offline operation, or capacity for 800 simultaneous users.
 
 ## Documentation upkeep
 
-Create the remaining documentation during T0001, and keep it concise and consistent with implemented behavior:
+During T0001, create the remaining documentation.
+Keep it concise and consistent with implemented behavior.
 
 | Document | Responsibility |
-|---|---|
-| `README.md` | Project introduction, exact setup/run/check commands, demo limitations, and documentation links. |
+| --- | --- |
+| `README.md` | Project introduction, exact setup and check commands, demo limitations, and documentation links. |
 | `docs/product-direction.md` | Agreed longer-term requirements, provisional architecture, and unresolved decisions. |
-| `docs/tickets.md` | Active development ticket, status, acceptance criteria, and a small follow-up queue. |
+| `docs/tickets.md` | Active development ticket, status, acceptance criteria, and a short follow-up queue. |
 | `docs/current-state.md` | Implemented and verified capabilities, limitations, and next work. |
-| `docs/manual-verification.md` | Repeatable verification steps, expected outcomes, and required fictional personas/data. |
-| `docs/cloud-onboarding.md` | Provider setup, costs and contributor onboarding for T0003; distinguish planned steps from verified outcomes. |
+| `docs/manual-verification.md` | Repeatable verification steps, expected results, and required fictional personas and data. |
+| `docs/cloud-onboarding.md` | Provider setup, costs, and contributor onboarding for T0003. Distinguish planned steps from verified results. |
 
-Update the relevant documents in the same change as behavior or workflow changes. Distinguish proposed, implemented, and verified capabilities. Use PLAN.md as the initial baseline. Keep later decisions explicit in the appropriate document rather than leaving conflicting instructions.
+Update relevant documents in the same change as behavior or workflow changes.
+Distinguish proposed, implemented, and verified capabilities.
+Use PLAN.md as the initial baseline.
+Record later decisions explicitly in the appropriate document.
+Do not leave conflicting instructions.
 
 ## Deferred decisions and production direction
 
-- **Cloud first, features first (2026-10-02).** The user explicitly deferred outage handling and resilience until after the cloud features. Assume connectivity for the developer phase; do not block backend work on manual fallback, offline capture or venue-local operation. Ordinary error reporting and shared-data correctness still belong in the product.
-- **Authentication revision (2026-10-02).** Use organizer-created usernames/passwords, temporary credentials and organizer-assisted recovery. Enforce temporary-password changes at the database boundary. SMTP and personal email addresses are not prerequisites. Preserve existing account IDs/history during the transition.
-- **Cloud contributor access (2026-10-02).** The user permits assuming contributors have full cloud credential access. Docker is optional, not a setup prerequisite. Use hosted Supabase for connected development, embedded PostgreSQL for fast policy/transaction checks, and isolated cloud fixtures for integration tests. Use `supabase functions deploy --use-api` for server-side bundling. Keep privileged credentials out of Git and frontend builds; privileged CI uses a protected separate test project.
-- Use Cloudflare Workers and Supabase, preferring free tiers. The user is willing to pay when necessary; document the concrete need and cost before a paid upgrade. Do not treat free tier as a hard constraint or enable speculative paid services.
-- Future attachments must link helpers' images to issues. Record configurable upload permissions, including enabling/disabling volunteer image submission, as future work. Contestant-visible versus staff-only attachments and the configuration scope remain undecided; do not silently choose a policy.
-- A free-tier pilot and production capacity validation are separate milestones. Future targets on a healthy venue connection are:
-  - 800 simultaneous users.
-  - 95% of ordinary actions within two seconds.
-  - Live updates within three seconds.
-- Consult the product direction in PLAN.md when recording future requirements, including configurable roles/categories, shared incidents, award ledgers, and browser push. These are not automatic additions to T0001.
+**Cloud first, features first (2026-10-02).**
+The user deferred outage handling and resilience until after cloud features.
+Assume connectivity during the developer phase.
+Do not block backend work on manual fallback, offline capture, or venue-local operation.
+Ordinary error reporting and correct shared data remain product requirements.
+
+**Authentication revision (2026-10-02).**
+Use organizer-created usernames and passwords.
+Use temporary credentials and organizer-assisted recovery.
+Enforce temporary-password changes at the database boundary.
+SMTP and personal email addresses are not prerequisites.
+Preserve existing account IDs and history during the transition.
+
+**Cloud contributor access (2026-10-02).**
+The user permits full cloud credential access for contributors.
+Docker is optional.
+Use hosted Supabase for connected development.
+Use embedded PostgreSQL for fast policy and transaction checks.
+Use isolated cloud fixtures for integration tests.
+
+Use `supabase functions deploy --use-api` for server-side bundling.
+Keep privileged credentials outside Git and frontend builds.
+Privileged CI uses a protected, separate test project.
+
+Use Cloudflare Workers and Supabase.
+Prefer free tiers.
+The user accepts necessary costs.
+Before a paid upgrade, document the concrete need and cost.
+Do not treat free tiers as a hard limit.
+Do not enable speculative paid services.
+
+Future attachments must link helpers' images to issues.
+Record configurable upload permissions as future work.
+These must include controls to enable or disable volunteer image submission.
+Attachment visibility for contestants and staff remains undecided.
+Configuration scope also remains undecided.
+Do not silently select either policy.
+
+A free-tier pilot and production capacity validation are separate milestones.
+Future targets on a healthy venue connection are:
+
+- 800 simultaneous users.
+- 95% of ordinary actions complete within two seconds.
+- Live updates arrive within three seconds.
+
+Consult the product direction in PLAN.md when you record future requirements.
+These include configurable roles and categories, shared incidents, award ledgers, and browser push.
+Do not automatically add these features to T0001.
 
 ## Required end-of-run report
 
-At the end of every Codex run, report all eight fields below. Keep them concise, use **None**, **Not run**, or **Not applicable** when appropriate, and distinguish completed checks from suggested manual steps.
+At the end of every Codex run, report all eight fields below.
+Keep them concise.
+Use **None**, **Not run**, or **Not applicable** when appropriate.
+Distinguish completed checks from suggested manual steps.
 
-1. **Summary of changes** — What changed and why.
-2. **Files changed** — Paths to created, modified, or deleted files.
-3. **Commands run** — Commands actually executed, including relevant failures.
-4. **Build/test results** — Observed outcomes and checks that could not run.
-5. **Manual verification steps** — What was manually checked and what the user should still verify.
-6. **Risks** — Known limitations, unresolved decisions, or regressions. Do not invent risks.
-7. **Follow-up tickets** — Existing ticket references or concise candidate work. Do not imply that an uncreated ticket exists.
-8. **Docs that need updating** — Outstanding documentation work, or None if the relevant docs are current.
+1. **Summary of changes** — State what changed and why.
+2. **Files changed** — List paths to created, modified, or deleted files.
+3. **Commands run** — List commands actually executed, including relevant failures.
+4. **Build/test results** — Record observed results and checks that could not run.
+5. **Manual verification steps** — State what you checked manually and what the user should still verify.
+6. **Risks** — Record known limitations, unresolved decisions, or regressions. Do not invent risks.
+7. **Follow-up tickets** — Reference existing tickets or concise candidate work. Do not imply that an uncreated ticket exists.
+8. **Docs that need updating** — List outstanding documentation work. Use **None** if relevant documents are current.

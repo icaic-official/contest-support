@@ -1,14 +1,43 @@
 # Minsky
 
-Minsky helps contest teams and staff report, triage, resolve and review technical problems. T0003 connects the existing workflow to Supabase Auth, Postgres and Realtime; Cloudflare Workers serves the static React frontend.
+Minsky helps contest teams and staff report, triage, resolve, and review technical problems.
+T0003 connects this workflow to Supabase Auth, Postgres, and Realtime.
+Cloudflare Workers serves the static React frontend.
 
-The connected app is a **development deployment**, with connectivity assumed. Accounts use organizer-provided usernames/passwords. Temporary passwords must be changed before contest access; organizers handle recovery without SMTP. It is not yet certified for a live contest or the 800-user target.
+The connected app is a **development deployment**.
+Development assumes connectivity.
+Organizers provide usernames and passwords.
+Users must change temporary passwords before they can access contest data.
+Organizers handle password recovery without SMTP.
+The app is not yet certified for a live contest or the 800-user target.
 
-T0004 gives the connected app a dark green interface based on the user's visual references. A compact sidebar sits beside the tabular issue queue and detail/activity panel on desktop. On phones, queue rows become cards, navigation uses **Menu**, and selecting a report focuses its details; **Back to queue** returns to the queue heading. **Report an issue** / **Report for team** opens the submission form. The centered public sign-in page has organizer recovery guidance, a password visibility control and an amber sign-in button. Account settings and administration use the same theme. Public Sans remains locally served, with its license in `public/fonts/OFL-Public-Sans.txt`. Workflow, account permissions and shared data remain connected; reference values are not seeded into the product. The old local demo and its commands have been removed.
+T0004 gives the app a dark green interface based on the user's references.
+On desktop screens, a compact sidebar sits beside the issue queue and the panel for issue details and activity.
+On phones, queue rows become cards.
+**Menu** opens navigation.
+When you select a report, focus moves to its details.
+**Back to queue** returns focus to the queue heading.
+
+**Report an issue** and **Report for team** open the submission form.
+The centered public sign-in page includes organizer recovery guidance and a control that shows or hides the password.
+The sign-in button is amber.
+Account settings and administration use the same theme.
+The app serves Public Sans locally.
+Its license is in `public/fonts/OFL-Public-Sans.txt`.
+
+The app uses actual authenticated accounts and shared data.
+It preserves the workflow and account permissions.
+The reference values are not product seed data.
+The old local demo and its commands are removed.
 
 ## Connected development — no Docker required
 
-Use Node.js 22.13+ within 22.x, or Node.js 24+, and npm. Contributors are assumed to have access to the shared cloud credentials, per the user's 2026-10-02 instruction. Provider-console permissions and Minsky session membership are separate.
+Use Node.js 22.13 or later within 22.x, or Node.js 24 or later.
+Use npm.
+The user's 2026-10-02 decision permits full cloud credential access for contributors.
+Provider-console permissions and Minsky session membership are separate.
+
+Run these commands in sequence:
 
 ```sh
 npm ci
@@ -18,9 +47,14 @@ npm run cloud:link
 npm run dev
 ```
 
-Enter the Supabase URL and publishable key in `.env.local`. Enter the database password privately at the CLI prompt. Never put service credentials in a `VITE_` variable. The existing local demo data is not imported.
+Enter the Supabase URL in `.env.local`.
+Enter the publishable key in `.env.local`.
+Enter the database password privately at the CLI prompt.
+Never put service credentials in a `VITE_` variable.
+The app does not import old local demo data.
 
-The project maintainer applies schema changes and bootstraps the first admin explicitly:
+The project maintainer explicitly applies schema changes and creates the first admin through the bootstrap command.
+For first setup, the commands are:
 
 ```sh
 npm run cloud:plan
@@ -31,41 +65,128 @@ npm run cloud:hosting-login
 npm run deploy
 ```
 
-`cloud:functions` uses server-side bundling (`--use-api`), so Docker is not required. The bootstrap refuses to run if an admin already exists. Review/edit `scripts/bootstrap.sql` for the initial event, session and roster. Once bootstrapped, select **Administration** in the sidebar for account membership, roles and contestant intake. See [cloud onboarding](docs/cloud-onboarding.md) for function configuration, username provisioning, password resets and tested setup outcomes.
+`cloud:functions` uses server-side bundling with `--use-api`.
+Docker is not required.
+The bootstrap refuses to run if an admin already exists.
+Before first setup, review `scripts/bootstrap.sql` for the initial event, session, and roster.
+Edit it if necessary.
+
+After bootstrap, select **Administration** in the sidebar.
+Use this section to manage account membership, roles, and contestant intake.
+See [cloud onboarding](docs/cloud-onboarding.md) for function configuration, username creation, password resets, and observed setup results.
 
 | Command | Purpose |
 | --- | --- |
-| `npm run dev` | Connected frontend at `http://127.0.0.1:5173` |
-| `npm run build` | Type check and create production static assets in `dist/` |
-| `npm run preview` | Serve built assets locally |
-| `npm run typecheck` | Check frontend, scripts' TypeScript and browser tests |
-| `npm run lint` | ESLint for TypeScript and Node scripts |
-| `npm run check:functions` | Deno type check of privileged Supabase function |
-| `npm test` | Connected timing, account identifiers and embedded PostgreSQL migration/RLS tests; no cloud credentials or Docker needed |
-| `npm run test:e2e` | Public landing/login browser checks without cloud credentials |
-| `npm run test:hosted` | Run the real-account smoke suite against the deployed development frontend |
-| `npm run test:cloud` | Real Auth/database/Realtime tests against the linked project, with temporary accounts and isolated sessions, then fixture cleanup |
-| `npm run cloud:plan` / `cloud:migrate` | Dry-run / apply linked cloud migrations |
-| `npm run cloud:bootstrap -- --admin-user UUID` | Trusted first-admin/session bootstrap |
-| `npm run cloud:recover-admin -- --user UUID` | Trusted provider recovery of an existing admin; prints a new temporary password in the private terminal |
-| `npm run cloud:functions` | Deploy account administration with cloud bundling |
-| `npm run deploy` | Build and explicitly deploy Workers Static Assets |
+| `npm run dev` | Serve the connected frontend at `http://127.0.0.1:5173`. |
+| `npm run build` | Check types and create production static assets in `dist/`. |
+| `npm run preview` | Serve built assets locally. |
+| `npm run typecheck` | Check TypeScript in the frontend, scripts, and browser tests. |
+| `npm run lint` | Run ESLint for TypeScript and Node scripts. |
+| `npm run check:functions` | Run the Deno type check for the privileged Supabase function. |
+| `npm test` | Test connected timing, account identifiers, and migrations and RLS with embedded PostgreSQL. Cloud credentials and Docker are not required. |
+| `npm run test:e2e` | Run public landing and login browser checks without cloud credentials. |
+| `npm run test:hosted` | Run the smoke suite with real accounts against the deployed development frontend. |
+| `npm run test:cloud` | Test real Auth, database, and Realtime behavior against the linked project. The suite creates temporary accounts and isolated sessions, then deletes its fixtures. |
+| `npm run cloud:plan` / `cloud:migrate` | Preview or apply migrations to the linked cloud project. |
+| `npm run cloud:bootstrap -- --admin-user UUID` | Create the first admin and session through a trusted bootstrap. |
+| `npm run cloud:recover-admin -- --user UUID` | Recover an existing admin through trusted provider access. Print a new temporary password in the private terminal. |
+| `npm run cloud:functions` | Deploy account administration with cloud bundling. |
+| `npm run deploy` | Build and explicitly deploy Workers Static Assets. |
 
-Install Chromium once with `npx playwright install chromium`. Deno and the provider CLIs are pinned npm dependencies. Test credentials are captured in memory and a temporary file; privileged credentials never enter the browser. Do not interrupt cloud tests during cleanup. If cleanup fails, investigate the reported test sessions before deleting them; there is no shared-data reset command.
+Install Chromium once:
 
-PR CI runs build/lint/type/function/database/landing-page checks without hosted secrets. The protected, manually dispatched `cloud-test` environment requires a separate Supabase test project and credentials. It refuses the shared development project. Preview deployments do not automatically use or mutate the shared database. See [contributor setup](docs/cloud-onboarding.md#contributor-setup) and [protected cloud CI](docs/cloud-onboarding.md#verification-and-protected-cloud-ci).
+```sh
+npx playwright install chromium
+```
 
-The development process is ticket branch → develop and add migrations → fast checks → PR review and isolated cloud integration checks → user review/merge → explicit deployment of approved changes. `Minsky` serves development and trial accounts; `Minsky CI` contains temporary automated fixtures. Production has not been provisioned. Once it exists, validate changes on development and CI before deploying them to its separate database and frontend. The rules are in [AGENTS.md](AGENTS.md#cloud-development-and-deployment-workflow), with practical commands in [cloud onboarding](docs/cloud-onboarding.md#development-and-release-process).
+Deno and the provider CLIs are pinned npm dependencies.
+Cloud tests hold test credentials in memory and a temporary file.
+Privileged credentials never enter the browser.
+Do not interrupt cloud tests during fixture deletion.
+If fixture deletion fails, investigate the reported test sessions before you delete them.
+There is no command to reset shared data.
 
-PR security checks scan Git history for secrets with redacted Gitleaks output and audit locked npm dependencies, blocking high/critical vulnerabilities. Dependabot proposes weekly dependency/action updates. TypeScript major updates are ignored until the installed lint toolchain accepts them. The [code-quality guide](docs/code-quality.md) describes the review checklist and prepared mandatory merge rules; the repository owner must enable those remote rules and vulnerability alerts.
+PR CI checks builds, lint, types, functions, database behavior, and the public landing and login pages without hosted secrets.
+The protected `cloud-test` environment supports manually dispatched cloud tests.
+It requires a separate Supabase test project and credentials.
+It refuses the shared development project.
+Preview deployments do not automatically use or change the shared database.
+See [contributor setup](docs/cloud-onboarding.md#contributor-setup) and [protected cloud CI](docs/cloud-onboarding.md#verification-and-protected-cloud-ci).
+
+Use this development sequence:
+
+1. Create the ticket branch from updated `main`.
+2. Develop the change and add migrations.
+3. Run fast checks.
+4. Prepare the PR.
+5. Review the PR and run isolated cloud integration checks on the reviewed revision.
+6. Let the user review and merge.
+7. Explicitly deploy the approved changes.
+
+`Minsky` serves development and trial accounts.
+`Minsky CI` contains temporary automated fixtures.
+Production is not provisioned.
+When production exists, validate changes on development and CI before deployment to its separate database and frontend.
+See [AGENTS.md](AGENTS.md#cloud-development-and-deployment-workflow) and the [release process](docs/cloud-onboarding.md#development-and-release-process).
+
+PR security checks scan Git history for secrets with redacted Gitleaks output.
+They also audit locked npm dependencies.
+High and critical vulnerabilities block the dependency check.
+Dependabot proposes weekly dependency and action updates.
+TypeScript major updates are ignored until the installed lint toolchain accepts them.
+The [code-quality guide](docs/code-quality.md) describes the review checklist and prepared mandatory merge rules.
+The repository owner must enable the remote rules and vulnerability alerts.
 
 ## Connected workflow
 
-Sign in with an organizer-provided username and password. Existing development accounts can keep using their original email until the admin assigns a username. Team accounts see their own issues and public activity. Staff see their combined volunteer/specialist/jury capabilities; admin is a separate capability. Submit → claim → escalate → accept → resolve → award → confirm external application. Support can report for a roster team. Reopening preserves ownership, every previous resolution and the existing award, while excluding resolved intervals from unresolved time. Server timestamps, issue revisions, transactional locks and persisted request IDs protect writes. An award remains separate from the external contest clock.
+Sign in with the username and password from your organizer.
+Existing development accounts can use their original email until an admin assigns a username.
+Team accounts see their own issues and public activity.
+Staff receive the combined capabilities of their volunteer, specialist, and jury roles.
+Admin is a separate capability.
 
-The admin view can create username accounts, issue new temporary passwords, assign existing Auth users to teams or staff roles, revoke membership, and open/close contestant intake. Credentials are shown for the provisioning/reset action only, not stored as recoverable passwords. Users must change temporary passwords before reading or changing contest data. Resets invalidate prior sessions. Account-wide changes require admin access to every session of that identity and reject archived memberships. It cannot remove the last admin. Existing logins lose database access immediately when membership is removed; the UI refetches current membership on focus, reconnect and at ten-second intervals. Realtime uses team-scoped public and staff-only private invalidations followed by authorized reads. Private notes do not advance public counters. No notes or issue content are sent in the invalidation payload.
+The complete workflow is:
 
-Uploads, broader event/roster/category editors, CSV, notifications, shared incidents, offline operation and award adjustments remain deferred. This implementation supports group events and one award per issue.
+1. The contestant submits an issue.
+2. A support staff member claims the issue.
+3. The owner requests a specialist handoff.
+4. A specialist accepts the handoff.
+5. The owner resolves the issue.
+6. The jury records an award.
+7. Staff confirm external application of the award.
+
+Support staff can report an issue for a roster team.
+Reopening retains the owner, every previous resolution, and any existing award.
+Unresolved time excludes resolved intervals.
+Server timestamps, issue revisions, transactional locks, and persisted request IDs protect writes.
+Minsky records awards separately from the external contest clock.
+
+The admin view supports these actions:
+
+- Create username accounts.
+- Issue new temporary passwords.
+- Assign existing Auth users to teams or staff roles.
+- Revoke membership.
+- Open or close contestant intake.
+
+The app shows temporary credentials only for the account creation or reset action.
+It does not store passwords in recoverable form.
+Users must change temporary passwords before they can read or change contest data.
+Resets invalidate previous sessions.
+
+Account-wide changes require admin access to every session of that identity.
+They reject archived memberships.
+The app prevents removal of the last admin.
+
+When an admin removes membership, an existing login immediately loses database access.
+The UI retrieves current membership on focus, on reconnect, and at ten-second intervals.
+Realtime sends public invalidations scoped to teams and private invalidations restricted to staff.
+The app then reads the data that the account can access.
+Private notes do not advance public counters.
+Invalidation payloads contain no notes or issue content.
+
+Uploads, broader event, roster, and category editors, CSV, notifications, shared incidents, offline operation, and award adjustments remain deferred.
+This implementation supports group events and one award per issue.
 
 ## Documentation
 

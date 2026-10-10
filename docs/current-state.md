@@ -1,10 +1,50 @@
 # Current state
 
-T0001/T0002 merged in PR #1. T0003's connected cloud app merged in [PR #2](https://github.com/notbowen/minsky/pull/2) on 2026-10-02. T0004 implements the UI makeover on `feature/t0004-ui-makeover`, created from updated `origin/main` (`8abfef6`), and is deployed to development at the user's explicit "Deploy first" instruction. [PR #9](https://github.com/notbowen/minsky/pull/9) remains open for user review and merge. Provider ownership/billing records, GitHub merge enforcement/vulnerability alerts and remaining user/manual acceptance checks are deferred to T0005 by the user's 2026-10-03 ticket decision (previously T0004). The older implementation/deployment reports below describe their revisions, not this branch's current UI.
+T0001 and T0002 merged in PR #1.
+T0003's connected cloud app merged in [PR #2](https://github.com/notbowen/minsky/pull/2) on 2026-10-02.
+T0004's UI makeover merged in [PR #9](https://github.com/notbowen/minsky/pull/9) on 2026-10-11 (SGT).
+The user deleted `feature/t0004-ui-makeover` after merge.
+[PR #13](https://github.com/notbowen/minsky/pull/13) now targets `main` for the documentation follow-up.
+The frontend remains deployed to development under the user's explicit "Deploy first" instruction.
+
+The 2026-10-03 ticket decision defers these items to T0005, which previously formed the T0004 follow-up scope:
+
+- Provider ownership and billing records.
+- GitHub merge enforcement and vulnerability alerts.
+- Remaining user and manual acceptance checks.
+
+Older implementation and deployment reports below describe their recorded revisions.
+Use the current status above to determine which PR remains open.
 
 ## Ticket allocation (2026-10-03)
 
-[T0004](tickets.md#t0004--ui-makeover) uses the user's dark green workspace and centered sign-in references. Previous T0004 scope notes move to [T0005](tickets.md#t0005--follow-up-scope-notes), including the operational follow-ups above and candidate organizer tools/configurable issue attachments. Attachment policy decisions remain unresolved. Protected cloud CI remains a recorded T0003 setup gap; repository inspection during this run found no GitHub environments. References to the earlier T0004 candidate in historical reports below record the scope at that time and are superseded by this decision.
+[T0004](tickets.md#t0004--ui-makeover) uses the user's dark green workspace and centered sign-in references.
+Previous T0004 scope notes move to [T0005](tickets.md#t0005--follow-up-scope-notes).
+They include the operational work above and candidate organizer tools and configurable issue attachments.
+Attachment policy decisions remain unresolved.
+
+Protected cloud CI remains a recorded T0003 setup gap.
+Repository inspection during the recorded run found no GitHub environments.
+Historical reports refer to the earlier T0004 candidate scope.
+Those references describe the scope at that time.
+The 2026-10-03 ticket decision replaces that scope.
+
+## T0004 merge and documentation follow-up (2026-10-11)
+
+The user merged [PR #9](https://github.com/notbowen/minsky/pull/9) into `main` at `2026-10-10T16:53:00Z`.
+This is `2026-10-11 00:53 SGT`.
+Merge commit: [`52ff99133bd727626b3589b40a507ab438f508da`](https://github.com/notbowen/minsky/commit/52ff99133bd727626b3589b40a507ab438f508da).
+Reviewed branch head: `601a0ab4bb31934fad4741647ac8a88b6c653a6c`.
+The user deleted `feature/t0004-ui-makeover` after merge.
+
+GitHub retargeted [PR #13](https://github.com/notbowen/minsky/pull/13) to `main`.
+That PR remains a draft.
+
+PR #13 now includes `main`'s dependency repair and required collaborator attribution rules.
+Its diff from `main` changes Markdown files only.
+T0005 implementation remains pending.
+The [2026-10-03 development deployment](#t0004-development-deployment-2026-10-03) remains the latest frontend deployment.
+Earlier reports retain the PR status and verification results from their recorded runs.
 
 ## T0004 UI makeover (2026-10-03)
 
@@ -52,6 +92,12 @@ Files changed: `package.json`, `package-lock.json`, `deno.lock`, `docs/tickets.m
 ## Dependabot TypeScript majors (2026-10-11)
 
 [PR #10](https://github.com/notbowen/minsky/pull/10) (`@types/node` 26.6.4) and [PR #11](https://github.com/notbowen/minsky/pull/11) (`typescript-eslint` 8.71.1) rebased onto the Wrangler pin and passed `checks`, `secrets` and `dependencies`. [PR #12](https://github.com/notbowen/minsky/pull/12) proposed TypeScript 7.0.2. Its `dependencies` and `secrets` checks passed after that rebase, and `checks` failed in `npm ci`: `typescript-eslint` 8.71 requires TypeScript `>=4.8.4 <6.1.0`. The npm registry's latest `typescript-eslint` is still 8.71.1 with that same peer range. Dependabot closed PR #12 after an ignore-this-major-version comment and will not reopen TypeScript 7.x unless that pull request is reopened. `.github/dependabot.yml` also ignores every TypeScript major update. Patch and minor TypeScript updates remain enabled. That committed ignore takes effect after this configuration reaches `main`.
+
+Conflict resolution for [PR #14](https://github.com/notbowen/minsky/pull/14) merged `main` at `44677c7` into `feature/dependabot-typescript-majors`.
+The resolution retains the documentation rewrite from PR #13 and the TypeScript major-update rule from PR #14.
+Dependabot YAML validation, all 30 local documentation links and anchors, and whitespace checks passed.
+Only the five intended configuration and documentation files differ from `main`.
+Application checks were not rerun locally for this resolution; GitHub CI runs on the pushed revision.
 
 ## Login landing page, sidebar and demo retirement (2026-10-02)
 

@@ -10,7 +10,11 @@
 
 ## Current scope and completed demo baseline
 
-**Latest user decision (2026-10-02):** remove the old local demo, its command, persona/reset/storage code, demo-only tests/fixtures and obsolete walkthrough/specification. Maintain the connected app, public login landing page, sidebar and real-account workflow/authorization tests. Requirements below about the completed demo are historical; do not restore its runtime or reset tooling.
+**Latest ticket decision (2026-10-03):** implement T0004's UI makeover using the user's dark green workspace and centered amber-button sign-in references. Keep actual authenticated data, workflow semantics and authorization; reference values are placeholders. T0004 starts from merged T0003 on updated `main`, on `feature/t0004-ui-makeover`. Previous T0004 follow-up scope notes move to T0005: provider ownership/billing records, GitHub merge enforcement/vulnerability alerts, remaining manual acceptance checks, and candidate organizer tools/configurable issue attachments. T0005 implementation has not started. See [docs/tickets.md](docs/tickets.md).
+
+**T0004 deployment exception (2026-10-03):** the user explicitly requested "Deploy first" while PR #9 was open. Deploy the completed T0004 frontend to the existing development Worker `minsky-dev` before merge and verify it there. This exception applies to T0004's development frontend; the user still reviews and merges the PR. See [deployment evidence](docs/current-state.md#t0004-development-deployment-2026-10-03).
+
+**Demo retirement decision (2026-10-02):** remove the old local demo, its command, persona/reset/storage code, demo-only tests/fixtures and obsolete walkthrough/specification. Maintain the connected app, public login landing page, sidebar and real-account workflow/authorization tests. Requirements below about the completed demo are historical; do not restore its runtime or reset tooling.
 
 T0001 and T0002 were merged in PR #1 on 2026-10-02. T0003 is scoped in `docs/tickets.md` for cloud onboarding and an authenticated shared product. Its implementation must start from updated `main` on `feature/t0003-cloud-product`. The demo requirements below describe the completed baseline; they do not exclude the connected features explicitly selected for T0003. Keep planning separate from implemented capabilities.
 
@@ -47,6 +51,8 @@ Use simple components and domain logic appropriate to the demo. Avoid speculativ
 
 ## Ticket and Git workflow
 
+- Include `Co-authored-by: PuR3Luck <aidan.ong822@gmail.com>` in every new commit Codex creates and pushes for this repository. Separate the co-author trailer from the commit body with a blank line.
+- Preserve the primary author and any other co-author trailers. Before each push, verify that every new Codex-created commit contains the required trailer exactly once.
 - Distinguish development tickets from contestant issues in code, documentation, and communication.
 - The first implementation ticket is **T0001 — Local workflow demo and project guidance**, using `feature/t0001-local-demo`.
 - Start each development ticket from updated `main`. Use `feature/tNNNN-description` for subsequent ticket branches.
@@ -68,7 +74,7 @@ Use simple components and domain logic appropriate to the demo. Avoid speculativ
 - Privileged GitHub cloud checks use the protected `cloud-test` environment and the separate CI project. Ordinary PR checks run without cloud credentials. Record a local cloud run separately from a protected GitHub Actions run; neither substitutes for the other.
 - CI fixtures create temporary accounts and UUID-scoped records and delete only their own data. Never point CI at development or production, copy real accounts into CI, or reset a shared project. Confirm the target before applying migrations or deploying functions.
 - Once production is selected and provisioned, validate the approved revision on development and CI before applying its migrations, deploying its account function/configuration, and deploying its frontend to production. Verify the production deployment afterward. Production setup is future work, not permission to create or upgrade provider resources now.
-- Use [cloud-onboarding.md](docs/cloud-onboarding.md) for project references, commands, environment protection requirements and current setup results. T0003 retains protected cloud CI; ownership/billing records, remote merge enforcement/vulnerability alerts and remaining user/manual acceptance checks are deferred to T0004 by user decision.
+- Use [cloud-onboarding.md](docs/cloud-onboarding.md) for project references, commands, environment protection requirements and current setup results. T0003 retains protected cloud CI; ownership/billing records, remote merge enforcement/vulnerability alerts and remaining user/manual acceptance checks are deferred to T0005 by the user's 2026-10-03 ticket decision.
 
 ## Verification
 

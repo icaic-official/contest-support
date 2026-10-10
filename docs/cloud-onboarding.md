@@ -28,7 +28,7 @@ No public signup, email confirmation links, invitation links or email recovery a
 
 ## Ownership and costs
 
-The user deferred recording provider ownership and billing details to T0004 on 2026-10-02. The guidance below still applies before any paid upgrade; no upgrade has been selected.
+The user deferred recording provider ownership and billing details on 2026-10-02 and moved these scope notes from T0004 to T0005 on 2026-10-03. The guidance below still applies before any paid upgrade; no upgrade has been selected.
 
 Use individual provider logins and membership controls for Supabase and Cloudflare. Provider access and Minsky app membership are separate. The user completes provider account verification and payment entry privately. Keep passwords, database credentials, recovery codes and API secrets out of Git, chat and public logs.
 
@@ -78,6 +78,8 @@ Review `scripts/bootstrap.sql` before first setup; it refuses an existing admin.
 
 For each ticket, start its branch from updated `main`, develop against the development project and add versioned migrations. Run the fast README checks, prepare the PR, and run cloud integration checks against the reviewed revision. The user reviews and merges. Explicitly deploy the approved revision afterward; merging does not automatically deploy. Once production exists, validate changes on development and CI before applying them there. [AGENTS.md](../AGENTS.md#cloud-development-and-deployment-workflow) records these rules for future contributors and agents.
 
+T0004-specific exception (2026-10-03): the user's "Deploy first" instruction authorized deploying the completed frontend to the existing `minsky-dev` Worker before PR #9 merges. That deployment and all 12 hosted cases passed; [current-state.md](current-state.md#t0004-development-deployment-2026-10-03) records the revision, version and asset checks. No database migration or account-function deployment was needed. The PR remains open for user review and merge.
+
 Run CI project commands from a **separate checkout** linked with `npx supabase link --project-ref ghtztmovdkhuketcbjmq`. Keep the primary checkout linked to development. In that CI checkout:
 
 ```sh
@@ -116,5 +118,5 @@ The `Checks` workflow file is also absent from `main`. GitHub requires a manuall
 - Authentication settings: user reported Email enabled, public signup and anonymous sign-in disabled, email confirmation enabled and exact local/hosted redirects saved. Keep these settings; the trusted function confirms organizer-created internal identities.
 - Historical migrations `202610020001_cloud.sql` through `202610020003_private_signals.sql` and the first bootstrap were applied without seeds. Both username/password migrations were applied without seeds, the account function was deployed, and all eight final hosted cases passed. Current deployment/version and detailed verification are recorded in current-state.md.
 - SMTP: deliberately removed from T0003 requirements by the user. No sender domain or paid mail service was configured; prior SMTP blockers are historical.
-- Ownership/billing: selected plans, organization owner, billing contact, recurring charges and receipt handling remain unverified and are deferred to T0004 by user decision. No paid upgrade was selected or payment action performed by the agent.
+- Ownership/billing: selected plans, organization owner, billing contact, recurring charges and receipt handling remain unverified and are deferred to T0005 by the user's 2026-10-03 ticket decision. No paid upgrade was selected or payment action performed by the agent.
 - Protected cloud CI: remains in T0003. The separate test project is prepared; protected GitHub environment setup and the first protected cloud run remain pending, including owner access and default-branch workflow availability. Local runs against isolated fixtures are separate evidence.

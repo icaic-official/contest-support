@@ -1,7 +1,10 @@
 import { test, expect, type Page } from "@playwright/test";
 import { account, fixture, anonKey, url, service, save } from "./fixture";
 import { createClient } from "@supabase/supabase-js";
-import {execFileSync} from "node:child_process";
+import { execFileSync } from "node:child_process";
+import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
+import { join, resolve } from "node:path";
+import { tmpdir } from "node:os";
 
 test("public signup is disabled while organizer-created accounts can log in", async () => {
   const client = createClient(url, anonKey, {
@@ -31,15 +34,14 @@ async function login(page: Page, name: string) {
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await expect(
     page.getByRole("heading", {
-      name:
-        name === "contestant"
-          ? "A little help, right here."
-          : "Keep the contest moving.",
+      name: name === "contestant" ? "My team’s issues" : "Issue Queue",
     }),
   ).toBeVisible();
   if (name === "admin") {
-    await page.getByRole("navigation", {name: "Workspace navigation"})
-      .getByRole("button", {name: "Administration", exact: true}).click();
+    await page
+      .getByRole("navigation", { name: "Workspace navigation" })
+      .getByRole("button", { name: "Administration", exact: true })
+      .click();
   }
 }
 
@@ -47,9 +49,7 @@ test("sign-in stays usable on phones and exposes recovery help by keyboard", asy
   page,
 }, testInfo) => {
   await page.goto("/");
-  await expect(
-    page.getByRole("heading", { name: "Sign in to Minsky" }),
-  ).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
   await page.evaluate(() => document.fonts.ready);
   await page.screenshot({
     path: testInfo.outputPath("sign-in-desktop.png"),
@@ -62,66 +62,260 @@ test("sign-in stays usable on phones and exposes recovery help by keyboard", asy
         () => document.documentElement.scrollWidth <= window.innerWidth,
       ),
     ).toBe(true);
-    const username = await page.getByLabel("Username", { exact: true })
+    const username = await page
+      .getByLabel("Username", { exact: true })
       .boundingBox();
     expect(username).not.toBeNull();
     expect(username!.x).toBeGreaterThanOrEqual(0);
     expect(username!.x + username!.width).toBeLessThanOrEqual(width);
     expect(username!.height).toBeGreaterThanOrEqual(44);
   }
-  const help = page.getByRole("button", { name: "Forgot password?" });
-  await help.focus();
+  await expect(
+    page.getByText("Contact your contest organizers.", { exact: true }),
+  ).toBeVisible();
+  const toggle = page.getByRole("button", {
+    name: "Show password",
+    exact: true,
+  });
+  await toggle.focus();
   await page.keyboard.press("Enter");
-  await expect(help).toHaveAttribute("aria-expanded", "true");
-  await expect(page.getByRole("status")).toContainText(
-    "Contact your contest organizer.",
+  await expect(page.getByLabel("Password", { exact: true })).toHaveAttribute(
+    "type",
+    "text",
   );
   await page.screenshot({
     path: testInfo.outputPath("sign-in-320.png"),
     fullPage: true,
   });
-  await page.keyboard.press("Enter");
-  await expect(help).toHaveAttribute("aria-expanded", "false");
 });
 
-test("sidebar navigation respects roles and remains usable by keyboard on phones", async ({page}, testInfo) => {
+test("sidebar navigation respects roles and remains usable by keyboard on phones", async ({
+  page,
+}, testInfo) => {
   await login(page, "volunteer");
-  const navigation = page.getByRole("navigation", {name: "Workspace navigation"});
-  await expect(navigation.getByRole("button", {name: "Administration", exact: true})).toHaveCount(0);
-  await navigation.getByRole("button", {name: "My account", exact: true}).click();
-  await expect(page.getByRole("heading", {name: "My account", exact: true})).toBeFocused();
-  await expect(page.locator(".account-details")).toContainText(fixture().accounts.volunteer.username);
-  await expect(navigation.getByRole("button", {name: "My account", exact: true})).toHaveAttribute("aria-current", "page");
-  await expect(page.getByRole("heading", {name: "Report an issue"})).toHaveCount(0);
-  await page.screenshot({path: testInfo.outputPath("sidebar-account-desktop.png"), fullPage: true});
+  const navigation = page.getByRole("navigation", {
+    name: "Workspace navigation",
+  });
+  await expect(
+    navigation.getByRole("button", { name: "Administration", exact: true }),
+  ).toHaveCount(0);
+  await navigation
+    .getByRole("button", { name: "My account", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "My account", exact: true }),
+  ).toBeFocused();
+  await expect(page.locator(".account-details")).toContainText(
+    fixture().accounts.volunteer.username,
+  );
+  await expect(
+    navigation.getByRole("button", { name: "My account", exact: true }),
+  ).toHaveAttribute("aria-current", "page");
+  await expect(
+    page.getByRole("heading", { name: "Report an issue" }),
+  ).toHaveCount(0);
+  await page.screenshot({
+    path: testInfo.outputPath("sidebar-account-desktop.png"),
+    fullPage: true,
+  });
   for (const width of [390, 320]) {
-    await page.setViewportSize({width, height: 844});
-    const menu = page.getByRole("button", {name: "Menu", exact: true});
+    await page.setViewportSize({ width, height: 844 });
+    const menu = page.getByRole("button", { name: "Menu", exact: true });
     await expect(menu).toHaveAttribute("aria-expanded", "false");
     await expect(navigation).toBeHidden();
     await menu.focus();
     await page.keyboard.press("Enter");
     await expect(menu).toHaveAttribute("aria-expanded", "true");
-    const issues = navigation.getByRole("button", {name: "Issues", exact: true});
+    const issues = navigation.getByRole("button", {
+      name: "Issues",
+      exact: true,
+    });
     await issues.focus();
     await page.keyboard.press("Enter");
-    await expect(page.getByRole("heading", {name: "Keep the contest moving."})).toBeFocused();
+    await expect(
+      page.getByRole("heading", { name: "Issue Queue" }),
+    ).toBeFocused();
     await expect(menu).toHaveAttribute("aria-expanded", "false");
-    await expect(page.getByRole("heading", {name: "Report an issue"})).toBeVisible();
-    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    await page
+      .getByRole("button", { name: "Report for team", exact: true })
+      .click();
+    await expect(
+      page.getByRole("heading", { name: "Report an issue" }),
+    ).toBeFocused();
+    await page
+      .getByRole("button", { name: "Cancel report", exact: true })
+      .click();
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= window.innerWidth,
+      ),
+    ).toBe(true);
   }
-  await page.screenshot({path: testInfo.outputPath("sidebar-support-320.png"), fullPage: true});
-  await page.setViewportSize({width: 1280, height: 900});
-  await page.getByRole("button", {name: "Sign out", exact: true}).click();
+  await page.screenshot({
+    path: testInfo.outputPath("sidebar-support-320.png"),
+    fullPage: true,
+  });
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.getByRole("button", { name: "Sign out", exact: true }).click();
   await expect(navigation).toHaveCount(0);
   await login(page, "admin");
-  await expect(navigation.getByRole("button", {name: "Administration", exact: true})).toHaveAttribute("aria-current", "page");
-  await expect(page.getByRole("heading", {name: "Session administration"})).toBeVisible();
-  await navigation.getByRole("button", {name: "Issues", exact: true}).click();
-  await expect(page.getByRole("heading", {name: "Session administration"})).toHaveCount(0);
-  await expect(page.getByRole("heading", {name: "Support queue"})).toBeVisible();
+  await expect(
+    navigation.getByRole("button", { name: "Administration", exact: true }),
+  ).toHaveAttribute("aria-current", "page");
+  await expect(
+    page.getByRole("heading", { name: "Session administration" }),
+  ).toBeVisible();
+  await navigation.getByRole("button", { name: "Issues", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "Session administration" }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("heading", { name: "Issue Queue" }),
+  ).toBeVisible();
   await page.reload();
-  await expect(navigation.getByRole("button", {name: "Issues", exact: true})).toHaveAttribute("aria-current", "page");
+  await expect(
+    navigation.getByRole("button", { name: "Issues", exact: true }),
+  ).toHaveAttribute("aria-current", "page");
+});
+
+test("queue and activity match the reference layout and adapt to phone widths", async ({
+  page,
+}, testInfo) => {
+  const api = await account("volunteer");
+  const state = fixture();
+  const descriptions = [
+    "Printer produces blank pages",
+    "IDE settings reset on restart",
+    "Unable to access the submission server",
+    "Keyboard stops responding",
+    "Compiler exits unexpectedly",
+  ];
+  const categories = [
+    "Printing",
+    "Environment",
+    "Network",
+    "Hardware",
+    "Software",
+  ];
+  const configured = await service()
+    .from("sessions")
+    .update({
+      categories: [
+        ...categories,
+        "Problem statement",
+        "Devices",
+        "Backend",
+        "Other",
+      ],
+    })
+    .eq("id", state.sessions[0]);
+  expect(configured.error).toBeNull();
+  let selected = "";
+  for (let index = 0; index < descriptions.length; index++) {
+    const submitted = await api.rpc("workflow", {
+      p_session: state.sessions[0],
+      p_request: crypto.randomUUID(),
+      p_action: {
+        type: "submit",
+        team_id: state.teams[index % 2],
+        category: categories[index],
+        description: descriptions[index],
+      },
+    });
+    expect(submitted.error).toBeNull();
+    if (index === 2) selected = submitted.data;
+    if (index !== 4) {
+      const claim = await api.rpc("workflow", {
+        p_session: state.sessions[0],
+        p_request: crypto.randomUUID(),
+        p_action: { type: "claim", issue_id: submitted.data, revision: 0 },
+      });
+      expect(claim.error).toBeNull();
+    }
+  }
+  for (const [revision, action] of [
+    [
+      1,
+      {
+        type: "message",
+        text: "Please keep working locally. We are checking the network at your desk.",
+        visibility: "public",
+      },
+    ],
+    [
+      2,
+      {
+        type: "message",
+        text: "Gateway reachable; submission endpoint times out. Requesting a network specialist.",
+        visibility: "internal",
+      },
+    ],
+    [2, { type: "escalate" }],
+  ] as const) {
+    const result = await api.rpc("workflow", {
+      p_session: state.sessions[0],
+      p_request: crypto.randomUUID(),
+      p_action: { ...action, issue_id: selected, revision },
+    });
+    expect(result.error).toBeNull();
+  }
+  await page.setViewportSize({ width: 1505, height: 1045 });
+  await login(page, "specialist");
+  await page
+    .locator(".issue-card")
+    .filter({ hasText: descriptions[2] })
+    .click();
+  await expect(
+    page.getByRole("button", { name: "Accept handoff", exact: true }),
+  ).toBeVisible();
+  await expect(page.locator(".internal-event")).toContainText(
+    "Gateway reachable",
+  );
+  await expect(page.getByRole("button", {name: "Send reply", exact: true})).toBeDisabled();
+  await expect(page.locator(".connection-status")).toContainText("Live");
+  await page.evaluate(() => document.fonts.ready);
+  const queue = await page.locator(".queue").boundingBox();
+  const detail = await page.locator(".detail").boundingBox();
+  expect(queue!.x + queue!.width).toBeLessThanOrEqual(detail!.x);
+  await page.screenshot({
+    path: testInfo.outputPath("workspace-desktop.png"),
+    fullPage: true,
+  });
+  await page.setViewportSize({ width: 1280, height: 900 });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true);
+  await page.screenshot({
+    path: testInfo.outputPath("workspace-laptop.png"),
+    fullPage: true,
+  });
+  for (const width of [390, 320]) {
+    await page.setViewportSize({ width, height: 844 });
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= window.innerWidth,
+      ),
+    ).toBe(true);
+    const row = page
+      .locator(".issue-card")
+      .filter({ hasText: descriptions[2] });
+    await row.focus();
+    await page.keyboard.press("Enter");
+    await expect(row).toHaveAttribute("aria-pressed", "true");
+    await expect(page.locator("#issue-heading")).toBeFocused();
+    await page.getByRole("button", {name: "Back to queue", exact: true}).click();
+    await expect(page.locator("#workspace-heading")).toBeFocused();
+    await row.click();
+    await expect(
+      page.getByRole("button", { name: "Accept handoff", exact: true }),
+    ).toBeVisible();
+    await page.screenshot({
+      path: testInfo.outputPath(`workspace-${width}.png`),
+      fullPage: true,
+    });
+  }
 });
 
 test("real accounts share the journey, private notes stay private, and phone/refresh/keyboard work", async ({
@@ -140,6 +334,9 @@ test("real accounts share the journey, private notes stay private, and phone/ref
     await login(staff, "volunteer");
     await login(specialist, "specialist");
     const description = `Browser journey ${crypto.randomUUID()}`;
+    await contestant
+      .getByRole("button", { name: "Report an issue", exact: true })
+      .click();
     await contestant.getByLabel("What’s happening?").fill(description);
     await contestant
       .getByRole("button", { name: "Submit issue", exact: true })
@@ -158,11 +355,11 @@ test("real accounts share the journey, private notes stay private, and phone/ref
     await staff
       .getByRole("button", { name: "Claim issue", exact: true })
       .click();
-    await staff.getByLabel("Message visibility").selectOption("internal");
+    await staff.getByLabel("Audience").selectOption("internal");
     await staff
       .getByLabel("Message", { exact: true })
       .fill("Private diagnostic");
-    await staff.getByRole("button", { name: "Send message" }).click();
+    await staff.getByRole("button", { name: "Send reply" }).click();
     await expect(
       staff.getByText("Private diagnostic", { exact: true }),
     ).toBeVisible();
@@ -189,9 +386,9 @@ test("real accounts share the journey, private notes stay private, and phone/ref
       [],
     );
 
-    await staff.getByLabel("Message visibility").selectOption("public");
+    await staff.getByLabel("Audience").selectOption("public");
     await staff.getByLabel("Message", { exact: true }).fill("Public update");
-    await staff.getByRole("button", { name: "Send message" }).click();
+    await staff.getByRole("button", { name: "Send reply" }).click();
     await expect(
       contestant.getByText("Public update", { exact: true }),
     ).toBeVisible({ timeout: 7000 });
@@ -202,7 +399,7 @@ test("real accounts share the journey, private notes stay private, and phone/ref
     const detail = await contestant.locator(".detail").boundingBox();
     expect(queue).not.toBeNull();
     expect(detail).not.toBeNull();
-    expect(queue!.x + queue!.width).toBeLessThan(detail!.x);
+    expect(queue!.x + queue!.width).toBeLessThanOrEqual(detail!.x);
     await staff.screenshot({
       path: testInfo.outputPath("support-390.png"),
       fullPage: true,
@@ -229,7 +426,9 @@ test("real accounts share the journey, private notes stay private, and phone/ref
       .getByRole("button", { name: "Sign out", exact: true })
       .click();
     const details = fixture().accounts.jury;
-    await specialist.getByLabel("Username", { exact: true }).fill(details.username);
+    await specialist
+      .getByLabel("Username", { exact: true })
+      .fill(details.username);
     await specialist
       .getByLabel("Password", { exact: true })
       .fill(details.password);
@@ -237,7 +436,7 @@ test("real accounts share the journey, private notes stay private, and phone/ref
       .getByRole("button", { name: "Sign in", exact: true })
       .click();
     await expect(
-      specialist.getByRole("heading", { name: "Review. Decide. Record." }),
+      specialist.getByRole("heading", { name: "Award review" }),
     ).toBeVisible();
     await specialist
       .getByRole("combobox", { name: "Award minutes", exact: true })
@@ -323,7 +522,7 @@ test("real accounts share the journey, private notes stay private, and phone/ref
     ).toBe(true);
     await staff.goto("/");
     await expect(
-      staff.getByRole("heading", { name: "Keep the contest moving." }),
+      staff.getByRole("heading", { name: "Issue Queue" }),
     ).toBeVisible();
     await staff.keyboard.press("Tab");
     await expect(
@@ -538,7 +737,9 @@ test("admin UI assigns combined roles; password change, refresh and logout work"
   await expect(
     page.getByRole("heading", { name: "Session administration" }),
   ).toBeVisible();
-  await page.getByText("Assign an existing account by ID", {exact: true}).click();
+  await page
+    .getByText("Assign an existing account by ID", { exact: true })
+    .click();
   await page.getByLabel("Auth user UUID").fill(fixture().accounts.combined.id);
   const form = page
     .locator("form")
@@ -555,197 +756,205 @@ test("admin UI assigns combined roles; password change, refresh and logout work"
   await page.getByRole("button", { name: "Sign out", exact: true }).click();
   await login(page, "volunteer");
   await page
+    .getByRole("navigation", { name: "Workspace navigation" })
+    .getByRole("button", { name: "My account", exact: true })
+    .click();
+  await page
     .getByRole("button", { name: "Change password", exact: true })
     .click();
   const password = crypto.randomUUID() + "A9!";
-  await page.getByLabel("Current password", { exact: true }).fill(fixture().accounts.volunteer.password);
+  await page
+    .getByLabel("Current password", { exact: true })
+    .fill(fixture().accounts.volunteer.password);
   await page.getByLabel("New password", { exact: true }).fill(password);
   await page.getByLabel("Confirm password", { exact: true }).fill(password);
   await page
     .getByRole("button", { name: "Save password", exact: true })
     .click();
   await expect(
-    page.getByRole("heading", { name: "Keep the contest moving." }),
+    page.getByRole("heading", { name: "Issue Queue" }),
   ).toBeVisible();
   await page.reload();
   await expect(
-    page.getByRole("heading", { name: "Keep the contest moving." }),
+    page.getByRole("heading", { name: "Issue Queue" }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Sign out", exact: true }).click();
-  await expect(
-    page.getByRole("heading", { name: "Sign in to Minsky" }),
-  ).toBeVisible();
-  await expect(
-    page.getByRole("heading", { name: "Support queue" }),
-  ).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Issue Queue" })).toHaveCount(
+    0,
+  );
   await page
     .getByLabel("Username", { exact: true })
     .fill(fixture().accounts.volunteer.username);
   await page.getByLabel("Password", { exact: true }).fill(password);
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await expect(
-    page.getByRole("heading", { name: "Keep the contest moving." }),
+    page.getByRole("heading", { name: "Issue Queue" }),
   ).toBeVisible();
 });
 
-test(
-  "organizer creates username accounts, mandatory changes and reset invalidate old access",
-  async ({ browser }, testInfo) => {
-    const adminContext = await browser.newContext();
-    const teamContext = await browser.newContext();
-    const page = await adminContext.newPage();
-    const team = await teamContext.newPage();
-    try {
-      await login(page, "admin");
-      const form = page.locator("form").filter({
-        has: page.getByRole("button", { name: "Create account", exact: true }),
-      });
-      const username = `new-${crypto.randomUUID().slice(0, 12)}`;
-      await form.getByLabel("Display name", { exact: true }).fill(
-        "Provisioned team",
-      );
-      await form.getByLabel("Username", { exact: true }).fill(username);
-      await form.getByLabel("Contestant team").selectOption(fixture().teams[0]);
-      await form.getByRole("button", { name: "Create account", exact: true })
-        .click();
-      const credentials = page.getByRole("region", {
-        name: "Temporary account credentials",
-      });
-      await expect(credentials).toBeVisible();
-      const temporary = await credentials.getByLabel("Temporary password", {
+test("organizer creates username accounts, mandatory changes and reset invalidate old access", async ({
+  browser,
+}, testInfo) => {
+  const adminContext = await browser.newContext();
+  const teamContext = await browser.newContext();
+  const page = await adminContext.newPage();
+  const team = await teamContext.newPage();
+  try {
+    await login(page, "admin");
+    const form = page.locator("form").filter({
+      has: page.getByRole("button", { name: "Create account", exact: true }),
+    });
+    const username = `new-${crypto.randomUUID().slice(0, 12)}`;
+    await form
+      .getByLabel("Display name", { exact: true })
+      .fill("Provisioned team");
+    await form.getByLabel("Username", { exact: true }).fill(username);
+    await form.getByLabel("Contestant team").selectOption(fixture().teams[0]);
+    await form
+      .getByRole("button", { name: "Create account", exact: true })
+      .click();
+    const credentials = page.getByRole("region", {
+      name: "Temporary account credentials",
+    });
+    await expect(credentials).toBeVisible();
+    const temporary = await credentials
+      .getByLabel("Temporary password", {
         exact: true,
-      }).inputValue();
-      const state = fixture();
-      const record = await service().from("people").select("id").eq(
-        "username",
-        username,
-      ).single();
-      expect(record.error).toBeNull();
-      const userId = record.data!.id;
-      state.accounts.provisioned = {
-        id: userId,
-        username,
-        email: `${username}@accounts.minsky.invalid`,
-        password: temporary,
-      };
-      save(state);
-      const api = createClient(url, anonKey, {
-        auth: { persistSession: false, autoRefreshToken: false },
-      });
-      const signed = await api.auth.signInWithPassword({
-        email: state.accounts.provisioned.email,
-        password: temporary,
-      });
-      expect(signed.error).toBeNull();
-      expect((await api.from("sessions").select("*")).data).toEqual([]);
-      expect((await api.rpc("complete_password_change")).error).not.toBeNull();
-      await team.goto("/");
-      await team.getByLabel("Username", { exact: true }).fill(
-        username.toUpperCase(),
-      );
-      await team.getByLabel("Password", { exact: true }).fill(temporary);
-      await team.getByRole("button", { name: "Sign in", exact: true }).click();
-      await expect(
-        team.getByRole("heading", { name: "Change your temporary password" }),
-      ).toBeVisible();
-      await expect(team.getByRole("button", { name: "Return to dashboard" }))
-        .toHaveCount(0);
-      await team.reload();
-      await expect(
-        team.getByRole("heading", { name: "Change your temporary password" }),
-      ).toBeVisible();
-      const personal = crypto.randomUUID() + "A9!";
-      await team.getByLabel("Current password", { exact: true }).fill(
-        temporary,
-      );
-      await team.getByLabel("New password", { exact: true }).fill(personal);
-      await team.getByLabel("Confirm password", { exact: true }).fill(personal);
-      await team.getByRole("button", { name: "Save password", exact: true })
-        .click();
-      await expect(
-        team.getByRole("heading", { name: "A little help, right here." }),
-      ).toBeVisible();
-      const old = createClient(url, anonKey, {
-        auth: { persistSession: false, autoRefreshToken: false },
-      });
-      const oldLogin = await old.auth.signInWithPassword({
-        email: state.accounts.provisioned.email,
-        password: personal,
-      });
-      expect(oldLogin.error).toBeNull();
-      await page.getByRole("button", { name: "Dismiss credentials" }).click();
-      const member = page.locator("details").filter({
-        has: page.locator("summary").filter({ hasText: "Provisioned team" }),
-      });
-      await member.locator("summary").click();
-      page.once("dialog", (dialog) => dialog.accept());
-      await member.getByRole("button", { name: "Reset password", exact: true })
-        .click();
-      await expect(credentials).toBeVisible();
-      const replacement = await credentials.getByLabel("Temporary password", {
+      })
+      .inputValue();
+    const state = fixture();
+    const record = await service()
+      .from("people")
+      .select("id")
+      .eq("username", username)
+      .single();
+    expect(record.error).toBeNull();
+    const userId = record.data!.id;
+    state.accounts.provisioned = {
+      id: userId,
+      username,
+      email: `${username}@accounts.minsky.invalid`,
+      password: temporary,
+    };
+    save(state);
+    const api = createClient(url, anonKey, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    const signed = await api.auth.signInWithPassword({
+      email: state.accounts.provisioned.email,
+      password: temporary,
+    });
+    expect(signed.error).toBeNull();
+    expect((await api.from("sessions").select("*")).data).toEqual([]);
+    expect((await api.rpc("complete_password_change")).error).not.toBeNull();
+    await team.goto("/");
+    await team
+      .getByLabel("Username", { exact: true })
+      .fill(username.toUpperCase());
+    await team.getByLabel("Password", { exact: true }).fill(temporary);
+    await team.getByRole("button", { name: "Sign in", exact: true }).click();
+    await expect(
+      team.getByRole("heading", { name: "Change your temporary password" }),
+    ).toBeVisible();
+    await expect(
+      team.getByRole("button", { name: "Return to dashboard" }),
+    ).toHaveCount(0);
+    await team.reload();
+    await expect(
+      team.getByRole("heading", { name: "Change your temporary password" }),
+    ).toBeVisible();
+    const personal = crypto.randomUUID() + "A9!";
+    await team.getByLabel("Current password", { exact: true }).fill(temporary);
+    await team.getByLabel("New password", { exact: true }).fill(personal);
+    await team.getByLabel("Confirm password", { exact: true }).fill(personal);
+    await team
+      .getByRole("button", { name: "Save password", exact: true })
+      .click();
+    await expect(
+      team.getByRole("heading", { name: "My team’s issues" }),
+    ).toBeVisible();
+    const old = createClient(url, anonKey, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    const oldLogin = await old.auth.signInWithPassword({
+      email: state.accounts.provisioned.email,
+      password: personal,
+    });
+    expect(oldLogin.error).toBeNull();
+    await page.getByRole("button", { name: "Dismiss credentials" }).click();
+    const member = page.locator("details").filter({
+      has: page.locator("summary").filter({ hasText: "Provisioned team" }),
+    });
+    await member.locator("summary").click();
+    page.once("dialog", (dialog) => dialog.accept());
+    await member
+      .getByRole("button", { name: "Reset password", exact: true })
+      .click();
+    await expect(credentials).toBeVisible();
+    const replacement = await credentials
+      .getByLabel("Temporary password", {
         exact: true,
-      }).inputValue();
-      expect(replacement).not.toBe(temporary);
-      expect((await old.from("sessions").select("*")).data).toEqual([]);
-      expect(
-        (await old.auth.updateUser({ password: crypto.randomUUID() + "A9!" }))
-          .error,
-      ).not.toBeNull();
-      expect((await old.auth.refreshSession()).error).not.toBeNull();
-      await team.reload();
-      await expect(team.getByRole("heading", { name: /Sign in/ }))
-        .toBeVisible();
-      if (
-        await team.getByRole("button", { name: "Sign out", exact: true })
-          .count()
-      ) {
-        await team.getByRole("button", { name: "Sign out", exact: true })
-          .click();
-      }
-      await team.getByLabel("Username", { exact: true }).fill(username);
-      await team.getByLabel("Password", { exact: true }).fill(replacement);
-      await team.getByRole("button", { name: "Sign in", exact: true }).click();
-      await expect(
-        team.getByRole("heading", { name: "Change your temporary password" }),
-      ).toBeVisible();
-      const final = crypto.randomUUID() + "A9!";
-      await team.getByLabel("Current password", { exact: true }).fill(
-        replacement,
-      );
-      await team.getByLabel("New password", { exact: true }).fill(final);
-      await team.getByLabel("Confirm password", { exact: true }).fill(final);
-      await team.getByRole("button", { name: "Save password", exact: true })
-        .click();
-      await expect(
-        team.getByRole("heading", { name: "A little help, right here." }),
-      ).toBeVisible();
-      await page.getByRole("button", { name: "Dismiss credentials" }).click();
-      await page.screenshot({
-        path: testInfo.outputPath("admin-redesign-desktop.png"),
-        fullPage: true,
-      });
-      await page.setViewportSize({ width: 390, height: 844 });
-      expect(
-        await page.evaluate(() =>
-          document.documentElement.scrollWidth <= window.innerWidth
-        ),
-      ).toBe(true);
-      await page.screenshot({
-        path: testInfo.outputPath("admin-redesign-phone.png"),
-        fullPage: true,
-      });
-      await page.setViewportSize({ width: 320, height: 740 });
-      expect(
-        await page.evaluate(() =>
-          document.documentElement.scrollWidth <= window.innerWidth
-        ),
-      ).toBe(true);
-    } finally {
-      await adminContext.close();
-      await teamContext.close();
+      })
+      .inputValue();
+    expect(replacement).not.toBe(temporary);
+    expect((await old.from("sessions").select("*")).data).toEqual([]);
+    expect(
+      (await old.auth.updateUser({ password: crypto.randomUUID() + "A9!" }))
+        .error,
+    ).not.toBeNull();
+    expect((await old.auth.refreshSession()).error).not.toBeNull();
+    await team.reload();
+    await expect(team.getByRole("heading", { name: /Sign in/ })).toBeVisible();
+    if (
+      await team.getByRole("button", { name: "Sign out", exact: true }).count()
+    ) {
+      await team.getByRole("button", { name: "Sign out", exact: true }).click();
     }
-  },
-);
+    await team.getByLabel("Username", { exact: true }).fill(username);
+    await team.getByLabel("Password", { exact: true }).fill(replacement);
+    await team.getByRole("button", { name: "Sign in", exact: true }).click();
+    await expect(
+      team.getByRole("heading", { name: "Change your temporary password" }),
+    ).toBeVisible();
+    const final = crypto.randomUUID() + "A9!";
+    await team
+      .getByLabel("Current password", { exact: true })
+      .fill(replacement);
+    await team.getByLabel("New password", { exact: true }).fill(final);
+    await team.getByLabel("Confirm password", { exact: true }).fill(final);
+    await team
+      .getByRole("button", { name: "Save password", exact: true })
+      .click();
+    await expect(
+      team.getByRole("heading", { name: "My team’s issues" }),
+    ).toBeVisible();
+    await page.getByRole("button", { name: "Dismiss credentials" }).click();
+    await page.screenshot({
+      path: testInfo.outputPath("admin-redesign-desktop.png"),
+      fullPage: true,
+    });
+    await page.setViewportSize({ width: 390, height: 844 });
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= window.innerWidth,
+      ),
+    ).toBe(true);
+    await page.screenshot({
+      path: testInfo.outputPath("admin-redesign-phone.png"),
+      fullPage: true,
+    });
+    await page.setViewportSize({ width: 320, height: 740 });
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= window.innerWidth,
+      ),
+    ).toBe(true);
+  } finally {
+    await adminContext.close();
+    await teamContext.close();
+  }
+});
 
 test("existing email accounts adopt a username without losing identity or password", async ({page}) => {
   const state = fixture();
@@ -778,18 +987,59 @@ test("trusted provider recovery restores a locked-out sole admin without email",
   const state = fixture();
   const old = await account("admin");
   // Capture the private terminal output in memory; never print the temporary password.
-  const output = execFileSync("node",["scripts/recover-admin.mjs","--user",state.accounts.admin.id],{encoding:"utf8",stdio:["ignore","pipe","pipe"]});
+  // The recovery script uses its linked project. Give this test its own link,
+  // so an environment-selected CI run never queries the developer's project.
+  const directory = await mkdtemp(join(tmpdir(), "minsky-recovery-test-"));
+  let output: string;
+  try {
+    const link = join(directory, "supabase", ".temp");
+    await mkdir(link, { recursive: true });
+    await writeFile(
+      join(link, "project-ref"),
+      new URL(url).hostname.split(".")[0],
+    );
+    await symlink(
+      resolve("node_modules"),
+      join(directory, "node_modules"),
+      "dir",
+    );
+    output = execFileSync(
+      "node",
+      [resolve("scripts/recover-admin.mjs"), "--user", state.accounts.admin.id],
+      { cwd: directory, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] },
+    );
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
   const temporary = output.trim().split("\n").at(-1)!;
   expect((await old.from("sessions").select("*")).data).toEqual([]);
-  const restored = createClient(url,anonKey,{auth:{persistSession:false,autoRefreshToken:false}});
-  const login = await restored.auth.signInWithPassword({email:state.accounts.admin.email,password:temporary});
+  const restored = createClient(url, anonKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+  const login = await restored.auth.signInWithPassword({
+    email: state.accounts.admin.email,
+    password: temporary,
+  });
   expect(login.error).toBeNull();
-  expect((await restored.rpc("is_session_admin",{p_session:state.sessions[0]})).data).toBe(false);
+  expect(
+    (await restored.rpc("is_session_admin", { p_session: state.sessions[0] }))
+      .data,
+  ).toBe(false);
   expect((await restored.rpc("complete_password_change")).error).not.toBeNull();
-  const personal = crypto.randomUUID()+"A9!";
-  expect((await restored.auth.updateUser({password:personal,current_password:temporary})).error).toBeNull();
+  const personal = crypto.randomUUID() + "A9!";
+  expect(
+    (
+      await restored.auth.updateUser({
+        password: personal,
+        current_password: temporary,
+      })
+    ).error,
+  ).toBeNull();
   expect((await restored.rpc("complete_password_change")).error).toBeNull();
-  expect((await restored.rpc("is_session_admin",{p_session:state.sessions[0]})).data).toBe(true);
+  expect(
+    (await restored.rpc("is_session_admin", { p_session: state.sessions[0] }))
+      .data,
+  ).toBe(true);
 });
 
 test("archived records allow queue navigation and disable writes", async ({
@@ -805,7 +1055,7 @@ test("archived records allow queue navigation and disable writes", async ({
     page.getByText("This event is archived. Records are read only."),
   ).toBeVisible();
   const filter = page.getByRole("combobox", {
-    name: "Status filter",
+    name: "Status",
     exact: true,
   });
   await expect(filter).toBeEnabled();
@@ -821,6 +1071,11 @@ test("archived records allow queue navigation and disable writes", async ({
     page.getByRole("button", { name: "Claim issue", exact: true }),
   ).toBeDisabled();
   await expect(
-    page.getByRole("button", { name: "Submit issue", exact: true }),
+    page.getByRole("button", { name: "Report for team", exact: true }),
   ).toBeDisabled();
+  await page.setViewportSize({width: 320, height: 740});
+  const back = page.getByRole("button", {name: "Back to queue", exact: true});
+  await expect(back).toBeEnabled();
+  await back.click();
+  await expect(page.locator("#workspace-heading")).toBeFocused();
 });

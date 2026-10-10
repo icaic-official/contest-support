@@ -2,6 +2,11 @@
 
 These tickets describe development work, not contestant issues.
 
+T0004 has two related pull requests: [PR #9](https://github.com/notbowen/minsky/pull/9) implements the UI makeover, and [PR #13](https://github.com/notbowen/minsky/pull/13) rewrites the documentation.
+The `feature/t0004-ste100-docs` branch is a documentation follow-up within T0004.
+T0005 remains follow-up scope notes with no implementation started.
+PR #13 targets PR #9's branch. After PR #9 merges, retarget PR #13 to `main` before merging it.
+
 ## T0001 — Local workflow demo and project guidance
 
 Branch: `feature/t0001-local-demo`
@@ -109,9 +114,9 @@ Verification is recorded in [current-state.md](current-state.md).
 
 ## T0003 — Cloud onboarding and authenticated shared product
 
-Status: implementation in progress on `feature/t0003-cloud-product`, started from updated `main` on 2026-10-02. Supabase schema and trusted first-admin/session bootstrap have been applied to the development project. Connected frontend, account administration, cloud contributor commands and embedded database tests are implemented. The initial hosted workflow/authorization/browser checks passed; final privacy/archival verification is recorded in current-state.md; the user has replaced email onboarding with username/password provisioning and organizer-assisted recovery. The user reviews and merges [draft PR #2](https://github.com/notbowen/minsky/pull/2). Username-flow verification is recorded in current-state.md. Protected cloud CI environment setup and its first successful run remain incomplete.
+Status: implemented and merged in [PR #2](https://github.com/notbowen/minsky/pull/2) on 2026-10-02. Work started from updated `main` on `feature/t0003-cloud-product`. Supabase schema and trusted first-admin/session bootstrap were applied to development; connected frontend, account administration, cloud contributor commands and embedded database tests are implemented. Hosted username-flow/workflow/authorization verification is recorded in current-state.md. Protected cloud CI environment setup and its first successful run remain a recorded setup gap; the T0004 repository inspection still found no GitHub environments.
 
-Updated completion boundary (2026-10-02): the user retained protected cloud integration CI in T0003 and deferred provider ownership/billing records, GitHub merge enforcement/vulnerability alerts and remaining user/manual acceptance checks to T0004. Previously completed automated and browser checks remain evidence; deferred checks are not claimed as completed. The user still reviews and merges. No T0004 implementation has started.
+Updated completion boundary (2026-10-02, ticket allocation revised 2026-10-03): the user retained protected cloud integration CI in T0003 and deferred provider ownership/billing records, GitHub merge enforcement/vulnerability alerts and remaining user/manual acceptance checks to T0005 (previously T0004). Previously completed automated and browser checks remain evidence; deferred checks are not claimed as completed. The user still reviews and merges. T0004 implements the UI makeover selected below; T0005 implementation has not started.
 
 Updated authentication decision (2026-10-02): organizer-created usernames/passwords replace email invitations and recovery. Users must change temporary passwords before contest access. Organizers verify identity and issue new temporary credentials for recovery. SMTP/personal email addresses are not prerequisites. Existing Auth IDs and history are preserved.
 
@@ -127,15 +132,15 @@ Selected navigation/demo retirement (2026-10-02): the user requested a main logi
 
 Different people can sign in to a hosted Minsky deployment and complete the existing issue journey against shared data. Another developer with authorized cloud access can clone the repository, run the connected frontend locally, make a migration and submit a tested PR. Fast checks run without cloud credentials or Docker; full integration tests provision isolated cloud fixtures.
 
-Include real authentication and the contestant/support/jury dashboards now: they are necessary to make shared workflows useful. Include only the account and session controls needed to operate the first group-contest pilot. Recommend broader organizer administration and configurable uploads for the next ticket (candidate T0004). Do not add every long-term product requirement to this ticket.
+Include real authentication and the contestant/support/jury dashboards now: they are necessary to make shared workflows useful. Include only the account and session controls needed to operate the first group-contest pilot. Broader organizer administration and configurable uploads remain candidate scope for T0005. Do not add every long-term product requirement to this ticket.
 
 Cloud first, features first: connectivity is assumed. Offline queues, synchronization after outages, venue-local operation, disaster recovery and capacity validation are deferred. Visible request failures and prevention of conflicting/duplicate writes are part of ordinary product correctness.
 
 ### Provider onboarding and deployment
 
-- Walk the user through Cloudflare and Supabase account/organization setup and developer access. Distinguish provider-console membership from Minsky application accounts. Ownership/billing records are deferred to T0004; the user completes provider login, verification and any payment entry in the provider UI.
+- Walk the user through Cloudflare and Supabase account/organization setup and developer access. Distinguish provider-console membership from Minsky application accounts. Ownership/billing records are deferred to T0005; the user completes provider login, verification and any payment entry in the provider UI.
 - Start with one Supabase Free development project and Workers Free on a `workers.dev` address. Use shared cloud access for contributors and an isolated cloud test project for privileged CI; Docker is optional. Avoid requiring paid hosted database branches, a purchased application domain, R2 or AWS merely to begin.
-- Follow [cloud-onboarding.md](cloud-onboarding.md), completing it with the actual region, non-secret project identifiers, deployment URL, tested commands and setup results. Explain any required spend before selecting a paid service. Recording selected plans, recurring charges and receipt handling is deferred to T0004.
+- Follow [cloud-onboarding.md](cloud-onboarding.md), completing it with the actual region, non-secret project identifiers, deployment URL, tested commands and setup results. Explain any required spend before selecting a paid service. Recording selected plans, recurring charges and receipt handling is deferred to T0005.
 - Add repository-owned Vite build/Workers Static Assets configuration, pinned npm tooling, environment examples and ignored secret files. Cloudflare serves the frontend only; all backend functionality lives in Supabase. Use Supabase Auth, Postgres policies/transactional database functions and Realtime, with Supabase Edge Functions for privileged account administration. Version and deploy those functions with the repository. Keep service credentials out of frontend builds and public CI logs; no custom Cloudflare backend endpoints are needed.
 - Provision username/password accounts using Supabase Auth behind internal email-format identifiers. Show temporary credentials for each create/reset action; distribute them securely outside the app. Enforce mandatory password changes in database policies and RPCs. Verify first login, password change, reset and prior-session denial against hosted Auth.
 - Sender-domain access is no longer a T0003 blocker. SMTP/email invitations and email recovery were explicitly replaced by the user; do not silently reintroduce email sending.
@@ -167,21 +172,50 @@ Cloud first, features first: connectivity is assumed. Offline queues, synchroniz
 
 ### Acceptance criteria
 
-- [x] Development URLs, environment settings, account setup and contributor access are documented. Provider ownership/billing records are deferred to T0004.
+- [x] Development URLs, environment settings, account setup and contributor access are documented. Provider ownership/billing records are deferred to T0005.
 - [x] App is deployed on Workers with a shared Supabase database and working username/password provisioning, mandatory password changes, login, logout and organizer-assisted resets.
 - [x] Admin can onboard a team and individual staff, assign combined roles, revoke access and operate contestant intake without editing source code. First-admin bootstrap is reproducible.
 - [x] Separate authenticated contestant/support/jury/admin views work; demo controls and client-supplied identity cannot bypass permissions.
 - [x] Full submit → claim → handoff → resolve → award → external confirmation journey and repeated reopening work across distinct signed-in browsers. Staff can submit for a roster team.
 - [x] Server timestamps, transactional transitions and a unique award constraint preserve history and reject concurrent/duplicate actions. Unauthorized API access and private-note leakage are tested.
 - [x] Cloud migrations, isolated fixtures and documented commands reproduce the connected environment from a fresh clone; fast PR checks run without hosted secrets or Docker.
-- [x] Build, lint, type checking, focused/database/browser tests and hosted automated checks pass, with actual evidence recorded in current-state.md. Remaining user/manual acceptance checks are deferred to T0004.
+- [x] Build, lint, type checking, focused/database/browser tests and hosted automated checks pass, with actual evidence recorded in current-state.md. Remaining user/manual acceptance checks are deferred to T0005.
 - [ ] The separate Supabase test project is prepared; configure the protected GitHub `cloud-test` environment and record the first passing manually dispatched cloud integration job. Owner access and workflow availability on the default branch remain setup dependencies.
 
 ### Explicit exclusions and later decisions
 
-No offline/resilience project, 800-user load certification, individual-contest UI, shared incidents, CSV imports, push notifications, full event/category/role editors, advanced reporting or award adjustments. Image uploads and upload-setting UI are deferred to the next candidate so visibility rules can be settled first; this does not discard the user's attachment requirement.
+No offline/resilience project, 800-user load certification, individual-contest UI, shared incidents, CSV imports, push notifications, full event/category/role editors, advanced reporting or award adjustments. Image uploads and upload-setting UI remain candidate T0005 scope so visibility rules can be settled first; this does not discard the user's attachment requirement.
 
-### Deferred to T0004 (not started)
+## T0004 — UI makeover
+
+Branch: `feature/t0004-ui-makeover`, created from updated `origin/main` after T0003 merged in PR #2 on 2026-10-02.
+
+Status: implemented, verified locally and deployed to [minsky-dev](https://minsky-dev.icaic-minsky.workers.dev) on 2026-10-03 at the user's explicit "Deploy first" instruction. All 12 hosted cases passed with fixture cleanup. [PR #9](https://github.com/notbowen/minsky/pull/9) remains open for user review and merge. The user selected the two attached visual references on 2026-10-03; [current-state.md](current-state.md#t0004-ui-makeover-2026-10-03) records implementation and [deployment evidence](current-state.md#t0004-development-deployment-2026-10-03). This development deployment precedes merge by the user's T0004-specific exception.
+
+### Selected scope
+
+- Match the workspace reference's dark green surfaces, restrained borders, compact sidebar, green status/selection accents, desktop queue/detail columns, timing facts and chronological activity. Put specialist acceptance in an amber handoff panel; distinguish staff notes with a lock marker and separate surface.
+- Match the centered sign-in reference: green Minsky mark, username/password fields, keyboard-operable password visibility control, amber submit button and always-visible organizer access/recovery guidance. Replace the prior introductory landing-page sections with this sign-in composition.
+- Keep actual authenticated session, team, account, issue and history values. The screenshots' names, counts, descriptions and timestamps are examples, not product seed data or new capabilities.
+- Make the desktop queue tabular and adapt rows to cards on phones. Put reporting behind **Report an issue** / **Report for team**. Keep filters, all workflow actions, account controls and administration accessible in the same theme. On narrow screens, selection focuses details and **Back to queue** returns to the queue.
+- Preserve backend permissions, public/internal visibility, handoff ownership, timer accounting, resolution history, reopening and separate award/application semantics. No schema/account-function changes, new organizer features or uploads are included.
+
+### Acceptance criteria
+
+- [x] Sign-in and authenticated workspace reflect the supplied visual references, with locally served typography and no example data added to the runtime.
+- [x] Queue, details, reporting, accounts and administration remain usable at desktop, laptop and 320/390px phone widths, without horizontal overflow.
+- [x] Keyboard navigation, focus, password visibility, report open/cancel, phone navigation and detail/queue return work.
+- [x] Real accounts complete submission → claim → escalation → acceptance → resolution → award → application and reopening; internal notes remain unavailable to contestants.
+- [x] Type checking, lint, build, focused/database tests and browser/cloud checks pass; screenshot review and remaining manual limitations are recorded in current-state.md.
+- [x] Relevant documentation is current and a PR is prepared for user review.
+
+The previous T0004 follow-up scope notes move to T0005 below.
+
+## T0005 — Follow-up scope notes
+
+Status: scope notes moved from T0004 by user decision on 2026-10-03. Detailed specification and acceptance criteria remain pending; implementation has not started.
+
+### Agreed deferred work
 
 - Record provider ownership, selected billing plans, billing contact, recurring charges and receipt handling.
 - Configure and verify GitHub merge enforcement and vulnerability alerts with repository owner access.
@@ -189,8 +223,8 @@ No offline/resilience project, 800-user load certification, individual-contest U
 
 These items are user-selected follow-up work. Broader organizer tools and attachments below remain candidates whose implementation scope must still be agreed.
 
-## Candidate queue (not yet development tickets)
+### Candidate scope: organizer tools and configurable issue attachments
 
-1. **Recommended T0004: organizer tools and configurable issue attachments.** Event/session/roster/category editing and permission settings, prioritized after the cloud workflow is reviewed. Helpers' uploaded photos/screenshots must be linked to an issue with uploader/time metadata. Include enable/disable controls for volunteer image submission, enforced by the backend. Decide configuration scope, defaults, and contestant-visible versus staff-only access before implementation; do not infer that the uploader chooses visibility. Supabase Storage is recommended initially, with file records in Postgres and private bucket access. Choose file types/size limits and deletion rules when scoping. This is a candidate, not a created or started T0004.
+Event/session/roster/category editing and permission settings, prioritized after the cloud workflow is reviewed. Helpers' uploaded photos/screenshots must be linked to an issue with uploader/time metadata. Include enable/disable controls for volunteer image submission, enforced by the backend. Decide configuration scope, defaults, and contestant-visible versus staff-only access before implementation; do not infer that the uploader chooses visibility. Supabase Storage is recommended initially, with file records in Postgres and private bucket access. Choose file types/size limits and deletion rules when scoping. These are T0005 candidate scope notes, not an agreed implementation specification.
 
 Resilience and event-capacity work remain deferred until feature feedback warrants them.

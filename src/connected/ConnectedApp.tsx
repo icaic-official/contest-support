@@ -18,7 +18,6 @@ import {
 } from "./client";
 import {
   type Command,
-  duration,
   isStaff,
   type Issue,
   isSupport,
@@ -28,6 +27,7 @@ import {
   unresolvedTime,
 } from "./model";
 import { z } from "zod";
+import { Brand, clockDuration, Icon } from "./ui";
 
 const statusNames = {
   open: "Open",
@@ -109,310 +109,189 @@ export function ConnectedApp() {
       window.removeEventListener("focus", refreshAccount);
     };
   }, [userId, accountRetry]);
+  function signOut() {
+    void requireClient()
+      .auth.signOut()
+      .then(({ error: cause }) => {
+        if (cause) setError(cause.message);
+      });
+  }
+  const dashboardReady =
+    !!user &&
+    !!account?.session_valid &&
+    !account.must_change &&
+    !passwordSetup &&
+    !accountError;
   return (
-    <>
+    <div
+      className={`app-shell ${dashboardReady ? "workspace-shell" : "auth-shell"}`}
+    >
       <a className="skip-link" href="#main">
         Skip to main content
       </a>
-      <div className="environment-banner">
-        <strong>MINSKY · DEVELOPMENT</strong>
-        <span>Shared contest support</span>
-      </div>
-      <header className="app-header">
-        <a className="brand" href="#main">
-          <span className="brand-mark">m</span>
-          <span>
-            minsky<small>Contest support, connected.</small>
-          </span>
-        </a>
-        {user && (
-          <div className="header-controls">
-            <span className="account-name">
-              {account?.username ?? user.email}
-            </span>
-            <button className="quiet" onClick={() => setPasswordSetup(true)}>
-              Change password
-            </button>
-            <button
-              className="quiet"
-              onClick={() => {
-                void requireClient()
-                  .auth.signOut()
-                  .then(({ error: cause }) => {
-                    if (cause) setError(cause.message);
-                  });
-              }}
-            >
-              Sign out
-            </button>
-          </div>
-        )}
-        {!user && !loading && (
-          <nav className="landing-nav" aria-label="Main navigation">
-            <a href="#how-it-works">How it works</a>
-            <a className="login-link" href="#sign-in">Sign in</a>
-          </nav>
-        )}
-      </header>
+      {user && !dashboardReady && (
+        <header className="account-gate-header">
+          <Brand />
+          <button className="quiet" onClick={signOut}>
+            Sign out
+          </button>
+        </header>
+      )}
       <main id="main" className="connected-main" tabIndex={-1}>
         {error && (
           <p role="alert" className="alert">
             {error}
           </p>
         )}
-        {loading
-          ? <p role="status">Restoring your session…</p>
-          : !client
-          ? (
-            <p role="alert">
-              Set VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY in
-              .env.local. See docs/cloud-onboarding.md.
+        {loading ? (
+          <p role="status">Restoring your session…</p>
+        ) : !client ? (
+          <p role="alert">
+            Set VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY in
+            .env.local. See docs/cloud-onboarding.md.
+          </p>
+        ) : !user ? (
+          <SignIn />
+        ) : accountError ? (
+          <section className="panel auth-panel">
+            <p role="alert">{accountError}</p>
+            <button onClick={() => setAccountRetry((value) => value + 1)}>
+              Retry account check
+            </button>
+          </section>
+        ) : !account ? (
+          <p role="status">Checking account access…</p>
+        ) : !account.session_valid ? (
+          <section className="panel auth-panel">
+            <h1>Sign in again</h1>
+            <p>
+              Your password was reset. Sign out and use the new credentials from
+              your organizer.
             </p>
-          )
-          : !user
-          ? <SignIn />
-          : accountError
-          ? (
-            <section className="panel auth-panel">
-              <p role="alert">{accountError}</p>
-              <button onClick={() => setAccountRetry((value) => value + 1)}>
-                Retry account check
-              </button>
-            </section>
-          )
-          : !account
-          ? <p role="status">Checking account access…</p>
-          : !account.session_valid
-          ? (
-            <section className="panel auth-panel">
-              <h1>Sign in again</h1>
-              <p>
-                Your password was reset. Sign out and use the new credentials
-                from your organizer.
-              </p>
-            </section>
-          )
-          : passwordSetup || account.must_change
-          ? (
-            <PasswordForm
-              required={account.must_change}
-              done={() => {
-                setPasswordSetup(false);
-                setAccount(undefined);
-                setAccountRetry((value) => value + 1);
-              }}
-            />
-          )
-          : (
-            <Dashboard
-              key={user.id}
-              user={user}
-              username={account.username}
-              changePassword={() => setPasswordSetup(true)}
-            />
-          )}
-        <footer>
-          Minsky · Development deployment
-          <span>External contest clocks are managed separately.</span>
-        </footer>
+          </section>
+        ) : passwordSetup || account.must_change ? (
+          <PasswordForm
+            required={account.must_change}
+            done={() => {
+              setPasswordSetup(false);
+              setAccount(undefined);
+              setAccountRetry((value) => value + 1);
+            }}
+          />
+        ) : (
+          <Dashboard
+            key={user.id}
+            user={user}
+            username={account.username}
+            changePassword={() => setPasswordSetup(true)}
+            signOut={signOut}
+          />
+        )}
       </main>
-    </>
+      {!dashboardReady && (
+        <footer className="auth-footer">Minsky · Development deployment</footer>
+      )}
+    </div>
   );
 }
 
 function SignIn() {
   const [busy, setBusy] = useState(false);
-  const [help, setHelp] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   return (
-    <div className="landing-page">
-      <div className="sign-in-layout">
-        <section className="sign-in-intro" aria-labelledby="welcome-heading">
-          <p className="eyebrow">Contest support</p>
-          <h2 id="welcome-heading">
-            Keep every team <br />in the running.
-          </h2>
-          <p>
-            A place for teams to ask for help and for staff to carry each issue
-            through to resolution.
-          </p>
-          <figure className="handoff-illustration">
-            <svg viewBox="0 40 480 180" fill="none" aria-hidden="true">
-              <path
-                className="route-guide"
-                d="M40 60H440M40 130H440M40 200H440"
-              />
-              <path
-                className="route-secondary"
-                d="M40 60H115Q145 60 145 90V170Q145 200 175 200H440"
-              />
-              <path
-                className="route-primary"
-                d="M40 130H205Q235 130 235 100V90Q235 60 265 60H315Q345 60 345 90V100Q345 130 375 130H440"
-              />
-              <circle className="route-node" cx="40" cy="60" r="9" />
-              <circle className="route-node" cx="40" cy="200" r="9" />
-              <rect
-                className="route-station"
-                x="17"
-                y="107"
-                width="46"
-                height="46"
-                rx="14"
-              />
-              <path className="station-symbol" d="M31 130H49M40 121V139" />
-              <rect
-                className="route-station"
-                x="217"
-                y="107"
-                width="46"
-                height="46"
-                rx="14"
-              />
-              <path
-                className="station-symbol"
-                d="M230 125H249M230 135H249M244 120L249 125L244 130M235 130L230 135L235 140"
-              />
-              <rect
-                className="route-finish"
-                x="417"
-                y="107"
-                width="46"
-                height="46"
-                rx="14"
-              />
-              <path className="finish-symbol" d="M429 130L437 138L452 122" />
-              <circle className="route-node" cx="440" cy="200" r="9" />
-            </svg>
-            <figcaption>
-              <span>Report a problem</span>
-              <span>Find the right help</span>
-              <span>Keep going</span>
-            </figcaption>
-          </figure>
-          <p className="sign-in-guidance">
-            Contestants, support staff and jury share one workflow, with the
-            right view for each role.
-          </p>
-        </section>
-        <section id="sign-in" className="panel auth-panel" tabIndex={-1}>
-          <p className="eyebrow">Welcome to Minsky</p>
-          <h1>Sign in to Minsky</h1>
-          <p>Use the username and password provided by your organizer.</p>
-          <form
-            onSubmit={(event) => {
-              const data = formData(event);
-              setBusy(true);
-              setError("");
-              void (async () => {
-                try {
-                  const result = await requireClient().auth.signInWithPassword({
-                    email: loginIdentifier(text(data, "username")),
-                    password: text(data, "password"),
-                  });
-                  if (result.error) throw result.error;
-                } catch (cause) {
-                  setError(errorMessage(cause));
-                } finally {
-                  setBusy(false);
-                }
-              })();
-            }}
-          >
-            <fieldset disabled={busy}>
-              <legend className="sr-only">Account credentials</legend>
-              <label>
-                Username<input
-                  name="username"
-                  required
-                  autoComplete="username"
-                  autoCapitalize="none"
-                  spellCheck={false}
-                />
-              </label>
-              <p className="field-help">
-                Existing accounts can use their original email until a username
-                is assigned.
-              </p>
-              <label>
-                Password<input
-                  name="password"
-                  type="password"
-                  required
-                  autoComplete="current-password"
-                />
-              </label>
-              <button type="submit">{busy ? "Signing in…" : "Sign in"}</button>
-            </fieldset>
-          </form>
-          <button
-            className="quiet"
-            aria-expanded={help}
-            aria-controls="sign-in-help"
-            onClick={() => setHelp(!help)}
-          >
-            Forgot password?
-          </button>
-          <p
-            id="sign-in-help"
-            role="status"
-            className="field-help"
-            hidden={!help}
-          >
-            Contact your contest organizer. They will verify your identity and
-            give you a new temporary password.
-          </p>
-          {error && <p className="alert" role="alert">{error}</p>}
-        </section>
-      </div>
-      <section
-        id="how-it-works"
-        className="landing-overview"
-        aria-labelledby="how-heading"
-        tabIndex={-1}
+    <section
+      id="sign-in"
+      className="sign-in-panel"
+      aria-labelledby="sign-in-heading"
+    >
+      <Brand />
+      <h1 id="sign-in-heading">Sign in</h1>
+      <p className="sign-in-subtitle">Access your contest workspace.</p>
+      <form
+        onSubmit={(event) => {
+          const data = formData(event);
+          setBusy(true);
+          setError("");
+          void (async () => {
+            try {
+              const result = await requireClient().auth.signInWithPassword({
+                email: loginIdentifier(text(data, "username")),
+                password: text(data, "password"),
+              });
+              if (result.error) throw result.error;
+            } catch (cause) {
+              setError(errorMessage(cause));
+            } finally {
+              setBusy(false);
+            }
+          })();
+        }}
       >
-        <div className="landing-overview-heading">
-          <p className="eyebrow">One place for contest support</p>
-          <h2 id="how-heading">From the first report to the final decision.</h2>
-          <p>
-            Your organizer provides your account. Sign in to see the workspace
-            for your team or staff permissions.
-          </p>
-        </div>
-        <div className="landing-steps">
-          <article>
-            <span className="step-number">01</span>
-            <h3>Report and follow up</h3>
-            <p>
-              Teams report problems and follow public replies, resolutions and
-              time awards.
-            </p>
-          </article>
-          <article>
-            <span className="step-number">02</span>
-            <h3>Coordinate the response</h3>
-            <p>
-              Support staff claim reports, keep internal notes and hand work
-              over to specialists.
-            </p>
-          </article>
-          <article>
-            <span className="step-number">03</span>
-            <h3>Record the outcome</h3>
-            <p>
-              Jury members record time awards. Staff separately confirm when
-              those awards have been applied.
-            </p>
-          </article>
-        </div>
-      </section>
-    </div>
+        <fieldset disabled={busy}>
+          <legend className="sr-only">Account credentials</legend>
+          <label>
+            Username
+            <input
+              name="username"
+              required
+              autoComplete="username"
+              autoCapitalize="none"
+              spellCheck={false}
+              placeholder="Enter your username"
+            />
+          </label>
+          <div className="password-field">
+            <label htmlFor="sign-in-password">Password</label>
+            <div className="password-input">
+              <input
+                id="sign-in-password"
+                name="password"
+                type={showPassword ? "text" : "password"}
+                required
+                autoComplete="current-password"
+                placeholder="Enter your password"
+              />
+              <button
+                type="button"
+                className="password-toggle"
+                aria-label={showPassword ? "Hide password" : "Show password"}
+                aria-pressed={showPassword}
+                aria-controls="sign-in-password"
+                onClick={() => setShowPassword(!showPassword)}
+              >
+                <Icon name={showPassword ? "eye-off" : "eye"} />
+              </button>
+            </div>
+          </div>
+          <button className="sign-in-submit" type="submit">
+            {busy ? "Signing in…" : "Sign in"}
+          </button>
+        </fieldset>
+      </form>
+      {error && (
+        <p className="alert" role="alert">
+          {error}
+        </p>
+      )}
+      <p className="sign-in-help">
+        Accounts are created by contest organizers.
+        <br />
+        Need access or a password reset?
+        <br />
+        <span>Contact your contest organizers.</span>
+      </p>
+    </section>
   );
 }
 
-function PasswordForm(
-  { done, required }: { done: () => void; required: boolean },
-) {
+function PasswordForm({
+  done,
+  required,
+}: {
+  done: () => void;
+  required: boolean;
+}) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   return (
@@ -461,7 +340,8 @@ function PasswordForm(
         <fieldset disabled={busy}>
           <legend className="sr-only">New password</legend>
           <label>
-            Current password<input
+            Current password
+            <input
               name="current"
               type="password"
               required
@@ -497,19 +377,25 @@ function PasswordForm(
         </p>
       )}
       {!required && (
-        <button className="quiet" onClick={done}>Return to dashboard</button>
+        <button className="quiet" onClick={done}>
+          Return to dashboard
+        </button>
       )}
     </section>
   );
 }
 
-function Dashboard(
-  { user, username, changePassword }: {
-    user: User;
-    username: string | null;
-    changePassword: () => void;
-  },
-) {
+function Dashboard({
+  user,
+  username,
+  changePassword,
+  signOut,
+}: {
+  user: User;
+  username: string | null;
+  changePassword: () => void;
+  signOut: () => void;
+}) {
   const [sessions, setSessions] = useState<Array<{ id: string; name: string }>>(
     [],
   );
@@ -523,6 +409,8 @@ function Dashboard(
   const [filter, setFilter] = useState("all");
   const [view, setView] = useState<"issues" | "admin" | "account">("issues");
   const [navigationOpen, setNavigationOpen] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
+  const [connected, setConnected] = useState(false);
   const [now, setNow] = useState(Date.now());
   const clockOffset = useRef(0);
   const inFlight = useRef(false);
@@ -578,6 +466,7 @@ function Dashboard(
   }, [session, user.id]);
   useEffect(() => {
     void refresh();
+    setConnected(false);
     const channel = requireClient()
       .channel(`session-${session}-${user.id}`)
       .on(
@@ -617,6 +506,7 @@ function Dashboard(
         },
       )
       .subscribe((status) => {
+        setConnected(status === "SUBSCRIBED");
         if (status === "SUBSCRIBED") void refresh();
       });
     // Poll current membership as a backstop: a revoked subscriber receives no further data.
@@ -651,9 +541,10 @@ function Dashboard(
     setBusy(true);
     setNotice("");
     setError("");
-    const request = retry && pending.current
-      ? pending.current
-      : { request: crypto.randomUUID(), command };
+    const request =
+      retry && pending.current
+        ? pending.current
+        : { request: crypto.randomUUID(), command };
     pending.current = request;
     try {
       const id = await execute(session, request.request, request.command);
@@ -684,8 +575,8 @@ function Dashboard(
     }
   }
   const m = state?.membership;
-  const juryOnly = m && m.roles.includes("jury") && !isSupport(m) &&
-    !m.is_admin;
+  const juryOnly =
+    m && m.roles.includes("jury") && !isSupport(m) && !m.is_admin;
   const visible =
     state?.issues.filter((i) => !juryOnly || i.status === "resolved") ?? [];
   const filtered = visible.filter(
@@ -697,14 +588,37 @@ function Dashboard(
     setView(next);
     setNavigationOpen(false);
     window.requestAnimationFrame(() =>
-      document.getElementById("workspace-heading")?.focus()
+      document.getElementById("workspace-heading")?.focus(),
     );
   }
+  const identity =
+    state?.members.find((member) => member.person.id === user.id)?.person
+      .name ??
+    (m?.team_id
+      ? state?.teams.find((team) => team.id === m.team_id)?.name
+      : undefined) ??
+    (typeof user.user_metadata.name === "string"
+      ? user.user_metadata.name
+      : undefined) ??
+    username ??
+    user.email ??
+    "Your account";
+  const roleNames = m?.team_id
+    ? "Contestant"
+    : [...(m?.roles ?? []), ...(m?.is_admin ? ["admin"] : [])]
+        .map((role) => role.charAt(0).toUpperCase() + role.slice(1))
+        .join(" · ");
+  const canReport = m && (m.team_id || isSupport(m));
+  const queueTitle = m?.team_id
+    ? "My team’s issues"
+    : juryOnly
+      ? "Award review"
+      : "Issue Queue";
   return (
     <div className="dashboard-layout">
       <aside className="sidebar">
         <div className="sidebar-heading">
-          <span className="eyebrow">Your workspace</span>
+          <Brand />
           <button
             className="quiet navigation-toggle"
             aria-expanded={navigationOpen}
@@ -713,6 +627,46 @@ function Dashboard(
           >
             Menu
           </button>
+        </div>
+        <div className="sidebar-context">
+          <span className="context-label">Contest session</span>
+          <p className="event-name">{state?.event?.name ?? "Your contest"}</p>
+          {sessions.length > 1 ? (
+            <label>
+              <span className="sr-only">Contest session</span>
+              <select
+                value={session}
+                disabled={busy || !!pending.current}
+                onChange={(event) => {
+                  generation.current++;
+                  setState(undefined);
+                  setSession(event.target.value);
+                  setSelected("");
+                  setFilter("all");
+                  setReportOpen(false);
+                }}
+              >
+                {sessions.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : (
+            <p className="session-name">
+              {state?.session?.name ?? "Checking access…"}
+            </p>
+          )}
+          {state?.session && (
+            <p className="sidebar-intake">
+              <span
+                className={`live-dot ${state.session.intake_open ? "" : "inactive"}`}
+              />
+              Contestant intake {state.session.intake_open ? "open" : "closed"}
+            </p>
+          )}
+          <p className="mobile-development">Development deployment</p>
         </div>
         <nav
           id="workspace-navigation"
@@ -724,15 +678,12 @@ function Dashboard(
             aria-current={activeView === "issues" ? "page" : undefined}
             onClick={() => navigate("issues")}
           >
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <rect x="4" y="3" width="16" height="18" rx="2" />
-              <path d="M8 8h8M8 12h8M8 16h5" />
-            </svg>
+            <Icon name="issues" />
             {m?.team_id
               ? "My team’s issues"
               : juryOnly
-              ? "Award review"
-              : "Issues"}
+                ? "Award review"
+                : "Issues"}
           </button>
           {m?.is_admin && (
             <button
@@ -740,11 +691,8 @@ function Dashboard(
               aria-current={activeView === "admin" ? "page" : undefined}
               onClick={() => navigate("admin")}
             >
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M4 7h16M4 17h16" />
-                <circle cx="9" cy="7" r="3" />
-                <circle cx="15" cy="17" r="3" />
-              </svg>Administration
+              <Icon name="settings" />
+              Administration
             </button>
           )}
           <button
@@ -752,16 +700,30 @@ function Dashboard(
             aria-current={activeView === "account" ? "page" : undefined}
             onClick={() => navigate("account")}
           >
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <circle cx="12" cy="8" r="4" />
-              <path d="M4 21v-2a8 8 0 0116 0v2" />
-            </svg>My account
+            <Icon name="account" />
+            My account
           </button>
         </nav>
-        <div className="sidebar-context">
-          <span className="live-dot" />Shared cloud workspace<p>
-            {state?.session?.name ?? "Checking session access…"}
-          </p>
+        <div className="sidebar-bottom">
+          <div className="sidebar-person">
+            <span className="avatar" aria-hidden="true">
+              {identity
+                .split(/\s+/)
+                .slice(0, 2)
+                .map((part) => part.charAt(0))
+                .join("")
+                .toUpperCase()}
+            </span>
+            <div>
+              <strong>{identity}</strong>
+              <span>{roleNames}</span>
+            </div>
+          </div>
+          <button className="sign-out" onClick={signOut}>
+            <Icon name="logout" />
+            Sign out
+          </button>
+          <p className="development-label">Development deployment</p>
         </div>
       </aside>
       <div className="workspace-content">
@@ -788,147 +750,174 @@ function Dashboard(
             Retry last request
           </button>
         )}
-        {sessions.length > 1 && (
-          <label>
-            Contest session
-            <select
-              value={session}
-              disabled={busy || !!pending.current}
-              onChange={(e) => {
-                generation.current++;
-                setState(undefined);
-                setSession(e.target.value);
-                setSelected("");
-                setFilter("all");
+        {!state || !m || !state.session ? (
+          <section className="panel access-panel">
+            <h1>Session access</h1>
+            <p>
+              No session data is available. If your account was just created,
+              ask an organizer to assign your membership.
+            </p>
+            <button
+              onClick={() => {
+                void refresh();
               }}
             >
-              {sessions.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
-        {!state || !m || !state.session
-          ? (
-            <section className="panel access-panel">
-              <h1>Session access</h1>
-              <p>
-                No session data is available. If your account was just created,
-                ask an organizer to assign your membership.
+              Refresh access
+            </button>
+          </section>
+        ) : (
+          <>
+            {state.event?.archived && (
+              <p className="alert">
+                This event is archived. Records are read only.
               </p>
-              <button
-                onClick={() => {
-                  void refresh();
-                }}
-              >
-                Refresh access
-              </button>
-            </section>
-          )
-          : (
-            <>
-              <div className="session">
-                <span>{state.event?.name}</span>
-                <span aria-hidden="true">/</span>
-                <span>{state.session.name}</span>
-              </div>
-              <div className="page-heading">
+            )}
+            {activeView !== "issues" && (
+              <div className="page-heading settings-heading">
                 <div>
-                  <p className="eyebrow">
-                    {m.team_id
-                      ? "Team contestant"
-                      : [...m.roles, ...(m.is_admin ? ["admin"] : [])].join(
-                        " + ",
-                      )}
-                  </p>
                   <h1 id="workspace-heading" tabIndex={-1}>
-                    {activeView === "admin"
-                      ? "Administration"
-                      : activeView === "account"
-                      ? "My account"
-                      : m.team_id
-                      ? "A little help, right here."
-                      : juryOnly
-                      ? "Review. Decide. Record."
-                      : "Keep the contest moving."}
+                    {activeView === "admin" ? "Administration" : "My account"}
                   </h1>
                   <p>
                     {activeView === "admin"
                       ? "Manage session access, accounts and contestant intake."
-                      : activeView === "account"
-                      ? "Review your sign-in details and session permissions."
-                      : m.team_id
-                      ? "Report a problem, follow updates, and review your team’s time awards."
-                      : juryOnly
-                      ? "Review resolved reports and record time award decisions."
-                      : "Claim reports, coordinate handoffs, and keep teams informed."}
+                      : "Your sign-in details and session permissions."}
                   </p>
                 </div>
-                <span
-                  className={`intake-status ${
-                    state.session.intake_open ? "is-open" : ""
-                  }`}
-                >
-                  Contestant intake{" "}
-                  {state.session.intake_open ? "open" : "closed"}
-                </span>
               </div>
-              {state.event?.archived && (
-                <p className="alert">
-                  This event is archived. Records are read only.
-                </p>
+            )}
+            <fieldset
+              className="workspace"
+              disabled={busy || !!pending.current}
+            >
+              <legend className="sr-only">Contest workflow</legend>
+              {activeView === "admin" && m.is_admin && (
+                <AdminPanel state={state} refresh={refresh} />
               )}
-              <fieldset
-                className="workspace"
-                disabled={busy || !!pending.current}
-              >
-                <legend className="sr-only">Contest workflow</legend>
-                {activeView === "admin" && m.is_admin && (
-                  <AdminPanel state={state} refresh={refresh} />
-                )}
-                {activeView === "account" && (
-                  <section className="panel account-panel">
-                    <h2>Sign-in and access</h2>
-                    <dl className="account-details">
-                      <div>
-                        <dt>Username</dt>
-                        <dd>{username ?? user.email}</dd>
-                      </div>
-                      <div>
-                        <dt>Session</dt>
-                        <dd>{state.session.name}</dd>
-                      </div>
-                      <div>
-                        <dt>Permissions</dt>
-                        <dd>
-                          {m.team_id
-                            ? `Contestant · ${
+              {activeView === "account" && (
+                <section className="panel account-panel">
+                  <h2>Sign-in and access</h2>
+                  <dl className="account-details">
+                    <div>
+                      <dt>Username</dt>
+                      <dd>{username ?? user.email}</dd>
+                    </div>
+                    <div>
+                      <dt>Session</dt>
+                      <dd>{state.session.name}</dd>
+                    </div>
+                    <div>
+                      <dt>Permissions</dt>
+                      <dd>
+                        {m.team_id
+                          ? `Contestant · ${
                               state.teams.find((team) => team.id === m.team_id)
                                 ?.name ?? "Your team"
                             }`
-                            : [...m.roles, ...(m.is_admin ? ["admin"] : [])]
-                              .join(" + ")}
-                        </dd>
+                          : [...m.roles, ...(m.is_admin ? ["admin"] : [])].join(
+                              " + ",
+                            )}
+                      </dd>
+                    </div>
+                  </dl>
+                  <button onClick={changePassword}>Change password</button>
+                  <p className="field-help">
+                    Contact your organizer if your team assignment or
+                    permissions need to change.
+                  </p>
+                </section>
+              )}
+              {activeView === "issues" && (
+                <div className="work-grid">
+                  <section className="queue" aria-label="Issue queue">
+                    <div className="page-heading queue-heading">
+                      <div>
+                        <h1 id="workspace-heading" tabIndex={-1}>
+                          {queueTitle}
+                        </h1>
+                        <p>
+                          {m.team_id
+                            ? "Contest workspace"
+                            : juryOnly
+                              ? "Resolved issues and time awards"
+                              : "Support workspace"}
+                        </p>
                       </div>
-                    </dl>
-                    <button onClick={changePassword}>Update password</button>
-                    <p className="field-help">
-                      Contact your organizer if your team assignment or
-                      permissions need to change.
-                    </p>
-                  </section>
-                )}
-                {activeView === "issues" && (
-                  <>
-                    {(m.team_id || isSupport(m)) && (
-                      <section className="panel submission">
+                      <div className="connection-status">
+                        <span
+                          className={`live-dot ${connected ? "" : "inactive"}`}
+                        />
+                        <span>{connected ? "Live" : "Connecting"}</span>
+                        <time>
+                          {new Date(now).toLocaleTimeString([], {
+                            hour12: false,
+                          })}
+                        </time>
+                      </div>
+                    </div>
+                    <div className="queue-toolbar">
+                      {!juryOnly && (
+                        <label className="filter-label">
+                          Status
+                          <select
+                            value={filter}
+                            onChange={(event) => setFilter(event.target.value)}
+                          >
+                            <option value="all">All statuses</option>
+                            {Object.entries(statusNames).map(
+                              ([value, label]) => (
+                                <option key={value} value={value}>
+                                  {label}
+                                </option>
+                              ),
+                            )}
+                          </select>
+                        </label>
+                      )}
+                      {canReport && (
+                        <button
+                          id="report-toggle"
+                          className="report-button"
+                          aria-expanded={reportOpen}
+                          aria-controls="issue-report"
+                          disabled={
+                            state.event?.archived ||
+                            (!!m.team_id && !state.session.intake_open)
+                          }
+                          onClick={() => {
+                            setReportOpen(!reportOpen);
+                            if (!reportOpen)
+                              window.requestAnimationFrame(() =>
+                                document
+                                  .getElementById("report-heading")
+                                  ?.focus(),
+                              );
+                          }}
+                        >
+                          <Icon name="plus" />
+                          {m.team_id ? "Report an issue" : "Report for team"}
+                        </button>
+                      )}
+                    </div>
+                    {reportOpen && canReport && (
+                      <section id="issue-report" className="panel submission">
                         <div className="submission-intro">
                           <p className="eyebrow">
                             {m.team_id ? "Ask for help" : "Report for a team"}
                           </p>
-                          <h2>Report an issue</h2>
+                          <h2 id="report-heading" tabIndex={-1}>
+                            Report an issue
+                          </h2>
+                          <button
+                            type="button"
+                            className="quiet"
+                            onClick={() => {
+                              setReportOpen(false);
+                              document.getElementById("report-toggle")?.focus();
+                            }}
+                          >
+                            Cancel report
+                          </button>
                           <p>
                             {state.session.intake_open
                               ? "Contestant intake is open."
@@ -936,10 +925,15 @@ function Dashboard(
                           </p>
                           {m.team_id && (
                             <p className="location">
-                              {state.teams.find((t) => t.id === m.team_id)
-                                ?.name} · {state.teams.find((t) =>
-                                  t.id === m.team_id
-                                )?.location}
+                              {
+                                state.teams.find((t) => t.id === m.team_id)
+                                  ?.name
+                              }{" "}
+                              ·{" "}
+                              {
+                                state.teams.find((t) => t.id === m.team_id)
+                                  ?.location
+                              }
                             </p>
                           )}
                         </div>
@@ -957,13 +951,19 @@ function Dashboard(
                             }).then((ok) => {
                               if (ok) {
                                 form.reset();
+                                setReportOpen(false);
+                                document
+                                  .getElementById("report-toggle")
+                                  ?.focus();
                               }
                             });
                           }}
                         >
                           <fieldset
-                            disabled={state.event?.archived ||
-                              (!!m.team_id && !state.session.intake_open)}
+                            disabled={
+                              state.event?.archived ||
+                              (!!m.team_id && !state.session.intake_open)
+                            }
                           >
                             <legend className="sr-only">
                               Issue submission
@@ -1001,125 +1001,108 @@ function Dashboard(
                         </form>
                       </section>
                     )}
-                    <div className="metrics">
-                      <div>
-                        <strong>{visible.length}</strong>
-                        <span>Issues in view</span>
-                      </div>
-                      <div>
-                        <strong>
-                          {visible.filter((i) => i.status !== "resolved")
-                            .length}
-                        </strong>
-                        <span>Awaiting resolution</span>
-                      </div>
-                      <div>
-                        <strong>
-                          {state.awards.filter((a) => !a.applied_at).length}
-                        </strong>
-                        <span>Pending application</span>
-                      </div>
+                    <p className="queue-caption">
+                      {filtered.length}{" "}
+                      {filtered.length === 1 ? "issue" : "issues"} · newest
+                      first
+                    </p>
+                    <div className="issue-table-head" aria-hidden="true">
+                      <span>Issue / status</span>
+                      <span>Category / description</span>
+                      <span>Team / location</span>
+                      <span>Owner / time</span>
                     </div>
-                    <div className="work-grid">
-                      <section className="panel queue">
-                        <div className="panel-heading">
-                          <h2>
-                            {m.team_id
-                              ? "Your team’s issues"
-                              : juryOnly
-                              ? "Resolved issues"
-                              : "Support queue"}
-                          </h2>
-                          <span
-                            className="count"
-                            aria-label={`${filtered.length} issues`}
+                    <div className="issue-list">
+                      {filtered.map((item) => {
+                        const team = state.teams.find(
+                          (team) => team.id === item.team_id,
+                        );
+                        return (
+                          <button
+                            key={item.id}
+                            className={`issue-card ${issue?.id === item.id ? "selected" : ""}`}
+                            aria-pressed={issue?.id === item.id}
+                            onClick={() => {
+                              setSelected(item.id);
+                              if (
+                                window.matchMedia("(max-width: 1200px)").matches
+                              ) {
+                                window.requestAnimationFrame(() =>
+                                  document
+                                    .getElementById("issue-heading")
+                                    ?.focus(),
+                                );
+                              }
+                            }}
                           >
-                            {filtered.length}
-                          </span>
-                        </div>
-                        {!juryOnly && (
-                          <div className="filter">
-                            <label>
-                              Status filter
-                              <select
-                                value={filter}
-                                onChange={(e) => setFilter(e.target.value)}
-                              >
-                                <option value="all">All statuses</option>
-                                {Object.entries(statusNames).map((
-                                  [value, label],
-                                ) => (
-                                  <option key={value} value={value}>
-                                    {label}
-                                  </option>
-                                ))}
-                              </select>
-                            </label>
-                          </div>
-                        )}
-                        <div className="issue-list">
-                          {filtered.map((i) => (
-                            <button
-                              key={i.id}
-                              className={`issue-card ${
-                                issue?.id === i.id ? "selected" : ""
-                              }`}
-                              aria-pressed={issue?.id === i.id}
-                              onClick={() => setSelected(i.id)}
-                            >
-                              <span className="card-top">
-                                <span>
-                                  ISS-{i.number} · {i.category}
-                                </span>
-                                <span className={`status ${i.status}`}>
-                                  {statusNames[i.status]}
-                                </span>
+                            <span className="issue-cell">
+                              <strong>ISS-{item.number}</strong>
+                              <span className={`status ${item.status}`}>
+                                {statusNames[item.status]}
                               </span>
-                              <strong>{i.description}</strong>
-                              <span>
-                                {state.teams.find((t) => t.id === i.team_id)
-                                  ?.name} ·{" "}
-                                {state.teams.find((t) => t.id === i.team_id)
-                                  ?.location}
+                            </span>
+                            <span className="description-cell">
+                              <span className="category-name">
+                                {item.category}
                               </span>
-                              <span className="card-bottom">
-                                <span>{i.owner_name ?? "Unassigned"}</span>
-                                <span>
-                                  {duration(
-                                    unresolvedTime(i, state.resolutions, now),
-                                  )}
-                                </span>
+                              <span>{item.description}</span>
+                            </span>
+                            <span className="team-cell">
+                              <strong>{team?.name}</strong>
+                              <span className="muted">{team?.location}</span>
+                            </span>
+                            <span className="owner-cell">
+                              <strong>{item.owner_name ?? "Unassigned"}</strong>
+                              <span className="muted">Unresolved</span>
+                              <span className="queue-duration">
+                                {clockDuration(
+                                  unresolvedTime(item, state.resolutions, now),
+                                )}
                               </span>
-                            </button>
-                          ))}
-                        </div>
-                        {!filtered.length && (
-                          <div className="empty">
-                            <h3>No issues in this view.</h3>
-                            <p>
-                              {visible.length
-                                ? "Choose another status to see more reports."
-                                : "Reports will appear here when they are submitted."}
-                            </p>
-                          </div>
-                        )}
-                      </section>
-                      {issue && (
-                        <IssueDetail
-                          key={issue.id}
-                          issue={issue}
-                          state={state}
-                          member={m}
-                          now={now}
-                          act={act}
-                        />
-                      )}
+                            </span>
+                          </button>
+                        );
+                      })}
                     </div>
-                  </>
-                )}
-              </fieldset>
-            </>
-          )}
+                    {!filtered.length && (
+                      <div className="empty">
+                        <Icon name="issues" />
+                        <h3>No issues in this view.</h3>
+                        <p>
+                          {visible.length
+                            ? "Choose another status to see more reports."
+                            : "Reports will appear here when they are submitted."}
+                        </p>
+                      </div>
+                    )}
+                    <p className="queue-footer">
+                      {filtered.length} of {visible.length} issues
+                    </p>
+                  </section>
+                  {issue ? (
+                    <IssueDetail
+                      key={issue.id}
+                      issue={issue}
+                      state={state}
+                      member={m}
+                      now={now}
+                      act={act}
+                    />
+                  ) : (
+                    <section className="detail detail-empty">
+                      <Icon name="issues" />
+                      <h2>A clear view of every issue.</h2>
+                      <p>
+                        Select a report to follow its progress, conversation and
+                        outcome.
+                      </p>
+                    </section>
+                  )}
+                </div>
+              )}
+            </fieldset>
+          </>
+        )}
       </div>
     </div>
   );
@@ -1140,32 +1123,87 @@ function IssueDetail({
 }) {
   const [resolution, setResolution] = useState("");
   const [minutes, setMinutes] = useState("");
+  const [message, setMessage] = useState("");
   const support = isSupport(m);
   const staff = isStaff(m);
   const owner = support && issue.owner === m.user_id;
   const active = issue.status !== "resolved";
   const award = state.awards.find((a) => a.issue_id === issue.id);
   const records = state.resolutions.filter((r) => r.issue_id === issue.id);
+  const team = state.teams.find((item) => item.id === issue.team_id);
+  const history = state.history.filter(
+    (item) =>
+      item.issue_id === issue.id &&
+      (!m.team_id || item.visibility === "public"),
+  );
   const base = { issue_id: issue.id, revision: issue.revision };
+  const activity = (
+    <section className="activity">
+      <div className="activity-heading">
+        <h3>Activity</h3>
+        <span>{history.length} events</span>
+      </div>
+      <ol>
+        {history.map((item) => (
+          <li
+            key={item.id}
+            className={item.visibility === "internal" ? "internal-event" : ""}
+          >
+            {item.visibility === "internal" && <Icon name="lock" />}
+            <div className="activity-meta">
+              <strong>{item.actor_name}</strong>
+              <time dateTime={item.at} title={formatDate(item.at)}>
+                {new Date(item.at).toLocaleTimeString([], {
+                  hour12: false,
+                })}
+              </time>
+            </div>
+            {item.visibility === "internal" && (
+              <span className="internal-label">Internal note · staff only</span>
+            )}
+            <p>{item.text}</p>
+          </li>
+        ))}
+      </ol>
+    </section>
+  );
   return (
     <section
       className="panel detail"
       aria-label={`Issue details ISS-${issue.number}`}
     >
+      <button
+        className="quiet back-to-queue"
+        onClick={() => document.getElementById("workspace-heading")?.focus()}
+      >
+        Back to queue
+      </button>
       <fieldset className="detail-actions" disabled={state.event?.archived}>
         <legend className="sr-only">Issue actions and history</legend>
-        <div className="panel-heading">
-          <p className="eyebrow">
-            ISS-{issue.number} / {issue.category}
-          </p>
+        <p className="detail-breadcrumb">Issues / ISS-{issue.number}</p>
+        <div className="detail-heading">
+          <strong>ISS-{issue.number}</strong>
+          <span className="category-tag">{issue.category}</span>
           <span className={`status ${issue.status}`}>
             {statusNames[issue.status]}
           </span>
         </div>
-        <h2>{issue.description}</h2>
-        <p className="location">
-          {state.teams.find((t) => t.id === issue.team_id)?.name} ·{" "}
-          {state.teams.find((t) => t.id === issue.team_id)?.location}
+        <h2 id="issue-heading" tabIndex={-1}>
+          {issue.description}
+        </h2>
+        <p className="detail-location">
+          <span>
+            <Icon name="team" />
+            {team?.name}
+          </span>
+          <span aria-hidden="true">·</span>
+          <span>
+            <Icon name="pin" />
+            {team?.location}
+          </span>
+        </p>
+        <p className="sr-only">
+          Submitted {formatDate(issue.created_at)} by {issue.reporter_name}
         </p>
         <dl className="facts">
           <div>
@@ -1173,32 +1211,50 @@ function IssueDetail({
             <dd>{issue.owner_name ?? "Unassigned"}</dd>
           </div>
           <div>
-            <dt>Unresolved time · {active ? "running" : "stopped"}</dt>
-            <dd>{duration(unresolvedTime(issue, state.resolutions, now))}</dd>
+            <dt>Unresolved time</dt>
+            <dd className="elapsed-time">
+              {clockDuration(unresolvedTime(issue, state.resolutions, now))}
+            </dd>
+            <span className="timer-state">
+              <span className={`live-dot ${active ? "" : "inactive"}`} />
+              {active ? "Running" : "Stopped"}
+            </span>
           </div>
           <div>
             <dt>First assignment</dt>
             <dd>
               {issue.first_assigned_at
-                ? duration(
+                ? clockDuration(
                     Date.parse(issue.first_assigned_at) -
                       Date.parse(issue.created_at),
                   )
-                : "Not yet assigned"}
+                : "Unassigned"}
             </dd>
-          </div>
-          <div>
-            <dt>Submitted</dt>
-            <dd>
-              {formatDate(issue.created_at)} · {issue.reporter_name}
-            </dd>
+            {issue.first_assigned_at && (
+              <span className="fact-caption">after submission</span>
+            )}
           </div>
         </dl>
         {issue.status === "escalated" && (
-          <p className="handoff">
-            Specialist handoff requested. {issue.owner_name} remains responsible
-            until acceptance.
-          </p>
+          <div className="handoff">
+            <Icon name="handoff" />
+            <p>
+              Specialist handoff requested.
+              <br />
+              <span>
+                {issue.owner_name} remains responsible until acceptance.
+              </span>
+            </p>
+            {m.roles.includes("specialist") && issue.owner !== m.user_id && (
+              <button
+                onClick={() => {
+                  void act({ type: "accept", ...base });
+                }}
+              >
+                Accept handoff
+              </button>
+            )}
+          </div>
         )}
         <div className="actions">
           {support && issue.status === "open" && (
@@ -1219,21 +1275,11 @@ function IssueDetail({
               Escalate to specialist
             </button>
           )}
-          {m.roles.includes("specialist") &&
-            issue.status === "escalated" &&
-            issue.owner !== m.user_id && (
-              <button
-                onClick={() => {
-                  void act({ type: "accept", ...base });
-                }}
-              >
-                Accept handoff
-              </button>
-            )}
         </div>
+        {active && activity}
         {active && (m.team_id || support || m.roles.includes("jury")) && (
           <form
-            className="section-form"
+            className="section-form reply-form"
             onSubmit={(event) => {
               const form = event.currentTarget;
               const data = formData(event);
@@ -1246,14 +1292,16 @@ function IssueDetail({
                     ? "internal"
                     : "public",
               }).then((ok) => {
-                if (ok) form.reset();
+                if (ok) {
+                  form.reset();
+                  setMessage("");
+                }
               });
             }}
           >
-            <h3>Conversation</h3>
             {staff && (
               <label>
-                Message visibility
+                Audience
                 <select name="visibility">
                   <option value="public">
                     Public reply · visible to the team
@@ -1264,9 +1312,18 @@ function IssueDetail({
             )}
             <label>
               {m.team_id ? "Reply to staff" : "Message"}
-              <textarea name="message" required maxLength={2000} />
+              <textarea
+                name="message"
+                value={message}
+                onChange={(event) => setMessage(event.target.value)}
+                required
+                maxLength={2000}
+                placeholder={`Write an update for ${team?.name ?? "the team"}…`}
+              />
             </label>
-            <button type="submit">Send message</button>
+            <button type="submit" disabled={!message.trim()}>
+              Send reply
+            </button>
           </form>
         )}
         {active && owner && (
@@ -1455,41 +1512,26 @@ function IssueDetail({
             </p>
           </section>
         )}
-        <section className="activity">
-          <h3>{m.team_id ? "Team activity" : "Activity history"}</h3>
-          <ol>
-            {state.history
-              .filter((h) => h.issue_id === issue.id)
-              .slice()
-              .reverse()
-              .map((h) => (
-                <li key={h.id}>
-                  <div>
-                    <strong>{h.actor_name}</strong>
-                    <time dateTime={h.at}>{formatDate(h.at)}</time>
-                  </div>
-                  <p>{h.text}</p>
-                  {h.visibility === "internal" && (
-                    <span className="internal-label">Staff only</span>
-                  )}
-                </li>
-              ))}
-          </ol>
-        </section>
+        {!active && activity}
       </fieldset>
     </section>
   );
 }
 
-function AdminPanel(
-  { state, refresh }: { state: Snapshot; refresh: () => Promise<void> },
-) {
+function AdminPanel({
+  state,
+  refresh,
+}: {
+  state: Snapshot;
+  refresh: () => Promise<void>;
+}) {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
-  const [credentials, setCredentials] = useState<
-    { username: string; password: string }
-  >();
+  const [credentials, setCredentials] = useState<{
+    username: string;
+    password: string;
+  }>();
   const guard = useRef(false);
   const session = state.session;
   if (!session) return null;
@@ -1526,7 +1568,8 @@ function AdminPanel(
       },
     });
     if (
-      result.error && "context" in result.error &&
+      result.error &&
+      "context" in result.error &&
       result.error.context instanceof Response
     ) {
       const body: unknown = await result.error.context.json();
@@ -1535,14 +1578,16 @@ function AdminPanel(
       }
     }
     if (!result.error && result.data?.temporary_password) {
-      const parsed = z.object({ temporary_password: z.string() }).parse(
-        result.data,
-      );
-      const target = state.members.find((m) =>
-        m.person.id === text(data, "user")
+      const parsed = z
+        .object({ temporary_password: z.string() })
+        .parse(result.data);
+      const target = state.members.find(
+        (m) => m.person.id === text(data, "user"),
       );
       setCredentials({
-        username: text(data, "username") || target?.person.username ||
+        username:
+          text(data, "username") ||
+          target?.person.username ||
           "Existing email login",
         password: parsed.temporary_password,
       });
@@ -1579,14 +1624,12 @@ function AdminPanel(
             new one. The user must change it on login.
           </p>
           <label>
-            Account username<input readOnly value={credentials.username} />
+            Account username
+            <input readOnly value={credentials.username} />
           </label>
           <label>
-            Temporary password<input
-              readOnly
-              value={credentials.password}
-              autoComplete="off"
-            />
+            Temporary password
+            <input readOnly value={credentials.password} autoComplete="off" />
           </label>
           <button className="quiet" onClick={() => setCredentials(undefined)}>
             Dismiss credentials
@@ -1619,7 +1662,7 @@ function AdminPanel(
                 requireClient().rpc("set_intake", {
                   p_session: session.id,
                   p_open: !session.intake_open,
-                })
+                }),
               );
             }}
           >
@@ -1641,7 +1684,8 @@ function AdminPanel(
               }}
             >
               <label>
-                Display name<input
+                Display name
+                <input
                   name="name"
                   required
                   maxLength={200}
@@ -1649,7 +1693,8 @@ function AdminPanel(
                 />
               </label>
               <label>
-                Username<input
+                Username
+                <input
                   name="username"
                   required
                   minLength={3}
@@ -1694,13 +1739,11 @@ function AdminPanel(
                     </span>
                     <span className="account-role">
                       {m.team_id
-                        ? state.teams.find((t) =>
-                          t.id === m.team_id
-                        )?.name ??
-                          "Team contestant"
+                        ? (state.teams.find((t) => t.id === m.team_id)?.name ??
+                          "Team contestant")
                         : [...m.roles, ...(m.is_admin ? ["admin"] : [])].join(
-                          " + ",
-                        )}
+                            " + ",
+                          )}
                     </span>
                   </summary>
                   {!person.username && (
@@ -1712,7 +1755,8 @@ function AdminPanel(
                       }}
                     >
                       <label>
-                        Assign username<input
+                        Assign username
+                        <input
                           name="username"
                           required
                           minLength={3}
@@ -1740,7 +1784,7 @@ function AdminPanel(
                           p_roles: data.getAll("role"),
                           p_admin: data.has("admin"),
                           p_remove: false,
-                        })
+                        }),
                       );
                     }}
                   >
@@ -1756,12 +1800,11 @@ function AdminPanel(
                             !window.confirm(
                               `Reset ${person.name}'s password? Verify their identity first. Existing sessions will lose access.`,
                             )
-                          ) return;
+                          )
+                            return;
                           const data = new FormData();
                           data.set("user", person.id);
-                          void run(() =>
-                            account("reset_password", data)
-                          );
+                          void run(() => account("reset_password", data));
                         }}
                       >
                         Reset password
@@ -1780,7 +1823,7 @@ function AdminPanel(
                               p_session: session.id,
                               p_user: person.id,
                               p_remove: true,
-                            })
+                            }),
                           );
                         }
                       }}
@@ -1809,12 +1852,13 @@ function AdminPanel(
                   p_roles: data.getAll("role"),
                   p_admin: data.has("admin"),
                   p_remove: false,
-                })
+                }),
               );
             }}
           >
             <label>
-              Auth user UUID<input name="user" required />
+              Auth user UUID
+              <input name="user" required />
             </label>
             <MembershipFields state={state} />
             <button type="submit">Assign membership</button>
@@ -1827,13 +1871,18 @@ function AdminPanel(
               <li key={a.id}>
                 {a.action.replaceAll("_", " ")} ·{" "}
                 {state.members.find((m) => m.person.id === a.actor)?.person
-                  .name ?? a.actor} · {formatDate(a.at)}
+                  .name ?? a.actor}{" "}
+                · {formatDate(a.at)}
               </li>
             ))}
           </ul>
         </details>
       </fieldset>
-      {error && <p role="alert" className="alert">{error}</p>}
+      {error && (
+        <p role="alert" className="alert">
+          {error}
+        </p>
+      )}
       <p role="status">{notice}</p>
     </section>
   );
@@ -1851,7 +1900,11 @@ function MembershipFields({
     <>
       <label>
         Contestant team
-        <select name="team" value={team} onChange={(event) => setTeam(event.target.value)}>
+        <select
+          name="team"
+          value={team}
+          onChange={(event) => setTeam(event.target.value)}
+        >
           <option value="">Staff account</option>
           {state.teams.map((t) => (
             <option key={t.id} value={t.id}>
@@ -1861,25 +1914,34 @@ function MembershipFields({
         </select>
       </label>
       <p className="field-help">
-        {team ? "This account can submit and view issues for the selected team." : "Choose the permissions this staff member needs."}
+        {team
+          ? "This account can submit and view issues for the selected team."
+          : "Choose the permissions this staff member needs."}
       </p>
-      {!team && <fieldset className="staff-options"><legend>Staff permissions</legend>
-      {(["volunteer", "specialist", "jury"] as const).map((role) => (
-        <label key={role} className="checkbox">
-          <input
-            name="role"
-            type="checkbox"
-            value={role}
-            defaultChecked={member?.roles.includes(role)}
-          />
-          {role}
-        </label>
-      ))}
-      <label className="checkbox">
-        <input name="admin" type="checkbox" defaultChecked={member?.is_admin} />
-        Admin
-      </label>
-      </fieldset>}
+      {!team && (
+        <fieldset className="staff-options">
+          <legend>Staff permissions</legend>
+          {(["volunteer", "specialist", "jury"] as const).map((role) => (
+            <label key={role} className="checkbox">
+              <input
+                name="role"
+                type="checkbox"
+                value={role}
+                defaultChecked={member?.roles.includes(role)}
+              />
+              {role}
+            </label>
+          ))}
+          <label className="checkbox">
+            <input
+              name="admin"
+              type="checkbox"
+              defaultChecked={member?.is_admin}
+            />
+            Admin
+          </label>
+        </fieldset>
+      )}
     </>
   );
 }

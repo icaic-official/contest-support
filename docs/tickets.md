@@ -278,7 +278,7 @@ Resilience and event-capacity work remain deferred until feature feedback warran
 
 Branch: `feature/t0008-team-search`, from updated `main` at `1ed603a`.
 
-Status: implemented on this branch for review.
+Status: implemented on this branch for review in [PR #22](https://github.com/notbowen/minsky/pull/22).
 The user asked to build it while [PR #19](https://github.com/notbowen/minsky/pull/19), [PR #20](https://github.com/notbowen/minsky/pull/20), and [PR #21](https://github.com/notbowen/minsky/pull/21) remain open.
 This branch does not change those pull requests.
 The user reviews and merges.

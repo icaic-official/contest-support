@@ -1,6 +1,6 @@
 # Current state
 
-T0008 fuzzy team search is implemented on `feature/t0008-team-search` and is awaiting review.
+T0008 fuzzy team search is implemented on `feature/t0008-team-search` and is awaiting review in [PR #22](https://github.com/notbowen/minsky/pull/22).
 It is not deployed.
 The branch starts from `main` at `1ed603a` and does not include the open T0005, T0006, or T0007 pull requests.
 See [T0008 fuzzy team search](#t0008-fuzzy-team-search-2026-10-11).

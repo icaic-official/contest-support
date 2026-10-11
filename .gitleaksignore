@@ -1,3 +1,8 @@
 # Public user UUID in the original onboarding wording; this is not a credential.
 # Ignore only this historical finding. All other files/values remain scanned.
 b34c3a34e4869f74587d1d51753aeb1c8e2bc27d:docs/cloud-onboarding.md:generic-api-key:83
+
+# Mock browser Auth token assembled from a fixed JWT header, fixture payload,
+# and literal .fixture signature; no provider credential or signing key exists.
+# All-history scans include this commit from the announcements branch.
+0e38d2b93eb9b066a4f4b45d9990c1f4d663199b:tests/support/announcementServer.ts:generic-api-key:148

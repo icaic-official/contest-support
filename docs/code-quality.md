@@ -50,6 +50,15 @@ Investigate false positives.
 Document any narrow exception.
 Do not suppress whole secret classes or all historical findings.
 
+`.gitleaksignore` records exact finding fingerprints for reviewed false positives.
+The browser fixture in commit `0e38d2b93eb9b066a4f4b45d9990c1f4d663199b`,
+`tests/support/announcementServer.ts:148`, constructs a mock Auth token with a
+fixed JWT header, a generated fixture payload, and a literal `.fixture` signature.
+Its mocked requests target `example.supabase.co`; it contains no provider credential
+or signing key. Scans of all fetched history include this announcements-branch commit,
+even on dependency PRs. The exception covers only that commit, file, rule, and line.
+Other findings, including new findings in the same file, still fail the scan.
+
 ## Human review
 
 [The PR template](../.github/pull_request_template.md) covers scope, readability, authorization, privacy, workflow behavior, migration compatibility, verification, and documentation.

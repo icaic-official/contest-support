@@ -1,5 +1,10 @@
 # Current state
 
+T0008 fuzzy team search is implemented on `feature/t0008-team-search` and is awaiting review.
+It is not deployed.
+The branch starts from `main` at `1ed603a` and does not include the open T0005, T0006, or T0007 pull requests.
+See [T0008 fuzzy team search](#t0008-fuzzy-team-search-2026-10-11).
+
 T0001 and T0002 merged in PR #1.
 T0003's connected cloud app merged in [PR #2](https://github.com/notbowen/minsky/pull/2) on 2026-10-02.
 T0004's UI makeover merged in [PR #9](https://github.com/notbowen/minsky/pull/9) on 2026-10-11 (SGT).
@@ -15,6 +20,23 @@ The 2026-10-03 ticket decision defers these items to T0005, which previously for
 
 Older implementation and deployment reports below describe their recorded revisions.
 Use the current status above to determine which PR remains open.
+
+## T0008 fuzzy team search (2026-10-11)
+
+Staff search team names and locations from the session snapshot.
+The issue queue and **Report for team** share one selection.
+Suggestions show the team name, location, and unresolved-issue count.
+An explicit choice stores the team's database id.
+The status filter still applies. Jury-only members stay on resolved issues.
+Contestants do not see the search.
+There is no migration and no new roster field.
+
+Focused Vitest coverage is in `src/connected/teamSearch.test.ts`.
+`npm test` passed: 4 files, 28 tests.
+`npm run lint`, `npm run typecheck` through `tsc --noEmit`, `npm run build`, and `git diff --check` passed.
+Signed-in browser use of the queue and report form was not run in this change.
+The manual steps are in [manual verification](manual-verification.md#10-team-search).
+Cloud integration checks and deployment were not run.
 
 ## Ticket allocation (2026-10-03)
 

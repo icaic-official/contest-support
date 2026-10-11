@@ -14,6 +14,14 @@
 
 ## Current scope and completed demo baseline
 
+**T0008 team search (2026-10-11):** implement fuzzy team search on `feature/t0008-team-search`.
+The branch starts from updated `main`.
+The user asked to build it while [PR #19](https://github.com/notbowen/minsky/pull/19) remains open.
+Do not add this work to the issue-image branch.
+[PR #20](https://github.com/notbowen/minsky/pull/20) and [PR #21](https://github.com/notbowen/minsky/pull/21) also stay independent.
+The user reviews and merges. Deployment is a separate explicit step.
+See [T0008](docs/tickets.md#t0008--fuzzy-team-search).
+
 **T0004 merge status (2026-10-11):** the user merged [PR #9](https://github.com/notbowen/minsky/pull/9) into `main` and deleted its branch.
 [PR #13](https://github.com/notbowen/minsky/pull/13) remains the documentation follow-up and now targets `main`.
 See [the merge record](docs/current-state.md#t0004-merge-and-documentation-follow-up-2026-10-11) for the revision and timestamp.

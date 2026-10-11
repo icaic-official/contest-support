@@ -181,6 +181,38 @@ Review the centered sign-in page at desktop, 800px, 390px, and 320px widths.
 The suite creates isolated test fixtures and deletes only those fixtures.
 It does not reset the shared project.
 
+## 10. Team search
+
+Use a volunteer or specialist account, then repeat the queue search as jury and as a session admin.
+Use a contestant account to confirm that team search stays hidden.
+
+1. Open the issue queue.
+2. Type part of a team name.
+3. Check that suggestions update and that none is selected by itself.
+4. Check that each suggestion shows the team name, location, and unresolved-issue count.
+5. Choose a suggestion with the keyboard and again with a pointer.
+6. Check that the queue shows that team's issues.
+7. Change the status filter to **Resolved**.
+8. Check that the same team's resolved issues remain available.
+9. Clear the team.
+10. Check that the previous queue returns.
+11. Select the team again.
+12. Open **Report for team**.
+13. Check that the same team is already selected.
+14. Edit the team text.
+15. Check that **Submit issue** stays unavailable until you choose a suggestion.
+16. Submit the issue.
+17. Check that the new issue belongs to that team.
+18. Type a table number, a reordered name, and a small spelling mistake.
+19. Check that the intended team appears before weaker matches.
+20. Type a query that matches nothing.
+21. Check that the message says no team matches and that no team is selected for you.
+22. Repeat the queue search at 390px and 320px widths.
+23. Sign in as a contestant.
+24. Check that **Report an issue** does not ask for a team.
+
+Expected result: the submission stores the chosen team's database id. Contestants remain limited to their own team. Jury members can filter the resolved queue and do not gain the other status filters.
+
 Record observed results in [current-state.md](current-state.md).
 Suggested manual checks are not completed checks.
 Browser automation does not establish results for real devices, assistive technology, or capacity.

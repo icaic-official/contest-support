@@ -9,7 +9,9 @@ T0004 has two related pull requests.
 The `feature/t0004-ste100-docs` branch is a documentation follow-up within T0004.
 The user merged PR #9 into `main` on 2026-10-11 (SGT) and deleted its UI branch.
 PR #13 now targets `main` and remains a draft.
-T0005 remains follow-up scope notes with no implementation started.
+T0005 remains follow-up scope notes with no implementation started on this branch.
+T0008 implements fuzzy team search on `feature/t0008-team-search`.
+That branch does not change the open issue-image, announcement, or installation pull requests.
 
 ## T0001 — Local workflow demo and project guidance
 
@@ -271,3 +273,51 @@ Choose file types, size limits, and deletion rules when you define scope.
 These are T0005 candidate scope notes.
 They are not an agreed implementation specification.
 Resilience and event-capacity work remain deferred until feature feedback warrants them.
+
+## T0008 — Fuzzy team search
+
+Branch: `feature/t0008-team-search`, from updated `main` at `1ed603a`.
+
+Status: implemented on this branch for review.
+The user asked to build it while [PR #19](https://github.com/notbowen/minsky/pull/19), [PR #20](https://github.com/notbowen/minsky/pull/20), and [PR #21](https://github.com/notbowen/minsky/pull/21) remain open.
+This branch does not change those pull requests.
+The user reviews and merges.
+Deployment is a separate explicit step.
+
+### Behavior
+
+- Use one team search in the issue queue and in **Report for team**.
+- Update suggestions as staff type.
+- Search team names and locations already present on the session snapshot.
+- Do not add team codes, aliases, institutions, or a migration.
+- Show at most eight suggestions.
+- Show each team's name, location, and unresolved-issue count.
+- Unresolved means open, in progress, or awaiting a specialist, including a reopened issue.
+- That count ignores the status filter.
+- Rank an exact team name, then an exact location, then whole words or whole numbers, then partial words, then a small spelling difference.
+- Match partial words of at least three characters, either word order, and accents.
+- Match a spelling difference only for a word of at least four characters.
+- Match table numbers as whole numbers, including leading zeros. `12` matches `Desk 12` and `A12`. `1` does not match `12`.
+- If more than eight teams match, say to keep typing. Those extra teams are not selectable.
+- If nothing matches, say that no team matches and do not choose a substitute.
+- An empty query shows no suggestions.
+- Never select the first suggestion automatically.
+- Store the chosen team's database id.
+- Filter the queue to that team. Keep the status filter, including resolved history.
+- Jury-only members keep the resolved queue and do not gain a status filter.
+- Volunteers, specialists, jury members, and session admins can filter the queue.
+- Only volunteers and specialists get the control on **Report for team**.
+- A team chosen in the queue starts selected in that form, and either control updates the same choice.
+- Editing the chosen text clears its id until staff choose again.
+- **Submit issue** stays unavailable until a team id is selected.
+- Clearing the team, or switching session, restores the unfiltered queue.
+- Contestants do not see team search. Their form stays bound to their own team.
+
+### Acceptance criteria
+
+- [x] Queue search and **Report for team** use the same matching and the same selected team id.
+- [x] Suggestions update while typing and require an explicit choice.
+- [x] Ranking, accents, word order, spelling, whole numbers, weak queries, and the eight-suggestion cap are covered by focused tests.
+- [x] The status filter and the jury-only resolved queue still apply with a selected team.
+- [x] No schema or cloud fixture is added.
+- [ ] The user reviews the pull request. Deployment waits for an explicit request.

@@ -90,6 +90,7 @@ export function classifyAttachmentError(message: string): {
     "The issue total must be",
     "No access to this session.",
     "Image unavailable.",
+    "Change your temporary password or sign in again.",
   ].some((prefix) => message.startsWith(prefix));
   const restart = message.startsWith("Upload the image before finishing.") ||
     message.startsWith("Upload failed.");

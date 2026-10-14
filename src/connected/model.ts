@@ -35,6 +35,12 @@ const attachmentSchema = z.object({
   original_name: z.string(),
 });
 export type Attachment = z.infer<typeof attachmentSchema>;
+const pendingRemovalSchema = z.object({
+  id: uuid,
+  issue_id: uuid,
+  original_name: z.string(),
+});
+export type PendingRemoval = z.infer<typeof pendingRemovalSchema>;
 const issueSchema = z.object({
   id: uuid,
   number: z.number(),
@@ -93,6 +99,7 @@ export const snapshotSchema = z.object({
     }),
   ),
   attachments: z.array(attachmentSchema).default([]),
+  pending_removals: z.array(pendingRemovalSchema).default([]),
   awards: z.array(
     z.object({
       id: uuid,

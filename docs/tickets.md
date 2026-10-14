@@ -240,6 +240,8 @@ That development deployment preceded merge under the user's exception for T0004.
 Branch: `feature/t0005-issue-attachments`, created from updated `main` after T0004 merged.
 
 Status: implemented and verified locally on 2026-10-11.
+The 2026-10-14 review fixes add current-access checks, fixed visibility during retry, exact file paths, saved removal retries, and completion-time count checks.
+See the [review-fix record](current-state.md#t0005-review-fixes-2026-10-14) for local verification and cloud-test limits.
 Review pull request: [PR #19](https://github.com/notbowen/minsky/pull/19).
 On 2026-10-11, the user requested a Cloudflare preview before merge and approved using the existing development backend.
 The migration and account/attachment functions are deployed to `Minsky` development.

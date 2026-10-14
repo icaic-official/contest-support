@@ -693,23 +693,35 @@ async function beginImage(
   );
   return result.rows[0].image;
 }
-async function finishImage(
-  uploader: string,
+async function stageImage(
   started: StartedImage,
   size = 1024,
-  header = "ffd8ffe0",
 ) {
   await db.exec("reset role");
   await db.query(
     "insert into storage.objects(bucket_id,name,metadata) values('issue-attachments',$1,$2::jsonb),('issue-attachments',$3,$4::jsonb)",
     [started.original_path, JSON.stringify({ size }), started.thumbnail_path, JSON.stringify({ size: 400 })],
   );
-  await db.query("select public.finish_attachment($1,$2,$3,$4,400,'ffd8ffe1')", [
+}
+async function completeImage(
+  uploader: string,
+  started: StartedImage,
+  size = 1024,
+  header = "ffd8ffe0",
+  authSession = id(Number(uploader.slice(-12)) + 300),
+) {
+  await db.exec("reset role; set role service_role");
+  await db.query("select public.finish_attachment($1,$2,$3,$4,$5,400,'ffd8ffe1')", [
     uploader,
+    authSession,
     started.id,
     size,
     header,
   ]);
+}
+async function finishImage(uploader: string, started: StartedImage, size = 1024, header = "ffd8ffe0") {
+  await stageImage(started, size);
+  await completeImage(uploader, started, size, header);
 }
 
 describe("issue image authorization and limits", () => {
@@ -743,8 +755,8 @@ describe("issue image authorization and limits", () => {
     ).rejects.toThrow("permission denied");
     await expect(
       db.query(
-        "select public.finish_attachment($1,$2,1,'ffd8ff',1,'ffd8ff')",
-        [volunteer, id(9)],
+        "select public.finish_attachment($1,$2,$3,1,'ffd8ff',1,'ffd8ff')",
+        [volunteer, id(303), id(9)],
       ),
     ).rejects.toThrow("permission denied");
   });
@@ -917,5 +929,169 @@ describe("issue image authorization and limits", () => {
     expect(
       (await db.query<{ status: string }>("select status from public.attachments where id=$1", [started.id])).rows[0].status,
     ).toBe("pending");
+  });
+
+  it("stops pending file access and completion when membership is removed", async () => {
+    const issueId = await submit();
+    const started = await beginImage(volunteer, issueId);
+    await stageImage(started);
+    await actor(admin);
+    await db.query("select public.manage_member($1,$2,p_remove=>true)", [session, volunteer]);
+    await actor(volunteer);
+    expect((await db.query("select name from storage.objects where name=$1", [started.original_path])).rows).toHaveLength(0);
+    await expect(db.query("insert into storage.objects(bucket_id,name) values('issue-attachments',$1)", [started.thumbnail_path]))
+      .rejects.toThrow(/row-level security|permission denied/);
+    expect((await db.query("update storage.objects set metadata='{}' where name=$1 returning id", [started.original_path])).rows).toHaveLength(0);
+    await expect(completeImage(volunteer, started)).rejects.toThrow("No access to this session");
+    await db.exec("reset role");
+    expect((await db.query<{ status: string }>("select status from public.attachments where id=$1", [started.id])).rows[0].status).toBe("pending");
+    expect((await db.query("select * from public.history where text='Image added.'")).rows).toHaveLength(0);
+  });
+
+  it("stops pending access and completion when a member loses staff permissions", async () => {
+    const issueId = await submit();
+    const started = await beginImage(volunteer, issueId);
+    await stageImage(started);
+    await actor(admin);
+    await db.query("select public.manage_member($1,$2,p_team=>$3,p_roles=>'{}'::text[])", [session, volunteer, aurora]);
+    await actor(volunteer);
+    expect((await db.query("select name from storage.objects where name=$1", [started.original_path])).rows).toHaveLength(0);
+    await expect(completeImage(volunteer, started)).rejects.toThrow("permission to add images");
+  });
+
+  it("checks password resets and the verified login session at completion", async () => {
+    const issueId = await submit();
+    const started = await beginImage(volunteer, issueId);
+    await stageImage(started);
+    await expect(completeImage(volunteer, started, 1024, "ffd8ffe0", id(304))).rejects.toThrow("sign in again");
+    await actor(admin);
+    await db.query("select public.begin_password_reset($1,$2)", [session, volunteer]);
+    await actor(volunteer);
+    expect((await db.query("select * from storage.objects where name=$1", [started.original_path])).rows).toHaveLength(0);
+    await expect(completeImage(volunteer, started)).rejects.toThrow("temporary password");
+    await db.exec("reset role");
+    await db.query("update app_private.account_credentials set must_change=false,operation=null where user_id=$1", [volunteer]);
+    await expect(completeImage(volunteer, started)).rejects.toThrow("sign in again");
+    await db.exec("reset role");
+    const newLogin = id(9999);
+    await db.query("insert into auth.sessions(id,user_id) values($1,$2)", [newLogin, volunteer]);
+    await actor(volunteer, newLogin);
+    const status = (await db.query<{ status: { auth_session_id: string } }>("select public.account_status() as status")).rows[0].status;
+    expect(status.auth_session_id).toBe(newLogin);
+    await completeImage(volunteer, started, 1024, "ffd8ffe0", newLogin);
+    // A lost success response can be retried without another activity entry.
+    await completeImage(volunteer, started, 1024, "ffd8ffe0", newLogin);
+    await db.exec("reset role");
+    expect((await db.query("select * from public.history where text='Image added.'")).rows).toHaveLength(1);
+    expect((await db.query("select to_regprocedure('public.finish_attachment(uuid,uuid,bigint,text,bigint,text)') as old")).rows[0]).toEqual({ old: null });
+  });
+
+  it("rejects pending writes and completion if the event is archived during an upload", async () => {
+    const issueId = await submit();
+    const started = await beginImage(volunteer, issueId);
+    await stageImage(started);
+    await db.query("update public.events set archived=true");
+    await actor(volunteer);
+    await expect(db.query("insert into storage.objects(bucket_id,name) values('issue-attachments',$1)", [started.original_path]))
+      .rejects.toThrow(/row-level security|permission denied/);
+    await expect(completeImage(volunteer, started)).rejects.toThrow("archived");
+  });
+
+  it("rejects pending access and completion if the login session has been deleted", async () => {
+    const issueId = await submit();
+    const started = await beginImage(volunteer, issueId);
+    await stageImage(started);
+    await db.query("delete from auth.sessions where id=$1", [id(303)]);
+    await actor(volunteer);
+    expect((await db.query("select name from storage.objects where name=$1", [started.original_path])).rows).toHaveLength(0);
+    await expect(db.query("insert into storage.objects(bucket_id,name) values('issue-attachments',$1)", [started.thumbnail_path]))
+      .rejects.toThrow(/row-level security|permission denied/);
+    await expect(completeImage(volunteer, started)).rejects.toThrow("sign in again");
+  });
+
+  it("accepts only the exact original and thumbnail paths for reads and writes", async () => {
+    const issueId = await submit();
+    const started = await beginImage(volunteer, issueId);
+    const extra = started.original_path.replace("/original", "/extra/untracked/original");
+    await actor(volunteer);
+    for (const path of [extra, started.original_path.replace(session, secondSession), `${started.original_path}/thumbnail`]) {
+      await expect(db.query("insert into storage.objects(bucket_id,name) values('issue-attachments',$1)", [path]))
+        .rejects.toThrow(/row-level security|permission denied/);
+    }
+    await finishImage(volunteer, started);
+    await db.exec("reset role");
+    await db.query("insert into storage.objects(bucket_id,name) values('issue-attachments',$1)", [extra]);
+    await actor(volunteer);
+    expect((await db.query("select * from storage.objects where name=$1", [extra])).rows).toHaveLength(0);
+    expect((await db.query("select * from storage.objects where name=$1", [started.original_path])).rows).toHaveLength(1);
+  });
+
+  it("uses the current image-count limit when pending uploads finish", async () => {
+    const issueId = await submit();
+    const first = await beginImage(volunteer, issueId);
+    const second = await beginImage(specialist, issueId);
+    await stageImage(first);
+    await stageImage(second);
+    await actor(admin);
+    await db.query("select public.set_image_limits($1,10,1,120)", [session]);
+    await completeImage(volunteer, first);
+    await expect(completeImage(specialist, second)).rejects.toThrow("already has 1 images");
+    await db.exec("reset role");
+    expect((await db.query("select id from public.attachments where status='ready'")).rows).toHaveLength(1);
+    await actor(admin);
+    await db.query("select public.set_image_limits($1,10,2,120)", [session]);
+    await completeImage(specialist, second);
+    await actor(admin);
+    await db.query("select public.set_image_limits($1,10,1,120)", [session]);
+    expect((await db.query("select id from public.attachments where status='ready'")).rows).toHaveLength(2);
+  });
+
+  it("keeps expired cleanup paths available for a failed Storage request", async () => {
+    const issueId = await submit();
+    const expired = await beginImage(volunteer, issueId);
+    await stageImage(expired);
+    await db.query("update public.attachments set created_at=clock_timestamp()-interval '2 hours' where id=$1", [expired.id]);
+    const started = await beginImage(volunteer, issueId);
+    const requestPaths = async () => (await db.query<{ paths: string[] }>("select public.attachment_cleanup_paths($1,$2) as paths", [session, issueId])).rows[0].paths;
+    expect((await requestPaths()).sort()).toEqual([expired.original_path, expired.thumbnail_path].sort());
+    expect((await requestPaths()).sort()).toEqual([expired.original_path, expired.thumbnail_path].sort());
+    await actor(contestant);
+    await expect(requestPaths()).rejects.toThrow("No access");
+    await db.exec("reset role");
+    await db.query("delete from storage.objects where name=any($1)", [[expired.original_path, expired.thumbnail_path]]);
+    await actor(volunteer);
+    expect(await requestPaths()).toEqual([]);
+    expect(started.id).not.toBe(expired.id);
+  });
+
+  it("keeps failed file removal in the uploader's snapshot until Storage confirms cleanup", async () => {
+    const issueId = await submit();
+    const started = await beginImage(volunteer, issueId);
+    await finishImage(volunteer, started);
+    await actor(volunteer);
+    const paths = (await db.query<{ paths: string[] }>("select public.delete_attachment($1,$2) as paths", [session, started.id])).rows[0].paths;
+    const pendingRemovals = async () => (await db.query<{ state: { pending_removals: Array<{ id: string }> } }>("select public.session_snapshot($1) as state", [session])).rows[0].state.pending_removals;
+    expect(await pendingRemovals()).toEqual([{ id: started.id, issue_id: issueId, original_name: "board.jpg" }]);
+    // A fresh authenticated read must still expose the retry after a failed
+    // Storage call. The deleted image itself is never downloadable.
+    await actor(volunteer);
+    expect(await pendingRemovals()).toHaveLength(1);
+    expect((await db.query("select * from storage.objects where name=$1", [started.original_path])).rows).toHaveLength(0);
+    await expect(db.query("select public.finish_attachment_removal($1,$2)", [volunteer, started.id])).rejects.toThrow("permission denied");
+    await actor(specialist);
+    expect(await pendingRemovals()).toEqual([]);
+    await actor(contestant);
+    expect(await pendingRemovals()).toEqual([]);
+    await actor(volunteer);
+    expect((await db.query<{ paths: string[] }>("select public.delete_attachment($1,$2) as paths", [session, started.id])).rows[0].paths).toEqual(paths);
+    await db.exec("reset role");
+    await db.query("delete from storage.objects where name=any($1)", [paths]);
+    await db.exec("set role service_role");
+    await expect(db.query("select public.finish_attachment_removal($1,$2)", [specialist, started.id])).rejects.toThrow("Image unavailable");
+    await db.query("select public.finish_attachment_removal($1,$2)", [volunteer, started.id]);
+    await db.query("select public.finish_attachment_removal($1,$2)", [volunteer, started.id]);
+    await actor(volunteer);
+    expect(await pendingRemovals()).toEqual([]);
+    expect((await db.query("select * from public.history where text='Image removed.'")).rows).toHaveLength(1);
   });
 });

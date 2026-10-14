@@ -15,6 +15,7 @@ export type StartedImage = {
 
 export type ImageTransport = {
   begin(input: {
+    requestId: string;
     sessionId: string;
     issueId: string;
     visibility: "public" | "internal";
@@ -46,15 +47,20 @@ async function invoke(body: Record<string, unknown>): Promise<FunctionPayload> {
   const result = await requireClient().functions.invoke("attachments", { body });
   if (result.error) {
     let message = "Upload failed. Check your connection and try again.";
+    let failure: FunctionPayload | undefined;
     const context = "context" in result.error ? result.error.context : undefined;
     if (context instanceof Response) {
       const payload = await context.json().catch(() => undefined) as
         | FunctionPayload
         | undefined;
       if (payload?.error) message = payload.error;
+      failure = payload;
     }
     const classified = classifyAttachmentError(message);
-    throw new ImageRequestError(message, classified);
+    throw new ImageRequestError(message, {
+      validation: failure?.validation ?? classified.validation,
+      restart: failure?.restart ?? classified.restart,
+    });
   }
   return (result.data ?? {}) as FunctionPayload;
 }
@@ -64,7 +70,7 @@ export const liveImageTransport: ImageTransport = {
     const data = await invoke({
       action: "begin",
       session_id: input.sessionId,
-      request_id: crypto.randomUUID(),
+      request_id: input.requestId,
       issue_id: input.issueId,
       visibility: input.visibility,
       name: input.name,

@@ -140,6 +140,22 @@ Then deploy the frontend.
 `npm run cloud:functions` deploys both functions to development.
 Merging does not deploy this change.
 
+The review fixes use `202610140001_attachment_fixes.sql`.
+Keep the first attachment migration unchanged.
+Apply the new migration, then deploy the updated `attachments` function, then deploy the frontend.
+The migration removes the old upload-completion function.
+The new function requires the verified login-session ID from `account_status`.
+The older deployed attachment function cannot complete uploads after this migration.
+Complete the function update in the same release before testing uploads.
+
+Failed file deletion keeps a cleanup record for the uploader.
+The record remains available after refresh.
+**Retry removal** repeats file deletion and confirms completion in the database.
+Other members cannot see the uploader's cleanup record.
+This does not add a deletion job.
+New removal requests stop after archival.
+File cleanup for a removal already approved before archival can still finish.
+
 ### Manual Worker previews
 
 From the reviewed ticket branch, run `npm run deploy:preview -- --preview-alias t0005`.
@@ -271,12 +287,15 @@ Run these checks:
 npm run typecheck
 npm run lint
 npm run check:functions
+npm run test:functions
 npm test
 npm run build
 ```
 
 Embedded PostgreSQL executes the actual migrations and policies with stubs for Auth context, sessions, and password hashes.
 It does not establish managed Auth behavior.
+`npm run test:functions` checks the attachment HTTP handler with fake Auth, database, and Storage clients.
+It tests revoked access, invalid login sessions, failed file deletion, and retries.
 `npm run test:e2e` checks the public landing page, login page, and image-preview harness without cloud credentials.
 The old demo and its tests are removed.
 `npm run test:cloud` tests managed Auth, database, and Realtime behavior against a local frontend.
@@ -310,6 +329,7 @@ Configure required reviewers where the repository's GitHub plan supports them.
 Verify plan availability before you treat protection as enabled.
 Then manually dispatch **Checks** for the reviewed branch.
 Record the cloud job result.
+The cloud job applies migrations and deploys both `admin` and `attachments` before running the tests.
 No automatic deployment or preview writes to shared data are configured.
 
 See [GitHub environment documentation](https://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/manage-environments).

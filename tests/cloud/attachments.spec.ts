@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { account, fixture } from "./fixture";
+import { account, fixture, service } from "./fixture";
 
 async function login(page: Page, name: string) {
   const details = fixture().accounts[name];
@@ -76,6 +76,10 @@ test("hosted staff images upload, download, respect visibility, and can be remov
   await expect(images.locator(".image-thumb")).toHaveCount(1);
   expect((await volunteer.storage.from("issue-attachments").download(privatePath)).error)
     .not.toBeNull();
+  // The service role can read stored files regardless of application RLS.
+  // This establishes physical deletion, not merely loss of download access.
+  expect((await service().storage.from("issue-attachments").download(privatePath)).error)
+    .not.toBeNull();
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.getByRole("button", { name: "Sign out", exact: true }).click();
   await login(page, "contestant");
@@ -85,4 +89,51 @@ test("hosted staff images upload, download, respect visibility, and can be remov
   await images.locator(".image-thumb").click();
   await expect(dialog.getByRole("img")).toBeVisible();
   await expect(dialog.getByRole("button", { name: "Remove image" })).toHaveCount(0);
+});
+
+test("removing membership blocks unfinished Storage access and image completion", async () => {
+  const state = fixture();
+  const volunteer = await account("volunteer");
+  const admin = await account("admin");
+  const userId = state.accounts.volunteer.id;
+  const submitted = await volunteer.rpc("workflow", {
+    p_session: state.sessions[0],
+    p_request: crypto.randomUUID(),
+    p_action: { type: "submit", team_id: state.teams[0], category: "Other", description: `Upload access check ${crypto.randomUUID()}` },
+  });
+  expect(submitted.error).toBeNull();
+  const image = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64");
+  const begun = await volunteer.functions.invoke("attachments", { body: {
+    action: "begin", session_id: state.sessions[0], request_id: crypto.randomUUID(),
+    issue_id: submitted.data, visibility: "internal", name: "access.png", bytes: image.length,
+  } });
+  expect(begun.error).toBeNull();
+  const paths = begun.data as { id: string; original_path: string; thumbnail_path: string };
+  for (const path of [paths.original_path, paths.thumbnail_path]) {
+    expect((await volunteer.storage.from("issue-attachments").upload(path, image, { contentType: "image/png" })).error).toBeNull();
+  }
+  const membership = await service().from("memberships").select("team_id,roles,is_admin")
+    .eq("session_id", state.sessions[0]).eq("user_id", userId).single();
+  expect(membership.error).toBeNull();
+  if (!membership.data) throw new Error("Missing fixture membership.");
+  const removed = await admin.rpc("manage_member", { p_session: state.sessions[0], p_user: userId, p_remove: true });
+  expect(removed.error).toBeNull();
+  try {
+    expect((await volunteer.storage.from("issue-attachments").download(paths.original_path)).error).not.toBeNull();
+    expect((await volunteer.storage.from("issue-attachments").upload(paths.thumbnail_path, image, { contentType: "image/png", upsert: true })).error).not.toBeNull();
+    const finished = await volunteer.functions.invoke("attachments", { body: {
+      action: "finish", session_id: state.sessions[0], attachment_id: paths.id,
+    } });
+    expect(finished.error).not.toBeNull();
+    const row = await service().from("attachments").select("status").eq("id", paths.id).single();
+    expect(row.error).toBeNull();
+    expect(row.data?.status).toBe("pending");
+  } finally {
+    // Restore only this run's fixture membership for the remaining cloud cases.
+    const restored = await admin.rpc("manage_member", {
+      p_session: state.sessions[0], p_user: userId,
+      p_team: membership.data.team_id, p_roles: membership.data.roles, p_admin: membership.data.is_admin,
+    });
+    expect(restored.error).toBeNull();
+  }
 });

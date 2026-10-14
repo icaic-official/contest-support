@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from "react";
-import { attachmentPath, imageKind, imageRejection } from "./imageFile";
+import { attachmentPath, ImageRequestError, imageKind, imageRejection } from "./imageFile";
 import {
   type ImageTransport,
   type StartedImage,
@@ -7,7 +7,7 @@ import {
   liveImageTransport,
   thumbnailBlob,
 } from "./imageUpload";
-import type { Attachment } from "./model";
+import type { Attachment, PendingRemoval } from "./model";
 import { Icon } from "./ui";
 
 export function IssueImages({
@@ -19,6 +19,7 @@ export function IssueImages({
   userId,
   limits,
   attachments,
+  pendingRemovals,
   onChanged,
   transport = liveImageTransport,
 }: {
@@ -30,16 +31,24 @@ export function IssueImages({
   userId: string;
   limits: { maxImageBytes: number; maxImages: number; maxTotalBytes: number };
   attachments: readonly Attachment[];
+  pendingRemovals: readonly PendingRemoval[];
   onChanged: () => Promise<void>;
   transport?: ImageTransport;
 }) {
   const inputId = useId();
   const dialogRef = useRef<HTMLDialogElement>(null);
   const openerRef = useRef<HTMLButtonElement | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
   const [visibility, setVisibility] = useState<"public" | "internal">("internal");
   const [progress, setProgress] = useState<number>();
   const [message, setMessage] = useState("");
-  const [retry, setRetry] = useState<{ file: File; pending?: StartedImage }>();
+  const [retry, setRetry] = useState<{
+    file: File;
+    requestId: string;
+    pending?: StartedImage;
+    cleanupOnly?: boolean;
+  }>();
+  const [failedRemoval, setFailedRemoval] = useState<PendingRemoval>();
   const [busy, setBusy] = useState(false);
   const [active, setActive] = useState<Attachment>();
   const [fullUrl, setFullUrl] = useState("");
@@ -47,6 +56,9 @@ export function IssueImages({
   const shown = attachments.filter((item) => staff || item.visibility === "public");
   const shownKey = shown.map((item) => item.id).join(" ");
   const totalBytes = shown.reduce((sum, item) => sum + item.byte_size, 0);
+  const removals = failedRemoval && !pendingRemovals.some((item) => item.id === failedRemoval.id)
+    ? [...pendingRemovals, failedRemoval]
+    : pendingRemovals;
 
   useEffect(() => {
     const urls: string[] = [];
@@ -76,32 +88,38 @@ export function IssueImages({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [issueId, sessionId, shownKey, transport]);
 
-  async function send(file: File, pending?: StartedImage) {
-    const header = new Uint8Array(await file.slice(0, 16).arrayBuffer());
-    const rejection = imageRejection(file.size, imageKind(header), limits, {
-      count: shown.length,
-      totalBytes,
-    });
-    if (rejection) {
-      setMessage(rejection);
-      setRetry(undefined);
-      return;
-    }
-    let preview: Blob;
-    try {
-      preview = await thumbnailBlob(file);
-    } catch (cause) {
-      setMessage(cause instanceof Error ? cause.message : "Choose a JPEG, PNG, or WebP image.");
-      setRetry(undefined);
-      return;
-    }
+  async function send(file: File, pending?: StartedImage, requestId: string = crypto.randomUUID()) {
     setBusy(true);
     setMessage("");
     setProgress(0);
+    setRetry({ file, requestId, pending });
     let started = pending;
     try {
+      // A previous finish response may have been lost. Check completion before
+      // writing again: Storage correctly rejects changes to a ready image.
+      if (started) {
+        try {
+          await transport.finish(sessionId, started.id);
+          setRetry(undefined);
+          setMessage("Image added.");
+          await onChanged();
+          return;
+        } catch (cause) {
+          if (!(isImageRequestError(cause) && cause.message.startsWith("Upload the image before finishing."))) {
+            throw cause;
+          }
+        }
+      }
+      const header = new Uint8Array(await file.slice(0, 16).arrayBuffer());
+      const rejection = imageRejection(file.size, imageKind(header), limits, {
+        count: shown.length,
+        totalBytes,
+      });
+      if (rejection) throw new ImageRequestError(rejection, { validation: true });
+      const preview = await thumbnailBlob(file);
       if (!started) {
         started = await transport.begin({
+          requestId,
           sessionId,
           issueId,
           visibility,
@@ -109,6 +127,7 @@ export function IssueImages({
           bytes: file.size,
         });
       }
+      setRetry({ file, requestId, pending: started });
       const total = file.size + preview.size;
       let loaded = 0;
       await transport.upload(
@@ -138,18 +157,48 @@ export function IssueImages({
         : "Upload failed. Check your connection and try again.";
       if (isImageRequestError(cause) && cause.validation) {
         if (started) {
-          await transport.abandon(sessionId, started.id).catch(() => undefined);
+          try {
+            await transport.abandon(sessionId, started.id);
+          } catch {
+            setRetry({ file, requestId, pending: started, cleanupOnly: true });
+            setMessage(`${text} The unfinished files could not be deleted. Use Cancel upload to try again.`);
+            return;
+          }
         }
         setRetry(undefined);
-      } else if (isImageRequestError(cause) && cause.restart) {
-        setRetry({ file });
       } else {
-        setRetry({ file, pending: started });
+        setRetry({ file, requestId, pending: started });
       }
       setMessage(text);
     } finally {
       setBusy(false);
       setProgress(undefined);
+    }
+  }
+
+  async function cancelUpload() {
+    if (!retry) return;
+    setBusy(true);
+    setMessage("");
+    try {
+      // Reuse the request ID if the begin response was lost, so cancellation
+      // finds the original upload instead of leaving an unknown pending row.
+      const pending = retry.pending ?? await transport.begin({
+        requestId: retry.requestId,
+        sessionId,
+        issueId,
+        visibility,
+        name: retry.file.name,
+        bytes: retry.file.size,
+      });
+      await transport.abandon(sessionId, pending.id);
+      setRetry(undefined);
+      if (fileRef.current) fileRef.current.value = "";
+      setMessage("Upload canceled. You can choose another image or visibility.");
+    } catch (cause) {
+      setMessage(cause instanceof Error ? cause.message : "The unfinished files could not be deleted. Try again.");
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -172,16 +221,20 @@ export function IssueImages({
     dialogRef.current?.close();
   }
 
-  async function remove(item: Attachment) {
+  async function remove(item: PendingRemoval) {
     setBusy(true);
     setMessage("");
     try {
       await transport.remove(sessionId, item.id);
+      setFailedRemoval(undefined);
       dismissPreview();
       setMessage("Image removed.");
       await onChanged();
     } catch (cause) {
+      setFailedRemoval(item);
+      dismissPreview();
       setMessage(cause instanceof Error ? cause.message : "This image could not be removed.");
+      await onChanged();
     } finally {
       setBusy(false);
     }
@@ -239,7 +292,7 @@ export function IssueImages({
               setMessage("Choose a JPEG, PNG, or WebP image.");
               return;
             }
-            void send(file, retry?.pending);
+            void send(file, retry?.pending, retry?.requestId);
           }}
         >
           <label>
@@ -247,6 +300,7 @@ export function IssueImages({
             <select
               name="visibility"
               value={visibility}
+              disabled={busy || Boolean(retry)}
               onChange={(event) => {
                 setVisibility(event.target.value === "public" ? "public" : "internal");
               }}
@@ -259,10 +313,11 @@ export function IssueImages({
             Image file
             <input
               id={inputId}
+              ref={fileRef}
               name="image"
               type="file"
               accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
-              disabled={busy}
+              disabled={busy || Boolean(retry)}
               onChange={() => setRetry(undefined)}
             />
           </label>
@@ -277,8 +332,9 @@ export function IssueImages({
               />
             </>
           )}
-          <button type="submit" disabled={busy || archived}>Add image</button>
-          {retry && (
+          {retry && <p className="field-help">The visibility choice stays fixed for this upload. Cancel the upload to change it.</p>}
+          <button type="submit" disabled={busy || archived || Boolean(retry)}>Add image</button>
+          {retry && !retry.cleanupOnly && (
             <button
               type="submit"
               className="quiet"
@@ -287,8 +343,25 @@ export function IssueImages({
               Try the upload again
             </button>
           )}
+          {retry && (
+            <button type="button" className="quiet" disabled={busy} onClick={() => {
+              void cancelUpload();
+            }}>
+              Cancel upload
+            </button>
+          )}
         </form>
       )}
+      {removals.map((item) => (
+        <div className="image-removal-retry" key={item.id}>
+          <p>The files for {item.original_name} still need to be deleted.</p>
+          <button type="button" className="quiet" disabled={busy} onClick={() => {
+            void remove(item);
+          }}>
+            Retry removal
+          </button>
+        </div>
+      ))}
       {archived && <p className="field-help">This event is archived. Images cannot be added.</p>}
       {message && (
         <p className="alert" role="status">{message}</p>

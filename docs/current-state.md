@@ -20,6 +20,82 @@ They are not part of T0005:
 Older reports below describe their recorded revisions.
 Use this status when an older report still says that T0005 is unimplemented or that PR #13 is open.
 
+## T0005 review fixes (2026-10-14)
+
+The user requested fixes for the six findings in PR #19.
+The work continues on `feature/t0005-issue-attachments` from reviewed revision `c68bb10`.
+The first attachment migration stays unchanged.
+The new migration is `supabase/migrations/202610140001_attachment_fixes.sql`.
+
+- Upload completion checks the verified login session, password status, current staff membership, and active event.
+- Removed staff cannot read or change unfinished files. Archived events reject unfinished-file writes.
+- Storage accepts only the exact original and thumbnail paths for reads and writes.
+- The visibility and file controls stay locked during upload and retry. **Cancel upload** removes the unfinished files before allowing another choice.
+- Retries reuse the original request ID. A lost completion response can be checked again without attaching the same image twice.
+- Storage deletion errors reach the UI. **Retry removal** remains available to the uploader after refresh until both files are deleted and the database confirms cleanup.
+- Other members cannot see the uploader's cleanup records. Previously attached images remain when limits are lowered.
+- Completion checks the current image-count limit while the issue is locked.
+- The protected cloud workflow deploys both `admin` and `attachments` before running tests.
+- Secret-free CI also runs the new attachment-handler failure tests.
+
+Deployment requires the new migration, then the updated attachment function, then the frontend.
+The old service-only completion function is removed by the migration.
+Do not leave the older attachment function running after applying it.
+The existing development preview remains on its recorded revision until a separate deployment.
+This run does not deploy or merge the PR.
+
+Local checks passed on Node.js 24.19.0:
+
+| Check | Result |
+| --- | --- |
+| Type checking, ESLint, and production build | Passed |
+| Focused and embedded PostgreSQL tests | 38 passed |
+| Deno checks for both functions | Passed |
+| Attachment HTTP-handler tests with fake clients | 12 passed |
+| Public sign-in and image browser tests | 9 passed |
+| Production preview-harness exclusion and Git whitespace | Passed |
+
+The database tests run the repository migrations.
+They cover membership removal, loss of staff access, password resets, old and incorrect login sessions, archival during transfer, extra file paths, lower count limits, repeated completion, saved cleanup records, and retryable expired-file cleanup.
+Password setup, password reset, provider recovery, and upload completion share an account lock.
+This also protects older accounts whose password-status row does not exist yet.
+Handler tests check error responses and service calls without cloud credentials.
+Browser tests check locked visibility, cancel and restart, failed removal after the image row disappears, saved removal after refresh, and a lost completion response.
+The cloud suite adds a real-account access-removal case and checks actual file deletion with the service role.
+These new hosted checks remain unverified in this run.
+
+Rendered verification used Playwright because the Browser plugin was not available.
+The local flow was `image-preview.html` → failed team-visible upload → locked choice → cancel → a new choice.
+The second flow was image preview → failed removal → **Retry removal** → completed cleanup.
+Saved cleanup was also checked after refresh.
+The page identity, meaningful content, absence of a framework error overlay, and interactions passed.
+Screenshots were inspected at 1280×900 and 320×740.
+The layout had no horizontal overflow at those widths or at 390×844.
+The preview harness requested a missing favicon and received HTTP 404; no application errors were found.
+Screenshots and the detailed browser log remain outside Git under `/tmp/minsky-pr19-fixes-*`.
+
+Protected cloud verification remains pending.
+GitHub environment, secret-name, and variable lookups for `cloud-test` returned HTTP 404.
+The session has repository write access but no administration access.
+Those responses do not establish whether the environment exists.
+The Supabase CLI also could not create its default directory at `/home/agent/.supabase` on the read-only filesystem.
+No credentials, shared database records, or provider settings were changed.
+Configure or expose the protected CI environment, then dispatch **Checks** on the updated PR branch.
+Keep its target on the separate `Minsky CI` project, `ghtztmovdkhuketcbjmq`.
+
+Required run report:
+
+| Field | Record |
+| --- | --- |
+| Summary of changes | Implemented all six review fixes and added tests. Updated the release and recovery instructions. |
+| Files changed | `.github/workflows/checks.yml`, `package.json`, `README.md`, `docs/current-state.md`, `docs/cloud-onboarding.md`, `docs/manual-verification.md`, `docs/tickets.md`; connected app, image component, transport, model, fixture, and database tests under `src/connected/`; attachment function entrypoint, handler, and tests; the corrective migration; `tests/images.spec.ts` and `tests/cloud/attachments.spec.ts`. |
+| Commands run | Git inspection, fetch and worktree setup; `npm ci` with a writable cache; TypeScript-guide fetch; `npm run typecheck`, `lint`, `build`, `check:functions`, `test:functions`, `npm test`, and `test:e2e`; `deno fmt`; local Vite and Playwright checks; GitHub access/environment lookups; a captured Supabase project-list attempt; `git diff --check`. Initial tests caught a request-ID type mismatch, an invalid staff-membership test setup, and selectors that also counted a form option. All were corrected before the passing runs. A repeated dev-server start found the existing port in use; verification used that server. |
+| Build/test results | Local results are in the table above. Protected and hosted cloud tests were not run. Follow the live PR checks for the pushed revision's GitHub results. |
+| Manual verification steps | Inspected desktop and phone screenshots and checked the browser's identity, console, layout, and rendered state through Playwright. Real devices, screen readers, other browser engines, 200% zoom, and hosted admin-limit acceptance remain unverified. |
+| Risks | Cloud verification is pending. The new migration and attachment function must be released together in the documented order. The current hosted preview does not contain these fixes. |
+| Follow-up tickets | Continue T0005/PR #19 through review and the explicit release step. Existing operational and manual-acceptance work stays deferred. No new ticket was created. |
+| Docs that need updating | Record protected cloud and deployment results when they occur. Existing preview records remain historical. |
+
 ## T0005 development preview (2026-10-11)
 
 The user requested a Cloudflare preview before merge and explicitly selected the existing `Minsky` development backend.

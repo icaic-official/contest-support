@@ -24,6 +24,7 @@
     "cloud:hosting-login": "wrangler login",
     "cloud:bootstrap": "node scripts/bootstrap.mjs",
     "check:functions": "deno check --node-modules-dir=none supabase/functions/admin/index.ts supabase/functions/attachments/index.ts",
+    "test:functions": "deno test --node-modules-dir=none supabase/functions/attachments/handler.test.ts",
     "test:cloud": "node scripts/cloud-test.mjs",
     "test:hosted": "node scripts/cloud-smoke.mjs",
     "cloud:recover-admin": "node scripts/recover-admin.mjs"

@@ -1295,6 +1295,7 @@ function IssueDetail({
             maxTotalBytes: state.session.max_image_bytes_per_issue,
           }}
           attachments={state.attachments.filter((item) => item.issue_id === issue.id)}
+          pendingRemovals={state.pending_removals.filter((item) => item.issue_id === issue.id)}
           onChanged={refresh}
         />
       )}

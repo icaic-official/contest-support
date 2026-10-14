@@ -210,6 +210,17 @@ Use an active event unless a step says the event is archived.
 23. Check that upload, removal, and limit changes are refused.
 24. Repeat the image controls at 390×844 and 320×740.
 25. Check that the page does not scroll horizontally.
+26. Start a team-visible upload and cause a transfer failure in an isolated test.
+27. Check that **Who can see this image** remains locked to **Visible to the team**.
+28. Select **Cancel upload**. Check that the unfinished files are deleted before the choice becomes available.
+29. Select **Staff only** and start a new upload. Check that contestants cannot see it.
+30. Cause file deletion to fail. Check that the app reports the failure and shows **Retry removal**.
+31. Refresh the page. Check that the uploader still has **Retry removal**, even though the image is no longer listed.
+32. Retry removal. Check that both stored files are gone and the retry control disappears.
+33. Start an upload, then remove that member's session access before completion. Check that unfinished-file access and completion fail.
+34. Repeat with a password reset and with event archival.
+35. Start two uploads, then lower the count limit to one. Check that only one can become attached.
+36. Try a file path with an extra folder. Check that Storage refuses it.
 
 Record observed results in [current-state.md](current-state.md).
 Suggested manual checks are not completed checks.

@@ -36,6 +36,9 @@ The uploader chooses **Staff only** or **Visible to the team**.
 Session admins set the size and count limits under **Administration**.
 Contestants can view team-visible images on their own team's issues.
 They cannot upload images.
+The visibility choice is locked during upload and retry.
+Use **Cancel upload** before starting again with a different choice.
+If file deletion fails, **Retry removal** stays available to the uploader after refresh.
 
 ## Connected development — no Docker required
 
@@ -90,6 +93,7 @@ See [cloud onboarding](docs/cloud-onboarding.md) for function configuration, use
 | `npm run typecheck` | Check TypeScript in the frontend, scripts, and browser tests. |
 | `npm run lint` | Run ESLint for TypeScript and Node scripts. |
 | `npm run check:functions` | Run the Deno type check for the account and attachment functions. |
+| `npm run test:functions` | Test upload authorization and file-removal failures with fake clients. No cloud credentials are required. |
 | `npm test` | Test connected timing, account identifiers, image rules, and migrations and RLS with embedded PostgreSQL. Cloud credentials and Docker are not required. |
 | `npm run test:e2e` | Run public landing, login, and image-preview browser checks without cloud credentials. |
 | `npm run test:hosted` | Run the smoke suite with real accounts against the deployed development frontend. |

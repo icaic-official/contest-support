@@ -27,6 +27,7 @@ test("staff can preview, validate, and retry an image on a phone", async ({ page
   await staff.getByRole("button", { name: "Add image" }).click();
   await expect(staff.getByText("Choose a JPEG, PNG, or WebP image.")).toBeVisible();
 
+  await staff.getByLabel("Who can see this image").selectOption("public");
   await staff.getByLabel("Image file").setInputFiles({
     name: "fail.png",
     mimeType: "image/png",
@@ -34,13 +35,69 @@ test("staff can preview, validate, and retry an image on a phone", async ({ page
   });
   await staff.getByRole("button", { name: "Add image" }).click();
   await expect(staff.getByRole("button", { name: "Try the upload again" })).toBeVisible();
+  await expect(staff.getByLabel("Who can see this image")).toBeDisabled();
+  await expect(staff.getByLabel("Who can see this image")).toHaveValue("public");
   await expect(staff.getByText("Uploading image,")).toBeHidden();
   await staff.getByRole("button", { name: "Try the upload again" }).click();
   await expect(staff.getByText("Image added.")).toBeVisible();
+  await expect(staff.locator(".image-thumb")).toHaveCount(2);
+  await expect(staff.locator(".image-thumb").getByText("Staff only", { exact: true })).toHaveCount(1);
   const overflow = await page.evaluate(() =>
     document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1
   );
   expect(overflow).toBe(true);
+});
+
+test("canceling a failed upload permits a new visibility choice", async ({ page }) => {
+  await page.goto("/image-preview.html");
+  const staff = page.getByRole("region", { name: "Staff images" });
+  await staff.getByLabel("Who can see this image").selectOption("public");
+  await staff.getByLabel("Image file").setInputFiles({ name: "fail.png", mimeType: "image/png", buffer: png });
+  await staff.getByRole("button", { name: "Add image", exact: true }).click();
+  await expect(staff.getByRole("button", { name: "Cancel upload" })).toBeEnabled();
+  await staff.getByRole("button", { name: "Cancel upload" }).click();
+  await expect(staff.getByLabel("Who can see this image")).toBeEnabled();
+  await staff.getByLabel("Who can see this image").selectOption("internal");
+  await staff.getByLabel("Image file").setInputFiles({ name: "new.png", mimeType: "image/png", buffer: png });
+  await staff.getByRole("button", { name: "Add image", exact: true }).click();
+  await expect(staff.getByText("Image added.")).toBeVisible();
+  await expect(staff.locator(".image-thumb")).toHaveCount(2);
+  await expect(staff.locator(".image-thumb").getByText("Staff only", { exact: true })).toHaveCount(2);
+});
+
+test("failed file deletion remains retryable after the image row disappears", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/image-preview.html");
+  const staff = page.getByRole("region", { name: "Staff images" });
+  await staff.locator(".image-thumb").click();
+  await page.getByRole("dialog").getByRole("button", { name: "Remove image" }).click();
+  await expect(staff.locator(".image-thumb")).toHaveCount(0);
+  await expect(staff.getByRole("status")).toHaveText("The stored files could not be deleted. Try again.");
+  await staff.getByRole("button", { name: "Retry removal" }).click();
+  await expect(staff.getByRole("status")).toHaveText("Image removed.");
+  await expect(staff.getByRole("button", { name: "Retry removal" })).toHaveCount(0);
+});
+
+test("retrying a lost completion response does not attach the image twice", async ({ page }) => {
+  await page.goto("/image-preview.html");
+  const staff = page.getByRole("region", { name: "Staff images" });
+  await staff.getByLabel("Image file").setInputFiles({ name: "finish-response.png", mimeType: "image/png", buffer: png });
+  await staff.getByRole("button", { name: "Add image", exact: true }).click();
+  await expect(staff.getByRole("button", { name: "Try the upload again" })).toBeVisible();
+  await expect(staff.locator(".image-thumb")).toHaveCount(2);
+  await staff.getByRole("button", { name: "Try the upload again" }).click();
+  await expect(staff.getByText("Image added.")).toBeVisible();
+  await expect(staff.locator(".image-thumb")).toHaveCount(2);
+});
+
+test("file removal can resume from the server's saved cleanup status after refresh", async ({ page }) => {
+  await page.goto("/image-preview.html");
+  await page.reload();
+  const pending = page.getByRole("region", { name: "Pending removal", exact: true });
+  await expect(pending.locator(".image-thumb")).toHaveCount(0);
+  await pending.getByRole("button", { name: "Retry removal" }).click();
+  await expect(pending.getByRole("status")).toHaveText("Image removed.");
+  await expect(pending.getByRole("button", { name: "Retry removal" })).toHaveCount(0);
 });
 
 test("contestant and archived image controls stay within a narrow phone", async ({ page }) => {

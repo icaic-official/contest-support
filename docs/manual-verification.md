@@ -213,6 +213,16 @@ Use a contestant account to confirm that team search stays hidden.
 
 Expected result: the submission stores the chosen team's database id. Contestants remain limited to their own team. Jury members can filter the resolved queue and do not gain the other status filters.
 
+Also check these regressions with isolated fixtures:
+
+- With locations `Desk 1234` and `Desk 1235`, `123` matches neither. `1234` and `001234` match only the first number. A spelling mistake in a word can still match beside an exact number.
+- Type a query with suggestions, then press Tab. Queue focus moves to **Status**; report-form focus moves to **Category**. The popup closes and no team is chosen. Arrow keys and Enter still choose a team; pointer selection still works.
+- Select a team as staff, then assign that account to a different contestant team. Trigger the normal refresh by focusing the window. The search disappears and the contestant's own issues remain visible without reloading.
+- Revoke access to the selected session while another session remains accessible. The automatic fallback clears the query and chosen team. Removing the chosen team from the next snapshot also clears it and disables staff submission until another team is chosen.
+
+`tests/team-search.spec.ts` runs the focus and refreshed-snapshot checks using mocked Auth and session responses.
+These fixtures do not connect to a hosted backend or verify database authorization.
+
 Record observed results in [current-state.md](current-state.md).
 Suggested manual checks are not completed checks.
 Browser automation does not establish results for real devices, assistive technology, or capacity.

@@ -95,6 +95,28 @@ describe("team search", () => {
     expect(result.suggestions[0]?.name).toBe("Team A");
   });
 
+  it("never uses partial or spelling matches for numeric tokens", () => {
+    const numbered: SearchTeam[] = [
+      { id: "exact", name: "Alpha", location: "Desk 1234" },
+      { id: "nearby", name: "Beta", location: "Desk 1235" },
+      { id: "transposed", name: "Gamma", location: "Desk 1243" },
+      { id: "compact", name: "Delta", location: "A001234" },
+    ];
+    for (const query of ["123", "Desk 123", "1236", "Desk 1236"]) {
+      expect(searchTeams(numbered, [], query).suggestions).toEqual([]);
+    }
+    for (const query of ["1234", "001234"]) {
+      expect(searchTeams(numbered, [], query).suggestions.map((team) => team.id)).toEqual([
+        "exact",
+        "compact",
+      ]);
+    }
+    // Words still permit spelling differences beside an exact number.
+    expect(searchTeams(numbered, [], "Dsek 1234").suggestions.map((team) => team.id)).toEqual([
+      "exact",
+    ]);
+  });
+
   it("counts unresolved issues without using the status filter", () => {
     expect(unresolvedCount(issues, "aurora")).toBe(2);
     expect(unresolvedCount(issues, "orbit")).toBe(0);

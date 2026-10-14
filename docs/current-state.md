@@ -38,6 +38,32 @@ Signed-in browser use of the queue and report form was not run in this change.
 The manual steps are in [manual verification](manual-verification.md#10-team-search).
 Cloud integration checks and deployment were not run.
 
+## T0008 review fixes (2026-10-14)
+
+Numeric search tokens now match only equal whole numbers, with leading zeros ignored.
+They cannot match prefixes or nearby numbers through spelling distance.
+Suggestion buttons stay outside the Tab order, so Tab moves to Status in the queue or Category in the report form.
+Arrow keys, Enter, and pointer selection still choose an explicit team id.
+Successful snapshot refreshes clear the choice after a session change, loss of staff access, or removal of the chosen team.
+This also covers automatic session fallback after membership revocation.
+
+On Node.js 24.19.0, `npm test` passed all 29 tests in four files.
+Type checking, ESLint, production build, and whitespace checks passed.
+The build retains the existing warning about a JavaScript chunk larger than 500 kB.
+`npm run test:e2e` passed all seven cases: three public-page checks and four team-search regressions.
+An external local Playwright configuration selected the preinstalled `/usr/bin/chromium` and stored artifacts under `/tmp`.
+No dependency or repository browser configuration changed.
+
+The Browser plugin was unavailable; local Playwright 1.63.0 exercised the actual app at `http://127.0.0.1:4173` with mocked Auth, session snapshots, and workflow responses.
+Checked shared selection, the submitted team id, status filtering, counts, focus after Tab, volunteer/jury/admin/contestant controls, membership changes, and explicit session changes.
+Desktop 1400×950 and phone 390×844/320×844 screenshots were captured and visually checked.
+The phone layouts had no horizontal page overflow. No JavaScript or console errors were observed, and no framework error overlay appeared.
+Realtime was disconnected by the fixture, so the local UI correctly showed Connecting.
+
+Hosted real-account checks, protected cloud CI, assistive technology, other browser engines, and deployment remain unverified.
+No migration or backend deployment is needed for these frontend fixes.
+The edited files retain their existing double-quote style and inferred React component return types for consistency; the new browser tests use single quotes.
+
 ## Ticket allocation (2026-10-03)
 
 [T0004](tickets.md#t0004--ui-makeover) uses the user's dark green workspace and centered sign-in references.

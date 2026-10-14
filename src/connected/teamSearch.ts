@@ -119,14 +119,17 @@ function tokenRank(query: string, fields: readonly string[]): MatchRank | null {
   const queryIsNumber = /^\p{N}+$/u.test(query);
   for (const field of fields) {
     const fieldIsNumber = /^\p{N}+$/u.test(field);
-    if (
-      queryIsNumber &&
-      fieldIsNumber &&
-      canonicalNumber(query) === canonicalNumber(field)
-    ) {
-      return 3;
+    if (queryIsNumber || fieldIsNumber) {
+      if (
+        queryIsNumber &&
+        fieldIsNumber &&
+        canonicalNumber(query) === canonicalNumber(field)
+      ) {
+        return 3;
+      }
+      continue;
     }
-    if (!queryIsNumber && query === field) return 3;
+    if (query === field) return 3;
     if (query.length >= 3 && field.includes(query)) {
       best = best === null || best > 4 ? 4 : best;
     } else if (best !== 4 && spellingMatch(query, field)) {

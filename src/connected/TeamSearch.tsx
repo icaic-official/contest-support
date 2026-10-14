@@ -141,6 +141,7 @@ export function TeamSearch({
                 id={`${id}-option-${index}`}
                 type="button"
                 role="option"
+                tabIndex={-1}
                 aria-selected={index === activeIndex}
                 onMouseDown={(event) => event.preventDefault()}
                 onClick={() => onSelection(chooseTeam(team.id))}

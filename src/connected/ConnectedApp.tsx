@@ -457,6 +457,21 @@ function Dashboard({
         setSessions(list);
         setSession(nextSession);
         setState(next?.membership ? next : undefined);
+        // Keep a choice only while its session, staff access, and team remain valid.
+        setTeamSelection((selection) => {
+          const member = next?.membership;
+          if (
+            nextSession !== session ||
+            !member ||
+            member.team_id ||
+            !isStaff(member) ||
+            (selection.teamId &&
+              !next?.teams.some((team) => team.id === selection.teamId))
+          ) {
+            return initialTeamSelection();
+          }
+          return selection;
+        });
         if (next) {
           clockOffset.current = Date.parse(next.server_time) - Date.now();
         }

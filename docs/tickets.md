@@ -319,5 +319,8 @@ Deployment is a separate explicit step.
 - [x] Suggestions update while typing and require an explicit choice.
 - [x] Ranking, accents, word order, spelling, whole numbers, weak queries, and the eight-suggestion cap are covered by focused tests.
 - [x] The status filter and the jury-only resolved queue still apply with a selected team.
+- [x] Numeric tokens never use partial or spelling matches, including three-digit prefixes and nearby four-digit numbers.
+- [x] Tab leaves open suggestions for the next control without losing focus; arrow keys, Enter, and pointer selection still work.
+- [x] Refreshed membership, automatic session fallback, and removal of a selected team cannot leave an invalid team choice active.
 - [x] No schema or cloud fixture is added.
 - [ ] The user reviews the pull request. Deployment waits for an explicit request.

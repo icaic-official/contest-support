@@ -167,6 +167,9 @@ Only volunteers and specialists choose the affected team in **Report for team**.
 A team already chosen in the queue starts selected there.
 Submit stays unavailable until staff choose a team, and the submission uses that team's database id.
 The first suggestion is never selected automatically.
+Table numbers match only as whole numbers, with leading zeros ignored.
+Tab leaves the suggestion list for the next control; use arrow keys and Enter to choose a team.
+A session change, loss of staff access, or removal of the selected team clears the choice when the session snapshot refreshes.
 Reopening retains the owner, every previous resolution, and any existing award.
 Unresolved time excludes resolved intervals.
 Server timestamps, issue revisions, transactional locks, and persisted request IDs protect writes.

@@ -24,6 +24,8 @@ Use this status when an older report still says that T0005 is unimplemented or t
 
 The user requested fixes for the six findings in PR #19.
 The work continues on `feature/t0005-issue-attachments` from reviewed revision `c68bb10`.
+Current `main` was merged into the PR branch for the final checks.
+This includes the accepted dependency updates and the existing narrow exception for the synthetic announcement fixture in Git history.
 The first attachment migration stays unchanged.
 The new migration is `supabase/migrations/202610140001_attachment_fixes.sql`.
 
@@ -89,7 +91,7 @@ Required run report:
 | --- | --- |
 | Summary of changes | Implemented all six review fixes and added tests. Updated the release and recovery instructions. |
 | Files changed | `.github/workflows/checks.yml`, `package.json`, `README.md`, `docs/current-state.md`, `docs/cloud-onboarding.md`, `docs/manual-verification.md`, `docs/tickets.md`; connected app, image component, transport, model, fixture, and database tests under `src/connected/`; attachment function entrypoint, handler, and tests; the corrective migration; `tests/images.spec.ts` and `tests/cloud/attachments.spec.ts`. |
-| Commands run | Git inspection, fetch and worktree setup; `npm ci` with a writable cache; TypeScript-guide fetch; `npm run typecheck`, `lint`, `build`, `check:functions`, `test:functions`, `npm test`, and `test:e2e`; `deno fmt`; local Vite and Playwright checks; GitHub access/environment lookups; a captured Supabase project-list attempt; `git diff --check`. Initial tests caught a request-ID type mismatch, an invalid staff-membership test setup, and selectors that also counted a form option. All were corrected before the passing runs. A repeated dev-server start found the existing port in use; verification used that server. |
+| Commands run | Git inspection, fetch, worktree setup, and merge of current `main`; `npm ci` with a writable cache; TypeScript-guide fetch; `npm run typecheck`, `lint`, `build`, `check:functions`, `test:functions`, `npm test`, and `test:e2e`; `deno fmt`; local Vite and Playwright checks; GitHub access/environment lookups; a captured Supabase project-list attempt; `git diff --check`. Initial tests caught a request-ID type mismatch, an invalid staff-membership test setup, and selectors that also counted a form option. All were corrected before the passing runs. A repeated dev-server start found the existing port in use; verification used that server. |
 | Build/test results | Local results are in the table above. Protected and hosted cloud tests were not run. Follow the live PR checks for the pushed revision's GitHub results. |
 | Manual verification steps | Inspected desktop and phone screenshots and checked the browser's identity, console, layout, and rendered state through Playwright. Real devices, screen readers, other browser engines, 200% zoom, and hosted admin-limit acceptance remain unverified. |
 | Risks | Cloud verification is pending. The new migration and attachment function must be released together in the documented order. The current hosted preview does not contain these fixes. |

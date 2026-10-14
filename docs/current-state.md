@@ -58,7 +58,7 @@ Local checks passed on Node.js 24.19.0:
 | Production preview-harness exclusion and Git whitespace | Passed |
 
 The database tests run the repository migrations.
-They cover membership removal, loss of staff access, password resets, old and incorrect login sessions, archival during transfer, extra file paths, lower count limits, repeated completion, saved cleanup records, and retryable expired-file cleanup.
+They cover membership removal, loss of staff access, password resets, old and incorrect login sessions, missing login timestamps after reset, archival during transfer, extra file paths, lower count limits, repeated completion, saved cleanup records, and retryable expired-file cleanup.
 Password setup, password reset, provider recovery, and upload completion share an account lock.
 This also protects older accounts whose password-status row does not exist yet.
 Handler tests check error responses and service calls without cloud credentials.
@@ -90,7 +90,7 @@ Required run report:
 | Field | Record |
 | --- | --- |
 | Summary of changes | Implemented all six review fixes and added tests. Updated the release and recovery instructions. |
-| Files changed | `.github/workflows/checks.yml`, `package.json`, `README.md`, `docs/current-state.md`, `docs/cloud-onboarding.md`, `docs/manual-verification.md`, `docs/tickets.md`; connected app, image component, transport, model, fixture, and database tests under `src/connected/`; attachment function entrypoint, handler, and tests; the corrective migration; `tests/images.spec.ts` and `tests/cloud/attachments.spec.ts`. |
+| Files changed | `.github/workflows/checks.yml`, `package.json`, `README.md`, `docs/current-state.md`, `docs/cloud-onboarding.md`, `docs/manual-verification.md`, `docs/tickets.md`; `src/connected/ConnectedApp.tsx`, `IssueImages.tsx`, `imageUpload.ts`, `imageFile.ts`, `model.ts`, `imagePreview.tsx`, and `database.test.ts`; `supabase/functions/attachments/index.ts`, `handler.ts`, and `handler.test.ts`; `supabase/migrations/202610140001_attachment_fixes.sql`; `tests/images.spec.ts` and `tests/cloud/attachments.spec.ts`. The merge also includes current `main` changes in `.github/workflows/security.yml`, `.gitleaksignore`, `package-lock.json`, and `docs/code-quality.md`; `deno.lock` now matches the merged dependencies. |
 | Commands run | Git inspection, fetch, worktree setup, and merge of current `main`; `npm ci` with a writable cache; TypeScript-guide fetch; `npm run typecheck`, `lint`, `build`, `check:functions`, `test:functions`, `npm test`, and `test:e2e`; `deno fmt`; local Vite and Playwright checks; GitHub access/environment lookups; a captured Supabase project-list attempt; `git diff --check`. Initial tests caught a request-ID type mismatch, an invalid staff-membership test setup, and selectors that also counted a form option. All were corrected before the passing runs. A repeated dev-server start found the existing port in use; verification used that server. |
 | Build/test results | Local results are in the table above. Protected and hosted cloud tests were not run. Follow the live PR checks for the pushed revision's GitHub results. |
 | Manual verification steps | Inspected desktop and phone screenshots and checked the browser's identity, console, layout, and rendered state through Playwright. Real devices, screen readers, other browser engines, 200% zoom, and hosted admin-limit acceptance remain unverified. |

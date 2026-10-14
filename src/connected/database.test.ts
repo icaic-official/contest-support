@@ -973,6 +973,9 @@ describe("issue image authorization and limits", () => {
     await db.query("update app_private.account_credentials set must_change=false,operation=null where user_id=$1", [volunteer]);
     await expect(completeImage(volunteer, started)).rejects.toThrow("sign in again");
     await db.exec("reset role");
+    await db.query("update auth.sessions set created_at=null where id=$1", [id(303)]);
+    await expect(completeImage(volunteer, started)).rejects.toThrow("sign in again");
+    await db.exec("reset role");
     const newLogin = id(9999);
     await db.query("insert into auth.sessions(id,user_id) values($1,$2)", [newLogin, volunteer]);
     await actor(volunteer, newLogin);

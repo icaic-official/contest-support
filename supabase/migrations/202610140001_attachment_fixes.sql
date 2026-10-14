@@ -164,7 +164,8 @@ begin
   select * into credentials from app_private.account_credentials where user_id = p_uploader for share;
   if login.id is null or coalesce(credentials.must_change, false)
     or credentials.operation is not null
-    or (credentials.sessions_after is not null and login.created_at < credentials.sessions_after) then
+    or (credentials.sessions_after is not null and
+      (login.created_at is null or login.created_at < credentials.sessions_after)) then
     raise exception 'Change your temporary password or sign in again.';
   end if;
   if archived then raise exception 'This event is archived. Images cannot be added.'; end if;

@@ -1,5 +1,72 @@
 # Current state
 
+## T0009 jury worklist (2026-10-15)
+
+Implemented on `feature/t0009-jury-worklist`, from updated `main` at `1ed603a`.
+The user authorized this work independently of the open T0005–T0008 branches.
+Those branches were not merged or copied into this implementation.
+The feature is not deployed. The user reviews and merges; merge does not deploy.
+
+Implemented:
+
+- Jury and combined-role members have a separate sidebar entry. Admin-only,
+  support-only, and contestant accounts gain no new capabilities.
+- **Needs decision** lists resolved issues without an award, oldest resolution
+  first. **Pending external application** lists every unapplied award, oldest
+  decision first, including zero-minute decisions and reopened issues. Counts,
+  resolution evidence, authenticated attribution, and timing use the existing snapshot.
+- Existing issue details and forms handle decisions and explicit external
+  confirmation. Jury-only members can reach a reopened issue's pending award.
+  Return focus goes to the originating row or section heading. Queue filters and
+  selection remain independent. Re-resolution does not create a second award.
+- Existing refresh, Realtime invalidations, revision checks, and request receipts
+  are reused. No schema, policy, backend function, provider resource, or runtime
+  dependency was added. The HTML title no longer refers to the retired local demo.
+
+Verification:
+
+| Check | Observed result |
+| --- | --- |
+| Type checking, lint, production build, Deno function check | Passed locally |
+| `npm test` | All 34 focused and database tests passed, including 12 new worklist cases |
+| `npm run test:e2e` | All 10 browser cases passed: seven jury cases and three existing public-page cases |
+| Local two-client updates | Passed with simulated Auth/HTTP/Realtime transport and actual migration-owned PostgreSQL RLS, snapshots, and workflow transactions |
+| Cloud integration | Could not start: the credential lookup for the isolated Minsky CI project failed before fixture creation |
+| Protected GitHub cloud job and hosted deployment | Not run; no deployment was performed |
+
+Browser plugin not available; repository Playwright/Chromium was used at
+`http://127.0.0.1:4173`. Checks covered eligibility, ordering, zero-minute decisions,
+reopened confirmations, queue-filter independence, two-client updates, preserved
+drafts, lost-response retries without duplicate decisions, session/role changes,
+membership removal, archival, failed reads, refresh, empty states, and focus.
+The screenshot case checks page title, meaningful content, interactions, and
+absence of application errors or warnings. Desktop and 390/320px screenshots
+were reviewed; 720px reflow and 200% CSS zoom are also automated. Native browser
+zoom, physical phones, screen readers, and other browser engines remain unverified.
+Screenshots, traces, and browser output are outside the repository under `/tmp`.
+
+The build retains the main-bundle size warning. Deno synchronized workspace
+metadata with dependency versions already accepted on `main`; the function's
+resolved dependencies are unchanged. The Google TypeScript guide was read before
+source changes. Repository double quotes, React component capitalization, and
+inferred component returns are deliberate existing style/framework exceptions.
+
+Verification corrections: the first network commands lacked sandbox network
+access, then passed with that access. The first dependency install used an
+unwritable home cache, then passed with a `/tmp` cache. Fixture UUID defaults were
+typed explicitly, the Playwright fixture callback was renamed to avoid a React
+Hook lint false positive, and overly strict label locators were corrected.
+The simulated Realtime payload now includes PostgreSQL column metadata. Browser
+testing caught the return-focus case after a row moved sections; it was corrected
+before the passing run. None of those failed attempts count as passing checks.
+
+The [specification](jury-worklist.md) and [manual walkthrough](manual-verification.md#10-jury-worklist-t0009)
+record remaining acceptance. Cloud results must not be inferred from local
+transport simulations. The hosted test includes zero-minute award, reopening,
+external confirmation, re-resolution, and rejection of a second award, but is unverified.
+
+## Earlier state records
+
 T0001 and T0002 merged in PR #1.
 T0003's connected cloud app merged in [PR #2](https://github.com/notbowen/minsky/pull/2) on 2026-10-02.
 T0004's UI makeover merged in [PR #9](https://github.com/notbowen/minsky/pull/9) on 2026-10-11 (SGT).

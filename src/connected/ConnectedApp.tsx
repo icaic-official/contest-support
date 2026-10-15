@@ -28,6 +28,7 @@ import {
 } from "./model";
 import { z } from "zod";
 import { Brand, clockDuration, Icon } from "./ui";
+import { JuryWorklist } from "./JuryWorklist";
 
 const statusNames = {
   open: "Open",
@@ -407,7 +408,9 @@ function Dashboard({
   const [busy, setBusy] = useState(false);
   const [selected, setSelected] = useState("");
   const [filter, setFilter] = useState("all");
-  const [view, setView] = useState<"issues" | "admin" | "account">("issues");
+  const [view, setView] = useState<"issues" | "admin" | "account" | "jury">(
+    "issues",
+  );
   const [navigationOpen, setNavigationOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [connected, setConnected] = useState(false);
@@ -450,6 +453,11 @@ function Dashboard({
         setSessions(list);
         setSession(nextSession);
         setState(next?.membership ? next : undefined);
+        setView((current) =>
+          current === "jury" && !next?.membership?.roles.includes("jury")
+            ? "issues"
+            : current,
+        );
         if (next) {
           clockOffset.current = Date.parse(next.server_time) - Date.now();
         }
@@ -550,8 +558,10 @@ function Dashboard({
       const id = await execute(session, request.request, request.command);
       pending.current = undefined;
       await refresh();
-      setSelected(id);
-      if (command.type === "reopen") setFilter("claimed");
+      if (view !== "jury") {
+        setSelected(id);
+        if (command.type === "reopen") setFilter("claimed");
+      }
       setNotice("Action recorded in shared history.");
       return true;
     } catch (cause) {
@@ -583,7 +593,11 @@ function Dashboard({
     (i) => filter === "all" || i.status === filter,
   );
   const issue = filtered.find((i) => i.id === selected) ?? filtered[0];
-  const activeView = view === "admin" && !m?.is_admin ? "issues" : view;
+  const activeView =
+    (view === "admin" && !m?.is_admin) ||
+    (view === "jury" && !m?.roles.includes("jury"))
+      ? "issues"
+      : view;
   function navigate(next: typeof view) {
     setView(next);
     setNavigationOpen(false);
@@ -685,6 +699,16 @@ function Dashboard({
                 ? "Award review"
                 : "Issues"}
           </button>
+          {m?.roles.includes("jury") && (
+            <button
+              disabled={busy || !!pending.current}
+              aria-current={activeView === "jury" ? "page" : undefined}
+              onClick={() => navigate("jury")}
+            >
+              <Icon name="issues" />
+              Jury worklist
+            </button>
+          )}
           {m?.is_admin && (
             <button
               disabled={busy || !!pending.current}
@@ -776,12 +800,18 @@ function Dashboard({
               <div className="page-heading settings-heading">
                 <div>
                   <h1 id="workspace-heading" tabIndex={-1}>
-                    {activeView === "admin" ? "Administration" : "My account"}
+                    {activeView === "admin"
+                      ? "Administration"
+                      : activeView === "jury"
+                        ? "Jury worklist"
+                        : "My account"}
                   </h1>
                   <p>
                     {activeView === "admin"
                       ? "Manage session access, accounts and contestant intake."
-                      : "Your sign-in details and session permissions."}
+                      : activeView === "jury"
+                        ? "Award decisions and outstanding external confirmations."
+                        : "Your sign-in details and session permissions."}
                   </p>
                 </div>
               </div>
@@ -793,6 +823,24 @@ function Dashboard({
               <legend className="sr-only">Contest workflow</legend>
               {activeView === "admin" && m.is_admin && (
                 <AdminPanel state={state} refresh={refresh} />
+              )}
+              {activeView === "jury" && m.roles.includes("jury") && (
+                <JuryWorklist
+                  key={state.session.id}
+                  state={state}
+                  now={now}
+                  renderDetail={(item, back) => (
+                    <IssueDetail
+                      key={item.id}
+                      issue={item}
+                      state={state}
+                      member={m}
+                      now={now}
+                      act={act}
+                      onBack={back}
+                    />
+                  )}
+                />
               )}
               {activeView === "account" && (
                 <section className="panel account-panel">
@@ -1114,12 +1162,14 @@ function IssueDetail({
   member: m,
   now,
   act,
+  onBack,
 }: {
   issue: Issue;
   state: Snapshot;
   member: Membership;
   now: number;
   act: (command: Command) => Promise<boolean>;
+  onBack?: () => void;
 }) {
   const [resolution, setResolution] = useState("");
   const [minutes, setMinutes] = useState("");
@@ -1173,10 +1223,13 @@ function IssueDetail({
       aria-label={`Issue details ISS-${issue.number}`}
     >
       <button
-        className="quiet back-to-queue"
-        onClick={() => document.getElementById("workspace-heading")?.focus()}
+        className={`quiet ${onBack ? "jury-back" : "back-to-queue"}`}
+        onClick={
+          onBack ??
+          (() => document.getElementById("workspace-heading")?.focus())
+        }
       >
-        Back to queue
+        {onBack ? "Back to jury worklist" : "Back to queue"}
       </button>
       <fieldset className="detail-actions" disabled={state.event?.archived}>
         <legend className="sr-only">Issue actions and history</legend>

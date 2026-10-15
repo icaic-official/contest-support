@@ -1,10 +1,21 @@
 # Minsky planning record
 
+**Latest ticket decision (2026-10-15):** the user authorized implementation of
+[T0009 — Jury worklist](docs/jury-worklist.md) independently of T0005, T0006,
+T0007, and T0008. The branch is `feature/t0009-jury-worklist`, from updated
+`main` at `1ed603a`. It uses existing issue, resolution, and award data.
+[Current state](docs/current-state.md#t0009-jury-worklist-2026-10-15) records local
+verification and the remaining hosted and manual checks. The user reviews and
+merges; deployment remains a separate explicit step.
+
+**Specification decision (2026-10-14):** the user requested T0009's specification.
+Its implementation scope is recorded in the document linked above.
+
 **T0004 merge status (2026-10-11):** the user merged [PR #9](https://github.com/notbowen/minsky/pull/9) into `main` and deleted its branch.
 [PR #13](https://github.com/notbowen/minsky/pull/13) remains the documentation follow-up and now targets `main`.
 See [the merge record](docs/current-state.md#t0004-merge-and-documentation-follow-up-2026-10-11) for the revision and timestamp.
 
-**Latest ticket decision (2026-10-03):** implement T0004's UI makeover from the user's references.
+**Earlier ticket decision (2026-10-03):** implement T0004's UI makeover from the user's references.
 The references specify these elements:
 
 - Dark green surfaces.

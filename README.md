@@ -30,6 +30,15 @@ It preserves the workflow and account permissions.
 The reference values are not product seed data.
 The old local demo and its commands are removed.
 
+T0009 adds **Jury worklist** for jury members, including combined staff roles.
+It separates resolved issues needing a decision from awards awaiting external
+application, including zero-minute awards and awards on reopened issues.
+**View issue** uses the existing details and forms; **Back to jury worklist**
+returns to the relevant row or heading. Queue filters do not limit these lists.
+This feature is implemented on `feature/t0009-jury-worklist` and is not deployed.
+[Verification](docs/current-state.md#t0009-jury-worklist-2026-10-15) distinguishes
+passing local checks from the outstanding hosted and manual checks.
+
 ## Connected development — no Docker required
 
 Use Node.js 22.13 or later within 22.x, or Node.js 24 or later.
@@ -192,6 +201,7 @@ This implementation supports group events and one award per issue.
 
 - [Working rules](AGENTS.md) and [original plan](PLAN.md)
 - [Development tickets](docs/tickets.md)
+- [T0009 jury worklist specification](docs/jury-worklist.md)
 - [Cloud onboarding and costs](docs/cloud-onboarding.md)
 - [Current implementation and verification](docs/current-state.md)
 - [Manual walkthrough](docs/manual-verification.md)

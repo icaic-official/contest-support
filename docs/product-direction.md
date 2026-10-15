@@ -4,7 +4,15 @@ This document preserves the agreed direction from [PLAN.md](../PLAN.md).
 Only requirements listed in [current-state.md](current-state.md) describe implemented behavior.
 The user selects later scope after demo feedback.
 
-Latest ticket decision (2026-10-03): implement [T0004](tickets.md#t0004--ui-makeover) from the user's dark green workspace and centered sign-in references.
+Latest ticket decision (2026-10-15): implement the separate
+[T0009 jury worklist](jury-worklist.md) using the current session's issue,
+resolution, and award records. Jury and combined-role members get outstanding
+decision and external-application lists, using existing issue details and actions.
+This branch is independent of T0005–T0008. Local verification is recorded in
+[current state](current-state.md#t0009-jury-worklist-2026-10-15); hosted cloud
+verification, review, merge, and deployment remain outstanding.
+
+Earlier ticket decision (2026-10-03): implement [T0004](tickets.md#t0004--ui-makeover) from the user's dark green workspace and centered sign-in references.
 The sign-in reference uses an amber button.
 Use actual authenticated data.
 Preserve workflow behavior and permissions.

@@ -14,11 +14,18 @@
 
 ## Current scope and completed demo baseline
 
+**Latest ticket decision (2026-10-15):** implement
+[T0009 — Jury worklist](docs/jury-worklist.md) independently of the open
+T0005, T0006, T0007, and T0008 branches. Start from updated `main` on
+`feature/t0009-jury-worklist`. Reuse current data, timing, permissions, and issue
+actions. The user reviews and merges; deployment remains a separate explicit step.
+This exception applies to starting T0009 while those earlier reviews remain open.
+
 **T0004 merge status (2026-10-11):** the user merged [PR #9](https://github.com/notbowen/minsky/pull/9) into `main` and deleted its branch.
 [PR #13](https://github.com/notbowen/minsky/pull/13) remains the documentation follow-up and now targets `main`.
 See [the merge record](docs/current-state.md#t0004-merge-and-documentation-follow-up-2026-10-11) for the revision and timestamp.
 
-**Latest ticket decision (2026-10-03):** implement T0004's UI makeover from the user's references.
+**Earlier ticket decision (2026-10-03):** implement T0004's UI makeover from the user's references.
 The references show a dark green workspace and a centered sign-in form with an amber button.
 Keep actual authenticated data, workflow behavior, and authorization.
 Reference values are placeholders.

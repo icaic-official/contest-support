@@ -184,3 +184,54 @@ It does not reset the shared project.
 Record observed results in [current-state.md](current-state.md).
 Suggested manual checks are not completed checks.
 Browser automation does not establish results for real devices, assistive technology, or capacity.
+
+## 10. Jury worklist (T0009)
+
+Run these checks on the T0009 revision with disposable accounts and a session
+reserved for verification. Use jury-only, combined jury/support, support-only,
+admin-only, and contestant accounts. Do not use real contest reports as fixtures.
+This is a checklist, not evidence that hosted or physical-device checks have passed.
+
+1. As jury or a combined-role member, open **Jury worklist** in the sidebar.
+   On phones use **Menu** first. Other roles must not have this entry; admin alone
+   does not grant jury powers. The initial issue screen remains available.
+2. Prepare resolved issues without decisions, a zero-minute pending award, a
+   pending award on a reopened issue, an applied award, and a reopened issue with
+   no award. Compare both sections and their counts with the specification's
+   eligibility table. Order decisions by resolution time and applications by award time.
+3. As a combined-role member, filter the ordinary queue, then open the worklist.
+   Its lists must still cover the entire authorized session. If team search is
+   available in the tested revision, also check independence from the chosen team.
+   Returning to the ordinary queue retains its filter and selected issue.
+4. Check team/location, status, resolution summary/actor/time, unresolved duration,
+   and award explanation/actor/time. Pending awards on reopened issues identify
+   the earlier resolution. Compare duration with issue details; resolved intervals
+   are excluded and first-assignment delay is separate.
+5. Use **View issue**, record an explicit zero-minute decision with a public
+   explanation, and return. It must leave **Needs decision** and enter **Pending
+   external application**. Zero is not a missing award and is not automatically applied.
+6. As support, reopen an issue with a pending award. As jury-only, reach it from
+   the worklist and confirm external application with the existing required
+   checkbox. It leaves the pending list. Minsky does not change the external clock.
+   Resolve it again: its existing award and confirmation remain, with no second decision.
+7. Open two signed-in browser contexts. In one, edit an explanation draft; in
+   the other, award a different issue. Lists/counts update without clearing the
+   unrelated draft or stealing focus. Confirm an award in one context and check
+   removal in the other. Check refresh and reconnect. Use the automated retry
+   case to verify a lost response does not duplicate an award or history.
+8. Switch sessions while viewing details. Selection clears and records belong
+   only to the next session. Losing the jury role removes its entry and returns
+   to an available screen; losing membership clears protected records. Password
+   setup/reset must retain the existing account-readiness gate.
+9. Check keyboard opening and **Back to jury worklist**. Focus returns to the
+   originating row, or its section heading if the row moved or disappeared.
+   Check a reopened unawarded issue leaving the decision list. Archived records
+   remain readable while decisions and confirmations are unavailable.
+10. Check desktop, 390px/320px phones, native browser 200% zoom, and screen-reader
+    labels. No text/control should clip or cause horizontal overflow. Distinguish
+    loading/read errors from valid empty sections; failed reads must clear stale data.
+
+Record results and remaining limits in [current state](current-state.md#t0009-jury-worklist-2026-10-15).
+The credential-free browser harness exercises actual migrations and RLS with
+simulated hosted transport. It does not establish real Auth, Storage, Realtime,
+deployment, offline operation, or capacity results.

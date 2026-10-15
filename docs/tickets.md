@@ -2,14 +2,15 @@
 
 These tickets describe development work, not contestant issues.
 
-T0004 has two related pull requests.
-[PR #9](https://github.com/notbowen/minsky/pull/9) implements the UI makeover.
-[PR #13](https://github.com/notbowen/minsky/pull/13) rewrites the documentation.
-
-The `feature/t0004-ste100-docs` branch is a documentation follow-up within T0004.
-The user merged PR #9 into `main` on 2026-10-11 (SGT) and deleted its UI branch.
-PR #13 now targets `main` and remains a draft.
-T0005 remains follow-up scope notes with no implementation started.
+**Implementation update (2026-10-15):** the user authorized work on
+[T0009 — Jury worklist](#t0009--jury-worklist).
+It is implemented on its feature branch and awaits review and merge.
+Local checks pass; hosted cloud verification remains blocked by missing credentials.
+It has no dependency on the open T0005 issue-image, T0006 announcement,
+T0007 installation, or T0008 team-search work.
+Earlier ticket records below retain their historical scope and verification notes;
+the T0005 follow-up notes do not describe the later issue-image implementation in
+[PR #19](https://github.com/notbowen/minsky/pull/19).
 
 ## T0001 — Local workflow demo and project guidance
 
@@ -271,3 +272,42 @@ Choose file types, size limits, and deletion rules when you define scope.
 These are T0005 candidate scope notes.
 They are not an agreed implementation specification.
 Resilience and event-capacity work remain deferred until feature feedback warrants them.
+
+## T0009 — Jury worklist
+
+Branch: `feature/t0009-jury-worklist`, from updated `main` at `1ed603a`.
+
+Status: specified on 2026-10-14 and implemented at the user's request on 2026-10-15.
+Local verification passes. Hosted cloud verification has not started because
+credentials for the isolated Minsky CI project are unavailable.
+The user reviews and merges; deployment remains separate. The feature is not deployed.
+The [jury worklist specification](jury-worklist.md) defines the scope.
+It is independent of T0005, T0006, T0007, and T0008; this implementation does
+not change those branches or their review fixes.
+
+### Selected scope
+
+- Add a separate **Jury worklist** screen for current jury and combined-role members.
+- Show **Needs decision** for resolved issues without an award and **Pending
+  external application** for every unapplied award, including zero-minute awards
+  and awards on reopened issues.
+- Show team/location, issue/status, unresolved time, resolution evidence, and
+  relevant award attribution. Order by the oldest outstanding resolution or award.
+- Open existing issue details and actions with a return path to the worklist.
+  Preserve discretionary awards, separate confirmation, and one award per issue.
+- Reuse authorized snapshots, updates, timing, and workflow operations. No schema
+  change or dependency on the other open feature branches is expected.
+
+### Acceptance criteria
+
+- [x] Role, session, archive, and live-access rules pass local browser/database checks.
+- [x] Both lists, counts, ordering, fields, zero-minute decisions, and reopening
+  behavior match the specification and its eligibility table.
+- [x] Existing issue actions work from the new screen, including jury-only access
+  to a reopened issue's pending confirmation and accessible return navigation.
+- [x] Simulated two-client updates, preserved drafts, refresh, phone layout,
+  keyboard use, and existing database workflow protections pass locally.
+- [x] Fast checks and documentation validation pass with actual results recorded.
+- [ ] Hosted cloud and protected CI verification, real devices, assistive
+  technology, other browser engines, and native browser zoom acceptance.
+- [ ] The user reviews and merges. Deployment remains a separate explicit step.

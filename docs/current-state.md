@@ -1,5 +1,10 @@
 # Current state
 
+T0010 fixes the three P2 review findings on `feature/t0010-p2-review-fixes`.
+The branch started from `main` at `d961f5b` and now includes `main` at `9c0341c`.
+The changes are verified locally and await user review. They are not deployed.
+See [T0010 verification](#t0010-p2-review-fixes-2026-10-15).
+
 T0008 fuzzy team search merged into `main` in [PR #22](https://github.com/notbowen/minsky/pull/22) on 2026-10-15 (SGT).
 It is not deployed.
 It was developed separately from T0005, T0006, and T0007.
@@ -274,6 +279,24 @@ Existing double quotes and inferred component returns remain repository exceptio
 The thumbnail effect omits the attachment array from its dependency list because that array is recreated on each render.
 The visible attachment ids are the dependency instead.
 
+## T0010 P2 review fixes (2026-10-15)
+
+Incoming reports preserve the displayed issue and its reply draft.
+Membership forms use the current saved roles, admin flag, and team. Unchanged membership values preserve local edits.
+Cloud test cleanup retains its recovery file on failure and removes it after success.
+See [fixture recovery](cloud-onboarding.md#fixture-recovery) for the recovery steps.
+
+At `c785964`, all 33 unit/database tests and 11 browser tests passed on Node.js 24.19.0.
+Lint, type checking, the Deno function check, the production build, and whitespace checks also passed.
+The browser tests use fictional API responses. Hosted Auth, Realtime, and cloud integration remain unverified.
+The changes are not deployed.
+
+After the merge from `main` at `9c0341c`, all 49 unit/database tests, 12 function tests, and 17 browser tests passed.
+Lint, type checking, both Deno function checks, the production build, and whitespace checks passed.
+Cloud integration was not run.
+
+[PR #24](https://github.com/notbowen/minsky/pull/24) records detailed commands, browser observations, and TypeScript style exceptions.
+
 ## T0008 fuzzy team search (2026-10-11)
 
 Staff search team names and locations from the session snapshot.
@@ -288,7 +311,7 @@ Focused Vitest coverage is in `src/connected/teamSearch.test.ts`.
 `npm test` passed: 4 files, 28 tests.
 `npm run lint`, `npm run typecheck` through `tsc --noEmit`, `npm run build`, and `git diff --check` passed.
 Signed-in browser use of the queue and report form was not run in this change.
-The manual steps are in [manual verification](manual-verification.md#10-team-search).
+The manual steps are in [manual verification](manual-verification.md#11-team-search).
 Cloud integration checks and deployment were not run.
 
 ## T0008 review fixes (2026-10-14)

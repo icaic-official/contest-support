@@ -296,7 +296,7 @@ Embedded PostgreSQL executes the actual migrations and policies with stubs for A
 It does not establish managed Auth behavior.
 `npm run test:functions` checks the attachment HTTP handler with fake Auth, database, and Storage clients.
 It tests revoked access, invalid login sessions, failed file deletion, and retries.
-`npm run test:e2e` checks the public landing page, login page, and image-preview harness without cloud credentials.
+`npm run test:e2e` checks login, team search, workspace refresh, and image previews with fictional API responses and no cloud credentials.
 The old demo and its tests are removed.
 `npm run test:cloud` tests managed Auth, database, and Realtime behavior against a local frontend.
 `npm run test:hosted` repeats the suite with real accounts against the deployed app.
@@ -347,6 +347,19 @@ GitHub requires a manually dispatched workflow on the default branch before exec
 The user must review and merge the workflow before the first dispatch.
 The agent must not merge it to bypass that step.
 See [manual workflow requirements](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/manually-run-a-workflow).
+
+## Fixture recovery
+
+Successful teardown deletes the fixture file after all fixture records and accounts are removed.
+The wrapper then removes its temporary directory, including when a test assertion failed.
+If cleanup fails, the wrapper keeps the file and prints its path.
+The file retains the recorded account and session IDs and its existing access restrictions.
+It can contain temporary test passwords. Do not copy its contents into logs, chat, or a pull request.
+
+Use the recorded IDs to identify the remaining fixtures in the selected test project.
+Delete only records and accounts from that test run.
+Remove the recovery file and its directory after cleanup succeeds.
+The file is local to the machine that ran the tests.
 
 ## Completion record
 

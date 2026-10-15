@@ -362,3 +362,23 @@ Deployment is a separate explicit step.
 - [x] Refreshed membership, automatic session fallback, and removal of a selected team cannot leave an invalid team choice active.
 - [x] No schema or cloud fixture is added.
 - [x] The user merged PR #22. Deployment waits for an explicit request.
+
+## T0010 — P2 review fixes
+
+Branch: `feature/t0010-p2-review-fixes`, from updated `main` at `d961f5b`.
+The branch now includes `main` at `9c0341c`, with T0005 issue images.
+Status: implemented and verified locally. The user reviews and merges.
+
+The user authorized fixes for the three P2 findings from the review of `1ed603a`.
+The branch preserves the merged T0008 team search and stays independent of the other open feature pull requests.
+
+Acceptance criteria:
+
+- [x] A new issue cannot replace the displayed issue or discard its reply draft during a background refresh.
+- [x] Refreshed membership fields send the current roles, admin flag, and team. Unchanged membership values preserve local edits.
+- [x] Failed cloud cleanup retains the fixture file and reports its path. Successful teardown removes it before the wrapper removes the directory.
+- [x] Regression tests use the application UI or the real test runner and assert exact requests and observable file effects.
+- [x] Required local checks pass and documentation records the results.
+- [ ] The user reviews and merges the pull request.
+
+No schema change or deployment is part of this ticket.

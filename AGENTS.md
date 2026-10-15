@@ -12,6 +12,12 @@
 - Do not assume that planned files or features exist.
 - Treat historical run reports as records of those runs. Check the repository to establish current state.
 
+## Technical communication
+
+- Use ASD-STE100 Simplified Technical English for technical explanations in replies, documentation, and pull requests.
+- Use short sentences, active voice, and familiar words. Avoid unnecessary jargon.
+- When a technical term is necessary, explain it in plain language on first use. Keep code names and commands exact.
+
 ## Current scope and completed demo baseline
 
 **T0008 team search (2026-10-11):** implement fuzzy team search on `feature/t0008-team-search`.

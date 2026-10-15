@@ -1,5 +1,11 @@
 # Current state
 
+T0008 fuzzy team search merged into `main` in [PR #22](https://github.com/notbowen/minsky/pull/22) on 2026-10-15 (SGT).
+It is not deployed.
+It was developed separately from T0005, T0006, and T0007.
+The T0005 branch now includes the accepted search through a merge from `main` at `d961f5b`.
+See [T0008 fuzzy team search](#t0008-fuzzy-team-search-2026-10-11).
+
 T0001 and T0002 merged in PR #1.
 T0003's connected cloud app merged in [PR #2](https://github.com/notbowen/minsky/pull/2) on 2026-10-02.
 T0004's UI makeover merged in [PR #9](https://github.com/notbowen/minsky/pull/9) on 2026-10-11 (SGT).
@@ -19,6 +25,46 @@ They are not part of T0005:
 
 Older reports below describe their recorded revisions.
 Use this status when an older report still says that T0005 is unimplemented or that PR #13 is open.
+
+## T0005 merge-conflict repair (2026-10-15)
+
+**Summary of changes:** merged `main` at `d961f5b` into the T0005 branch after the user merged team search in PR #22.
+Resolved conflicts in the app imports and three documentation files.
+Both team search and issue images remain present.
+The team-search browser fixture now supplies the image limits and empty attachment and removal lists required by the combined snapshot type.
+The ticket records now show that PR #22 is merged.
+
+**Files changed:** `AGENTS.md`, `PLAN.md`, `README.md`, `docs/current-state.md`, `docs/manual-verification.md`, `docs/product-direction.md`, `docs/tickets.md`, `src/connected/ConnectedApp.tsx`, `src/connected/TeamSearch.tsx`, `src/connected/teamSearch.ts`, `src/connected/teamSearch.test.ts`, `src/styles.css`, and `tests/team-search.spec.ts`.
+Most changes come directly from the accepted team-search revision.
+The search component and matching rules are unchanged from `main`.
+
+**Commands run:** `git fetch origin main feature/t0005-issue-attachments`, `git merge --no-commit --no-ff origin/main`, Git diff and conflict-marker checks, `npm run typecheck`, `npm run lint`, `npm test`, `npm run check:functions`, `npm run test:functions`, `npm run build`, `npm run test:e2e -- --output=/tmp/minsky-pr19-merge-test-results --reporter=line`, and a temporary Playwright interaction script outside Git.
+Initial type and build checks caught the incomplete team-search fixture; both passed after correction.
+The first Deno and browser attempts hit sandbox network restrictions; both passed with network access enabled.
+The temporary visual script needed its visibility-control locator corrected before it passed.
+
+**Build/test results:** all local checks passed on Node.js 24.19.0.
+There are 45 passing unit and embedded database tests, 12 passing attachment-function tests, and 15 passing Chromium browser tests.
+Type checking, ESLint, both Deno function checks, and the production build passed.
+The build retains the existing warning for a JavaScript chunk larger than 500 kB.
+Protected cloud tests remain unrun because their credentials are unavailable in this environment.
+
+**Manual verification steps:** used Playwright at `http://127.0.0.1:4187/` with isolated Auth and session responses at 1400×950 and 320×844.
+Browser plugin not available; regular Playwright was used.
+The flow was sign in, choose Aurora by keyboard, apply the Open status filter, and open the remaining issue.
+The expected issue and image controls appeared with **Staff only** selected.
+Page identity, meaningful content, absence of a framework overlay, console health, screenshots, and interaction results passed.
+Neither viewport had horizontal page overflow or app errors.
+Screenshots and the detailed QA result remain outside Git under `/tmp/minsky-pr19-merge-*`.
+The mocked fixture has no Realtime server and displays **Connecting**.
+It does not establish hosted Auth or Storage results.
+
+**Risks:** protected cloud verification and the previously listed real-device and assistive-technology checks remain pending.
+This repair does not deploy a function, migration, or frontend and does not merge PR #19.
+
+**Follow-up tickets:** None. Finish cloud verification within the existing work when access is available.
+
+**Docs that need updating:** None for this repair. Record the protected cloud result after that check runs.
 
 ## T0005 review fixes (2026-10-14)
 
@@ -227,6 +273,72 @@ The [Google TypeScript Style Guide](https://google.github.io/styleguide/tsguide.
 Existing double quotes and inferred component returns remain repository exceptions.
 The thumbnail effect omits the attachment array from its dependency list because that array is recreated on each render.
 The visible attachment ids are the dependency instead.
+
+## T0008 fuzzy team search (2026-10-11)
+
+Staff search team names and locations from the session snapshot.
+The issue queue and **Report for team** share one selection.
+Suggestions show the team name, location, and unresolved-issue count.
+An explicit choice stores the team's database id.
+The status filter still applies. Jury-only members stay on resolved issues.
+Contestants do not see the search.
+There is no migration and no new roster field.
+
+Focused Vitest coverage is in `src/connected/teamSearch.test.ts`.
+`npm test` passed: 4 files, 28 tests.
+`npm run lint`, `npm run typecheck` through `tsc --noEmit`, `npm run build`, and `git diff --check` passed.
+Signed-in browser use of the queue and report form was not run in this change.
+The manual steps are in [manual verification](manual-verification.md#10-team-search).
+Cloud integration checks and deployment were not run.
+
+## T0008 review fixes (2026-10-14)
+
+Numeric search tokens now match only equal whole numbers, with leading zeros ignored.
+They cannot match prefixes or nearby numbers through spelling distance.
+Suggestion buttons stay outside the Tab order, so Tab moves to Status in the queue or Category in the report form.
+Arrow keys, Enter, and pointer selection still choose an explicit team id.
+Successful snapshot refreshes clear the choice after a session change, loss of staff access, or removal of the chosen team.
+This also covers automatic session fallback after membership revocation.
+
+On Node.js 24.19.0, `npm test` passed all 29 tests in four files.
+Type checking, ESLint, production build, and whitespace checks passed.
+The build retains the existing warning about a JavaScript chunk larger than 500 kB.
+`npm run test:e2e` passed all seven cases: three public-page checks and four team-search regressions.
+An external local Playwright configuration selected the preinstalled `/usr/bin/chromium` and stored artifacts under `/tmp`.
+No dependency or repository browser configuration changed.
+
+The Browser plugin was unavailable; local Playwright 1.63.0 exercised the actual app at `http://127.0.0.1:4173` with mocked Auth, session snapshots, and workflow responses.
+Checked shared selection, the submitted team id, status filtering, counts, focus after Tab, volunteer/jury/admin/contestant controls, membership changes, and explicit session changes.
+Desktop 1400×950 and phone 390×844/320×844 screenshots were captured and visually checked.
+The phone layouts had no horizontal page overflow. No JavaScript or console errors were observed, and no framework error overlay appeared.
+Realtime was disconnected by the fixture, so the local UI correctly showed Connecting.
+
+Hosted real-account checks, protected cloud CI, assistive technology, other browser engines, and deployment remain unverified.
+No migration or backend deployment is needed for these frontend fixes.
+The edited files retain their existing double-quote style and inferred React component return types for consistency; the new browser tests use single quotes.
+
+## T0008 keyboard clearing (2026-10-15)
+
+**Clear team** now works with Enter and Space in both the queue and report form.
+The input's focus handler publishes only an actual focus-state change, so refocusing after Clear cannot replay the previous selected team.
+Both fields clear, focus returns to the initiating input, and the existing status filter remains active across all teams.
+The report category and draft remain intact. Submission stays disabled until staff choose another team.
+Pointer clearing and choosing another team still work.
+
+The two new browser regressions reproduced the old failure with Enter and Space before the fix.
+After the fix, all 29 unit/database tests and all nine credential-free browser tests passed on Node.js 24.19.0.
+Type checking, ESLint, production build, and whitespace checks passed; the existing chunk-size warning remains.
+The browser cases cover both controls, keyboard focus, shared selection, status filtering, draft retention, disabled submission, subsequent selection, and pointer clearing.
+
+The Browser plugin was unavailable; Playwright 1.63.0 used installed Chromium at `http://127.0.0.1:4197` with mocked Auth and session responses.
+Desktop 1400×950 and phone 320×844 screenshots were captured and visually checked after clearing.
+Both fields were empty, the draft remained visible, Submit issue was disabled, and focus was on the report input.
+There was no horizontal page overflow, framework error overlay, JavaScript error, or console error.
+No workflow request was sent during the clear checks. Realtime remained disconnected by the fixture.
+
+No migration, dependency, backend, or deployment change is included.
+Hosted real-account checks, protected cloud integration, assistive technology, and other browser engines remain unverified.
+The existing double-quote style in the React component remains unchanged; the browser tests retain single quotes.
 
 ## Ticket allocation (2026-10-03)
 

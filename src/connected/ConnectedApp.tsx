@@ -28,6 +28,12 @@ import {
 } from "./model";
 import { z } from "zod";
 import { IssueImages } from "./IssueImages";
+import { TeamSearch } from "./TeamSearch";
+import {
+  initialTeamSelection,
+  issueVisibleForTeam,
+  submitTeamId,
+} from "./teamSearch";
 import { Brand, clockDuration, Icon } from "./ui";
 
 const statusNames = {
@@ -408,6 +414,7 @@ function Dashboard({
   const [busy, setBusy] = useState(false);
   const [selected, setSelected] = useState("");
   const [filter, setFilter] = useState("all");
+  const [teamSelection, setTeamSelection] = useState(initialTeamSelection);
   const [view, setView] = useState<"issues" | "admin" | "account">("issues");
   const [navigationOpen, setNavigationOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
@@ -451,6 +458,21 @@ function Dashboard({
         setSessions(list);
         setSession(nextSession);
         setState(next?.membership ? next : undefined);
+        // Keep a choice only while its session, staff access, and team remain valid.
+        setTeamSelection((selection) => {
+          const member = next?.membership;
+          if (
+            nextSession !== session ||
+            !member ||
+            member.team_id ||
+            !isStaff(member) ||
+            (selection.teamId &&
+              !next?.teams.some((team) => team.id === selection.teamId))
+          ) {
+            return initialTeamSelection();
+          }
+          return selection;
+        });
         if (next) {
           clockOffset.current = Date.parse(next.server_time) - Date.now();
         }
@@ -578,11 +600,20 @@ function Dashboard({
   const m = state?.membership;
   const juryOnly =
     m && m.roles.includes("jury") && !isSupport(m) && !m.is_admin;
+  const canSearchTeams = Boolean(m && !m.team_id && isStaff(m));
   const visible =
-    state?.issues.filter((i) => !juryOnly || i.status === "resolved") ?? [];
-  const filtered = visible.filter(
-    (i) => filter === "all" || i.status === filter,
-  );
+    state?.issues.filter((issue) =>
+      issueVisibleForTeam(issue, null, "all", Boolean(juryOnly)),
+    ) ?? [];
+  const filtered =
+    state?.issues.filter((issue) =>
+      issueVisibleForTeam(
+        issue,
+        teamSelection.teamId,
+        filter,
+        Boolean(juryOnly),
+      ),
+    ) ?? [];
   const issue = filtered.find((i) => i.id === selected) ?? filtered[0];
   const activeView = view === "admin" && !m?.is_admin ? "issues" : view;
   function navigate(next: typeof view) {
@@ -644,6 +675,7 @@ function Dashboard({
                   setSession(event.target.value);
                   setSelected("");
                   setFilter("all");
+                  setTeamSelection(initialTeamSelection());
                   setReportOpen(false);
                 }}
               >
@@ -857,6 +889,17 @@ function Dashboard({
                       </div>
                     </div>
                     <div className="queue-toolbar">
+                      {canSearchTeams && (
+                        <TeamSearch
+                          id="queue-team-search"
+                          label="Find a team"
+                          teams={state.teams}
+                          issues={state.issues}
+                          selection={teamSelection}
+                          onSelection={setTeamSelection}
+                          variant="inline"
+                        />
+                      )}
                       {!juryOnly && (
                         <label className="filter-label">
                           Status
@@ -942,13 +985,15 @@ function Dashboard({
                           onSubmit={(event) => {
                             const form = event.currentTarget;
                             const data = formData(event);
+                            const teamId = submitTeamId(teamSelection);
+                            if (!m.team_id && !teamId) return;
                             void act({
                               type: "submit",
                               category: text(data, "category"),
                               description: text(data, "description"),
                               ...(m.team_id
                                 ? {}
-                                : { team_id: text(data, "team") }),
+                                : { team_id: teamId ?? undefined }),
                             }).then((ok) => {
                               if (ok) {
                                 form.reset();
@@ -970,16 +1015,15 @@ function Dashboard({
                               Issue submission
                             </legend>
                             {!m.team_id && (
-                              <label>
-                                Affected team
-                                <select name="team" required>
-                                  {state.teams.map((t) => (
-                                    <option key={t.id} value={t.id}>
-                                      {t.name} · {t.location}
-                                    </option>
-                                  ))}
-                                </select>
-                              </label>
+                              <TeamSearch
+                                id="report-team-search"
+                                label="Affected team"
+                                teams={state.teams}
+                                issues={state.issues}
+                                selection={teamSelection}
+                                onSelection={setTeamSelection}
+                                variant="field"
+                              />
                             )}
                             <label>
                               Category
@@ -997,7 +1041,12 @@ function Dashboard({
                                 maxLength={2000}
                               />
                             </label>
-                            <button type="submit">Submit issue</button>
+                            <button
+                              type="submit"
+                              disabled={!m.team_id && !teamSelection.teamId}
+                            >
+                              Submit issue
+                            </button>
                           </fieldset>
                         </form>
                       </section>
@@ -1070,9 +1119,11 @@ function Dashboard({
                         <Icon name="issues" />
                         <h3>No issues in this view.</h3>
                         <p>
-                          {visible.length
-                            ? "Choose another status to see more reports."
-                            : "Reports will appear here when they are submitted."}
+                          {teamSelection.teamId
+                            ? "This team has no issues in the current view."
+                            : visible.length
+                              ? "Choose another status to see more reports."
+                              : "Reports will appear here when they are submitted."}
                         </p>
                       </div>
                     )}

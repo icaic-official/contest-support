@@ -1,5 +1,11 @@
 # Minsky planning record
 
+**T0008 team search (2026-10-15):** the user merged [PR #22](https://github.com/notbowen/minsky/pull/22) into `main`.
+Staff match the current session's team names and locations while they investigate issues or report one for a team.
+The T0005 branch includes the accepted search through a merge from `main`.
+Deployment is a separate explicit step.
+See [T0008](docs/tickets.md#t0008--fuzzy-team-search).
+
 **T0004 merge status (2026-10-11):** the user merged [PR #9](https://github.com/notbowen/minsky/pull/9) into `main` and deleted its branch.
 The user merged the documentation rewrite in [PR #13](https://github.com/notbowen/minsky/pull/13) on 2026-10-11 (SGT).
 See [the merge record](docs/current-state.md#t0004-merge-and-documentation-follow-up-2026-10-11) for the revision and timestamp.

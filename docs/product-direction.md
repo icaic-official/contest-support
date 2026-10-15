@@ -4,7 +4,13 @@ This document preserves the agreed direction from [PLAN.md](../PLAN.md).
 Only requirements listed in [current-state.md](current-state.md) describe implemented behavior.
 The user selects later scope after demo feedback.
 
-Latest ticket decision (2026-10-11): [T0005](tickets.md#t0005--issue-images) adds issue images.
+Team-search status (2026-10-15): [T0008](tickets.md#t0008--fuzzy-team-search) merged into `main` in PR #22.
+Staff search the current session's team names and locations from the issue queue.
+Volunteers and specialists use the same search to choose a team before they report an issue.
+The T0005 branch includes the accepted search through a merge from `main`.
+Deployment waits for an explicit request after review.
+
+Issue-image decision (2026-10-11): [T0005](tickets.md#t0005--issue-images) adds issue images.
 Staff attach JPEG, PNG, and WebP images to an issue.
 The uploader chooses team-visible or staff-only visibility at upload.
 The default is staff-only, and the choice stays fixed.
@@ -29,6 +35,7 @@ The broader organizer tools below remain incomplete.
 
   T0002 implements this behavior in the local demo. Role and permission administration remain deferred in that scope. In the demo, volunteer and specialist roles confer support membership. Jury alone does not.
 - Contestants and staff can report issues. Staff manually open and close contestant intake.
+- Volunteers, specialists, jury members, and session admins can search team names and locations in the current session. T0008 matches partial words, either word order, accents, small spelling mistakes, and whole table numbers. Suggestions show the unresolved-issue count. The queue filter combines with the status filter. Jury-only members still see resolved issues only. Only volunteers and specialists select the affected team for a new report, and that choice uses the team's database id. Team codes, aliases, and institutions are not part of this search.
 - The current owner retains ownership during escalation until a specialist accepts the handoff. Timers run continuously while an issue remains unresolved. After reopening, unresolved time excludes resolved intervals. Recurrences become linked new reports. Duplicates link to a canonical report.
 - Contestants and helpers must be able to reopen resolved issues. T0002 implements reopening on the same issue and retains its history. Reopening continues an issue whose resolution needs review. A separate recurrence may still use a linked new report in future work. Linked-report controls remain outside T0002. The ticket records the implemented demo rules for ownership, timing, and awards.
 - The user confirmed that reopening resumes accumulated unresolved time and excludes time spent resolved. First-assignment delay remains separate. Awards remain discretionary.

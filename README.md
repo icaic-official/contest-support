@@ -173,6 +173,20 @@ The complete workflow is:
 7. Staff confirm external application of the award.
 
 Support staff can report an issue for a roster team.
+Volunteers, specialists, jury members, and session admins can search team names and locations in the issue queue.
+The search covers only teams in the current session that the signed-in member can access.
+Suggestions update while staff type.
+Each suggestion shows the team name, location, and unresolved-issue count.
+Choosing a suggestion filters that team's issues.
+The status filter still applies, so staff can include resolved history.
+Jury-only members keep the resolved-issue queue.
+Only volunteers and specialists choose the affected team in **Report for team**.
+A team already chosen in the queue starts selected there.
+Submit stays unavailable until staff choose a team, and the submission uses that team's database id.
+The first suggestion is never selected automatically.
+Table numbers match only as whole numbers, with leading zeros ignored.
+Tab leaves the suggestion list for the next control; use arrow keys and Enter to choose a team.
+A session change, loss of staff access, or removal of the selected team clears the choice when the session snapshot refreshes.
 Reopening retains the owner, every previous resolution, and any existing award.
 Unresolved time excludes resolved intervals.
 Server timestamps, issue revisions, transactional locks, and persisted request IDs protect writes.

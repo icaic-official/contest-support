@@ -333,7 +333,6 @@ Status: implemented and verified locally. The user reviews and merges.
 
 The user authorized fixes for the three P2 findings from the review of `1ed603a`.
 The branch preserves the merged T0008 team search and stays independent of the other open feature pull requests.
-The two P3 findings remain outside this change.
 
 Acceptance criteria:
 

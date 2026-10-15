@@ -18,7 +18,7 @@
 - Use short sentences, active voice, and familiar words. Avoid unnecessary jargon.
 - When a technical term is necessary, explain it in plain language on first use. Keep code names and commands exact.
 
-## Current scope and completed demo baseline
+## Current scope
 
 **T0008 team search (2026-10-11):** implement fuzzy team search on `feature/t0008-team-search`.
 The branch starts from updated `main`.
@@ -64,25 +64,7 @@ See [deployment evidence](docs/current-state.md#t0004-development-deployment-202
 
 Maintain the connected app, public login landing page, and sidebar.
 Maintain workflow and authorization tests that use real accounts.
-The demo requirements below are historical.
 Do not restore the demo runtime or reset tooling.
-
-### Historical demo baseline
-
-T0001 and T0002 were merged in PR #1 on 2026-10-02. T0003 is scoped in `docs/tickets.md` for cloud onboarding and an authenticated shared product. Its implementation must start from updated `main` on `feature/t0003-cloud-product`. The demo requirements below describe the completed baseline; they do not exclude the connected features explicitly selected for T0003. Keep planning separate from implemented capabilities.
-
-The initial objective was an interactive demo that helped the user decide where the application should go. T0001 and T0002 completed that baseline. Keep subsequent tickets small and driven by the user's feedback.
-
-- Use React, TypeScript, Vite, and npm with a committed lockfile.
-- Use fictional seeded data, simulated personas, and versioned browser-local persistence. The demo requires no cloud account or paid service.
-- Implement the complete journey: contestant submission, volunteer claim, escalation, specialist acceptance and resolution, discretionary award, and confirmation of external application.
-- Support team contestant, volunteer, specialist, and jury personas in one fictional group-contest session.
-- Make the volunteer experience usable on phones. Make the contestant and jury experiences usable on laptops/desktops. Support keyboard navigation. Label controls clearly.
-- Clearly identify the application as a demo. Persona switching and hidden UI controls are not authentication or authorization boundaries.
-- Keep real authentication, uploads, push notifications, cloud synchronization, CSV imports, shared-incident actions, and administration interfaces outside the initial demo ticket.
-- Preserve broader requirements in documentation. Do not silently implement them as extra demo scope.
-
-Use simple components and domain logic appropriate to the demo. Avoid speculative infrastructure or abstractions for features outside the selected scope.
 
 ## TypeScript style
 

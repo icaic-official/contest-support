@@ -191,6 +191,72 @@ test('Tab leaves open suggestions and selection still supports keyboard and poin
   expect(fixture.errors).toEqual([]);
 });
 
+for (const activation of ['Enter', 'Space']) {
+  test(`Clear team with ${activation} resets both controls and restores the queue`, async ({ page }) => {
+    await page.setViewportSize({
+      width: activation === 'Enter' ? 1400 : 320,
+      height: activation === 'Enter' ? 950 : 844,
+    });
+    const fixture = await signIn(page);
+    const queue = page.locator('#queue-team-search');
+    const options = page.locator('.team-suggestions [role=option]');
+    const rows = page.locator('.issue-list .issue-card');
+    const status = page.locator('.filter-label select');
+    await status.selectOption('open');
+    await queue.fill('aur');
+    await queue.press('ArrowDown');
+    await queue.press('Enter');
+    await expect(queue).toHaveValue('Aurora');
+    await expect(rows).toHaveCount(1);
+    await queue.press('Tab');
+    await expect(page.locator('.queue-toolbar .team-search-clear')).toBeFocused();
+    await page.keyboard.press(activation);
+    await expect(queue).toHaveValue('');
+    await expect(queue).toBeFocused();
+    await expect(rows).toHaveCount(2);
+    await expect(status).toHaveValue('open');
+    await expect(page.locator('.team-search-clear')).toHaveCount(0);
+    await expect(options).toHaveCount(0);
+
+    await queue.fill('ced');
+    await options.click();
+    await page.getByRole('button', { name: 'Report for team', exact: true }).click();
+    const report = page.locator('#report-team-search');
+    const submit = page.getByRole('button', { name: 'Submit issue', exact: true });
+    await expect(report).toHaveValue('Cedar');
+    await expect(submit).toBeEnabled();
+    await page.locator('select[name=category]').selectOption('Device');
+    await page.getByLabel('What’s happening?').fill('Keep this draft');
+    await report.focus();
+    await report.press('Tab');
+    await expect(page.locator('#issue-report .team-search-clear')).toBeFocused();
+    await page.keyboard.press(activation);
+    await expect(report).toHaveValue('');
+    await expect(report).toBeFocused();
+    await expect(queue).toHaveValue('');
+    await expect(rows).toHaveCount(2);
+    await expect(status).toHaveValue('open');
+    await expect(submit).toBeDisabled();
+    await expect(page.locator('.team-search-clear')).toHaveCount(0);
+    await expect(page.getByLabel('What’s happening?')).toHaveValue('Keep this draft');
+    await expect(page.locator('select[name=category]')).toHaveValue('Device');
+
+    // A new choice still enables submission, and pointer clearing still works.
+    await report.fill('aur');
+    await options.click();
+    await expect(queue).toHaveValue('Aurora');
+    await expect(submit).toBeEnabled();
+    await page.locator('#issue-report .team-search-clear').click();
+    await expect(report).toHaveValue('');
+    await expect(report).toBeFocused();
+    await expect(queue).toHaveValue('');
+    await expect(rows).toHaveCount(2);
+    await expect(submit).toBeDisabled();
+    expect(fixture.commands).toEqual([]);
+    expect(fixture.errors).toEqual([]);
+  });
+}
+
 test('a refreshed contestant membership drops the hidden staff team filter', async ({ page }) => {
   const fixture = await signIn(page);
   await page.locator('#queue-team-search').fill('ced');

@@ -64,6 +64,29 @@ Hosted real-account checks, protected cloud CI, assistive technology, other brow
 No migration or backend deployment is needed for these frontend fixes.
 The edited files retain their existing double-quote style and inferred React component return types for consistency; the new browser tests use single quotes.
 
+## T0008 keyboard clearing (2026-10-15)
+
+**Clear team** now works with Enter and Space in both the queue and report form.
+The input's focus handler publishes only an actual focus-state change, so refocusing after Clear cannot replay the previous selected team.
+Both fields clear, focus returns to the initiating input, and the existing status filter remains active across all teams.
+The report category and draft remain intact. Submission stays disabled until staff choose another team.
+Pointer clearing and choosing another team still work.
+
+The two new browser regressions reproduced the old failure with Enter and Space before the fix.
+After the fix, all 29 unit/database tests and all nine credential-free browser tests passed on Node.js 24.19.0.
+Type checking, ESLint, production build, and whitespace checks passed; the existing chunk-size warning remains.
+The browser cases cover both controls, keyboard focus, shared selection, status filtering, draft retention, disabled submission, subsequent selection, and pointer clearing.
+
+The Browser plugin was unavailable; Playwright 1.63.0 used installed Chromium at `http://127.0.0.1:4197` with mocked Auth and session responses.
+Desktop 1400×950 and phone 320×844 screenshots were captured and visually checked after clearing.
+Both fields were empty, the draft remained visible, Submit issue was disabled, and focus was on the report input.
+There was no horizontal page overflow, framework error overlay, JavaScript error, or console error.
+No workflow request was sent during the clear checks. Realtime remained disconnected by the fixture.
+
+No migration, dependency, backend, or deployment change is included.
+Hosted real-account checks, protected cloud integration, assistive technology, and other browser engines remain unverified.
+The existing double-quote style in the React component remains unchanged; the browser tests retain single quotes.
+
 ## Ticket allocation (2026-10-03)
 
 [T0004](tickets.md#t0004--ui-makeover) uses the user's dark green workspace and centered sign-in references.

@@ -83,7 +83,11 @@ export function TeamSearch({
             onChange={(event) =>
               onSelection(editTeamQuery(selection, event.target.value, id))
             }
-            onFocus={() => onSelection(focusTeamQuery(selection, id))}
+            onFocus={() => {
+              const next = focusTeamQuery(selection, id);
+              // Clear refocuses before React commits; do not replay unchanged state.
+              if (next !== selection) onSelection(next);
+            }}
             onKeyDown={(event) => {
               if (
                 (event.key === "ArrowDown" || event.key === "ArrowUp") &&

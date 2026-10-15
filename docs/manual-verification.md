@@ -224,6 +224,26 @@ Also check these regressions with isolated fixtures:
 `tests/team-search.spec.ts` runs the focus and refreshed-snapshot checks using mocked Auth and session responses.
 These fixtures do not connect to a hosted backend or verify database authorization.
 
+## 11. Workspace refresh and cloud fixture recovery
+
+Use isolated test accounts for these checks.
+
+1. Open the issue queue as support staff without selecting a row.
+2. Enter a reply on the displayed issue.
+3. Submit another issue from a second client.
+4. Check that the first client still shows the original issue and reply text.
+5. Send the reply. Check that it belongs to the original issue.
+6. Open a membership form as an administrator.
+7. Change that member's roles or team from a second administrator account.
+8. Return focus to the first client so it receives the current membership.
+9. Check that both the summary and form show the current roles or team.
+10. Save the form. Check that it preserves the second administrator's change.
+
+The credential-free tests in `tests/workspace-refresh.spec.ts` cover these UI effects and exact write requests.
+The cleanup tests in `scripts/cloud-test.test.mjs` check a failed deletion, a successful retry, and the retained recovery file.
+They use mocked cloud responses and a local child process. They do not access hosted data.
+See [fixture recovery](cloud-onboarding.md#fixture-recovery) for failed cloud cleanup.
+
 Record observed results in [current-state.md](current-state.md).
 Suggested manual checks are not completed checks.
 Browser automation does not establish results for real devices, assistive technology, or capacity.

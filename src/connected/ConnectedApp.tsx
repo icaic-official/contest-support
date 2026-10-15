@@ -614,6 +614,10 @@ function Dashboard({
       ),
     ) ?? [];
   const issue = filtered.find((i) => i.id === selected) ?? filtered[0];
+  // Keep the displayed issue selected when a new report arrives.
+  if (issue && issue.id !== selected) {
+    setSelected(issue.id);
+  }
   const activeView = view === "admin" && !m?.is_admin ? "issues" : view;
   function navigate(next: typeof view) {
     setView(next);
@@ -1839,7 +1843,11 @@ function AdminPanel({
                       );
                     }}
                   >
-                    <MembershipFields state={state} member={m} />
+                    <MembershipFields
+                      key={JSON.stringify(m)}
+                      state={state}
+                      member={m}
+                    />
                     <button type="submit">Save membership</button>
                   </form>
                   <div className="account-actions">

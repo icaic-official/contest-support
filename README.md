@@ -84,7 +84,7 @@ See [cloud onboarding](docs/cloud-onboarding.md) for function configuration, use
 | `npm run lint` | Run ESLint for TypeScript and Node scripts. |
 | `npm run check:functions` | Run the Deno type check for the privileged Supabase function. |
 | `npm test` | Test connected timing, account identifiers, and migrations and RLS with embedded PostgreSQL. Cloud credentials and Docker are not required. |
-| `npm run test:e2e` | Run public landing and login browser checks without cloud credentials. |
+| `npm run test:e2e` | Run login, team-search, and workspace-refresh browser checks without cloud credentials. |
 | `npm run test:hosted` | Run the smoke suite with real accounts against the deployed development frontend. |
 | `npm run test:cloud` | Test real Auth, database, and Realtime behavior against the linked project. The suite creates temporary accounts and isolated sessions, then deletes its fixtures. |
 | `npm run cloud:plan` / `cloud:migrate` | Preview or apply migrations to the linked cloud project. |
@@ -103,7 +103,7 @@ Deno and the provider CLIs are pinned npm dependencies.
 Cloud tests hold test credentials in memory and a temporary file.
 Privileged credentials never enter the browser.
 Do not interrupt cloud tests during fixture deletion.
-If fixture deletion fails, investigate the reported test sessions before you delete them.
+If fixture deletion fails, use the retained recovery file as described in [fixture recovery](docs/cloud-onboarding.md#fixture-recovery).
 There is no command to reset shared data.
 
 PR CI checks builds, lint, types, functions, database behavior, and the public landing and login pages without hosted secrets.

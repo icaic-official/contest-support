@@ -1,5 +1,9 @@
 # Current state
 
+T0010 fixes the three P2 review findings on `feature/t0010-p2-review-fixes`, from `main` at `d961f5b`.
+The changes are verified locally and await user review. They are not deployed.
+See [T0010 verification](#t0010-p2-review-fixes-2026-10-15).
+
 T0008 fuzzy team search is implemented on `feature/t0008-team-search` and is awaiting review in [PR #22](https://github.com/notbowen/minsky/pull/22).
 It is not deployed.
 The branch starts from `main` at `1ed603a` and does not include the open T0005, T0006, or T0007 pull requests.
@@ -20,6 +24,38 @@ The 2026-10-03 ticket decision defers these items to T0005, which previously for
 
 Older implementation and deployment reports below describe their recorded revisions.
 Use the current status above to determine which PR remains open.
+
+## T0010 P2 review fixes (2026-10-15)
+
+The issue queue records its displayed issue as the selection before another snapshot can change the first row.
+An incoming report therefore preserves the open issue and its reply draft.
+Membership fields reset only when their saved membership values change.
+An unchanged membership preserves local edits; a changed role, admin flag, or team appears in the form and its next write request.
+No synchronization effect, migration, or new application API was added.
+
+Cloud teardown removes the fixture file only after cleanup succeeds.
+The runner removes its temporary directory when that file is gone, even if a test assertion failed.
+Failed cleanup keeps the recovery file and reports its path without printing its contents.
+See [fixture recovery](cloud-onboarding.md#fixture-recovery).
+
+The new browser tests reproduced the issue switch and stale role checkbox on the original code.
+The new runner tests reproduced loss of the recovery file after a failed child process.
+After the fixes, all 33 Vitest tests and all 11 credential-free browser tests passed on Node.js 24.19.0.
+ESLint, TypeScript checking, the Deno function check, the production build, and whitespace checks passed.
+The unit tests call the actual teardown and runner, then check exact deletion requests, retained file contents, removal after a successful retry, and process exit status.
+The browser tests use the real UI and assert the reply text, selected issue, and exact workflow and membership payloads.
+
+The Browser plugin was unavailable. Playwright used the installed system Chromium through an external configuration under `/tmp`.
+An additional browser walkthrough retained the reply after a new report and sent both refreshed staff roles.
+Desktop screenshots at 1505×1045 and membership screenshots at 390px and 320px were checked.
+Neither phone width had horizontal page overflow. No app console errors or framework error overlay appeared.
+The existing React quote style and inferred component return types were retained; the new browser tests use single quotes.
+The Google TypeScript Style Guide was read before TypeScript changes.
+No dependency versions changed. Deno's generated workspace-lockfile update was removed from the patch.
+
+The tests use fictional Auth, database responses, and a local child process.
+They do not verify hosted Auth or Realtime, and no cloud integration run or deployment was performed.
+The two P3 review findings remain outside T0010.
 
 ## T0008 fuzzy team search (2026-10-11)
 

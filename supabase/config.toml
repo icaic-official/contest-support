@@ -22,3 +22,5 @@ enable_confirmations = true
 [functions.admin]
 # Supabase publishable keys are not JWTs. The handler validates every caller.
 verify_jwt = false
+[functions.attachments]
+verify_jwt = false

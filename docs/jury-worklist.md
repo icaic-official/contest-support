@@ -2,6 +2,7 @@
 
 Status: specified on 2026-10-14 and implemented on 2026-10-15 at the user's request.
 Branch: `feature/t0009-jury-worklist`, from updated `main` at `1ed603a`.
+Review: [draft PR #23](https://github.com/notbowen/minsky/pull/23).
 Local verification passes; hosted cloud and remaining manual acceptance are unverified.
 See [current state](current-state.md#t0009-jury-worklist-2026-10-15).
 
@@ -176,8 +177,8 @@ No backend release is expected for this scope. Merging does not deploy the app.
   are recorded. Physical devices and native browser zoom remain unverified.
 - [x] Required checks and the existing workflow regressions pass, or unavailable
   checks are clearly identified without claiming readiness.
-- [ ] Documentation describes the actual implementation and verification. A PR
-  is prepared for user review; deployment remains a separate explicit step.
+- [x] Documentation describes the actual implementation and verification.
+  Draft PR #23 is prepared for user review; deployment remains separate.
 
 ## Exclusions
 

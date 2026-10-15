@@ -278,6 +278,7 @@ Resilience and event-capacity work remain deferred until feature feedback warran
 Branch: `feature/t0009-jury-worklist`, from updated `main` at `1ed603a`.
 
 Status: specified on 2026-10-14 and implemented at the user's request on 2026-10-15.
+[Draft PR #23](https://github.com/notbowen/minsky/pull/23) contains the implementation.
 Local verification passes. Hosted cloud verification has not started because
 credentials for the isolated Minsky CI project are unavailable.
 The user reviews and merges; deployment remains separate. The feature is not deployed.

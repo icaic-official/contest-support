@@ -3,6 +3,7 @@
 ## T0009 jury worklist (2026-10-15)
 
 Implemented on `feature/t0009-jury-worklist`, from updated `main` at `1ed603a`.
+Source revision: `2ce66bd`; [draft PR #23](https://github.com/notbowen/minsky/pull/23).
 The user authorized this work independently of the open T0005–T0008 branches.
 Those branches were not merged or copied into this implementation.
 The feature is not deployed. The user reviews and merges; merge does not deploy.
@@ -33,6 +34,8 @@ Verification:
 | Local two-client updates | Passed with simulated Auth/HTTP/Realtime transport and actual migration-owned PostgreSQL RLS, snapshots, and workflow transactions |
 | Cloud integration | Could not start: the credential lookup for the isolated Minsky CI project failed before fixture creation |
 | Protected GitHub cloud job and hosted deployment | Not run; no deployment was performed |
+| Dependency audit | `npm audit --audit-level=high` reported zero vulnerabilities |
+| Documentation | All 63 local links/anchors and whitespace checks passed |
 
 Browser plugin not available; repository Playwright/Chromium was used at
 `http://127.0.0.1:4173`. Checks covered eligibility, ordering, zero-minute decisions,

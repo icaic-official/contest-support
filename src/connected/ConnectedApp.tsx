@@ -27,6 +27,7 @@ import {
   unresolvedTime,
 } from "./model";
 import { z } from "zod";
+import { IssueImages } from "./IssueImages";
 import { TeamSearch } from "./TeamSearch";
 import {
   initialTeamSelection,
@@ -1142,6 +1143,7 @@ function Dashboard({
                       member={m}
                       now={now}
                       act={act}
+                      refresh={refresh}
                     />
                   ) : (
                     <section className="detail detail-empty">
@@ -1169,12 +1171,14 @@ function IssueDetail({
   member: m,
   now,
   act,
+  refresh,
 }: {
   issue: Issue;
   state: Snapshot;
   member: Membership;
   now: number;
   act: (command: Command) => Promise<boolean>;
+  refresh: () => Promise<void>;
 }) {
   const [resolution, setResolution] = useState("");
   const [minutes, setMinutes] = useState("");
@@ -1234,7 +1238,7 @@ function IssueDetail({
         Back to queue
       </button>
       <fieldset className="detail-actions" disabled={state.event?.archived}>
-        <legend className="sr-only">Issue actions and history</legend>
+        <legend className="sr-only">Issue actions</legend>
         <p className="detail-breadcrumb">Issues / ISS-{issue.number}</p>
         <div className="detail-heading">
           <strong>ISS-{issue.number}</strong>
@@ -1328,9 +1332,30 @@ function IssueDetail({
               }}
             >
               Escalate to specialist
-            </button>
-          )}
+          </button>
+        )}
         </div>
+      </fieldset>
+      {state.session && (
+        <IssueImages
+          sessionId={state.session.id}
+          issueId={issue.id}
+          archived={Boolean(state.event?.archived)}
+          canUpload={staff && !state.event?.archived}
+          staff={staff}
+          userId={m.user_id}
+          limits={{
+            maxImageBytes: state.session.max_image_bytes,
+            maxImages: state.session.max_images_per_issue,
+            maxTotalBytes: state.session.max_image_bytes_per_issue,
+          }}
+          attachments={state.attachments.filter((item) => item.issue_id === issue.id)}
+          pendingRemovals={state.pending_removals.filter((item) => item.issue_id === issue.id)}
+          onChanged={refresh}
+        />
+      )}
+      <fieldset className="detail-actions" disabled={state.event?.archived}>
+        <legend className="sr-only">Issue conversation and resolution</legend>
         {active && activity}
         {active && (m.team_id || support || m.roles.includes("jury")) && (
           <form
@@ -1726,6 +1751,66 @@ function AdminPanel({
               : "Open contestant intake"}
           </button>
         </div>
+        <form
+          className="image-limits"
+          key={`${session.max_image_bytes}-${session.max_images_per_issue}-${session.max_image_bytes_per_issue}`}
+          onSubmit={(event) => {
+            const data = formData(event);
+            void run(async () =>
+              requireClient().rpc("set_image_limits", {
+                p_session: session.id,
+                p_file_mb: Number(text(data, "file_mb")),
+                p_count: Number(text(data, "count")),
+                p_total_mb: Number(text(data, "total_mb")),
+              })
+            );
+          }}
+        >
+          <div>
+            <h3>Image limits</h3>
+            <p>
+              JPEG, PNG, and WebP images. Lowering a limit leaves images that
+              are already attached.
+            </p>
+          </div>
+          <label>
+            Maximum size of one image (MB)
+            <input
+              name="file_mb"
+              type="number"
+              min={1}
+              max={50}
+              step={1}
+              required
+              defaultValue={session.max_image_bytes / 1048576}
+            />
+          </label>
+          <label>
+            Maximum images on one issue
+            <input
+              name="count"
+              type="number"
+              min={1}
+              max={24}
+              step={1}
+              required
+              defaultValue={session.max_images_per_issue}
+            />
+          </label>
+          <label>
+            Maximum combined size on one issue (MB)
+            <input
+              name="total_mb"
+              type="number"
+              min={1}
+              max={120}
+              step={1}
+              required
+              defaultValue={session.max_image_bytes_per_issue / 1048576}
+            />
+          </label>
+          <button type="submit">Save image limits</button>
+        </form>
         <div className="admin-workspace">
           <section className="admin-section">
             <div className="admin-section-heading">

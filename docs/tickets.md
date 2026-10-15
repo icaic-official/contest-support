@@ -5,13 +5,17 @@ These tickets describe development work, not contestant issues.
 T0004 has two related pull requests.
 [PR #9](https://github.com/notbowen/minsky/pull/9) implements the UI makeover.
 [PR #13](https://github.com/notbowen/minsky/pull/13) rewrites the documentation.
+The user merged both into `main` on 2026-10-11 (SGT).
+[PR #14](https://github.com/notbowen/minsky/pull/14) records the TypeScript major-update rule.
 
-The `feature/t0004-ste100-docs` branch is a documentation follow-up within T0004.
-The user merged PR #9 into `main` on 2026-10-11 (SGT) and deleted its UI branch.
-PR #13 now targets `main` and remains a draft.
-T0005 remains follow-up scope notes with no implementation started on this branch.
-T0008 implements fuzzy team search on `feature/t0008-team-search`.
-That branch does not change the open issue-image, announcement, or installation pull requests.
+T0005 implements issue images on `feature/t0005-issue-attachments`.
+These items stay deferred and are not part of T0005:
+
+- Provider ownership and billing records.
+- GitHub merge enforcement and vulnerability alerts.
+- Remaining manual acceptance checks.
+
+T0008 fuzzy team search merged into `main` in [PR #22](https://github.com/notbowen/minsky/pull/22) on 2026-10-15 (SGT).
 
 ## T0001 — Local workflow demo and project guidance
 
@@ -200,7 +204,7 @@ The branch started from updated `origin/main` after T0003 merged in PR #2 on 202
 Status: implemented and merged in [PR #9](https://github.com/notbowen/minsky/pull/9) on 2026-10-11 (SGT).
 Merge commit: `52ff99133bd727626b3589b40a507ab438f508da`.
 [The merge record](current-state.md#t0004-merge-and-documentation-follow-up-2026-10-11) gives the exact UTC timestamp and reviewed revision.
-[PR #13](https://github.com/notbowen/minsky/pull/13) remains the documentation follow-up within T0004.
+[PR #13](https://github.com/notbowen/minsky/pull/13) merged the documentation rewrite on 2026-10-11 (SGT).
 
 Deployment evidence (2026-10-03): verified locally and deployed to [minsky-dev](https://minsky-dev.icaic-minsky.workers.dev).
 The user explicitly requested "Deploy first".
@@ -233,55 +237,88 @@ That development deployment preceded merge under the user's exception for T0004.
 - [x] Type checking, lint, build, focused tests, database tests, and browser and cloud checks pass. Current-state.md records screenshot review and remaining manual limitations.
 - [x] Relevant documentation is current. A PR is prepared for user review.
 
-Previous T0004 follow-up scope notes move to T0005 below.
+## T0005 — Issue images
 
-## T0005 — Follow-up scope notes
+Branch: `feature/t0005-issue-attachments`, created from updated `main` after T0004 merged.
 
-Status: the user's 2026-10-03 decision moved these scope notes from T0004.
-Detailed specification and acceptance criteria remain pending.
-Implementation remains pending.
+Status: implemented and verified locally on 2026-10-11.
+The 2026-10-14 review fixes add current-access checks, fixed visibility during retry, exact file paths, saved removal retries, and completion-time count checks.
+See the [review-fix record](current-state.md#t0005-review-fixes-2026-10-14) for local verification and cloud-test limits.
+Review pull request: [PR #19](https://github.com/notbowen/minsky/pull/19).
+On 2026-10-11, the user requested a Cloudflare preview before merge and approved using the existing development backend.
+The migration and account/attachment functions are deployed to `Minsky` development.
+The frontend preview is uploaded at https://t0005-minsky-dev.icaic-minsky.workers.dev.
+See the [preview record](current-state.md#t0005-development-preview-2026-10-11) for verification.
+`Minsky CI` and the main Worker deployment remain unchanged.
+The user reviews and merges.
+Deployment is a separate explicit step.
 
-### Agreed deferred work
+### Selected scope
 
-- Record provider ownership, selected billing plans, billing contact, recurring charges, and receipt procedures.
-- Configure GitHub merge enforcement and vulnerability alerts with repository owner access.
-- Verify those settings.
-- Complete the remaining user and manual acceptance checks for the connected app.
+- Staff add JPEG, PNG, or WebP images from the issue detail.
+- Each image belongs to that issue and records the uploader and upload time.
+- The uploader chooses **Staff only** or **Visible to the team**.
+- **Staff only** is the default.
+- The choice stays fixed.
+- Contestants can view team-visible images on their own team's issues.
+- Contestants cannot upload images, and they cannot see staff-only images.
+- Volunteers, specialists, jury members, and session admins can upload while the event is active.
+- There is no control that disables uploads.
+- Only the uploader can remove an image, and only while the event is active.
+- Removal deletes the stored file.
+- Activity records the actor and time at the same visibility.
+- Session admins set three limits for the session.
+- One image can be from 1 to 50 MB. The default is 10 MB.
+- One issue can have from 1 to 24 images. The default is 12.
+- The combined size can be from 1 to 120 MB. The default is 120 MB.
+- The combined limit must be at least the single-image limit.
+- One MB is 1,048,576 bytes.
+- A lower limit leaves images that are already attached.
+- The next upload must fit the current limits.
+- Resolved issues keep their images.
+- Authorized uploads still work on a resolved issue while the event is active.
+- Reopening does not change images, ownership, or awards.
+- Images do not change the issue timer.
+- An archived event keeps the files.
+- Authorized members can still preview and download them.
+- Uploads, removal, and limit changes stop.
+- Minsky does not delete archived images.
+- The interface shows thumbnails, upload progress, validation messages, and a retry control for a failed transfer.
+- Full-size preview and download use the signed-in member's storage access.
+- The controls use the dark green workspace.
+- They remain usable on phones and desktops.
+- Postgres and Storage enforce authorization.
+- Clients cannot insert attachment rows directly.
 
-The user selected these follow-up items.
-Broader organizer tools and attachments remain candidates.
-Their implementation scope still requires agreement.
+### Outside this ticket
 
-### Candidate scope: organizer tools and configurable issue attachments
+Contestant uploads, HEIC, GIF, SVG, PDF, video, extra captions, later visibility changes, event and roster editors, shared incidents, image transformations, a paid storage upgrade, and image deletion jobs are outside this ticket.
 
-Candidate work includes event, session, roster, and category editors and permission settings.
-Prioritize this work after review of the cloud workflow.
-Helpers' uploaded photos and screenshots must link to an issue.
-Records must identify the uploader and upload time.
-Include controls to enable or disable volunteer image submission.
-The backend must enforce those controls.
+These operational items stay deferred.
+They do not receive a new ticket number:
 
-Before implementation, decide these rules:
+- Provider ownership, selected billing plans, billing contact, recurring charges, and receipt procedures.
+- GitHub merge enforcement and vulnerability alerts.
+- The remaining user and manual acceptance checks.
 
-- Configuration scope.
-- Defaults.
-- Access for contestants and staff.
+Resilience and event-capacity work remain deferred.
 
-Do not assume that the uploader chooses visibility.
-Supabase Storage is the initial recommendation, with file records in Postgres and private bucket access.
-Choose file types, size limits, and deletion rules when you define scope.
-These are T0005 candidate scope notes.
-They are not an agreed implementation specification.
-Resilience and event-capacity work remain deferred until feature feedback warrants them.
+### Acceptance criteria
+
+- [x] Staff can upload from the issue detail. Each image links to the issue and records the uploader and time.
+- [x] Team-visible and staff-only images follow the same separation as public replies and internal notes. The uploader's choice stays fixed.
+- [x] Only a session admin can change limits. The limits stay inside the stated ranges. The next upload must fit. Existing images remain when a limit is lowered.
+- [x] Only the uploader can remove an image during an active event. An archived event stays readable and rejects uploads, removal, and limit changes.
+- [x] Embedded database tests cover roles, storage access, visibility, limits, resolved issues, and archival. Phone-width browser checks cover preview, validation, retry, contestant hiding, and archived read-only controls.
+- [x] Documentation matches this behavior. A pull request is prepared for review. Development and CI stay unchanged until an explicit deployment.
 
 ## T0008 — Fuzzy team search
 
 Branch: `feature/t0008-team-search`, from updated `main` at `1ed603a`.
 
-Status: implemented on this branch for review in [PR #22](https://github.com/notbowen/minsky/pull/22).
+Status: merged into `main` in [PR #22](https://github.com/notbowen/minsky/pull/22) on 2026-10-15 (SGT).
 The user asked to build it while [PR #19](https://github.com/notbowen/minsky/pull/19), [PR #20](https://github.com/notbowen/minsky/pull/20), and [PR #21](https://github.com/notbowen/minsky/pull/21) remain open.
-This branch does not change those pull requests.
-The user reviews and merges.
+T0008 was developed separately. The T0005 branch now includes the accepted search through a merge from `main`.
 Deployment is a separate explicit step.
 
 ### Behavior
@@ -324,11 +361,12 @@ Deployment is a separate explicit step.
 - [x] Enter and Space on **Clear team** clear the shared selection, return focus to the input, and preserve the status filter and report draft. Pointer clearing still works.
 - [x] Refreshed membership, automatic session fallback, and removal of a selected team cannot leave an invalid team choice active.
 - [x] No schema or cloud fixture is added.
-- [ ] The user reviews the pull request. Deployment waits for an explicit request.
+- [x] The user merged PR #22. Deployment waits for an explicit request.
 
 ## T0010 — P2 review fixes
 
 Branch: `feature/t0010-p2-review-fixes`, from updated `main` at `d961f5b`.
+The branch now includes `main` at `9c0341c`, with T0005 issue images.
 Status: implemented and verified locally. The user reviews and merges.
 
 The user authorized fixes for the three P2 findings from the review of `1ed603a`.

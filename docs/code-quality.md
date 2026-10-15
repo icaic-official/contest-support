@@ -71,7 +71,9 @@ The Google TypeScript style policy and manual interface checks in AGENTS.md stil
 ## Owner setup for mandatory merges
 
 On 2026-10-02, the user deferred remote merge enforcement and setup of vulnerability alerts.
-On 2026-10-03, the user moved these scope notes from T0004 to T0005.
+On 2026-10-03, the user moved these scope notes from T0004.
+They stay deferred.
+They are not part of the T0005 issue-image ticket.
 Existing checks and prepared configuration remain in T0003.
 The owner steps below remain incomplete.
 Setup of the protected cloud integration CI environment remains a separate T0003 requirement.

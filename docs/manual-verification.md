@@ -1,4 +1,4 @@
-# Connected manual verification (T0003/T0004)
+# Connected manual verification (T0003/T0004/T0005)
 
 Use the linked development project and organizer-provided username and password accounts.
 Create the first admin through the explicit bootstrap process.
@@ -181,7 +181,48 @@ Review the centered sign-in page at desktop, 800px, 390px, and 320px widths.
 The suite creates isolated test fixtures and deletes only those fixtures.
 It does not reset the shared project.
 
-## 10. Team search
+## 10. Issue images
+
+Use an active event unless a step says the event is archived.
+
+1. As a volunteer, specialist, jury member, and admin, add a JPEG, PNG, or WebP image from the issue detail.
+2. Check the progress text, thumbnail, uploader, and time.
+3. Open the full-size preview with the keyboard.
+4. Download the image.
+5. Close the preview and check that focus returns to the thumbnail.
+6. Keep the default **Staff only** choice for one image.
+7. Choose **Visible to the team** for another image.
+8. As a contestant on that team, check that only the team-visible image appears.
+9. Check that the contestant has no image file control.
+10. As a contestant on another team, check that neither image appears.
+11. As a staff member who did not upload the image, check that removal is refused.
+12. As the uploader, remove the image.
+13. Check that activity records the removal at the same visibility.
+14. Retry a failed transfer with **Try the upload again**.
+15. Reject a file that is not a JPEG, PNG, or WebP image.
+16. Reject an image above the current size limit.
+17. As admin, save lower image limits.
+18. Check that existing images remain and that the next upload must fit.
+19. Resolve the issue.
+20. Check that the images remain and that an authorized upload still works.
+21. Archive the event.
+22. Check that preview and download still work.
+23. Check that upload, removal, and limit changes are refused.
+24. Repeat the image controls at 390×844 and 320×740.
+25. Check that the page does not scroll horizontally.
+26. Start a team-visible upload and cause a transfer failure in an isolated test.
+27. Check that **Who can see this image** remains locked to **Visible to the team**.
+28. Select **Cancel upload**. Check that the unfinished files are deleted before the choice becomes available.
+29. Select **Staff only** and start a new upload. Check that contestants cannot see it.
+30. Cause file deletion to fail. Check that the app reports the failure and shows **Retry removal**.
+31. Refresh the page. Check that the uploader still has **Retry removal**, even though the image is no longer listed.
+32. Retry removal. Check that both stored files are gone and the retry control disappears.
+33. Start an upload, then remove that member's session access before completion. Check that unfinished-file access and completion fail.
+34. Repeat with a password reset and with event archival.
+35. Start two uploads, then lower the count limit to one. Check that only one can become attached.
+36. Try a file path with an extra folder. Check that Storage refuses it.
+
+## 11. Team search
 
 Use a volunteer or specialist account, then repeat the queue search as jury and as a session admin.
 Use a contestant account to confirm that team search stays hidden.
@@ -224,7 +265,7 @@ Also check these regressions with isolated fixtures:
 `tests/team-search.spec.ts` runs the focus and refreshed-snapshot checks using mocked Auth and session responses.
 These fixtures do not connect to a hosted backend or verify database authorization.
 
-## 11. Workspace refresh and cloud fixture recovery
+## 12. Workspace refresh and cloud fixture recovery
 
 Use isolated test accounts for these checks.
 

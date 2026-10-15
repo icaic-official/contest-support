@@ -4,6 +4,7 @@ Minsky helps contest teams and staff report, triage, resolve, and review technic
 Contestants report issues; volunteers and specialists handle them through a shared queue.
 Jury members record time awards, and staff confirm their application to the external contest clock.
 Administrators manage accounts, roles, and contestant intake.
+Staff can attach images to issues and choose staff-only or team visibility.
 
 The app uses React, TypeScript, and Vite, with Supabase Auth, Postgres, and Realtime.
 Cloudflare Workers hosts the frontend.
@@ -46,7 +47,8 @@ See [cloud onboarding](docs/cloud-onboarding.md#contributor-setup) for provider 
 | `npm run preview` | Serve built assets locally. |
 | `npm run typecheck` | Check TypeScript. |
 | `npm run lint` | Run ESLint. |
-| `npm run check:functions` | Check the Supabase function with Deno. |
+| `npm run check:functions` | Check the account and attachment functions with Deno. |
+| `npm run test:functions` | Test attachment authorization and file removal with fake clients. |
 | `npm test` | Run unit, script, and embedded database tests without cloud credentials. |
 | `npm run test:e2e` | Run browser tests with mocked cloud responses. |
 

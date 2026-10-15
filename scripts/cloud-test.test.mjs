@@ -23,6 +23,12 @@ vi.mock("@supabase/supabase-js", () => {
   return {
     createClient: () => ({
       from: (table) => ({
+        select: (columns) => ({
+          in: (column, value) => {
+            cloud.requests.push({ table, columns, column, value });
+            return { data: [], error: null };
+          },
+        }),
         delete: () => ({
           in: (column, value) => remove(table, column, value),
           eq: (column, value) => remove(table, column, value),
@@ -66,6 +72,11 @@ it("keeps exact fixture records after a rejected deletion and removes the file a
     '{"event":"event-one","sessions":["session-one"],"teams":["team-one"],"accounts":{"helper":{"id":"user-one"}}}',
   );
   expect(cloud.requests).toEqual([
+    {
+      table: "attachments", columns: "id,session_id,issue_id",
+      column: "session_id", value: ["session-one"],
+    },
+    { table: "attachments", column: "session_id", value: ["session-one"] },
     { table: "admin_audit", column: "session_id", value: ["session-one"] },
     { table: "history", column: "session_id", value: ["session-one"] },
   ]);
@@ -73,6 +84,11 @@ it("keeps exact fixture records after a rejected deletion and removes the file a
   cloud.requests = [];
   await teardown();
   expect(cloud.requests).toEqual([
+    {
+      table: "attachments", columns: "id,session_id,issue_id",
+      column: "session_id", value: ["session-one"],
+    },
+    { table: "attachments", column: "session_id", value: ["session-one"] },
     { table: "admin_audit", column: "session_id", value: ["session-one"] },
     { table: "history", column: "session_id", value: ["session-one"] },
     { table: "awards", column: "session_id", value: ["session-one"] },

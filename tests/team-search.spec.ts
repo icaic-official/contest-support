@@ -93,7 +93,17 @@ async function signIn(page: Page) {
         team.id !== removedTeam && (!member.team_id || team.id === member.team_id),
       );
       const snapshot: Snapshot = {
-        session: { id: sessionId, event_id: EVENT_ID, name: 'Review session', intake_open: true, categories: ['Network', 'Device'], revision: 0 },
+        session: {
+          id: sessionId,
+          event_id: EVENT_ID,
+          name: 'Review session',
+          intake_open: true,
+          categories: ['Network', 'Device'],
+          revision: 0,
+          max_image_bytes: 10 * 1048576,
+          max_images_per_issue: 12,
+          max_image_bytes_per_issue: 120 * 1048576,
+        },
         event: { id: EVENT_ID, name: 'Review event', archived: false },
         membership: member,
         teams: visibleTeams,
@@ -118,6 +128,8 @@ async function signIn(page: Page) {
         })).filter((issue) => visibleTeams.some((team) => team.id === issue.team_id)),
         resolutions: [],
         history: [],
+        attachments: [],
+        pending_removals: [],
         awards: [],
         members: [{ membership: member, person: { id: USER_ID, name: 'Review fixture', username: 'reviewer' } }],
         audit: [],

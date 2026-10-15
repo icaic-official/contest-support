@@ -23,6 +23,9 @@ async function openWorkspace(page: Page) {
       intake_open: true,
       categories: ['Network'],
       revision: 0,
+      max_image_bytes: 10 * 1024 * 1024,
+      max_images_per_issue: 20,
+      max_image_bytes_per_issue: 120 * 1024 * 1024,
     },
     event: {
       id: '00000000-0000-4000-8000-000000000090',
@@ -59,6 +62,8 @@ async function openWorkspace(page: Page) {
     ],
     resolutions: [],
     history: [],
+    attachments: [],
+    pending_removals: [],
     awards: [],
     audit: [],
     members: [

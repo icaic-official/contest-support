@@ -1,6 +1,7 @@
 import { expect, test as base, type Page } from "@playwright/test";
 import { mkdir } from "node:fs/promises";
 import { createJuryFixture } from "./jury-fixture";
+import { snapshotSchema } from "../src/connected/model";
 
 const test = base.extend<{
   local: Awaited<ReturnType<typeof createJuryFixture>>;
@@ -185,22 +186,24 @@ test("two simulated Realtime clients refresh decisions and confirmations without
     await second
       .getByLabel("Public award explanation")
       .fill("Five minutes approved");
+    // Match the other issue's award so an earlier or in-flight read cannot pass.
+    const updatedSnapshot = page.waitForResponse(async (response) => {
+      if (
+        !response.url().endsWith("/rpc/session_snapshot") ||
+        !response.ok()
+      )
+        return false;
+      const state = snapshotSchema.parse(await response.json());
+      return state.awards.some((award) => award.issue_id === local.issues[1]);
+    });
     await second
       .getByRole("button", { name: "Record award", exact: true })
       .click();
     await expect(
       second.getByText("5 minutes awarded", { exact: true }),
     ).toBeVisible();
-    await expect
-      .poll(async () =>
-        page.evaluate(
-          () =>
-            document.querySelector<HTMLTextAreaElement>(
-              'textarea[name="explanation"]',
-            )?.value,
-        ),
-      )
-      .toBe("Draft under review");
+    await (await updatedSnapshot).finished();
+    await expect(draft).toHaveValue("Draft under review");
     await expect(draft).toBeFocused();
     await page.getByRole("button", { name: "Back to jury worklist" }).click();
     await expect(

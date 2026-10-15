@@ -68,6 +68,28 @@ record remaining acceptance. Cloud results must not be inferred from local
 transport simulations. The hosted test includes zero-minute award, reopening,
 external confirmation, re-resolution, and rejection of a second award, but is unverified.
 
+### PR23 review fixes (2026-10-15)
+
+The shared cloud journey now saves the volunteer's changed password in its
+private fixture file and restores the event's previous archive state in `finally`,
+including when an assertion fails. The later jury case can reuse that fixture
+without inheriting stale credentials or an archived event. All updates stay
+within the run's UUID-scoped fixture; no shared project state was changed.
+
+The two-client browser case now waits for the first client's completed snapshot
+response containing the other issue's award before checking the explanation
+draft and keyboard focus. An unchanged pre-refresh draft can no longer satisfy
+the check before that response arrives.
+
+After these fixes, type checking, lint, build, Deno checking, all 34 unit/database
+tests, and all 10 credential-free browser cases passed. Browser plugin not
+available; Playwright used system Chromium and a temporary configuration outside
+the repository. The cloud runner still cannot retrieve credentials for the
+isolated Minsky CI project `ghtztmovdkhuketcbjmq`; it stopped before fixture
+creation. Listing the cloud suite confirms 13 cases, but does not execute them.
+Hosted verification remains unverified, and PR23 remains a draft. The build
+retains its existing bundle-size warning. No deployment was performed.
+
 ## Earlier state records
 
 T0001 and T0002 merged in PR #1.

@@ -1,213 +1,71 @@
 # Minsky
 
 Minsky helps contest teams and staff report, triage, resolve, and review technical problems.
-T0003 connects this workflow to Supabase Auth, Postgres, and Realtime.
-Cloudflare Workers serves the static React frontend.
+Contestants report issues; volunteers and specialists handle them through a shared queue.
+Jury members record time awards, and staff confirm their application to the external contest clock.
+Administrators manage accounts, roles, and contestant intake.
 
-The connected app is a **development deployment**.
-Development assumes connectivity.
-Organizers provide usernames and passwords.
-Users must change temporary passwords before they can access contest data.
-Organizers handle password recovery without SMTP.
-The app is not yet certified for a live contest or the 800-user target.
+The app uses React, TypeScript, and Vite, with Supabase Auth, Postgres, and Realtime.
+Cloudflare Workers hosts the frontend.
+This is a **development deployment** that requires connectivity.
+Live-contest readiness and capacity for 800 simultaneous users remain unverified.
 
-T0004 gives the app a dark green interface based on the user's references.
-On desktop screens, a compact sidebar sits beside the issue queue and the panel for issue details and activity.
-On phones, queue rows become cards.
-**Menu** opens navigation.
-When you select a report, focus moves to its details.
-**Back to queue** returns focus to the queue heading.
+## Local development
 
-**Report an issue** and **Report for team** open the submission form.
-The centered public sign-in page includes organizer recovery guidance and a control that shows or hides the password.
-The sign-in button is amber.
-Account settings and administration use the same theme.
-The app serves Public Sans locally.
-Its license is in `public/fonts/OFL-Public-Sans.txt`.
-
-The app uses actual authenticated accounts and shared data.
-It preserves the workflow and account permissions.
-The reference values are not product seed data.
-The old local demo and its commands are removed.
-
-## Connected development — no Docker required
-
-Use Node.js 22.13 or later within 22.x, or Node.js 24 or later.
-Use npm.
-The user's 2026-10-02 decision permits full cloud credential access for contributors.
-Provider-console permissions and Minsky session membership are separate.
-
-Run these commands in sequence:
+Use npm with Node.js 22.13 or later within 22.x, or Node.js 24 or later. Docker is not required.
 
 ```sh
 npm ci
 cp .env.example .env.local
+```
+
+Set `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` in `.env.local` using the development project's public credentials.
+Never put service credentials in a `VITE_` variable.
+
+Then connect to the development project and start the frontend.
+Enter the database password privately when prompted by the link command.
+
+```sh
 npm run cloud:login
 npm run cloud:link
 npm run dev
 ```
 
-Enter the Supabase URL in `.env.local`.
-Enter the publishable key in `.env.local`.
-Enter the database password privately at the CLI prompt.
-Never put service credentials in a `VITE_` variable.
-The app does not import old local demo data.
+Open [http://127.0.0.1:5173](http://127.0.0.1:5173).
+Provider access and app membership are separate: an administrator must grant your account session access.
+Sign in with your organizer-provided username and password, then change any temporary password.
 
-The project maintainer explicitly applies schema changes and creates the first admin through the bootstrap command.
-For first setup, the commands are:
+See [cloud onboarding](docs/cloud-onboarding.md#contributor-setup) for provider access, first setup, migrations, account recovery, and deployment.
 
-```sh
-npm run cloud:plan
-npm run cloud:migrate
-npm run cloud:bootstrap -- --admin-user EXISTING_AUTH_UUID
-npm run cloud:functions
-npm run cloud:hosting-login
-npm run deploy
-```
-
-`cloud:functions` uses server-side bundling with `--use-api`.
-Docker is not required.
-The bootstrap refuses to run if an admin already exists.
-Before first setup, review `scripts/bootstrap.sql` for the initial event, session, and roster.
-Edit it if necessary.
-
-After bootstrap, select **Administration** in the sidebar.
-Use this section to manage account membership, roles, and contestant intake.
-See [cloud onboarding](docs/cloud-onboarding.md) for function configuration, username creation, password resets, and observed setup results.
+## Checks and common commands
 
 | Command | Purpose |
 | --- | --- |
-| `npm run dev` | Serve the connected frontend at `http://127.0.0.1:5173`. |
-| `npm run build` | Check types and create production static assets in `dist/`. |
+| `npm run dev` | Start the local frontend. |
+| `npm run build` | Check types and create static assets in `dist/`. |
 | `npm run preview` | Serve built assets locally. |
-| `npm run typecheck` | Check TypeScript in the frontend, scripts, and browser tests. |
-| `npm run lint` | Run ESLint for TypeScript and Node scripts. |
-| `npm run check:functions` | Run the Deno type check for the privileged Supabase function. |
-| `npm test` | Test connected timing, account identifiers, and migrations and RLS with embedded PostgreSQL. Cloud credentials and Docker are not required. |
-| `npm run test:e2e` | Run login, team-search, and workspace-refresh browser checks without cloud credentials. |
-| `npm run test:hosted` | Run the smoke suite with real accounts against the deployed development frontend. |
-| `npm run test:cloud` | Test real Auth, database, and Realtime behavior against the linked project. The suite creates temporary accounts and isolated sessions, then deletes its fixtures. |
-| `npm run cloud:plan` / `cloud:migrate` | Preview or apply migrations to the linked cloud project. |
-| `npm run cloud:bootstrap -- --admin-user UUID` | Create the first admin and session through a trusted bootstrap. |
-| `npm run cloud:recover-admin -- --user UUID` | Recover an existing admin through trusted provider access. Print a new temporary password in the private terminal. |
-| `npm run cloud:functions` | Deploy account administration with cloud bundling. |
-| `npm run deploy` | Build and explicitly deploy Workers Static Assets. |
+| `npm run typecheck` | Check TypeScript. |
+| `npm run lint` | Run ESLint. |
+| `npm run check:functions` | Check the Supabase function with Deno. |
+| `npm test` | Run unit, script, and embedded database tests without cloud credentials. |
+| `npm run test:e2e` | Run browser tests with mocked cloud responses. |
 
-Install Chromium once:
+Install Chromium once before browser tests:
 
 ```sh
 npx playwright install chromium
 ```
 
 Deno and the provider CLIs are pinned npm dependencies.
-Cloud tests hold test credentials in memory and a temporary file.
-Privileged credentials never enter the browser.
-Do not interrupt cloud tests during fixture deletion.
-If fixture deletion fails, use the retained recovery file as described in [fixture recovery](docs/cloud-onboarding.md#fixture-recovery).
-There is no command to reset shared data.
-
-PR CI checks builds, lint, types, functions, database behavior, and the public landing and login pages without hosted secrets.
-The protected `cloud-test` environment supports manually dispatched cloud tests.
-It requires a separate Supabase test project and credentials.
-It refuses the shared development project.
-Preview deployments do not automatically use or change the shared database.
-See [contributor setup](docs/cloud-onboarding.md#contributor-setup) and [protected cloud CI](docs/cloud-onboarding.md#verification-and-protected-cloud-ci).
-
-Use this development sequence:
-
-1. Create the ticket branch from updated `main`.
-2. Develop the change and add migrations.
-3. Run fast checks.
-4. Prepare the PR.
-5. Review the PR and run isolated cloud integration checks on the reviewed revision.
-6. Let the user review and merge.
-7. Explicitly deploy the approved changes.
-
-`Minsky` serves development and trial accounts.
-`Minsky CI` contains temporary automated fixtures.
-Production is not provisioned.
-When production exists, validate changes on development and CI before deployment to its separate database and frontend.
-See [AGENTS.md](AGENTS.md#cloud-development-and-deployment-workflow) and the [release process](docs/cloud-onboarding.md#development-and-release-process).
-
-PR security checks scan Git history for secrets with redacted Gitleaks output.
-They also audit locked npm dependencies.
-High and critical vulnerabilities block the dependency check.
-Dependabot proposes weekly dependency and action updates.
-TypeScript major updates are ignored until the installed lint toolchain accepts them.
-The [code-quality guide](docs/code-quality.md) describes the review checklist and prepared mandatory merge rules.
-The repository owner must enable the remote rules and vulnerability alerts.
-
-## Connected workflow
-
-Sign in with the username and password from your organizer.
-Existing development accounts can use their original email until an admin assigns a username.
-Team accounts see their own issues and public activity.
-Staff receive the combined capabilities of their volunteer, specialist, and jury roles.
-Admin is a separate capability.
-
-The complete workflow is:
-
-1. The contestant submits an issue.
-2. A support staff member claims the issue.
-3. The owner requests a specialist handoff.
-4. A specialist accepts the handoff.
-5. The owner resolves the issue.
-6. The jury records an award.
-7. Staff confirm external application of the award.
-
-Support staff can report an issue for a roster team.
-Volunteers, specialists, jury members, and session admins can search team names and locations in the issue queue.
-The search covers only teams in the current session that the signed-in member can access.
-Suggestions update while staff type.
-Each suggestion shows the team name, location, and unresolved-issue count.
-Choosing a suggestion filters that team's issues.
-The status filter still applies, so staff can include resolved history.
-Jury-only members keep the resolved-issue queue.
-Only volunteers and specialists choose the affected team in **Report for team**.
-A team already chosen in the queue starts selected there.
-Submit stays unavailable until staff choose a team, and the submission uses that team's database id.
-The first suggestion is never selected automatically.
-Table numbers match only as whole numbers, with leading zeros ignored.
-Tab leaves the suggestion list for the next control; use arrow keys and Enter to choose a team.
-A session change, loss of staff access, or removal of the selected team clears the choice when the session snapshot refreshes.
-Reopening retains the owner, every previous resolution, and any existing award.
-Unresolved time excludes resolved intervals.
-Server timestamps, issue revisions, transactional locks, and persisted request IDs protect writes.
-Minsky records awards separately from the external contest clock.
-
-The admin view supports these actions:
-
-- Create username accounts.
-- Issue new temporary passwords.
-- Assign existing Auth users to teams or staff roles.
-- Revoke membership.
-- Open or close contestant intake.
-
-The app shows temporary credentials only for the account creation or reset action.
-It does not store passwords in recoverable form.
-Users must change temporary passwords before they can read or change contest data.
-Resets invalidate previous sessions.
-
-Account-wide changes require admin access to every session of that identity.
-They reject archived memberships.
-The app prevents removal of the last admin.
-
-When an admin removes membership, an existing login immediately loses database access.
-The UI retrieves current membership on focus, on reconnect, and at ten-second intervals.
-Realtime sends public invalidations scoped to teams and private invalidations restricted to staff.
-The app then reads the data that the account can access.
-Private notes do not advance public counters.
-Invalidation payloads contain no notes or issue content.
-
-Uploads, broader event, roster, and category editors, CSV, notifications, shared incidents, offline operation, and award adjustments remain deferred.
-This implementation supports group events and one award per issue.
+For `npm run test:cloud` and `npm run test:hosted`, follow [cloud verification](docs/cloud-onboarding.md#verification-and-protected-cloud-ci).
+If fixture cleanup fails, follow [fixture recovery](docs/cloud-onboarding.md#fixture-recovery).
 
 ## Documentation
 
-- [Working rules](AGENTS.md) and [original plan](PLAN.md)
-- [Development tickets](docs/tickets.md)
-- [Cloud onboarding and costs](docs/cloud-onboarding.md)
-- [Current implementation and verification](docs/current-state.md)
-- [Manual walkthrough](docs/manual-verification.md)
-- [Code quality and review](docs/code-quality.md)
-- [Product direction](docs/product-direction.md)
+- [Development tickets](docs/tickets.md) — ticket scope, status, and acceptance criteria.
+- [Current state](docs/current-state.md) — implementation details, verification records, and limitations.
+- [Cloud onboarding](docs/cloud-onboarding.md) — provider setup, costs, accounts, and deployment.
+- [Manual verification](docs/manual-verification.md) — workflow and interface checks.
+- [Code quality](docs/code-quality.md) — CI checks and review requirements.
+- [Product direction](docs/product-direction.md) — agreed requirements and open decisions.
+- [Contributor rules](AGENTS.md) and [planning record](PLAN.md).

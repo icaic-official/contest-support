@@ -12,7 +12,7 @@ The records below retain the original verification results. T0015's hosted resul
 4. Build and test results. Documentation paths, anchors, heading structure, conflict-marker checks, and whitespace checks pass. Application builds, browser tests, and cloud tests were not run for this documentation-only repair.
 5. Manual verification. Compared the resolved records with PR #37's merge and verification evidence. Confirmed that application code, tests, workflows, and dependency files match `main` exactly.
 6. Risks. None added by this repair. The proposed Cloudflare implementation and migration remain unverified, as recorded in T0016.
-7. Follow-up tickets. User review of T0016 in PR #36. T0015 is merged. No new ticket is required for this repair.
+7. Follow-up tickets. At the time of this report, T0016 still awaited review in PR #36. The user merged PR #36 at `b68ef72` on 2026-10-17 at 13:50:36 UTC. T0015 is merged.
 8. Docs that need updating. None for this repair. Record future identity decisions and implementation evidence in T0016's existing plan.
 
 ## T0016 Cloudflare backend design, 2026-10-17
@@ -21,6 +21,7 @@ The user authorized this design in parallel with shared provider tests while PR 
 `feature/t0016-cloudflare-backend-design` started from that PR at `d158906`.
 The user then merged PR #32 at `ef6a029` on 2026-10-17 at 12:51:42 UTC.
 This branch now includes that merge commit.
+The user merged T0016 in [PR #36](https://github.com/GiftedNovaHD/minsky/pull/36) at `b68ef72` on 2026-10-17 at 13:50:36 UTC. The design review is complete.
 The [design](cloudflare-backend-design.md) separates existing contracts from proposed server components.
 The [implementation plan](cloudflare-implementation-plan.md) defines bounded phases and acceptance evidence.
 Supabase remains active. No Cloudflare backend, authentication replacement, or data migration is implemented here.
@@ -100,9 +101,9 @@ That design does not implement a Cloudflare connector or migrate existing data.
 3. Commands run. Git and GitHub inspection, fetch, isolated worktree creation, and fast-forward to merged `main`. Locked npm installs, type checking, lint, build, unit tests, Deno checks, browser tests, docs build and browser checks, scenario discovery, import-boundary checks, documentation link checks, and whitespace checks. Added the exact T0015 branch to the existing `cloud-test` allowlist. Ran the shared suite against Minsky CI and read-only fixture cleanup queries. No development migration or deployment ran.
 4. Build and test results. Type checking, lint, app build, docs build, function checks, 115 unit and database tests, 12 function tests, six browser bridge tests, and three docs browser tests pass. The initial full isolated browser run passed 32 cases and failed a pre-existing keyboard test that pressed Tab before sign-in rendering completed. The corrected test waits for the sign-in heading. All 33 ordinary browser cases then passed on an isolated server. The session-selection regression adds one case, and all 34 now pass. The final protected run passed all 14 hosted UI tests and all eight shared scenarios after the earlier failures recorded above.
 5. Manual verification. Reviewed provider imports, typed errors, cookie isolation, image byte transfer, callback cleanup, and exact fixture ownership. Verified the CI target is `ghtztmovdkhuketcbjmq` and the deployment switch remains `false`. No shared development account journey ran.
-6. Risks. The existing CI backend includes unmerged announcement migration `202610110002`, so these runs use its existing schema and functions. The suite does not verify fresh installation, migration correctness, capacity, or an unimplemented provider. PRs #36 and #37 both update planning documents. Reconcile those documents in the remaining PR after the first merge.
-7. Follow-up tickets. Review T0015 in PR #37 and T0016's architecture in PR #36 before Cloudflare implementation. AWS implementation and Terraform remain deferred.
-8. Docs that need updating. None for this implementation. Reconcile the shared planning documents after the first parallel PR merges.
+6. Risks. The existing CI backend includes unmerged announcement migration `202610110002`, so these runs use its existing schema and functions. The suite does not verify fresh installation, migration correctness, capacity, or an unimplemented provider. At the time of this report, PRs #36 and #37 both updated planning documents. PR #36 later reconciled those documents and merged at `b68ef72`.
+7. Follow-up tickets. T0015 merged in PR #37, and T0016 design merged in PR #36. Complete the identity, transaction, notification, connector, and migration acceptance work in the implementation plan before cutover. AWS implementation and Terraform remain deferred.
+8. Docs that need updating. At the time of this report, reconcile the shared planning documents after the first parallel PR merges. PR #36 later completed that reconciliation.
 
 ## T0014 existing backend verification, 2026-10-17
 

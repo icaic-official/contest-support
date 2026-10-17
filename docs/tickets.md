@@ -2,10 +2,30 @@
 
 These tickets describe development work, not contestant issues.
 
-This branch records [T0016 Cloudflare backend design](#t0016-cloudflare-backend-design) in PR #36.
+T0016 Cloudflare backend design merged in [PR #36](https://github.com/GiftedNovaHD/minsky/pull/36) at `b68ef72` on 2026-10-17.
 [T0015 shared provider tests](#t0015-shared-provider-tests) merged in [PR #37](https://github.com/GiftedNovaHD/minsky/pull/37).
 [PR #32](https://github.com/GiftedNovaHD/minsky/pull/32) merged on 2026-10-17 at `ef6a029`.
 The numbered records below retain their original scope and verification history.
+
+## Ticket record format
+
+Start each ticket with these fields in this order:
+
+```markdown
+## TNNNN Ticket title
+
+Branch: `feature/tNNNN-description`, from the stated base revision.
+Status: Current state, with the PR and merge revision when merged.
+Summary: One or two sentences that state the goal and result.
+
+Optional sections describe scope, behavior, decisions, and exclusions.
+
+### Acceptance criteria
+
+- [ ] Observable condition or required evidence.
+```
+
+Use the same field order for every ticket. Keep the summary brief even when the ticket needs detailed scope or behavior sections. Use `### Acceptance criteria` for the checklist. Add detail sections only when they help explain the ticket. Add a `### Verification` section when the ticket has separate test or deployment evidence. Keep deployment state separate from merge state. Preserve historical details when you update an older ticket.
 
 T0011 documentation and deployment automation merged in [PR #29](https://github.com/GiftedNovaHD/minsky/pull/29) on 2026-10-17.
 T0005 merged in PR #19 and T0010 merged in PR #24 on 2026-10-15.
@@ -35,10 +55,11 @@ T0008 fuzzy team search merged into `main` in [PR #22](https://github.com/notbow
 Branch: `feature/t0015-provider-contract-tests`, started at PR #32 revision `d158906` and updated to merged `main` at `ef6a029`.
 
 Status: merged in [PR #37](https://github.com/GiftedNovaHD/minsky/pull/37) at `738ef4a` on 2026-10-17 at 13:44:12 UTC. Local and protected hosted checks passed.
+Summary: Added provider-neutral browser behavior checks and isolated Supabase fixtures. Cloudflare and AWS can use the same scenarios when their adapters exist.
 
 The user authorized this branch exception on 2026-10-17.
 T0015 and separate T0016 Cloudflare design work started during PR #32 review.
-PRs #32 and #37 are now merged. The user still reviews and merges T0016.
+PRs #32 and #37 are now merged. T0016 design merged in PR #36.
 
 The shared scenarios call the real browser `Backend` contract.
 Each provider supplies isolated accounts, records, clients, fault controls, and cleanup.
@@ -46,7 +67,7 @@ Supabase is the first fixture implementation.
 Cloudflare and a possible future AWS adapter must pass the same behavior assertions.
 Existing Supabase database, function, and hosted UI tests remain separate.
 
-Acceptance criteria:
+### Acceptance criteria
 
 - [x] Shared scenarios contain no provider SDK, database query, or provider-specific response assertion.
 - [x] Supabase runs the shared scenarios against isolated hosted accounts and records.
@@ -57,6 +78,8 @@ Acceptance criteria:
 - [x] Documentation explains coverage, limits, and the requirements for another provider fixture.
 - [x] Required local checks and the protected hosted run pass on the implementation revision.
 - [x] The user merged PR #37.
+
+### Verification
 
 The [protected run on `672ec6d`](https://github.com/GiftedNovaHD/minsky/actions/runs/39036173268) passed all 14 existing hosted UI tests and all eight shared scenarios.
 Cleanup completed without retained recovery files. The run used the existing CI backend and applied no migrations or function deployments.
@@ -72,6 +95,7 @@ Cloudflare resource creation, data migration, AWS implementation, and Terraform 
 Branch: `feature/t0013-image-preview-race`, from updated `main` at `de92d54`.
 
 Status: merged into `main` in [PR #31](https://github.com/GiftedNovaHD/minsky/pull/31) on 2026-10-17.
+Summary: Prevented older image preview requests from replacing the current preview and released temporary browser URLs when previews close or change.
 
 The user requested two independent PRs for the review findings on 2026-10-17.
 T0013 fixes image previews. [PR #30](https://github.com/GiftedNovaHD/minsky/pull/30) fixes reply retry cleanup in T0012.
@@ -81,7 +105,7 @@ Only the current, open preview can use a completed download or report its error.
 Closing a preview or opening another image makes older requests inactive.
 The app releases each temporary browser URL when its preview closes, changes, or leaves the page.
 
-Acceptance criteria:
+### Acceptance criteria
 
 - [x] A delayed download cannot replace a newer preview or its download link.
 - [x] A delayed error from an older preview cannot replace the current status. Current errors still appear.
@@ -90,7 +114,9 @@ Acceptance criteria:
 - [x] Browser regression tests reproduce the original failures and pass with the fix. Required local checks pass.
 - [x] The user merged PR #31.
 
-Verification is recorded in [current state](current-state.md#t0013-image-preview-request-handling-2026-10-17).
+### Verification
+
+Results are recorded in [current state](current-state.md#t0013-image-preview-request-handling-2026-10-17).
 No schema or function change is required. Deployment remains a separate step.
 
 ## T0001 — Local workflow demo and project guidance
@@ -98,12 +124,13 @@ No schema or function change is required. Deployment remains a separate step.
 Branch: `feature/t0001-local-demo`
 
 Status: implemented, verified and merged in [PR #1](https://github.com/notbowen/minsky/pull/1) on 2026-10-02. The user accepted the proof of concept and authorized T0002 on this branch before the shared merge.
+Summary: Created the local workflow demo and project guidance. T0003 later replaced the demo with the connected app.
 
 Scope: React, TypeScript, Vite, npm lockfile, fictional group session, simulated contestant/volunteer/specialist/jury personas, versioned local persistence, and supporting project guidance. No cloud or deferred production features.
 
 The tooling update on this branch upgraded ESLint to version 10 and installed compatible plugins. It preserved the existing Hooks checks. It updated the lockfile and Node requirements. All required automated checks passed after the update.
 
-Acceptance criteria:
+### Acceptance criteria
 
 - [x] Complete submission → claim → escalation → specialist acceptance → resolution → jury award → separate application confirmation.
 - [x] Submission/assignment/resolution timestamps, ownership during handoff, public/internal visibility and actor history.
@@ -120,6 +147,7 @@ Acceptance criteria:
 Branch: `feature/t0001-local-demo` (explicit user exception; continue on the T0001 branch).
 
 Status: implemented and verified; [PR #1](https://github.com/notbowen/minsky/pull/1) merged T0001 and T0002 into `main` on 2026-10-02.
+Summary: Added combined staff-role capabilities, issue triage and handoffs, and reopening to the local demo.
 
 ### Outcome and scope
 
@@ -172,7 +200,7 @@ Requested for T0002 on 2026-10-02. “Helper” means any staff member with a su
 4. Extend domain/storage tests and the browser suite. Retain the original complete journey and add direct specialist triage and combined-role triage/handoff coverage. Add contestant reopening → owner resolves again → helper reopening → refresh → resolution, including an existing award. Exercise a support + jury fixture to catch role precedence bugs without adding a role editor.
 5. Run the checks below, perform the manual walkthrough, update implementation/verification documentation, and prepare the shared branch PR for user review with both tickets distinguished. The user merges.
 
-### Acceptance and verification
+### Acceptance criteria
 
 - [x] Volunteer-only, specialist-only and volunteer + specialist people can each claim an open issue. Contestants and jury-only people cannot. Repeated claims fail without changing state.
 - [x] A combined-role person can claim and resolve directly, and can accept another person's escalation. Their own escalation requires another specialist to accept; role switching cannot transfer ownership to themselves.
@@ -188,6 +216,10 @@ Requested for T0002 on 2026-10-02. “Helper” means any staff member with a su
 - [x] Manually check combined-role labels/actions at 390 × 844 and 320 × 740, keyboard claiming/handoff/reopening, contestant and helper reopening forms, desktop jury controls, refresh, reset and contestant omission of internal notes.
 - [x] README, demo specification, current state and manual guide describe the implemented behavior and observed checks. Record any deliberate Google TypeScript Style Guide exceptions. Shared branch PR is ready for user review.
 
+### Verification
+
+Results are recorded in [current state](current-state.md).
+
 ### Review refinements — 2026-10-02
 
 The user requested these refinements on the open shared PR, within T0002:
@@ -196,11 +228,16 @@ The user requested these refinements on the open shared PR, within T0002:
 - Offer common public resolution summaries in a dropdown: Resolved without comment, Service restored, Device issue resolved, Problem statement clarified, and Custom. The no-comment choice stores its explicit text. Custom retains the existing required 1–2,000-character validation. Reopening clears the current selection so another resolution needs a fresh choice.
 - Preserve saved v2 data without resetting or adding a schema version: this extends the accepted minute range and keeps the existing summary representation. Keep the frozen v1 migration validator unchanged.
 
-Verification is recorded in [current-state.md](current-state.md).
+### Verification
+
+Results are recorded in [current state](current-state.md).
 
 ## T0003 — Cloud onboarding and authenticated shared product
 
-Status: implemented and merged in [PR #2](https://github.com/notbowen/minsky/pull/2) on 2026-10-02. Work started from updated `main` on `feature/t0003-cloud-product`. Supabase schema and trusted first-admin/session bootstrap were applied to development; connected frontend, account administration, cloud contributor commands and embedded database tests are implemented. Hosted username-flow/workflow/authorization verification is recorded in current-state.md. Protected cloud CI environment setup and its first successful run remain a recorded setup gap; the T0004 repository inspection still found no GitHub environments.
+Branch: `feature/t0003-cloud-product`, from updated `main`.
+
+Status: implemented and merged in [PR #2](https://github.com/notbowen/minsky/pull/2) on 2026-10-02. Hosted verification is recorded in current-state.md. Protected cloud CI setup remained incomplete at the time of the T0004 inspection.
+Summary: Connected the app to Supabase and added account administration, contributor commands, and embedded database tests.
 
 Updated completion boundary (2026-10-02, ticket allocation revised 2026-10-03): the user retained protected cloud integration CI in T0003 and deferred provider ownership/billing records, GitHub merge enforcement/vulnerability alerts and remaining user/manual acceptance checks to T0005 (previously T0004). Previously completed automated and browser checks remain evidence; deferred checks are not claimed as completed. The user still reviews and merges. T0004 implements the UI makeover selected below; T0005 implementation has not started.
 
@@ -274,13 +311,14 @@ No offline/resilience project, 800-user load certification, individual-contest U
 
 ## T0004 — UI makeover
 
-Implementation branch: `feature/t0004-ui-makeover` (deleted after merge).
+Branch: `feature/t0004-ui-makeover` (deleted after merge).
 The branch started from updated `origin/main` after T0003 merged in PR #2 on 2026-10-02.
 
 Status: implemented and merged in [PR #9](https://github.com/notbowen/minsky/pull/9) on 2026-10-11 (SGT).
 Merge commit: `52ff99133bd727626b3589b40a507ab438f508da`.
 [The merge record](current-state.md#t0004-merge-and-documentation-follow-up-2026-10-11) gives the exact UTC timestamp and reviewed revision.
 [PR #13](https://github.com/notbowen/minsky/pull/13) merged the documentation rewrite on 2026-10-11 (SGT).
+Summary: Redesigned the connected workspace and sign-in experience while preserving workflow and authorization behavior.
 
 Deployment evidence (2026-10-03): verified locally and deployed to [minsky-dev](https://minsky-dev.icaic-minsky.workers.dev).
 The user explicitly requested "Deploy first".
@@ -291,7 +329,7 @@ The user selected the two attached visual references on 2026-10-03.
 The [deployment record](current-state.md#t0004-development-deployment-2026-10-03) contains the hosted evidence.
 That development deployment preceded merge under the user's exception for T0004.
 
-### Selected scope
+### Scope
 
 - Match the workspace reference's dark green surfaces, restrained borders, and compact sidebar.
 - Use green status and selection accents.
@@ -318,6 +356,7 @@ That development deployment preceded merge under the user's exception for T0004.
 Branch: `feature/t0005-issue-attachments`, created from updated `main` after T0004 merged.
 
 Status: merged in [PR #19](https://github.com/GiftedNovaHD/minsky/pull/19) on 2026-10-15.
+Summary: Added private issue images with uploader-selected visibility, session limits, and active-event removal rules.
 The following dated records describe implementation and preview verification.
 The 2026-10-14 review fixes add current-access checks, fixed visibility during retry, exact file paths, saved removal retries, and completion-time count checks.
 See the [review-fix record](current-state.md#t0005-review-fixes-2026-10-14) for local verification and cloud-test limits.
@@ -330,7 +369,7 @@ See the [preview record](current-state.md#t0005-development-preview-2026-10-11) 
 The user reviews and merges.
 Deployment is a separate explicit step.
 
-### Selected scope
+### Scope
 
 - Staff add JPEG, PNG, or WebP images from the issue detail.
 - Each image belongs to that issue and records the uploader and upload time.
@@ -394,6 +433,7 @@ Resilience and event-capacity work remain deferred.
 Branch: `feature/t0008-team-search`, from updated `main` at `1ed603a`.
 
 Status: merged into `main` in [PR #22](https://github.com/notbowen/minsky/pull/22) on 2026-10-15 (SGT).
+Summary: Added fuzzy team search to the issue queue and the report-for-team form.
 The user asked to build it while [PR #19](https://github.com/notbowen/minsky/pull/19), [PR #20](https://github.com/notbowen/minsky/pull/20), and [PR #21](https://github.com/notbowen/minsky/pull/21) remain open.
 T0008 was developed separately. The T0005 branch now includes the accepted search through a merge from `main`.
 Deployment is a separate explicit step.
@@ -445,11 +485,12 @@ Deployment is a separate explicit step.
 Branch: `feature/t0010-p2-review-fixes`, from updated `main` at `d961f5b`.
 The branch now includes `main` at `9c0341c`, with T0005 issue images.
 Status: merged in [PR #24](https://github.com/GiftedNovaHD/minsky/pull/24) on 2026-10-15.
+Summary: Fixed three review findings in issue refresh, membership refresh, and cloud fixture cleanup.
 
 The user authorized fixes for the three P2 findings from the review of `1ed603a`.
 The branch preserves the merged T0008 team search and stays independent of the other open feature pull requests.
 
-Acceptance criteria:
+### Acceptance criteria
 
 - [x] A new issue cannot replace the displayed issue or discard its reply draft during a background refresh.
 - [x] Refreshed membership fields send the current roles, admin flag, and team. Unchanged membership values preserve local edits.
@@ -463,14 +504,15 @@ No schema change or deployment is part of this ticket.
 ## T0016 Cloudflare backend design
 
 Branch: `feature/t0016-cloudflare-backend-design`, from PR #32 at `d158906`.
-The branch now includes PR #32 at `ef6a029` and T0015 in PR #37 at `738ef4a`.
-Status: design prepared for review. No Cloudflare connector or resources exist in this change.
+The branch included PR #32 at `ef6a029` and T0015 in PR #37 at `738ef4a`.
+Status: design merged in [PR #36](https://github.com/GiftedNovaHD/minsky/pull/36) at `b68ef72` on 2026-10-17 at 13:50:36 UTC. No Cloudflare connector or resources exist in this change.
+Summary: Documented the proposed Cloudflare architecture and staged acceptance plan for implementation and data migration.
 
 The user authorized this design in parallel with T0015 shared provider tests while PR #32 was under review.
-This is an explicit exception to the normal branch and merge sequence.
-The user still reviews and merges the dependent work.
+This was an explicit exception to the normal branch and merge sequence.
+The user accepted the design by merging PR #36. This did not authorize Cloudflare resource creation, credential exports, deployment, or data migration.
 
-Acceptance criteria:
+### Acceptance criteria
 
 - [x] Separate browser contracts from server domain rules, transactional persistence, identity, blob storage, and change delivery.
 - [x] Specify D1 command receipts, atomic preconditions, concurrent changes, and private revision rules without a cross-resource transaction claim.
@@ -479,7 +521,9 @@ Acceptance criteria:
 - [x] Record credential-migration options and decisions required before account cutover.
 - [x] Define bounded implementation phases with provider tests, migration comparison, and rollback acceptance.
 - [x] Keep AWS and Terraform as future work while defining portable interfaces.
-- [ ] The user reviews and accepts the design.
+- [x] The user reviewed and accepted the design by merging PR #36.
+
+### Verification
 
 The [design](cloudflare-backend-design.md) explains the decisions.
 The [implementation plan](cloudflare-implementation-plan.md) defines acceptance steps.
@@ -490,12 +534,13 @@ Supabase remains active. This ticket creates no credentials, provider resources,
 
 Branch: `feature/t0014-backend-adapters`, from updated `main` at `de92d54`.
 Status: merged in [PR #32](https://github.com/GiftedNovaHD/minsky/pull/32) at `ef6a029` on 2026-10-17. Local checks, ordinary GitHub checks, and all 14 hosted Supabase cases pass. Fixture cleanup completed.
+Summary: Added provider-neutral backend contracts and moved the existing Supabase integration behind the first adapter.
 
 The user selected shared backend interfaces before the Cloudflare migration.
 This ticket extracts Supabase as the first implementation.
 The browser continues to use the existing Auth service, database functions, account function, private image storage, and live subscriptions.
 
-Acceptance criteria:
+### Acceptance criteria
 
 - [x] The UI uses typed interfaces for authentication, session reads, issue commands, administration, images, and live updates.
 - [x] Provider clients, access tokens, channels, database queries, and function payloads stay inside the Supabase implementation.
@@ -508,6 +553,8 @@ Acceptance criteria:
 - [x] Documentation separates the current Supabase implementation from the selected future Cloudflare backend.
 - [x] Protected cloud checks pass on the reviewed revision against the existing Supabase backend. The [run on `a3b3c70`](https://github.com/GiftedNovaHD/minsky/actions/runs/39027288113) passes all 14 cases with `existing_backend=true` and successful fixture cleanup. The verification record identifies the backend versions.
 - [x] The user merged PR #32.
+
+### Verification
 
 The [backend reference](backend-contracts.md) defines the interfaces.
 [Current state](current-state.md#t0014-existing-backend-verification-2026-10-17) records the verification results.
@@ -527,13 +574,14 @@ The later CI workflow passes local checks and awaits account setup and its first
 The user merged [PR #29](https://github.com/GiftedNovaHD/minsky/pull/29) on 2026-10-17 at 10:36:06 UTC, commit `aaa6bbc`.
 The GitHub deployment switch remains off. Automatic deployment remains unverified.
 See [deployment evidence](current-state.md#t0011-documentation-site-2026-10-17).
+Summary: Built and deployed the documentation site, then added CI deployment workflows for the frontend and docs. The first automatic deployments remain unverified.
 
 The user requested a documentation site to accompany T0007, including written content and Workers deployment.
 This request authorizes the initial `minsky-docs` deployment before the source PR merges.
 The user still reviews and merges the PR.
 T0007 remains a separate open change.
 
-### Selected scope
+### Scope
 
 - Publish user, staff, jury, administrator, operator, and contributor guides from repository Markdown.
 - Label merged features, pending T0007 installation steps, and unverified operating conditions.
@@ -592,13 +640,14 @@ The [audit](documentation-release-plan.md#permission-documentation-fixes) maps e
 Branch: `feature/t0012-reply-retry-cleanup`, from updated `main` at `de92d54`.
 
 Status: merged into `main` in [PR #30](https://github.com/GiftedNovaHD/minsky/pull/30) on 2026-10-17.
+Summary: Preserved reply drafts and request identity across uncertain retries, then cleared the editor after confirmed success.
 
 The pending reply now retains its success cleanup with its request ID and command.
 A successful retry clears the reply text and resets the audience before editing resumes.
 Failed requests preserve the draft.
 The request ID stays the same across retries, so the server can recognize an already recorded reply.
 
-Acceptance criteria:
+### Acceptance criteria
 
 - [x] Successful retries clear public replies and internal notes. **Send reply** stays disabled until new text is entered.
 - [x] Repeated transport failures preserve the draft, audience, request ID, and command until success.

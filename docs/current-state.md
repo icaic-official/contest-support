@@ -1,5 +1,17 @@
 # Current state
 
+## T0015 organiser phone app (2026-10-17)
+
+Step 2a of T0015 is on `feature/t0015-frontend-redesign`. It is not merged or deployed.
+Below 1024 px, organisers get the phone app from `e-organiser-phone.html` instead of the legacy workspace.
+The Session tab still shows the administration page from before T0015.
+See [frontend architecture](frontend-architecture.md#organiser-phone-app).
+
+Local type checking, lint, build and 100 unit and database tests passed.
+26 of 28 mocked browser tests passed. Two tests still use old selectors: one runs at 320 px and now gets the phone app, and one uses the contestant UI from step 3. Step 5 updates them.
+A manual check at 390 × 844 used a local mock of the Supabase endpoints with fictional data. It covered the queue, the issue view, reply with an internal note, accept handoff, resolve, report for a team with team search, Find, Me, the Session tab and an award decision.
+No development account was available. Protected cloud tests and hosted checks were not run.
+
 ## T0015 frontend foundation (2026-10-17)
 
 Step 1 of T0015 is on `feature/t0015-frontend-redesign`. It is not merged or deployed.

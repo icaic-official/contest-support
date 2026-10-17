@@ -132,6 +132,42 @@ These rules apply:
 - The reply box sends with Enter and adds a line with Shift+Enter. The draft is cleared only when the server records the message, also after **Retry last request** (T0012).
 - `IssueImages` gets only the team-visible images, with `staff={false}` and `canUpload={false}`. Its image list and preview dialog use Tailwind classes. The upload form is not restyled yet. The organiser steps restyle it. The old class names, such as `image-thumb`, stay because tests use them.
 
+## Organiser phone app
+
+`OrganiserPhoneApp` (`src/organiser/phone/`) is the organiser UI below 1024 px. It follows `design/redesign/e-organiser-phone.html`.
+
+| File | Content |
+| --- | --- |
+| `OrganiserPhoneApp.tsx` | The shell. It holds the tab, the open issue, the report sheet and the reply drafts. The drafts stay in memory while the snapshot is missing. |
+| `PhoneParts.tsx` | Tab bar, tab header with **Live** or **Reconnecting** and the intake state, the status banners and the queue card. |
+| `PhoneTabs.tsx` | The Queue, Mine, Find, Awards, Me and Session tabs. |
+| `PhoneIssueView.tsx` | The full-screen issue view with the bottom action bar and its sheets. |
+
+Shared organiser parts are one level up, so the desktop console can use them:
+
+| File | Content |
+| --- | --- |
+| `organiserModel.ts` | Pure rules: tabs by role, jury-only visibility, queue chips, sort order, age tiers, hall and table from a location, issue number search, the allowed actions of an issue and its primary action. `organiserModel.test.ts` tests them. |
+| `components/issueDisplay.tsx` | Status badge (icon and label), place tile, unresolved timer, **Live**/**Reconnecting** badge and avatar. |
+| `components/IssueDetails.tsx` | Timers, lifecycle bar, owner, handoff banner, award receipt, resolution history and activity. |
+| `actions/IssueForms.tsx` | `ReplyForm`, `ResolveForm`, `EscalateForm`, `ReopenForm`, `AwardForm` and `ApplyForm`. Each form takes the issue, the `CommandRunner` and `onDone`. |
+| `actions/ReportForm.tsx` | Report for a team, with `TeamSearch`. |
+| `actions/OrganiserImages.tsx` | `ImageGallery`, `ImageUploadForm`, `ImagePreviewDialog` and `OrganiserImages`. They use `useIssueImages`. |
+| `actions/ActionSheet.tsx` | `ActionSheet` (a vaul bottom sheet with a **Cancel** button) and `CommandFeedback` (the command error and **Retry last request**). |
+
+The forms do not depend on the sheet. The desktop console can put them in a dialog or a side sheet.
+
+These rules apply:
+
+- Tabs follow the combined roles. Volunteers and specialists get Queue, Mine, Find and Me. Jury members get Awards. A jury-only member sees resolved issues only, as before T0015. Admins also get Session.
+- The queue chips map to the shared status filter of `useWorkflowState`. Waiting is `open`, Handoffs is `escalated` and Resolved is `resolved`. Every other value, including `all` and `claimed` after a reopen, shows All active.
+- Cards are sorted by unresolved time, longest first. The timer is neutral below 10 minutes, amber below 20 minutes and rose after that. A resolved issue stays neutral.
+- A recorded command selects its issue, so the issue view opens. An inline **Claim** or **Accept** on a card returns to the list. **Claim and go** opens the issue.
+- **Back** returns focus to the card of the issue. A tab change moves focus to the tab heading. Sheets trap focus and have a **Cancel** button, so no action needs a swipe. Buttons are at least 44 px high.
+- The Session tab still shows the `AdminPanel` from before T0015 inside a `.legacy-ui` element. A later step replaces it.
+
+`useIssueImages` (`src/connected/hooks/`) holds the upload, retry, preview and removal logic of `IssueImages`. `IssueImages` uses it with its existing markup.
+
 ## Where later steps plug in
 
 The organiser shells currently render `LegacyWorkspace` (`src/connected/legacy/`). This is the workflow UI from before T0015, with the same markup and selectors.
@@ -140,7 +176,7 @@ Its root element has `data-ui="contestant"`, `data-ui="organiser-phone"` or `dat
 
 | Step | Replace | Mockup |
 | --- | --- | --- |
-| Organiser phone app | `src/organiser/phone/OrganiserPhoneApp.tsx` | `design/redesign/e-organiser-phone.html` |
+| Organiser phone app (done, except the Session tab) | `src/organiser/phone/OrganiserPhoneApp.tsx` | `design/redesign/e-organiser-phone.html` |
 | Contestant desktop app (done) | `src/contestant/ContestantApp.tsx` | `design/redesign/f-contestant-desktop.html` |
 | Organiser desktop console | `src/organiser/desktop/OrganiserDesktopConsole.tsx` | `design/redesign/a-console.html` |
 | Integration | Playwright selectors, `docs/manual-verification.md`, README | — |

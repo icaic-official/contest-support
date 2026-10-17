@@ -22,6 +22,7 @@
     "src",
     "tests",
     "vite.config.ts",
+    "vitest.d1.config.ts",
     "playwright.config.ts",
     "playwright.cloud.config.ts",
     "playwright.providers.config.ts",

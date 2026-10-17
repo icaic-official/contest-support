@@ -2,7 +2,10 @@
 
 This page explains the proposed Cloudflare backend and its provider boundaries.
 T0016 began while PR #32 was under review. The user merged PR #32 on 2026-10-17.
-The Cloudflare connector, resources, and migration tools do not exist at this revision.
+T0017 starts the [D1 transaction proof](d1-transaction-proof.md).
+The complete Cloudflare connector and migration tools remain later work.
+The owner authorizes isolated development and CI resources for this implementation.
+That authorization does not establish a hosted verification result.
 Supabase remains the active backend.
 
 The user selected Workers, D1 with a SQLite rewrite, private R2, and Durable Objects.
@@ -43,7 +46,8 @@ flowchart TD
     Live --> CF
 ```
 
-The diagram shows proposed components. Only the Supabase path exists today.
+The diagram shows the complete target. T0017 implements only the D1 transaction proof.
+The Supabase path remains the active application backend.
 
 ## Modules have explicit responsibilities
 
@@ -161,30 +165,23 @@ A retry repeats that work safely without repeating the workflow command.
 Administration methods currently lack workflow-style request IDs.
 Their implementation must define retry semantics before adding automatic retries or claiming the same guarantee.
 
-## Authentication is an explicit migration decision
+## Authentication uses replacement temporary passwords
 
 Account preservation and password preservation are different requirements.
-The selected cloud resources do not yet define Minsky's replacement identity implementation.
+The owner selected organizer-issued replacement temporary passwords on 2026-10-17.
+Users must change these passwords before contest access.
+Preserve account IDs, memberships, permissions, and history.
+Existing passwords do not need to survive. Password-hash import is no longer required.
+
+The replacement identity implementation remains unselected.
 The proposed final boundary is a maintained identity implementation behind a small server port.
 Minsky retains its username rules, organizer recovery, mandatory password changes, and cross-session authorization.
 
-Supabase stores password hashes in `auth.users.encrypted_password` and documents bcrypt for its own password storage.
-The actual exported hash formats still need inspection in a protected migration rehearsal.
-An export does not prove that a chosen replacement can verify those hashes.
-See [Supabase password security](https://supabase.com/docs/guides/auth/password-security).
-
-These options require a decision before account cutover:
-
-| Option | Effect on existing users | Remaining work |
-| --- | --- | --- |
-| Import supported password hashes into the selected identity implementation. | Users retain passwords but sign in again after migration. | Prove hash compatibility, Worker execution limits, password upgrades, session revocation, and recovery. |
-| Issue replacement temporary passwords through organizers. | Users receive new credentials and must change them. Account IDs and history remain intact. | Owner approval, private credential distribution, recovery capacity, and enforcement tests. |
-| Retain Supabase Auth temporarily behind the identity port. | Existing credentials remain valid during an intermediate phase. | Keep the Auth dependency and its database session checks, then plan a separate identity cutover. |
-
-The recommendation is to prove hash import with isolated accounts before choosing the final identity implementation.
-If compatibility fails, keep Supabase active while the owner chooses temporary Auth retention or organizer resets.
-This design authorizes no reset, password export, or mixed production backend.
-This design does not require a live hybrid deployment to begin Cloudflare testing.
+Authentication implementation follows the D1 proof.
+Use fictional accounts to verify password creation, mandatory changes, private credential distribution, recovery, and Worker execution limits.
+Full migration tooling follows connector verification.
+The owner decision authorizes no real-account reset, credential export, or backend switch in T0017.
+Supabase remains active during the proof and connector work.
 
 The replacement must verify current login state for each protected operation.
 A signed token alone does not prove that the login remains active.
@@ -293,10 +290,21 @@ The application Worker serves static assets and routes backend requests under th
 Development, CI, and future production use separate databases, buckets, object namespaces, and identity credentials.
 Untrusted branch previews receive no shared database write access or privileged credentials.
 
-The first proof uses fictional fixtures and local provider emulation.
-Hosted verification later uses an explicitly provisioned isolated environment.
+The first proof uses fictional fixtures in local emulation and isolated hosted D1 resources.
+The owner authorizes separate development and CI resources in the existing Cloudflare account.
+Check existing Wrangler access before requesting credentials. Keep tokens out of chat and logs.
+
+The existing OAuth login was checked against account `458ad6a930b0fb717796dfa19ca6a2b1`, which matches the repository configuration.
+Verify that account before provisioning. Document the concrete need and cost before any paid upgrade.
+Subagents may perform independent, bounded tasks.
+
+Record hosted evidence in [the proof guide](d1-transaction-proof.md) before claiming transaction verification.
 Passing that suite does not prove a fresh installation, a data migration, or capacity for 800 simultaneous users.
 Each claim needs its own evidence.
+
+Authentication and the remaining connector operations follow the D1 proof.
+Full migration tooling follows connector verification. Real-data exports and the backend switch remain later phases.
+AWS adapters and Terraform remain deferred.
 
 Cutover uses one writable backend at a time.
 The migration rehearsal compares IDs, references, timestamps, receipts, image hashes, and authorized snapshots.

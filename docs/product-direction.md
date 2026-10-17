@@ -88,7 +88,11 @@ Actual authorization, synchronization, deployment, capacity, and recovery behavi
 ## Unresolved decisions
 
 The authentication implementation for Cloudflare remains unselected.
-Password-hash compatibility and login continuity need a verified migration plan before any account cutover.
+The owner selected organizer-issued replacement temporary passwords for migration on 2026-10-17.
+Users must change these passwords before contest access.
+Existing passwords do not need to survive. Password-hash import is not required.
+Preserve account IDs, memberships, permissions, and history.
+Credential distribution, recovery, and login revocation need verification before account cutover.
 The final transfer also needs a reconciliation check and a tested rollback procedure.
 
 Outage handling remains deferred until after cloud feature development.
@@ -120,7 +124,7 @@ Preserve existing Auth UUIDs, history, and permissions when you assign a usernam
 On 2026-10-17, the user selected Cloudflare D1 with a SQLite rewrite.
 The user also required preservation of existing data and requested Durable Objects for live updates.
 This decision replaces Supabase as the long-term backend target.
-Supabase remains active while the shared interfaces and their first implementation are verified.
+Supabase remains active during Cloudflare implementation and verification.
 
 The selected target has these responsibilities.
 
@@ -136,14 +140,21 @@ Live messages do not grant access and do not carry private issue data.
 A later implementation must define how committed changes reach subscribers and how clients recover missed notifications.
 The transaction and permission rules currently enforced in Postgres must also hold in the SQLite implementation.
 
-The migration order starts with shared Minsky interfaces and the Supabase adapter.
-Hosted contract verification comes before the Cloudflare implementation and data cutover.
-This makes the current behavior the comparison point for the replacement backend.
-It also keeps provider calls out of React components.
+The shared Minsky interfaces, Supabase adapter, provider tests, and Cloudflare design merged before T0017.
+Hosted Supabase contract checks provide the comparison point for the replacement backend.
+T0017 requires proof of the D1 transaction pattern with fictional fixtures and hosted evidence.
+Authentication and the remaining connector operations follow that proof.
+Full migration tooling follows connector verification. Real-data exports and the backend switch remain later phases.
+See [the proof guide](d1-transaction-proof.md) and [implementation plan](cloudflare-implementation-plan.md).
 
 The migration preserves account IDs, relationships, historical actors, timestamps, resolution cycles, awards, external application status, image visibility, and file contents.
-T0014 implements only the interfaces and Supabase extraction.
-Cloudflare resources and migration tooling remain later work.
+T0014 implemented only the interfaces and Supabase extraction.
+The owner now authorizes isolated Cloudflare development and CI resources in the existing account for connector work.
+Keep those resources separate and verify the account before provisioning.
+Check existing Wrangler access before requesting credentials. Keep tokens out of chat and logs.
+
+Document the concrete need and cost before any paid upgrade.
+Subagents may perform independent, bounded tasks.
 AWS implementations and Terraform remain deferred until a concrete deployment needs them.
 
 On 2026-10-17, the user authorized shared provider tests and Cloudflare design in parallel with PR #32 review.
@@ -151,4 +162,5 @@ T0015 contains the test work on its own branch.
 T0016 records the [proposed architecture](cloudflare-backend-design.md) and [implementation plan](cloudflare-implementation-plan.md).
 Neither design work nor provider tests migrate existing data.
 Possible AWS testing motivates separate domain rules, transactional persistence, identity, image storage, and live-delivery interfaces.
-Cloudflare implementation still requires a proved D1 transaction pattern and an explicit identity decision.
+Cloudflare implementation still requires a verified D1 transaction pattern and a selected identity implementation.
+The owner selected replacement temporary passwords rather than password-hash import for the later migration.

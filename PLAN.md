@@ -1,5 +1,33 @@
 # Minsky planning record
 
+**D1 proof and migration decisions, 2026-10-17.** The next focused ticket is T0017 on `feature/t0017-d1-transaction-proof`.
+The branch starts from updated `main` at `53f9dfd`.
+Prove one D1 command that commits its state change, retry receipt, history, and notification record together.
+Define the SQLite schema and a provider-independent application-store interface.
+Use fictional fixtures and obtain hosted D1 evidence before claiming verification.
+See [the proof guide](docs/d1-transaction-proof.md) and [implementation plan](docs/cloudflare-implementation-plan.md).
+
+Authentication and the remaining Cloudflare operations follow the proof.
+Full migration tooling follows connector verification.
+Real-data exports and the backend switch remain later phases. Keep Supabase active.
+AWS adapters and Terraform remain deferred.
+
+The owner selected organizer-issued replacement temporary passwords for migration.
+Users must change these passwords before contest access.
+Preserve account IDs, memberships, permissions, and history. Existing passwords do not need to survive.
+Password-hash import is no longer required.
+
+The owner authorizes isolated development and CI resources in the existing Cloudflare account as needed for this work.
+Keep the resources separate. Verify the account before provisioning.
+Check existing Wrangler access before requesting credentials. Keep tokens out of chat and logs.
+
+The existing OAuth login was checked against account `458ad6a930b0fb717796dfa19ca6a2b1`, which matches the repository configuration.
+Document the concrete need and cost before any paid upgrade.
+Subagents may perform independent, bounded tasks.
+
+The earlier dated records below retain their original ticket scope.
+This decision adds resource authorization for T0017 without authorizing real-data exports or a backend switch.
+
 **Parallel provider work, 2026-10-17.** The user authorized shared provider tests and Cloudflare design while PR #32 was under review.
 T0015 uses `feature/t0015-provider-contract-tests`.
 T0016 uses `feature/t0016-cloudflare-backend-design` for the [backend design](docs/cloudflare-backend-design.md) and [implementation plan](docs/cloudflare-implementation-plan.md).

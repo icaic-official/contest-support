@@ -204,6 +204,14 @@ They are not part of the T0005 issue-image ticket:
 
 ## Documentation upkeep
 
+The user requires documentation suitable for an open-source release.
+Follow the [documentation release plan](docs/documentation-release-plan.md).
+Write for readers without project conversations or access to the maintainers' provider accounts.
+State prerequisites, exact commands, expected results, permissions, and failure recovery where relevant.
+Label development, experimental, and unverified behavior explicitly.
+Update affected guides with behavior changes. Keep historical run reports separate from current instructions.
+Do not call an installation path supported until its documented procedure passes on an isolated installation.
+
 During T0001, create the remaining documentation.
 Keep it concise and consistent with implemented behavior.
 

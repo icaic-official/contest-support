@@ -94,6 +94,7 @@ Later merges do not automatically deploy either site.
 
 ### Repository records
 
+- [Documentation release plan](docs/documentation-release-plan.md) — public-reader requirements, specific gaps, and completion criteria.
 - [Development tickets](docs/tickets.md) — ticket scope, status, and acceptance criteria.
 - [Current state](docs/current-state.md) — implementation details, verification records, and limitations.
 - [Cloud onboarding](docs/cloud-onboarding.md) — provider setup, costs, accounts, and deployment.

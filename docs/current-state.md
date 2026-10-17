@@ -1,5 +1,27 @@
 # Current state
 
+## Documentation release audit (2026-10-17)
+
+The user required documentation suitable for an open-source release and requested a specific cleanup audit.
+The [release plan](documentation-release-plan.md) records 20 findings, their source files, and completion criteria.
+It covers outside contributors, versioned guidance, installation, operating procedures, permissions, usability, and hosting.
+The initial site remains a working development baseline. Release readiness remains incomplete.
+
+The audit inspected docs revision `3c18cbb` and `main` at `de92d54`.
+GitHub reported a private repository, no selected license, and no published releases.
+The docs PR remains open. Ordinary, dependency, and secret checks passed on `3c18cbb`.
+The protected cloud job was skipped. It did not pass a cloud integration check.
+
+The follow-up removes the obsolete demo-command comment from `.env.example`.
+It also corrects maintenance command paths in `docs/code-quality.md` to `GiftedNovaHD/minsky`.
+Those commands were not executed. Historical links remain intact.
+Contributor rules and the planning record now require public-reader quality and evidence for supported installation paths.
+No public-site content, application behavior, provider settings, or deployment changed in this follow-up.
+
+Checks passed for 74 repository Markdown targets and anchors, unchanged environment declarations, and all three corrected maintenance paths.
+The new release plan passed the STE structural check. Whitespace checks passed.
+Application builds, browser tests, and cloud checks were not repeated for these repository-prose and comment changes.
+
 ## T0011 documentation site (2026-10-17)
 
 The user requested a written documentation site and its deployment to Cloudflare Workers.

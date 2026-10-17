@@ -100,10 +100,10 @@ An authenticated repository administrator can also use the prepared payload.
 Before you use it, reconcile it with existing rules.
 
 ```sh
-gh api --method PUT repos/notbowen/minsky/branches/main/protection \
+gh api --method PUT repos/GiftedNovaHD/minsky/branches/main/protection \
   --input .github/main-protection.json
-gh api --method GET repos/notbowen/minsky/branches/main/protection
-gh api --method PUT repos/notbowen/minsky/vulnerability-alerts
+gh api --method GET repos/GiftedNovaHD/minsky/branches/main/protection
+gh api --method PUT repos/GiftedNovaHD/minsky/vulnerability-alerts
 ```
 
 The payload replaces branch protection.

@@ -1,5 +1,12 @@
 # Minsky planning record
 
+**Open-source documentation quality (2026-10-17):** the documentation must serve readers outside the project.
+Provide reproducible instructions, exact behavior and limits, clear release status, and tested installation procedures for supported paths.
+Keep public guides separate from maintainer deployment records and historical ticket reports.
+The initial T0011 site is a working baseline. It is not yet release-ready.
+See the [documentation release plan and audit](docs/documentation-release-plan.md) for specific gaps and completion criteria.
+License selection and repository publication remain owner decisions.
+
 **Documentation site (2026-10-17):** the user requested implementation, written guides, and deployment to Cloudflare Workers.
 T0011 is a companion to the open T0007 installation work.
 Use `feature/t0011-documentation-site` from updated `main`.

@@ -423,3 +423,18 @@ Application deployment, backend changes, T0007 container execution, merging othe
 - [x] Required local checks pass, including docs search, navigation, local links, and phone layout.
 - [x] The deployed site passes HTTP, deep-link, search, and 404 checks.
 - [x] Deployment evidence and a source PR are available for user review.
+
+### Open-source release follow-up (2026-10-17)
+
+The user requires release-quality documentation for readers outside the project.
+The initial site acceptance above remains complete. Public release readiness remains incomplete.
+Use the [documentation release plan and audit](documentation-release-plan.md) for exact findings and completion criteria.
+
+- [x] Record the reader structure, quality rules, source audit, and release gaps.
+- [x] Remove the obsolete demo-command comment and correct current maintenance command repository paths.
+- [ ] Complete factual details, public contribution instructions, and separation from maintainer records.
+- [ ] Complete installation and operating guides against T0007's verified revision.
+- [ ] Record owner decisions about licensing, source publication, and support before a public release.
+- [ ] Verify the complete reader journey and explicitly deploy the reviewed documentation.
+
+These items do not authorize merging T0007, changing repository visibility, selecting a license, or provisioning services.

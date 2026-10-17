@@ -1,5 +1,9 @@
 # Cloud onboarding for T0003
 
+Supabase remains the active backend during [T0014 backend adapters](tickets.md#t0014-backend-adapters).
+The adapter extraction keeps the public environment variables and provider commands below unchanged.
+The selected future migration to Workers, D1, R2, and Durable Objects is recorded in [product direction](product-direction.md#backend-migration-direction).
+
 **Workflow update (2026-10-17):** the user selected automatic frontend previews and deployment from `main` for both Workers.
 GitHub Actions publishes both sites only after all required CI jobs pass.
 Follow [deployment setup](cloudflare-builds.md). Credentials, activation, and the first automatic deployments remain unverified.
@@ -307,7 +311,9 @@ npm run test:cloud
 Review the configuration diff before you apply it.
 Review the migration target before you apply migrations.
 Deploy `attachments` only from a checkout that contains that function.
-T0005 is applied to `Minsky` for the approved preview; it is not applied to `Minsky CI`.
+The merged T0005 image migrations and both functions are installed in `Minsky CI` as of 2026-10-17.
+The CI preparation retained the already applied announcement migration from open PR #20.
+See the [T0014 verification record](current-state.md#t0014-existing-backend-verification-2026-10-17) for the setup and recovery evidence.
 The `cloud:link` and `cloud:functions` npm shortcuts target development.
 Use the explicit CI commands above in the separate checkout.
 
@@ -368,7 +374,28 @@ Configure required reviewers where the repository's GitHub plan supports them.
 Verify plan availability before you treat protection as enabled.
 Then manually dispatch **Checks** for the reviewed branch.
 Record the cloud job result.
-The cloud job applies migrations and deploys both `admin` and `attachments` before running the tests.
+By default, the cloud job applies configuration and migrations, deploys both `admin` and `attachments`, and sets the test origin before the tests.
+The job records the remote migration versions and function versions in its log.
+
+To test a frontend change against the existing CI backend, select `existing_backend` when you dispatch the workflow.
+Use this mode only when the change needs no new backend migration, function, or configuration.
+The existing backend must already allow the test origin `http://127.0.0.1:4174`.
+For T0014, the command is:
+
+```sh
+gh workflow run checks.yml --repo GiftedNovaHD/minsky \
+	--ref feature/t0014-backend-adapters -f existing_backend=true
+```
+
+This mode skips backend preparation. The tests still create and delete isolated fixtures.
+Before fixture creation, `scripts/check-cloud-backend.mjs` requires every local migration version and active `admin` and `attachments` functions.
+The check reads provider metadata and reports additional remote migration versions.
+It stops when prerequisites are missing. It does not compare deployed function source or prove that database objects match migration history.
+A passing result verifies the frontend against the recorded backend. It does not verify installation of that revision's backend.
+Keep the default mode for changes to migrations, functions, or backend configuration.
+If the migration history differs, resolve that difference before an installation check.
+Do not remove a migration record while its database objects remain.
+
 Automatic frontend deployment is selected but its setup remains unverified.
 An app preview can write to its configured development backend through the authenticated app.
 It does not isolate data. See [preview backend limits](cloudflare-preview-behavior.md).

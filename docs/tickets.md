@@ -425,7 +425,7 @@ No schema change or deployment is part of this ticket.
 ## T0014 backend adapters
 
 Branch: `feature/t0014-backend-adapters`, from updated `main` at `de92d54`.
-Status: implementation, local checks, and ordinary GitHub checks pass after the merge from `main`. The replacement token works. Minsky CI now has the missing merged image migrations and functions. A failed run's fixtures were recovered and deleted. Hosted verification and user review remain pending.
+Status: implementation, local checks, ordinary GitHub checks, and all 14 hosted Supabase cases pass. Fixture cleanup completed. PR #32 is ready for user review and merge.
 
 The user selected shared backend interfaces before the Cloudflare migration.
 This ticket extracts Supabase as the first implementation.
@@ -442,11 +442,11 @@ Acceptance criteria:
 - [x] Live subscriptions release their resources and ignore callbacks after cleanup. The UI retains refresh on reconnect, focus, and polling.
 - [x] Local type, lint, build, database, function, adapter, and browser checks pass.
 - [x] Documentation separates the current Supabase implementation from the selected future Cloudflare backend.
-- [ ] Protected cloud checks pass on the reviewed revision against the existing Supabase backend. The `cloud-test` environment permits `main` and `feature/t0014-backend-adapters`. Use `existing_backend` for this frontend extraction. Record the backend versions and fixture cleanup result.
+- [x] Protected cloud checks pass on the reviewed revision against the existing Supabase backend. The [run on `a3b3c70`](https://github.com/GiftedNovaHD/minsky/actions/runs/39027288113) passes all 14 cases with `existing_backend=true` and successful fixture cleanup. The verification record identifies the backend versions.
 - [ ] The user reviews and merges the pull request.
 
 The [backend reference](backend-contracts.md) defines the interfaces.
-[Current state](current-state.md#t0014-backend-adapters-2026-10-17) records the verification results.
+[Current state](current-state.md#t0014-existing-backend-verification-2026-10-17) records the verification results.
 
 The Cloudflare backend, D1 schema rewrite, account migration, R2 copy, and Durable Objects implementation remain later work.
 The next candidate is a shared hosted verification suite for the contracts before the second provider implementation.

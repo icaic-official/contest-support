@@ -69,6 +69,18 @@ Expected result: successful submission closes the form and selects the new repor
 12. Leave the reply input blank.
 13. Check that **Send reply** remains disabled.
 
+Check reply retries with isolated accounts and controlled request failures:
+
+1. Enter a public reply and cause its response to be lost after the server records it.
+2. Select **Retry last request**. Repeat a transport failure and check that the text remains.
+3. Let the next retry succeed. Check that the text clears and **Send reply** is disabled.
+4. Check that history contains one copy of the reply.
+5. Enter a fresh reply. Check that it sends and clears normally.
+6. Repeat with an internal note. Check that successful retry resets **Audience** to its default.
+7. Reject a reply at the server. Check that its text remains editable and no history entry appears.
+
+The retry cases in `tests/workspace-refresh.spec.ts` automate these checks with mocked responses.
+
 ## 5. Resolution and award
 
 1. Resolve the issue with a preset or **Custom** summary.

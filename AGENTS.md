@@ -23,7 +23,9 @@
 ## Current scope
 
 **T0019 shared server workflow, 2026-10-18.** Use `feature/t0019-shared-server-workflow` from updated `main` at `0c797ad`.
-The owner authorizes this extraction in parallel with open PR #40. Do not modify or base work on its authentication branch.
+The owner authorized this extraction while PR #40 was open. The branch started independently of its authentication branch.
+PR #40 merged at `68e8642` on 2026-10-17 at 17:16:41 UTC. This branch now includes that updated `main`.
+Preserve the merged authentication implementation. T0019 changes only the shared issue workflow and its adapters.
 PR #39 merged the bounded D1 transaction proof.
 Extract the existing nine issue commands into one provider-independent server service.
 Verify an actual trusted Supabase execution path with isolated fictional CI fixtures before expanding D1 workflow persistence.
@@ -34,9 +36,22 @@ Keep Supabase active and its legacy browser path available during replacement ve
 Do not deploy to the development backend without the required authorization.
 The owner reviews and merges. Bounded subagent work is authorized.
 PR #40's hosted HTTP check remains incomplete after a Workers Free resource limit.
-Workers Paid remains deferred. Do not enable a subscription or change PR #40.
+Workers Paid remains deferred. Do not enable a subscription.
 Full D1 workflow persistence, R2, notification delivery, migration tooling, AWS, and Terraform remain later work.
 Do not export real data, reset real accounts, or switch backends.
+
+**T0018 Cloudflare authentication, 2026-10-18.** PR #39 merged at `0c797ad` on 2026-10-17 at 15:49:49 UTC.
+PR #40 merged T0018 at `68e8642` on 2026-10-17 at 17:16:41 UTC.
+Use `feature/t0018-cloudflare-authentication` from that updated `main`.
+Implement the bounded authentication API and browser adapter with maintained Better Auth, D1 credential guards, and fictional fixtures.
+See [the reference](docs/cloudflare-authentication.md), [identity choice](docs/cloudflare-authentication-choice.md), and [verification guide](docs/verify-cloudflare-authentication.md).
+Keep Supabase active. The complete connector, real-account migration, exports, and backend switch remain later work.
+Use local development databases and the separate hosted `minsky-auth-ci` database.
+The owner approved adding only `feature/t0018-cloudflare-authentication` to the existing `cloud-test` branch allowlist on 2026-10-18. Preserve the other entries and protection rules.
+Measured password CPU exceeds Workers Free's allowance. The protected HTTP check hit a runtime resource limit.
+The owner deferred the paid subscription on 2026-10-18. Keep that check incomplete until Workers Paid is active and verification passes.
+The configuration requests a 1,000 ms CPU cap. Free rejects it with error `100328`. No paid upgrade occurred.
+The owner reviewed and merged T0018. Bounded subagent work remains authorized within the active ticket.
 
 **T0017 D1 transaction proof, 2026-10-17.** Start `feature/t0017-d1-transaction-proof` from updated `main` at `53f9dfd`.
 Implement one complete command through a provider-independent application-store interface and a D1 adapter.

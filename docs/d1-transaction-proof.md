@@ -55,6 +55,10 @@ npx wrangler d1 migrations apply minsky-d1-proof-ci --remote --config wrangler.d
 ```
 
 Expect both `0001_transaction_proof.sql` and `0002_version_guards.sql` to succeed on their first application.
+T0018 adds authentication migrations `0003_authentication.sql` and `0004_identity.sql` to the same directory.
+The command also applies those files when absent. They do not enable a complete connector.
+The original T0017 hosted result used the first two migrations only.
+Run [authentication checks](verify-cloudflare-authentication.md) against the separate `minsky-auth-ci` target.
 On later runs, expect `No migrations to apply`.
 This command changes only the isolated proof database.
 It does not install a complete Cloudflare connector.

@@ -90,7 +90,8 @@ Actual authorization, synchronization, deployment, capacity, and recovery behavi
 
 ## Unresolved decisions
 
-The authentication implementation for Cloudflare remains unselected.
+T0018 selects maintained Better Auth for experimental Cloudflare authentication.
+See [the identity choice](cloudflare-authentication-choice.md) and [API reference](cloudflare-authentication.md).
 The owner selected organizer-issued replacement temporary passwords for migration on 2026-10-17.
 Users must change these passwords before contest access.
 Existing passwords do not need to survive. Password-hash import is not required.
@@ -146,9 +147,11 @@ The SQLite adapter must preserve the existing decisions through the same shared 
 The shared Minsky interfaces, Supabase adapter, provider tests, and Cloudflare design merged before T0017.
 Hosted Supabase contract checks provide the comparison point for the replacement backend.
 T0017's bounded D1 transaction proof merged in PR #39 at `0c797ad`.
-T0018 authentication remains in open PR #40, with hosted HTTP verification incomplete after a Workers Free resource limit.
+T0018 authentication merged in PR #40 at `68e8642` on 2026-10-17 at 17:16:41 UTC.
+Its hosted HTTP verification remains incomplete after a Workers Free resource limit.
 Workers Paid remains deferred.
 T0019 verifies the extracted server workflow through Supabase before further D1 workflow persistence.
+Its branch started independently at `0c797ad` and now includes the merged authentication implementation unchanged.
 The remaining connector operations follow that shared-rule verification.
 Full migration tooling follows connector verification. Real-data exports and the backend switch remain later phases.
 See [the proof guide](d1-transaction-proof.md) and [implementation plan](cloudflare-implementation-plan.md).

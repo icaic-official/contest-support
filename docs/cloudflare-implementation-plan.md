@@ -13,7 +13,7 @@ Its protected run passed all eight shared scenarios and all 14 existing hosted U
 T0016 merged in [PR #36](https://github.com/GiftedNovaHD/minsky/pull/36) at `b68ef72` on 2026-10-17 at 13:50:36 UTC.
 The design review and bounded T0017 proof are complete.
 T0019 extracts the existing server workflow before further Cloudflare workflow persistence.
-Authentication in PR #40 remains a separate open change.
+Authentication in PR #40 merged at `68e8642`. T0019 now includes that updated `main`.
 
 The user authorized T0015 and T0016 in parallel on 2026-10-17 while PR #32 was under review.
 Both branches started at its `d158906` revision. T0016 now includes PR #32 and PR #37.
@@ -29,7 +29,7 @@ T0017 uses `feature/t0017-d1-transaction-proof` from updated `main` at `53f9dfd`
 [PR #39](https://github.com/GiftedNovaHD/minsky/pull/39) implements the bounded proof.
 All 42 local and hosted D1 cases pass on `edb4bd0`, with verified scoped fixture cleanup.
 See [the evidence](current-state.md#t0017-d1-transaction-proof-2026-10-17).
-The owner merged PR #39 at `0c797ad`.
+The owner merged PR #39 at `0c797ad` on 2026-10-17 at 15:49:49 UTC.
 Those hosted results apply to the recorded proof revision, not later adapter changes.
 See [the proof guide](d1-transaction-proof.md) for the focused scope and verification procedure.
 
@@ -56,8 +56,9 @@ Subagents may perform independent, bounded tasks.
 ## Extract and verify the existing workflow
 
 T0019 uses `feature/t0019-shared-server-workflow` from `main` at `0c797ad`.
-The owner authorizes this ticket in parallel with open authentication PR #40.
-It does not modify or depend on the unmerged authentication implementation.
+The owner authorized this ticket while authentication PR #40 was open.
+The branch started independently of that authentication branch.
+It now includes PR #40's merge at `68e8642` and preserves the merged authentication implementation.
 
 1. Inventory the effective PostgreSQL functions and all existing browser commands.
 2. Extract the existing decisions and application orchestration into shared server modules.
@@ -78,13 +79,16 @@ Further D1 workflow persistence follows that verification.
 
 ## Select and verify identity
 
-T0018 implements this phase in [PR #40](https://github.com/GiftedNovaHD/minsky/pull/40).
-That PR remains open. Maintained Better Auth supplies its bounded authentication implementation.
-The protected hosted HTTP check failed at the Workers Free resource limit in run `39049037968`.
-The later ordinary check run `39050321738` passed. It does not complete hosted HTTP verification.
-The owner deferred Workers Paid. Keep the hosted HTTP check incomplete until that requirement is resolved and verification passes.
-T0019 changes neither that implementation nor the subscription decision.
+T0018 implements this phase on `feature/t0018-cloudflare-authentication` from merged PR #39.
+PR #40 merged T0018 at `68e8642` on 2026-10-17 at 17:16:41 UTC.
+See the [reference](cloudflare-authentication.md), [choice and costs](cloudflare-authentication-choice.md), and [verification guide](verify-cloudflare-authentication.md).
+Current evidence remains in the [T0018 record](current-state.md#t0018-cloudflare-authentication-2026-10-18).
+The complete connector and migration remain later phases.
+T0018 passed all 28 protected hosted D1 account cases. Protected HTTP verification needs a paid Worker CPU allowance.
+The owner deferred subscription activation on 2026-10-18. Keep that result incomplete until the paid check passes.
 
+T0019 changes neither the authentication implementation nor the subscription decision.
+This phase follows the D1 proof.
 The owner selected organizer-issued replacement temporary passwords on 2026-10-17.
 Users must change these passwords before contest access.
 Preserve account IDs, memberships, permissions, and history.

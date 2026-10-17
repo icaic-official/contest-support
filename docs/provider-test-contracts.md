@@ -113,3 +113,12 @@ Provider-specific consistency, storage recovery, and migration tests remain addi
 
 No generic database API or infrastructure provisioning layer is part of this test boundary.
 Terraform can later create resources. It cannot establish the behavior that these scenarios verify.
+
+
+## Bounded Cloudflare authentication reuse
+
+T0018 extracts `verifyTemporaryAuthentication()` from the existing authentication scenario.
+The Supabase scenario retains its workflow hooks. Cloudflare supplies its real authentication adapter and protected session-list hooks.
+Both providers use the same identity, temporary-password, password-change, logout, stale-password, and subscription-cleanup assertions.
+This bounded reuse does not establish complete Cloudflare `Backend` conformance.
+The remaining workflow, image, and live-update scenarios still require the complete connector.

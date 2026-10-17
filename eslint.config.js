@@ -3,7 +3,7 @@ import tseslint from "typescript-eslint";
 import hooks from "eslint-plugin-react-hooks";
 import globals from "globals";
 export default tseslint.config(
-  { ignores: ["dist", "node_modules", "playwright-report", "test-results", "site/dist", "site/.astro", "site/node_modules"] },
+  { ignores: ["dist", "node_modules", "playwright-report", "test-results", "site/dist", "site/.astro", "site/node_modules", "**/.wrangler/**"] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {

@@ -4,7 +4,7 @@ This page explains the proposed Cloudflare backend and its provider boundaries.
 T0016 began while PR #32 was under review. The user merged PR #32 on 2026-10-17.
 T0017's bounded [D1 transaction proof](d1-transaction-proof.md) merged in PR #39.
 T0019 extracts the existing workflow into shared server code and verifies it through Supabase before further D1 workflow implementation.
-T0018 authentication remains in open PR #40, outside this branch.
+T0018 authentication merged in PR #40 at `68e8642`. T0019 now includes that updated `main`.
 The complete Cloudflare connector and migration tools remain later work.
 The owner authorizes isolated development and CI resources for this implementation.
 That authorization does not establish a hosted verification result.
@@ -56,6 +56,8 @@ flowchart TD
 The diagram includes the complete target and the separate Supabase verification path.
 T0019's Supabase function executes every issue command through the shared service.
 The bounded D1 adapter reuses that service for `claim` and `message` only.
+The merged authentication Worker has no workflow route.
+The complete connector must also guard current identity sessions and credential generations inside each workflow commit.
 The active Supabase browser workflow still calls the legacy RPC.
 The dotted connection identifies the opt-in executor used for replacement verification.
 
@@ -181,8 +183,9 @@ Their implementation must define retry semantics before adding automatic retries
 
 ## Authentication uses replacement temporary passwords
 
-T0018 evaluates and implements authentication in [PR #40](https://github.com/GiftedNovaHD/minsky/pull/40).
-That PR remains open and separate from T0019.
+T0018 implements bounded authentication in [PR #40](https://github.com/GiftedNovaHD/minsky/pull/40).
+The owner merged that PR at `68e8642` on 2026-10-17 at 17:16:41 UTC.
+T0019 preserves the merged authentication implementation.
 Its protected hosted HTTP check reached a Workers Free resource limit.
 The owner deferred Workers Paid. That verification remains incomplete.
 
@@ -192,11 +195,12 @@ Users must change these passwords before contest access.
 Preserve account IDs, memberships, permissions, and history.
 Existing passwords do not need to survive. Password-hash import is no longer required.
 
-The authentication PR selects maintained Better Auth behind a small server boundary.
-That selection does not activate Cloudflare authentication in the application.
+T0018 selects maintained Better Auth behind the identity adapter.
+See [the implementation reference](cloudflare-authentication.md) and [choice with costs](cloudflare-authentication-choice.md).
+The identity boundary does not activate Cloudflare authentication in the application.
 Minsky retains its username rules, organizer recovery, mandatory password changes, and cross-session authorization.
 
-Authentication verification remains a separate acceptance step after the D1 proof.
+T0018 implements authentication after the merged D1 proof.
 Use fictional accounts to verify password creation, mandatory changes, private credential distribution, recovery, and Worker execution limits.
 Full migration tooling follows connector verification.
 The owner decision authorizes no real-account reset, credential export, or backend switch in T0017.
@@ -212,7 +216,8 @@ The identity adapter owns expiry, rotation, and revocation. The browser receives
 State-changing routes check the request origin and a cross-site request forgery token.
 The WebSocket upgrade checks the origin and current login too.
 Preview origins and cross-origin local development need an explicit allowlist and browser tests.
-Cookie scope and session lifetime remain part of identity design review.
+T0018 uses host-only HttpOnly cookies, SameSite Strict, and a fixed eight-hour lifetime.
+Hosted cookies require Secure. The authentication reference defines exact origins and request protection.
 
 Password resets first place the account behind the mandatory-change gate and revoke earlier logins.
 The authorization check, gate, account access version, and audit record commit together.
@@ -321,6 +326,7 @@ Record hosted evidence in [the proof guide](d1-transaction-proof.md) before clai
 Passing that suite does not prove a fresh installation, a data migration, or capacity for 800 simultaneous users.
 Each claim needs its own evidence.
 
+T0018 adds bounded authentication after the D1 proof.
 Shared-rule verification through Supabase precedes further Cloudflare workflow persistence.
 Authentication verification and the remaining connector operations remain separate requirements.
 Full migration tooling follows connector verification. Real-data exports and the backend switch remain later phases.

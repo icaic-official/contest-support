@@ -3,7 +3,8 @@
 These tickets describe development work, not contestant issues.
 
 The active ticket is [T0019 shared server workflow](#t0019-shared-server-workflow).
-The owner authorizes this extraction in parallel with T0018 authentication in open PR #40.
+The owner authorized this extraction while T0018 authentication PR #40 was open.
+The owner merged PR #40 at `68e8642` on 2026-10-17 at 17:16:41 UTC.
 PR #39 merged T0017's bounded D1 proof at `0c797ad`.
 Further Cloudflare workflow persistence follows shared-rule verification through Supabase.
 Migration tooling follows connector verification. Supabase remains active.
@@ -62,9 +63,11 @@ Branch: `feature/t0019-shared-server-workflow`, from updated `main` at `0c797ad`
 Status: implemented in [PR #41](https://github.com/GiftedNovaHD/minsky/pull/41). Local, hosted Supabase, and bounded hosted D1 checks pass. Protected GitHub cloud execution remains pending. The owner reviews and merges.
 Summary: Extract the existing issue rules into one shared server service. Exercise all nine commands through a trusted Supabase path before expanding Cloudflare workflow persistence.
 
-The owner authorizes work in parallel with [PR #40](https://github.com/GiftedNovaHD/minsky/pull/40).
-This branch does not include or modify its authentication implementation.
-That PR remains open. Its protected HTTP check failed with a Workers Free resource limit.
+The owner authorized work while [PR #40](https://github.com/GiftedNovaHD/minsky/pull/40) was open.
+This branch started independently at `0c797ad`.
+It now includes that PR's merge at `68e8642`, from 2026-10-17 at 17:16:41 UTC.
+T0019 preserves the merged authentication implementation.
+The protected authentication HTTP check failed with a Workers Free resource limit.
 Workers Paid remains deferred, and the HTTP verification remains incomplete.
 
 Supabase remains active. The legacy browser workflow and protective SQL remain available during replacement verification.
@@ -93,10 +96,45 @@ The [verification guide](verify-server-workflow.md) gives the local and CI-only 
 [Current state](current-state.md) records observed results.
 An interface or an uncalled rule module does not complete this extraction.
 
+## T0018 Cloudflare authentication
+
+Branch: `feature/t0018-cloudflare-authentication`, from updated `main` at `0c797ad` after PR #39 merged.
+Status: merged in [PR #40](https://github.com/GiftedNovaHD/minsky/pull/40) at `68e8642` on 2026-10-17 at 17:16:41 UTC. Local and protected hosted D1 checks pass. Protected HTTP verification awaits Workers Paid, which the owner deferred.
+Summary: Add Workers and D1 authentication, temporary passwords, account sessions, and organizer-assisted recovery. Keep Supabase active.
+
+Better Auth `1.7.10` supplies username login and signed cookie sessions.
+D1 guards preserve current permissions and atomic credentials. The browser implements the existing `Authentication` interface.
+The [reference](cloudflare-authentication.md) defines endpoints, cookie scope, lifetime, request protection, and account restrictions.
+The [identity choice](cloudflare-authentication-choice.md) records maintained crypto, schema coupling, Worker measurements, and cost.
+Use the [verification guide](verify-cloudflare-authentication.md) for local and isolated hosted checks.
+
+The isolated `minsky-auth-ci` database and Worker use confirmed account `458ad6a930b0fb717796dfa19ca6a2b1`.
+Development databases remain local and separate. No real accounts, real-data exports, backend switch, or paid upgrade are included.
+The remaining workflow connector, R2, Durable Object delivery, migration tooling, AWS, and Terraform remain later work.
+
+### Acceptance criteria
+
+- [x] Select and document a maintained Workers and D1 identity implementation and cryptographic components.
+- [x] Implement username login, logout, restoration, fixed expiry, revocation, and a browser authentication adapter.
+- [x] Enforce temporary-password changes at the server before contest access.
+- [x] Preserve account IDs and memberships through create, reset, and password changes.
+- [x] Recheck all-session admin access, archived restrictions, current permissions, and stale credentials.
+- [x] Protect cookie scope, permitted origins, state changes, and one-time credential responses.
+- [x] Test partial failures, recovery, superseded updates, and login races with isolated fixtures.
+- [x] Reuse provider-neutral authentication assertions and verify browser cookie and request protection.
+- [x] Measure password cost in Workers and record the CPU allowance and paid-plan need.
+- [x] Complete local checks, protected hosted D1 checks, scoped cleanup, and verification records.
+- [ ] Complete protected HTTP verification after the owner activates Workers Paid.
+- [x] Prepare a PR for owner review. The owner merges.
+
+### Verification
+
+See [the current-state record](current-state.md#t0018-cloudflare-authentication-2026-10-18) for separate local, hosted D1, Worker HTTP, and protected CI results.
+
 ## T0017 D1 transaction proof
 
 Branch: `feature/t0017-d1-transaction-proof`, from updated `main` at `53f9dfd`.
-Status: merged in [PR #39](https://github.com/GiftedNovaHD/minsky/pull/39) at `0c797ad`. Its recorded local and hosted D1 verification remains bounded to that proof revision.
+Status: merged in [PR #39](https://github.com/GiftedNovaHD/minsky/pull/39) at `0c797ad` on 2026-10-17 at 15:49:49 UTC. Local and hosted D1 checks passed. Its recorded hosted verification remains bounded to that proof revision.
 Summary: Prove atomic workflow writes through a provider-independent application-store interface and a D1 adapter. Use `claim` and `message` to check concurrent transitions and private activity.
 
 The owner authorized isolated Cloudflare development and CI resources in the existing account.

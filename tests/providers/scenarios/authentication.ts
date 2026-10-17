@@ -1,66 +1,13 @@
 import type { ScenarioContext } from '../contracts';
-import { check, eventually, rejects, submit } from './assertions';
+import { check, rejects, submit } from './assertions';
+import { verifyTemporaryAuthentication } from './authentication-lifecycle';
 
 export async function authentication(context: ScenarioContext): Promise<void> {
   const backend = await context.connect();
-  check(
-    await backend.auth.currentUser() === undefined,
-    'A new client must start signed out.',
-  );
-  const account = context.accounts.temporary;
-  let currentId: string | undefined;
-  let notifications = 0;
-  const stop = backend.auth.subscribe((user) => {
-    currentId = user?.id;
-    notifications++;
+  await verifyTemporaryAuthentication(backend.auth, context.accounts.temporary, {
+    restricted: () => rejects(() => submit(backend, context.sessionId)),
+    ready: () => submit(backend, context.sessionId),
   });
-  try {
-    await backend.auth.signIn(account.username, account.password);
-    check(
-      (await backend.auth.currentUser())?.id === account.id,
-      'Sign-in must identify the fixture account.',
-    );
-    await eventually(
-      () => currentId === account.id,
-      'Authentication must notify subscribers after sign-in.',
-    );
-    check(
-      (await backend.auth.accountStatus()).must_change,
-      'Temporary credentials must require a password change.',
-    );
-    await rejects(() => submit(backend, context.sessionId));
-    const password = crypto.randomUUID() + 'A9!';
-    await backend.auth.changePassword(account.password, password);
-    const status = await backend.auth.accountStatus();
-    check(
-      !status.must_change && status.session_valid,
-      'A completed password change must grant a valid session.',
-    );
-    await submit(backend, context.sessionId);
-    await backend.auth.signOut();
-    check(
-      await backend.auth.currentUser() === undefined,
-      'Sign-out must clear the current identity.',
-    );
-    await eventually(
-      () => currentId === undefined,
-      'Authentication must notify subscribers after sign-out.',
-    );
-    await rejects(() =>
-      backend.auth.signIn(account.username, account.password)
-    );
-    stop();
-    stop();
-    const stoppedAt = notifications;
-    await backend.auth.signIn(account.username, password);
-    await backend.auth.signOut();
-    check(
-      notifications === stoppedAt,
-      'Authentication cleanup must suppress later callbacks.',
-    );
-  } finally {
-    stop();
-  }
 }
 
 export async function revocation(context: ScenarioContext): Promise<void> {

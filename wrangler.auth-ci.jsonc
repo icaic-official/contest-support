@@ -1,0 +1,20 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "minsky-auth-ci",
+  "main": "src/server/adapters/cloudflare/worker.ts",
+  "account_id": "458ad6a930b0fb717796dfa19ca6a2b1",
+  "compatibility_date": "2026-10-13",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "preview_urls": false,
+  "observability": { "enabled": true, "head_sampling_rate": 1 },
+  "triggers": { "crons": ["19 3 * * *"] },
+  "vars": { "AUTH_ORIGIN": "https://minsky-auth-ci.icaic-minsky.workers.dev" },
+  "d1_databases": [{
+    "binding": "DB",
+    "database_name": "minsky-auth-ci",
+    "database_id": "5d746d29-0a66-4346-96a6-4974126685d7",
+    "migrations_dir": "src/server/adapters/d1/migrations",
+    "remote": true
+  }]
+}

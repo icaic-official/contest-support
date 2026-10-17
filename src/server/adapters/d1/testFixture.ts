@@ -24,7 +24,7 @@ export class D1Fixture {
   readonly otherContestant: Caller = { accountId: randomUUID(), loginId: randomUUID() };
   private journalDirectory: string | undefined;
 
-  constructor(readonly db: D1Connection) {}
+  constructor(readonly db: D1Connection, private readonly configPath = 'wrangler.d1-proof.jsonc') {}
 
   statement(sql: string, ...values: Array<string | number | null>): D1Statement {
     return this.db.prepare(sql).bind(...values);
@@ -44,9 +44,9 @@ export class D1Fixture {
   }
 
   private recoveryDetails() {
-    const config = JSON.parse(readFileSync("wrangler.d1-proof.jsonc", "utf8"));
+    const config = JSON.parse(readFileSync(this.configPath, "utf8"));
     return {
-      config: "wrangler.d1-proof.jsonc", remote: process.env.MINSKY_D1_REMOTE === "1",
+      config: this.configPath, remote: process.env.MINSKY_D1_REMOTE === "1" || process.env.MINSKY_AUTH_REMOTE === "1",
       accountId: config.account_id, databaseId: config.d1_databases[0].database_id,
       databaseName: config.d1_databases[0].database_name,
       eventId: this.eventId, sessionIds: [this.sessionId, this.secondSessionId],

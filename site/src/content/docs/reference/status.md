@@ -3,7 +3,7 @@ title: Feature status
 description: Distinguish merged features, pending changes, and unverified operating conditions.
 ---
 
-Status checked on **17 October 2026** against the repository and GitHub pull requests.
+Status checked on **18 October 2026** against the repository and GitHub pull requests.
 This page is a dated record, not a live deployment dashboard.
 
 ## Merged into main
@@ -21,6 +21,8 @@ This page is a dated record, not a live deployment dashboard.
 | [T0015](https://github.com/GiftedNovaHD/minsky/pull/37) | Shared provider behavior tests, verified against isolated Supabase fixtures. |
 | [T0016](https://github.com/GiftedNovaHD/minsky/pull/36) | Proposed Cloudflare architecture and implementation plan. |
 
+| [T0017](https://github.com/GiftedNovaHD/minsky/pull/39) | Bounded D1 transaction proof with local and hosted fixture verification. |
+
 ## Pending changes
 
 | Work | Status |
@@ -28,7 +30,7 @@ This page is a dated record, not a live deployment dashboard.
 | [T0006 announcements](https://github.com/GiftedNovaHD/minsky/pull/20) | Open pull request. |
 | [T0007 independent installations](https://github.com/GiftedNovaHD/minsky/pull/21) | Open pull request. Packaging exists on its branch. Container operation remains unverified. |
 | [T0009 jury worklist](https://github.com/GiftedNovaHD/minsky/pull/23) | Draft pull request. |
-| T0017 D1 transaction proof | Experimental store for claims and messages. The Cloudflare connector remains incomplete. Supabase remains active. |
+| T0018 Cloudflare authentication | Experimental username authentication, cookie sessions, and organizer recovery. The full connector and migration remain incomplete. Supabase remains active. |
 
 T0011 adds this documentation site.
 The initial docs deployment did not deploy the Minsky application or apply database migrations.

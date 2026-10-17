@@ -2,8 +2,9 @@
 
 These tickets describe development work, not contestant issues.
 
-The active ticket is [T0017 D1 transaction proof](#t0017-d1-transaction-proof).
-Authentication and the remaining Cloudflare operations follow this proof.
+The active ticket is [T0018 Cloudflare authentication](#t0018-cloudflare-authentication).
+PR #39 merged the D1 proof at `0c797ad` on 2026-10-17 at 15:49:49 UTC.
+The remaining Cloudflare operations follow authentication.
 Migration tooling follows connector verification. Supabase remains active.
 
 T0016 Cloudflare backend design merged in [PR #36](https://github.com/GiftedNovaHD/minsky/pull/36) at `b68ef72` on 2026-10-17.
@@ -54,10 +55,44 @@ These items stay deferred and are not part of T0005:
 
 T0008 fuzzy team search merged into `main` in [PR #22](https://github.com/notbowen/minsky/pull/22) on 2026-10-15 (SGT).
 
+## T0018 Cloudflare authentication
+
+Branch: `feature/t0018-cloudflare-authentication`, from updated `main` at `0c797ad` after PR #39 merged.
+Status: implemented and verified locally and on isolated hosted resources. PR preparation is in progress.
+Summary: Add Workers and D1 authentication, temporary passwords, account sessions, and organizer-assisted recovery. Keep Supabase active.
+
+Better Auth `1.7.10` supplies username login and signed cookie sessions.
+D1 guards preserve current permissions and atomic credentials. The browser implements the existing `Authentication` interface.
+The [reference](cloudflare-authentication.md) defines endpoints, cookie scope, lifetime, request protection, and account restrictions.
+The [identity choice](cloudflare-authentication-choice.md) records maintained crypto, schema coupling, Worker measurements, and cost.
+Use the [verification guide](verify-cloudflare-authentication.md) for local and isolated hosted checks.
+
+The isolated `minsky-auth-ci` database and Worker use confirmed account `458ad6a930b0fb717796dfa19ca6a2b1`.
+Development databases remain local and separate. No real accounts, real-data exports, backend switch, or paid upgrade are included.
+The remaining workflow connector, R2, Durable Object delivery, migration tooling, AWS, and Terraform remain later work.
+
+### Acceptance criteria
+
+- [x] Select and document a maintained Workers and D1 identity implementation and cryptographic components.
+- [x] Implement username login, logout, restoration, fixed expiry, revocation, and a browser authentication adapter.
+- [x] Enforce temporary-password changes at the server before contest access.
+- [x] Preserve account IDs and memberships through create, reset, and password changes.
+- [x] Recheck all-session admin access, archived restrictions, current permissions, and stale credentials.
+- [x] Protect cookie scope, permitted origins, state changes, and one-time credential responses.
+- [x] Test partial failures, recovery, superseded updates, and login races with isolated fixtures.
+- [x] Reuse provider-neutral authentication assertions and verify browser cookie and request protection.
+- [x] Measure password cost in Workers and record the CPU allowance and paid-plan need.
+- [x] Complete required checks, scoped cleanup, and verification records.
+- [ ] Prepare a PR for owner review. The owner merges.
+
+### Verification
+
+See [the current-state record](current-state.md#t0018-cloudflare-authentication-2026-10-18) for separate local, hosted D1, Worker HTTP, and protected CI results.
+
 ## T0017 D1 transaction proof
 
 Branch: `feature/t0017-d1-transaction-proof`, from updated `main` at `53f9dfd`.
-Status: implemented and verified locally and on hosted D1 in [PR #39](https://github.com/GiftedNovaHD/minsky/pull/39). The user reviews and merges.
+Status: merged in [PR #39](https://github.com/GiftedNovaHD/minsky/pull/39) at `0c797ad` on 2026-10-17 at 15:49:49 UTC. Local and hosted D1 checks passed.
 Summary: Prove atomic workflow writes through a provider-independent application-store interface and a D1 adapter. Use `claim` and `message` to check concurrent transitions and private activity.
 
 The owner authorized isolated Cloudflare development and CI resources in the existing account.

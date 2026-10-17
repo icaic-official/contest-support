@@ -1,5 +1,16 @@
 # Minsky planning record
 
+**Cloudflare authentication, 2026-10-18.** The owner selected the next focused ticket after PR #39 merged.
+T0018 uses `feature/t0018-cloudflare-authentication` from updated `main` at `0c797ad`.
+Implement username login, bounded cookie sessions, mandatory password changes, and organizer-assisted recovery behind the shared contracts.
+Preserve account IDs, memberships, permissions, and history. Check current permissions and revoked credentials at the server.
+Use maintained Better Auth and cryptographic components, explicit origins, request-forgery protection, and isolated fictional fixtures.
+See [the authentication reference](docs/cloudflare-authentication.md) and [verification guide](docs/verify-cloudflare-authentication.md).
+Isolated development and CI resources remain authorized in the confirmed account. No paid upgrade occurred.
+The measured hash requires more CPU than Workers Free permits. The identity choice records the concrete Standard plan cost.
+Supabase remains active. The remaining connector, real-data exports, migration, and backend switch remain later work.
+The owner reviews and merges.
+
 **D1 proof and migration decisions, 2026-10-17.** The next focused ticket is T0017 on `feature/t0017-d1-transaction-proof`.
 The branch starts from updated `main` at `53f9dfd`.
 Prove one D1 command that commits its state change, retry receipt, history, and notification record together.

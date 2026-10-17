@@ -87,7 +87,8 @@ Actual authorization, synchronization, deployment, capacity, and recovery behavi
 
 ## Unresolved decisions
 
-The authentication implementation for Cloudflare remains unselected.
+T0018 selects maintained Better Auth for experimental Cloudflare authentication.
+See [the identity choice](cloudflare-authentication-choice.md) and [API reference](cloudflare-authentication.md).
 The owner selected organizer-issued replacement temporary passwords for migration on 2026-10-17.
 Users must change these passwords before contest access.
 Existing passwords do not need to survive. Password-hash import is not required.
@@ -142,8 +143,8 @@ The transaction and permission rules currently enforced in Postgres must also ho
 
 The shared Minsky interfaces, Supabase adapter, provider tests, and Cloudflare design merged before T0017.
 Hosted Supabase contract checks provide the comparison point for the replacement backend.
-T0017 requires proof of the D1 transaction pattern with fictional fixtures and hosted evidence.
-Authentication and the remaining connector operations follow that proof.
+T0017 proved the bounded D1 transaction pattern and merged in PR #39 at `0c797ad`.
+T0018 implements and verifies authentication. The remaining connector operations follow this ticket.
 Full migration tooling follows connector verification. Real-data exports and the backend switch remain later phases.
 See [the proof guide](d1-transaction-proof.md) and [implementation plan](cloudflare-implementation-plan.md).
 

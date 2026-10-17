@@ -1,5 +1,173 @@
 # Current state
 
+## T0018 Cloudflare authentication, 2026-10-18
+
+T0018 starts from `main` at `0c797ad` after PR #39 merged on 2026-10-17 at 15:49:49 UTC.
+The working tree was clean. The branch is `feature/t0018-cloudflare-authentication`.
+Supabase remains the active application backend. No real-data export, real-account reset, migration, or backend switch occurred.
+
+### Implemented behavior
+
+Better Auth `1.7.10` supplies username authentication and signed cookie sessions through a server identity adapter.
+The bounded browser adapter implements the shared `Authentication` interface.
+The HTTP boundary enforces exact origins, JSON requests, custom headers, and current CSRF tokens.
+Hosted cookies are host-only, Secure, HttpOnly, SameSite Strict, and fixed to eight hours without refresh.
+Every protected request checks current identity and approved D1 login state.
+
+Guarded D1 operations preserve account IDs, memberships, permissions, and history.
+Organizer resets require admin access to every assigned session. Any archived assigned event blocks the reset.
+Temporary-password gates and revoked credentials are enforced at the server.
+Resets revoke prior sessions before hashing. A persisted operation ID prevents older updates from replacing newer credentials.
+Interrupted create or reset operations remain restricted and can receive another authorized reset.
+Self changes hash before one atomic credential batch so a sole organizer can retry a rejected change.
+An unknown commit outcome requires checking the new credentials. It does not prove a rollback.
+
+The same temporary-authentication lifecycle assertions now serve Supabase and Cloudflare.
+Cloudflare's complete workflow, image, and live-update provider scenarios remain later connector work.
+See the [API reference](cloudflare-authentication.md), [choice and costs](cloudflare-authentication-choice.md), and [verification guide](verify-cloudflare-authentication.md).
+
+### Resources and execution evidence
+
+Existing Wrangler OAuth access matched account `458ad6a930b0fb717796dfa19ca6a2b1` before provisioning.
+Development and HTTPS browser checks use disposable local databases.
+Hosted checks use separate `minsky-auth-ci`, ID `5d746d29-0a66-4346-96a6-4974126685d7`, in APAC with read replication disabled.
+All four repository migrations are applied there.
+The dedicated Worker is `https://minsky-auth-ci.icaic-minsky.workers.dev`.
+Its private random secret was installed without printing or storing the value in repository files.
+The latest recorded Worker code version is `be41aff6-666d-4707-9680-a77f891d8c2f`.
+
+| Check | Observed result |
+| --- | --- |
+| Local unit, script, PostgreSQL, D1, and authentication checks | 211 tests passed across 17 files. Includes 28 account cases and three password-component cases. |
+| Local type checking and ESLint | Passed. |
+| Application build | Passed. Existing large-chunk warning remains. |
+| Supabase function checks | Deno type checks passed. All 12 attachment function tests passed. |
+| Existing application browser regressions | All 34 passed. These tests use mocked provider responses. |
+| Local authentication browser security | All three passed against Chromium, HTTPS workerd, and isolated D1. |
+| Documentation build and browser checks | 14 pages and 566 links checked. All three browser cases passed. Existing duplicate `/404` warning remains. |
+| Shared provider registry | Eight scenarios listed. The existing Supabase scenario now uses the extracted authentication helper. |
+| Dependency audit | Root and site lockfile audits reported zero vulnerabilities. |
+| Local CLI against hosted D1 | All 28 cases passed across the initial run and focused verification. Initial run: 25 of 26 passed in 719.74 seconds. Focused run: three passed in 61.96 seconds. |
+| Hosted Worker HTTP | One comprehensive scenario passed in 108.29 seconds. It used the real adapter and shared lifecycle assertions. |
+| Protected GitHub Actions | Not yet run for T0018. |
+
+The initial hosted D1 run returned an uncertain database outcome in the sole-organizer retry case.
+The focused run passed that case and the two added regressions for Unicode equivalence and a lost committed response.
+The focused run skipped the other 25 cases. It was not a complete 28-case run.
+All fixtures verified scoped cleanup and removed their recovery journals.
+
+The final hosted HTTP run started on 2026-10-18 at 00:07:32 SGT.
+It checked exact 401 and 403 rejections, mandatory changes, reset recovery, cross-session permissions, expiry, revocation, cookies, origins, and CSRF.
+A prior read encountered a connection reset. The fixture driver now retries safe GET requests at most three times.
+It never automatically retries a state-changing request.
+All final-run scoped cleanup assertions passed. The shared IP-attempt counter remains for daily expiry because no single fixture owns it.
+
+The HTTPS browser suite checked cookie flags, scope, restoration, no browser credential storage, logout replay, stale passwords, other-browser revocation, hostile previews, preflight, and forged forms.
+Those browser checks disabled traces, screenshots, and videos.
+The browser runner verified empty UUID fixture records and removed its temporary database directory.
+No new product screen requires a manual phone-layout check in this ticket.
+
+### Password resource limits
+
+Local workerd samples measured 56 to 62 ms for hashing and 52 to 61 ms for verification.
+Hosted adaptive analytics recorded 66.425 ms for verification and 75.577 ms for an initial hash sample.
+A separate small hash sample recorded a 96.311 ms median and a 196.446 ms 99th percentile.
+These samples exceed the Workers Free 10 ms CPU allowance.
+The selected maintained hash therefore needs a larger CPU allowance for dependable hosting.
+The [choice record](cloudflare-authentication-choice.md#resource-evidence-and-deployment-cost) documents Standard's minimum US$5 monthly cost and usage charges.
+No paid upgrade occurred. Three temporary benchmark Workers were deleted.
+The samples do not establish memory under concurrent load, a fresh supported installation, production capacity, or contest latency targets.
+
+### Limits and follow-up
+
+The active Supabase backend is unchanged.
+The Cloudflare connector still lacks the remaining workflow operations, private R2 images, and Durable Object notification delivery.
+Better Auth upgrades must recheck the pinned schema and password format before deployment.
+The experimental session summaries use IDs as names until the complete contest-session schema exists.
+Venue-wide IP rate limits need later capacity review.
+A Cloudflare owner-recovery procedure for lost sole-organizer credentials is required before independent installations are supported.
+Full migration tooling, real-data exports, and cutover remain later authorized phases. AWS and Terraform remain deferred.
+
+
+### Commands run and file inventory
+
+The run used Git inspection, fetch, branch creation, and PR #39 metadata checks.
+It used existing Wrangler access, D1 target inspection, isolated database creation, migrations, Worker deployment, private secret installation, and version inspection.
+It installed exact `better-auth@1.7.10` with npm.
+The verification commands were `npm run typecheck`, `npm run lint`, `npm run build`, `npm test`, `npm run check:functions`, and `npm run test:functions`.
+Browser commands were `npm run test:e2e`, `npm run test:auth:browser`, and `npm run docs:test`, with Chromium installed under `/tmp/minsky-playwright`.
+Documentation checks used `npm run docs:build`, `npm run test:providers:list`, and `git diff --check`.
+Both package lockfiles passed `npm audit --package-lock-only --audit-level=high` in their respective package directories.
+The focused suites used `npm run test:auth`, `npm run test:auth:hosted`, and `node scripts/auth-http-test.mjs` with the explicit CI targets.
+Hash measurements used `node scripts/auth-hash-benchmark.mjs` locally and with the explicit hosted account and separate operations.
+`node scripts/auth-target.mjs` verified the automatic target guard.
+
+Initial sandbox network and socket restrictions required authorized retries.
+An initial browser launch lacked Chromium until the configured `/tmp` installation was selected.
+The first hosted HTTP run had a connection reset. The D1 run and benchmark propagation limits are recorded above.
+No new product screens received manual layout verification. Browser checks supplied the observed interaction evidence.
+The owner still reviews and merges the PR. Remaining connector work follows that merge and scope selection.
+Relevant ticket documentation is current. Broader release gaps remain tracked in the existing documentation release plan.
+
+The created or modified files are:
+
+```text
+.github/workflows/checks.yml
+AGENTS.md
+PLAN.md
+README.md
+deno.lock
+docs/backend-contracts.md
+docs/cloud-onboarding.md
+docs/cloudflare-authentication-choice.md
+docs/cloudflare-authentication.md
+docs/cloudflare-backend-design.md
+docs/cloudflare-implementation-plan.md
+docs/current-state.md
+docs/d1-transaction-proof.md
+docs/manual-verification.md
+docs/product-direction.md
+docs/provider-test-contracts.md
+docs/tickets.md
+docs/verify-cloudflare-authentication.md
+eslint.config.js
+package-lock.json
+package.json
+playwright.auth.config.ts
+playwright.config.ts
+scripts/auth-browser-fixture.mjs
+scripts/auth-hash-benchmark.mjs
+scripts/auth-http-test.mjs
+scripts/auth-target.mjs
+scripts/auth-test.mjs
+site/src/content/docs/reference/status.md
+src/backend/cloudflare/authentication.test.ts
+src/backend/cloudflare/authentication.ts
+src/server/adapters/cloudflare/authentication.test.ts
+src/server/adapters/cloudflare/authentication.ts
+src/server/adapters/cloudflare/hostedHttp.test.ts
+src/server/adapters/cloudflare/identity.ts
+src/server/adapters/cloudflare/password.test.ts
+src/server/adapters/cloudflare/password.ts
+src/server/adapters/cloudflare/worker.ts
+src/server/adapters/d1/migrations/0003_authentication.sql
+src/server/adapters/d1/migrations/0004_identity.sql
+src/server/adapters/d1/testFixture.ts
+src/server/authentication.ts
+src/server/authenticationHttp.test.ts
+src/server/authenticationHttp.ts
+tests/auth/fixtureWorker.ts
+tests/auth/security.spec.ts
+tests/auth/wrangler.jsonc
+tests/providers/scenarios/authentication-lifecycle.ts
+tests/providers/scenarios/authentication.ts
+tsconfig.json
+vite.config.ts
+vitest.auth-http.config.ts
+vitest.auth.config.ts
+wrangler.auth-ci.jsonc
+```
+
 ## T0017 D1 transaction proof, 2026-10-17
 
 T0017 starts from merged `main` at `53f9dfd` on `feature/t0017-d1-transaction-proof`.

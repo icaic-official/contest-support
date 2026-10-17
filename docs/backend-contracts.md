@@ -2,7 +2,8 @@
 
 The browser uses `Backend` in [contracts.ts](../src/backend/contracts.ts) for accounts, workflows, administration, images, and live updates.
 An adapter implements those operations for a provider.
-The Supabase adapter is the only implementation.
+The Supabase adapter is the only complete implementation.
+T0018 adds an experimental Cloudflare authentication adapter without changing the active backend.
 
 The contracts describe Minsky operations.
 They do not expose database queries, access tokens, provider clients, or channel objects.
@@ -18,7 +19,7 @@ The [proof guide](d1-transaction-proof.md) describes local and hosted checks.
 
 `Caller` contains an account ID and login ID from a trusted identity adapter.
 These values must never come directly from an HTTP request body.
-Authentication and HTTP handlers remain unimplemented for Cloudflare.
+T0018 supplies trusted callers through the [Cloudflare authentication service](cloudflare-authentication.md).
 The D1 adapter checks the login, expiry, account restrictions, membership, team, roles, and event inside the database.
 The issue view uses one primary query for its permission check, permitted history, and audience sequence.
 An archived event permits reads but prevents command commits and receipt replay.
@@ -54,7 +55,7 @@ Notification delivery remains later work.
 The experimental [schema](../src/server/adapters/d1/migrations/0001_transaction_proof.sql) retains UUID identifiers and combined role records.
 Triggers advance access and membership versions when permissions change.
 The [version guard](../src/server/adapters/d1/migrations/0002_version_guards.sql) requires every issue writer to advance its internal version.
-The schema supports the proof only. Remaining operations, timestamp migration encoding, and the complete connector schema require later work.
+T0018 extends this schema for bounded authentication. Remaining operations, timestamp migration encoding, and the complete connector schema require later work.
 
 ## Module boundaries
 
@@ -98,6 +99,11 @@ Server checks enforce password changes, revoked logins, session membership, and 
 Authentication subscriptions invoke callbacks synchronously.
 Their cleanup function can run more than once.
 No callback runs after cleanup returns.
+
+The experimental Cloudflare adapter implements this same authentication contract through same-origin HTTP and HttpOnly cookies.
+Password changes return a fresh session after the atomic credential commit. All earlier sessions are revoked.
+Its extra `account()` and `sessions()` methods cover this bounded ticket. Other `Backend` groups remain incomplete.
+See the [authentication reference](cloudflare-authentication.md) for current checks, endpoints, expiry, and request protection.
 
 ## Session reads and workflow commands
 

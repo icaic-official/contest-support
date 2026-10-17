@@ -6,11 +6,14 @@ Use one Diataxis purpose per page and preserve exact code names and commands.
 See [the writing guide](docs/writing-guide.md).
 
 **Automatic frontend builds (2026-10-17):** the user requested previews for branch pushes and stable deployments after merges to `main`.
-Use Workers Builds for `minsky-dev` and `minsky-docs`.
-This replaces the per-deployment approval rule for these static frontends after the Git connections are enabled.
+The later CI requirement selects GitHub Actions for `minsky-dev` and `minsky-docs`.
+Deployment depends on passing `checks`, `secrets`, and `dependencies` jobs for the same push.
+Keep independent Cloudflare Git builds disabled.
+This replaces repeated frontend deployment approval after activation.
 The user still reviews and merges. Backend deployment remains an explicit, coordinated step.
-Repository preparation and dashboard instructions are in [Cloudflare builds](docs/cloudflare-builds.md).
-The Git connections and first automatic builds remain unverified.
+The user requested the completed workflow and setup instructions before adding credentials.
+See [setup and verification](docs/cloudflare-builds.md).
+Provider authentication and the first automatic deployments remain unverified.
 
 **Open-source documentation quality (2026-10-17):** the documentation must serve readers outside the project.
 Provide reproducible instructions, exact behavior and limits, clear release status, and tested installation procedures for supported paths.

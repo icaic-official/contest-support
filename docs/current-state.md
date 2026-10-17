@@ -1,6 +1,61 @@
 # Current state
 
+## Deployment after CI passes, 2026-10-17
+
+The user requested automatic publication only after CI passes, then requested the completed workflow and setup instructions before adding credentials.
+T0011 now uses GitHub Actions for both static Workers.
+This replaces the earlier Cloudflare Git build proposal below.
+The user still reviews and merges PR #29.
+
+`Checks` now runs for all repository branch pushes and pull requests.
+The existing `secrets` and `dependencies` jobs moved into that workflow, with their names and weekly schedule preserved.
+`deploy` depends on `checks`, `secrets`, and `dependencies`.
+Trusted branch pushes publish previews. Pushes to `main` publish both stable sites.
+Pull requests, forks, Dependabot, scheduled runs, and manual dispatch do not publish frontends.
+The manually dispatched `cloud` job retains the separate `cloud-test` environment and now waits for all three prerequisite jobs.
+
+The deployment script checks the account, development backend, public key format, Worker names, and asset directories.
+It creates stable preview names with branch hashes and checks the current remote commit before each upload.
+A deleted branch or outdated run skips remaining uploads.
+Each upload includes `minsky-revision.json`. The script checks that the published file contains the expected source revision.
+The run summary records the preview name, published URLs, and revision-check results.
+A retry cannot deliberately publish an outdated branch commit.
+App and docs uploads remain separate operations, so a failure can leave only one site updated.
+
+`wrangler.docs.jsonc` now enables `preview_urls`.
+The earlier guide incorrectly treated that setting as relevant only to older version URLs.
+Current Cloudflare guidance and the installed Wrangler source also require it for Worker Preview routing on `workers.dev`.
+The setup guide includes the one-time dashboard routing change before the first docs preview.
+No remote Worker setting changed in this run.
+
+The repository Actions API reported zero secrets and zero variables during inspection.
+The user chose to complete those settings later through [the setup guide](cloudflare-builds.md).
+Automatic uploads and hosted revision checks remain unverified. This run does not deploy either site.
+Disable independent Cloudflare Git builds before activation so they cannot publish before GitHub checks finish.
+Previews share development data and need approved function origins for account and image operations.
+
+The first stable app update also needs a compatible backend.
+The latest recorded hosted attachment verification predates `202610140001_attachment_fixes.sql` and its matching function correction.
+Confirm that backend release before merging with frontend deployment enabled.
+This CI change does not apply that migration or deploy Supabase functions.
+
+Local verification used Node.js `22.22.1` and npm `11.12.0`.
+Type checking, ESLint, both builds, both Deno checks, 68 unit and database tests, and 12 function tests passed.
+The 68 tests include 19 deployment cases for event selection, branch names, settings, stale revisions, failed uploads, and hosted revision checks.
+All 17 app browser tests and all three docs browser tests passed.
+The docs build checked 14 HTML pages and 566 local links and assets.
+Actionlint `1.7.12` accepted the workflow. Both Wrangler dry runs accepted the assets without uploading them.
+The read-only GitHub revision lookup also passed for the real T0011 branch, including its slash-containing name.
+GitHub run results appear on [PR #29](https://github.com/GiftedNovaHD/minsky/pull/29).
+
+The first docs browser run found a page-title mismatch with its navigation label.
+Restoring the matching title fixed the check. The final build and all docs browser checks passed.
+Astro still reports its existing duplicate `/404` route warning. The generated missing page passes its browser check.
+Protected Supabase cloud checks and new hosted deployment checks were not run.
+
 ## Branch preview and permission-guide follow-up (2026-10-17)
+
+This earlier record describes the initial configuration. The CI workflow above replaces its Git build setup.
 
 The user selected automatic branch previews and stable frontend deployment from `main`.
 Both static Workers now have empty `previews` configurations for the installed Wrangler preview command.

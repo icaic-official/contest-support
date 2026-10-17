@@ -52,8 +52,10 @@ Never use the CI fixture scripts against real competition data.
 
 Implement the ticket, verify it, update its documentation, and prepare a pull request.
 The user reviews and merges.
-Maintainers selected branch previews and automatic frontend deployment from `main` through Cloudflare Git builds.
-The Git connections and first automatic builds remain unverified.
+After account setup, GitHub Actions publishes branch previews and stable sites from `main` only when all required CI jobs pass.
+Pull request checks do not receive deployment credentials.
+The repository setup guide is `docs/cloudflare-builds.md`.
+The first automatic deployments remain unverified.
 Backend deployment remains a separate step.
 Include the required co-author trailer in each Codex-created commit for this repository.
 Follow the Google TypeScript Style Guide for TypeScript changes, with documented project exceptions.

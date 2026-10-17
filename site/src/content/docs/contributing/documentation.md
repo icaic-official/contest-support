@@ -1,6 +1,6 @@
 ---
 title: Write and deploy these docs
-description: Edit Markdown, check the generated site, and deploy only the documentation Worker.
+description: Edit Markdown, check the generated site, and submit a documentation change.
 ---
 
 The docs use Astro Starlight to turn Markdown files into a static website.
@@ -80,43 +80,21 @@ Check the page at a phone width and with the keyboard.
 Check any new commands against the source revision they describe.
 The repository CI also builds and checks the site.
 
-## 5. Confirm the Cloudflare target
+## 5. Submit the documentation change
 
-The docs configuration is `wrangler.docs.jsonc`.
-Its Worker name is `minsky-docs`.
-Its account ID is `458ad6a930b0fb717796dfa19ca6a2b1`, the existing Minsky development account.
-Its asset directory is `site/dist`.
+Push your branch and open a pull request.
+Wait for `checks`, `secrets`, and `dependencies` to pass.
+Ask a maintainer to review the content and the generated site.
 
-```sh
-npx wrangler whoami
-npx wrangler deploy --config wrangler.docs.jsonc --dry-run
-```
+After account setup, repository branch pushes publish app and docs previews when CI passes.
+Open the docs preview URL in the push run's summary.
+Fork pull requests run checks without deployment credentials and do not publish previews.
+The user reviews and merges. A passing `main` run then updates the stable sites.
 
-If you need to authenticate, run `npm run cloud:hosting-login` and complete Cloudflare login in your browser.
-Compare the reported account with the docs configuration before deployment.
-Never put a Cloudflare token in a Markdown page or frontend environment variable.
+For activation or manual recovery, follow the repository's `docs/cloudflare-builds.md` guide.
+The first automatic deployments remain unverified.
 
-## 6. Deploy the reviewed docs
-
-After the source checks pass and deployment is authorized:
-
-```sh
-npm run docs:deploy
-```
-
-This rebuilds the docs and deploys only `minsky-docs`.
-The site address is `https://minsky-docs.icaic-minsky.workers.dev`.
-The root `npm run deploy` command deploys the Minsky application instead.
-Do not use that command for a documentation update.
-
-The first docs deployment is explicitly authorized with T0011, before its source PR is merged.
-The maintainers selected automatic branch previews and deployment from `main` for both sites.
-The setup instructions are in the repository's `docs/cloudflare-builds.md`.
-The Git connections and first automatic builds remain unverified.
-After setup, successful `main` builds publish the static sites without another deployment request.
-The user still reviews and merges. Backend deployment remains separate.
-
-## 7. Check the published result
+## 6. Check the published result
 
 Open the returned URL.
 Open an inner page directly and refresh it.

@@ -25,7 +25,9 @@ This page is a dated record, not a live deployment dashboard.
 | [T0009 jury worklist](https://github.com/GiftedNovaHD/minsky/pull/23) | Draft pull request. |
 
 T0011 adds this documentation site.
-Publishing these pages does not deploy the Minsky application or apply database migrations.
+The initial docs deployment did not deploy the Minsky application or apply database migrations.
+After activation, the CI workflow publishes both frontends when all required checks pass.
+Backend deployment remains separate.
 
 ## Development and production
 

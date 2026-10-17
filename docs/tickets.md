@@ -392,7 +392,8 @@ No schema change or deployment is part of this ticket.
 ## T0011 — Documentation site
 
 Branch: `feature/t0011-documentation-site`, from updated `main` at `de92d54`.
-Status: implemented, deployed, and verified locally and on the public docs site.
+Status: the initial site is implemented, deployed, and verified locally and on the public docs site.
+The later CI workflow passes local checks and awaits account setup and its first automatic deployments.
 Review PR: [#29](https://github.com/GiftedNovaHD/minsky/pull/29). The user reviews and merges.
 See [deployment evidence](current-state.md#t0011-documentation-site-2026-10-17).
 
@@ -443,9 +444,12 @@ These items do not authorize merging T0007, changing repository visibility, sele
 ### Automatic frontend deployment decision (2026-10-17)
 
 The user requested branch previews and stable deployment after merges to `main`.
-The branch prepares both static Workers with `previews` configuration and records exact [Git build setup](cloudflare-builds.md).
+The later CI requirement makes GitHub Actions publish only after `checks`, `secrets`, and `dependencies` pass.
+The branch includes both Worker configurations, deployment validation, focused tests, and exact [setup instructions](cloudflare-builds.md).
 The setup covers `minsky-dev` and `minsky-docs` and replaces repeated frontend deployment approval after activation.
-GitHub connection, first previews, and the first automatic `main` builds remain unverified.
+Independent Cloudflare Git builds must remain disabled.
+The user requested the workflow and setup steps before adding credentials.
+Account setup, first automatic previews, and the first automatic `main` deployments remain unverified.
 Migrations and functions remain explicit backend work.
 Full app preview operation also needs approved browser origins for the development functions.
 

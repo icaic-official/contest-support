@@ -23,9 +23,10 @@
 ## Current scope
 
 **Automatic frontend builds (2026-10-17):** the user authorized branch previews and automatic stable deployments after merges to `main`.
-Use the existing `minsky-dev` and `minsky-docs` Workers through their Git connections.
+Use GitHub Actions to publish the existing `minsky-dev` and `minsky-docs` Workers after all required CI jobs pass.
+Keep independent Cloudflare Git builds disabled.
 See [setup and verification](docs/cloudflare-builds.md).
-Until those connections are enabled and verified, do not claim that merges deploy automatically.
+Until credentials, activation, and hosted checks pass, do not claim that automatic deployment is verified.
 The user still reviews and merges. Backend changes retain explicit deployment and target checks.
 
 **T0011 documentation site (2026-10-17):** the user requested implementation, written guides, and deployment.
@@ -160,11 +161,11 @@ For each ticket, use this sequence:
 5. Prepare the PR.
 6. Run cloud integration checks on the reviewed revision.
 7. Let the user review and merge.
-8. After Git build setup, let Cloudflare deploy the static frontends from `main`. Coordinate backend deployment separately.
+8. After automation setup, let GitHub Actions deploy both static frontends when the `main` CI checks pass. Coordinate backend deployment separately.
 
-Automatic frontend deployment requires the configured Git connections and a successful build.
+Automatic frontend deployment requires GitHub deployment settings and passing `checks`, `secrets`, and `dependencies` jobs.
 Before setup is verified, report deployment separately from merge.
-Prepare compatible backend changes before a dependent frontend merges, or pause automatic app builds for that release.
+Prepare compatible backend changes before a dependent frontend merges, or pause frontend deployment for that release.
 Privileged GitHub cloud checks use the protected `cloud-test` environment and the separate CI project.
 Ordinary PR checks run without cloud credentials.
 Record local cloud runs separately from protected GitHub Actions runs.

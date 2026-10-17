@@ -4,7 +4,7 @@
   "account_id": "458ad6a930b0fb717796dfa19ca6a2b1",
   "compatibility_date": "2026-10-17",
   "workers_dev": true,
-  "preview_urls": false,
+  "preview_urls": true,
   "previews": {},
   "assets": {
     "directory": "./site/dist",

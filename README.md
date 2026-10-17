@@ -85,19 +85,21 @@ npm run docs:dev
 | `npm run docs:build` | Build the static site and check local links and anchors. |
 | `npm run docs:preview` | Serve the built site, including search. |
 | `npm run docs:test` | Check navigation, search, and phone layouts with Chromium. Build the docs first. |
-| `npm run docs:deploy` | Build and publish only the `minsky-docs` Worker after deployment authorization. |
+| `npm run docs:deploy` | Build and publish only the `minsky-docs` Worker during an approved manual recovery. |
 
 The deployment configuration is `wrangler.docs.jsonc`.
 See [the writing and deployment guide](site/src/content/docs/contributing/documentation.md).
 The initial docs deployment is explicitly authorized in T0011 before merge.
 The user selected automatic branch previews and deployment from `main` for both sites.
-See [Cloudflare build setup](docs/cloudflare-builds.md) for the exact dashboard settings and backend limits.
-The Git connections and first automatic builds remain unverified.
+GitHub Actions runs CI for pull requests and all branch pushes.
+The deployment job waits for `checks`, `secrets`, and `dependencies` before publishing either Worker.
+See [deployment setup](docs/cloudflare-builds.md) for credentials, activation, and backend limits.
+The workflow requires account setup. The first automatic deployments remain unverified.
 
 ### Repository records
 
 - [Writing guide](docs/writing-guide.md) gives the documentation structure and sentence rules.
-- [Cloudflare builds](docs/cloudflare-builds.md) explains branch previews, deployment from `main`, and first-run verification.
+- [Deployment setup](docs/cloudflare-builds.md) explains branch previews, deployment after CI passes, and first-run verification.
 - [Documentation release plan](docs/documentation-release-plan.md) — public-reader requirements, specific gaps, and completion criteria.
 - [Development tickets](docs/tickets.md) — ticket scope, status, and acceptance criteria.
 - [Current state](docs/current-state.md) — implementation details, verification records, and limitations.

@@ -1,7 +1,8 @@
 # Cloud onboarding for T0003
 
 **Workflow update (2026-10-17):** the user selected automatic frontend previews and deployment from `main` for both Workers.
-Follow [Cloudflare build setup](cloudflare-builds.md). Git connection and first automatic builds remain unverified.
+GitHub Actions publishes both sites only after all required CI jobs pass.
+Follow [deployment setup](cloudflare-builds.md). Credentials, activation, and the first automatic deployments remain unverified.
 Backend migrations, functions, and provider settings retain their explicit deployment steps.
 
 The connected development app runs at https://minsky-dev.icaic-minsky.workers.dev.
@@ -118,7 +119,7 @@ npm run docs:deploy
 Confirm the account and Worker name before the final command.
 The user authorized the initial documentation deployment before merge on 2026-10-17.
 This is a T0011 exception for the docs Worker only.
-Later updates use review, merge, and explicit deployment.
+After automation setup, later stable updates use review, merge, passing CI, and automatic frontend deployment.
 The app's `npm run deploy` command is separate.
 See [the complete guide](../site/src/content/docs/contributing/documentation.md).
 
@@ -174,7 +175,7 @@ Apply the migration before you deploy functions.
 Then deploy `admin` and `attachments`.
 Then deploy the frontend.
 `npm run cloud:functions` deploys both functions to development.
-Merging does not deploy this change.
+Prepare these backend changes before a dependent frontend merges. Automatic frontend deployment does not apply backend changes.
 
 The review fixes use `202610140001_attachment_fixes.sql`.
 Keep the first attachment migration unchanged.
@@ -198,7 +199,7 @@ From the reviewed ticket branch, run `npm run deploy:preview -- --preview-alias 
 This builds the frontend and runs `wrangler versions upload`.
 It updates `https://t0005-minsky-dev.icaic-minsky.workers.dev` and leaves the main Worker deployment unchanged.
 No permanent `preview` Git branch is needed.
-PR pushes do not upload automatically.
+This command is the older manual preview path. After setup, repository branch pushes publish through [the CI workflow](cloudflare-builds.md).
 See [Cloudflare version URLs](https://developers.cloudflare.com/workers/versions-and-deployments/version-urls/).
 
 The frontend uses its build-time Supabase settings.
@@ -272,11 +273,11 @@ For each ticket, use this sequence:
 5. Prepare the PR.
 6. Run cloud integration checks against the reviewed revision.
 7. Let the user review and merge.
-8. After Git build setup, let Cloudflare deploy the static frontends from `main`. Coordinate backend deployment separately.
+8. After automation setup, let GitHub Actions deploy both static frontends when the `main` CI checks pass. Coordinate backend deployment separately.
 
-Automatic frontend deployment requires the configured Git connections and a successful build.
+Automatic frontend deployment requires GitHub deployment settings and passing `checks`, `secrets`, and `dependencies` jobs.
 Until setup is verified, record merge and deployment separately.
-Prepare compatible backend changes before a dependent frontend merges, or pause automatic app builds for that release.
+Prepare compatible backend changes before a dependent frontend merges, or pause frontend deployment for that release.
 When production exists, validate changes on development and CI before you apply them to production.
 See [AGENTS.md](../AGENTS.md#cloud-development-and-deployment-workflow).
 

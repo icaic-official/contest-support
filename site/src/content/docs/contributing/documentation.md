@@ -110,8 +110,11 @@ The root `npm run deploy` command deploys the Minsky application instead.
 Do not use that command for a documentation update.
 
 The first docs deployment is explicitly authorized with T0011, before its source PR is merged.
-Future updates follow the usual review, merge, and explicit deployment process.
-There is no automatic deployment on merge.
+The maintainers selected automatic branch previews and deployment from `main` for both sites.
+The setup instructions are in the repository's `docs/cloudflare-builds.md`.
+The Git connections and first automatic builds remain unverified.
+After setup, successful `main` builds publish the static sites without another deployment request.
+The user still reviews and merges. Backend deployment remains separate.
 
 ## 7. Check the published result
 

@@ -414,7 +414,8 @@ T0007 remains a separate open change.
 
 ### Outside this ticket
 
-Application deployment, backend changes, T0007 container execution, merging other PRs, paid services, domain purchases, and automatic deployment on merge.
+Backend changes, T0007 container execution, merging other PRs, paid services, and domain purchases.
+The later automation decision below extends the original static-site scope to prepare both existing frontend configurations.
 
 ### Acceptance criteria
 
@@ -435,6 +436,18 @@ Use the [documentation release plan and audit](documentation-release-plan.md) fo
 - [ ] Complete factual details, public contribution instructions, and separation from maintainer records.
 - [ ] Complete installation and operating guides against T0007's verified revision.
 - [ ] Record owner decisions about licensing, source publication, and support before a public release.
-- [ ] Verify the complete reader journey and explicitly deploy the reviewed documentation.
+- [ ] Verify the complete reader journey and publish through the selected deployment workflow.
 
 These items do not authorize merging T0007, changing repository visibility, selecting a license, or provisioning services.
+
+### Automatic frontend deployment decision (2026-10-17)
+
+The user requested branch previews and stable deployment after merges to `main`.
+The branch prepares both static Workers with `previews` configuration and records exact [Git build setup](cloudflare-builds.md).
+The setup covers `minsky-dev` and `minsky-docs` and replaces repeated frontend deployment approval after activation.
+GitHub connection, first previews, and the first automatic `main` builds remain unverified.
+Migrations and functions remain explicit backend work.
+Full app preview operation also needs approved browser origins for the development functions.
+
+The four reported permission rules now appear in the public guides.
+The [audit](documentation-release-plan.md#permission-documentation-fixes) maps each correction and its remaining proposed work.

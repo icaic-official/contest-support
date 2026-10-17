@@ -14,11 +14,19 @@
 
 ## Technical communication
 
+- Apply the user's `unslop` and `technical-writing` principles through [the writing guide](docs/writing-guide.md).
+- Give each public documentation page one purpose: tutorial, how-to, reference, or explanation.
 - Use ASD-STE100 Simplified Technical English for technical explanations in replies, documentation, and pull requests.
 - Use short sentences, active voice, and familiar words. Avoid unnecessary jargon.
 - When a technical term is necessary, explain it in plain language on first use. Keep code names and commands exact.
 
 ## Current scope
+
+**Automatic frontend builds (2026-10-17):** the user authorized branch previews and automatic stable deployments after merges to `main`.
+Use the existing `minsky-dev` and `minsky-docs` Workers through their Git connections.
+See [setup and verification](docs/cloudflare-builds.md).
+Until those connections are enabled and verified, do not claim that merges deploy automatically.
+The user still reviews and merges. Backend changes retain explicit deployment and target checks.
 
 **T0011 documentation site (2026-10-17):** the user requested implementation, written guides, and deployment.
 Develop on `feature/t0011-documentation-site` from updated `main`, alongside the open T0007 PR.
@@ -152,9 +160,11 @@ For each ticket, use this sequence:
 5. Prepare the PR.
 6. Run cloud integration checks on the reviewed revision.
 7. Let the user review and merge.
-8. Explicitly deploy approved changes afterward.
+8. After Git build setup, let Cloudflare deploy the static frontends from `main`. Coordinate backend deployment separately.
 
-Do not imply that merge automatically deploys the app.
+Automatic frontend deployment requires the configured Git connections and a successful build.
+Before setup is verified, report deployment separately from merge.
+Prepare compatible backend changes before a dependent frontend merges, or pause automatic app builds for that release.
 Privileged GitHub cloud checks use the protected `cloud-test` environment and the separate CI project.
 Ordinary PR checks run without cloud credentials.
 Record local cloud runs separately from protected GitHub Actions runs.

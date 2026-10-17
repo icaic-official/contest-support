@@ -1,5 +1,36 @@
 # Current state
 
+## Branch preview and permission-guide follow-up (2026-10-17)
+
+The user selected automatic branch previews and stable frontend deployment from `main`.
+Both static Workers now have empty `previews` configurations for the installed Wrangler preview command.
+[Cloudflare build setup](cloudflare-builds.md) gives the exact Git connection, branch, command, and build-variable settings.
+The dashboard connection and first automatic builds remain unverified. No provider settings changed during this preparation.
+The setup preserves separate app and docs hosting. Supabase migrations and functions remain explicit deployment steps.
+App previews share the configured development backend and need approved origins for account and image operations.
+The preview explanation records a proposed origin registry as separate backend work.
+
+The public guides now state the current-owner resolution rule, different-specialist handoff rule, and resolved-conversation restriction.
+The administrator guide explains account-wide reset permissions and the archived-membership restriction.
+The [audit](documentation-release-plan.md#permission-documentation-fixes) maps these corrections and remaining proposed improvements.
+These changes preserve application authorization behavior.
+
+The user supplied `unslop` and `technical-writing` principles.
+The [writing guide](writing-guide.md) records their application to repository writing.
+Cloudflare setup steps, settings reference, and backend explanation now have separate pages.
+
+`npm run docs:build` passed, including its local-link check.
+All three `npm run docs:test` browser checks passed.
+Both Wrangler configuration dry runs accepted the static assets and reported no bindings.
+The first dry runs could not write their logs inside the filesystem sandbox.
+Both dry runs passed outside the sandbox without log errors.
+Repository Markdown paths, heading anchors, whitespace, and the new writing guides passed their checks.
+No automatic preview or stable deployment was run. The live docs still use the earlier published source.
+
+Temporary cleanup removed old review files, caches, test results, and completed PR notes.
+The saved package edits were already present in `main`, and T0012 already had PR #30.
+The active T0013 checkout and its temporary test files were left intact during this cleanup.
+
 ## Documentation release audit (2026-10-17)
 
 The user required documentation suitable for an open-source release and requested a specific cleanup audit.

@@ -52,7 +52,9 @@ Never use the CI fixture scripts against real competition data.
 
 Implement the ticket, verify it, update its documentation, and prepare a pull request.
 The user reviews and merges.
-Deployment requires an explicit request.
+Maintainers selected branch previews and automatic frontend deployment from `main` through Cloudflare Git builds.
+The Git connections and first automatic builds remain unverified.
+Backend deployment remains a separate step.
 Include the required co-author trailer in each Codex-created commit for this repository.
 Follow the Google TypeScript Style Guide for TypeScript changes, with documented project exceptions.
 

@@ -36,6 +36,11 @@ The reset invalidates prior access.
 Account IDs and historical activity remain.
 Existing passwords are never displayed.
 
+Password resets and username changes affect the whole account.
+You need admin access to every session assigned to that account.
+An archived membership blocks these account-wide changes.
+Ordinary session permission changes apply only to the selected session.
+
 ## Control contestant intake
 
 Open intake when contestants may submit new reports.

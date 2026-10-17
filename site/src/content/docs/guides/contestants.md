@@ -30,6 +30,7 @@ It does not wait for a volunteer to claim the issue.
 
 Open an issue to read its public replies, resolution history, and award status.
 Add a reply when staff need more information.
+Resolved issues do not accept replies. Reopen the issue first if the problem needs more attention.
 You can see only your own team's issues.
 Staff-only notes and images are hidden from contestant accounts.
 
@@ -43,6 +44,7 @@ Ask a staff member if an image would help explain the problem.
 ## Reopen a resolved issue
 
 Reopen the issue if the same problem still needs attention.
+Enter a reason for reopening it.
 The prior owner and resolution history remain.
 The timer resumes accumulated unresolved time and excludes the period when the issue was resolved.
 Any existing award and external application status remain unchanged.

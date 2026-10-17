@@ -8,6 +8,8 @@ description: Record an award decision and track its separate application to an e
 Jury-only members use **Award review**, which shows resolved issues.
 Team search can narrow that list.
 Members with combined support and jury roles also receive the support controls.
+Jury-only access does not permit claiming, resolving, or reopening an issue.
+Ask support staff to reopen a resolved issue if it needs further discussion.
 
 Read the issue description, elapsed unresolved time, resolution history, and staff notes before you decide.
 The first assignment time shows when a staff member first claimed the issue.

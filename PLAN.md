@@ -1,5 +1,17 @@
 # Minsky planning record
 
+**Documentation writing rules, 2026-10-17.** The user supplied `unslop` and `technical-writing` principles.
+Apply them to documentation, README text, PR descriptions, and commit messages.
+Use one Diataxis purpose per page and preserve exact code names and commands.
+See [the writing guide](docs/writing-guide.md).
+
+**Automatic frontend builds (2026-10-17):** the user requested previews for branch pushes and stable deployments after merges to `main`.
+Use Workers Builds for `minsky-dev` and `minsky-docs`.
+This replaces the per-deployment approval rule for these static frontends after the Git connections are enabled.
+The user still reviews and merges. Backend deployment remains an explicit, coordinated step.
+Repository preparation and dashboard instructions are in [Cloudflare builds](docs/cloudflare-builds.md).
+The Git connections and first automatic builds remain unverified.
+
 **Open-source documentation quality (2026-10-17):** the documentation must serve readers outside the project.
 Provide reproducible instructions, exact behavior and limits, clear release status, and tested installation procedures for supported paths.
 Keep public guides separate from maintainer deployment records and historical ticket reports.

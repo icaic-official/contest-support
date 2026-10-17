@@ -5,6 +5,7 @@
   "compatibility_date": "2026-10-17",
   "workers_dev": true,
   "preview_urls": false,
+  "previews": {},
   "assets": {
     "directory": "./site/dist",
     "html_handling": "force-trailing-slash",

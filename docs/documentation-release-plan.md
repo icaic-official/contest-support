@@ -6,6 +6,8 @@ On 2026-10-17, the user required documentation suitable for an open-source relea
 The intended reader has no access to project conversations or the maintainers' cloud accounts.
 The documentation must help that reader use, install, operate, and contribute to Minsky.
 Treat documentation as part of each feature's acceptance criteria.
+The later [writing rules](writing-guide.md) apply the user's supplied `unslop` and `technical-writing` principles.
+Public pages each have one purpose: tutorial, how-to, reference, or explanation.
 
 This audit inspected T0011 revision `3c18cbb` and `main` at `de92d54` on 2026-10-17.
 GitHub reported a private repository, no selected license, and no published releases.
@@ -287,16 +289,31 @@ Record and fix every missing step found during that review.
 
 - Removed the `.env.example` comment advertising the deleted `npm run dev:demo` command.
 - Corrected the three maintenance command paths in `docs/code-quality.md` to `GiftedNovaHD/minsky`.
+- Added the four reported permission rules to the public staff, contestant, jury, and administrator guides.
 
-These edits change comments and instructions only. The maintenance commands were not executed.
+The maintenance corrections change comments and instructions only. The maintenance commands were not executed.
 Historical links and run reports remain intact.
+
+### Permission documentation fixes
+
+These are existing behavior rules. The proposed fixes clarify the guides and interface feedback, without changing authorization.
+
+| Existing rule | Guide correction in this branch | Remaining proposed work |
+| --- | --- | --- |
+| Only the current owner can resolve an issue | Staff guide states the owner requirement. | Include the rule in the full permission table. Check whether unavailable controls explain the requirement. |
+| A different specialist must accept a handoff | Staff guide explicitly excludes self-acceptance. | Check the combined owner/specialist case in the reader walkthrough. |
+| Resolved issues reject replies and internal notes | Staff and contestant guides explain reopening. Jury guide explains its reopening limit. | Include the rule in the action/state table and check the closed-conversation explanation. |
+| Account-wide resets require admin access to all assigned sessions | Administrator guide states the permission requirement and archived-membership restriction. | Add a troubleshooting example for an admin who controls only one of the account's sessions. |
+
+Source: `supabase/migrations/202610020003_private_signals.sql` for issue actions and `supabase/migrations/202610020004_usernames.sql` for account administration.
+The broader permission table and account-guide work in findings 7 and 8 remain incomplete.
 
 ## Recommended order
 
 1. Complete factual corrections, audience separation, and the contributor path within T0011.
 2. Use T0007's verified revision to finish installation, configuration, recovery, and operating procedures.
 3. Resolve owner decisions about licensing, publication, support, and the canonical address before announcing a public release.
-4. Review the complete reader journey, run applicable checks, and explicitly deploy the reviewed documentation.
+4. Review the complete reader journey, run applicable checks, and publish through the selected deployment workflow.
 
 The owner decisions can proceed alongside writing.
 A development preview may remain public with clear limits while release work continues.

@@ -32,6 +32,8 @@ If another staff member claims first, check the updated owner before you act.
 Use **Audience** before you send a reply.
 A public reply is visible to the contestant team.
 An internal note is visible only to authorized staff.
+Replies and internal notes are available only while the issue is unresolved.
+Reopen a resolved issue if it needs further discussion.
 Do not put internal investigation details in a public reply.
 
 ### Attach an image
@@ -53,15 +55,18 @@ See [image limits](/guides/administration/#set-image-limits) if a file is reject
 
 ## Hand off to a specialist
 
-Request a specialist handoff when the issue needs that capability.
+Only the current owner can request a specialist handoff.
+Request a specialist handoff when you own the issue and need that capability.
 You remain the owner until a specialist accepts.
+Another specialist must accept. An owner with specialist access cannot accept their own handoff.
 The timer continues during the handoff.
 The accepting specialist becomes the owner.
 The activity history records both actions and their actors.
 
 ## Resolve and reopen
 
-Record a resolution summary when the issue is resolved.
+Only the current owner can resolve the issue.
+When you resolve the issue, record a resolution summary.
 Choose a supplied summary or write a custom one.
 Resolution stops the timer.
 

@@ -90,10 +90,14 @@ npm run docs:dev
 The deployment configuration is `wrangler.docs.jsonc`.
 See [the writing and deployment guide](site/src/content/docs/contributing/documentation.md).
 The initial docs deployment is explicitly authorized in T0011 before merge.
-Later merges do not automatically deploy either site.
+The user selected automatic branch previews and deployment from `main` for both sites.
+See [Cloudflare build setup](docs/cloudflare-builds.md) for the exact dashboard settings and backend limits.
+The Git connections and first automatic builds remain unverified.
 
 ### Repository records
 
+- [Writing guide](docs/writing-guide.md) gives the documentation structure and sentence rules.
+- [Cloudflare builds](docs/cloudflare-builds.md) explains branch previews, deployment from `main`, and first-run verification.
 - [Documentation release plan](docs/documentation-release-plan.md) — public-reader requirements, specific gaps, and completion criteria.
 - [Development tickets](docs/tickets.md) — ticket scope, status, and acceptance criteria.
 - [Current state](docs/current-state.md) — implementation details, verification records, and limitations.

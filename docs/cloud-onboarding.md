@@ -1,5 +1,9 @@
 # Cloud onboarding for T0003
 
+**Workflow update (2026-10-17):** the user selected automatic frontend previews and deployment from `main` for both Workers.
+Follow [Cloudflare build setup](cloudflare-builds.md). Git connection and first automatic builds remain unverified.
+Backend migrations, functions, and provider settings retain their explicit deployment steps.
+
 The connected development app runs at https://minsky-dev.icaic-minsky.workers.dev.
 Supabase hosts authentication, Postgres, and Realtime.
 Cloudflare Workers Static Assets serves the frontend.
@@ -268,9 +272,11 @@ For each ticket, use this sequence:
 5. Prepare the PR.
 6. Run cloud integration checks against the reviewed revision.
 7. Let the user review and merge.
-8. Explicitly deploy the approved revision afterward.
+8. After Git build setup, let Cloudflare deploy the static frontends from `main`. Coordinate backend deployment separately.
 
-Merge does not automatically deploy the app.
+Automatic frontend deployment requires the configured Git connections and a successful build.
+Until setup is verified, record merge and deployment separately.
+Prepare compatible backend changes before a dependent frontend merges, or pause automatic app builds for that release.
 When production exists, validate changes on development and CI before you apply them to production.
 See [AGENTS.md](../AGENTS.md#cloud-development-and-deployment-workflow).
 
@@ -362,7 +368,9 @@ Verify plan availability before you treat protection as enabled.
 Then manually dispatch **Checks** for the reviewed branch.
 Record the cloud job result.
 The cloud job applies migrations and deploys both `admin` and `attachments` before running the tests.
-No automatic deployment or preview writes to shared data are configured.
+Automatic frontend deployment is selected but its setup remains unverified.
+An app preview can write to its configured development backend through the authenticated app.
+It does not isolate data. See [preview backend limits](cloudflare-preview-behavior.md).
 
 See [GitHub environment documentation](https://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/manage-environments).
 Initial inspection on 2026-10-02 found no GitHub environments and no separate Supabase test project.

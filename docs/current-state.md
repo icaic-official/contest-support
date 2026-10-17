@@ -19,16 +19,17 @@ The active browser adapter retains the legacy SQL path during replacement verifi
 D1 still supports only `claim`, `message`, and its limited issue view. Its commands now use the shared decisions and orchestration.
 
 Review is in [PR #41](https://github.com/GiftedNovaHD/minsky/pull/41).
-The implementation commit is `8f8145c447ff095b68d4f9bdf837df5eae9e1d7f`.
+The final implementation commit is `61da723438a435586b1c1332939e5a30353a4a1d`.
 
 ### Observed verification
 
-- Local after main integration: 261 tests pass across 21 files. These include 21 shared PostgreSQL cases, 42 local D1 cases, and authentication regressions.
+- Local after main integration: 262 tests pass across 21 files. These include 21 shared PostgreSQL cases, 42 local D1 cases, and authentication regressions.
 - Local: type checking, lint, application build, Deno function checks, 12 function tests, all 34 application browser regressions, and three HTTPS authentication browser cases pass.
 - Documentation: the build checks 14 pages and 566 local links/assets. All three documentation browser tests pass.
-- Hosted Supabase: all five focused cases pass through the deployed `workflow` function on Minsky CI, `ghtztmovdkhuketcbjmq`. The run checked committed implementation `8f8145c447ff095b68d4f9bdf837df5eae9e1d7f`. It began at 2026-10-17 17:16:20 UTC and took 45.43 seconds.
+- Hosted Supabase: all five focused cases pass through the deployed `workflow` function on Minsky CI, `ghtztmovdkhuketcbjmq`. The final run checked committed implementation `61da723438a435586b1c1332939e5a30353a4a1d`. It began at 2026-10-17 17:28:18 UTC and took 49.25 seconds.
 - Hosted D1: all 42 changed bounded-proof cases pass against `minsky-d1-proof-ci`, database `06560c1c-8907-47d6-b2b6-f22e129ebbe4`. The run began at 2026-10-17 17:12:57 UTC and took 69.32 seconds. Fixture deletion checks passed.
 - Ordinary GitHub Actions: [implementation run 39053057235](https://github.com/GiftedNovaHD/minsky/actions/runs/39053057235) passed `checks`, `secrets`, and `dependencies` on `8f8145c`. Cloud and deployment jobs did not run.
+- Ordinary GitHub Actions after main integration: [run 39053704275](https://github.com/GiftedNovaHD/minsky/actions/runs/39053704275) passed on `42caed9`. The final submit-validation assertion follows that run.
 - Protected GitHub Actions: not run for T0019. The `cloud-test` branch allowlist excludes this branch. Its existing entries and protection rules remain unchanged.
 
 Hosted Supabase verifies the shared lifecycle, all command variants, persisted history, public/private separation, and team/session isolation.
@@ -45,11 +46,13 @@ The dry run selected only `202610180001_shared_workflow.sql`.
 The CLI applied that migration. It made no history repair or unrelated migration change.
 The applied source matches the repository migration.
 The main-merge resolution did not change the shared service, Supabase function, commit migration, or D1 adapter.
-Hosted Supabase and D1 evidence therefore retains the same implementation sources.
+The final compatibility review also preserved ignored contestant team overrides, including malformed unused values.
+A local regression and the hosted identity-boundary case verify this input behavior.
+The bounded D1 claim/message paths remain unchanged by that submit validation fix.
 Local D1 now loads migrations `0001` through `0004`. The hosted proof retains `0001` and `0002`.
-The CLI deployed only the new `workflow` function, at version 1 with `verify_jwt=false`. Its handler verifies every bearer itself.
+The CLI deployed only the new `workflow` function, at version 2 with `verify_jwt=false`. Its handler verifies every bearer itself.
 Its deployment ID is `a8d178ba-7c60-459c-a64e-ba155cc50ddb`.
-The CLI reported bundle SHA-256 `f9f7696cff2a7f675b2b55418ffbd100b223ebb266cdb881578296b3bab53c53`.
+The CLI reported bundle SHA-256 `ef1eb24f67d037ca4648a47044b65fc4b89e67c7e6e043ed6dda57d37b76cabf`.
 No development backend deployment, real-account change, backend switch, or data export occurred.
 
 The first hosted attempt passed four cases. Its fifth fixture setup hit Auth's password-update rate limit.

@@ -38,6 +38,7 @@ export function IssueImages({
   const inputId = useId();
   const dialogRef = useRef<HTMLDialogElement>(null);
   const openerRef = useRef<HTMLButtonElement | null>(null);
+  const previewRequest = useRef(0);
   const fileRef = useRef<HTMLInputElement>(null);
   const [visibility, setVisibility] = useState<"public" | "internal">("internal");
   const [progress, setProgress] = useState<number>();
@@ -59,6 +60,12 @@ export function IssueImages({
   const removals = failedRemoval && !pendingRemovals.some((item) => item.id === failedRemoval.id)
     ? [...pendingRemovals, failedRemoval]
     : pendingRemovals;
+
+  useEffect(() => {
+    return () => {
+      if (fullUrl) URL.revokeObjectURL(fullUrl);
+    };
+  }, [fullUrl]);
 
   useEffect(() => {
     const urls: string[] = [];
@@ -203,6 +210,7 @@ export function IssueImages({
   }
 
   async function openPreview(item: Attachment, button: HTMLButtonElement) {
+    const request = ++previewRequest.current;
     openerRef.current = button;
     setActive(item);
     setFullUrl("");
@@ -211,13 +219,17 @@ export function IssueImages({
       const blob = await transport.download(
         attachmentPath(sessionId, issueId, item.id, "original"),
       );
+      // A closed, replaced, or unmounted preview must ignore its late response.
+      if (request !== previewRequest.current || !dialogRef.current?.open) return;
       setFullUrl(URL.createObjectURL(blob));
     } catch (cause) {
+      if (request !== previewRequest.current || !dialogRef.current?.open) return;
       setMessage(cause instanceof Error ? cause.message : "This image could not be opened.");
     }
   }
 
   function dismissPreview() {
+    previewRequest.current++;
     dialogRef.current?.close();
   }
 
@@ -370,12 +382,12 @@ export function IssueImages({
         ref={dialogRef}
         className="image-preview"
         aria-labelledby={`${inputId}-preview`}
-        onClose={() => {
+        onClose={(event) => {
+          // A queued close event can arrive after another preview opens.
+          if (event.currentTarget.open) return;
+          previewRequest.current++;
           setActive(undefined);
-          setFullUrl((current) => {
-            if (current) URL.revokeObjectURL(current);
-            return "";
-          });
+          setFullUrl("");
           openerRef.current?.focus();
         }}
       >

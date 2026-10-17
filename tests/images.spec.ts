@@ -5,6 +5,60 @@ const png = Buffer.from(
   "base64",
 );
 
+for (const response of ["slow", "fail"] as const) {
+  for (const close of ["button", "Escape"] as const) {
+    test(`a ${response} image response cannot change a newer preview after ${close}`, async ({ page }) => {
+      await page.clock.install({ time: new Date("2026-10-17T00:00:00Z") });
+      await page.goto(`/image-preview.html?previewResponse=${response}`);
+      await page.clock.pauseAt(new Date("2026-10-17T00:01:00Z"));
+      const staff = page.getByRole("region", { name: "Staff images" });
+      await staff.getByLabel("Image file").setInputFiles({
+        name: "new.png",
+        mimeType: "image/png",
+        buffer: png,
+      });
+      await staff.getByRole("button", { name: "Add image", exact: true }).click();
+      await expect(staff.locator(".image-thumb")).toHaveCount(2);
+
+      const dialog = staff.getByRole("dialog");
+      await staff.locator(".image-thumb").first().click();
+      await expect(dialog.getByText("Opening image.")).toBeVisible();
+      if (close === "button") {
+        await dialog.getByRole("button", { name: "Close", exact: true }).click();
+      } else {
+        await page.keyboard.press("Escape");
+      }
+      await expect(dialog).toBeHidden();
+      await expect(staff.locator(".image-thumb").first()).toBeFocused();
+      await staff.locator(".image-thumb").last().click();
+      const download = dialog.getByRole("link", { name: "Download image" });
+      await expect(download).toHaveAttribute("download", "new.png");
+      const currentUrl = await download.getAttribute("href");
+      if (!currentUrl) throw new Error("The newer preview has no download URL.");
+      await expect(dialog.getByRole("img")).toHaveAttribute("src", currentUrl);
+
+      // Finish the older request only after the newer image is displayed.
+      await page.clock.runFor(10_000);
+      await expect(download).toHaveAttribute("href", currentUrl);
+      await expect(download).toHaveAttribute("download", "new.png");
+      await expect(dialog.getByRole("img")).toHaveAttribute("src", currentUrl);
+      await expect(staff.getByRole("status")).toHaveText("Image added.");
+    });
+  }
+}
+
+test("a failed current image request still reports its error", async ({ page }) => {
+  await page.clock.install({ time: new Date("2026-10-17T00:00:00Z") });
+  await page.goto("/image-preview.html?previewResponse=fail");
+  await page.clock.pauseAt(new Date("2026-10-17T00:01:00Z"));
+  const staff = page.getByRole("region", { name: "Staff images" });
+  await staff.locator(".image-thumb").click();
+  await expect(staff.getByRole("dialog").getByText("Opening image.")).toBeVisible();
+  await page.clock.runFor(10_000);
+  await staff.getByRole("button", { name: "Close", exact: true }).click();
+  await expect(staff.getByRole("status")).toHaveText("This image could not be opened.");
+});
+
 test("staff can preview, validate, and retry an image on a phone", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/image-preview.html");
@@ -15,9 +69,14 @@ test("staff can preview, validate, and retry an image on a phone", async ({ page
   const dialog = page.getByRole("dialog");
   await expect(dialog).toBeVisible();
   await expect(dialog.getByRole("img", { name: /Image uploaded by Ada Lovelace/ })).toBeVisible();
+  const previewUrl = await dialog.getByRole("link", { name: "Download image" }).getAttribute("href");
+  if (!previewUrl) throw new Error("The preview has no download URL.");
   await page.keyboard.press("Escape");
   await expect(dialog).toBeHidden();
   await expect(thumb).toBeFocused();
+  await expect.poll(() => page.evaluate(async (url) => {
+    return fetch(url).then(() => false, () => true);
+  }, previewUrl)).toBe(true);
 
   await staff.getByLabel("Image file").setInputFiles({
     name: "notes.txt",

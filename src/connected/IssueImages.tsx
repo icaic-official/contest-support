@@ -1,12 +1,9 @@
 import { useEffect, useId, useRef, useState } from "react";
-import { attachmentPath, ImageRequestError, imageKind, imageRejection } from "./imageFile";
-import {
-  type ImageTransport,
-  type StartedImage,
-  isImageRequestError,
-  liveImageTransport,
-  thumbnailBlob,
-} from "./imageUpload";
+import { attachmentPath, imageKind, imageRejection } from "./imageFile";
+import { isImageRequestError, thumbnailBlob } from "./imageUpload";
+import { requireBackend } from "../backend";
+import type { ImageTransport, StartedImage } from "../backend/contracts";
+import { ImageRequestError } from "../backend/errors";
 import type { Attachment, PendingRemoval } from "./model";
 import { Icon } from "./ui";
 
@@ -21,7 +18,7 @@ export function IssueImages({
   attachments,
   pendingRemovals,
   onChanged,
-  transport = liveImageTransport,
+  transport = requireBackend().images,
 }: {
   sessionId: string;
   issueId: string;
@@ -105,7 +102,7 @@ export function IssueImages({
           await onChanged();
           return;
         } catch (cause) {
-          if (!(isImageRequestError(cause) && cause.message.startsWith("Upload the image before finishing."))) {
+          if (!(isImageRequestError(cause) && cause.incomplete)) {
             throw cause;
           }
         }

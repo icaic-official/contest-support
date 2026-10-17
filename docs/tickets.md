@@ -2,6 +2,10 @@
 
 These tickets describe development work, not contestant issues.
 
+The active implementation is [T0014 backend adapters](#t0014-backend-adapters).
+The user authorized it on 2026-10-17 while earlier pull requests remain open.
+The numbered records below retain their original scope and verification history.
+
 T0004 has two related pull requests.
 [PR #9](https://github.com/notbowen/minsky/pull/9) implements the UI makeover.
 [PR #13](https://github.com/notbowen/minsky/pull/13) rewrites the documentation.
@@ -382,3 +386,34 @@ Acceptance criteria:
 - [ ] The user reviews and merges the pull request.
 
 No schema change or deployment is part of this ticket.
+
+## T0014 backend adapters
+
+Branch: `feature/t0014-backend-adapters`, from updated `main` at `de92d54`.
+Status: implementation and local checks complete. Protected cloud verification and user review remain pending.
+
+The user selected shared backend interfaces before the Cloudflare migration.
+This ticket extracts Supabase as the first implementation.
+The browser continues to use the existing Auth service, database functions, account function, private image storage, and live subscriptions.
+
+Acceptance criteria:
+
+- [x] The UI uses typed interfaces for authentication, session reads, issue commands, administration, images, and live updates.
+- [x] Provider clients, access tokens, channels, database queries, and function payloads stay inside the Supabase implementation.
+- [x] Existing database and server functions remain the authority for permissions and workflow transitions.
+- [x] An uncertain write retains its request ID. A confirmed server rejection permits a new command.
+- [x] Password changes complete the existing mandatory-password check before the UI reports success.
+- [x] Image retries retain the existing upload identity, visibility, file checks, and removal behavior.
+- [x] Live subscriptions release their resources and ignore callbacks after cleanup. The UI retains refresh on reconnect, focus, and polling.
+- [x] Local type, lint, build, database, function, adapter, and browser checks pass.
+- [x] Documentation separates the current Supabase implementation from the selected future Cloudflare backend.
+- [ ] Protected cloud checks pass on the reviewed revision. The repository has no `cloud-test` environment as of this run.
+- [ ] The user reviews and merges the pull request.
+
+The [backend reference](backend-contracts.md) defines the interfaces.
+[Current state](current-state.md#t0014-backend-adapters-2026-10-17) records the verification results.
+
+The Cloudflare backend, D1 schema rewrite, account migration, R2 copy, and Durable Objects implementation remain later work.
+The next candidate is a shared hosted verification suite for the contracts before the second provider implementation.
+Other provider adapters and Terraform remain deferred.
+This ticket does not change provider resources, copy data, or deploy the app.

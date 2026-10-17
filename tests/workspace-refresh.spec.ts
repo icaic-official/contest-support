@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import type { Membership, Snapshot } from '../src/connected/model';
+import type { Command, Membership, Snapshot } from '../src/connected/model';
 
 const USER_ID = '00000000-0000-4000-8000-000000000001';
 const MEMBER_ID = '00000000-0000-4000-8000-000000000002';
@@ -7,7 +7,7 @@ const SESSION_ID = '00000000-0000-4000-8000-000000000100';
 const TEAM_ID = '00000000-0000-4000-8000-000000000200';
 
 /** Opens the real UI with isolated Auth and database responses. */
-async function openWorkspace(page: Page) {
+async function openWorkspace(page: Page, firstWrite?: 'uncertain' | 'rejected') {
   const membership: Membership = {
     session_id: SESSION_ID,
     user_id: USER_ID,
@@ -80,6 +80,7 @@ async function openWorkspace(page: Page) {
     server_time: '2026-10-15T00:00:00Z',
   };
   const writes: Array<{ path: string; body: unknown }> = [];
+  const workflowRequests: Array<{ p_request: string; p_action: Command }> = [];
   const user = {
     id: USER_ID,
     aud: 'authenticated',
@@ -137,6 +138,19 @@ async function openWorkspace(page: Page) {
         break;
       case '/rest/v1/rpc/workflow': {
         const body = route.request().postDataJSON();
+        workflowRequests.push(body);
+        if (workflowRequests.length === 1 && firstWrite === 'uncertain') {
+          await route.abort('failed');
+          return;
+        }
+        if (workflowRequests.length === 1 && firstWrite === 'rejected') {
+          await route.fulfill({
+            status: 400,
+            contentType: 'application/json',
+            body: JSON.stringify({ code: 'P0001', message: 'The issue changed. Try again.' }),
+          });
+          return;
+        }
         writes.push({ path, body: body.p_action });
         result = body.p_action.issue_id;
         break;
@@ -155,8 +169,35 @@ async function openWorkspace(page: Page) {
   await page.getByLabel('Password', { exact: true }).fill('fixture-password');
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
   await expect(page.locator('#issue-heading')).toHaveText('Original issue');
-  return { state, writes };
+  return { state, writes, workflowRequests };
 }
+
+test('an uncertain write retains its request ID until the user retries', async ({ page }) => {
+  const { workflowRequests } = await openWorkspace(page, 'uncertain');
+  await page.getByRole('textbox', { name: 'Message', exact: true }).fill('Preserve this reply.');
+  await page.getByRole('button', { name: 'Send reply', exact: true }).click();
+  const retry = page.getByRole('button', { name: 'Retry last request', exact: true });
+  await expect(retry).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Send reply', exact: true })).toBeDisabled();
+  await retry.click();
+  await expect(retry).not.toBeVisible();
+  expect(workflowRequests).toHaveLength(2);
+  expect(workflowRequests[1]).toEqual(workflowRequests[0]);
+});
+
+test('a definitive rejection allows a new command with a new request ID', async ({ page }) => {
+  const { workflowRequests } = await openWorkspace(page, 'rejected');
+  const reply = page.getByRole('textbox', { name: 'Message', exact: true });
+  await reply.fill('Rejected reply.');
+  await page.getByRole('button', { name: 'Send reply', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('The issue changed. Try again.');
+  await expect(page.getByRole('button', { name: 'Retry last request', exact: true })).not.toBeVisible();
+  await reply.fill('Updated reply.');
+  await page.getByRole('button', { name: 'Send reply', exact: true }).click();
+  await expect.poll(() => workflowRequests.length).toBe(2);
+  expect(workflowRequests[1].p_request).not.toBe(workflowRequests[0].p_request);
+  expect(workflowRequests[1].p_action).toMatchObject({ type: 'message', text: 'Updated reply.' });
+});
 
 test('an incoming issue preserves the displayed issue and sends its existing reply draft', async ({
   page,

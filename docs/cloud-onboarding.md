@@ -1,5 +1,9 @@
 # Cloud onboarding for T0003
 
+Supabase remains the active backend during [T0014 backend adapters](tickets.md#t0014-backend-adapters).
+The adapter extraction keeps the public environment variables and provider commands below unchanged.
+The selected future migration to Workers, D1, R2, and Durable Objects is recorded in [product direction](product-direction.md#backend-migration-direction).
+
 The connected development app runs at https://minsky-dev.icaic-minsky.workers.dev.
 Supabase hosts authentication, Postgres, and Realtime.
 Cloudflare Workers Static Assets serves the frontend.

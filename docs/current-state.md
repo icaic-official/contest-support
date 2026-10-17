@@ -1,5 +1,22 @@
 # Current state
 
+## T0014 backend adapters 2026-10-17
+
+The branch is `feature/t0014-backend-adapters`, from updated `main` at `de92d54`.
+The user authorized this first migration step while the other pull requests remain open.
+
+1. Summary of changes. The UI now uses `Backend` for authentication, session reads, workflows, administration, images, and live updates. Supabase implements those contracts through the existing services. Server permissions, database functions, and provider resources remain unchanged. The reference and product direction distinguish this extraction from the later D1 migration.
+2. Files changed. Added `src/backend/contracts.ts`, `errors.ts`, `index.ts`, `supabase/backend.ts`, `supabase/images.ts`, `supabase/backend.test.ts`, and `supabase/images.test.ts`. Moved `src/connected/client.test.ts` to `src/backend/supabase/login.test.ts` and removed `src/connected/client.ts`. Updated `src/connected/ConnectedApp.tsx`, `IssueImages.tsx`, `imageFile.ts`, `imagePreview.tsx`, and `imageUpload.ts`. Updated `tests/workspace-refresh.spec.ts` and `eslint.config.js`. Added `docs/backend-contracts.md`. Updated `AGENTS.md`, `PLAN.md`, `README.md`, `docs/tickets.md`, `docs/product-direction.md`, `docs/cloud-onboarding.md`, and this record.
+3. Commands run. Git status, diff, fetch, and worktree creation. Repository inspection with `rg`, `sed`, and `cat`. `gh pr list` and `gh api repos/GiftedNovaHD/minsky/environments`. `npm ci --offline --no-audit --no-fund`. `npx deno fmt --single-quote src/backend`. `npm run typecheck`, `npm run lint`, `npm run build`, `npm test -- src/backend/supabase`, `npm test`, `npm run check:functions`, `npm run test:functions`, and `npm run test:e2e`. `git diff --check` and a Python check of documentation paths and anchors. Commit, trailer verification, push, and PR preparation complete the repository workflow.
+4. Build and test results. Local type checking, lint, and build pass. The unit and embedded database suite passes 70 tests. The function suite passes 12 tests. Both functions pass Deno type checking. The browser suite passes 19 Chromium tests. The sandbox blocked the dependency install check and browser server. It also affected the existing child-process stderr test. Those commands pass outside the sandbox. Initial checks caught a test URL mismatch, test type errors, lint errors, and a moved helper still imported by the attachment function. The corrections retain that helper at its original path.
+5. Manual verification. Reviewed the extraction and provider imports against the existing calls. Automated browser checks cover narrow layouts, keyboard controls, image retries, membership refresh, and workflow retry IDs. No new manual hosted account journey ran. The protected hosted check remains pending.
+6. Risks. GitHub reports zero configured environments, so `cloud-test` cannot run. No hosted verification result is claimed for this revision. PRs #30 and #31 also edit the reply and image components. Their eventual merge may require conflict resolution and another verification run. The interfaces do not prove a Cloudflare implementation, password migration, or production capacity. Existing UI files retain double-quoted strings for consistency. New backend modules use single-quoted strings under the Google TypeScript Style Guide.
+7. Follow-up tickets. Complete T0014 protected cloud verification and user review. The next candidate is a shared hosted contract suite before the Cloudflare implementation. Authentication migration, D1, R2, Durable Objects, and eventual data cutover remain later work. Other providers and Terraform remain deferred.
+8. Docs that need updating. None for the implemented extraction. Future hosted verification must add its result to this record.
+
+The [backend contracts](backend-contracts.md) describe the interfaces and retry rules.
+The [cloud onboarding guide](cloud-onboarding.md#verification-and-protected-cloud-ci) lists the `cloud-test` environment configuration.
+
 ## Supabase CLI upgrade (2026-10-17)
 
 The user approved the existing Supabase CLI update from `2.119.0` to `2.121.0`.

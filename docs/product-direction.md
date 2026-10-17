@@ -47,7 +47,8 @@ The broader organizer tools below remain incomplete.
 
 ## Provisional architecture and milestones
 
-Cloudflare Workers and Supabase are the selected cloud direction.
+Cloudflare Workers hosts the frontend, and Supabase runs the current backend.
+The selected future backend is described in [backend migration direction](#backend-migration-direction).
 On 2026-10-02, the user prioritized working cloud features and deferred resilience.
 Assume connectivity during development.
 Outage planning no longer blocks backend work.
@@ -56,12 +57,10 @@ Necessary paid services are acceptable after the need and cost are identified.
 
 A developer pilot and production capacity validation are separate milestones.
 
-Architecture clarification (2026-10-02): Cloudflare serves the React frontend as static assets.
-All backend functionality resides in Supabase.
-Use managed Auth, Postgres, Realtime, and Storage.
-Use database functions for transactional workflows.
-Use Edge Functions for privileged account administration.
-This replaces the earlier proposal for privileged Worker endpoints.
+The implemented architecture uses Supabase Auth, Postgres, Realtime, and private Storage.
+Database functions enforce workflow transactions and permissions.
+Edge Functions handle privileged account administration and image operations.
+T0014 places the browser integration behind [backend contracts](backend-contracts.md).
 
 Supabase manages the services.
 Minsky still requires repository-owned migrations and functions that implement its schema, authorization policies, and business rules.
@@ -88,6 +87,10 @@ Actual authorization, synchronization, deployment, capacity, and recovery behavi
 
 ## Unresolved decisions
 
+The authentication implementation for Cloudflare remains unselected.
+Password-hash compatibility and login continuity need a verified migration plan before any account cutover.
+The final transfer also needs a reconciliation check and a tested rollback procedure.
+
 Outage handling remains deferred until after cloud feature development.
 Manual fallback, offline capture, and venue-local operation remain unselected.
 Do not make these decisions a prerequisite for T0003.
@@ -111,3 +114,34 @@ These identifiers are not mailboxes.
 Credential distribution and organizer-issued resets replace email invitations and email recovery.
 Keep team accounts shared and staff identities individual.
 Preserve existing Auth UUIDs, history, and permissions when you assign a username.
+
+## Backend migration direction
+
+On 2026-10-17, the user selected Cloudflare D1 with a SQLite rewrite.
+The user also required preservation of existing data and requested Durable Objects for live updates.
+This decision replaces Supabase as the long-term backend target.
+Supabase remains active while the shared interfaces and their first implementation are verified.
+
+The selected target has these responsibilities.
+
+| Component | Planned responsibility |
+| --- | --- |
+| Workers | Serve the frontend and authenticated backend operations. Check current access before reads and commands. |
+| D1 | Store accounts' application records, memberships, issues, activity, resolutions, awards, and image metadata. |
+| R2 | Store original images and thumbnails privately. Backend operations check access before file reads and writes. |
+| Durable Objects | Manage live connections and notify authorized clients of changes. Clients refetch their permitted snapshots. |
+
+D1 remains the source of saved workflow state.
+Live messages do not grant access and do not carry private issue data.
+A later implementation must define how committed changes reach subscribers and how clients recover missed notifications.
+The transaction and permission rules currently enforced in Postgres must also hold in the SQLite implementation.
+
+The migration order starts with shared Minsky interfaces and the Supabase adapter.
+Hosted contract verification comes before the Cloudflare implementation and data cutover.
+This makes the current behavior the comparison point for the replacement backend.
+It also keeps provider calls out of React components.
+
+The migration preserves account IDs, relationships, historical actors, timestamps, resolution cycles, awards, external application status, image visibility, and file contents.
+T0014 implements only the interfaces and Supabase extraction.
+Cloudflare resources and migration tooling remain later work.
+AWS implementations and Terraform remain deferred until a concrete deployment needs them.

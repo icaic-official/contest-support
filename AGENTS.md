@@ -20,6 +20,15 @@
 
 ## Current scope
 
+**T0014 backend adapters, 2026-10-17.** The user authorized the shared interfaces and Supabase extraction before the Cloudflare migration.
+Use `feature/t0014-backend-adapters`, from updated `main` at `de92d54`.
+This start is authorized while the earlier PRs remain open.
+Preserve existing server authorization, transactions, accounts, and image behavior.
+The selected future target is Workers, D1 with a SQLite rewrite, private R2, and Durable Objects for live updates.
+Preserve existing data during that later migration.
+Other providers, Terraform, provider resource changes, and deployment remain outside T0014.
+See [T0014](docs/tickets.md#t0014-backend-adapters) and [backend contracts](docs/backend-contracts.md).
+
 **T0008 team search (2026-10-15):** the user merged [PR #22](https://github.com/notbowen/minsky/pull/22) into `main`.
 It was developed separately on `feature/t0008-team-search` while PR #19 remained open.
 The T0005 branch now includes it through a merge from `main` to resolve conflicts.

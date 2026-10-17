@@ -34,7 +34,7 @@ T0008 fuzzy team search merged into `main` in [PR #22](https://github.com/notbow
 
 Branch: `feature/t0015-provider-contract-tests`, started at PR #32 revision `d158906` and updated to merged `main` at `ef6a029`.
 
-Status: implementation and verification in progress.
+Status: implemented and verified in [PR #37](https://github.com/GiftedNovaHD/minsky/pull/37). Awaiting user review and merge.
 
 The user authorized this branch exception on 2026-10-17.
 T0015 and separate T0016 Cloudflare design work proceed during PR #32 review.
@@ -49,13 +49,16 @@ Existing Supabase database, function, and hosted UI tests remain separate.
 Acceptance criteria:
 
 - [x] Shared scenarios contain no provider SDK, database query, or provider-specific response assertion.
-- [ ] Supabase runs the shared scenarios against isolated hosted accounts and records.
+- [x] Supabase runs the shared scenarios against isolated hosted accounts and records.
 - [x] Tests cover authentication, workflow permissions, retries, images, live updates, and access revocation.
 - [x] The runner requires an explicit provider and isolated target, rejects development, and checks prerequisites before creating fixtures.
 - [x] Fixture cleanup uses recorded identifiers, handles partial setup, and reports cleanup failures without exposing credentials.
 - [x] Ordinary CI runs without hosted credentials. Protected CI runs the hosted contract suite.
 - [x] Documentation explains coverage, limits, and the requirements for another provider fixture.
-- [ ] Required local checks and the protected hosted run pass on the implementation revision.
+- [x] Required local checks and the protected hosted run pass on the implementation revision.
+
+The [protected run on `672ec6d`](https://github.com/GiftedNovaHD/minsky/actions/runs/39036173268) passed all 14 existing hosted UI tests and all eight shared scenarios.
+Cleanup completed without retained recovery files. The run used the existing CI backend and applied no migrations or function deployments.
 
 The shared tests and subsequent verification exposed image and live-update defects.
 Private image reads now bypass cached authorized responses.

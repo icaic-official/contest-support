@@ -234,6 +234,19 @@ Use an active event unless a step says the event is archived.
 35. Start two uploads, then lower the count limit to one. Check that only one can become attached.
 36. Try a file path with an extra folder. Check that Storage refuses it.
 
+Check delayed previews with two different images, A and B, in an isolated test:
+
+1. Delay the original-file response for A, then open A.
+2. Close its preview and open B. Let B finish first.
+3. Release A's delayed response. Check that B's image, uploader, time, and download file still match B.
+4. Repeat with a failed response for A. Check that it does not report an error for the closed preview.
+5. Repeat with Escape to close A. Check that focus returns to A's thumbnail before opening B.
+6. Fail the response for the current preview. Check that the error still appears.
+
+`tests/images.spec.ts` automates these response-order checks with the development image harness.
+It also checks that closing the preview releases its temporary browser URL.
+These tests do not access hosted data.
+
 ## 11. Team search
 
 Use a volunteer or specialist account, then repeat the queue search as jury and as a session admin.

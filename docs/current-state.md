@@ -89,6 +89,9 @@ T0005 adds issue images and has an approved frontend preview using the shared de
 The main Worker frontend remains on the approved `main` revision.
 See [T0005 issue images](#t0005-issue-images-2026-10-11).
 
+T0013 fixes delayed image preview responses and awaits user review.
+See [T0013 verification](#t0013-image-preview-request-handling-2026-10-17).
+
 These operational items stay deferred.
 They are not part of T0005:
 
@@ -98,6 +101,35 @@ They are not part of T0005:
 
 Older reports below describe their recorded revisions.
 Use this status when an older report still says that T0005 is unimplemented or that PR #13 is open.
+
+## T0013 image preview request handling (2026-10-17)
+
+The branch is `feature/t0013-image-preview-race`, from `main` at `de92d54`.
+The user requested separate PRs for this fix and T0012 reply retry cleanup.
+
+Each preview has a request number. A completed download must match the current number and an open dialog.
+Older downloads cannot replace the current image or its download link.
+Older failures cannot report an error for a closed preview.
+Current failures still report the error.
+Closing a preview, replacing its image, or leaving the page releases its temporary browser URL.
+
+Checks passed on Node.js `22.22.1` and npm `11.12.0`:
+
+- `npm run typecheck`, `npm run lint`, and `npm run build` passed.
+- `npm test` passed all 49 local tests outside the sandbox.
+- `npm run check:functions` passed, and `npm run test:functions` passed all 12 tests.
+- `npm run test:e2e` passed all 22 Chromium tests outside the sandbox.
+
+Four new tests failed against the original app. They confirm that late downloads and errors cannot affect a newer preview after **Close** or Escape.
+The focused image suite now passes all 11 tests.
+It also checks that current errors still appear, focus returns, and a closed preview releases its browser URL.
+The development image harness can delay a response or return an error. The tests control its clock.
+Existing phone-width, upload, removal, contestant, and archived-event checks still pass.
+
+The build retains the existing JavaScript chunk-size warning.
+Hosted checks, real-device checks, and deployment were not run.
+The source keeps its existing double quotes and JSX conventions for consistency with the surrounding code.
+No database migration or function change is required.
 
 ## T0005 merge-conflict repair (2026-10-15)
 

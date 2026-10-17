@@ -21,6 +21,32 @@ These items stay deferred and are not part of T0005:
 
 T0008 fuzzy team search merged into `main` in [PR #22](https://github.com/notbowen/minsky/pull/22) on 2026-10-15 (SGT).
 
+## T0013 — Image preview request handling
+
+Branch: `feature/t0013-image-preview-race`, from updated `main` at `de92d54`.
+
+Status: implemented and verified locally. The user reviews and merges.
+
+The user requested two independent PRs for the review findings on 2026-10-17.
+T0013 fixes image previews. [PR #30](https://github.com/GiftedNovaHD/minsky/pull/30) fixes reply retry cleanup in T0012.
+Both branches start from `main`. Either PR can be reviewed and merged first.
+
+Only the current, open preview can use a completed download or report its error.
+Closing a preview or opening another image makes older requests inactive.
+The app releases each temporary browser URL when its preview closes, changes, or leaves the page.
+
+Acceptance criteria:
+
+- [x] A delayed download cannot replace a newer preview or its download link.
+- [x] A delayed error from an older preview cannot replace the current status. Current errors still appear.
+- [x] Both **Close** and Escape restore focus and prevent older results from changing a new preview.
+- [x] The temporary browser URL is released when the preview closes.
+- [x] Browser regression tests reproduce the original failures and pass with the fix. Required local checks pass.
+- [ ] The user reviews and merges the pull request.
+
+Verification is recorded in [current state](current-state.md#t0013-image-preview-request-handling-2026-10-17).
+No schema or function change is required. Deployment remains a separate step.
+
 ## T0001 — Local workflow demo and project guidance
 
 Branch: `feature/t0001-local-demo`

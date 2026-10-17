@@ -12,6 +12,42 @@ The migration must preserve existing accounts, IDs, history, awards, permissions
 The Cloudflare implementation, authentication choice, migration tools, other providers, and Terraform remain later work.
 This decision supersedes the older long-term Supabase direction below.
 
+The user confirmed the migration order after PR #29 merged on 2026-10-17.
+First implement the shared interfaces and Supabase adapter.
+Verify that adapter against hosted Supabase before implementing the Cloudflare adapter.
+Test the Cloudflare implementation and rehearse a data-preserving migration before switching the active backend.
+Frontend deployment automation is separate from these acceptance steps.
+
+**Documentation writing rules, 2026-10-17.** The user supplied `unslop` and `technical-writing` principles.
+Apply them to documentation, README text, PR descriptions, and commit messages.
+Use one Diataxis purpose per page and preserve exact code names and commands.
+See [the writing guide](docs/writing-guide.md).
+
+**Automatic frontend builds (2026-10-17):** the user requested previews for branch pushes and stable deployments after merges to `main`.
+The later CI requirement selects GitHub Actions for `minsky-dev` and `minsky-docs`.
+Deployment depends on passing `checks`, `secrets`, and `dependencies` jobs for the same push.
+Keep independent Cloudflare Git builds disabled.
+This replaces repeated frontend deployment approval after activation.
+The user still reviews and merges. Backend deployment remains an explicit, coordinated step.
+The user requested the completed workflow and setup instructions before adding credentials.
+See [setup and verification](docs/cloudflare-builds.md).
+Provider authentication and the first automatic deployments remain unverified.
+
+**Open-source documentation quality (2026-10-17):** the documentation must serve readers outside the project.
+Provide reproducible instructions, exact behavior and limits, clear release status, and tested installation procedures for supported paths.
+Keep public guides separate from maintainer deployment records and historical ticket reports.
+The initial T0011 site is a working baseline. It is not yet release-ready.
+See the [documentation release plan and audit](docs/documentation-release-plan.md) for specific gaps and completion criteria.
+License selection and repository publication remain owner decisions.
+
+**Documentation site (2026-10-17):** the user requested implementation, written guides, and deployment to Cloudflare Workers.
+T0011 is a companion to the open T0007 installation work.
+Use `feature/t0011-documentation-site` from updated `main`.
+The user authorizes a separate `minsky-docs` Worker in the existing development account and its initial deployment before merge.
+The user still reviews and merges the source PR.
+This exception does not authorize application, database, or function deployment.
+See [T0011](docs/tickets.md#t0011--documentation-site).
+
 **T0008 team search (2026-10-15):** the user merged [PR #22](https://github.com/notbowen/minsky/pull/22) into `main`.
 Staff match the current session's team names and locations while they investigate issues or report one for a team.
 The T0005 branch includes the accepted search through a merge from `main`.

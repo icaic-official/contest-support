@@ -14,6 +14,8 @@
 
 ## Technical communication
 
+- Apply the user's `unslop` and `technical-writing` principles through [the writing guide](docs/writing-guide.md).
+- Give each public documentation page one purpose: tutorial, how-to, reference, or explanation.
 - Use ASD-STE100 Simplified Technical English for technical explanations in replies, documentation, and pull requests.
 - Use short sentences, active voice, and familiar words. Avoid unnecessary jargon.
 - When a technical term is necessary, explain it in plain language on first use. Keep code names and commands exact.
@@ -28,6 +30,22 @@ The selected future target is Workers, D1 with a SQLite rewrite, private R2, and
 Preserve existing data during that later migration.
 Other providers, Terraform, provider resource changes, and deployment remain outside T0014.
 See [T0014](docs/tickets.md#t0014-backend-adapters) and [backend contracts](docs/backend-contracts.md).
+
+**Automatic frontend builds (2026-10-17):** the user authorized branch previews and automatic stable deployments after merges to `main`.
+Use GitHub Actions to publish the existing `minsky-dev` and `minsky-docs` Workers after all required CI jobs pass.
+Keep independent Cloudflare Git builds disabled.
+See [setup and verification](docs/cloudflare-builds.md).
+Until credentials, activation, and hosted checks pass, do not claim that automatic deployment is verified.
+The user still reviews and merges. Backend changes retain explicit deployment and target checks.
+
+**T0011 documentation site (2026-10-17):** the user requested implementation, written guides, and deployment.
+Develop on `feature/t0011-documentation-site` from updated `main`, alongside the open T0007 PR.
+Publish a separate static `minsky-docs` Worker in the existing Minsky development account.
+The user's request authorizes this initial docs deployment before merge.
+The user still reviews and merges the source PR.
+This exception does not authorize application, database, or function deployment.
+Maintain public guides under `site/src/content/docs/` and label T0007's pending and unverified steps.
+See [T0011](docs/tickets.md#t0011--documentation-site).
 
 **T0008 team search (2026-10-15):** the user merged [PR #22](https://github.com/notbowen/minsky/pull/22) into `main`.
 It was developed separately on `feature/t0008-team-search` while PR #19 remained open.
@@ -152,9 +170,11 @@ For each ticket, use this sequence:
 5. Prepare the PR.
 6. Run cloud integration checks on the reviewed revision.
 7. Let the user review and merge.
-8. Explicitly deploy approved changes afterward.
+8. After automation setup, let GitHub Actions deploy both static frontends when the `main` CI checks pass. Coordinate backend deployment separately.
 
-Do not imply that merge automatically deploys the app.
+Automatic frontend deployment requires GitHub deployment settings and passing `checks`, `secrets`, and `dependencies` jobs.
+Before setup is verified, report deployment separately from merge.
+Prepare compatible backend changes before a dependent frontend merges, or pause frontend deployment for that release.
 Privileged GitHub cloud checks use the protected `cloud-test` environment and the separate CI project.
 Ordinary PR checks run without cloud credentials.
 Record local cloud runs separately from protected GitHub Actions runs.
@@ -203,6 +223,14 @@ They are not part of the T0005 issue-image ticket:
 - Never present local demo tests as evidence of production security, offline operation, or capacity for 800 simultaneous users.
 
 ## Documentation upkeep
+
+The user requires documentation suitable for an open-source release.
+Follow the [documentation release plan](docs/documentation-release-plan.md).
+Write for readers without project conversations or access to the maintainers' provider accounts.
+State prerequisites, exact commands, expected results, permissions, and failure recovery where relevant.
+Label development, experimental, and unverified behavior explicitly.
+Update affected guides with behavior changes. Keep historical run reports separate from current instructions.
+Do not call an installation path supported until its documented procedure passes on an isolated installation.
 
 During T0001, create the remaining documentation.
 Keep it concise and consistent with implemented behavior.

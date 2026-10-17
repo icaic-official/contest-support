@@ -6,6 +6,12 @@ const MEMBER_ID = '00000000-0000-4000-8000-000000000002';
 const SESSION_ID = '00000000-0000-4000-8000-000000000100';
 const TEAM_ID = '00000000-0000-4000-8000-000000000200';
 
+interface WorkflowRequest {
+  p_session: string;
+  p_request: string;
+  p_action: Command;
+}
+
 /** Opens the real UI with isolated Auth and database responses. */
 async function openWorkspace(page: Page, firstWrite?: 'uncertain' | 'rejected') {
   const membership: Membership = {
@@ -235,6 +241,116 @@ test('an incoming issue preserves the displayed issue and sends its existing rep
         },
       },
     ]);
+});
+
+for (const visibility of ['public', 'internal'] as const) {
+  test(`a successful ${visibility} reply retry clears the completed draft`, async ({ page }) => {
+    const { state } = await openWorkspace(page);
+    const requests: WorkflowRequest[] = [];
+    await page.route('https://example.supabase.co/rest/v1/rpc/workflow', async (route) => {
+      const request: WorkflowRequest = route.request().postDataJSON();
+      const action = request.p_action;
+      if (action.type !== 'message') throw new Error('Expected a reply request.');
+      requests.push(request);
+      // Record the reply once, then lose the first two responses.
+      if (!state.history.some((item) => item.id === request.p_request)) {
+        state.history.push({
+          id: request.p_request,
+          issue_id: action.issue_id,
+          at: state.server_time,
+          actor: USER_ID,
+          actor_name: 'Review administrator',
+          text: action.text,
+          visibility: action.visibility,
+        });
+        if (action.visibility === 'public') state.issues[0].revision++;
+      }
+      if (requests.length <= 2) {
+        await route.abort('failed');
+        return;
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(action.issue_id),
+      });
+    });
+
+    const message = page.getByRole('textbox', { name: 'Message', exact: true });
+    const audience = page.getByRole('combobox', { name: 'Audience', exact: true });
+    const send = page.getByRole('button', { name: 'Send reply', exact: true });
+    const retry = page.getByRole('button', { name: 'Retry last request', exact: true });
+    const draft = 'Keep this reply until the retry succeeds.';
+    await audience.selectOption(visibility);
+    await message.fill(draft);
+    await send.click();
+    await expect(retry).toBeEnabled();
+    await retry.click();
+    await expect.poll(() => requests.length).toBe(2);
+    await expect(retry).toBeEnabled();
+    await expect(message).toHaveValue(draft);
+    await expect(audience).toHaveValue(visibility);
+    await expect(send).toBeDisabled();
+
+    await retry.click();
+    await expect(retry).toHaveCount(0);
+    await expect(message).toHaveValue('');
+    await expect(audience).toHaveValue('public');
+    await expect(send).toBeDisabled();
+    await expect(page.locator('.activity li')).toHaveCount(1);
+    expect(requests).toEqual([requests[0], requests[0], requests[0]]);
+    expect(requests[0]).toEqual({
+      p_session: SESSION_ID,
+      p_request: expect.any(String),
+      p_action: {
+        type: 'message',
+        issue_id: state.issues[0].id,
+        revision: 0,
+        text: draft,
+        visibility,
+      },
+    });
+
+    await message.fill('A fresh reply after the retry.');
+    await send.click();
+    await expect(message).toHaveValue('');
+    await expect(send).toBeDisabled();
+    await expect(page.locator('.activity li')).toHaveCount(2);
+    expect(requests).toHaveLength(4);
+    expect(requests[3].p_request).not.toBe(requests[0].p_request);
+    expect(state.history.map((item) => item.text)).toEqual([
+      draft,
+      'A fresh reply after the retry.',
+    ]);
+  });
+}
+
+test('a rejected reply keeps its draft available for correction', async ({ page }) => {
+  await openWorkspace(page);
+  await page.route('https://example.supabase.co/rest/v1/rpc/workflow', async (route) => {
+    await route.fulfill({
+      status: 400,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        code: 'P0001',
+        message: 'Issue changed. Refresh and try again.',
+        details: null,
+        hint: null,
+      }),
+    });
+  });
+  const message = page.getByRole('textbox', { name: 'Message', exact: true });
+  const send = page.getByRole('button', { name: 'Send reply', exact: true });
+  await page.getByRole('combobox', { name: 'Audience', exact: true }).selectOption('internal');
+  await message.fill('Keep this rejected draft.');
+  await send.click();
+  await expect(page.getByRole('alert')).toHaveText('Issue changed. Refresh and try again.');
+  await expect(message).toHaveValue('Keep this rejected draft.');
+  await expect(message).toBeEnabled();
+  await expect(page.getByRole('combobox', { name: 'Audience', exact: true })).toHaveValue('internal');
+  await expect(send).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Retry last request' })).toHaveCount(0);
+  await expect(page.locator('.activity li')).toHaveCount(0);
 });
 
 test('refreshed roles and team assignments are the values saved by the membership form', async ({

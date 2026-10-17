@@ -4,6 +4,11 @@ Supabase remains the active backend during [T0014 backend adapters](tickets.md#t
 The adapter extraction keeps the public environment variables and provider commands below unchanged.
 The selected future migration to Workers, D1, R2, and Durable Objects is recorded in [product direction](product-direction.md#backend-migration-direction).
 
+**Workflow update (2026-10-17):** the user selected automatic frontend previews and deployment from `main` for both Workers.
+GitHub Actions publishes both sites only after all required CI jobs pass.
+Follow [deployment setup](cloudflare-builds.md). Credentials, activation, and the first automatic deployments remain unverified.
+Backend migrations, functions, and provider settings retain their explicit deployment steps.
+
 The connected development app runs at https://minsky-dev.icaic-minsky.workers.dev.
 Supabase hosts authentication, Postgres, and Realtime.
 Cloudflare Workers Static Assets serves the frontend.
@@ -11,6 +16,8 @@ Docker is optional.
 The user permits full authorized cloud credential access for contributors.
 
 ## Authentication decision (2026-10-02)
+
+The public documentation has separate hosting. See [documentation hosting](#documentation-hosting-t0011).
 
 The user replaced email invitations and email recovery with organizer-created **usernames and passwords**.
 SMTP and personal email addresses are not prerequisites.
@@ -92,6 +99,36 @@ T0003 does not require a sender, domain, or SMTP setup.
 
 ## Ownership and costs
 
+### Documentation hosting (T0011)
+
+The documentation site uses a separate static Worker named `minsky-docs`.
+Its address is `https://minsky-docs.icaic-minsky.workers.dev`.
+Its configuration is `wrangler.docs.jsonc`, with `site/dist` as its only asset directory.
+The account is the existing Minsky development account, `458ad6a930b0fb717796dfa19ca6a2b1`.
+It has no backend binding, Supabase credential, or Worker request handler.
+No paid upgrade or purchased domain is required for this setup.
+
+Use Node.js 22.22 or later. From the repository root:
+
+```sh
+npm ci
+npm ci --prefix site
+npm run docs:build
+npm run docs:test
+npx wrangler whoami
+npx wrangler deploy --config wrangler.docs.jsonc --dry-run
+npm run docs:deploy
+```
+
+Confirm the account and Worker name before the final command.
+The user authorized the initial documentation deployment before merge on 2026-10-17.
+This is a T0011 exception for the docs Worker only.
+After automation setup, later stable updates use review, merge, passing CI, and automatic frontend deployment.
+The app's `npm run deploy` command is separate.
+See [the complete guide](../site/src/content/docs/contributing/documentation.md).
+
+### Existing provider records
+
 On 2026-10-02, the user deferred records of provider ownership and billing details.
 On 2026-10-03, the user moved these scope notes from T0004.
 They stay deferred.
@@ -142,7 +179,7 @@ Apply the migration before you deploy functions.
 Then deploy `admin` and `attachments`.
 Then deploy the frontend.
 `npm run cloud:functions` deploys both functions to development.
-Merging does not deploy this change.
+Prepare these backend changes before a dependent frontend merges. Automatic frontend deployment does not apply backend changes.
 
 The review fixes use `202610140001_attachment_fixes.sql`.
 Keep the first attachment migration unchanged.
@@ -166,7 +203,7 @@ From the reviewed ticket branch, run `npm run deploy:preview -- --preview-alias 
 This builds the frontend and runs `wrangler versions upload`.
 It updates `https://t0005-minsky-dev.icaic-minsky.workers.dev` and leaves the main Worker deployment unchanged.
 No permanent `preview` Git branch is needed.
-PR pushes do not upload automatically.
+This command is the older manual preview path. After setup, repository branch pushes publish through [the CI workflow](cloudflare-builds.md).
 See [Cloudflare version URLs](https://developers.cloudflare.com/workers/versions-and-deployments/version-urls/).
 
 The frontend uses its build-time Supabase settings.
@@ -240,9 +277,11 @@ For each ticket, use this sequence:
 5. Prepare the PR.
 6. Run cloud integration checks against the reviewed revision.
 7. Let the user review and merge.
-8. Explicitly deploy the approved revision afterward.
+8. After automation setup, let GitHub Actions deploy both static frontends when the `main` CI checks pass. Coordinate backend deployment separately.
 
-Merge does not automatically deploy the app.
+Automatic frontend deployment requires GitHub deployment settings and passing `checks`, `secrets`, and `dependencies` jobs.
+Until setup is verified, record merge and deployment separately.
+Prepare compatible backend changes before a dependent frontend merges, or pause frontend deployment for that release.
 When production exists, validate changes on development and CI before you apply them to production.
 See [AGENTS.md](../AGENTS.md#cloud-development-and-deployment-workflow).
 
@@ -334,7 +373,9 @@ Verify plan availability before you treat protection as enabled.
 Then manually dispatch **Checks** for the reviewed branch.
 Record the cloud job result.
 The cloud job applies migrations and deploys both `admin` and `attachments` before running the tests.
-No automatic deployment or preview writes to shared data are configured.
+Automatic frontend deployment is selected but its setup remains unverified.
+An app preview can write to its configured development backend through the authenticated app.
+It does not isolate data. See [preview backend limits](cloudflare-preview-behavior.md).
 
 See [GitHub environment documentation](https://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/manage-environments).
 Initial inspection on 2026-10-02 found no GitHub environments and no separate Supabase test project.

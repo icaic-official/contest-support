@@ -22,6 +22,15 @@
 
 ## Current scope
 
+**Parallel provider work, 2026-10-17.** The user authorized T0015 shared provider tests and T0016 Cloudflare design while PR #32 was under review.
+Both branches started from PR #32 at `d158906`, as an exception to waiting for its merge.
+The user then merged PR #32 at `ef6a029`. Both dependent branches include that merge commit.
+T0016 uses `feature/t0016-cloudflare-backend-design`.
+Its scope is the [backend design](docs/cloudflare-backend-design.md) and [implementation plan](docs/cloudflare-implementation-plan.md).
+Keep Supabase active. Do not treat design approval as authorization to provision resources, export credentials, deploy, or migrate data.
+The user still reviews and merges the dependent work.
+AWS is a portability requirement for the design. AWS adapters and Terraform remain deferred.
+
 **T0014 backend adapters, 2026-10-17.** The user authorized the shared interfaces and Supabase extraction before the Cloudflare migration.
 Use `feature/t0014-backend-adapters`, from updated `main` at `de92d54`.
 This start is authorized while the earlier PRs remain open.

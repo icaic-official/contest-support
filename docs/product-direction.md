@@ -145,3 +145,10 @@ The migration preserves account IDs, relationships, historical actors, timestamp
 T0014 implements only the interfaces and Supabase extraction.
 Cloudflare resources and migration tooling remain later work.
 AWS implementations and Terraform remain deferred until a concrete deployment needs them.
+
+On 2026-10-17, the user authorized shared provider tests and Cloudflare design in parallel with PR #32 review.
+T0015 contains the test work on its own branch.
+T0016 records the [proposed architecture](cloudflare-backend-design.md) and [implementation plan](cloudflare-implementation-plan.md).
+Neither design work nor provider tests migrate existing data.
+Possible AWS testing motivates separate domain rules, transactional persistence, identity, image storage, and live-delivery interfaces.
+Cloudflare implementation still requires a proved D1 transaction pattern and an explicit identity decision.

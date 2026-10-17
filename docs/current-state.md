@@ -1,5 +1,24 @@
 # Current state
 
+## T0016 Cloudflare backend design, 2026-10-17
+
+The user authorized this design in parallel with shared provider tests while PR #32 was under review.
+`feature/t0016-cloudflare-backend-design` started from that PR at `d158906`.
+The user then merged PR #32 at `ef6a029` on 2026-10-17 at 12:51:42 UTC.
+This branch now includes that merge commit.
+The [design](cloudflare-backend-design.md) separates existing contracts from proposed server components.
+The [implementation plan](cloudflare-implementation-plan.md) defines bounded phases and acceptance evidence.
+Supabase remains active. No Cloudflare backend, authentication replacement, or data migration is implemented here.
+
+1. Summary of changes. Prepared the Cloudflare architecture and implementation acceptance plan. Recorded the parallel branch exception and AWS portability motivation.
+2. Files changed. `AGENTS.md`, `PLAN.md`, `README.md`, `docs/cloudflare-backend-design.md`, `docs/cloudflare-implementation-plan.md`, `docs/current-state.md`, `docs/product-direction.md`, and `docs/tickets.md`.
+3. Commands run. Git status, branch and worktree inspection, source reads with `sed`, `cat`, and `rg`, Python documentation checks, the STE writing checker, and `git diff --check`. The initial `python` command was unavailable. The checks ran with `python3`. Consulted current official Cloudflare and Supabase documentation.
+4. Build and test results. Documentation paths, heading structure, and whitespace pass. The structural writing check passes with synonym warnings disabled after review. Its initial pass flagged terminology such as confirmed rejection and validated response. Those terms retain distinct meanings. Application builds and tests were not run for this prose-only change. Cloudflare behavior remains unverified.
+5. Manual verification. Compared the design with `Backend`, workflow transactions, private signals, password restrictions, and image lifecycle code. Checked primary provider references near factual claims.
+6. Risks. The D1 assertion pattern, replacement identity implementation, hash compatibility, hosted limits, notification latency, and post-write rollback require implementation evidence. None is presented as verified.
+7. Follow-up tickets. Review T0015 and T0016. T0014 merged. The implementation plan defines later phases without opening speculative development tickets.
+8. Docs that need updating. Record approved identity settings and measured implementation results when those decisions and tests are complete.
+
 ## T0014 existing backend verification, 2026-10-17
 
 The [completed hosted run](https://github.com/GiftedNovaHD/minsky/actions/runs/39027288113) passed on `a3b3c70` with `existing_backend=true`.

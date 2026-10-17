@@ -2,8 +2,8 @@
 
 These tickets describe development work, not contestant issues.
 
-The active implementation is [T0014 backend adapters](#t0014-backend-adapters).
-The user authorized it on 2026-10-17 while earlier pull requests remain open.
+This branch records [T0016 Cloudflare backend design](#t0016-cloudflare-backend-design).
+T0015 shared provider tests proceed on a separate branch. T0014 merged in PR #32.
 The numbered records below retain their original scope and verification history.
 
 T0011 documentation and deployment automation merged in [PR #29](https://github.com/GiftedNovaHD/minsky/pull/29) on 2026-10-17.
@@ -422,10 +422,36 @@ Acceptance criteria:
 
 No schema change or deployment is part of this ticket.
 
+## T0016 Cloudflare backend design
+
+Branch: `feature/t0016-cloudflare-backend-design`, from PR #32 at `d158906`.
+The branch now includes its merge into `main` at `ef6a029`.
+Status: design prepared for review. No Cloudflare connector or resources exist in this change.
+
+The user authorized this design in parallel with T0015 shared provider tests while PR #32 was under review.
+This is an explicit exception to the normal branch and merge sequence.
+The user still reviews and merges the dependent work.
+
+Acceptance criteria:
+
+- [x] Separate browser contracts from server domain rules, transactional persistence, identity, blob storage, and change delivery.
+- [x] Specify D1 command receipts, atomic preconditions, concurrent changes, and private revision rules without a cross-resource transaction claim.
+- [x] Specify image permission checks, reservation limits, immutable storage, retryable deletion, and orphan cleanup.
+- [x] Specify Durable Object authorization, audience separation, reconnect behavior, revocation, and recovery of pending notifications.
+- [x] Record credential-migration options and decisions required before account cutover.
+- [x] Define bounded implementation phases with provider tests, migration comparison, and rollback acceptance.
+- [x] Keep AWS and Terraform as future work while defining portable interfaces.
+- [ ] The user reviews and accepts the design.
+
+The [design](cloudflare-backend-design.md) explains the decisions.
+The [implementation plan](cloudflare-implementation-plan.md) defines acceptance steps.
+The [verification record](current-state.md#t0016-cloudflare-backend-design-2026-10-17) identifies this documentation-only change.
+Supabase remains active. This ticket creates no credentials, provider resources, or data migration.
+
 ## T0014 backend adapters
 
 Branch: `feature/t0014-backend-adapters`, from updated `main` at `de92d54`.
-Status: implementation, local checks, ordinary GitHub checks, and all 14 hosted Supabase cases pass. Fixture cleanup completed. PR #32 is ready for user review and merge.
+Status: implementation, local checks, ordinary GitHub checks, and all 14 hosted Supabase cases pass. Fixture cleanup completed. The user merged PR #32 at `ef6a029` on 2026-10-17 at 12:51:42 UTC.
 
 The user selected shared backend interfaces before the Cloudflare migration.
 This ticket extracts Supabase as the first implementation.
@@ -443,13 +469,15 @@ Acceptance criteria:
 - [x] Local type, lint, build, database, function, adapter, and browser checks pass.
 - [x] Documentation separates the current Supabase implementation from the selected future Cloudflare backend.
 - [x] Protected cloud checks pass on the reviewed revision against the existing Supabase backend. The [run on `a3b3c70`](https://github.com/GiftedNovaHD/minsky/actions/runs/39027288113) passes all 14 cases with `existing_backend=true` and successful fixture cleanup. The verification record identifies the backend versions.
-- [ ] The user reviews and merges the pull request.
+- [x] The user reviewed and merged PR #32.
 
 The [backend reference](backend-contracts.md) defines the interfaces.
 [Current state](current-state.md#t0014-existing-backend-verification-2026-10-17) records the verification results.
 
 The Cloudflare backend, D1 schema rewrite, account migration, R2 copy, and Durable Objects implementation remain later work.
-The next candidate is a shared hosted verification suite for the contracts before the second provider implementation.
+The user later authorized T0015 shared provider tests and T0016 Cloudflare design in parallel with PR #32 review.
+T0015 is developed separately on `feature/t0015-provider-contract-tests`.
+This branch records T0016 only and does not claim T0015 verification results.
 Other provider adapters and Terraform remain deferred.
 This ticket adds no backend schema or provider service and does not migrate user data or deploy the app.
 Hosted verification requires the existing CI project to have the merged backend migrations and functions.

@@ -30,6 +30,18 @@ export default tseslint.config(
     },
   },
   {
+    files: ["src/server/**/*.ts"],
+    ignores: ["src/server/adapters/**"],
+    rules: {
+      "no-restricted-imports": ["error", {
+        patterns: [{
+          group: ["@supabase/*", "@aws-sdk/*", "cloudflare:*", "@cloudflare/*", "**/adapters/**"],
+          message: "Server contracts and domain rules must not import provider adapters.",
+        }],
+      }],
+    },
+  },
+  {
     files: [
       "tests/providers/scenarios/**/*.ts", "tests/providers/contracts.ts",
       "tests/providers/browser-backend.ts", "tests/providers/browser-dispatch.ts",

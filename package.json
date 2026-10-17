@@ -13,6 +13,8 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "test": "vitest run",
+    "test:d1": "vitest run --config vitest.d1.config.ts",
+    "test:d1:hosted": "node scripts/d1-proof.mjs",
     "test:e2e": "playwright test",
     "test:providers": "node scripts/provider-test.mjs",
     "test:providers:list": "playwright test --config playwright.providers.config.ts --list",

@@ -2,6 +2,10 @@
 
 These tickets describe development work, not contestant issues.
 
+The active ticket is [T0017 D1 transaction proof](#t0017-d1-transaction-proof).
+Authentication and the remaining Cloudflare operations follow this proof.
+Migration tooling follows connector verification. Supabase remains active.
+
 T0016 Cloudflare backend design merged in [PR #36](https://github.com/GiftedNovaHD/minsky/pull/36) at `b68ef72` on 2026-10-17.
 [T0015 shared provider tests](#t0015-shared-provider-tests) merged in [PR #37](https://github.com/GiftedNovaHD/minsky/pull/37).
 [PR #32](https://github.com/GiftedNovaHD/minsky/pull/32) merged on 2026-10-17 at `ef6a029`.
@@ -49,6 +53,42 @@ These items stay deferred and are not part of T0005:
 - Remaining manual acceptance checks.
 
 T0008 fuzzy team search merged into `main` in [PR #22](https://github.com/notbowen/minsky/pull/22) on 2026-10-15 (SGT).
+
+## T0017 D1 transaction proof
+
+Branch: `feature/t0017-d1-transaction-proof`, from updated `main` at `53f9dfd`.
+Status: implemented and verified locally and on hosted D1 in [PR #39](https://github.com/GiftedNovaHD/minsky/pull/39). The user reviews and merges.
+Summary: Prove atomic workflow writes through a provider-independent application-store interface and a D1 adapter. Use `claim` and `message` to check concurrent transitions and private activity.
+
+The owner authorized isolated Cloudflare development and CI resources in the existing account.
+Existing Wrangler access verified account `458ad6a930b0fb717796dfa19ca6a2b1` before provisioning.
+Development uses temporary local databases. Hosted fixtures use the separate `minsky-d1-proof-ci` database.
+No paid upgrade is needed for this proof.
+
+The later migration will use organizer-issued replacement temporary passwords with mandatory changes.
+Preserve account IDs, memberships, permissions, and history. Password-hash import is no longer required.
+Authentication implementation, remaining operations, real-data exports, migration tooling, and the backend switch remain outside this ticket.
+AWS adapters and Terraform remain deferred. Bounded subagent work is authorized.
+
+### Acceptance criteria
+
+- [x] Define the necessary SQLite schema and provider-independent application-store interface.
+- [x] Commit a command's state change, receipt, history, and permitted notifications in one D1 batch.
+- [x] Prove assertion rollback, concurrent claims, concurrent duplicate requests, lost responses, and conflicting request IDs.
+- [x] Prove current membership, login, account restrictions, event state, and consistent authorized reads.
+- [x] Prove that private changes do not alter contestant-visible history, revisions, or notification sequences.
+- [x] Obtain hosted D1 evidence with fictional fixtures and verified scoped cleanup.
+- [x] Pass the required local checks and update relevant documents.
+- [x] Prepare a PR for owner review. The owner merges.
+
+### Verification
+
+Use [Run the D1 transaction proof](d1-transaction-proof.md) for exact commands and recovery.
+The [store reference](backend-contracts.md#experimental-application-store) defines its bounded interface.
+The [current-state record](current-state.md#t0017-d1-transaction-proof-2026-10-17) separates local and hosted evidence.
+All 42 focused cases pass locally and on hosted D1 at `edb4bd0`. Ordinary CI passes on that implementation revision.
+The complete Cloudflare connector remains unimplemented.
+
 
 ## T0015 shared provider tests
 

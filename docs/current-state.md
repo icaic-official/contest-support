@@ -1,5 +1,66 @@
 # Current state
 
+## T0017 D1 transaction proof, 2026-10-17
+
+T0017 starts from merged `main` at `53f9dfd` on `feature/t0017-d1-transaction-proof`.
+The working tree was clean. Open PRs #20, #21, and #23 cover separate tickets.
+Supabase remains active. This ticket adds an experimental store, not a complete Cloudflare connector.
+
+The owner selected organizer-issued replacement temporary passwords for the later migration.
+Mandatory changes preserve the contest-access gate. Account IDs, memberships, permissions, and history remain required.
+Password-hash import is no longer required. Earlier T0016 reports below describe their original decisions.
+Authentication and remaining connector operations follow this proof. Migration tooling follows connector verification.
+
+### Scope and target
+
+The provider-independent `ApplicationStore` implements `claim`, `message`, and a limited authorized issue view.
+Each command commits its state, actor/request receipt, authenticated history, audience sequence, and notification records together.
+False, missing, or stale assertions cause a database error and roll back the batch.
+A separate internal issue version detects private changes without exposing them through public revisions.
+Original message text remains in receipt comparison. Stored history trims the text.
+
+Existing Wrangler OAuth access matched account `458ad6a930b0fb717796dfa19ca6a2b1` before provisioning.
+The owner authorized isolated development and CI resources. Development uses temporary local D1 databases.
+The new hosted CI database is `minsky-d1-proof-ci`, ID `06560c1c-8907-47d6-b2b6-f22e129ebbe4`, in APAC.
+Both proof migrations are applied. Read replication is disabled.
+No paid upgrade, real-data export, real-account reset, application deployment, or backend switch occurred.
+The static frontend configurations have no D1 binding.
+
+### Verification
+
+The hosted suite passed all 42 cases on committed implementation revision `edb4bd05202ba0ee1443e032605bcabfb7d6b621`.
+The run started at 2026-10-17 14:47:48 UTC and completed in 192.50 seconds.
+It used the ordinary remote D1 binding with read replication disabled.
+Each fixture verified deletion of its own workflow and access records. All final-run recovery journals were removed.
+A separate fixture remained readable while another fixture's cleanup ran.
+
+The cases prove these bounded behaviors on hosted D1:
+
+- Failed permission, state, false, and NULL assertions roll back receipts and every command write.
+- Competing claims have one winner. Equal duplicate requests replay one history entry. Different command content rejects request-ID reuse.
+- A lost committed response produces an unknown outcome. Retrying the original request returns the saved result without another write.
+- Membership revocation, account restrictions, login expiry or revocation, team changes, and event archival prevent unauthorized commits and receipt replay.
+- A primary snapshot racing revocation returns one permitted view or no view. The next read after revocation denies access.
+- Private messages change only internal versions and staff notifications. Contestant history, public revisions, and team sequences remain unchanged.
+- Private conflicts trigger bounded internal reevaluation. Exhausted retries expose an unknown outcome, without a private conflict signal.
+
+Ordinary [PR CI](https://github.com/GiftedNovaHD/minsky/actions/runs/39042256683) passed `checks`, `secrets`, and `dependencies` on `edb4bd0`.
+The protected cloud job and frontend deployment job were skipped. A skipped cloud job is not hosted evidence.
+[PR #39](https://github.com/GiftedNovaHD/minsky/pull/39) contains the implementation for owner review.
+The [proof guide](d1-transaction-proof.md) contains exact commands, target checks, and recovery steps.
+This local CLI run against hosted D1 is separate from protected GitHub Actions verification.
+
+### Run report
+
+1. Summary of changes. Added the bounded D1 command foundation, SQLite migrations, independent rules, isolated tests, recovery journals, and owner decisions.
+2. Files changed. Created `src/server/applicationStore.ts`, `src/server/issueRules.ts`, `src/server/adapters/d1/connection.ts`, `src/server/adapters/d1/store.ts`, `src/server/adapters/d1/store.test.ts`, `src/server/adapters/d1/testFixture.ts`, both migrations under `src/server/adapters/d1/migrations/`, `scripts/d1-proof.mjs`, `vitest.d1.config.ts`, `wrangler.d1-proof.jsonc`, and `docs/d1-transaction-proof.md`. Updated `AGENTS.md`, `PLAN.md`, `README.md`, `package.json`, `tsconfig.json`, `eslint.config.js`, `docs/backend-contracts.md`, `docs/provider-test-contracts.md`, `docs/cloudflare-backend-design.md`, `docs/cloudflare-implementation-plan.md`, `docs/product-direction.md`, `docs/tickets.md`, `docs/current-state.md`, and `site/src/content/docs/reference/status.md`.
+3. Commands run. Git inspection, fetch, branch creation, diff checks, commits, trailer checks, and pushes. GitHub PR creation, edits, and CI queries. File inspection with `cat`, `sed`, and `rg`. Wrangler `whoami`, `d1 list`, `d1 create`, `d1 info`, `d1 migrations apply`, and `d1 migrations list`. Ran `npm run typecheck`, `npm run lint`, `npm run build`, `npm test`, `npm run test:d1`, `npm run check:functions`, `npm run test:functions`, `npm run test:e2e`, `npm run test:providers:list`, `npm ci --prefix site`, `npm run docs:build`, `npm run docs:test`, the STE checker, and `git diff --check`. Ran hosted proof commands with explicit target IDs. A wrong-target runner check rejected access before fixture creation.
+4. Build and test results. Type checking, lint, application build, function checks, 157 local tests, 12 function tests, 34 browser tests, and three docs browser tests pass. The final focused local and hosted suites each pass all 42 D1 cases. Docs build checks 14 pages and 566 local links/assets. The first D1 run lacked sandbox socket permission. The first executable run passed 35 of 36 cases, with a claim-text expectation mismatch that is corrected. Initial lint found missing Node globals in the new script, now imported. The first docs build lacked installed site dependencies, then passed after installation. Known build warnings remain the app chunk size and duplicate docs 404 route. Hosted D1 and ordinary GitHub CI pass on implementation revision `edb4bd0`. Initial Git writes, GitHub access, and local socket tests required sandbox escalation. An exploratory `/tmp` scan hit protected system directories and was replaced with a scoped path scan.
+5. Manual verification. Checked the current repository, base revision, open PRs, account and database targets, provider boundaries, authorization dependencies, and fixture deletion scope. Two bounded subagents added adversarial tests and reviewed correctness independently. Manual product UI checks were not repeated because the product UI did not change. Documented manual fixture-recovery commands were not executed.
+6. Risks. Authentication, HTTP handlers, remaining operations, R2, notification delivery, complete connector tests, installation, migration, and contest capacity remain unverified. This proof does not authorize the later backend switch. Failed or interrupted fixture cleanup retains a credential-free recovery journal under `/tmp/minsky-d1-proof-*`.
+7. Follow-up tickets. Complete T0017 review and owner merge. Authentication and remaining connector operations are next candidates. Full migration tooling follows connector verification. AWS adapters and Terraform remain deferred.
+8. Docs that need updating. None for this proof. Later authentication and connector work must update the existing design and implementation plan with its own evidence.
+
 ## PR #36 merge-conflict repair, 2026-10-17
 
 The user merged T0015 in [PR #37](https://github.com/GiftedNovaHD/minsky/pull/37) at `738ef4a` on 2026-10-17 at 13:44:12 UTC.

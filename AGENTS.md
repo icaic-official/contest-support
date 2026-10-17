@@ -22,6 +22,30 @@
 
 ## Current scope
 
+**T0017 D1 transaction proof, 2026-10-17.** Start `feature/t0017-d1-transaction-proof` from updated `main` at `53f9dfd`.
+Implement one complete command through a provider-independent application-store interface and a D1 adapter.
+Commit the state change, retry receipt, history, and notification record together.
+Use fictional fixtures. Obtain hosted D1 evidence before calling the transaction pattern verified.
+See [the proof guide](docs/d1-transaction-proof.md) and [implementation plan](docs/cloudflare-implementation-plan.md).
+Keep Supabase active. Authentication and the remaining connector operations follow the proof.
+Migration tooling follows connector verification. Real-data exports and the backend switch remain later work.
+AWS adapters and Terraform remain deferred.
+
+The owner selected organizer-issued replacement temporary passwords for the later migration.
+Require a password change before contest access.
+Preserve account IDs, memberships, permissions, and history. Existing passwords and password-hash import are not required.
+
+The owner authorizes isolated Cloudflare development and CI resources in the existing account for this work.
+Keep development and CI resources separate. Confirm the account before provisioning.
+Check existing Wrangler access before requesting credentials. Keep tokens out of chat and logs.
+
+The existing Wrangler OAuth login was checked against account `458ad6a930b0fb717796dfa19ca6a2b1`, which matches the repository configuration.
+Document the concrete need and cost before any paid upgrade.
+Subagents may perform independent, bounded tasks.
+
+The earlier scope records below retain the authorization limits of those tickets.
+T0017 supplies the later resource authorization above. It does not authorize real-data exports or a backend switch.
+
 **Parallel provider work, 2026-10-17.** The user authorized T0015 shared provider tests and T0016 Cloudflare design during PR #32 review.
 Both branches started from PR #32 at `d158906` under this explicit branch exception.
 PR #32 merged at `ef6a029`. T0015 then merged in [PR #37](https://github.com/GiftedNovaHD/minsky/pull/37) at `738ef4a`.

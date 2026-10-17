@@ -57,6 +57,8 @@ See [cloud onboarding](docs/cloud-onboarding.md#contributor-setup) for provider 
 | `npm run check:functions` | Check the account and attachment functions with Deno. |
 | `npm run test:functions` | Test attachment authorization and file removal with fake clients. |
 | `npm test` | Run unit, script, and embedded database tests without cloud credentials. |
+| `npm run test:d1` | Run the experimental D1 transaction proof with local emulation. |
+| `npm run test:d1:hosted -- --account=… --database=…` | Run the proof against its explicit isolated hosted D1 target. See the proof guide for exact values. |
 | `npm run test:e2e` | Run browser tests with mocked cloud responses. |
 | `npm run test:providers:list` | List the shared provider scenarios without hosted credentials. |
 | `npm run test:providers -- --provider=supabase` | Run the shared contracts against an explicitly configured isolated Supabase project. |
@@ -115,6 +117,7 @@ The workflow requires account setup. The first automatic deployments remain unve
 - [Backend contracts](docs/backend-contracts.md) describe the provider interfaces and their behavior.
 - [Cloudflare backend design](docs/cloudflare-backend-design.md) explains the proposed server boundaries and migration decisions.
 - [Cloudflare implementation plan](docs/cloudflare-implementation-plan.md) defines the work and verification required before cutover.
+- [D1 transaction proof](docs/d1-transaction-proof.md) gives the local and isolated hosted verification commands.
 - [Shared provider test contracts](docs/provider-test-contracts.md) describe reusable assertions, fixture ownership, and provider requirements.
 - [Product direction](docs/product-direction.md) — agreed requirements and open decisions.
 - [Contributor rules](AGENTS.md) and [planning record](PLAN.md).

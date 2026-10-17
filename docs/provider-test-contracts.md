@@ -4,6 +4,11 @@ The shared suite checks Minsky behavior through the browser `Backend` interface.
 Supabase supplies the first hosted test implementation.
 Cloudflare and AWS implementations do not exist in this change.
 
+T0017 adds a separate [D1 transaction proof](d1-transaction-proof.md).
+It checks the experimental application store directly, with local and hosted D1 bindings.
+It does not add a Cloudflare browser adapter or fixture driver for this shared suite.
+The complete Cloudflare connector must later pass the same shared scenarios as Supabase.
+
 The suite complements the database, function, and hosted UI tests.
 It does not replace provider-specific policy tests or prove capacity, installation, or migration correctness.
 [Run the provider tests](run-provider-tests.md) describes setup and recovery.

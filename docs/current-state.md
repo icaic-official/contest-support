@@ -1,5 +1,39 @@
 # Current state
 
+## Supabase CLI upgrade (2026-10-17)
+
+The user approved the existing Supabase CLI update from `2.119.0` to `2.121.0`.
+The maintenance branch is `chore/supabase-cli-2.121.0`, from updated `main` at `bb45c06`.
+`package.json` pins the new version, and `package-lock.json` records its platform packages.
+`npm ci` installs the update successfully.
+The Deno checks also synchronized workspace metadata with the accepted dependencies in `package.json`.
+The resolved function dependencies did not change.
+See the [upstream release](https://github.com/supabase/cli/releases/tag/v2.121.0).
+
+Checks used Node.js `22.22.1` and npm `11.12.0`.
+
+| Check | Result |
+| --- | --- |
+| `npm ci` | Passed |
+| `npx --no-install supabase --version` | Reports `2.121.0` |
+| `npm run typecheck`, `npm run lint`, and `npm run build` | Passed |
+| `npm run check:functions` | Both functions passed |
+| `npm run test:functions` | 12 passed |
+| `npm test` | 49 passed outside the sandbox |
+| `npm run test:e2e` | 17 Chromium tests passed |
+| `npm audit --package-lock-only --audit-level=high` | Zero vulnerabilities |
+| `npm run cloud:plan` | Read-only plan passed for `ovymmobupzowotvrywek` (development). No migrations or seeds were pending. |
+| `npx --no-install supabase functions deploy --help` | The CLI still supports `--use-api` for bundling without Docker. |
+
+Two sandboxed test attempts did not capture the child process's cleanup error message.
+The focused test and full suite passed outside the sandbox without code changes.
+The build retains the existing warning for a JavaScript chunk larger than 500 kB.
+Full cloud and hosted workflow tests were not run for this maintenance change.
+No application code, database migration, function, or frontend deployment changed.
+The user reviews and merges the maintenance PR.
+
+## Ticket status
+
 T0010 fixes the three P2 review findings on `feature/t0010-p2-review-fixes`.
 The branch started from `main` at `d961f5b` and now includes `main` at `9c0341c`.
 The changes are verified locally and await user review. They are not deployed.

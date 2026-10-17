@@ -32,11 +32,12 @@
     "cloud:functions": "supabase functions deploy admin --project-ref ovymmobupzowotvrywek --use-api && supabase functions deploy attachments --project-ref ovymmobupzowotvrywek --use-api",
     "cloud:hosting-login": "wrangler login",
     "cloud:bootstrap": "node scripts/bootstrap.mjs",
-    "check:functions": "deno check --node-modules-dir=none supabase/functions/admin/index.ts supabase/functions/attachments/index.ts",
+    "check:functions": "deno check --node-modules-dir=none supabase/functions/admin/index.ts supabase/functions/attachments/index.ts && deno check --node-modules-dir=none --config supabase/functions/workflow/deno.json supabase/functions/workflow/index.ts",
     "test:functions": "deno test --node-modules-dir=none supabase/functions/attachments/handler.test.ts",
     "test:cloud": "node scripts/cloud-test.mjs",
     "test:hosted": "node scripts/cloud-smoke.mjs",
-    "cloud:recover-admin": "node scripts/recover-admin.mjs"
+    "cloud:recover-admin": "node scripts/recover-admin.mjs",
+    "test:workflow:hosted": "node scripts/workflow-proof.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "2.117.3",

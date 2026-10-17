@@ -2,8 +2,10 @@
 
 These tickets describe development work, not contestant issues.
 
-The active ticket is [T0017 D1 transaction proof](#t0017-d1-transaction-proof).
-Authentication and the remaining Cloudflare operations follow this proof.
+The active ticket is [T0019 shared server workflow](#t0019-shared-server-workflow).
+The owner authorizes this extraction in parallel with T0018 authentication in open PR #40.
+PR #39 merged T0017's bounded D1 proof at `0c797ad`.
+Further Cloudflare workflow persistence follows shared-rule verification through Supabase.
 Migration tooling follows connector verification. Supabase remains active.
 
 T0016 Cloudflare backend design merged in [PR #36](https://github.com/GiftedNovaHD/minsky/pull/36) at `b68ef72` on 2026-10-17.
@@ -54,10 +56,47 @@ These items stay deferred and are not part of T0005:
 
 T0008 fuzzy team search merged into `main` in [PR #22](https://github.com/notbowen/minsky/pull/22) on 2026-10-15 (SGT).
 
+## T0019 Shared server workflow
+
+Branch: `feature/t0019-shared-server-workflow`, from updated `main` at `0c797ad`.
+Status: implemented; local and hosted Supabase checks pass. Hosted D1 checks also pass. PR preparation is in progress. The owner reviews and merges.
+Summary: Extract the existing issue rules into one shared server service. Exercise all nine commands through a trusted Supabase path before expanding Cloudflare workflow persistence.
+
+The owner authorizes work in parallel with [PR #40](https://github.com/GiftedNovaHD/minsky/pull/40).
+This branch does not include or modify its authentication implementation.
+That PR remains open. Its protected HTTP check failed with a Workers Free resource limit.
+Workers Paid remains deferred, and the HTTP verification remains incomplete.
+
+Supabase remains active. The legacy browser workflow and protective SQL remain available during replacement verification.
+The new Supabase path is opt-in and uses the approved CI project, `ghtztmovdkhuketcbjmq`.
+No active development backend deployment or backend switch is part of this ticket.
+Full D1 workflow support, R2, notification delivery, migration tooling, AWS, and Terraform remain outside this scope.
+Bounded subagent work is authorized.
+
+### Acceptance criteria
+
+- [x] Inventory every existing command against effective migrations, browser contracts, constraints, policies, receipts, and tests.
+- [x] Implement one shared service with explicit decisions and operation-level persistence methods for all nine existing commands.
+- [x] Execute that service through an authenticated Supabase server boundary and guarded atomic commits.
+- [x] Preserve access, roles, ownership, lifecycle, persisted timestamps, resolution history, awards, and external application records.
+- [x] Preserve request identity across uncertain retries and reject conflicting request reuse.
+- [x] Preserve public and private history and notification visibility under concurrent requests.
+- [x] Align D1's bounded `claim` and `message` proof with the shared service without adding the remaining D1 workflow commands.
+- [x] Verify isolated Supabase execution, concurrent state and permission changes, rollback, lost responses, retries, and database bypass attempts.
+- [x] Pass required checks and record local, hosted Supabase, hosted D1, and protected GitHub Actions evidence separately.
+- [ ] Update affected documents and prepare a PR for owner review.
+
+### Verification
+
+The [workflow reference](server-workflow.md) records the existing behavior and implemented boundaries.
+The [verification guide](verify-server-workflow.md) gives the local and CI-only commands and recovery procedure.
+[Current state](current-state.md) records observed results.
+An interface or an uncalled rule module does not complete this extraction.
+
 ## T0017 D1 transaction proof
 
 Branch: `feature/t0017-d1-transaction-proof`, from updated `main` at `53f9dfd`.
-Status: implemented and verified locally and on hosted D1 in [PR #39](https://github.com/GiftedNovaHD/minsky/pull/39). The user reviews and merges.
+Status: merged in [PR #39](https://github.com/GiftedNovaHD/minsky/pull/39) at `0c797ad`. Its recorded local and hosted D1 verification remains bounded to that proof revision.
 Summary: Prove atomic workflow writes through a provider-independent application-store interface and a D1 adapter. Use `claim` and `message` to check concurrent transitions and private activity.
 
 The owner authorized isolated Cloudflare development and CI resources in the existing account.
@@ -84,7 +123,7 @@ AWS adapters and Terraform remain deferred. Bounded subagent work is authorized.
 ### Verification
 
 Use [Run the D1 transaction proof](d1-transaction-proof.md) for exact commands and recovery.
-The [store reference](backend-contracts.md#experimental-application-store) defines its bounded interface.
+The [store reference](backend-contracts.md#bounded-d1-application-store) defines its bounded interface.
 The [current-state record](current-state.md#t0017-d1-transaction-proof-2026-10-17) separates local and hosted evidence.
 All 42 focused cases pass locally and on hosted D1 at `edb4bd0`. Ordinary CI passes on that implementation revision.
 The complete Cloudflare connector remains unimplemented.

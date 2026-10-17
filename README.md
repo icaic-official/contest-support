@@ -9,6 +9,8 @@ Staff can attach images to issues and choose staff-only or team visibility.
 The app uses React, TypeScript, and Vite, with Supabase Auth, Postgres, and Realtime.
 Cloudflare Workers hosts the frontend.
 The browser uses shared [backend contracts](docs/backend-contracts.md), with Supabase as the current implementation.
+The [shared server workflow](docs/server-workflow.md) now supplies all nine issue decisions for a separate Supabase verification path.
+The active browser path retains its guarded SQL workflow during the transition.
 The selected future backend uses Workers, D1, R2, and Durable Objects.
 See [the migration direction](docs/product-direction.md#backend-migration-direction) for the agreed scope and pending decisions.
 This is a **development deployment** that requires connectivity.
@@ -54,11 +56,12 @@ See [cloud onboarding](docs/cloud-onboarding.md#contributor-setup) for provider 
 | `npm run preview` | Serve built assets locally. |
 | `npm run typecheck` | Check TypeScript. |
 | `npm run lint` | Run ESLint. |
-| `npm run check:functions` | Check the account and attachment functions with Deno. |
+| `npm run check:functions` | Check the account, attachment, and workflow functions with Deno. |
 | `npm run test:functions` | Test attachment authorization and file removal with fake clients. |
 | `npm test` | Run unit, script, and embedded database tests without cloud credentials. |
 | `npm run test:d1` | Run the experimental D1 transaction proof with local emulation. |
 | `npm run test:d1:hosted -- --account=… --database=…` | Run the proof against its explicit isolated hosted D1 target. See the proof guide for exact values. |
+| `npm run test:workflow:hosted` | Verify the shared server through the deployed Supabase function on approved Minsky CI. See the [verification guide](docs/verify-server-workflow.md). |
 | `npm run test:e2e` | Run browser tests with mocked cloud responses. |
 | `npm run test:providers:list` | List the shared provider scenarios without hosted credentials. |
 | `npm run test:providers -- --provider=supabase` | Run the shared contracts against an explicitly configured isolated Supabase project. |
@@ -114,6 +117,8 @@ The workflow requires account setup. The first automatic deployments remain unve
 - [Cloud onboarding](docs/cloud-onboarding.md) — provider setup, costs, accounts, and deployment.
 - [Manual verification](docs/manual-verification.md) — workflow and interface checks.
 - [Code quality](docs/code-quality.md) — CI checks and review requirements.
+- [Server workflow reference](docs/server-workflow.md) inventories existing rules and the shared service and persistence boundaries.
+- [Verify the shared server workflow](docs/verify-server-workflow.md) gives local, CI-only hosted, and recovery commands.
 - [Backend contracts](docs/backend-contracts.md) describe the provider interfaces and their behavior.
 - [Cloudflare backend design](docs/cloudflare-backend-design.md) explains the proposed server boundaries and migration decisions.
 - [Cloudflare implementation plan](docs/cloudflare-implementation-plan.md) defines the work and verification required before cutover.

@@ -19,7 +19,7 @@ export default tseslint.config(
   },
   {
     files: ["src/**/*.{ts,tsx}"],
-    ignores: ["src/backend/supabase/**", "src/backend/index.ts"],
+    ignores: ["src/backend/supabase/**", "src/backend/index.ts", "src/server/adapters/**"],
     rules: {
       "no-restricted-imports": ["error", {
         patterns: [{

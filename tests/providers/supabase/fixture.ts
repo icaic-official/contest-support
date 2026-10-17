@@ -79,7 +79,10 @@ function checked(error: unknown, operation: string): void {
 }
 
 /** The journal contains only UUIDs and the provider target. It contains no credentials. */
-export async function createFixture(path: string): Promise<SupabaseFixture> {
+export async function createFixture(
+  path: string,
+  options: { organizerPasswordSetup?: boolean } = {},
+): Promise<SupabaseFixture> {
   const config = configuration();
   const journal: Journal = {
     version: 1,
@@ -204,7 +207,17 @@ export async function createFixture(path: string): Promise<SupabaseFixture> {
         try {
           await backend.auth.signIn(username, password);
           readyPassword = crypto.randomUUID() + 'A9!';
-          await backend.auth.changePassword(password, readyPassword);
+          if (options.organizerPasswordSetup) {
+            // Workflow-only verification does not test the user password endpoint.
+            // Use organizer provisioning to avoid its shared per-IP rate limit.
+            // The real database gate still requires the Auth hash to change.
+            checked((await admin.auth.admin.updateUserById(id, { password: readyPassword })).error,
+              'set organizer fixture password');
+            checked((await client.rpc('complete_password_change')).error,
+              'complete organizer fixture password gate');
+          } else {
+            await backend.auth.changePassword(password, readyPassword);
+          }
         } finally {
           await client.auth.signOut({ scope: 'local' });
         }

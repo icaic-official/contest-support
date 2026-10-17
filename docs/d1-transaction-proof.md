@@ -2,8 +2,11 @@
 
 Use this guide to test the experimental application store in T0017.
 The store implements `claim` and `message` only. Supabase remains the active backend.
-The [store reference](backend-contracts.md#experimental-application-store) defines the interface and transaction rules.
+The [store reference](backend-contracts.md#bounded-d1-application-store) defines the interface and transaction rules.
 The [current-state record](current-state.md#t0017-d1-transaction-proof-2026-10-17) records observed results.
+T0019 aligns this bounded adapter with the [shared workflow service](server-workflow.md).
+The adapter still implements only `claim` and `message`.
+Record new adapter checks separately from T0017's historical hosted result.
 
 ## Run without cloud access
 

@@ -9,6 +9,18 @@ It checks the experimental application store directly, with local and hosted D1 
 It does not add a Cloudflare browser adapter or fixture driver for this shared suite.
 The complete Cloudflare connector must later pass the same shared scenarios as Supabase.
 
+T0019 reuses the workflow scenarios against the [shared server service](server-workflow.md).
+The focused [hosted Supabase suite](../tests/workflow/supabase.test.ts) replaces only the workflow executor in a real Supabase connection.
+Commands pass through the deployed `workflow` Edge Function, the shared service, and guarded PostgreSQL commits.
+Reads and other operations retain their existing Supabase adapters.
+Scenario assertions remain provider-neutral and unchanged for the replacement path.
+This focused suite does not constitute a second complete `Backend` implementation.
+Use [Verify the shared server workflow](verify-server-workflow.md) to run it.
+The focused workflow run shares one owned fixture across cases with distinct request and issue IDs.
+Its organizer setup uses a fresh privileged Auth password update, then completes the actual mandatory-change database gate.
+That setup avoids password-change rate limits. It is not evidence for the account password-change endpoint.
+The existing provider authentication scenario keeps its normal setup and assertions.
+
 The suite complements the database, function, and hosted UI tests.
 It does not replace provider-specific policy tests or prove capacity, installation, or migration correctness.
 [Run the provider tests](run-provider-tests.md) describes setup and recovery.
@@ -25,6 +37,8 @@ It does not replace provider-specific policy tests or prove capacity, installati
 | `tests/providers/supabase/` | Supabase fixture creation, the real browser adapter, transport fault injection, and scoped cleanup. |
 | `scripts/provider-test.mjs` | Target checks, backend prerequisites, process status, and recovery-journal retention. |
 | `playwright.providers.config.ts` | Hosted suite isolation and disabled credential-bearing captures. |
+| `tests/workflow/supabase.test.ts` | Reuses workflow scenarios through the opt-in shared server path and adds trusted-boundary checks. |
+| `scripts/workflow-proof.mjs` | Restricts the focused workflow run to approved Minsky CI and retains recovery journals on cleanup failure. |
 
 Each connection has a separate browser context, including its cookies and local storage.
 The Node scenarios call a `Backend` bridge that invokes the real adapter in that context.
@@ -63,6 +77,9 @@ It does not prove delivery latency or the absence of arbitrarily delayed message
 The existing SQL and function suites retain lower-level permission and failure cases.
 The hosted UI suite still checks the app's account journey and provider-specific integration.
 Passing shared scenarios on Supabase does not establish Cloudflare or AWS conformance.
+The focused T0019 suite adds direct plan rejection and captured-state race checks for the shared Supabase execution path.
+Local embedded PostgreSQL covers additional commit guards and rollback cases.
+Record local, hosted Supabase, hosted D1, and protected GitHub Actions results separately.
 
 ## Fixture ownership and recovery
 

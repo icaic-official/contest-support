@@ -1,5 +1,26 @@
 # Minsky planning record
 
+**Shared server workflow, 2026-10-18.** T0019 extracts the existing issue rules before further Cloudflare workflow implementation.
+Use `feature/t0019-shared-server-workflow` from updated `main` at `0c797ad`.
+The owner authorizes this ticket in parallel with open [PR #40](https://github.com/GiftedNovaHD/minsky/pull/40).
+Keep the authentication branch and implementation separate.
+PR #39 merged the bounded D1 proof. Its merge does not make the complete server workflow portable.
+
+Use one shared application service for all existing issue commands.
+Exercise that service through a trusted Supabase entry point and isolated CI fixtures.
+Keep database constraints, atomic writes, current-access checks, and stale-state detection in provider adapters.
+Align D1's existing `claim` and `message` proof with those same decisions.
+Do not design a separate Cloudflare workflow.
+See [the workflow reference](docs/server-workflow.md) and [verification guide](docs/verify-server-workflow.md).
+
+Supabase remains active. The legacy browser workflow stays available during replacement verification.
+Development backend deployment requires separate authorization.
+The owner reviews and merges. Bounded subagent work is authorized.
+PR #40's protected HTTP verification remains incomplete after the Workers Free resource limit.
+Workers Paid remains deferred. Do not enable a subscription.
+Remaining D1 commands, R2, notification delivery, migration tooling, AWS, and Terraform remain later work.
+No real-data export, real-account reset, or backend switch is authorized.
+
 **D1 proof and migration decisions, 2026-10-17.** The next focused ticket is T0017 on `feature/t0017-d1-transaction-proof`.
 The branch starts from updated `main` at `53f9dfd`.
 Prove one D1 command that commits its state change, retry receipt, history, and notification record together.

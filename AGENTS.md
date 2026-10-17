@@ -22,6 +22,22 @@
 
 ## Current scope
 
+**T0019 shared server workflow, 2026-10-18.** Use `feature/t0019-shared-server-workflow` from updated `main` at `0c797ad`.
+The owner authorizes this extraction in parallel with open PR #40. Do not modify or base work on its authentication branch.
+PR #39 merged the bounded D1 transaction proof.
+Extract the existing nine issue commands into one provider-independent server service.
+Verify an actual trusted Supabase execution path with isolated fictional CI fixtures before expanding D1 workflow persistence.
+Retain database constraints, atomic commits, current-access checks, and stale-state guards.
+Align the bounded D1 `claim` and `message` proof with the same shared decisions.
+See [the workflow reference](docs/server-workflow.md) and [verification guide](docs/verify-server-workflow.md).
+Keep Supabase active and its legacy browser path available during replacement verification.
+Do not deploy to the development backend without the required authorization.
+The owner reviews and merges. Bounded subagent work is authorized.
+PR #40's hosted HTTP check remains incomplete after a Workers Free resource limit.
+Workers Paid remains deferred. Do not enable a subscription or change PR #40.
+Full D1 workflow persistence, R2, notification delivery, migration tooling, AWS, and Terraform remain later work.
+Do not export real data, reset real accounts, or switch backends.
+
 **T0017 D1 transaction proof, 2026-10-17.** Start `feature/t0017-d1-transaction-proof` from updated `main` at `53f9dfd`.
 Implement one complete command through a provider-independent application-store interface and a D1 adapter.
 Commit the state change, retry receipt, history, and notification record together.

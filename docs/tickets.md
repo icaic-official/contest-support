@@ -2,9 +2,14 @@
 
 These tickets describe development work, not contestant issues.
 
-T0012 fixes reply cleanup after a successful retry.
-The user requested separate PRs for the reply and image-preview findings on 2026-10-17.
-Each fix starts from updated `main` and can proceed before the other fix merges.
+T0011 is the active documentation-site companion to the open T0007 installation PR.
+The user requested its implementation and deployment on 2026-10-17.
+T0005 merged in PR #19 and T0010 merged in PR #24 on 2026-10-15.
+Those merges do not imply application deployment.
+
+T0012 reply retry cleanup merged in [PR #30](https://github.com/GiftedNovaHD/minsky/pull/30) on 2026-10-17.
+T0013 image preview request handling merged in [PR #31](https://github.com/GiftedNovaHD/minsky/pull/31) on the same date.
+The T0011 branch includes both fixes through a merge from `main` at `f8a8cac`.
 
 T0004 has two related pull requests.
 [PR #9](https://github.com/notbowen/minsky/pull/9) implements the UI makeover.
@@ -25,11 +30,11 @@ T0008 fuzzy team search merged into `main` in [PR #22](https://github.com/notbow
 
 Branch: `feature/t0013-image-preview-race`, from updated `main` at `de92d54`.
 
-Status: implemented and verified locally. The user reviews and merges.
+Status: merged into `main` in [PR #31](https://github.com/GiftedNovaHD/minsky/pull/31) on 2026-10-17.
 
 The user requested two independent PRs for the review findings on 2026-10-17.
 T0013 fixes image previews. [PR #30](https://github.com/GiftedNovaHD/minsky/pull/30) fixes reply retry cleanup in T0012.
-Both branches start from `main`. Either PR can be reviewed and merged first.
+Both branches started from `main`. The user merged both PRs.
 
 Only the current, open preview can use a completed download or report its error.
 Closing a preview or opening another image makes older requests inactive.
@@ -42,7 +47,7 @@ Acceptance criteria:
 - [x] Both **Close** and Escape restore focus and prevent older results from changing a new preview.
 - [x] The temporary browser URL is released when the preview closes.
 - [x] Browser regression tests reproduce the original failures and pass with the fix. Required local checks pass.
-- [ ] The user reviews and merges the pull request.
+- [x] The user merged PR #31.
 
 Verification is recorded in [current state](current-state.md#t0013-image-preview-request-handling-2026-10-17).
 No schema or function change is required. Deployment remains a separate step.
@@ -271,7 +276,8 @@ That development deployment preceded merge under the user's exception for T0004.
 
 Branch: `feature/t0005-issue-attachments`, created from updated `main` after T0004 merged.
 
-Status: implemented and verified locally on 2026-10-11.
+Status: merged in [PR #19](https://github.com/GiftedNovaHD/minsky/pull/19) on 2026-10-15.
+The following dated records describe implementation and preview verification.
 The 2026-10-14 review fixes add current-access checks, fixed visibility during retry, exact file paths, saved removal retries, and completion-time count checks.
 See the [review-fix record](current-state.md#t0005-review-fixes-2026-10-14) for local verification and cloud-test limits.
 Review pull request: [PR #19](https://github.com/notbowen/minsky/pull/19).
@@ -397,7 +403,7 @@ Deployment is a separate explicit step.
 
 Branch: `feature/t0010-p2-review-fixes`, from updated `main` at `d961f5b`.
 The branch now includes `main` at `9c0341c`, with T0005 issue images.
-Status: merged into `main` in [PR #24](https://github.com/GiftedNovaHD/minsky/pull/24).
+Status: merged in [PR #24](https://github.com/GiftedNovaHD/minsky/pull/24) on 2026-10-15.
 
 The user authorized fixes for the three P2 findings from the review of `1ed603a`.
 The branch preserves the merged T0008 team search and stays independent of the other open feature pull requests.
@@ -409,15 +415,83 @@ Acceptance criteria:
 - [x] Failed cloud cleanup retains the fixture file and reports its path. Successful teardown removes it before the wrapper removes the directory.
 - [x] Regression tests use the application UI or the real test runner and assert exact requests and observable file effects.
 - [x] Required local checks pass and documentation records the results.
-- [x] The user merged the pull request.
+- [x] The user merged PR #24.
 
 No schema change or deployment is part of this ticket.
+
+## T0011 — Documentation site
+
+Branch: `feature/t0011-documentation-site`, from updated `main` at `de92d54`.
+The branch now includes `main` at `f8a8cac`, with the merged T0012 and T0013 fixes.
+Status: the initial site is implemented, deployed, and verified locally and on the public docs site.
+The later CI workflow passes local checks and awaits account setup and its first automatic deployments.
+Review PR: [#29](https://github.com/GiftedNovaHD/minsky/pull/29). The user reviews and merges.
+See [deployment evidence](current-state.md#t0011-documentation-site-2026-10-17).
+
+The user requested a documentation site to accompany T0007, including written content and Workers deployment.
+This request authorizes the initial `minsky-docs` deployment before the source PR merges.
+The user still reviews and merges the PR.
+T0007 remains a separate open change.
+
+### Selected scope
+
+- Publish user, staff, jury, administrator, operator, and contributor guides from repository Markdown.
+- Label merged features, pending T0007 installation steps, and unverified operating conditions.
+- Use Astro Starlight with local search, keyboard navigation, phone layouts, and a useful 404 page.
+- Keep the docs package and build output under `site/`.
+- Deploy static assets through `wrangler.docs.jsonc` to `minsky-docs.icaic-minsky.workers.dev`.
+- Add documentation links to the README, sign-in footer, and workspace sidebar.
+- Add docs build, local-link, browser, and dependency checks to ordinary CI.
+- Document the exact editing, verification, deployment, and hosted-check commands.
+
+### Outside this ticket
+
+Backend changes, T0007 container execution, merging other PRs, paid services, and domain purchases.
+The later automation decision below extends the original static-site scope to prepare both existing frontend configurations.
+
+### Acceptance criteria
+
+- [x] Public guides describe the inspected implementation and clearly label T0007's pending status.
+- [x] The site uses a separate Worker and publishes only its generated static files.
+- [x] Required local checks pass, including docs search, navigation, local links, and phone layout.
+- [x] The deployed site passes HTTP, deep-link, search, and 404 checks.
+- [x] Deployment evidence and a source PR are available for user review.
+
+### Open-source release follow-up (2026-10-17)
+
+The user requires release-quality documentation for readers outside the project.
+The initial site acceptance above remains complete. Public release readiness remains incomplete.
+Use the [documentation release plan and audit](documentation-release-plan.md) for exact findings and completion criteria.
+
+- [x] Record the reader structure, quality rules, source audit, and release gaps.
+- [x] Remove the obsolete demo-command comment and correct current maintenance command repository paths.
+- [ ] Complete factual details, public contribution instructions, and separation from maintainer records.
+- [ ] Complete installation and operating guides against T0007's verified revision.
+- [ ] Record owner decisions about licensing, source publication, and support before a public release.
+- [ ] Verify the complete reader journey and publish through the selected deployment workflow.
+
+These items do not authorize merging T0007, changing repository visibility, selecting a license, or provisioning services.
+
+### Automatic frontend deployment decision (2026-10-17)
+
+The user requested branch previews and stable deployment after merges to `main`.
+The later CI requirement makes GitHub Actions publish only after `checks`, `secrets`, and `dependencies` pass.
+The branch includes both Worker configurations, deployment validation, focused tests, and exact [setup instructions](cloudflare-builds.md).
+The setup covers `minsky-dev` and `minsky-docs` and replaces repeated frontend deployment approval after activation.
+Independent Cloudflare Git builds must remain disabled.
+The user requested the workflow and setup steps before adding credentials.
+Account setup, first automatic previews, and the first automatic `main` deployments remain unverified.
+Migrations and functions remain explicit backend work.
+Full app preview operation also needs approved browser origins for the development functions.
+
+The four reported permission rules now appear in the public guides.
+The [audit](documentation-release-plan.md#permission-documentation-fixes) maps each correction and its remaining proposed work.
 
 ## T0012 — Reply retry cleanup
 
 Branch: `feature/t0012-reply-retry-cleanup`, from updated `main` at `de92d54`.
 
-Status: implemented and verified locally. The user reviews and merges.
+Status: merged into `main` in [PR #30](https://github.com/GiftedNovaHD/minsky/pull/30) on 2026-10-17.
 
 The pending reply now retains its success cleanup with its request ID and command.
 A successful retry clears the reply text and resets the audience before editing resumes.
@@ -431,7 +505,7 @@ Acceptance criteria:
 - [x] A rejected request preserves an editable draft and does not create a history entry.
 - [x] A new reply after successful retry uses a new request ID and completes normally.
 - [x] Browser regression tests reproduce the original failure and pass with the fix. Required local checks pass.
-- [ ] The user reviews and merges the pull request.
+- [x] The user merged PR #30.
 
 Verification is recorded in [current state](current-state.md#t0012-reply-retry-cleanup-2026-10-17).
 Deployment remains a separate step.

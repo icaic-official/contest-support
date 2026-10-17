@@ -202,7 +202,16 @@ export function ConnectedApp() {
         )}
       </main>
       {!dashboardReady && (
-        <footer className="auth-footer">Minsky · Development deployment</footer>
+        <footer className="auth-footer">
+          Minsky · Development deployment ·{" "}
+          <a
+            href="https://minsky-docs.icaic-minsky.workers.dev"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Documentation <span className="sr-only">(opens in a new tab)</span>↗
+          </a>
+        </footer>
       )}
     </div>
   );
@@ -753,6 +762,13 @@ function Dashboard({
             <Icon name="account" />
             My account
           </button>
+          <a
+            href="https://minsky-docs.icaic-minsky.workers.dev"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Documentation <span className="sr-only">(opens in a new tab)</span>↗
+          </a>
         </nav>
         <div className="sidebar-bottom">
           <div className="sidebar-person">

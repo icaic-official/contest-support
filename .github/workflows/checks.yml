@@ -2,15 +2,19 @@ name: Checks
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: ["**"]
+  schedule:
+    - cron: "23 3 * * 1"
   workflow_dispatch:
 permissions:
   contents: read
 concurrency:
   group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: ${{ github.event_name != 'workflow_dispatch' }}
+  # Finish a running push deployment before another run can publish that branch.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   checks:
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -21,18 +25,102 @@ jobs:
         with:
           node-version: 22
           cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            site/package-lock.json
       - run: npm ci
+      - run: npm ci --prefix site
       - run: npm run typecheck
       - run: npm run lint
       - run: npm run check:functions
       - run: npm run test:functions
       - run: npm test
       - run: npm run build
+      - run: npm run docs:build
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e
+      - run: npm run docs:test
+  secrets:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v4.3.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install checksum-verified Gitleaks
+        env:
+          GITLEAKS_VERSION: "8.30.1"
+          GITLEAKS_SHA256: "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb"
+        run: |
+          curl --fail --silent --show-error --location \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
+            --output "$RUNNER_TEMP/gitleaks.tar.gz"
+          printf '%s  %s\n' "$GITLEAKS_SHA256" "$RUNNER_TEMP/gitleaks.tar.gz" | sha256sum --check
+          tar -xzf "$RUNNER_TEMP/gitleaks.tar.gz" -C "$RUNNER_TEMP" gitleaks
+      - name: Scan fetched Git history with redacted output
+        run: '"$RUNNER_TEMP/gitleaks" git --redact --verbose --log-opts=--all .'
+  dependencies:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v4.3.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      - name: Audit locked runtime and development dependencies
+        run: npm audit --package-lock-only --audit-level=high
+      - name: Audit documentation dependencies
+        run: npm audit --prefix site --package-lock-only --audit-level=high
+  deploy:
+    needs: [checks, secrets, dependencies]
+    if: >-
+      github.event_name == 'push' &&
+      github.repository == 'GiftedNovaHD/minsky' &&
+      github.actor != 'dependabot[bot]' &&
+      github.event.deleted == false &&
+      vars.CLOUDFLARE_DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+      VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}
+      VITE_ENVIRONMENT: development
+      CLOUDFLARE_ACCOUNT_ID: 458ad6a930b0fb717796dfa19ca6a2b1
+      WRANGLER_SEND_METRICS: "false"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v4.3.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            site/package-lock.json
+      - name: Check deployment settings
+        env:
+          HAS_CLOUDFLARE_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN != '' }}
+        run: |
+          test "$HAS_CLOUDFLARE_TOKEN" = true
+          node scripts/deploy-workers.mjs --check
+      - run: npm ci
+      - run: npm ci --prefix site
+      - run: npm run build
+      - run: npm run docs:build
+      - name: Publish both Workers and verify the source revision
+        # Only this step receives provider credentials. PR jobs never receive them.
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: node scripts/deploy-workers.mjs
   cloud:
     if: github.event_name == 'workflow_dispatch'
-    needs: checks
+    needs: [checks, secrets, dependencies]
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment: cloud-test

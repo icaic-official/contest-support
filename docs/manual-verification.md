@@ -1,5 +1,17 @@
 # Connected manual verification (T0003/T0004/T0005)
 
+## Documentation site (T0011)
+
+Run `npm run docs:build` and `npm run docs:test` after installing the separate `site/` dependencies.
+For the published site, run `MINSKY_DOCS_URL=https://minsky-docs.icaic-minsky.workers.dev npm run docs:test`.
+These checks only read documentation.
+Check a direct guide URL after refresh, search by keyboard, phone navigation, and a missing page.
+Review light and dark themes at desktop and 320px widths.
+The sign-in footer and sidebar links open the guides in a new tab to preserve the workspace.
+Those links reach the development app only after its separate frontend deployment.
+
+## Connected application
+
 Use the linked development project and organizer-provided username and password accounts.
 Create the first admin through the explicit bootstrap process.
 Docker and persona switching are not required.

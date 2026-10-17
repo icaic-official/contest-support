@@ -1,0 +1,53 @@
+@font-face {
+  font-family: 'Public Sans';
+  src: url('../../../public/fonts/public-sans-variable.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+}
+:root {
+  --sl-color-accent-low: #17372a;
+  --sl-color-accent: #3fba75;
+  --sl-color-accent-high: #b4edc8;
+  --sl-color-white: #edf1ee;
+  --sl-color-gray-1: #d5e0d9;
+  --sl-color-gray-2: #b0beb5;
+  --sl-color-gray-3: #81958a;
+  --sl-color-gray-4: #465b4e;
+  --sl-color-gray-5: #273c2f;
+  --sl-color-gray-6: #15271d;
+  --sl-color-black: #0b1710;
+  --sl-font: 'Public Sans', system-ui, sans-serif;
+  --sl-content-width: 48rem;
+}
+:root[data-theme='light'] {
+  --sl-color-accent-low: #d5efdf;
+  --sl-color-accent: #226a41;
+  --sl-color-accent-high: #173e27;
+  --sl-color-white: #14291c;
+  --sl-color-gray-1: #263c2e;
+  --sl-color-gray-2: #3a5143;
+  --sl-color-gray-3: #577061;
+  --sl-color-gray-4: #899e90;
+  --sl-color-gray-5: #c2d3c7;
+  --sl-color-gray-6: #edf4ef;
+  --sl-color-gray-7: #f4f8f5;
+  --sl-color-black: #ffffff;
+}
+.site-title {
+  letter-spacing: -0.035em;
+  font-weight: 750;
+}
+.hero h1 {
+  letter-spacing: -0.045em;
+  max-width: 15ch;
+}
+.sl-markdown-content h2 {
+  letter-spacing: -0.025em;
+}
+.sl-markdown-content table {
+  font-size: 0.92rem;
+}
+:focus-visible {
+  outline-offset: 4px;
+}

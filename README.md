@@ -11,6 +11,10 @@ Cloudflare Workers hosts the frontend.
 This is a **development deployment** that requires connectivity.
 Live-contest readiness and capacity for 800 simultaneous users remain unverified.
 
+[Read the user and operator guides](https://minsky-docs.icaic-minsky.workers.dev).
+The documentation site describes merged features and labels pending T0007 installation work.
+Its deployment is separate from the application.
+
 ## Local development
 
 Use npm with Node.js 22.13 or later within 22.x, or Node.js 24 or later. Docker is not required.
@@ -64,6 +68,39 @@ If fixture cleanup fails, follow [fixture recovery](docs/cloud-onboarding.md#fix
 
 ## Documentation
 
+### Write and publish the site
+
+Use Node.js 22.22 or later for the documentation tools.
+The public guides are Markdown files in `site/src/content/docs/`.
+
+```sh
+npm ci
+npm ci --prefix site
+npm run docs:dev
+```
+
+| Command | Purpose |
+| --- | --- |
+| `npm run docs:dev` | Start the documentation server locally. |
+| `npm run docs:build` | Build the static site and check local links and anchors. |
+| `npm run docs:preview` | Serve the built site, including search. |
+| `npm run docs:test` | Check navigation, search, and phone layouts with Chromium. Build the docs first. |
+| `npm run docs:deploy` | Build and publish only the `minsky-docs` Worker during an approved manual recovery. |
+
+The deployment configuration is `wrangler.docs.jsonc`.
+See [the writing and deployment guide](site/src/content/docs/contributing/documentation.md).
+The initial docs deployment is explicitly authorized in T0011 before merge.
+The user selected automatic branch previews and deployment from `main` for both sites.
+GitHub Actions runs CI for pull requests and all branch pushes.
+The deployment job waits for `checks`, `secrets`, and `dependencies` before publishing either Worker.
+See [deployment setup](docs/cloudflare-builds.md) for credentials, activation, and backend limits.
+The workflow requires account setup. The first automatic deployments remain unverified.
+
+### Repository records
+
+- [Writing guide](docs/writing-guide.md) gives the documentation structure and sentence rules.
+- [Deployment setup](docs/cloudflare-builds.md) explains branch previews, deployment after CI passes, and first-run verification.
+- [Documentation release plan](docs/documentation-release-plan.md) — public-reader requirements, specific gaps, and completion criteria.
 - [Development tickets](docs/tickets.md) — ticket scope, status, and acceptance criteria.
 - [Current state](docs/current-state.md) — implementation details, verification records, and limitations.
 - [Cloud onboarding](docs/cloud-onboarding.md) — provider setup, costs, accounts, and deployment.

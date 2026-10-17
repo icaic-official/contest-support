@@ -1,5 +1,222 @@
 # Current state
 
+## T0011 update from main (2026-10-17)
+
+PR #29 now includes `main` at `f8a8cac`, after the user merged PRs #30 and #31.
+The merge preserves the reply retry and image preview fixes and their browser tests.
+Conflicts affected `docs/current-state.md` and `docs/tickets.md`.
+Both sets of records remain. The ticket records and public feature-status guide now show both completed merges.
+Review of the combined source found no new blocking issue.
+
+Local type checking, lint, app and docs builds, and both Deno checks passed.
+All 68 unit and database tests, 12 function tests, 25 app browser tests, and three docs browser tests passed.
+The app build also passed with fictional public backend settings.
+It retained the existing chunk-size warning. The docs build retained its duplicate `/404` route warning.
+The docs build checked 14 HTML pages and 566 local links and assets. Its 404 browser check passed.
+The browser checks used fictional responses or local static documentation.
+Protected cloud tests and verification after deployment were not run.
+The [push run](https://github.com/GiftedNovaHD/minsky/actions/runs/39024745166) and [PR run](https://github.com/GiftedNovaHD/minsky/actions/runs/39024747650) passed on merge commit `d37e0ab`.
+Both runs skipped protected cloud tests and deployment.
+Current GitHub checks are available on [PR #29](https://github.com/GiftedNovaHD/minsky/pull/29).
+
+The user also requested the deployment variables.
+GitHub now stores the development `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` from the existing local configuration.
+Both values passed the deployment validator and a read-back check.
+`CLOUDFLARE_DEPLOY_ENABLED` is `false` while token setup and hosted checks remain pending.
+
+A read-only browser check of `minsky-dev.icaic-minsky.workers.dev` confirmed the missing-Supabase-settings screen and no sign-in form.
+This is the development app. Setting the GitHub variables does not change its published build.
+Cloudflare reports a newer Worker version from 2026-10-17, but its source revision remains unverified.
+The docs Worker's preview routing is still disabled. The local login could not read Cloudflare build triggers.
+No manual application or docs deployment was performed during this update.
+
+Pushing the reviewed merge exposed a separate Cloudflare Git build for `minsky-dev`.
+It published a branch preview before the GitHub checks finished, despite the GitHub deployment switch being off.
+The user then confirmed that they disabled those Cloudflare Git builds.
+This confirmation came from the user; the local login could not verify the build setting through the API.
+The GitHub deployment switch remains off until the token and other activation checks are complete.
+
+## Deployment after CI passes, 2026-10-17
+
+The user requested automatic publication only after CI passes, then requested the completed workflow and setup instructions before adding credentials.
+T0011 now uses GitHub Actions for both static Workers.
+This replaces the earlier Cloudflare Git build proposal below.
+The user still reviews and merges PR #29.
+
+`Checks` now runs for all repository branch pushes and pull requests.
+The existing `secrets` and `dependencies` jobs moved into that workflow, with their names and weekly schedule preserved.
+`deploy` depends on `checks`, `secrets`, and `dependencies`.
+Trusted branch pushes publish previews. Pushes to `main` publish both stable sites.
+Pull requests, forks, Dependabot, scheduled runs, and manual dispatch do not publish frontends.
+The manually dispatched `cloud` job retains the separate `cloud-test` environment and now waits for all three prerequisite jobs.
+
+The deployment script checks the account, development backend, public key format, Worker names, and asset directories.
+It creates stable preview names with branch hashes and checks the current remote commit before each upload.
+A deleted branch or outdated run skips remaining uploads.
+Each upload includes `minsky-revision.json`. The script checks that the published file contains the expected source revision.
+The run summary records the preview name, published URLs, and revision-check results.
+A retry cannot deliberately publish an outdated branch commit.
+App and docs uploads remain separate operations, so a failure can leave only one site updated.
+
+`wrangler.docs.jsonc` now enables `preview_urls`.
+The earlier guide incorrectly treated that setting as relevant only to older version URLs.
+Current Cloudflare guidance and the installed Wrangler source also require it for Worker Preview routing on `workers.dev`.
+The setup guide includes the one-time dashboard routing change before the first docs preview.
+No remote Worker setting changed in this run.
+
+The repository Actions API reported zero secrets and zero variables during inspection.
+The user chose to complete those settings later through [the setup guide](cloudflare-builds.md).
+Automatic uploads and hosted revision checks remain unverified. This run does not deploy either site.
+Disable independent Cloudflare Git builds before activation so they cannot publish before GitHub checks finish.
+Previews share development data and need approved function origins for account and image operations.
+
+The first stable app update also needs a compatible backend.
+The latest recorded hosted attachment verification predates `202610140001_attachment_fixes.sql` and its matching function correction.
+Confirm that backend release before merging with frontend deployment enabled.
+This CI change does not apply that migration or deploy Supabase functions.
+
+Local verification used Node.js `22.22.1` and npm `11.12.0`.
+Type checking, ESLint, both builds, both Deno checks, 68 unit and database tests, and 12 function tests passed.
+The 68 tests include 19 deployment cases for event selection, branch names, settings, stale revisions, failed uploads, and hosted revision checks.
+All 17 app browser tests and all three docs browser tests passed.
+The docs build checked 14 HTML pages and 566 local links and assets.
+Actionlint `1.7.12` accepted the workflow. Both Wrangler dry runs accepted the assets without uploading them.
+The read-only GitHub revision lookup also passed for the real T0011 branch, including its slash-containing name.
+GitHub run results appear on [PR #29](https://github.com/GiftedNovaHD/minsky/pull/29).
+
+The first docs browser run found a page-title mismatch with its navigation label.
+Restoring the matching title fixed the check. The final build and all docs browser checks passed.
+Astro still reports its existing duplicate `/404` route warning. The generated missing page passes its browser check.
+Protected Supabase cloud checks and new hosted deployment checks were not run.
+
+## Branch preview and permission-guide follow-up (2026-10-17)
+
+This earlier record describes the initial configuration. The CI workflow above replaces its Git build setup.
+
+The user selected automatic branch previews and stable frontend deployment from `main`.
+Both static Workers now have empty `previews` configurations for the installed Wrangler preview command.
+[Cloudflare build setup](cloudflare-builds.md) gives the exact Git connection, branch, command, and build-variable settings.
+The dashboard connection and first automatic builds remain unverified. No provider settings changed during this preparation.
+The setup preserves separate app and docs hosting. Supabase migrations and functions remain explicit deployment steps.
+App previews share the configured development backend and need approved origins for account and image operations.
+The preview explanation records a proposed origin registry as separate backend work.
+
+The public guides now state the current-owner resolution rule, different-specialist handoff rule, and resolved-conversation restriction.
+The administrator guide explains account-wide reset permissions and the archived-membership restriction.
+The [audit](documentation-release-plan.md#permission-documentation-fixes) maps these corrections and remaining proposed improvements.
+These changes preserve application authorization behavior.
+
+The user supplied `unslop` and `technical-writing` principles.
+The [writing guide](writing-guide.md) records their application to repository writing.
+Cloudflare setup steps, settings reference, and backend explanation now have separate pages.
+
+`npm run docs:build` passed, including its local-link check.
+All three `npm run docs:test` browser checks passed.
+Both Wrangler configuration dry runs accepted the static assets and reported no bindings.
+The first dry runs could not write their logs inside the filesystem sandbox.
+Both dry runs passed outside the sandbox without log errors.
+Repository Markdown paths, heading anchors, whitespace, and the new writing guides passed their checks.
+No automatic preview or stable deployment was run. The live docs still use the earlier published source.
+
+Temporary cleanup removed old review files, caches, test results, and completed PR notes.
+The saved package edits were already present in `main`, and T0012 already had PR #30.
+The active T0013 checkout and its temporary test files were left intact during this cleanup.
+
+## Documentation release audit (2026-10-17)
+
+The user required documentation suitable for an open-source release and requested a specific cleanup audit.
+The [release plan](documentation-release-plan.md) records 20 findings, their source files, and completion criteria.
+It covers outside contributors, versioned guidance, installation, operating procedures, permissions, usability, and hosting.
+The initial site remains a working development baseline. Release readiness remains incomplete.
+
+The audit inspected docs revision `3c18cbb` and `main` at `de92d54`.
+GitHub reported a private repository, no selected license, and no published releases.
+The docs PR remains open. Ordinary, dependency, and secret checks passed on `3c18cbb`.
+The protected cloud job was skipped. It did not pass a cloud integration check.
+
+The follow-up removes the obsolete demo-command comment from `.env.example`.
+It also corrects maintenance command paths in `docs/code-quality.md` to `GiftedNovaHD/minsky`.
+Those commands were not executed. Historical links remain intact.
+Contributor rules and the planning record now require public-reader quality and evidence for supported installation paths.
+No public-site content, application behavior, provider settings, or deployment changed in this follow-up.
+
+Checks passed for 74 repository Markdown targets and anchors, unchanged environment declarations, and all three corrected maintenance paths.
+The new release plan passed the STE structural check. Whitespace checks passed.
+Application builds, browser tests, and cloud checks were not repeated for these repository-prose and comment changes.
+
+## T0011 documentation site (2026-10-17)
+
+The user requested a written documentation site and its deployment to Cloudflare Workers.
+The branch `feature/t0011-documentation-site` starts from `main` at `de92d54`.
+The user authorized the initial docs deployment before merge. The user still reviews and merges the source PR.
+
+The site contains 13 guides and a 404 page, built from `site/src/content/docs/` with Astro Starlight.
+It covers user workflows, accounts, image rules, T0007 installation steps, verification, troubleshooting, and docs maintenance.
+T0007 remains an open PR, and its container and independent-backend limits are explicit in the guides.
+Search uses a static Pagefind index. The site requires no application backend or credentials.
+
+The Worker target is `minsky-docs`, account `458ad6a930b0fb717796dfa19ca6a2b1`, at `https://minsky-docs.icaic-minsky.workers.dev`.
+`wrangler.docs.jsonc` uploads only `site/dist`.
+Its dry run passed with 77 assets and no bindings.
+The Cloudflare account check passed, and the deployment-list check confirmed the new Worker did not yet exist.
+The site is deployed and verified at that address.
+Review PR: [#29](https://github.com/GiftedNovaHD/minsky/pull/29).
+Deployed source: `718402fbe19e2e34f942ce5be0660d7c447c8259`.
+Worker version: `c591634a-100a-405a-99ed-465d2da72d82`.
+`npm run docs:deploy` completed on 2026-10-17 at approximately 14:19 SGT.
+All three browser checks passed against the public docs URL in 3.4 seconds.
+All 56 published files matched the build by SHA-256.
+The custom missing-page response returned HTTP 404 with the expected content, and the configured response headers were present.
+No application, database, or function deployment is part of this change.
+The app's new documentation links will appear when its frontend is separately deployed.
+
+Local checks used Node.js `22.22.1` and npm `11.12.0`.
+Type checking, ESLint, the app build, both function checks, all 49 unit/database tests, all 12 function tests, and all 17 app browser tests passed.
+The docs build generated 14 HTML pages and checked 569 local links and assets.
+All three docs browser tests passed, including search, keyboard access, direct page reload, 320px navigation, and the 404 page.
+Desktop light and dark screenshots and the 320px phone screenshot were reviewed.
+The local browser reported no page errors or horizontal overflow, and the Public Sans font loaded.
+The final dependency audits reported zero vulnerabilities for both lockfiles.
+
+The initial dependency audit found a CSS selector parsing advisory in the docs build dependencies.
+The site pins `postcss-selector-parser` to `7.1.6` under `postcss-nested` until its upstream dependency range includes the fix.
+The subsequent audit reported zero vulnerabilities.
+This override affects build-time CSS processing and passed the docs build and browser checks.
+
+The first sandboxed unit run hit the existing child-process stderr failure. All tests passed outside the sandbox without source changes.
+Astro initially needed permission to create its local configuration directory.
+Its automatic background preview mode caused the first browser run to stop early; `--ignore-lock` now keeps previews in the foreground.
+The first search assertion used `searchbox`; the rendered control exposes `textbox`. The corrected check passed.
+The link checker now handles Workers' clean URLs for flat HTML files, including `404.html`.
+Astro reports a duplicate `/404` route warning for Starlight's custom error content; the generated error page and 404 response pass the browser checks.
+
+The STE prose check passed structural rules with lexical synonym checks disabled.
+Terms such as Auth confirmation, removal, and verification keep their distinct operational meanings.
+Existing TSX double quotes and component conventions are retained as project style exceptions.
+New Starlight content exports follow its required framework interface.
+
+The repository adds docs build, browser, and dependency checks to ordinary CI.
+GitHub's ordinary, dependency, and secret checks passed on `7007e63`.
+The [ordinary job](https://github.com/GiftedNovaHD/minsky/actions/runs/39009536861) completed in 1 minute 54 seconds. Its protected cloud job was skipped.
+The PR reports results for each subsequent revision.
+Protected Supabase cloud checks are not required for this static site and were not run here.
+
+The final editing-preview check found that Vite blocked the shared font outside `site/`.
+The docs configuration now permits only the site directory and the existing `public/fonts` directory.
+The editing page and font returned HTTP 200, with no browser page errors.
+Lint and the docs build passed after this fix.
+All 57 build files, including the local `_headers` configuration, remained byte-identical to the published build.
+No second deployment was needed for this development-server setting.
+
+### Current merge status
+
+T0005 merged through PR #19, T0008 through PR #22, and T0010 through PR #24 on 2026-10-15.
+The Supabase CLI update merged through PR #28 on 2026-10-17.
+T0006, T0007, and T0009 remain separate open PRs.
+The latest recorded main application deployment is still `d1c36fd` from 2026-10-11.
+This docs change does not establish the running application revision.
+The older sections below record their original runs.
+
 ## T0012 reply retry cleanup (2026-10-17)
 
 The user selected the reply-retry finding from the review of `main` at `de92d54`.
@@ -66,10 +283,11 @@ The user reviews and merges the maintenance PR.
 
 ## Ticket status
 
-T0012 implements reply cleanup after successful retry and awaits user review.
+T0012 merged into `main` in [PR #30](https://github.com/GiftedNovaHD/minsky/pull/30) on 2026-10-17.
+It fixes reply cleanup after a successful retry.
 See [T0012 verification](#t0012-reply-retry-cleanup-2026-10-17).
 
-T0010 merged into `main` in [PR #24](https://github.com/GiftedNovaHD/minsky/pull/24).
+T0010 merged into `main` in [PR #24](https://github.com/GiftedNovaHD/minsky/pull/24) on 2026-10-15.
 It fixes the three earlier P2 findings. Deployment remains a separate step.
 See [T0010 verification](#t0010-p2-review-fixes-2026-10-15).
 
@@ -89,7 +307,8 @@ T0005 adds issue images and has an approved frontend preview using the shared de
 The main Worker frontend remains on the approved `main` revision.
 See [T0005 issue images](#t0005-issue-images-2026-10-11).
 
-T0013 fixes delayed image preview responses and awaits user review.
+T0013 merged into `main` in [PR #31](https://github.com/GiftedNovaHD/minsky/pull/31) on 2026-10-17.
+It fixes delayed image preview responses.
 See [T0013 verification](#t0013-image-preview-request-handling-2026-10-17).
 
 These operational items stay deferred.

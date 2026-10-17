@@ -110,16 +110,38 @@ Show **Retry last request** while `command.pending` is set and `command.busy` is
 `src/connected/labels.ts` holds the status names, the resolution summaries and the award minute presets.
 Use these values in every UI so that the text stays the same.
 
+## Contestant app
+
+`ContestantApp` (`src/contestant/`) is the UI for team accounts. It is a desktop layout and has no phone layout. It needs a window that is at least 1024 px wide.
+
+| File | Content |
+| --- | --- |
+| `ContestantApp.tsx` | The shell. It holds the selected report, the open report form and the drafts of reports, replies and reopen reasons. Navigation moves focus to the main heading. Errors and **Retry last request** show at the top of the report area and stay in view during scrolling. |
+| `ContestantTopBar.tsx` | Event, session (a session menu when the team has more than one session), **Live** or **Reconnecting**, theme menu and the account menu with **Change password** and **Sign out**. |
+| `ReportList.tsx` | The team's reports, newest first, with a status badge, timer, number, category and age. |
+| `IssuePage.tsx` | The headline, report, unresolved timer, tracker, resolution cards, reopen form, award card, messages, images and the reply box. |
+| `ReportForm.tsx` | Category tiles with one generic icon, the description (up to 2,000 characters) and the team's location. |
+| `contestantView.ts` | Pure functions for the headline, the tracker steps, the filters and the message list. `contestantView.test.ts` tests them. |
+
+These rules apply:
+
+- The contestant UI shows only public history and images with team visibility. The server already omits internal notes and staff-only images for team accounts. `publicHistory()` and `teamImages()` filter them a second time.
+- The history table has no type column. `conversation()` identifies workflow events by their fixed text, or by the timestamp of the related record when the text contains free input. All other entries show as chat messages.
+- The timer uses `unresolvedTime()` from `model.ts`. It stops on resolution and continues on reopening. Resolved intervals are not counted.
+- **Report an issue** is disabled with a reason when contestant intake is closed or the event is archived. Reply and reopen are not available in an archived event.
+- The reply box sends with Enter and adds a line with Shift+Enter. The draft is cleared only when the server records the message, also after **Retry last request** (T0012).
+- `IssueImages` gets only the team-visible images, with `staff={false}` and `canUpload={false}`. Its image list and preview dialog use Tailwind classes. The upload form is not restyled yet. The organiser steps restyle it. The old class names, such as `image-thumb`, stay because tests use them.
+
 ## Where later steps plug in
 
-The shells currently render `LegacyWorkspace` (`src/connected/legacy/`). This is the workflow UI from before T0015, with the same markup and selectors.
+The organiser shells currently render `LegacyWorkspace` (`src/connected/legacy/`). This is the workflow UI from before T0015, with the same markup and selectors.
 Its root element has `data-ui="contestant"`, `data-ui="organiser-phone"` or `data-ui="organiser-desktop"`.
 `tests/ui-selection.spec.ts` uses this attribute to check the UI selection. Keep the attribute on the root element of each new layout.
 
 | Step | Replace | Mockup |
 | --- | --- | --- |
 | Organiser phone app | `src/organiser/phone/OrganiserPhoneApp.tsx` | `design/redesign/e-organiser-phone.html` |
-| Contestant desktop app | `src/contestant/ContestantApp.tsx` | `design/redesign/f-contestant-desktop.html` |
+| Contestant desktop app (done) | `src/contestant/ContestantApp.tsx` | `design/redesign/f-contestant-desktop.html` |
 | Organiser desktop console | `src/organiser/desktop/OrganiserDesktopConsole.tsx` | `design/redesign/a-console.html` |
 | Integration | Playwright selectors, `docs/manual-verification.md`, README | — |
 

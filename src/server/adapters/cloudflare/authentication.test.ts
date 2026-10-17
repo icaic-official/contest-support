@@ -15,6 +15,11 @@ import { verifyTemporaryAuthentication } from '../../../../tests/providers/scena
 const remote = process.env.MINSKY_AUTH_REMOTE === '1';
 const origin = 'http://127.0.0.1:8788';
 
+/** Failed rejection assertions must never print a password or cookie result. */
+function expectFailure(operation: Promise<unknown>) {
+  return expect(operation.then(() => undefined)).rejects;
+}
+
 describe('Cloudflare account authentication', () => {
   let db: D1Connection;
   let dispose: () => Promise<void>;
@@ -115,8 +120,8 @@ describe('Cloudflare account authentication', () => {
   });
 
   it('rejects incorrect passwords and nonexistent usernames', async () => {
-    await expect(signIn(username, randomSecret())).rejects.toMatchObject({ status: 401 });
-    await expect(signIn(`absent_${randomSecret().slice(0, 15)}`)).rejects.toMatchObject({ status: 401 });
+    await expectFailure(signIn(username, randomSecret())).toMatchObject({ status: 401 });
+    await expectFailure(signIn(`absent_${randomSecret().slice(0, 15)}`)).toMatchObject({ status: 401 });
   });
 
   it('never verifies an old credential when the captured account is pending', async () => {
@@ -128,14 +133,14 @@ describe('Cloudflare account authentication', () => {
       await stmt("UPDATE accounts SET credential_state = 'ready' WHERE id = ?", fixture.contestant.accountId).run();
       return identity.signIn(name, value);
     } };
-    await expect(signIn(username, password, new D1AuthenticationService(db, racing, passwordHasher))).rejects.toMatchObject({ status: 401 });
+    await expectFailure(signIn(username, password, new D1AuthenticationService(db, racing, passwordHasher))).toMatchObject({ status: 401 });
     expect(invoked).toBe(false);
   });
 
   it('keeps a lone organizer able to retry an interrupted self password change', async () => {
     await stmt('UPDATE accounts SET must_change = 1 WHERE id = ?', fixture.staff.accountId).run();
     const interrupted = new D1AuthenticationService(db, identity, { ...passwordHasher, hash: async () => { throw new Error('Interrupted self hash'); } });
-    await expect(interrupted.changePassword(adminHeaders, password, randomSecret())).rejects.toThrow('Interrupted self hash');
+    await expectFailure(interrupted.changePassword(adminHeaders, password, randomSecret())).toThrow('Interrupted self hash');
     expect((await service.current(adminHeaders))?.status.must_change).toBe(true);
     const changed = await service.changePassword(adminHeaders, password, randomSecret());
     expect((await service.current(new Headers({ cookie: changed.cookie.split(';')[0] })))?.status.must_change).toBe(false);
@@ -148,7 +153,7 @@ describe('Cloudflare account authentication', () => {
       await db.batch(statements);
       throw new Error('Committed response lost');
     } };
-    await expect(new D1AuthenticationService(lostResponse, identity, passwordHasher).changePassword(headers, password, replacement)).rejects.toMatchObject({ status: 409 });
+    await expectFailure(new D1AuthenticationService(lostResponse, identity, passwordHasher).changePassword(headers, password, replacement)).toMatchObject({ status: 409 });
     expect(await service.current(headers)).toBeUndefined();
     expect((await service.current(await signIn(username, replacement)))?.status.must_change).toBe(false);
   });
@@ -163,8 +168,8 @@ describe('Cloudflare account authentication', () => {
       },
     };
     const interrupted = new D1AuthenticationService(interruptedDb, identity, passwordHasher);
-    await expect(interrupted.account(adminHeaders, fixture.sessionId, { action: 'reset_password', userId: fixture.contestant.accountId })).rejects.toMatchObject({ status: 409 });
-    await expect(signIn()).rejects.toMatchObject({ status: 401 });
+    await expectFailure(interrupted.account(adminHeaders, fixture.sessionId, { action: 'reset_password', userId: fixture.contestant.accountId })).toMatchObject({ status: 409 });
+    await expectFailure(signIn()).toMatchObject({ status: 401 });
     expect((await stmt('SELECT credential_state FROM accounts WHERE id = ?', fixture.contestant.accountId).first<{credential_state: string}>())?.credential_state).toBe('pending');
     const recovered = await service.account(adminHeaders, fixture.sessionId, { action: 'reset_password', userId: fixture.contestant.accountId });
     expect((await service.current(await signIn(username, recovered.temporaryPassword!)))?.status.must_change).toBe(true);
@@ -179,7 +184,7 @@ describe('Cloudflare account authentication', () => {
       }
       return db.batch(statements);
     } };
-    await expect(new D1AuthenticationService(competingDb, identity, passwordHasher).account(adminHeaders, fixture.sessionId, { action: 'reset_password', userId: fixture.contestant.accountId })).rejects.toMatchObject({ status: 409 });
+    await expectFailure(new D1AuthenticationService(competingDb, identity, passwordHasher).account(adminHeaders, fixture.sessionId, { action: 'reset_password', userId: fixture.contestant.accountId })).toMatchObject({ status: 409 });
     expect((await service.current(await signIn()))?.status.must_change).toBe(false);
     expect((await stmt('SELECT count(*) n FROM account_operations WHERE account_id = ?', fixture.contestant.accountId).first<{n: number}>())?.n).toBe(0);
   });
@@ -189,8 +194,8 @@ describe('Cloudflare account authentication', () => {
       await stmt('UPDATE memberships SET is_admin = 0 WHERE account_id = ?', fixture.staff.accountId).run();
       return passwordHasher.hash(value);
     } });
-    await expect(interrupted.account(adminHeaders, fixture.sessionId, { action: 'reset_password', userId: fixture.contestant.accountId })).rejects.toMatchObject({ status: 403 });
-    await expect(signIn()).rejects.toMatchObject({ status: 401 });
+    await expectFailure(interrupted.account(adminHeaders, fixture.sessionId, { action: 'reset_password', userId: fixture.contestant.accountId })).toMatchObject({ status: 403 });
+    await expectFailure(signIn()).toMatchObject({ status: 401 });
     await stmt('UPDATE memberships SET is_admin = 1 WHERE account_id = ?', fixture.staff.accountId).run();
     const reset = await service.account(adminHeaders, fixture.sessionId, { action: 'reset_password', userId: fixture.contestant.accountId });
     expect((await service.current(await signIn(username, reset.temporaryPassword!)))?.status.must_change).toBe(true);
@@ -200,7 +205,7 @@ describe('Cloudflare account authentication', () => {
     const accountUsername = `create_${randomSecret().slice(0, 20)}`;
     usernames.push(accountUsername);
     const interrupted = new D1AuthenticationService(db, identity, { ...passwordHasher, hash: async () => { throw new Error('Interrupted creation'); } });
-    await expect(interrupted.account(adminHeaders, fixture.sessionId, { action: 'create_account', username: accountUsername, name: `auth-fixture:${fixture.eventId}`, teamId: fixture.teamId, roles: [], isAdmin: false })).rejects.toThrow('Interrupted creation');
+    await expectFailure(interrupted.account(adminHeaders, fixture.sessionId, { action: 'create_account', username: accountUsername, name: `auth-fixture:${fixture.eventId}`, teamId: fixture.teamId, roles: [], isAdmin: false })).toThrow('Interrupted creation');
     const row = await stmt('SELECT id, credential_state FROM accounts WHERE username = ?', accountUsername).first<{id: string; credential_state: string}>();
     extraIds.push(row!.id);
     expect(row?.credential_state).toBe('pending');
@@ -216,7 +221,7 @@ describe('Cloudflare account authentication', () => {
       stmt('INSERT INTO memberships (session_id, account_id) VALUES (?, ?)', fixture.secondSessionId, fixture.contestant.accountId),
     ]);
     try {
-      await expect(service.account(adminHeaders, fixture.sessionId, { action: 'reset_password', userId: fixture.contestant.accountId })).rejects.toMatchObject({ status: 403 });
+      await expectFailure(service.account(adminHeaders, fixture.sessionId, { action: 'reset_password', userId: fixture.contestant.accountId })).toMatchObject({ status: 403 });
     } finally {
       await db.batch([stmt('UPDATE sessions SET event_id = ? WHERE id = ?', fixture.eventId, fixture.secondSessionId), stmt('DELETE FROM events WHERE id = ?', archivedEvent)]);
     }
@@ -226,14 +231,14 @@ describe('Cloudflare account authentication', () => {
     const key = `username:${username}`;
     await service.limit(key, 2);
     await service.limit(key, 2);
-    await expect(service.limit(key, 2)).rejects.toMatchObject({ status: 429 });
+    await expectFailure(service.limit(key, 2)).toMatchObject({ status: 429 });
     await stmt('UPDATE authentication_limits SET window_start = unixepoch() - 901 WHERE key = ?', key).run();
     await service.limit(key, 2);
   });
 
   it('requires a live identity cookie rather than browser account data', async () => {
     expect(await service.current(new Headers())).toBeUndefined();
-    await expect(service.sessions(new Headers({ 'X-Account-Id': fixture.staff.accountId }))).rejects.toMatchObject({ status: 401 });
+    await expectFailure(service.sessions(new Headers({ 'X-Account-Id': fixture.staff.accountId }))).toMatchObject({ status: 401 });
   });
 
   it('blocks temporary passwords at both session reads and the application store', async () => {
@@ -241,9 +246,9 @@ describe('Cloudflare account authentication', () => {
     const headers = await signIn();
     const current = await service.current(headers);
     expect(current?.status.must_change).toBe(true);
-    await expect(service.sessions(headers)).rejects.toMatchObject({ status: 403 });
+    await expectFailure(service.sessions(headers)).toMatchObject({ status: 403 });
     expect(await new D1ApplicationStore(db).issue(current!.caller, fixture.sessionId, fixture.issueId)).toBeUndefined();
-    await expect(service.account(headers, fixture.sessionId, { action: 'reset_password', userId: fixture.staff.accountId })).rejects.toMatchObject({ status: 403 });
+    await expectFailure(service.account(headers, fixture.sessionId, { action: 'reset_password', userId: fixture.staff.accountId })).toMatchObject({ status: 403 });
   });
 
   it('changes a temporary password, rotates the cookie, and revokes every older login', async () => {
@@ -256,14 +261,14 @@ describe('Cloudflare account authentication', () => {
     expect((await service.current(fresh))?.status.must_change).toBe(false);
     expect(await service.current(first)).toBeUndefined();
     expect(await service.current(second)).toBeUndefined();
-    await expect(signIn()).rejects.toMatchObject({ status: 401 });
+    await expectFailure(signIn()).toMatchObject({ status: 401 });
     expect((await service.current(await signIn(username, replacement)))?.user.id).toBe(fixture.contestant.accountId);
   });
 
   it('rejects incorrect current passwords and unchanged passwords', async () => {
     const headers = await signIn();
-    await expect(service.changePassword(headers, randomSecret(), randomSecret())).rejects.toMatchObject({ status: 400 });
-    await expect(service.changePassword(headers, password, password)).rejects.toMatchObject({ status: 400 });
+    await expectFailure(service.changePassword(headers, randomSecret(), randomSecret())).toMatchObject({ status: 400 });
+    await expectFailure(service.changePassword(headers, password, password)).toMatchObject({ status: 400 });
     expect((await service.current(headers))?.status.session_valid).toBe(true);
   });
 
@@ -272,7 +277,7 @@ describe('Cloudflare account authentication', () => {
     await stmt("UPDATE ba_account SET password = ? WHERE userId = ? AND providerId = 'credential'", await passwordHasher.hash(original), fixture.contestant.accountId).run();
     await stmt('UPDATE accounts SET must_change = 1 WHERE id = ?', fixture.contestant.accountId).run();
     const headers = await signIn(username, original);
-    await expect(service.changePassword(headers, original, original.normalize('NFKC'))).rejects.toMatchObject({ status: 400 });
+    await expectFailure(service.changePassword(headers, original, original.normalize('NFKC'))).toMatchObject({ status: 400 });
     expect((await service.current(headers))?.status.must_change).toBe(true);
   });
 
@@ -298,13 +303,13 @@ describe('Cloudflare account authentication', () => {
     const newHeaders = await signIn();
     await stmt('UPDATE accounts SET disabled = 1 WHERE id = ?', fixture.contestant.accountId).run();
     expect(await service.current(newHeaders)).toBeUndefined();
-    await expect(signIn()).rejects.toMatchObject({ status: 401 });
+    await expectFailure(signIn()).toMatchObject({ status: 401 });
   });
 
   it('requires current admin access in every assigned session for reset', async () => {
     await stmt('INSERT INTO memberships (session_id, account_id) VALUES (?, ?)', fixture.secondSessionId, fixture.contestant.accountId).run();
     await stmt('UPDATE memberships SET is_admin = 0 WHERE session_id = ? AND account_id = ?', fixture.secondSessionId, fixture.staff.accountId).run();
-    await expect(service.account(adminHeaders, fixture.sessionId, { action: 'reset_password', userId: fixture.contestant.accountId })).rejects.toMatchObject({ status: 403 });
+    await expectFailure(service.account(adminHeaders, fixture.sessionId, { action: 'reset_password', userId: fixture.contestant.accountId })).toMatchObject({ status: 403 });
     expect((await service.current(await signIn()))?.status.must_change).toBe(false);
   });
 
@@ -314,7 +319,7 @@ describe('Cloudflare account authentication', () => {
     const reset = await service.account(adminHeaders, fixture.sessionId, { action: 'reset_password', userId: fixture.contestant.accountId });
     expect(Boolean(reset.temporaryPassword)).toBe(true);
     expect(await service.current(oldHeaders)).toBeUndefined();
-    await expect(signIn()).rejects.toMatchObject({ status: 401 });
+    await expectFailure(signIn()).toMatchObject({ status: 401 });
     const newHeaders = await signIn(username, reset.temporaryPassword!);
     const current = await service.current(newHeaders);
     expect(current?.user.id).toBe(fixture.contestant.accountId);
@@ -325,10 +330,10 @@ describe('Cloudflare account authentication', () => {
   });
 
   it('rejects self-reset, archived accounts, and replacement of an assigned username', async () => {
-    await expect(service.account(adminHeaders, fixture.sessionId, { action: 'reset_password', userId: fixture.staff.accountId })).rejects.toMatchObject({ status: 400 });
-    await expect(service.account(adminHeaders, fixture.sessionId, { action: 'set_username', userId: fixture.contestant.accountId, username: 'replacement' })).rejects.toMatchObject({ status: 409 });
+    await expectFailure(service.account(adminHeaders, fixture.sessionId, { action: 'reset_password', userId: fixture.staff.accountId })).toMatchObject({ status: 400 });
+    await expectFailure(service.account(adminHeaders, fixture.sessionId, { action: 'set_username', userId: fixture.contestant.accountId, username: 'replacement' })).toMatchObject({ status: 409 });
     await stmt('UPDATE events SET archived = 1 WHERE id = ?', fixture.eventId).run();
-    await expect(service.account(adminHeaders, fixture.sessionId, { action: 'reset_password', userId: fixture.contestant.accountId })).rejects.toMatchObject({ status: 403 });
+    await expectFailure(service.account(adminHeaders, fixture.sessionId, { action: 'reset_password', userId: fixture.contestant.accountId })).toMatchObject({ status: 403 });
   });
 
   it('creates a temporary account with stable identity and restricted membership', async () => {
@@ -345,9 +350,9 @@ describe('Cloudflare account authentication', () => {
     const old = await signIn();
     const failed: PasswordHasher = { ...passwordHasher, hash: async () => { throw new Error('Interrupted hash'); } };
     const interrupted = new D1AuthenticationService(db, identity, failed);
-    await expect(interrupted.account(adminHeaders, fixture.sessionId, { action: 'reset_password', userId: fixture.contestant.accountId })).rejects.toThrow('Interrupted hash');
+    await expectFailure(interrupted.account(adminHeaders, fixture.sessionId, { action: 'reset_password', userId: fixture.contestant.accountId })).toThrow('Interrupted hash');
     expect(await service.current(old)).toBeUndefined();
-    await expect(signIn()).rejects.toMatchObject({ status: 401 });
+    await expectFailure(signIn()).toMatchObject({ status: 401 });
     const pending = await stmt('SELECT credential_state, must_change FROM accounts WHERE id = ?', fixture.contestant.accountId).first();
     expect(pending).toEqual({ credential_state: 'pending', must_change: 1 });
     const reset = await service.account(adminHeaders, fixture.sessionId, { action: 'reset_password', userId: fixture.contestant.accountId });
@@ -376,7 +381,7 @@ describe('Cloudflare account authentication', () => {
       await service.account(adminHeaders, fixture.sessionId, { action: 'reset_password', userId: fixture.contestant.accountId });
       return signed;
     } };
-    await expect(signIn(username, password, new D1AuthenticationService(db, racingIdentity, passwordHasher))).rejects.toMatchObject({ status: 409 });
+    await expectFailure(signIn(username, password, new D1AuthenticationService(db, racingIdentity, passwordHasher))).toMatchObject({ status: 409 });
   });
 
   it('passes the same temporary-authentication lifecycle used by the Supabase provider scenario', async () => {
@@ -396,7 +401,7 @@ describe('Cloudflare account authentication', () => {
       },
     });
     await verifyTemporaryAuthentication(auth, { id: fixture.contestant.accountId, username, password }, {
-      restricted: async () => { await expect(auth.sessions()).rejects.toThrow(); },
+      restricted: async () => { await expectFailure(auth.sessions()).toThrow(); },
       ready: async () => { expect((await auth.sessions()).map((session) => session.id)).toEqual([fixture.sessionId]); },
     });
   });

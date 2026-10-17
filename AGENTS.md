@@ -28,6 +28,7 @@ Implement the bounded authentication API and browser adapter with maintained Bet
 See [the reference](docs/cloudflare-authentication.md), [identity choice](docs/cloudflare-authentication-choice.md), and [verification guide](docs/verify-cloudflare-authentication.md).
 Keep Supabase active. The complete connector, real-account migration, exports, and backend switch remain later work.
 Use local development databases and the separate hosted `minsky-auth-ci` database.
+The owner approved adding only `feature/t0018-cloudflare-authentication` to the existing `cloud-test` branch allowlist on 2026-10-18. Preserve the other entries and protection rules.
 Measured password CPU exceeds Workers Free's allowance. Record the Standard plan need and cost before any upgrade.
 The owner still reviews and merges. Bounded subagent work is authorized.
 

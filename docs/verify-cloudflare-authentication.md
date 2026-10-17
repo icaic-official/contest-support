@@ -24,6 +24,7 @@ No provider credentials are needed. Local socket access is required.
 
 The browser fixture Worker contains test-only setup routes. The deployed Worker does not import those routes.
 Browser checks disable traces, screenshots, and video because request bodies contain fictional credentials.
+Expected-rejection assertions discard success values so failures cannot print a generated password or cookie.
 Fixture passwords and cookies remain in memory. Do not enable request tracing for these suites.
 Cleanup checks the UUID-owned records and removes the temporary database directory.
 
@@ -110,6 +111,9 @@ Local elapsed time and hosted client time are not hosted CPU measurements.
 The `Checks` workflow has a `cloudflare_auth` dispatch option.
 Select the reviewed branch revision and enable that option.
 The protected `cloud-test` environment controls the hosted job.
+Its deployment branch policy must permit the exact reviewed ticket branch.
+An authorized owner must approve that allowlist change before the job can start.
+The T0018 initial dispatch was blocked before any hosted step ran.
 The existing `CLOUDFLARE_API_TOKEN` needs D1 access and deployment access to the isolated authentication Worker.
 The Worker must already have its private `AUTH_SECRET`.
 The job checks the target, applies CI migrations, deploys that revision, and runs both hosted suites.

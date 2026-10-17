@@ -60,6 +60,11 @@ function cookieClient() {
   };
 }
 
+/** Failed rejection assertions must never print a password or cookie result. */
+function expectFailure(operation: Promise<unknown>) {
+  return expect(operation.then(() => undefined)).rejects;
+}
+
 describe('isolated hosted Cloudflare authentication HTTP', () => {
   let db: D1Connection;
   let dispose: (() => Promise<void>) | undefined;
@@ -140,12 +145,12 @@ describe('isolated hosted Cloudflare authentication HTTP', () => {
       method: 'POST', headers: { Origin: origin, 'Content-Type': 'application/json', 'X-Minsky-Request': '1' }, body: '{}', redirect: 'error',
     });
     expect(unauthorized.status).toBe(401);
-    await expect(member.auth.signIn(username, randomSecret())).rejects.toThrow();
+    await expectFailure(member.auth.signIn(username, randomSecret())).toThrow();
     expect(member.status('/api/auth/sign-in')).toBe(401);
     expect(await member.auth.currentUser()).toBeUndefined();
     await verifyTemporaryAuthentication(member.auth, { id: fixture.contestant.accountId, username, password }, {
       restricted: async () => {
-        await expect(member.auth.sessions()).rejects.toThrow();
+        await expectFailure(member.auth.sessions()).toThrow();
         expect(member.status('/api/auth/sessions')).toBe(403);
       },
       ready: async () => { expect((await member.auth.sessions()).map((session) => session.id)).toEqual([fixture.sessionId]); },
@@ -160,11 +165,11 @@ describe('isolated hosted Cloudflare authentication HTTP', () => {
     if (!recovered.temporaryPassword) throw new Error('The authorized reset returned no temporary password.');
     await member.auth.signIn(username, recovered.temporaryPassword);
     expect((await member.auth.accountStatus()).must_change).toBe(true);
-    await expect(member.auth.sessions()).rejects.toThrow();
+    await expectFailure(member.auth.sessions()).toThrow();
     const stale = member.capture();
     const reset = await admin.auth.account(fixture.sessionId, { action: 'reset_password', userId: fixture.contestant.accountId });
     expect((await stale('/api/auth/session')).status).toBe(401);
-    await expect(member.auth.signIn(username, recovered.temporaryPassword)).rejects.toThrow();
+    await expectFailure(member.auth.signIn(username, recovered.temporaryPassword)).toThrow();
     expect(member.status('/api/auth/sign-in')).toBe(401);
     if (!reset.temporaryPassword) throw new Error('The authorized reset returned no temporary password.');
     await member.auth.signIn(username, reset.temporaryPassword);
@@ -176,7 +181,7 @@ describe('isolated hosted Cloudflare authentication HTTP', () => {
       stmt('INSERT INTO memberships (session_id, account_id, team_id) VALUES (?, ?, ?)', fixture.secondSessionId, fixture.contestant.accountId, fixture.secondSessionTeamId),
       stmt('UPDATE memberships SET is_admin = 0 WHERE session_id = ? AND account_id = ?', fixture.secondSessionId, fixture.staff.accountId),
     ]);
-    await expect(admin.auth.account(fixture.sessionId, { action: 'reset_password', userId: fixture.contestant.accountId })).rejects.toThrow();
+    await expectFailure(admin.auth.account(fixture.sessionId, { action: 'reset_password', userId: fixture.contestant.accountId })).toThrow();
     expect(admin.status('/api/accounts')).toBe(403);
     expect((await member.auth.accountStatus()).session_valid).toBe(true);
 

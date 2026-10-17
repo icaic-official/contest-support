@@ -4,6 +4,8 @@
 
 T0018 starts from `main` at `0c797ad` after PR #39 merged on 2026-10-17 at 15:49:49 UTC.
 The working tree was clean. The branch is `feature/t0018-cloudflare-authentication`.
+[PR #40](https://github.com/GiftedNovaHD/minsky/pull/40) contains implementation commit `48ed3dbc2f1359e8160610fdfe7ffa4cec313f44`.
+The owner reviews and merges.
 Supabase remains the active application backend. No real-data export, real-account reset, migration, or backend switch occurred.
 
 ### Implemented behavior
@@ -49,7 +51,14 @@ The latest recorded Worker code version is `be41aff6-666d-4707-9680-a77f891d8c2f
 | Dependency audit | Root and site lockfile audits reported zero vulnerabilities. |
 | Local CLI against hosted D1 | All 28 cases passed across the initial run and focused verification. Initial run: 25 of 26 passed in 719.74 seconds. Focused run: three passed in 61.96 seconds. |
 | Hosted Worker HTTP | One comprehensive scenario passed in 108.29 seconds. It used the real adapter and shared lifecycle assertions. |
-| Protected GitHub Actions | Not yet run for T0018. |
+| Protected GitHub Actions | [Run 39048644009](https://github.com/GiftedNovaHD/minsky/actions/runs/39048644009) passed `checks`, `secrets`, and `dependencies`. GitHub blocked `cloudflare-auth` before startup because the branch is absent from the `cloud-test` allowlist. |
+
+The first protected dispatch permitted only `main`, `feature/t0014-backend-adapters`, and `feature/t0015-provider-contract-tests`.
+The owner then approved adding the exact T0018 branch to that allowlist on 2026-10-18 SGT.
+The three prior entries and the environment protection remained in place. The first rejected job used no hosted credentials.
+A new protected run will verify the assertion-only follow-up revision.
+A later assertion-only change discards credential-bearing success values before expected-rejection checks.
+This prevents a failing test from printing a generated password or cookie. Runtime behavior is unchanged.
 
 The initial hosted D1 run returned an uncertain database outcome in the sole-organizer retry case.
 The focused run passed that case and the two added regressions for Unicode equivalence and a lost committed response.
@@ -101,6 +110,9 @@ Both package lockfiles passed `npm audit --package-lock-only --audit-level=high`
 The focused suites used `npm run test:auth`, `npm run test:auth:hosted`, and `node scripts/auth-http-test.mjs` with the explicit CI targets.
 Hash measurements used `node scripts/auth-hash-benchmark.mjs` locally and with the explicit hosted account and separate operations.
 `node scripts/auth-target.mjs` verified the automatic target guard.
+The run created PR #40 and dispatched `checks.yml` with `cloudflare_auth=true`.
+All new commits passed the exact required co-author trailer check before push.
+Default exports in Worker entry points and test configuration follow the framework requirement.
 
 Initial sandbox network and socket restrictions required authorized retries.
 An initial browser launch lacked Chromium until the configured `/tmp` installation was selected.

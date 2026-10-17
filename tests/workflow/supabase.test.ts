@@ -100,7 +100,7 @@ describe('shared workflow on hosted Supabase', () => {
       });
       expect(direct.error?.code).toBe('42501');
       const body = { sessionId: fixture.sessionId, requestId: crypto.randomUUID(), command: {
-        type: 'submit', category: 'Backend', description: 'Authenticated identity wins', team_id: crypto.randomUUID(),
+        type: 'submit', category: 'Backend', description: 'Authenticated identity wins', team_id: 'ignored-non-uuid-override',
       }, accountId: fixture.accounts.volunteer.id, roles: ['volunteer', 'specialist', 'jury'] };
       const response = await fetch(`${url}/functions/v1/workflow`, { method: 'POST', headers: {
         apikey: fixture.publicKey, authorization: `Bearer ${token}`, 'content-type': 'application/json',

@@ -62,7 +62,7 @@ function validText(value: unknown): value is string {
 export function isWorkflowCommand(value: unknown): value is Command {
   if (!object(value)) return false;
   if (value.type === 'submit') return validText(value.description) && typeof value.category === 'string' &&
-    (value.team_id === undefined || typeof value.team_id === 'string' && uuid.test(value.team_id));
+    (value.team_id === undefined || typeof value.team_id === 'string');
   if (typeof value.issue_id !== 'string' || !uuid.test(value.issue_id) ||
     !Number.isSafeInteger(value.revision) || (value.revision as number) < 0) return false;
   switch (value.type) {

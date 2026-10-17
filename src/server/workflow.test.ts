@@ -18,6 +18,13 @@ describe('shared workflow compatibility edges', () => {
     expect(isWorkflowCommand({ type: 'submit', category: 'Backend', description: '   ' })).toBe(false);
     expect(isWorkflowCommand({ type: 'submit', category: 'Backend', description: '\t' })).toBe(true);
   });
+  it('ignores a contestant team override even when the unused value is not a UUID', () => {
+    const command = { type: 'submit' as const, category: 'Backend', description: 'Fixture', team_id: 'unused-browser-value' };
+    expect(isWorkflowCommand(command)).toBe(true);
+    expect(decideWorkflow({ ...state, membership: { team_id: 'team', roles: [], is_admin: false } }, command))
+      .toMatchObject({ teamId: 'team' });
+    expect(decideWorkflow(state, command)).toEqual({ outcome: 'rejected', reason: 'input' });
+  });
   it('compares receipts as JSON values while preserving original whitespace', () => {
     expect(equalWorkflowJson({ type: 'message', text: ' text ', extra: { a: 1, b: 2 } },
       { extra: { b: 2, a: 1 }, text: ' text ', type: 'message' })).toBe(true);

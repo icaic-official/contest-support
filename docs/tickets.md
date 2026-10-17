@@ -58,7 +58,7 @@ T0008 fuzzy team search merged into `main` in [PR #22](https://github.com/notbow
 ## T0018 Cloudflare authentication
 
 Branch: `feature/t0018-cloudflare-authentication`, from updated `main` at `0c797ad` after PR #39 merged.
-Status: implemented and verified locally and on isolated hosted resources in [PR #40](https://github.com/GiftedNovaHD/minsky/pull/40). The owner reviews and merges.
+Status: implemented in [PR #40](https://github.com/GiftedNovaHD/minsky/pull/40). Local and protected hosted D1 checks pass. Protected HTTP verification awaits Workers Paid, which the owner deferred. The owner reviews and merges.
 Summary: Add Workers and D1 authentication, temporary passwords, account sessions, and organizer-assisted recovery. Keep Supabase active.
 
 Better Auth `1.7.10` supplies username login and signed cookie sessions.
@@ -82,7 +82,8 @@ The remaining workflow connector, R2, Durable Object delivery, migration tooling
 - [x] Test partial failures, recovery, superseded updates, and login races with isolated fixtures.
 - [x] Reuse provider-neutral authentication assertions and verify browser cookie and request protection.
 - [x] Measure password cost in Workers and record the CPU allowance and paid-plan need.
-- [x] Complete required checks, scoped cleanup, and verification records.
+- [x] Complete local checks, protected hosted D1 checks, scoped cleanup, and verification records.
+- [ ] Complete protected HTTP verification after the owner activates Workers Paid.
 - [x] Prepare a PR for owner review. The owner merges.
 
 ### Verification

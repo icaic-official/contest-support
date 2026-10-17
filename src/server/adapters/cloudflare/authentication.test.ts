@@ -315,7 +315,13 @@ describe('Cloudflare account authentication', () => {
 
   it('resets through the organizer and preserves IDs, membership, and issue history', async () => {
     const oldHeaders = await signIn();
+    const caller = (await service.current(oldHeaders))!.caller;
+    expect(await new D1ApplicationStore(db).execute(caller, fixture.sessionId, randomUUID(), {
+      type: 'message', issue_id: fixture.issueId, revision: 1,
+      text: 'Fictional history retained through password reset.', visibility: 'public',
+    })).toMatchObject({ outcome: 'committed' });
     const before = await fixture.durableState();
+    expect(before.history.length).toBe(1);
     const reset = await service.account(adminHeaders, fixture.sessionId, { action: 'reset_password', userId: fixture.contestant.accountId });
     expect(Boolean(reset.temporaryPassword)).toBe(true);
     expect(await service.current(oldHeaders)).toBeUndefined();

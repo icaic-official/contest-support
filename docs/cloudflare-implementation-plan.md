@@ -56,6 +56,8 @@ T0018 implements this phase on `feature/t0018-cloudflare-authentication` from me
 See the [reference](cloudflare-authentication.md), [choice and costs](cloudflare-authentication-choice.md), and [verification guide](verify-cloudflare-authentication.md).
 Current evidence remains in the [T0018 record](current-state.md#t0018-cloudflare-authentication-2026-10-18).
 The complete connector and migration remain later phases.
+T0018 passed all 28 protected hosted D1 account cases. Protected HTTP verification needs a paid Worker CPU allowance.
+The owner deferred subscription activation on 2026-10-18. Keep that result incomplete until the paid check passes.
 
 This phase follows the D1 proof.
 The owner selected organizer-issued replacement temporary passwords on 2026-10-17.

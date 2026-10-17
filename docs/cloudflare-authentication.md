@@ -76,6 +76,9 @@ The team must belong to that session.
 Account-wide username assignment and resets require admin access to every contest session assigned to the target account.
 Any archived assigned event blocks those actions.
 Self-resets are rejected. An account holder uses `changePassword()` instead.
+Organizers verify the account holder's identity before issuing a recovery reset.
+They distribute the returned temporary password through an approved private channel.
+If that response is lost, another authorized reset replaces the unavailable credentials.
 
 ## Session authority and browser protection
 

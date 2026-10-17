@@ -30,7 +30,7 @@ This page is a dated record, not a live deployment dashboard.
 | [T0006 announcements](https://github.com/GiftedNovaHD/minsky/pull/20) | Open pull request. |
 | [T0007 independent installations](https://github.com/GiftedNovaHD/minsky/pull/21) | Open pull request. Packaging exists on its branch. Container operation remains unverified. |
 | [T0009 jury worklist](https://github.com/GiftedNovaHD/minsky/pull/23) | Draft pull request. |
-| T0018 Cloudflare authentication | Experimental username authentication, cookie sessions, and organizer recovery. The full connector and migration remain incomplete. Supabase remains active. |
+| [T0018 Cloudflare authentication](https://github.com/GiftedNovaHD/minsky/pull/40) | Experimental username authentication, cookie sessions, and organizer recovery. Protected HTTP verification awaits a paid CPU allowance. The full connector and migration remain incomplete. Supabase remains active. |
 
 T0011 adds this documentation site.
 The initial docs deployment did not deploy the Minsky application or apply database migrations.

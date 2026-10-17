@@ -41,6 +41,12 @@ Expect account `458ad6a930b0fb717796dfa19ca6a2b1` and database `5d746d29-0a66-43
 The database name must be `minsky-auth-ci`. Stop if any value differs.
 Development uses local databases. Neither the active Supabase projects nor the earlier D1 proof database is this target.
 
+The committed Worker configuration requests a 1,000 ms CPU cap per request.
+Cloudflare requires Workers Paid for that setting. The current account remains on Free by owner choice.
+The protected D1 cases pass, but a protected password-change request exceeded runtime resources.
+Before deploying the Worker, activate the selected paid plan through an authorized account owner.
+On Free, deployment fails with error `100328`. Do not reduce password cost to bypass that requirement.
+
 Only authorized maintainers apply schema or deploy this isolated CI Worker:
 
 ```sh
@@ -113,7 +119,8 @@ Select the reviewed branch revision and enable that option.
 The protected `cloud-test` environment controls the hosted job.
 Its deployment branch policy must permit the exact reviewed ticket branch.
 An authorized owner must approve that allowlist change before the job can start.
-The T0018 initial dispatch was blocked before any hosted step ran.
+The current allowlist includes the exact T0018 branch with owner approval.
+See [the run record](current-state.md#t0018-cloudflare-authentication-2026-10-18) for the initial rejection and later hosted resource limit.
 The existing `CLOUDFLARE_API_TOKEN` needs D1 access and deployment access to the isolated authentication Worker.
 The Worker must already have its private `AUTH_SECRET`.
 The job checks the target, applies CI migrations, deploys that revision, and runs both hosted suites.

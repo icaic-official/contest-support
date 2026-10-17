@@ -122,3 +122,19 @@ For example, 100,000 password checks at 100 ms each consume ten million CPU mill
 These figures explain the concrete need and cost before a possible upgrade.
 No upgrade is part of the benchmark runner.
 See [Workers limits](https://developers.cloudflare.com/workers/platform/limits/) and [pricing](https://developers.cloudflare.com/workers/platform/pricing/).
+
+
+### Protected HTTP resource rejection
+
+Protected run `39049037968` passed all 28 hosted D1 account cases on `8cfd7a5`.
+Cloudflare then terminated one password-change invocation with `exceededResources` at 252.901 ms CPU.
+The invocation reported 16,724,317 bytes in adaptive memory metrics. This does not establish peak native memory use.
+Cloudflare's resource status can include CPU and other runtime limits.
+See [the invocation status reference](https://developers.cloudflare.com/workers/observability/metrics-and-analytics/).
+
+A subsequent deployment requested `limits.cpu_ms = 1000` for the isolated authentication Worker.
+Cloudflare rejected that setting with error `100328`: CPU settings require a paid plan, and this account uses Free.
+The rejected deployment left the prior Worker active.
+The owner selected subscription activation later. No paid upgrade occurred.
+The committed configuration retains the bounded CPU setting for verification after activation.
+The earlier successful HTTP runs do not establish dependable operation on Free.

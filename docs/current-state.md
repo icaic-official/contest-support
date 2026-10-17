@@ -36,7 +36,7 @@ Hosted checks use separate `minsky-auth-ci`, ID `5d746d29-0a66-4346-96a6-4974126
 All four repository migrations are applied there.
 The dedicated Worker is `https://minsky-auth-ci.icaic-minsky.workers.dev`.
 Its private random secret was installed without printing or storing the value in repository files.
-The latest recorded Worker code version is `be41aff6-666d-4707-9680-a77f891d8c2f`.
+The protected job deployed Worker version `99cbba19-3afd-4e46-ab15-e09f7bd3115a` from `8cfd7a5`.
 
 | Check | Observed result |
 | --- | --- |
@@ -51,12 +51,15 @@ The latest recorded Worker code version is `be41aff6-666d-4707-9680-a77f891d8c2f
 | Dependency audit | Root and site lockfile audits reported zero vulnerabilities. |
 | Local CLI against hosted D1 | All 28 cases passed across the initial run and focused verification. Initial run: 25 of 26 passed in 719.74 seconds. Focused run: three passed in 61.96 seconds. |
 | Hosted Worker HTTP | One comprehensive scenario passed in 108.29 seconds. It used the real adapter and shared lifecycle assertions. |
-| Protected GitHub Actions | [Run 39048644009](https://github.com/GiftedNovaHD/minsky/actions/runs/39048644009) passed `checks`, `secrets`, and `dependencies`. GitHub blocked `cloudflare-auth` before startup because the branch is absent from the `cloud-test` allowlist. |
+| Protected GitHub Actions | [Run 39049037968](https://github.com/GiftedNovaHD/minsky/actions/runs/39049037968) on `8cfd7a5` passed ordinary checks and all 28 hosted D1 account cases. The hosted HTTP scenario failed when Cloudflare terminated a password-change request for exceeding runtime resources. |
 
 The first protected dispatch permitted only `main`, `feature/t0014-backend-adapters`, and `feature/t0015-provider-contract-tests`.
 The owner then approved adding the exact T0018 branch to that allowlist on 2026-10-18 SGT.
 The three prior entries and the environment protection remained in place. The first rejected job used no hosted credentials.
-A new protected run will verify the assertion-only follow-up revision.
+Protected run `39049037968` passed its target check, schema step, and deployment using the existing GitHub credential.
+Its complete 28-case hosted D1 step passed in about 332 seconds.
+A final focused hosted check populated issue history before reset and proved that the history, receipt, and notifications remained unchanged.
+That additional case passed in 201.27 seconds, with 27 other cases skipped and scoped cleanup verified.
 A later assertion-only change discards credential-bearing success values before expected-rejection checks.
 This prevents a failing test from printing a generated password or cookie. Runtime behavior is unchanged.
 
@@ -69,7 +72,8 @@ The final hosted HTTP run started on 2026-10-18 at 00:07:32 SGT.
 It checked exact 401 and 403 rejections, mandatory changes, reset recovery, cross-session permissions, expiry, revocation, cookies, origins, and CSRF.
 A prior read encountered a connection reset. The fixture driver now retries safe GET requests at most three times.
 It never automatically retries a state-changing request.
-All final-run scoped cleanup assertions passed. The shared IP-attempt counter remains for daily expiry because no single fixture owns it.
+All local-CLI hosted HTTP cleanup assertions passed. The protected failed HTTP run also completed fixture cleanup.
+The shared IP-attempt counter remains for daily expiry because no single fixture owns it.
 
 The HTTPS browser suite checked cookie flags, scope, restoration, no browser credential storage, logout replay, stale passwords, other-browser revocation, hostile previews, preflight, and forged forms.
 Those browser checks disabled traces, screenshots, and videos.
@@ -85,11 +89,18 @@ These samples exceed the Workers Free 10 ms CPU allowance.
 The selected maintained hash therefore needs a larger CPU allowance for dependable hosting.
 The [choice record](cloudflare-authentication-choice.md#resource-evidence-and-deployment-cost) documents Standard's minimum US$5 monthly cost and usage charges.
 No paid upgrade occurred. Three temporary benchmark Workers were deleted.
-The samples do not establish memory under concurrent load, a fresh supported installation, production capacity, or contest latency targets.
+The protected HTTP failure produced one `exceededResources` invocation at 252.901 ms CPU.
+The same invocation reported 16,724,317 bytes of memory in adaptive metrics. That value does not establish peak native allocation or concurrent capacity.
+Cloudflare rejected a 1,000 ms CPU setting with error `100328`, which confirms that this account is on Workers Free.
+The repository now requests that bounded CPU allowance for later paid verification. The rejected deployment did not change the active Worker.
+The owner chose to obtain the subscription later on 2026-10-18 SGT. Hosted HTTP verification remains incomplete for the selected target plan.
+Do not infer reliable Free operation from the earlier successful CLI runs.
+These checks do not establish a fresh supported installation, production capacity, or contest latency targets.
 
 ### Limits and follow-up
 
 The active Supabase backend is unchanged.
+The remaining hosted HTTP result requires Workers Paid and another protected run. No paid upgrade occurred.
 The Cloudflare connector still lacks the remaining workflow operations, private R2 images, and Durable Object notification delivery.
 Better Auth upgrades must recheck the pinned schema and password format before deployment.
 The experimental session summaries use IDs as names until the complete contest-session schema exists.
@@ -102,6 +113,8 @@ Full migration tooling, real-data exports, and cutover remain later authorized p
 
 The run used Git inspection, fetch, branch creation, and PR #39 metadata checks.
 It used existing Wrangler access, D1 target inspection, isolated database creation, migrations, Worker deployment, private secret installation, and version inspection.
+A later deployment with the prepared CPU cap failed with Cloudflare error `100328` on Free.
+Read-only analytics established the resource rejection. The existing login received 403 for billing access. No subscription action ran.
 It installed exact `better-auth@1.7.10` with npm.
 The verification commands were `npm run typecheck`, `npm run lint`, `npm run build`, `npm test`, `npm run check:functions`, and `npm run test:functions`.
 Browser commands were `npm run test:e2e`, `npm run test:auth:browser`, and `npm run docs:test`, with Chromium installed under `/tmp/minsky-playwright`.

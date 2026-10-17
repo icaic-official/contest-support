@@ -8,6 +8,8 @@ Use maintained Better Auth and cryptographic components, explicit origins, reque
 See [the authentication reference](docs/cloudflare-authentication.md) and [verification guide](docs/verify-cloudflare-authentication.md).
 Isolated development and CI resources remain authorized in the confirmed account. No paid upgrade occurred.
 The measured hash requires more CPU than Workers Free permits. The identity choice records the concrete Standard plan cost.
+The protected run passed all 28 hosted D1 account cases, then hit a Worker resource limit during HTTP password change.
+The owner deferred the subscription on 2026-10-18. Keep the protected HTTP result incomplete until paid verification passes.
 Supabase remains active. The remaining connector, real-data exports, migration, and backend switch remain later work.
 The owner reviews and merges.
 

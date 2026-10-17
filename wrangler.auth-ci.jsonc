@@ -7,6 +7,7 @@
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": true,
   "preview_urls": false,
+  "limits": { "cpu_ms": 1000 },
   "observability": { "enabled": true, "head_sampling_rate": 1 },
   "triggers": { "crons": ["19 3 * * *"] },
   "vars": { "AUTH_ORIGIN": "https://minsky-auth-ci.icaic-minsky.workers.dev" },

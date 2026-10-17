@@ -104,11 +104,15 @@ export class D1AuthenticationService implements AuthenticationService {
     // Fixed windows bound expensive password verification, including nonexistent
     // usernames. The HTTP Worker adds an IP limit before reaching this method.
     await this.limit(`username:${parsed.data}`, 10);
-    const before = await this.statement('SELECT * FROM accounts WHERE username = ?', parsed.data).first<Account>();
+    return this.createLogin(parsed.data, password);
+  }
+
+  private async createLogin(username: string, password: string): Promise<{ cookie: string }> {
+    const before = await this.statement('SELECT * FROM accounts WHERE username = ?', username).first<Account>();
     if (before && (before.disabled || before.credential_state !== 'ready')) {
       throw new AuthenticationError(401, 'Username or password is incorrect.');
     }
-    const signed = await this.identity.signIn(parsed.data, password);
+    const signed = await this.identity.signIn(username, password);
     const loginId = crypto.randomUUID();
     const assertionId = crypto.randomUUID();
     // A reset can race Better Auth password verification. Only the generation
@@ -290,7 +294,9 @@ export class D1AuthenticationService implements AuthenticationService {
       this.statement(`INSERT INTO account_operations (id, account_id, actor, action, state) VALUES (?, ?, ?, 'change_password', 'pending')`, operationId, current.user.id, current.user.id),
       this.statement('DELETE FROM command_assertions WHERE id = ?', assertionId),
     ] });
-    return this.signIn(before.username!, newPassword);
+    // The authenticated change uses its own attempt limit. Replacing the login
+    // must also succeed when the public username window is already exhausted.
+    return this.createLogin(before.username!, newPassword);
   }
 
   async sessions(headers: Headers): Promise<SessionSummary[]> {

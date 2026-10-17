@@ -89,6 +89,17 @@ export function createCloudflareAuthentication(options: {
     return response;
   }
 
+  async function mutateSession(path: string, body: unknown, authenticated = true) {
+    generation++;
+    try {
+      await mutate(path, body, authenticated);
+    } finally {
+      // Reads started during a mutation can still contain the earlier identity.
+      // Discard them after success or failure, including an unknown write outcome.
+      generation++;
+    }
+  }
+
   return {
     async currentUser() {
       return (await session())?.user;
@@ -117,13 +128,11 @@ export function createCloudflareAuthentication(options: {
       };
     },
     async signIn(username, password) {
-      generation++;
-      await mutate('/api/auth/sign-in', { username, password }, false);
+      await mutateSession('/api/auth/sign-in', { username, password }, false);
       await refresh();
     },
     async signOut() {
-      generation++;
-      await mutate('/api/auth/sign-out', {});
+      await mutateSession('/api/auth/sign-out', {});
       notify(undefined);
     },
     async accountStatus() {
@@ -132,8 +141,7 @@ export function createCloudflareAuthentication(options: {
       return current.status;
     },
     async changePassword(currentPassword, newPassword) {
-      generation++;
-      await mutate('/api/auth/change-password', { currentPassword, newPassword });
+      await mutateSession('/api/auth/change-password', { currentPassword, newPassword });
       const current = await refresh();
       if (!current || current.status.must_change || !current.status.session_valid) {
         throw new Error('Sign in again to confirm the password change.');

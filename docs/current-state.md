@@ -28,6 +28,43 @@ The same temporary-authentication lifecycle assertions now serve Supabase and Cl
 Cloudflare's complete workflow, image, and live-update provider scenarios remain later connector work.
 See the [API reference](cloudflare-authentication.md), [choice and costs](cloudflare-authentication-choice.md), and [verification guide](verify-cloudflare-authentication.md).
 
+### PR review corrections, 2026-10-18
+
+The owner requested both PR #40 review fixes on the existing ticket branch.
+Password changes now create a guarded replacement login without consuming another public username attempt.
+The separate password-change limit, current-password verification, and credential-generation checks still apply.
+Login, logout, and password changes invalidate overlapping subscription reads when each request finishes.
+This prevents delayed reads from replacing the completed browser state after success, rejection, or an uncertain response.
+
+Two added D1 cases check the exhausted username window and the separate password-change limit.
+Eleven added transport cases check delayed focus, polling, and subscription reads, including failed logout requests.
+All 224 local tests pass across 17 files. This includes 30 D1 account cases and 23 browser-adapter cases.
+All three HTTPS authentication browser cases pass. Type checking, ESLint, the application build, and whitespace checks pass.
+The existing application chunk-size warning remains.
+The original delayed-logout reproduction now ends with the signed-out notification.
+The new password-change regression failed with 429 before the fix and passes afterward.
+
+Commands were `npm test`, `npm run typecheck`, `npm run lint`, `npm run build`, and `git diff --check`.
+The browser run used `PLAYWRIGHT_BROWSERS_PATH=/tmp/minsky-playwright npm run test:auth:browser`.
+The focused account command used `npm run test:auth -- --testNamePattern='last permitted username login|separate password-change attempt limit'`.
+The initial sandbox run could not open the emulator's local socket. The authorized rerun reached the regression assertion.
+No product screens changed. Interactive phone and keyboard checks were not repeated.
+The hosted HTTP result remains incomplete until Workers Paid is active and protected verification passes.
+
+`node scripts/auth-target.mjs` confirmed the existing account and isolated `minsky-auth-ci` database before fixture writes.
+The local CLI then ran these two regression cases against hosted D1:
+
+```sh
+npm run test:auth:hosted -- \
+  --account=458ad6a930b0fb717796dfa19ca6a2b1 \
+  --database=5d746d29-0a66-4346-96a6-4974126685d7 \
+  '--test-name-pattern=last permitted username login|separate password-change attempt limit'
+```
+
+Both cases passed in 79.93 seconds. The other 28 cases were skipped.
+The fixtures verified scoped cleanup. This was a focused local CLI run, separate from protected GitHub Actions.
+No schema, Worker deployment, or paid subscription changed during this correction run.
+
 ### Resources and execution evidence
 
 Existing Wrangler OAuth access matched account `458ad6a930b0fb717796dfa19ca6a2b1` before provisioning.

@@ -123,6 +123,93 @@ describe('Cloudflare browser authentication transport', () => {
     } finally { stop(); }
   });
 
+  describe.each(['signIn', 'signOut', 'changePassword'] as const)('%s completion', (action) => {
+    it.each(['focus', 'poll', 'subscription'] as const)('discards an earlier %s response started during the mutation', async (source) => {
+      vi.useFakeTimers();
+      const writes: Array<(response: Response) => void> = [];
+      const pending: Array<(response: Response) => void> = [];
+      let deferReads = false;
+      let signedIn = action !== 'signIn';
+      const { auth, events } = setup((request) => {
+        if (request.method === 'POST') return new Promise<Response>((resolve) => { writes.push(resolve); });
+        if (deferReads) return new Promise<Response>((resolve) => { pending.push(resolve); });
+        return signedIn ? json({ user, status, csrf: 'test' }) : json({}, 401);
+      });
+      const changed = vi.fn();
+      const stops = [auth.subscribe(changed)];
+      try {
+        await vi.advanceTimersByTimeAsync(0);
+        changed.mockClear();
+        const mutations = {
+          signIn: () => auth.signIn('helper', 'fictional-password'),
+          signOut: () => auth.signOut(),
+          changePassword: () => auth.changePassword('fictional-old', 'fictional-new'),
+        };
+        const mutation = mutations[action]();
+        await vi.advanceTimersByTimeAsync(0);
+        expect(writes).toHaveLength(1);
+
+        deferReads = true;
+        if (source === 'focus') events.dispatchEvent(new Event('focus'));
+        if (source === 'poll') await vi.advanceTimersByTimeAsync(60_000);
+        if (source === 'subscription') stops.push(auth.subscribe(changed));
+        expect(pending).toHaveLength(1);
+
+        deferReads = false;
+        signedIn = action !== 'signOut';
+        writes[0](json({}));
+        await mutation;
+        expect(changed).toHaveBeenLastCalledWith(signedIn ? user : undefined);
+        const completedCalls = changed.mock.calls.slice();
+        // An old cookie can also return 401 while password rotation replaces it.
+        pending[0](action === 'signOut' ? json({ user, status, csrf: 'test' }) : json({}, 401));
+        await vi.advanceTimersByTimeAsync(0);
+        expect(changed.mock.calls).toEqual(completedCalls);
+      } finally {
+        for (const stop of stops) stop();
+      }
+    });
+  });
+
+  it.each([401, 503])('discards stale refreshes after logout fails with %i and permits later refreshes', async (statusCode) => {
+    vi.useFakeTimers();
+    const writes: Array<(response: Response) => void> = [];
+    const pending: Array<(response: Response) => void> = [];
+    let deferReads = false;
+    let revoked = false;
+    const { auth, events } = setup((request) => {
+      if (request.method === 'POST') return new Promise<Response>((resolve) => { writes.push(resolve); });
+      if (deferReads) return new Promise<Response>((resolve) => { pending.push(resolve); });
+      return revoked ? json({}, 401) : json({ user, status, csrf: 'test' });
+    });
+    const changed = vi.fn();
+    const stop = auth.subscribe(changed);
+    try {
+      await vi.advanceTimersByTimeAsync(0);
+      const mutation = auth.signOut();
+      const rejection = expect(mutation).rejects.toThrow(statusCode === 401 ? 'Sign in' : 'Unavailable');
+      await vi.advanceTimersByTimeAsync(0);
+      expect(writes).toHaveLength(1);
+      deferReads = true;
+      events.dispatchEvent(new Event('focus'));
+      expect(pending).toHaveLength(1);
+      revoked = statusCode === 401;
+      writes[0](json({ error: 'Unavailable' }, statusCode));
+      await rejection;
+      expect(changed).toHaveBeenLastCalledWith(revoked ? undefined : user);
+      const completedCalls = changed.mock.calls.slice();
+      pending[0](revoked ? json({ user, status, csrf: 'test' }) : json({}, 401));
+      await vi.advanceTimersByTimeAsync(0);
+      expect(changed.mock.calls).toEqual(completedCalls);
+
+      deferReads = false;
+      events.dispatchEvent(new Event('focus'));
+      await vi.advanceTimersByTimeAsync(0);
+      expect(changed).toHaveBeenCalledTimes(completedCalls.length + 1);
+      expect(changed).toHaveBeenLastCalledWith(revoked ? undefined : user);
+    } finally { stop(); }
+  });
+
   it('refreshes subscribers after focus and polling, and makes cleanup idempotent', async () => {
     vi.useFakeTimers();
     const { auth, events, requests } = setup();

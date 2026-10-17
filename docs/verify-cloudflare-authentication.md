@@ -20,7 +20,10 @@ The browser suite creates a separate temporary D1 database and a local HTTPS Wor
 It uses Chromium with a self-signed local certificate.
 Expect all focused cases and three browser cases to pass.
 No provider credentials are needed. Local socket access is required.
-`npm test` also runs the account suite. Browser tests run separately.
+`npm test` also runs the account suite and browser-adapter unit tests. Browser tests run separately.
+The account suite checks password changes after the final allowed username login and retains the separate password-change limit.
+The browser-adapter unit tests delay session responses across login, logout, and password changes.
+They check that subscriptions retain the completed state after successful or failed requests.
 
 The browser fixture Worker contains test-only setup routes. The deployed Worker does not import those routes.
 Browser checks disable traces, screenshots, and video because request bodies contain fictional credentials.

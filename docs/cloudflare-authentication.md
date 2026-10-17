@@ -104,6 +104,7 @@ Bodies are limited to 16 KiB. Redirected browser authentication requests fail.
 The browser adapter fetches a fresh CSRF token before each authenticated mutation.
 Subscriptions check session state every 60 seconds and on focus or page restoration.
 Callbacks run synchronously. Subscription cleanup is idempotent and stops later callbacks.
+Completed login, logout, and password-change requests invalidate earlier subscription reads, including reads started during the request.
 Polling affects UI awareness only. Server revocation takes effect on the next protected operation.
 
 Untrusted previews have no shared authentication binding or secret.
@@ -135,6 +136,8 @@ The browser receives a fresh session only after the credential commit.
 Daily maintenance removes password-attempt counters and expired login records after a one-day retention period.
 Login attempts allow ten attempts per normalized username per 15-minute window.
 Self password verification uses a separate ten-attempt account window.
+The replacement login after an authenticated password change does not consume a public username attempt.
+Password verification and credential-generation checks still apply to that replacement login.
 The hosted Worker also allows fifty login attempts per source IP per 15-minute window.
 It stores a secret-salted IP digest rather than the address.
 These pilot limits need later capacity review for venue networks that share an address.

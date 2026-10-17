@@ -392,7 +392,9 @@ No schema change or deployment is part of this ticket.
 ## T0011 — Documentation site
 
 Branch: `feature/t0011-documentation-site`, from updated `main` at `de92d54`.
-Status: implemented and verified locally; initial deployment is pending.
+Status: implemented, deployed, and verified locally and on the public docs site.
+Review PR: [#29](https://github.com/GiftedNovaHD/minsky/pull/29). The user reviews and merges.
+See [deployment evidence](current-state.md#t0011-documentation-site-2026-10-17).
 
 The user requested a documentation site to accompany T0007, including written content and Workers deployment.
 This request authorizes the initial `minsky-docs` deployment before the source PR merges.
@@ -419,5 +421,5 @@ Application deployment, backend changes, T0007 container execution, merging othe
 - [x] Public guides describe the inspected implementation and clearly label T0007's pending status.
 - [x] The site uses a separate Worker and publishes only its generated static files.
 - [x] Required local checks pass, including docs search, navigation, local links, and phone layout.
-- [ ] The deployed site passes HTTP, deep-link, search, and 404 checks.
-- [ ] Deployment evidence and a source PR are available for user review.
+- [x] The deployed site passes HTTP, deep-link, search, and 404 checks.
+- [x] Deployment evidence and a source PR are available for user review.

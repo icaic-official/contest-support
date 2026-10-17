@@ -15,7 +15,14 @@ The Worker target is `minsky-docs`, account `458ad6a930b0fb717796dfa19ca6a2b1`, 
 `wrangler.docs.jsonc` uploads only `site/dist`.
 Its dry run passed with 77 assets and no bindings.
 The Cloudflare account check passed, and the deployment-list check confirmed the new Worker did not yet exist.
-Initial deployment and hosted verification are pending in this record.
+The site is deployed and verified at that address.
+Review PR: [#29](https://github.com/GiftedNovaHD/minsky/pull/29).
+Deployed source: `718402fbe19e2e34f942ce5be0660d7c447c8259`.
+Worker version: `c591634a-100a-405a-99ed-465d2da72d82`.
+`npm run docs:deploy` completed on 2026-10-17 at approximately 14:19 SGT.
+All three browser checks passed against the public docs URL in 3.4 seconds.
+All 56 published files matched the build by SHA-256.
+The custom missing-page response returned HTTP 404 with the expected content, and the configured response headers were present.
 No application, database, or function deployment is part of this change.
 The app's new documentation links will appear when its frontend is separately deployed.
 
@@ -45,6 +52,8 @@ Existing TSX double quotes and component conventions are retained as project sty
 New Starlight content exports follow its required framework interface.
 
 The repository adds docs build, browser, and dependency checks to ordinary CI.
+GitHub's dependency and secret checks passed on the initial source commit; the ordinary check job was still running when this deployment record was prepared.
+The PR reports results for each subsequent revision.
 Protected Supabase cloud checks are not required for this static site and were not run here.
 
 ### Current merge status

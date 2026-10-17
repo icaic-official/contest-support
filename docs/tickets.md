@@ -7,6 +7,10 @@ The user requested its implementation and deployment on 2026-10-17.
 T0005 merged in PR #19 and T0010 merged in PR #24 on 2026-10-15.
 Those merges do not imply application deployment.
 
+T0012 reply retry cleanup merged in [PR #30](https://github.com/GiftedNovaHD/minsky/pull/30) on 2026-10-17.
+T0013 image preview request handling merged in [PR #31](https://github.com/GiftedNovaHD/minsky/pull/31) on the same date.
+The T0011 branch includes both fixes through a merge from `main` at `f8a8cac`.
+
 T0004 has two related pull requests.
 [PR #9](https://github.com/notbowen/minsky/pull/9) implements the UI makeover.
 [PR #13](https://github.com/notbowen/minsky/pull/13) rewrites the documentation.
@@ -21,6 +25,32 @@ These items stay deferred and are not part of T0005:
 - Remaining manual acceptance checks.
 
 T0008 fuzzy team search merged into `main` in [PR #22](https://github.com/notbowen/minsky/pull/22) on 2026-10-15 (SGT).
+
+## T0013 — Image preview request handling
+
+Branch: `feature/t0013-image-preview-race`, from updated `main` at `de92d54`.
+
+Status: merged into `main` in [PR #31](https://github.com/GiftedNovaHD/minsky/pull/31) on 2026-10-17.
+
+The user requested two independent PRs for the review findings on 2026-10-17.
+T0013 fixes image previews. [PR #30](https://github.com/GiftedNovaHD/minsky/pull/30) fixes reply retry cleanup in T0012.
+Both branches started from `main`. The user merged both PRs.
+
+Only the current, open preview can use a completed download or report its error.
+Closing a preview or opening another image makes older requests inactive.
+The app releases each temporary browser URL when its preview closes, changes, or leaves the page.
+
+Acceptance criteria:
+
+- [x] A delayed download cannot replace a newer preview or its download link.
+- [x] A delayed error from an older preview cannot replace the current status. Current errors still appear.
+- [x] Both **Close** and Escape restore focus and prevent older results from changing a new preview.
+- [x] The temporary browser URL is released when the preview closes.
+- [x] Browser regression tests reproduce the original failures and pass with the fix. Required local checks pass.
+- [x] The user merged PR #31.
+
+Verification is recorded in [current state](current-state.md#t0013-image-preview-request-handling-2026-10-17).
+No schema or function change is required. Deployment remains a separate step.
 
 ## T0001 — Local workflow demo and project guidance
 
@@ -392,6 +422,7 @@ No schema change or deployment is part of this ticket.
 ## T0011 — Documentation site
 
 Branch: `feature/t0011-documentation-site`, from updated `main` at `de92d54`.
+The branch now includes `main` at `f8a8cac`, with the merged T0012 and T0013 fixes.
 Status: the initial site is implemented, deployed, and verified locally and on the public docs site.
 The later CI workflow passes local checks and awaits account setup and its first automatic deployments.
 Review PR: [#29](https://github.com/GiftedNovaHD/minsky/pull/29). The user reviews and merges.
@@ -455,3 +486,26 @@ Full app preview operation also needs approved browser origins for the developme
 
 The four reported permission rules now appear in the public guides.
 The [audit](documentation-release-plan.md#permission-documentation-fixes) maps each correction and its remaining proposed work.
+
+## T0012 — Reply retry cleanup
+
+Branch: `feature/t0012-reply-retry-cleanup`, from updated `main` at `de92d54`.
+
+Status: merged into `main` in [PR #30](https://github.com/GiftedNovaHD/minsky/pull/30) on 2026-10-17.
+
+The pending reply now retains its success cleanup with its request ID and command.
+A successful retry clears the reply text and resets the audience before editing resumes.
+Failed requests preserve the draft.
+The request ID stays the same across retries, so the server can recognize an already recorded reply.
+
+Acceptance criteria:
+
+- [x] Successful retries clear public replies and internal notes. **Send reply** stays disabled until new text is entered.
+- [x] Repeated transport failures preserve the draft, audience, request ID, and command until success.
+- [x] A rejected request preserves an editable draft and does not create a history entry.
+- [x] A new reply after successful retry uses a new request ID and completes normally.
+- [x] Browser regression tests reproduce the original failure and pass with the fix. Required local checks pass.
+- [x] The user merged PR #30.
+
+Verification is recorded in [current state](current-state.md#t0012-reply-retry-cleanup-2026-10-17).
+Deployment remains a separate step.

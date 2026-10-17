@@ -9,6 +9,7 @@ import "../styles.css";
 const sessionId = "00000000-0000-4000-8000-000000000100";
 const issueId = "00000000-0000-4000-8000-000000000301";
 const ada = "00000000-0000-4000-8000-000000000003";
+const previewResponse = new URLSearchParams(window.location.search).get("previewResponse");
 const pixel = Uint8Array.from(atob(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
 ), (char) => char.charCodeAt(0));
@@ -106,7 +107,13 @@ function Preview({
     async abandon(_session, attachmentId) {
       pending.current.delete(attachmentId);
     },
-    async download() {
+    async download(path) {
+      if (previewResponse && path.endsWith(`${existing.id}/original`)) {
+        await new Promise((resolve) => window.setTimeout(resolve, 10_000));
+        if (previewResponse === "fail") {
+          throw new ImageRequestError("This image could not be opened.");
+        }
+      }
       return new Blob([pixel], { type: "image/png" });
     },
   }), []);

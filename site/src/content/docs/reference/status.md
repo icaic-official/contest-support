@@ -15,6 +15,8 @@ This page is a dated record, not a live deployment dashboard.
 | [T0005](https://github.com/GiftedNovaHD/minsky/pull/19) | Staff image uploads, fixed visibility, removal, and session limits. |
 | [T0008](https://github.com/GiftedNovaHD/minsky/pull/22) | Team search in the queue and staff report form. |
 | [T0010](https://github.com/GiftedNovaHD/minsky/pull/24) | Refresh behavior and cloud fixture cleanup fixes. |
+| [T0012](https://github.com/GiftedNovaHD/minsky/pull/30) | Reply text clears after a successful retry without duplicate history entries. |
+| [T0013](https://github.com/GiftedNovaHD/minsky/pull/31) | Delayed image downloads and errors cannot replace the current preview. |
 
 ## Pending changes
 

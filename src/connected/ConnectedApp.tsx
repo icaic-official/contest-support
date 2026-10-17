@@ -49,6 +49,12 @@ const resolutions = [
   "Problem statement clarified",
 ];
 const formatDate = (value: string) => new Date(value).toLocaleString();
+
+interface ActionOptions {
+  retry?: boolean;
+  onSuccess?: () => void;
+}
+
 function formData(event: FormEvent<HTMLFormElement>): FormData {
   event.preventDefault();
   return new FormData(event.currentTarget);
@@ -431,9 +437,11 @@ function Dashboard({
   const [now, setNow] = useState(Date.now());
   const clockOffset = useRef(0);
   const inFlight = useRef(false);
-  const pending = useRef<{ request: string; command: Command } | undefined>(
-    undefined,
-  );
+  const pending = useRef<{
+    request: string;
+    command: Command;
+    onSuccess?: () => void;
+  } | undefined>(undefined);
   const generation = useRef(0);
   const refreshQueue = useRef<Promise<void>>(Promise.resolve());
   const refresh = useCallback(() => {
@@ -567,7 +575,10 @@ function Dashboard({
     );
     return () => window.clearInterval(interval);
   }, []);
-  async function act(command: Command, retry = false): Promise<boolean> {
+  async function act(
+    command: Command,
+    { retry = false, onSuccess }: ActionOptions = {},
+  ): Promise<boolean> {
     if (inFlight.current || (!retry && pending.current)) return false;
     inFlight.current = true;
     setBusy(true);
@@ -576,11 +587,13 @@ function Dashboard({
     const request =
       retry && pending.current
         ? pending.current
-        : { request: crypto.randomUUID(), command };
+        : { request: crypto.randomUUID(), command, onSuccess };
     pending.current = request;
     try {
       const id = await execute(session, request.request, request.command);
       pending.current = undefined;
+      // A retry must complete the original form's cleanup before enabling edits.
+      request.onSuccess?.();
       await refresh();
       setSelected(id);
       if (command.type === "reopen") setFilter("claimed");
@@ -797,7 +810,7 @@ function Dashboard({
           <button
             onClick={() => {
               const command = pending.current?.command;
-              if (command) void act(command, true);
+              if (command) void act(command, { retry: true });
             }}
           >
             Retry last request
@@ -1193,7 +1206,7 @@ function IssueDetail({
   state: Snapshot;
   member: Membership;
   now: number;
-  act: (command: Command) => Promise<boolean>;
+  act: (command: Command, options?: ActionOptions) => Promise<boolean>;
   refresh: () => Promise<void>;
 }) {
   const [resolution, setResolution] = useState("");
@@ -1379,20 +1392,23 @@ function IssueDetail({
             onSubmit={(event) => {
               const form = event.currentTarget;
               const data = formData(event);
-              void act({
-                type: "message",
-                ...base,
-                text: text(data, "message"),
-                visibility:
-                  text(data, "visibility") === "internal"
-                    ? "internal"
-                    : "public",
-              }).then((ok) => {
-                if (ok) {
-                  form.reset();
-                  setMessage("");
-                }
-              });
+              void act(
+                {
+                  type: "message",
+                  ...base,
+                  text: text(data, "message"),
+                  visibility:
+                    text(data, "visibility") === "internal"
+                      ? "internal"
+                      : "public",
+                },
+                {
+                  onSuccess: () => {
+                    form.reset();
+                    setMessage("");
+                  },
+                },
+              );
             }}
           >
             {staff && (

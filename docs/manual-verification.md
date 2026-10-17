@@ -81,6 +81,18 @@ Expected result: successful submission closes the form and selects the new repor
 12. Leave the reply input blank.
 13. Check that **Send reply** remains disabled.
 
+Check reply retries with isolated accounts and controlled request failures:
+
+1. Enter a public reply and cause its response to be lost after the server records it.
+2. Select **Retry last request**. Repeat a transport failure and check that the text remains.
+3. Let the next retry succeed. Check that the text clears and **Send reply** is disabled.
+4. Check that history contains one copy of the reply.
+5. Enter a fresh reply. Check that it sends and clears normally.
+6. Repeat with an internal note. Check that successful retry resets **Audience** to its default.
+7. Reject a reply at the server. Check that its text remains editable and no history entry appears.
+
+The retry cases in `tests/workspace-refresh.spec.ts` automate these checks with mocked responses.
+
 ## 5. Resolution and award
 
 1. Resolve the issue with a preset or **Custom** summary.
@@ -233,6 +245,19 @@ Use an active event unless a step says the event is archived.
 34. Repeat with a password reset and with event archival.
 35. Start two uploads, then lower the count limit to one. Check that only one can become attached.
 36. Try a file path with an extra folder. Check that Storage refuses it.
+
+Check delayed previews with two different images, A and B, in an isolated test:
+
+1. Delay the original-file response for A, then open A.
+2. Close its preview and open B. Let B finish first.
+3. Release A's delayed response. Check that B's image, uploader, time, and download file still match B.
+4. Repeat with a failed response for A. Check that it does not report an error for the closed preview.
+5. Repeat with Escape to close A. Check that focus returns to A's thumbnail before opening B.
+6. Fail the response for the current preview. Check that the error still appears.
+
+`tests/images.spec.ts` automates these response-order checks with the development image harness.
+It also checks that closing the preview releases its temporary browser URL.
+These tests do not access hosted data.
 
 ## 11. Team search
 

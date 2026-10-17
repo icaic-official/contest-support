@@ -1,5 +1,33 @@
 # Current state
 
+## T0011 update from main (2026-10-17)
+
+PR #29 now includes `main` at `f8a8cac`, after the user merged PRs #30 and #31.
+The merge preserves the reply retry and image preview fixes and their browser tests.
+Conflicts affected `docs/current-state.md` and `docs/tickets.md`.
+Both sets of records remain. The ticket records and public feature-status guide now show both completed merges.
+Review of the combined source found no new blocking issue.
+
+Local type checking, lint, app and docs builds, and both Deno checks passed.
+All 68 unit and database tests, 12 function tests, 25 app browser tests, and three docs browser tests passed.
+The app build also passed with fictional public backend settings.
+It retained the existing chunk-size warning. The docs build retained its duplicate `/404` route warning.
+The docs build checked 14 HTML pages and 566 local links and assets. Its 404 browser check passed.
+The browser checks used fictional responses or local static documentation.
+Protected cloud tests and verification after deployment were not run.
+Current GitHub checks are available on [PR #29](https://github.com/GiftedNovaHD/minsky/pull/29).
+
+The user also requested the deployment variables.
+GitHub now stores the development `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` from the existing local configuration.
+Both values passed the deployment validator and a read-back check.
+`CLOUDFLARE_DEPLOY_ENABLED` is `false` while token setup and hosted checks remain pending.
+
+A read-only browser check of `minsky-dev.icaic-minsky.workers.dev` confirmed the missing-Supabase-settings screen and no sign-in form.
+This is the development app. Setting the GitHub variables does not change its published build.
+Cloudflare reports a newer Worker version from 2026-10-17, but its source revision remains unverified.
+The docs Worker's preview routing is still disabled. The local login could not read Cloudflare build triggers.
+No application or docs deployment was performed during this update.
+
 ## Deployment after CI passes, 2026-10-17
 
 The user requested automatic publication only after CI passes, then requested the completed workflow and setup instructions before adding credentials.
@@ -181,6 +209,38 @@ The latest recorded main application deployment is still `d1c36fd` from 2026-10-
 This docs change does not establish the running application revision.
 The older sections below record their original runs.
 
+## T0012 reply retry cleanup (2026-10-17)
+
+The user selected the reply-retry finding from the review of `main` at `de92d54`.
+The branch is `feature/t0012-reply-retry-cleanup`.
+The user requested an independent PR for each of the two review findings.
+
+The pending reply retains its success cleanup with its request ID and command.
+After a successful retry, the reply text clears and the audience returns to its default.
+**Send reply** stays disabled until new text is entered.
+Repeated transport failures retain the draft and original request.
+A rejected request leaves the draft available for correction.
+
+Checks passed on Node.js `22.22.1` and npm `11.12.0`:
+
+- `npm run typecheck`, `npm run lint`, and `npm run build` passed.
+- `npm test` passed all 49 local tests outside the sandbox.
+- `npm run check:functions` passed, and `npm run test:functions` passed all 12 tests.
+- `npm run test:e2e` passed all 20 Chromium tests outside the sandbox.
+
+The new browser tests lose two responses for the same recorded reply.
+They check public replies, internal notes, exact retry requests, one history entry, cleared controls, and a subsequent new reply.
+Both retry tests failed against the original app because the reply text remained after success.
+The first test attempt needed an accessible combobox selector for **Audience**.
+A separate test checks that server rejection preserves the draft.
+These tests use fictional Auth and database responses. They do not access hosted data.
+The suite also retains the existing phone-width and keyboard checks.
+
+The build retains the existing JavaScript chunk-size warning.
+Hosted checks, real-device checks, and deployment were not run.
+The app keeps its existing double quotes and JSX conventions for consistency with the surrounding code.
+No database migration or function change is required.
+
 ## Supabase CLI upgrade (2026-10-17)
 
 The user approved the existing Supabase CLI update from `2.119.0` to `2.121.0`.
@@ -215,9 +275,12 @@ The user reviews and merges the maintenance PR.
 
 ## Ticket status
 
-T0010 fixes the three P2 review findings on `feature/t0010-p2-review-fixes`.
-The branch started from `main` at `d961f5b` and now includes `main` at `9c0341c`.
-The user merged [PR #24](https://github.com/GiftedNovaHD/minsky/pull/24) on 2026-10-15. Application deployment remains a separate step.
+T0012 merged into `main` in [PR #30](https://github.com/GiftedNovaHD/minsky/pull/30) on 2026-10-17.
+It fixes reply cleanup after a successful retry.
+See [T0012 verification](#t0012-reply-retry-cleanup-2026-10-17).
+
+T0010 merged into `main` in [PR #24](https://github.com/GiftedNovaHD/minsky/pull/24) on 2026-10-15.
+It fixes the three earlier P2 findings. Deployment remains a separate step.
 See [T0010 verification](#t0010-p2-review-fixes-2026-10-15).
 
 T0008 fuzzy team search merged into `main` in [PR #22](https://github.com/notbowen/minsky/pull/22) on 2026-10-15 (SGT).
@@ -236,6 +299,10 @@ T0005 adds issue images and has an approved frontend preview using the shared de
 The main Worker frontend remains on the approved `main` revision.
 See [T0005 issue images](#t0005-issue-images-2026-10-11).
 
+T0013 merged into `main` in [PR #31](https://github.com/GiftedNovaHD/minsky/pull/31) on 2026-10-17.
+It fixes delayed image preview responses.
+See [T0013 verification](#t0013-image-preview-request-handling-2026-10-17).
+
 These operational items stay deferred.
 They are not part of T0005:
 
@@ -245,6 +312,35 @@ They are not part of T0005:
 
 Older reports below describe their recorded revisions.
 Use this status when an older report still says that T0005 is unimplemented or that PR #13 is open.
+
+## T0013 image preview request handling (2026-10-17)
+
+The branch is `feature/t0013-image-preview-race`, from `main` at `de92d54`.
+The user requested separate PRs for this fix and T0012 reply retry cleanup.
+
+Each preview has a request number. A completed download must match the current number and an open dialog.
+Older downloads cannot replace the current image or its download link.
+Older failures cannot report an error for a closed preview.
+Current failures still report the error.
+Closing a preview, replacing its image, or leaving the page releases its temporary browser URL.
+
+Checks passed on Node.js `22.22.1` and npm `11.12.0`:
+
+- `npm run typecheck`, `npm run lint`, and `npm run build` passed.
+- `npm test` passed all 49 local tests outside the sandbox.
+- `npm run check:functions` passed, and `npm run test:functions` passed all 12 tests.
+- `npm run test:e2e` passed all 22 Chromium tests outside the sandbox.
+
+Four new tests failed against the original app. They confirm that late downloads and errors cannot affect a newer preview after **Close** or Escape.
+The focused image suite now passes all 11 tests.
+It also checks that current errors still appear, focus returns, and a closed preview releases its browser URL.
+The development image harness can delay a response or return an error. The tests control its clock.
+Existing phone-width, upload, removal, contestant, and archived-event checks still pass.
+
+The build retains the existing JavaScript chunk-size warning.
+Hosted checks, real-device checks, and deployment were not run.
+The source keeps its existing double quotes and JSX conventions for consistency with the surrounding code.
+No database migration or function change is required.
 
 ## T0005 merge-conflict repair (2026-10-15)
 

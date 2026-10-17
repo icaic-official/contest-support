@@ -1,5 +1,39 @@
 # Current state
 
+## PR #36 merge-conflict repair, 2026-10-17
+
+The user merged T0015 in [PR #37](https://github.com/GiftedNovaHD/minsky/pull/37) at `738ef4a` on 2026-10-17 at 13:44:12 UTC.
+PR #36 now includes that `main` revision. Its remaining changes are documentation only.
+The records below retain the original verification results. T0015's hosted results are not a new cloud run for this repair.
+
+1. Summary of changes. Merged `main` into the T0016 branch. Retained the shared provider tests, Supabase fixes, and Cloudflare design. Updated current planning and ticket status after PR #37 merged.
+2. Files changed. Resolved `AGENTS.md`, `PLAN.md`, `README.md`, `docs/current-state.md`, and `docs/tickets.md`. Updated `docs/cloudflare-implementation-plan.md` to use the merged test suite and its coverage limits. Other merged files match `main`.
+3. Commands run. Git status, log, branch, remote, fetch, switch, merge, diff, commit, trailer check, and push. GitHub PR and check queries. Read documents with `cat`, `sed`, and `rg`. Ran Python documentation checks, the STE structural checker, and `git diff --check`. Initial GitHub access and branch switching required sandbox escalation.
+4. Build and test results. Documentation paths, anchors, heading structure, conflict-marker checks, and whitespace checks pass. Application builds, browser tests, and cloud tests were not run for this documentation-only repair.
+5. Manual verification. Compared the resolved records with PR #37's merge and verification evidence. Confirmed that application code, tests, workflows, and dependency files match `main` exactly.
+6. Risks. None added by this repair. The proposed Cloudflare implementation and migration remain unverified, as recorded in T0016.
+7. Follow-up tickets. User review of T0016 in PR #36. T0015 is merged. No new ticket is required for this repair.
+8. Docs that need updating. None for this repair. Record future identity decisions and implementation evidence in T0016's existing plan.
+
+## T0016 Cloudflare backend design, 2026-10-17
+
+The user authorized this design in parallel with shared provider tests while PR #32 was under review.
+`feature/t0016-cloudflare-backend-design` started from that PR at `d158906`.
+The user then merged PR #32 at `ef6a029` on 2026-10-17 at 12:51:42 UTC.
+This branch now includes that merge commit.
+The [design](cloudflare-backend-design.md) separates existing contracts from proposed server components.
+The [implementation plan](cloudflare-implementation-plan.md) defines bounded phases and acceptance evidence.
+Supabase remains active. No Cloudflare backend, authentication replacement, or data migration is implemented here.
+
+1. Summary of changes. Prepared the Cloudflare architecture and implementation acceptance plan. Recorded the parallel branch exception and AWS portability motivation.
+2. Files changed. `AGENTS.md`, `PLAN.md`, `README.md`, `docs/cloudflare-backend-design.md`, `docs/cloudflare-implementation-plan.md`, `docs/current-state.md`, `docs/product-direction.md`, and `docs/tickets.md`.
+3. Commands run. Git status, branch and worktree inspection, source reads with `sed`, `cat`, and `rg`, Python documentation checks, the STE writing checker, and `git diff --check`. The initial `python` command was unavailable. The checks ran with `python3`. Consulted current official Cloudflare and Supabase documentation.
+4. Build and test results. Documentation paths, heading structure, and whitespace pass. The structural writing check passes with synonym warnings disabled after review. Its initial pass flagged terminology such as confirmed rejection and validated response. Those terms retain distinct meanings. Application builds and tests were not run for this prose-only change. Cloudflare behavior remains unverified.
+5. Manual verification. Compared the design with `Backend`, workflow transactions, private signals, password restrictions, and image lifecycle code. Checked primary provider references near factual claims.
+6. Risks. The D1 assertion pattern, replacement identity implementation, hash compatibility, hosted limits, notification latency, and post-write rollback require implementation evidence. None is presented as verified.
+7. Follow-up tickets. Review T0015 and T0016. T0014 merged. The implementation plan defines later phases without opening speculative development tickets.
+8. Docs that need updating. Record approved identity settings and measured implementation results when those decisions and tests are complete.
+
 ## T0015 shared provider tests, 2026-10-17
 
 [PR #37](https://github.com/GiftedNovaHD/minsky/pull/37) implements and verifies the shared provider suite.

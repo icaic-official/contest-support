@@ -2,8 +2,8 @@
 
 These tickets describe development work, not contestant issues.
 
-The active implementation is [T0015 shared provider tests](#t0015-shared-provider-tests).
-The user authorized it alongside separate T0016 Cloudflare design work during PR #32 review.
+This branch records [T0016 Cloudflare backend design](#t0016-cloudflare-backend-design) in PR #36.
+[T0015 shared provider tests](#t0015-shared-provider-tests) merged in [PR #37](https://github.com/GiftedNovaHD/minsky/pull/37).
 [PR #32](https://github.com/GiftedNovaHD/minsky/pull/32) merged on 2026-10-17 at `ef6a029`.
 The numbered records below retain their original scope and verification history.
 
@@ -34,11 +34,11 @@ T0008 fuzzy team search merged into `main` in [PR #22](https://github.com/notbow
 
 Branch: `feature/t0015-provider-contract-tests`, started at PR #32 revision `d158906` and updated to merged `main` at `ef6a029`.
 
-Status: implemented and verified in [PR #37](https://github.com/GiftedNovaHD/minsky/pull/37). Awaiting user review and merge.
+Status: merged in [PR #37](https://github.com/GiftedNovaHD/minsky/pull/37) at `738ef4a` on 2026-10-17 at 13:44:12 UTC. Local and protected hosted checks passed.
 
 The user authorized this branch exception on 2026-10-17.
-T0015 and separate T0016 Cloudflare design work proceed during PR #32 review.
-Neither task changes PR #32. The user still reviews and merges.
+T0015 and separate T0016 Cloudflare design work started during PR #32 review.
+PRs #32 and #37 are now merged. The user still reviews and merges T0016.
 
 The shared scenarios call the real browser `Backend` contract.
 Each provider supplies isolated accounts, records, clients, fault controls, and cleanup.
@@ -56,6 +56,7 @@ Acceptance criteria:
 - [x] Ordinary CI runs without hosted credentials. Protected CI runs the hosted contract suite.
 - [x] Documentation explains coverage, limits, and the requirements for another provider fixture.
 - [x] Required local checks and the protected hosted run pass on the implementation revision.
+- [x] The user merged PR #37.
 
 The [protected run on `672ec6d`](https://github.com/GiftedNovaHD/minsky/actions/runs/39036173268) passed all 14 existing hosted UI tests and all eight shared scenarios.
 Cleanup completed without retained recovery files. The run used the existing CI backend and applied no migrations or function deployments.
@@ -458,6 +459,32 @@ Acceptance criteria:
 - [x] The user merged PR #24.
 
 No schema change or deployment is part of this ticket.
+
+## T0016 Cloudflare backend design
+
+Branch: `feature/t0016-cloudflare-backend-design`, from PR #32 at `d158906`.
+The branch now includes PR #32 at `ef6a029` and T0015 in PR #37 at `738ef4a`.
+Status: design prepared for review. No Cloudflare connector or resources exist in this change.
+
+The user authorized this design in parallel with T0015 shared provider tests while PR #32 was under review.
+This is an explicit exception to the normal branch and merge sequence.
+The user still reviews and merges the dependent work.
+
+Acceptance criteria:
+
+- [x] Separate browser contracts from server domain rules, transactional persistence, identity, blob storage, and change delivery.
+- [x] Specify D1 command receipts, atomic preconditions, concurrent changes, and private revision rules without a cross-resource transaction claim.
+- [x] Specify image permission checks, reservation limits, immutable storage, retryable deletion, and orphan cleanup.
+- [x] Specify Durable Object authorization, audience separation, reconnect behavior, revocation, and recovery of pending notifications.
+- [x] Record credential-migration options and decisions required before account cutover.
+- [x] Define bounded implementation phases with provider tests, migration comparison, and rollback acceptance.
+- [x] Keep AWS and Terraform as future work while defining portable interfaces.
+- [ ] The user reviews and accepts the design.
+
+The [design](cloudflare-backend-design.md) explains the decisions.
+The [implementation plan](cloudflare-implementation-plan.md) defines acceptance steps.
+The [verification record](current-state.md#t0016-cloudflare-backend-design-2026-10-17) identifies this documentation-only change.
+Supabase remains active. This ticket creates no credentials, provider resources, or data migration.
 
 ## T0014 backend adapters
 

@@ -113,6 +113,8 @@ The workflow requires account setup. The first automatic deployments remain unve
 - [Manual verification](docs/manual-verification.md) — workflow and interface checks.
 - [Code quality](docs/code-quality.md) — CI checks and review requirements.
 - [Backend contracts](docs/backend-contracts.md) describe the provider interfaces and their behavior.
+- [Cloudflare backend design](docs/cloudflare-backend-design.md) explains the proposed server boundaries and migration decisions.
+- [Cloudflare implementation plan](docs/cloudflare-implementation-plan.md) defines the work and verification required before cutover.
 - [Shared provider test contracts](docs/provider-test-contracts.md) describe reusable assertions, fixture ownership, and provider requirements.
 - [Product direction](docs/product-direction.md) — agreed requirements and open decisions.
 - [Contributor rules](AGENTS.md) and [planning record](PLAN.md).

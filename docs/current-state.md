@@ -15,6 +15,8 @@ It retained the existing chunk-size warning. The docs build retained its duplica
 The docs build checked 14 HTML pages and 566 local links and assets. Its 404 browser check passed.
 The browser checks used fictional responses or local static documentation.
 Protected cloud tests and verification after deployment were not run.
+The [push run](https://github.com/GiftedNovaHD/minsky/actions/runs/39024745166) and [PR run](https://github.com/GiftedNovaHD/minsky/actions/runs/39024747650) passed on merge commit `d37e0ab`.
+Both runs skipped protected cloud tests and deployment.
 Current GitHub checks are available on [PR #29](https://github.com/GiftedNovaHD/minsky/pull/29).
 
 The user also requested the deployment variables.
@@ -26,7 +28,13 @@ A read-only browser check of `minsky-dev.icaic-minsky.workers.dev` confirmed the
 This is the development app. Setting the GitHub variables does not change its published build.
 Cloudflare reports a newer Worker version from 2026-10-17, but its source revision remains unverified.
 The docs Worker's preview routing is still disabled. The local login could not read Cloudflare build triggers.
-No application or docs deployment was performed during this update.
+No manual application or docs deployment was performed during this update.
+
+Pushing the reviewed merge exposed a separate Cloudflare Git build for `minsky-dev`.
+It published a branch preview before the GitHub checks finished, despite the GitHub deployment switch being off.
+The user then confirmed that they disabled those Cloudflare Git builds.
+This confirmation came from the user; the local login could not verify the build setting through the API.
+The GitHub deployment switch remains off until the token and other activation checks are complete.
 
 ## Deployment after CI passes, 2026-10-17
 

@@ -17,6 +17,18 @@ The user authorized this first migration step while the other pull requests rema
 The [backend contracts](backend-contracts.md) describe the interfaces and retry rules.
 The [cloud onboarding guide](cloud-onboarding.md#verification-and-protected-cloud-ci) lists the `cloud-test` environment configuration.
 
+[Draft PR #32](https://github.com/GiftedNovaHD/minsky/pull/32) contains implementation commit `408dafa`.
+[GitHub Checks](https://github.com/GiftedNovaHD/minsky/actions/runs/39022916356) and the [secret and dependency checks](https://github.com/GiftedNovaHD/minsky/actions/runs/39022916361) passed for that commit.
+The protected cloud job was skipped.
+An in-memory ESLint check also confirmed that UI imports of the SDK and provider implementation fail lint.
+
+The independent [Cloudflare build for `minsky-dev`](https://dash.cloudflare.com/458ad6a930b0fb717796dfa19ca6a2b1/workers/services/view/minsky-dev/production/builds/41169b14-a851-4c69-8c39-d696b3da6a9f) failed.
+Its GitHub check exposes no failure details.
+A read-only Builds API request returned HTTP 401 with `Authentication error`, so the cause remains unverified.
+`npx --no-install wrangler --help` succeeded but could not write its diagnostic log in the sandbox.
+The failed provider check and missing protected environment remain recorded setup gaps.
+The PR stays in draft.
+
 ## Supabase CLI upgrade (2026-10-17)
 
 The user approved the existing Supabase CLI update from `2.119.0` to `2.121.0`.

@@ -1,6 +1,6 @@
 # Minsky frontend redesign: concepts and directions
 
-Status: **proposal for review** (2026-10-17). Nothing here is implemented in the app.
+Status: **direction chosen, not implemented** (2026-10-17). See [section 6](#6-chosen-direction-2026-10-17).
 The mockups use fictional sample data. They do not connect to Supabase.
 
 ## 1. What the app does today
@@ -107,6 +107,61 @@ Use a combination. Each direction solves a different problem, and the same compo
 - **Tests:** the Playwright journey test uses current labels and roles. A redesign needs selector updates in the same change.
 - **Size:** the full redesign is several tickets: foundation and shell, issue view, queue and search, contestant view, admin, mobile, and tests and docs. Plan to split it.
 
+## 6. Chosen direction (2026-10-17)
+
+The user chose **A (shadcn/ui console) combined with D (phone-first field mode)**:
+
+- **Organisers use phones.** Volunteers, specialists, jury members and session admins open Minsky in a phone browser.
+- **Contestants use computers.** Team accounts open Minsky in a desktop browser at their workstation.
+- **The two audiences get different UIs.** This is not one responsive layout with parts hidden. Both UIs share one shadcn/ui design system and the existing data layer.
+
+The account type selects the UI after sign-in. A membership with `team_id` gets the contestant UI. Every other membership gets the organiser UI. The two UIs are separate route trees and component sets.
+
+### Organiser app (`e-organiser-phone.html`)
+
+- Bottom tab bar. The tabs follow the person's combined roles:
+  - Volunteer or specialist: **Queue · Mine · Find · Me**.
+  - Jury only: **Awards · Find · Me** (resolved issues only, as today).
+  - Session admin: helper tabs plus **Session** (intake, image limits, accounts).
+- **Queue:** "oldest waiting" card with **Claim and go**, filter chips (Waiting, Handoffs, All active, Resolved), and cards sorted by unresolved time. Each card shows the hall and table number first, plus the aging timer and an inline Claim or Accept button.
+- **Issue:** a pushed full-screen view with table, timer, first assignment, lifecycle bar, owner, handoff banner, award receipt, images and activity. A fixed bottom action bar holds the reply button and one primary action: Claim, Resolve, Accept handoff, Reopen or Decide award. Secondary actions go in a "more" sheet.
+- **Bottom sheets** for these tasks:
+  - Reply, with a To the team / Staff only switch. Internal mode is amber and striped.
+  - Resolve, with radio cards.
+  - Escalate.
+  - Reopen.
+  - Add image. The visibility choice is fixed, and the default is staff only.
+  - Report for a team, with fuzzy team search.
+  - Decide award, with minute chips.
+  - Create account, followed by a one-time credential screen.
+- **Find:** T0008 fuzzy search for teams, tables and issue numbers.
+- On a phone the app fills the screen. The frame in the mockup is only for desktop review.
+
+### Contestant app (`f-contestant-desktop.html`)
+
+- A desktop layout. The top bar shows the event, the Live badge, the team name and table, and the theme toggle. The left column shows **Report an issue** and the team's reports. The main area shows the selected report.
+- **Issue page:** a plain-language headline ("Priya is handling your report."), the report, a large unresolved timer, and a four-step tracker (Sent → Helper assigned → Resolved → Time award).
+  - A resolution card with an inline reopen form.
+  - An award card that shows "Decided by the jury" and "Applied / not yet applied to your contest time" as two separate steps.
+  - Chat-style messages and team-visible images only. Internal notes and staff-only images never reach this UI.
+- **Report form:** category tiles, a description, and the table where the helper will come. When intake is closed, the button is disabled and a banner explains why.
+
+### Open decisions before implementation
+
+1. **Organisers on a desktop or tablet.** Proposed: the same organiser app, with the content in a centred column of about 480 px on wide screens. A desktop console for organisers (mockup A) can come later if leads need it.
+2. **Contestants on a phone.** Proposed: a single-column fallback below about 768 px. Contestants are not expected to use phones, but the page should not break.
+3. **Category descriptions and icons** on the contestant tiles. Categories are plain strings today. Proposed: use a generic icon and no description until a category editor exists.
+4. **Mockup items that need new data** stay out of scope: "Near me" or the helper's zone, quick replies, a floor map, and configurable aging thresholds.
+
+### Proposed implementation split
+
+The work is too large for one change. Proposed chats, all on one ticket branch:
+
+1. **Foundation:** Tailwind v4, shadcn/ui setup, design tokens, split `ConnectedApp.tsx` into data hooks, sign-in and password screens, and selection of the UI by account type.
+2. **Organiser app:** tabs, queue, issue view, sheets, find, awards, session admin. This step can split further.
+3. **Contestant app:** report list, issue page, report form, account. It runs in parallel with step 2.
+4. **Integration:** Playwright journey and selector updates, a phone-width check, documentation, and the PR.
+
 ## Files
 
 | File | Content |
@@ -115,5 +170,7 @@ Use a combination. Each direction solves a different problem, and the same compo
 | `b-ops-board.html` | Direction B (built file) |
 | `c-inbox.html` | Direction C (built file) |
 | `d-field-mobile.html` | Direction D (built file) |
-| `src/*.html`, `src/data.js` | Mockup sources and shared sample data |
-| `build.py` | Inlines `src/data.js` into each mockup: `python3 design/redesign/build.py` |
+| `e-organiser-phone.html` | Chosen: organiser phone app (A tokens + D layout) |
+| `f-contestant-desktop.html` | Chosen: contestant desktop app (A style) |
+| `src/*.html`, `src/data.js`, `src/_shadcn-head.html` | Mockup sources, shared sample data and shared shadcn tokens |
+| `build.py` | Inlines the shared parts into each mockup: `python3 design/redesign/build.py` |

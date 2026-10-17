@@ -1,0 +1,45 @@
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet" />
+<script>
+tailwind.config = {
+  darkMode: "class",
+  theme: { extend: {
+    fontFamily: { sans: ["Inter", "sans-serif"], mono: ["JetBrains Mono", "monospace"] },
+    colors: {
+      border: "hsl(var(--border))", input: "hsl(var(--input))", ring: "hsl(var(--ring))",
+      background: "hsl(var(--background))", foreground: "hsl(var(--foreground))",
+      primary: { DEFAULT: "hsl(var(--primary))", foreground: "hsl(var(--primary-foreground))" },
+      muted: { DEFAULT: "hsl(var(--muted))", foreground: "hsl(var(--muted-foreground))" },
+      accent: { DEFAULT: "hsl(var(--accent))", foreground: "hsl(var(--accent-foreground))" },
+      card: "hsl(var(--card))", sidebar: "hsl(var(--sidebar))",
+    },
+  } },
+};
+</script>
+<style>
+  :root { --background: 0 0% 100%; --foreground: 240 10% 3.9%; --card: 0 0% 100%; --sidebar: 0 0% 98%; --muted: 240 4.8% 95.9%; --muted-foreground: 240 3.8% 46.1%; --accent: 240 4.8% 95.9%; --accent-foreground: 240 5.9% 10%; --primary: 240 5.9% 10%; --primary-foreground: 0 0% 98%; --border: 240 5.9% 90%; --input: 240 5.9% 90%; --ring: 240 5% 64.9%; }
+  .dark { --background: 240 10% 3.9%; --foreground: 0 0% 98%; --card: 240 10% 5.5%; --sidebar: 240 6% 7%; --muted: 240 3.7% 15.9%; --muted-foreground: 240 5% 64.9%; --accent: 240 3.7% 15.9%; --accent-foreground: 0 0% 98%; --primary: 0 0% 98%; --primary-foreground: 240 5.9% 10%; --border: 240 3.7% 15.9%; --input: 240 3.7% 15.9%; --ring: 240 4.9% 83.9%; }
+  [data-lucide] { width: 16px; height: 16px; stroke-width: 2; flex-shrink: 0; }
+  .btn { display:inline-flex; align-items:center; justify-content:center; gap:.5rem; height:2.25rem; padding:0 .875rem; border-radius:.5rem; font-size:.875rem; font-weight:500; transition: background .15s, opacity .15s; white-space:nowrap; }
+  .btn-primary { background:hsl(var(--primary)); color:hsl(var(--primary-foreground)); } .btn-primary:hover { opacity:.9; }
+  .btn-outline { border:1px solid hsl(var(--border)); background:hsl(var(--background)); } .btn-outline:hover, .btn-ghost:hover { background:hsl(var(--accent)); }
+  .btn-lg { height:3rem; border-radius:.75rem; font-size:1rem; font-weight:600; }
+  .btn-sm { height:2rem; padding:0 .625rem; font-size:.8125rem; }
+  .badge { display:inline-flex; align-items:center; gap:.3rem; border-radius:9999px; padding:.125rem .55rem; font-size:.75rem; font-weight:500; border:1px solid hsl(var(--border)); white-space:nowrap; }
+  .s-open { color:#2563eb; } .s-claimed { color:#7c3aed; } .s-escalated { color:#b45309; } .s-resolved { color:#047857; }
+  .dark .s-open { color:#60a5fa; } .dark .s-claimed { color:#a78bfa; } .dark .s-escalated { color:#fbbf24; } .dark .s-resolved { color:#34d399; }
+  .age-fresh { color:hsl(var(--muted-foreground)); } .age-warn { color:#d97706; } .age-crit { color:#e11d48; } .age-done { color:hsl(var(--muted-foreground)); }
+  .dark .age-warn { color:#f59e0b; } .dark .age-crit { color:#fb7185; }
+  .internal { background: repeating-linear-gradient(135deg, rgb(245 158 11 / .07) 0 8px, transparent 8px 16px); border-color: rgb(245 158 11 / .45) !important; }
+  .switch { width:2.75rem; height:1.5rem; border-radius:9999px; background:hsl(var(--input)); position:relative; transition:background .2s; flex-shrink:0; }
+  .switch::after { content:""; position:absolute; top:2px; left:2px; width:1.25rem; height:1.25rem; border-radius:9999px; background:hsl(var(--background)); box-shadow: 0 1px 2px rgb(0 0 0 / .2); transition: transform .2s; }
+  .switch[aria-checked="true"] { background:#10b981; } .switch[aria-checked="true"]::after { transform: translateX(1.25rem); }
+  .seg { display:inline-flex; border-radius:.5rem; background:hsl(var(--muted)); padding:.2rem; }
+  .seg > button { border-radius:.375rem; padding:0 .75rem; height:2rem; font-size:.8125rem; font-weight:500; color:hsl(var(--muted-foreground)); }
+  .seg > button[aria-pressed="true"] { background:hsl(var(--background)); color:hsl(var(--foreground)); box-shadow:0 1px 2px rgb(0 0 0 / .12); }
+  .kbd { font-family: "JetBrains Mono", monospace; font-size:.6875rem; border:1px solid hsl(var(--border)); border-radius:.25rem; padding:0 .3rem; color:hsl(var(--muted-foreground)); }
+  input, textarea, select { background: transparent; }
+  .field { width:100%; border:1px solid hsl(var(--input)); border-radius:.5rem; padding:.5rem .75rem; font-size:.9375rem; outline:none; }
+  .field:focus { box-shadow: 0 0 0 2px hsl(var(--ring)); }
+</style>

@@ -59,6 +59,11 @@ See [cloud onboarding](docs/cloud-onboarding.md#contributor-setup) for provider 
 | `npm test` | Run unit, script, and embedded database tests without cloud credentials. |
 | `npm run test:d1` | Run the experimental D1 transaction proof with local emulation. |
 | `npm run test:d1:hosted -- --account=… --database=…` | Run the proof against its explicit isolated hosted D1 target. See the proof guide for exact values. |
+| `npm run test:auth` | Run experimental Cloudflare account and permission tests on local D1. |
+| `npm run test:auth:browser` | Check cookies, origins, and request protection with a local HTTPS Worker and Chromium. |
+| `npm run test:auth:hosted -- --account=… --database=…` | Run account cases on the explicit isolated hosted authentication D1 target. |
+| `npm run test:auth:http -- --account=… --database=… --origin=…` | Check the isolated deployed authentication Worker. |
+| `npm run test:auth:hash` | Measure password cost in a temporary local Worker. |
 | `npm run test:e2e` | Run browser tests with mocked cloud responses. |
 | `npm run test:providers:list` | List the shared provider scenarios without hosted credentials. |
 | `npm run test:providers -- --provider=supabase` | Run the shared contracts against an explicitly configured isolated Supabase project. |
@@ -117,6 +122,9 @@ The workflow requires account setup. The first automatic deployments remain unve
 - [Backend contracts](docs/backend-contracts.md) describe the provider interfaces and their behavior.
 - [Cloudflare backend design](docs/cloudflare-backend-design.md) explains the proposed server boundaries and migration decisions.
 - [Cloudflare implementation plan](docs/cloudflare-implementation-plan.md) defines the work and verification required before cutover.
+- [Cloudflare authentication reference](docs/cloudflare-authentication.md) defines the experimental API, browser sessions, and account rules.
+- [Authentication choice](docs/cloudflare-authentication-choice.md) records Better Auth, maintained crypto, resource measurements, and costs.
+- [Verify Cloudflare authentication](docs/verify-cloudflare-authentication.md) gives local, hosted, and protected CI procedures.
 - [D1 transaction proof](docs/d1-transaction-proof.md) gives the local and isolated hosted verification commands.
 - [Shared provider test contracts](docs/provider-test-contracts.md) describe reusable assertions, fixture ownership, and provider requirements.
 - [Product direction](docs/product-direction.md) — agreed requirements and open decisions.

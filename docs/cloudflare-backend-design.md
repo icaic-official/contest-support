@@ -173,11 +173,12 @@ Users must change these passwords before contest access.
 Preserve account IDs, memberships, permissions, and history.
 Existing passwords do not need to survive. Password-hash import is no longer required.
 
-The replacement identity implementation remains unselected.
+T0018 selects maintained Better Auth behind the identity adapter.
+See [the implementation reference](cloudflare-authentication.md) and [choice with costs](cloudflare-authentication-choice.md).
 The proposed final boundary is a maintained identity implementation behind a small server port.
 Minsky retains its username rules, organizer recovery, mandatory password changes, and cross-session authorization.
 
-Authentication implementation follows the D1 proof.
+T0018 implements authentication after the merged D1 proof.
 Use fictional accounts to verify password creation, mandatory changes, private credential distribution, recovery, and Worker execution limits.
 Full migration tooling follows connector verification.
 The owner decision authorizes no real-account reset, credential export, or backend switch in T0017.
@@ -193,7 +194,8 @@ The identity adapter owns expiry, rotation, and revocation. The browser receives
 State-changing routes check the request origin and a cross-site request forgery token.
 The WebSocket upgrade checks the origin and current login too.
 Preview origins and cross-origin local development need an explicit allowlist and browser tests.
-Cookie scope and session lifetime remain part of identity design review.
+T0018 uses host-only HttpOnly cookies, SameSite Strict, and a fixed eight-hour lifetime.
+Hosted cookies require Secure. The authentication reference defines exact origins and request protection.
 
 Password resets first place the account behind the mandatory-change gate and revoke earlier logins.
 The authorization check, gate, account access version, and audit record commit together.
@@ -302,7 +304,7 @@ Record hosted evidence in [the proof guide](d1-transaction-proof.md) before clai
 Passing that suite does not prove a fresh installation, a data migration, or capacity for 800 simultaneous users.
 Each claim needs its own evidence.
 
-Authentication and the remaining connector operations follow the D1 proof.
+T0018 adds authentication after the D1 proof. Remaining connector operations follow T0018.
 Full migration tooling follows connector verification. Real-data exports and the backend switch remain later phases.
 AWS adapters and Terraform remain deferred.
 

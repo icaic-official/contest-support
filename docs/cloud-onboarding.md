@@ -15,6 +15,13 @@ Cloudflare Workers Static Assets serves the frontend.
 Docker is optional.
 The user permits full authorized cloud credential access for contributors.
 
+## Experimental Cloudflare authentication
+
+T0018 uses separate local development databases and the isolated hosted `minsky-auth-ci` database and Worker.
+Follow [the authentication verification guide](verify-cloudflare-authentication.md) for explicit targets, credentials, checks, and recovery.
+The [identity choice](cloudflare-authentication-choice.md) records measured Worker CPU and the Standard plan need and cost.
+These resources contain fictional fixtures. They do not replace the Supabase projects described below.
+
 ## Authentication decision (2026-10-02)
 
 The public documentation has separate hosting. See [documentation hosting](#documentation-hosting-t0011).

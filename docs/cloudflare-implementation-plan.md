@@ -27,7 +27,7 @@ The remaining phases require the additional cases below.
 T0017 uses `feature/t0017-d1-transaction-proof` from updated `main` at `53f9dfd`.
 [PR #39](https://github.com/GiftedNovaHD/minsky/pull/39) implements the bounded proof.
 All 42 local and hosted D1 cases pass on `edb4bd0`, with verified scoped fixture cleanup.
-See [the evidence](current-state.md#t0017-d1-transaction-proof-2026-10-17). Owner review and merge remain pending.
+See [the evidence](current-state.md#t0017-d1-transaction-proof-2026-10-17). PR #39 merged at `0c797ad` on 2026-10-17 at 15:49:49 UTC.
 See [the proof guide](d1-transaction-proof.md) for the focused scope and verification procedure.
 
 1. Define the SQLite schema and the proposed application-store port.
@@ -51,6 +51,13 @@ Document the concrete need and cost before any paid upgrade.
 Subagents may perform independent, bounded tasks.
 
 ## Select and verify identity
+
+T0018 implements this phase on `feature/t0018-cloudflare-authentication` from merged PR #39.
+See the [reference](cloudflare-authentication.md), [choice and costs](cloudflare-authentication-choice.md), and [verification guide](verify-cloudflare-authentication.md).
+Current evidence remains in the [T0018 record](current-state.md#t0018-cloudflare-authentication-2026-10-18).
+The complete connector and migration remain later phases.
+T0018 passed all 28 protected hosted D1 account cases. Protected HTTP verification needs a paid Worker CPU allowance.
+The owner deferred subscription activation on 2026-10-18. Keep that result incomplete until the paid check passes.
 
 This phase follows the D1 proof.
 The owner selected organizer-issued replacement temporary passwords on 2026-10-17.

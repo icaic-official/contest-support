@@ -10,6 +10,12 @@ Review light and dark themes at desktop and 320px widths.
 The sign-in footer and sidebar links open the guides in a new tab to preserve the workspace.
 Those links reach the development app only after its separate frontend deployment.
 
+## Experimental Cloudflare authentication
+
+Follow [Verify Cloudflare authentication](verify-cloudflare-authentication.md) for isolated HTTPS browser checks.
+These checks use fictional local accounts. They do not switch the connected application from Supabase.
+The account reference records current cookie, origin, recovery, and session restrictions.
+
 ## Connected application
 
 Use the linked development project and organizer-provided username and password accounts.

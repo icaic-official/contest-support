@@ -219,7 +219,10 @@ export function createSupabaseBackend(
         };
         // A channel can join before Postgres starts streaming its changes.
         // Report connected only after the server confirms that subscription.
-        const channel = client.channel(`session-${sessionId}-${userId}`, {
+        // The SDK reuses topics while removal is pending. Each subscription
+        // needs its own channel so cleanup cannot close another subscriber.
+        const topic = `session-${sessionId}-${userId}-${crypto.randomUUID()}`;
+        const channel = client.channel(topic, {
           config: { postgres_changes_options: { wait: true } },
         })
           .on('postgres_changes', {

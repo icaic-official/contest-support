@@ -15,7 +15,7 @@ Those synthetic tests do not count as hosted provider verification.
 The first hosted shared run passed six cases and failed two.
 Image downloads remained available after membership removal, and the live-update case did not receive all required notifications.
 Fixture cleanup completed. Read-only checks found zero remaining records, accounts, receipts, or image objects for the captured first fixture identifiers.
-The strict assertions remain in place. Both adapter corrections are included in this branch.
+The strict assertions remain in place. The branch corrects the discovered defects.
 
 The image diagnostic confirmed that `snapshot.membership` was null after removal.
 The original download and a browser-only `no-store` request still returned HTTP 200 with `CF-Cache-Status: HIT`.
@@ -30,19 +30,37 @@ The third account remained valid and its snapshot contained the issue.
 Its database subscription became ready only after the other clients received that change.
 The adapter now sets `postgres_changes_options.wait` to `true`.
 It delays its ready signal until the database subscription is active.
-The focused adapter checks pass. The next local attempt hit the provider Auth rate limit during fixture setup and cleaned up without running the scenario.
-No rate limit or provider setting changed. The protected GitHub run remains the final verification step.
+The focused adapter checks pass. One local attempt hit the provider Auth rate limit during fixture setup and cleaned up without running the scenario.
+The next targeted hosted run passed with unchanged assertions in 25.9 seconds, including setup and cleanup.
+No rate limit or provider setting changed.
+
+The [first protected run](https://github.com/GiftedNovaHD/minsky/actions/runs/39035271460) passed 13 of 14 existing hosted UI tests.
+The layout test remained at `Connecting` during its five-second assertion. The shared suite did not run after that failure.
+Further inspection found that the SDK reuses a channel topic while asynchronous removal is pending.
+A regression test reproduced the collision for independent subscriptions on one `Backend`.
+The adapter now assigns each subscription a unique topic. The regression test passes.
+This also protects rapid unsubscribe and resubscribe, including React StrictMode cleanup.
+The shared live scenario now checks multiple subscriptions on one `Backend` and immediate cancellation followed by replacement.
+
+A targeted UI rerun still failed its original five-second assertion after channel isolation.
+Temporary metadata-only diagnostics found two invalid-input errors for subscriptions with an empty session ID.
+The valid subscription became ready after 9.627 seconds. The UI showed `Live` by 10.041 seconds.
+The dashboard now waits for session selection before it subscribes. Initial reads and polling remain active.
+A browser regression fails before that guard and passes after it.
+The diagnostic code was removed. The original hosted assertion remains unchanged.
+The targeted hosted layout case then passed in 24.2 seconds with complete fixture cleanup.
+The protected hosted rerun remains pending.
 
 The separate Cloudflare design is in [PR #36](https://github.com/GiftedNovaHD/minsky/pull/36).
 Its ordinary GitHub checks, secret scan, and dependency audits pass.
 That design does not implement a Cloudflare connector or migrate existing data.
 
 1. Summary of changes. Added provider-neutral behavior scenarios, isolated browser clients, Supabase fixtures, exact-ID recovery, and protected CI execution. Recorded the parallel branch exception and PR #32 merge.
-2. Files changed. Added `tests/providers/`, `tests/provider-bridge.spec.ts`, `playwright.providers.config.ts`, `scripts/provider-test.mjs`, `scripts/provider-test-options.mjs`, `scripts/provider-test-options.test.mjs`, `scripts/provider-fixture.test.mjs`, `docs/provider-test-contracts.md`, and `docs/run-provider-tests.md`. Updated `.github/workflows/checks.yml`, `package.json`, `playwright.config.ts`, `tsconfig.json`, `eslint.config.js`, `tests/landing.spec.ts`, `src/backend/supabase/backend.ts`, `src/backend/supabase/backend.test.ts`, `src/backend/supabase/images.ts`, `src/backend/supabase/images.test.ts`, `README.md`, `AGENTS.md`, `PLAN.md`, `docs/backend-contracts.md`, `docs/cloud-onboarding.md`, `docs/tickets.md`, and this record.
+2. Files changed. Added `tests/providers/`, `tests/provider-bridge.spec.ts`, `playwright.providers.config.ts`, `scripts/provider-test.mjs`, `scripts/provider-test-options.mjs`, `scripts/provider-test-options.test.mjs`, `scripts/provider-fixture.test.mjs`, `docs/provider-test-contracts.md`, and `docs/run-provider-tests.md`. Updated `.github/workflows/checks.yml`, `package.json`, `playwright.config.ts`, `tsconfig.json`, `eslint.config.js`, `tests/landing.spec.ts`, `tests/workspace-refresh.spec.ts`, `src/connected/ConnectedApp.tsx`, `src/backend/supabase/backend.ts`, `src/backend/supabase/backend.test.ts`, `src/backend/supabase/images.ts`, `src/backend/supabase/images.test.ts`, `README.md`, `AGENTS.md`, `PLAN.md`, `docs/backend-contracts.md`, `docs/cloud-onboarding.md`, `docs/tickets.md`, and this record.
 3. Commands run. Git and GitHub inspection, fetch, isolated worktree creation, and fast-forward to merged `main`. Locked npm installs, type checking, lint, build, unit tests, Deno checks, browser tests, docs build and browser checks, scenario discovery, import-boundary checks, documentation link checks, and whitespace checks. Added the exact T0015 branch to the existing `cloud-test` allowlist. Ran the shared suite against Minsky CI and read-only fixture cleanup queries. No development migration or deployment ran.
-4. Build and test results. Type checking, lint, app build, docs build, function checks, 114 unit and database tests, 12 function tests, six browser bridge tests, and three docs browser tests pass. The initial full isolated browser run passed 32 cases and failed a pre-existing keyboard test that pressed Tab before sign-in rendering completed. The corrected test waits for the sign-in heading. All 33 ordinary browser cases then passed on an isolated server. The first hosted provider run passed six of eight cases. Further hosted verification remains pending.
+4. Build and test results. Type checking, lint, app build, docs build, function checks, 115 unit and database tests, 12 function tests, six browser bridge tests, and three docs browser tests pass. The initial full isolated browser run passed 32 cases and failed a pre-existing keyboard test that pressed Tab before sign-in rendering completed. The corrected test waits for the sign-in heading. All 33 ordinary browser cases then passed on an isolated server. The session-selection regression adds one case, and all 34 now pass. The first hosted provider run passed six of eight cases. Further hosted verification remains pending.
 5. Manual verification. Reviewed provider imports, typed errors, cookie isolation, image byte transfer, callback cleanup, and exact fixture ownership. Verified the CI target is `ghtztmovdkhuketcbjmq` and the deployment switch remains `false`. No shared development account journey ran.
-6. Risks. The image fix passed a targeted hosted check. The readiness fix still requires the final hosted run. The existing CI backend includes unmerged announcement migration `202610110002`, so these runs use its existing schema and functions. The suite does not verify fresh installation, migration correctness, capacity, or an unimplemented provider.
+6. Risks. The image fix passed a targeted hosted check. The readiness fix passed a targeted hosted check. The combined changes still require the final protected hosted run. The existing CI backend includes unmerged announcement migration `202610110002`, so these runs use its existing schema and functions. The suite does not verify fresh installation, migration correctness, capacity, or an unimplemented provider.
 7. Follow-up tickets. Finish T0015 verification and review. Review T0016's architecture before Cloudflare implementation. AWS implementation and Terraform remain deferred.
 8. Docs that need updating. Record the final shared-suite results, discovered fixes, and protected CI run before review completion.
 

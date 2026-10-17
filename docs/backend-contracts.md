@@ -130,6 +130,8 @@ The Supabase adapter sets `postgres_changes_options.wait` to `true` before it re
 The UI fetches a new authorized snapshot when that connection opens or reconnects.
 
 The cleanup function can run more than once and stops subsequent callbacks.
+Subscriptions on the same `Backend` are independent, including when an earlier subscription is still closing.
+The Supabase adapter assigns each subscription a unique channel topic to prevent SDK channel reuse.
 The UI also refreshes every ten seconds and on focus or network restoration.
 Those reads detect revoked access even when the subscriber receives no more events.
 Live notifications do not authorize reads or writes.

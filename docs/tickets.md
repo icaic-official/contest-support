@@ -57,9 +57,10 @@ Acceptance criteria:
 - [x] Documentation explains coverage, limits, and the requirements for another provider fixture.
 - [ ] Required local checks and the protected hosted run pass on the implementation revision.
 
-The shared tests exposed two adapter defects.
+The shared tests and subsequent verification exposed image and live-update defects.
 Private image reads now bypass cached authorized responses.
 Live subscriptions wait for database readiness before reporting a connected state.
+Each subscriber has its own channel, and the dashboard waits for a selected session before it subscribes.
 Cloudflare resource creation, data migration, AWS implementation, and Terraform remain outside T0015.
 
 ## T0013 — Image preview request handling

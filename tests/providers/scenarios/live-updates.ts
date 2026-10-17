@@ -1,69 +1,80 @@
+import type { Backend } from '../../../src/backend/contracts';
 import type { ScenarioContext } from '../contracts';
 import { change, check, eventually, submit } from './assertions';
 
+function observeChanges(backend: Backend, sessionId: string, userId: string) {
+  const state = {
+    connected: false,
+    changes: 0,
+    callbacks: 0,
+    payloadCount: 0,
+  };
+  const stop = backend.updates.subscribe({
+    sessionId,
+    userId,
+    onChange: (...args) => {
+      state.changes++;
+      state.callbacks++;
+      state.payloadCount += args.length;
+    },
+    onConnection: (connected) => {
+      state.connected = connected;
+      state.callbacks++;
+    },
+  });
+  return { state, stop };
+}
+
 export async function liveUpdates(context: ScenarioContext): Promise<void> {
   const writer = await context.connect('volunteer');
-  const reader = await context.connect('contestant');
-  const observer = await context.connect('contestant');
-  const staff = await context.connect('specialist');
-  let staffConnected = false;
-  let staffChanges = 0;
-  let connected = false;
-  let observed = false;
-  let changes = 0;
-  let observerChanges = 0;
-  let payloadCount = 0;
-  const stop = reader.updates.subscribe({
-    sessionId: context.sessionId,
-    userId: context.accounts.contestant.id,
-    onChange: (...args) => {
-      changes++;
-      payloadCount += args.length;
-    },
-    onConnection: (value) => {
-      connected = value;
-    },
-  });
-  const stopObserver = observer.updates.subscribe({
-    sessionId: context.sessionId,
-    userId: context.accounts.contestant.id,
-    onChange: () => {
-      observerChanges++;
-    },
-    onConnection: (value) => {
-      observed = value;
-    },
-  });
-  const stopStaff = staff.updates.subscribe({
-    sessionId: context.sessionId,
-    userId: context.accounts.specialist.id,
-    onChange: () => {
-      staffChanges++;
-    },
-    onConnection: (value) => {
-      staffConnected = value;
-    },
-  });
+  const readerBackend = await context.connect('contestant');
+  const observerBackend = await context.connect('contestant');
+  const staffBackend = await context.connect('specialist');
+  const sessionId = context.sessionId;
+  const userId = context.accounts.contestant.id;
+  const reader = observeChanges(readerBackend, sessionId, userId);
+  const sibling = observeChanges(readerBackend, sessionId, userId);
+  const cancelled = observeChanges(readerBackend, sessionId, userId);
+  cancelled.stop();
+  cancelled.stop();
+  const cancelledAt = cancelled.state.callbacks;
+  const replacement = observeChanges(readerBackend, sessionId, userId);
+  const observer = observeChanges(observerBackend, sessionId, userId);
+  const staff = observeChanges(
+    staffBackend,
+    sessionId,
+    context.accounts.specialist.id,
+  );
+  const teamSubscriptions = [reader, sibling, replacement, observer];
   try {
     await eventually(
-      () => connected && observed && staffConnected,
-      'Live connections must report their subscribed state.',
+      () => teamSubscriptions.every(({ state }) => state.connected) &&
+        staff.state.connected,
+      'Independent subscriptions and the immediate replacement must connect.',
     );
-    const id = await submit(writer, context.sessionId, context.teamId);
+    const id = await submit(writer, sessionId, context.teamId);
     await eventually(
-      () => changes > 0 && observerChanges > 0 && staffChanges > 0,
-      'A committed issue must invalidate the team snapshot.',
+      () => teamSubscriptions.every(({ state }) => state.changes > 0) &&
+        staff.state.changes > 0,
+      'Every active subscription must receive the committed issue change.',
     );
-    check(payloadCount === 0, 'Live callbacks must not expose issue data.');
     check(
-      (await reader.workflows.snapshot(context.sessionId)).issues.some((item) =>
+      teamSubscriptions.every(({ state }) => state.payloadCount === 0),
+      'Live callbacks must not expose issue data.',
+    );
+    check(
+      (await readerBackend.workflows.snapshot(sessionId)).issues.some((item) =>
         item.id === id
       ),
       'The authorized read after notification must contain the issue.',
     );
-    const teamBeforeNote = changes;
-    const staffBeforeNote = staffChanges;
-    await change(writer, context.sessionId, id, {
+    check(
+      cancelled.state.callbacks === cancelledAt,
+      'Immediate cancellation must suppress later change and connection callbacks.',
+    );
+    const teamsBeforeNote = teamSubscriptions.map(({ state }) => state.changes);
+    const staffBeforeNote = staff.state.changes;
+    await change(writer, sessionId, id, {
       type: 'message',
       issue_id: id,
       revision: 0,
@@ -71,31 +82,40 @@ export async function liveUpdates(context: ScenarioContext): Promise<void> {
       text: `Private notification ${crypto.randomUUID()}`,
     });
     await eventually(
-      () => staffChanges > staffBeforeNote,
+      () => staff.state.changes > staffBeforeNote,
       'Staff must receive internal-note invalidation.',
     );
     // Observe a bounded quiet interval after the positive staff delivery check.
     await new Promise((resolve) => setTimeout(resolve, 500));
     check(
-      changes === teamBeforeNote,
-      'An internal note must not notify the team subscriber.',
+      teamSubscriptions.every(({ state }, index) =>
+        state.changes === teamsBeforeNote[index]
+      ),
+      'An internal note must not notify any team subscriber.',
     );
-    stop();
-    stop();
-    const stoppedAt = changes;
-    const observerAt = observerChanges;
-    await submit(writer, context.sessionId, context.teamId);
+    reader.stop();
+    reader.stop();
+    const stoppedAt = reader.state.callbacks;
+    const remaining = [sibling, replacement, observer];
+    const changesBefore = remaining.map(({ state }) => state.changes);
+    await submit(writer, sessionId, context.teamId);
     await eventually(
-      () => observerChanges > observerAt,
-      'An active observer must receive the next change.',
+      () => remaining.every(({ state }, index) =>
+        state.changes > changesBefore[index]
+      ),
+      'Stopping one subscriber must preserve its siblings and the separate observer.',
     );
     check(
-      changes === stoppedAt,
-      'Subscription cleanup must suppress subsequent callbacks.',
+      reader.state.callbacks === stoppedAt,
+      'Subscription cleanup must suppress later change and connection callbacks.',
+    );
+    check(
+      cancelled.state.callbacks === cancelledAt,
+      'The immediately cancelled subscription must remain inactive after resubscription.',
     );
   } finally {
-    stop();
-    stopObserver();
-    stopStaff();
+    for (const subscription of teamSubscriptions) subscription.stop();
+    cancelled.stop();
+    staff.stop();
   }
 }

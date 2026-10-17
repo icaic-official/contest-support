@@ -48,7 +48,7 @@ The suite checks these behaviors:
 - Team and session access, staff-note separation, and forbidden workflow transitions.
 - Lost responses, request-ID reuse, conflicting request content, and concurrent claims.
 - Image reservation retries, incomplete uploads, visibility, removal, abandonment, and revoked access.
-- Live invalidation, authorized reads after notification, and callback cleanup.
+- Live invalidation, independent subscribers, immediate resubscription, authorized reads after notification, and callback cleanup.
 - Membership removal and account password resets.
 
 The shared suite does not yet cover account creation through `Backend.admin.account`, every image-limit edge, reconnect recovery, or every authorization race.

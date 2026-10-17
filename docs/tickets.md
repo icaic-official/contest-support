@@ -517,6 +517,14 @@ Deployment remains a separate step.
 Branch: `feature/t0015-frontend-redesign`, from updated `main` at `aaa6bbc`.
 Status: design accepted. Implementation is in progress across several chats. The user reviews and merges the PR.
 
+### Progress
+
+- [x] **Step 1, foundation (2026-10-17).** Tailwind CSS v4, shadcn/ui components and zinc tokens. The data layer moved from `ConnectedApp.tsx` into hooks. Sign-in, password change and session access screens use shadcn/ui. The membership selects `ContestantApp` or `OrganiserApp`. `OrganiserApp` selects the phone or desktop layout by viewport. All three layouts render the existing workflow UI as placeholders. See [frontend architecture](frontend-architecture.md).
+- [ ] Step 2, organiser phone app.
+- [ ] Step 3, contestant desktop app (parallel with step 2).
+- [ ] Step 4, organiser desktop console.
+- [ ] Step 5, integration: Playwright selectors, documentation and the PR.
+
 The user requested a complete frontend redesign on 2026-10-17.
 They reviewed four mockup directions in [`design/redesign/`](../design/redesign/README.md).
 They chose direction A (shadcn/ui console) combined with direction D (phone-first field mode).

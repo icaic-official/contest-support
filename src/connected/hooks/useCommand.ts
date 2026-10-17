@@ -1,0 +1,126 @@
+import { useRef, useState } from "react";
+import { errorMessage, execute } from "../client";
+import type { Command } from "../model";
+
+/** Options for one workflow command. */
+export interface ActionOptions {
+  /** Send the pending command again with its original request UUID. */
+  retry?: boolean;
+  /**
+   * Runs once when the server records the command, before the refresh. Use it
+   * to clear the form that sent the command. A retry runs the callback of the
+   * original request.
+   */
+  onSuccess?: () => void;
+}
+
+/** Sends a workflow command. Resolves to true when the server records it. */
+export type Act = (
+  command: Command,
+  options?: ActionOptions,
+) => Promise<boolean>;
+
+/** The workflow command runner and its status for one session. */
+export interface CommandRunner {
+  act: Act;
+  /** True while a command request runs. */
+  busy: boolean;
+  /** A command whose result is unknown after a transport failure. */
+  pending: Command | undefined;
+  /** True while a command runs or waits for a retry. Disable workflow controls. */
+  locked: boolean;
+  /** Sends the pending command again with its original request UUID. */
+  retry: () => void;
+  /** Confirmation of the last recorded command. */
+  notice: string;
+  /** The error of the last command. */
+  error: string;
+}
+
+interface PendingRequest {
+  request: string;
+  command: Command;
+  onSuccess?: () => void;
+}
+
+/**
+ * Runs workflow commands one at a time. A repeated click while a command runs
+ * does nothing. After a transport failure the command keeps its request UUID
+ * until the person retries it, so the server cannot record it twice.
+ */
+export function useCommand({
+  sessionId,
+  refresh,
+  onRecorded,
+}: {
+  sessionId: string;
+  refresh: () => Promise<void>;
+  /** Runs after the refresh that follows a recorded command. */
+  onRecorded?: (issueId: string, command: Command) => void;
+}): CommandRunner {
+  const [busy, setBusy] = useState(false);
+  const [pending, setPending] = useState<Command>();
+  const [notice, setNotice] = useState("");
+  const [error, setError] = useState("");
+  const inFlight = useRef(false);
+  const pendingRequest = useRef<PendingRequest | undefined>(undefined);
+  function remember(request: PendingRequest | undefined) {
+    pendingRequest.current = request;
+    setPending(request?.command);
+  }
+  async function act(
+    command: Command,
+    { retry = false, onSuccess }: ActionOptions = {},
+  ): Promise<boolean> {
+    if (inFlight.current || (!retry && pendingRequest.current)) return false;
+    inFlight.current = true;
+    setBusy(true);
+    setNotice("");
+    setError("");
+    const request =
+      retry && pendingRequest.current
+        ? pendingRequest.current
+        : { request: crypto.randomUUID(), command, onSuccess };
+    remember(request);
+    try {
+      const id = await execute(sessionId, request.request, request.command);
+      remember(undefined);
+      // A retry must complete the original form's cleanup before enabling edits.
+      request.onSuccess?.();
+      await refresh();
+      onRecorded?.(id, command);
+      setNotice("Action recorded in shared history.");
+      return true;
+    } catch (cause) {
+      // Known server rejections are definitive. Transport failures retain the same
+      // request UUID for an explicit retry, including submissions and messages.
+      if (
+        cause &&
+        typeof cause === "object" &&
+        "code" in cause &&
+        typeof cause.code === "string" &&
+        cause.code
+      ) {
+        remember(undefined);
+      }
+      await refresh();
+      setError(errorMessage(cause));
+      return false;
+    } finally {
+      inFlight.current = false;
+      setBusy(false);
+    }
+  }
+  return {
+    act,
+    busy,
+    pending,
+    locked: busy || !!pending,
+    retry: () => {
+      const command = pendingRequest.current?.command;
+      if (command) void act(command, { retry: true });
+    },
+    notice,
+    error,
+  };
+}

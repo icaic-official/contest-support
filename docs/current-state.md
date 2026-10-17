@@ -1,5 +1,20 @@
 # Current state
 
+## T0015 frontend foundation (2026-10-17)
+
+Step 1 of T0015 is on `feature/t0015-frontend-redesign`. It is not merged or deployed.
+It adds Tailwind CSS v4, shadcn/ui components and the zinc design tokens.
+It moves the session, command and timer logic from `ConnectedApp.tsx` into hooks without a change in behavior.
+Sign-in, password change and session access screens use shadcn/ui, with light and dark themes.
+After sign-in, a team membership gets `ContestantApp`. Every other membership gets `OrganiserApp`.
+`OrganiserApp` shows a phone layout below 1024 px and a desktop console at 1024 px and wider.
+All three layouts still render the workflow UI from before T0015 as placeholders.
+See [frontend architecture](frontend-architecture.md).
+
+Local type checking, lint, build, 70 unit and database tests and 28 mocked browser tests passed.
+The browser tests ran in a job VM without `NODE_ENV=production`.
+Protected cloud tests and hosted checks were not run.
+
 ## T0011 update from main (2026-10-17)
 
 PR #29 now includes `main` at `f8a8cac`, after the user merged PRs #30 and #31.

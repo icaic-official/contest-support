@@ -6,7 +6,7 @@ Jury members record time awards, and staff confirm their application to the exte
 Administrators manage accounts, roles, and contestant intake.
 Staff can attach images to issues and choose staff-only or team visibility.
 
-The app uses React, TypeScript, and Vite, with Supabase Auth, Postgres, and Realtime.
+The app uses React, TypeScript, Vite, Tailwind CSS, and shadcn/ui, with Supabase Auth, Postgres, and Realtime.
 Cloudflare Workers hosts the frontend.
 This is a **development deployment** that requires connectivity.
 Live-contest readiness and capacity for 800 simultaneous users remain unverified.
@@ -102,6 +102,7 @@ The workflow requires account setup. The first automatic deployments remain unve
 - [Deployment setup](docs/cloudflare-builds.md) explains branch previews, deployment after CI passes, and first-run verification.
 - [Documentation release plan](docs/documentation-release-plan.md) — public-reader requirements, specific gaps, and completion criteria.
 - [Development tickets](docs/tickets.md) — ticket scope, status, and acceptance criteria.
+- [Frontend architecture](docs/frontend-architecture.md) — UI selection, shells, data hooks, and the Tailwind and shadcn/ui setup.
 - [Current state](docs/current-state.md) — implementation details, verification records, and limitations.
 - [Cloud onboarding](docs/cloud-onboarding.md) — provider setup, costs, accounts, and deployment.
 - [Manual verification](docs/manual-verification.md) — workflow and interface checks.

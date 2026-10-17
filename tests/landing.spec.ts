@@ -24,7 +24,9 @@ test("centered sign-in explains access and keeps unauthenticated users outside t
   ).toHaveCount(0);
   await page.setViewportSize({ width: 1505, height: 1045 });
   await page.evaluate(() => document.fonts.ready);
-  const form = await page.locator(".sign-in-panel").boundingBox();
+  const form = await page
+    .getByRole("region", { name: "Sign in", exact: true })
+    .boundingBox();
   expect(form).not.toBeNull();
   expect(Math.abs(form!.x + form!.width / 2 - 1505 / 2)).toBeLessThan(2);
   await page.screenshot({

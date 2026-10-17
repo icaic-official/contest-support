@@ -4,7 +4,7 @@ import { IssueImages } from "./IssueImages";
 import { ImageRequestError } from "./imageFile";
 import type { ImageTransport, StartedImage } from "./imageUpload";
 import type { Attachment, PendingRemoval } from "./model";
-import "../styles.css";
+import "../index.css";
 
 const sessionId = "00000000-0000-4000-8000-000000000100";
 const issueId = "00000000-0000-4000-8000-000000000301";
@@ -150,7 +150,7 @@ const existing: Attachment = {
 };
 
 createRoot(document.getElementById("root")!).render(
-  <main>
+  <main className="legacy-ui">
     <Preview title="Staff images" canUpload attachments={[existing]} />
     <Preview title="Contestant images" canUpload={false} attachments={[{
       ...existing,

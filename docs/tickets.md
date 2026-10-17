@@ -2,8 +2,11 @@
 
 These tickets describe development work, not contestant issues.
 
-T0011 is the active documentation-site companion to the open T0007 installation PR.
-The user requested its implementation and deployment on 2026-10-17.
+The active implementation is [T0014 backend adapters](#t0014-backend-adapters).
+The user authorized it on 2026-10-17 while earlier pull requests remain open.
+The numbered records below retain their original scope and verification history.
+
+T0011 documentation and deployment automation merged in [PR #29](https://github.com/GiftedNovaHD/minsky/pull/29) on 2026-10-17.
 T0005 merged in PR #19 and T0010 merged in PR #24 on 2026-10-15.
 Those merges do not imply application deployment.
 
@@ -419,13 +422,46 @@ Acceptance criteria:
 
 No schema change or deployment is part of this ticket.
 
+## T0014 backend adapters
+
+Branch: `feature/t0014-backend-adapters`, from updated `main` at `de92d54`.
+Status: implementation, local checks, ordinary GitHub checks, and all 14 hosted Supabase cases pass. Fixture cleanup completed. PR #32 is ready for user review and merge.
+
+The user selected shared backend interfaces before the Cloudflare migration.
+This ticket extracts Supabase as the first implementation.
+The browser continues to use the existing Auth service, database functions, account function, private image storage, and live subscriptions.
+
+Acceptance criteria:
+
+- [x] The UI uses typed interfaces for authentication, session reads, issue commands, administration, images, and live updates.
+- [x] Provider clients, access tokens, channels, database queries, and function payloads stay inside the Supabase implementation.
+- [x] Existing database and server functions remain the authority for permissions and workflow transitions.
+- [x] An uncertain write retains its request ID. A confirmed server rejection permits a new command.
+- [x] Password changes complete the existing mandatory-password check before the UI reports success.
+- [x] Image retries retain the existing upload identity, visibility, file checks, and removal behavior.
+- [x] Live subscriptions release their resources and ignore callbacks after cleanup. The UI retains refresh on reconnect, focus, and polling.
+- [x] Local type, lint, build, database, function, adapter, and browser checks pass.
+- [x] Documentation separates the current Supabase implementation from the selected future Cloudflare backend.
+- [x] Protected cloud checks pass on the reviewed revision against the existing Supabase backend. The [run on `a3b3c70`](https://github.com/GiftedNovaHD/minsky/actions/runs/39027288113) passes all 14 cases with `existing_backend=true` and successful fixture cleanup. The verification record identifies the backend versions.
+- [ ] The user reviews and merges the pull request.
+
+The [backend reference](backend-contracts.md) defines the interfaces.
+[Current state](current-state.md#t0014-existing-backend-verification-2026-10-17) records the verification results.
+
+The Cloudflare backend, D1 schema rewrite, account migration, R2 copy, and Durable Objects implementation remain later work.
+The next candidate is a shared hosted verification suite for the contracts before the second provider implementation.
+Other provider adapters and Terraform remain deferred.
+This ticket adds no backend schema or provider service and does not migrate user data or deploy the app.
+Hosted verification requires the existing CI project to have the merged backend migrations and functions.
+
 ## T0011 — Documentation site
 
 Branch: `feature/t0011-documentation-site`, from updated `main` at `de92d54`.
 The branch now includes `main` at `f8a8cac`, with the merged T0012 and T0013 fixes.
 Status: the initial site is implemented, deployed, and verified locally and on the public docs site.
 The later CI workflow passes local checks and awaits account setup and its first automatic deployments.
-Review PR: [#29](https://github.com/GiftedNovaHD/minsky/pull/29). The user reviews and merges.
+The user merged [PR #29](https://github.com/GiftedNovaHD/minsky/pull/29) on 2026-10-17 at 10:36:06 UTC, commit `aaa6bbc`.
+The GitHub deployment switch remains off. Automatic deployment remains unverified.
 See [deployment evidence](current-state.md#t0011-documentation-site-2026-10-17).
 
 The user requested a documentation site to accompany T0007, including written content and Workers deployment.

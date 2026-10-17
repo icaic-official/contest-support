@@ -22,6 +22,15 @@
 
 ## Current scope
 
+**T0014 backend adapters, 2026-10-17.** The user authorized the shared interfaces and Supabase extraction before the Cloudflare migration.
+Use `feature/t0014-backend-adapters`, from updated `main` at `de92d54`.
+This start is authorized while the earlier PRs remain open.
+Preserve existing server authorization, transactions, accounts, and image behavior.
+The selected future target is Workers, D1 with a SQLite rewrite, private R2, and Durable Objects for live updates.
+Preserve existing data during that later migration.
+Other providers, Terraform, provider resource changes, and deployment remain outside T0014.
+See [T0014](docs/tickets.md#t0014-backend-adapters) and [backend contracts](docs/backend-contracts.md).
+
 **Automatic frontend builds (2026-10-17):** the user authorized branch previews and automatic stable deployments after merges to `main`.
 Use GitHub Actions to publish the existing `minsky-dev` and `minsky-docs` Workers after all required CI jobs pass.
 Keep independent Cloudflare Git builds disabled.

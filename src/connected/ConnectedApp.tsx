@@ -5,28 +5,24 @@ import {
   useRef,
   useState,
 } from "react";
-import type { User } from "@supabase/supabase-js";
-import {
-  type AccountStatus,
-  accountStatus,
-  client,
-  errorMessage,
-  execute,
-  loginIdentifier,
-  requireClient,
-  snapshot,
-} from "./client";
+import { backend, backendSetupMessage, requireBackend } from "../backend";
+import type {
+  AccountCommand,
+  AccountIdentity,
+  AccountStatus,
+  MembershipInput,
+} from "../backend/contracts";
+import { errorMessage, WorkflowRejectedError } from "../backend/errors";
 import {
   type Command,
   isStaff,
   type Issue,
   isSupport,
   type Membership,
-  membershipSchema,
+  roleSchema,
   type Snapshot,
   unresolvedTime,
 } from "./model";
-import { z } from "zod";
 import { IssueImages } from "./IssueImages";
 import { TeamSearch } from "./TeamSearch";
 import {
@@ -63,8 +59,16 @@ function text(data: FormData, name: string): string {
   return String(data.get(name) ?? "");
 }
 
+function memberInput(data: FormData): MembershipInput {
+  return {
+    teamId: text(data, "team") || null,
+    roles: data.getAll("role").map((role) => roleSchema.parse(role)),
+    isAdmin: data.has("admin"),
+  };
+}
+
 export function ConnectedApp() {
-  const [user, setUser] = useState<User>();
+  const [user, setUser] = useState<AccountIdentity>();
   const [loading, setLoading] = useState(true);
   const [passwordSetup, setPasswordSetup] = useState(false);
   const [error, setError] = useState("");
@@ -73,28 +77,30 @@ export function ConnectedApp() {
   const [accountRetry, setAccountRetry] = useState(0);
   const userId = user?.id;
   useEffect(() => {
-    if (!client) {
+    if (!backend) {
       setLoading(false);
       return;
     }
     let active = true;
-    const { data: subscription } = client.auth.onAuthStateChange(
-      (event, session) => {
-        if (!active) return;
-        setUser(session?.user);
-        setLoading(false);
-        if (event === "SIGNED_OUT") setPasswordSetup(false);
-      },
-    );
-    void client.auth.getSession().then(({ data, error: cause }) => {
+    const unsubscribe = backend.auth.subscribe((nextUser) => {
       if (!active) return;
-      setUser(data.session?.user);
-      if (cause) setError(cause.message);
+      setUser(nextUser);
       setLoading(false);
+      if (!nextUser) setPasswordSetup(false);
     });
+    void backend.auth.currentUser()
+      .then((nextUser) => {
+        if (!active) return;
+        setUser(nextUser);
+        setLoading(false);
+      }).catch((cause: unknown) => {
+        if (!active) return;
+        setError(errorMessage(cause));
+        setLoading(false);
+      });
     return () => {
       active = false;
-      subscription.subscription.unsubscribe();
+      unsubscribe();
     };
   }, []);
   useEffect(() => {
@@ -103,7 +109,7 @@ export function ConnectedApp() {
     setAccount(undefined);
     async function refreshAccount() {
       try {
-        const next = await accountStatus();
+        const next = await requireBackend().auth.accountStatus();
         if (!active) return;
         setAccount(next);
         setAccountError("");
@@ -123,11 +129,9 @@ export function ConnectedApp() {
     };
   }, [userId, accountRetry]);
   function signOut() {
-    void requireClient()
-      .auth.signOut()
-      .then(({ error: cause }) => {
-        if (cause) setError(cause.message);
-      });
+    void requireBackend().auth.signOut().catch((cause: unknown) => {
+      setError(errorMessage(cause));
+    });
   }
   const dashboardReady =
     !!user &&
@@ -158,10 +162,9 @@ export function ConnectedApp() {
         )}
         {loading ? (
           <p role="status">Restoring your session…</p>
-        ) : !client ? (
+        ) : !backend ? (
           <p role="alert">
-            Set VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY in
-            .env.local. See docs/cloud-onboarding.md.
+            {backendSetupMessage}
           </p>
         ) : !user ? (
           <SignIn />
@@ -237,11 +240,10 @@ function SignIn() {
           setError("");
           void (async () => {
             try {
-              const result = await requireClient().auth.signInWithPassword({
-                email: loginIdentifier(text(data, "username")),
-                password: text(data, "password"),
-              });
-              if (result.error) throw result.error;
+              await requireBackend().auth.signIn(
+                text(data, "username"),
+                text(data, "password"),
+              );
             } catch (cause) {
               setError(errorMessage(cause));
             } finally {
@@ -341,15 +343,10 @@ function PasswordForm({
           setError("");
           void (async () => {
             try {
-              const updated = await requireClient().auth.updateUser({
-                password: text(data, "password"),
-                current_password: text(data, "current"),
-              });
-              if (updated.error) throw updated.error;
-              const completed = await requireClient().rpc(
-                "complete_password_change",
+              await requireBackend().auth.changePassword(
+                text(data, "current"),
+                text(data, "password"),
               );
-              if (completed.error) throw completed.error;
               done();
             } catch (cause) {
               setError(errorMessage(cause));
@@ -413,7 +410,7 @@ function Dashboard({
   changePassword,
   signOut,
 }: {
-  user: User;
+  user: AccountIdentity;
   username: string | null;
   changePassword: () => void;
   signOut: () => void;
@@ -450,27 +447,13 @@ function Dashboard({
     // revision. A write waits for its own refresh before enabling controls.
     const task = refreshQueue.current.then(async () => {
       try {
-        const membershipsResult = await requireClient()
-          .from("memberships")
-          .select("*")
-          .eq("user_id", user.id);
-        if (membershipsResult.error) throw membershipsResult.error;
-        const members = z.array(membershipSchema).parse(membershipsResult.data);
-        const sessionResult = await requireClient()
-          .from("sessions")
-          .select("id,name")
-          .in(
-            "id",
-            members.map((m) => m.session_id),
-          );
-        if (sessionResult.error) throw sessionResult.error;
-        const list = z
-          .array(z.object({ id: z.string().uuid(), name: z.string() }))
-          .parse(sessionResult.data);
+        const list = await requireBackend().workflows.sessions(user.id);
         const nextSession = list.some((s) => s.id === session)
           ? session
           : (list[0]?.id ?? "");
-        const next = nextSession ? await snapshot(nextSession) : undefined;
+        const next = nextSession
+          ? await requireBackend().workflows.snapshot(nextSession)
+          : undefined;
         if (run !== generation.current) return;
         setSessions(list);
         setSession(nextSession);
@@ -507,48 +490,17 @@ function Dashboard({
   useEffect(() => {
     void refresh();
     setConnected(false);
-    const channel = requireClient()
-      .channel(`session-${session}-${user.id}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "changes",
-          filter: `session_id=eq.${session}`,
-        },
-        () => {
-          void refresh();
-        },
-      )
-      .on(
-        "postgres_changes",
-        {
-          event: "UPDATE",
-          schema: "public",
-          table: "sessions",
-          filter: `id=eq.${session}`,
-        },
-        () => {
-          void refresh();
-        },
-      )
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "staff_changes",
-          filter: `session_id=eq.${session}`,
-        },
-        () => {
-          void refresh();
-        },
-      )
-      .subscribe((status) => {
-        setConnected(status === "SUBSCRIBED");
-        if (status === "SUBSCRIBED") void refresh();
-      });
+    const unsubscribe = requireBackend().updates.subscribe({
+      sessionId: session,
+      userId: user.id,
+      onChange: () => {
+        void refresh();
+      },
+      onConnection: (isConnected) => {
+        setConnected(isConnected);
+        if (isConnected) void refresh();
+      },
+    });
     // Poll current membership as a backstop: a revoked subscriber receives no further data.
     const interval = window.setInterval(() => {
       void refresh();
@@ -565,7 +517,7 @@ function Dashboard({
       window.clearInterval(interval);
       window.removeEventListener("focus", focus);
       window.removeEventListener("online", focus);
-      void requireClient().removeChannel(channel);
+      unsubscribe();
     };
   }, [refresh, session, user.id]);
   useEffect(() => {
@@ -590,7 +542,11 @@ function Dashboard({
         : { request: crypto.randomUUID(), command, onSuccess };
     pending.current = request;
     try {
-      const id = await execute(session, request.request, request.command);
+      const id = await requireBackend().workflows.execute(
+        session,
+        request.request,
+        request.command,
+      );
       pending.current = undefined;
       // A retry must complete the original form's cleanup before enabling edits.
       request.onSuccess?.();
@@ -602,13 +558,7 @@ function Dashboard({
     } catch (cause) {
       // Known server rejections are definitive. Transport failures retain the same
       // request UUID for an explicit retry, including submissions and messages.
-      if (
-        cause &&
-        typeof cause === "object" &&
-        "code" in cause &&
-        typeof cause.code === "string" &&
-        cause.code
-      ) {
+      if (cause instanceof WorkflowRejectedError) {
         pending.current = undefined;
       }
       await refresh();
@@ -655,9 +605,7 @@ function Dashboard({
     (m?.team_id
       ? state?.teams.find((team) => team.id === m.team_id)?.name
       : undefined) ??
-    (typeof user.user_metadata.name === "string"
-      ? user.user_metadata.name
-      : undefined) ??
+    user.name ??
     username ??
     user.email ??
     "Your account";
@@ -1647,7 +1595,7 @@ function AdminPanel({
   const guard = useRef(false);
   const session = state.session;
   if (!session) return null;
-  async function run(work: () => Promise<{ error: unknown }>) {
+  async function run(work: () => Promise<void>) {
     if (guard.current) return;
     guard.current = true;
     setBusy(true);
@@ -1655,8 +1603,7 @@ function AdminPanel({
     setNotice("");
     setCredentials(undefined);
     try {
-      const result = await work();
-      if (result.error) throw result.error;
+      await work();
       await refresh();
       setNotice("Administration action completed.");
     } catch (cause) {
@@ -1666,45 +1613,33 @@ function AdminPanel({
       guard.current = false;
     }
   }
-  async function account(action: string, data: FormData) {
-    const result = await requireClient().functions.invoke("admin", {
-      body: {
-        action,
-        session_id: session?.id,
-        username: text(data, "username"),
-        user_id: text(data, "user"),
-        name: text(data, "name"),
-        team_id: text(data, "team") || null,
-        roles: data.getAll("role"),
-        is_admin: data.has("admin"),
-      },
-    });
-    if (
-      result.error &&
-      "context" in result.error &&
-      result.error.context instanceof Response
-    ) {
-      const body: unknown = await result.error.context.json();
-      if (body && typeof body === "object" && "error" in body) {
-        return { error: { message: String(body.error) } };
-      }
-    }
-    if (!result.error && result.data?.temporary_password) {
-      const parsed = z
-        .object({ temporary_password: z.string() })
-        .parse(result.data);
-      const target = state.members.find(
-        (m) => m.person.id === text(data, "user"),
-      );
+  async function account(action: AccountCommand["action"], data: FormData) {
+    if (!session) return;
+    const command: AccountCommand = action === "create_account"
+      ? {
+          action,
+          username: text(data, "username"),
+          name: text(data, "name"),
+          ...memberInput(data),
+        }
+      : action === "set_username"
+        ? {
+            action,
+            userId: text(data, "user"),
+            username: text(data, "username"),
+          }
+        : { action, userId: text(data, "user") };
+    const result = await requireBackend().admin.account(session.id, command);
+    if (result.temporaryPassword) {
+      const target = state.members.find((m) => m.person.id === text(data, "user"));
       setCredentials({
         username:
           text(data, "username") ||
           target?.person.username ||
           "Existing email login",
-        password: parsed.temporary_password,
+        password: result.temporaryPassword,
       });
     }
-    return result;
   }
   return (
     <section className="panel admin-panel">
@@ -1771,10 +1706,9 @@ function AdminPanel({
           <button
             onClick={() => {
               void run(async () =>
-                requireClient().rpc("set_intake", {
-                  p_session: session.id,
-                  p_open: !session.intake_open,
-                }),
+                requireBackend().admin.setIntake(
+                  session.id, !session.intake_open,
+                ),
               );
             }}
           >
@@ -1789,11 +1723,10 @@ function AdminPanel({
           onSubmit={(event) => {
             const data = formData(event);
             void run(async () =>
-              requireClient().rpc("set_image_limits", {
-                p_session: session.id,
-                p_file_mb: Number(text(data, "file_mb")),
-                p_count: Number(text(data, "count")),
-                p_total_mb: Number(text(data, "total_mb")),
+              requireBackend().admin.setImageLimits(session.id, {
+                fileMegabytes: Number(text(data, "file_mb")),
+                count: Number(text(data, "count")),
+                totalMegabytes: Number(text(data, "total_mb")),
               })
             );
           }}
@@ -1949,14 +1882,9 @@ function AdminPanel({
                     onSubmit={(event) => {
                       const data = formData(event);
                       void run(async () =>
-                        requireClient().rpc("manage_member", {
-                          p_session: session.id,
-                          p_user: person.id,
-                          p_team: text(data, "team") || null,
-                          p_roles: data.getAll("role"),
-                          p_admin: data.has("admin"),
-                          p_remove: false,
-                        }),
+                        requireBackend().admin.saveMember(
+                          session.id, person.id, memberInput(data),
+                        ),
                       );
                     }}
                   >
@@ -1995,11 +1923,9 @@ function AdminPanel({
                           )
                         ) {
                           void run(async () =>
-                            requireClient().rpc("manage_member", {
-                              p_session: session.id,
-                              p_user: person.id,
-                              p_remove: true,
-                            }),
+                            requireBackend().admin.removeMember(
+                              session.id, person.id,
+                            ),
                           );
                         }
                       }}
@@ -2015,20 +1941,15 @@ function AdminPanel({
         <details className="admin-advanced">
           <summary>Assign an existing account by ID</summary>
           <p>
-            For trusted provisioning and accounts already created in Supabase.
+            For trusted provisioning and accounts that already exist.
           </p>
           <form
             onSubmit={(event) => {
               const data = formData(event);
               void run(async () =>
-                requireClient().rpc("manage_member", {
-                  p_session: session.id,
-                  p_user: text(data, "user"),
-                  p_team: text(data, "team") || null,
-                  p_roles: data.getAll("role"),
-                  p_admin: data.has("admin"),
-                  p_remove: false,
-                }),
+                requireBackend().admin.saveMember(
+                  session.id, text(data, "user"), memberInput(data),
+                ),
               );
             }}
           >

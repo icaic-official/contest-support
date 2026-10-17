@@ -8,6 +8,9 @@ Staff can attach images to issues and choose staff-only or team visibility.
 
 The app uses React, TypeScript, and Vite, with Supabase Auth, Postgres, and Realtime.
 Cloudflare Workers hosts the frontend.
+The browser uses shared [backend contracts](docs/backend-contracts.md), with Supabase as the current implementation.
+The selected future backend uses Workers, D1, R2, and Durable Objects.
+See [the migration direction](docs/product-direction.md#backend-migration-direction) for the agreed scope and pending decisions.
 This is a **development deployment** that requires connectivity.
 Live-contest readiness and capacity for 800 simultaneous users remain unverified.
 
@@ -106,5 +109,6 @@ The workflow requires account setup. The first automatic deployments remain unve
 - [Cloud onboarding](docs/cloud-onboarding.md) — provider setup, costs, accounts, and deployment.
 - [Manual verification](docs/manual-verification.md) — workflow and interface checks.
 - [Code quality](docs/code-quality.md) — CI checks and review requirements.
+- [Backend contracts](docs/backend-contracts.md) describe the provider interfaces and their behavior.
 - [Product direction](docs/product-direction.md) — agreed requirements and open decisions.
 - [Contributor rules](AGENTS.md) and [planning record](PLAN.md).

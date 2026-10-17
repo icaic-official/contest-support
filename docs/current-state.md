@@ -1,5 +1,117 @@
 # Current state
 
+## T0014 existing backend verification, 2026-10-17
+
+The [completed hosted run](https://github.com/GiftedNovaHD/minsky/actions/runs/39027288113) passed on `a3b3c70` with `existing_backend=true`.
+All 14 hosted cases passed in 2.8 minutes, and global teardown completed without a cleanup error or retained recovery file.
+The ordinary CI jobs passed too. PR #32 is ready for user review.
+The following documentation update changes no application, workflow, or test code.
+
+The run recorded all seven repository migration versions and the additional announcement version `202610110002`.
+The active functions were `admin` version 6, `attachments` version 2, and `announcement-images` version 3.
+This verifies the shared interfaces and Supabase adapter against the prepared CI backend.
+It does not verify a fresh installation, a Cloudflare backend, or the published Cloudflare frontend.
+`CLOUDFLARE_DEPLOY_ENABLED` remains `false`.
+
+The owner replaced `SUPABASE_ACCESS_TOKEN` in `cloud-test`.
+The [retry on `1a5349b`](https://github.com/GiftedNovaHD/minsky/actions/runs/39026364030) passed the ordinary checks, connected to Minsky CI, and applied Auth configuration.
+Database preparation then stopped because remote migration `202610110002` is absent from PR #32.
+That version belongs to `202610110002_announcements.sql` in open PR #20.
+The retry deployed no functions and created no fixtures.
+
+PR #32 changes no files under `supabase/` compared with its merge base on `main`.
+The new `existing_backend` workflow input permits a regression check against the already deployed CI backend.
+It records migration and function versions, then skips backend preparation.
+The default remains backend preparation with the migration-history check.
+Neither mode resets the database or repairs its migration history.
+
+1. Summary of changes. Added an explicit existing-backend mode for the hosted connector check after tracing the migration mismatch to PR #20. Added a prerequisite check before fixture creation. Prepared the missing merged CI backend and recovered the failed run's temporary records.
+2. Files changed. `.github/workflows/checks.yml`, `scripts/check-cloud-backend.mjs`, `scripts/check-cloud-backend.test.mjs`, `docs/cloud-onboarding.md`, `docs/tickets.md`, and `docs/current-state.md`.
+3. Commands run. Git status, fetch, worktree creation, source and migration inspection, commit, trailer verification, and push. GitHub metadata queries, workflow dispatch, run monitoring, failed-log inspection, and PR updates. YAML and shell checks, documentation path checks, and `git diff --check`. Supabase project list, isolated link, read-only database queries, migration fetch into a temporary directory, migration dry run and push, function deployment, and test-origin configuration. `npm ci --offline --no-audit --no-fund`, the prerequisite unit suite, lint, the live prerequisite check, fixture recovery through the existing cleanup function, and zero-count queries.
+4. Build and test results. Final GitHub CI passed type checking, lint, both builds, function checks, 99 unit and database tests, 12 function tests, 27 app browser tests, three docs browser tests, and 14 hosted cases. The docs build checked 14 pages and 566 local links and assets. Earlier ordinary CI passed on `1a5349b` and `81eddfb`. The first existing-backend run passed five hosted tests and failed nine because CI lacked the image schema and function. Teardown stopped at the missing attachments table. Recovery completed after CI preparation. All ten prerequisite tests and the live prerequisite check pass. The sandbox blocked esbuild's install check. Dependency installation passed outside the sandbox. Initial checks caught an incorrect parameterized fixture and missing JavaScript global declarations. Both were corrected.
+5. Manual verification. Confirmed target `ghtztmovdkhuketcbjmq`, the CI environment branch restrictions, the replacement secret timestamp, and `CLOUDFLARE_DEPLOY_ENABLED=false`. Compared PR #32's Supabase files with `main`. Confirmed zero remaining events, sessions, teams, people, Auth accounts, and command receipts for the recovered fixture identifiers.
+6. Risks. A regression run against the existing backend does not verify a fresh backend installation. Minsky CI includes an unmerged announcement migration. Full backend preparation still requires reconciliation of that difference. The prerequisite check verifies version records and function availability, not source equivalence. The existing Cloudflare frontend still needs a configured build.
+7. Follow-up tickets. The user reviews and merges T0014 in PR #32. Resolve the CI migration history with the PR #20 work before a later backend installation check. Shared contract checks, Cloudflare implementation, and migration rehearsal remain later work.
+8. Docs that need updating. None for this verification.
+
+The [first existing-backend run](https://github.com/GiftedNovaHD/minsky/actions/runs/39026689165) tested `81eddfb`.
+Its version log showed that CI lacked `202610110001_attachments.sql` and `202610140001_attachment_fixes.sql`.
+CI had `admin` version 4 and `announcement-images` version 2, but no `attachments` function.
+The tests started without those prerequisites, and fixture teardown could not query the missing table.
+The new prerequisite check prevents that sequence.
+
+CI preparation used a temporary directory with the fetched remote announcement migration and the merged repository migrations.
+The dry run selected only the two missing image migrations.
+Both applied without seeds or a reset. The `admin` and `attachments` functions then deployed from the reviewed source.
+The test origin remains `http://127.0.0.1:4174`.
+The announcements migration, function, and data remain intact.
+
+Recovery identified event `7c800db8-716b-40e6-bbd5-aff5c381d10a` through its unique test tag and the run's account-creation window.
+Exact generated account names and session memberships identified its nine temporary accounts, including the legacy-account test.
+The existing fixture cleanup deleted that event, its two sessions, and those accounts.
+Read-only queries confirmed zero remaining records for the recovered identifiers, including command receipts.
+No development project records were involved.
+
+## T0014 update after the documentation merge, 2026-10-17
+
+The user merged PR #29 at `aaa6bbc` on 2026-10-17 at 10:36:06 UTC.
+PR #32 now includes that revision, including the earlier reply retry and image preview fixes.
+The shared interfaces and Supabase adapter remain the active work.
+Hosted Supabase verification precedes the Cloudflare adapter and any data migration.
+
+1. Summary of changes. Merged current `main` into the connector branch and retained both sets of project records. Recorded the confirmed migration order and PR #29 merge. Restricted the existing `cloud-test` environment to `main` and `feature/t0014-backend-adapters`.
+2. Files changed. Resolved `AGENTS.md`, `PLAN.md`, `docs/cloud-onboarding.md`, `docs/current-state.md`, and `docs/tickets.md`. The merge also brings the already-reviewed documentation site, deployment workflow, reply retry cleanup, image preview guards, and their tests into this branch.
+3. Commands run. Git fetch, worktree creation, merge, diff, status, commit, trailer verification, and push. GitHub PR, variable, secret-name, environment, and branch-policy queries. GitHub environment branch-policy updates, PR description update, workflow dispatch, run inspection, and failed-log inspection. `npm ci --offline --no-audit --no-fund` for the root and docs packages. Type checking, lint, both builds, unit and database tests, both Deno checks, app browser tests, and docs browser tests. A second app build uses the existing public GitHub variables. HTTP asset inspection and a local Chromium sign-in check verify the missing-settings diagnosis.
+4. Build and test results. Type checking, lint, both builds, and both Deno checks pass. `npm test` passes 89 tests. The function suite passes 12 tests. The app browser suite passes 27 tests, and the docs browser suite passes three tests. The docs build checks 14 HTML pages and 566 local links and assets. Its existing duplicate `/404` warning remains. The configured app build retains the existing chunk-size warning.
+5. Manual verification. Reviewed the merged application and provider boundaries. The configured local build displays the sign-in form, omits the setup error, and reports no browser page errors. No account login or shared development record write was part of this check. The hosted test target is `Minsky CI`, reference `ghtztmovdkhuketcbjmq`.
+6. Risks. Hosted Supabase verification is blocked by the access-token format error recorded below. The old Cloudflare preview and the stable app both serve bundles without the development Supabase URL or publishable key. They cannot connect until a configured frontend build replaces them. The deployment switch remains `false`. The GitHub environment has branch restrictions but no required-reviewer rule. The account-plan API did not expose a plan, so reviewer availability remains unverified.
+7. Follow-up tickets. Complete T0014 hosted verification and user review. Test the same contracts against Cloudflare before a migration rehearsal and data cutover. Other provider adapters and Terraform remain deferred.
+8. Docs that need updating. Add the hosted run result after it finishes. Record frontend deployment separately when publication is activated.
+
+The user supplied the old preview URL `https://ccdd90fb-minsky-dev.icaic-minsky.workers.dev`.
+That preview serves `index-B4jx6y34.js`. The stable app serves `index-CSDiNndQ.js`.
+Both bundles contain the setup message and omit the development Supabase URL and publishable key prefix.
+Setting GitHub variables does not change already published assets.
+No application or documentation deployment occurred in this update.
+
+The [hosted workflow](https://github.com/GiftedNovaHD/minsky/actions/runs/39025809230) ran on `6f46e54`.
+Its ordinary checks, secret scan, and dependency audits passed.
+The cloud job confirmed the CI project reference, then failed at `supabase link`.
+The CLI reported an invalid `SUPABASE_ACCESS_TOKEN` format and required an `sbp_` personal access token.
+Configuration changes, migrations, function deployment, and fixture creation did not run.
+The owner must replace that environment secret before the hosted check can proceed.
+The separate [push run](https://github.com/GiftedNovaHD/minsky/actions/runs/39025807758) passed on the same revision.
+PR #32 remains in draft until hosted verification passes.
+
+## T0014 backend adapters 2026-10-17
+
+The branch is `feature/t0014-backend-adapters`, from updated `main` at `de92d54`.
+The user authorized this first migration step while the other pull requests remain open.
+
+1. Summary of changes. The UI now uses `Backend` for authentication, session reads, workflows, administration, images, and live updates. Supabase implements those contracts through the existing services. Server permissions, database functions, and provider resources remain unchanged. The reference and product direction distinguish this extraction from the later D1 migration.
+2. Files changed. Added `src/backend/contracts.ts`, `errors.ts`, `index.ts`, `supabase/backend.ts`, `supabase/images.ts`, `supabase/backend.test.ts`, and `supabase/images.test.ts`. Moved `src/connected/client.test.ts` to `src/backend/supabase/login.test.ts` and removed `src/connected/client.ts`. Updated `src/connected/ConnectedApp.tsx`, `IssueImages.tsx`, `imageFile.ts`, `imagePreview.tsx`, and `imageUpload.ts`. Updated `tests/workspace-refresh.spec.ts` and `eslint.config.js`. Added `docs/backend-contracts.md`. Updated `AGENTS.md`, `PLAN.md`, `README.md`, `docs/tickets.md`, `docs/product-direction.md`, `docs/cloud-onboarding.md`, and this record.
+3. Commands run. Git status, diff, fetch, and worktree creation. Repository inspection with `rg`, `sed`, and `cat`. `gh pr list` and `gh api repos/GiftedNovaHD/minsky/environments`. `npm ci --offline --no-audit --no-fund`. `npx deno fmt --single-quote src/backend`. `npm run typecheck`, `npm run lint`, `npm run build`, `npm test -- src/backend/supabase`, `npm test`, `npm run check:functions`, `npm run test:functions`, and `npm run test:e2e`. `git diff --check` and a Python check of documentation paths and anchors. Commit, trailer verification, push, and PR preparation complete the repository workflow.
+4. Build and test results. Local type checking, lint, and build pass. The unit and embedded database suite passes 70 tests. The function suite passes 12 tests. Both functions pass Deno type checking. The browser suite passes 19 Chromium tests. The sandbox blocked the dependency install check and browser server. It also affected the existing child-process stderr test. Those commands pass outside the sandbox. Initial checks caught a test URL mismatch, test type errors, lint errors, and a moved helper still imported by the attachment function. The corrections retain that helper at its original path.
+5. Manual verification. Reviewed the extraction and provider imports against the existing calls. Automated browser checks cover narrow layouts, keyboard controls, image retries, membership refresh, and workflow retry IDs. No new manual hosted account journey ran. The protected hosted check remains pending.
+6. Risks. GitHub reports zero configured environments, so `cloud-test` cannot run. No hosted verification result is claimed for this revision. PRs #30 and #31 also edit the reply and image components. Their eventual merge may require conflict resolution and another verification run. The interfaces do not prove a Cloudflare implementation, password migration, or production capacity. Existing UI files retain double-quoted strings for consistency. New backend modules use single-quoted strings under the Google TypeScript Style Guide.
+7. Follow-up tickets. Complete T0014 protected cloud verification and user review. The next candidate is a shared hosted contract suite before the Cloudflare implementation. Authentication migration, D1, R2, Durable Objects, and eventual data cutover remain later work. Other providers and Terraform remain deferred.
+8. Docs that need updating. None for the implemented extraction. Future hosted verification must add its result to this record.
+
+The [backend contracts](backend-contracts.md) describe the interfaces and retry rules.
+The [cloud onboarding guide](cloud-onboarding.md#verification-and-protected-cloud-ci) lists the `cloud-test` environment configuration.
+
+[Draft PR #32](https://github.com/GiftedNovaHD/minsky/pull/32) contains implementation commit `408dafa`.
+[GitHub Checks](https://github.com/GiftedNovaHD/minsky/actions/runs/39022916356) and the [secret and dependency checks](https://github.com/GiftedNovaHD/minsky/actions/runs/39022916361) passed for that commit.
+The protected cloud job was skipped.
+An in-memory ESLint check also confirmed that UI imports of the SDK and provider implementation fail lint.
+
+The independent [Cloudflare build for `minsky-dev`](https://dash.cloudflare.com/458ad6a930b0fb717796dfa19ca6a2b1/workers/services/view/minsky-dev/production/builds/41169b14-a851-4c69-8c39-d696b3da6a9f) failed.
+Its GitHub check exposes no failure details.
+A read-only Builds API request returned HTTP 401 with `Authentication error`, so the cause remains unverified.
+`npx --no-install wrangler --help` succeeded but could not write its diagnostic log in the sandbox.
+The failed provider check and missing protected environment remain recorded setup gaps.
+The PR stays in draft.
+
 ## T0011 update from main (2026-10-17)
 
 PR #29 now includes `main` at `f8a8cac`, after the user merged PRs #30 and #31.

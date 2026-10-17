@@ -217,7 +217,11 @@ export function createSupabaseBackend(
         const changed = () => {
           if (active) onChange();
         };
-        const channel = client.channel(`session-${sessionId}-${userId}`)
+        // A channel can join before Postgres starts streaming its changes.
+        // Report connected only after the server confirms that subscription.
+        const channel = client.channel(`session-${sessionId}-${userId}`, {
+          config: { postgres_changes_options: { wait: true } },
+        })
           .on('postgres_changes', {
             event: '*',
             schema: 'public',

@@ -40,6 +40,7 @@ jobs:
       - run: npm run check:functions
       - run: npm run test:functions
       - run: npm test
+      - run: npm run test:providers:list
       - run: npm run build
       - run: npm run docs:build
       - run: npx playwright install --with-deps chromium
@@ -177,3 +178,13 @@ jobs:
         run: node scripts/check-cloud-backend.mjs
       - run: npx playwright install --with-deps chromium
       - run: npm run test:cloud
+      - name: Test shared provider contracts against Supabase
+        run: npm run test:providers -- --provider=supabase
+      - name: Retain fixture recovery IDs after incomplete cleanup
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: provider-recovery-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/minsky-provider-*/recovery.json
+          if-no-files-found: ignore
+          retention-days: 7

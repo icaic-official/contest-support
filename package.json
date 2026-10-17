@@ -14,6 +14,8 @@
     "lint": "eslint .",
     "test": "vitest run",
     "test:e2e": "playwright test",
+    "test:providers": "node scripts/provider-test.mjs",
+    "test:providers:list": "playwright test --config playwright.providers.config.ts --list",
     "deploy": "npm run build && wrangler deploy",
     "deploy:preview": "npm run build && wrangler versions upload",
     "docs:dev": "npm --prefix site run dev --",

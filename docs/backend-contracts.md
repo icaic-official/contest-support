@@ -105,6 +105,11 @@ The browser adapter does not implement those checks.
 | `abandon(sessionId, attachmentId)` | Cleans up an unfinished upload. |
 | `download(path)` | Returns a `Blob` after the storage service checks access. |
 
+Each download checks current access instead of reusing an earlier authorized response.
+The Supabase adapter uses a fresh `cacheNonce` and `cache: 'no-store'` for private image reads.
+The nonce bypasses the provider cache, as described in [Supabase's cache guidance](https://supabase.com/docs/guides/storage/cdn/smart-cdn#bypassing-cache).
+These checks cannot retract bytes that a user already received.
+
 `attachmentPath()` defines the common object key as `sessionId/issueId/attachmentId/original` or `sessionId/issueId/attachmentId/thumbnail`.
 An implementation can translate these keys to its storage system.
 An object key is not a public URL or an access credential.
@@ -120,7 +125,8 @@ It does not inspect a provider's error text for that decision.
 `Backend.updates.subscribe()` accepts the session ID, user ID, `onChange`, and `onConnection`.
 `onChange()` signals that the current snapshot may be stale.
 It does not deliver issue bodies, staff notes, or membership records.
-`onConnection(true)` reports a subscribed connection.
+`onConnection(true)` reports that the database subscription is ready to receive changes.
+The Supabase adapter sets `postgres_changes_options.wait` to `true` before it reports that state.
 The UI fetches a new authorized snapshot when that connection opens or reconnects.
 
 The cleanup function can run more than once and stops subsequent callbacks.
@@ -140,4 +146,7 @@ The suite also covers the existing account, team-search, image, and refresh beha
 
 These checks do not verify a hosted provider or a second implementation.
 Hosted checks use isolated accounts and records through [protected cloud CI](cloud-onboarding.md#verification-and-protected-cloud-ci).
-The latest observed results are in [current state](current-state.md#t0014-backend-adapters-2026-10-17).
+The [shared provider suite](provider-test-contracts.md) checks these contracts through real browser adapters.
+Supabase supplies the first fixture implementation. Other providers remain unimplemented.
+[Run the shared checks](run-provider-tests.md) separately from the provider-specific hosted UI suite.
+The latest observed results are in [current state](current-state.md).

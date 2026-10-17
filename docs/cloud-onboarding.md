@@ -345,6 +345,8 @@ It tests revoked access, invalid login sessions, failed file deletion, and retri
 The old demo and its tests are removed.
 `npm run test:cloud` tests managed Auth, database, and Realtime behavior against a local frontend.
 `npm run test:hosted` repeats the suite with real accounts against the deployed app.
+The protected cloud job also runs the [shared provider suite](provider-test-contracts.md) through the Supabase adapter.
+See [Run the shared provider tests](run-provider-tests.md) for its explicit target settings and separate recovery journal.
 
 Install Chromium with `npx playwright install chromium`.
 Cloud tests create unique temporary sessions and accounts.

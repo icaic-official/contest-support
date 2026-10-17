@@ -337,7 +337,7 @@ describe('Supabase live updates adapter', () => {
     const channel = client.channel('test-channel');
     const on = vi.spyOn(channel, 'on');
     const subscribe = vi.spyOn(channel, 'subscribe').mockReturnValue(channel);
-    vi.spyOn(client, 'channel').mockReturnValue(channel);
+    const createChannel = vi.spyOn(client, 'channel').mockReturnValue(channel);
     const remove = vi.spyOn(client, 'removeChannel').mockResolvedValue('ok');
     const onChange = vi.fn();
     const onConnection = vi.fn();
@@ -347,6 +347,10 @@ describe('Supabase live updates adapter', () => {
       onChange,
       onConnection,
     });
+    expect(createChannel).toHaveBeenCalledExactlyOnceWith(
+      `session-${SESSION_ID}-${USER_ID}`,
+      { config: { postgres_changes_options: { wait: true } } },
+    );
     expect(on.mock.calls.map((call) => call.slice(0, 2))).toEqual([
       ['postgres_changes', {
         event: '*',

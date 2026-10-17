@@ -9,10 +9,10 @@ Hosted Supabase verification precedes the Cloudflare adapter and any data migrat
 
 1. Summary of changes. Merged current `main` into the connector branch and retained both sets of project records. Recorded the confirmed migration order and PR #29 merge. Restricted the existing `cloud-test` environment to `main` and `feature/t0014-backend-adapters`.
 2. Files changed. Resolved `AGENTS.md`, `PLAN.md`, `docs/cloud-onboarding.md`, `docs/current-state.md`, and `docs/tickets.md`. The merge also brings the already-reviewed documentation site, deployment workflow, reply retry cleanup, image preview guards, and their tests into this branch.
-3. Commands run. Git fetch, worktree creation, merge, diff, and status. GitHub PR, variable, secret-name, environment, and branch-policy queries. GitHub environment branch-policy updates. `npm ci --offline --no-audit --no-fund` for the root and docs packages. Type checking, lint, both builds, unit and database tests, both Deno checks, app browser tests, and docs browser tests. A second app build uses the existing public GitHub variables. HTTP asset inspection and a local Chromium sign-in check verify the missing-settings diagnosis.
+3. Commands run. Git fetch, worktree creation, merge, diff, status, commit, trailer verification, and push. GitHub PR, variable, secret-name, environment, and branch-policy queries. GitHub environment branch-policy updates, PR description update, workflow dispatch, run inspection, and failed-log inspection. `npm ci --offline --no-audit --no-fund` for the root and docs packages. Type checking, lint, both builds, unit and database tests, both Deno checks, app browser tests, and docs browser tests. A second app build uses the existing public GitHub variables. HTTP asset inspection and a local Chromium sign-in check verify the missing-settings diagnosis.
 4. Build and test results. Type checking, lint, both builds, and both Deno checks pass. `npm test` passes 89 tests. The function suite passes 12 tests. The app browser suite passes 27 tests, and the docs browser suite passes three tests. The docs build checks 14 HTML pages and 566 local links and assets. Its existing duplicate `/404` warning remains. The configured app build retains the existing chunk-size warning.
 5. Manual verification. Reviewed the merged application and provider boundaries. The configured local build displays the sign-in form, omits the setup error, and reports no browser page errors. No account login or shared development record write was part of this check. The hosted test target is `Minsky CI`, reference `ghtztmovdkhuketcbjmq`.
-6. Risks. Hosted Supabase checks remain pending on this merged revision. The old Cloudflare preview and the stable app both serve bundles without the development Supabase URL or publishable key. They cannot connect until a configured frontend build replaces them. The deployment switch remains `false`. The GitHub environment has branch restrictions but no required-reviewer rule. The account-plan API did not expose a plan, so reviewer availability remains unverified.
+6. Risks. Hosted Supabase verification is blocked by the access-token format error recorded below. The old Cloudflare preview and the stable app both serve bundles without the development Supabase URL or publishable key. They cannot connect until a configured frontend build replaces them. The deployment switch remains `false`. The GitHub environment has branch restrictions but no required-reviewer rule. The account-plan API did not expose a plan, so reviewer availability remains unverified.
 7. Follow-up tickets. Complete T0014 hosted verification and user review. Test the same contracts against Cloudflare before a migration rehearsal and data cutover. Other provider adapters and Terraform remain deferred.
 8. Docs that need updating. Add the hosted run result after it finishes. Record frontend deployment separately when publication is activated.
 
@@ -21,6 +21,15 @@ That preview serves `index-B4jx6y34.js`. The stable app serves `index-CSDiNndQ.j
 Both bundles contain the setup message and omit the development Supabase URL and publishable key prefix.
 Setting GitHub variables does not change already published assets.
 No application or documentation deployment occurred in this update.
+
+The [hosted workflow](https://github.com/GiftedNovaHD/minsky/actions/runs/39025809230) ran on `6f46e54`.
+Its ordinary checks, secret scan, and dependency audits passed.
+The cloud job confirmed the CI project reference, then failed at `supabase link`.
+The CLI reported an invalid `SUPABASE_ACCESS_TOKEN` format and required an `sbp_` personal access token.
+Configuration changes, migrations, function deployment, and fixture creation did not run.
+The owner must replace that environment secret before the hosted check can proceed.
+The separate [push run](https://github.com/GiftedNovaHD/minsky/actions/runs/39025807758) passed on the same revision.
+PR #32 remains in draft until hosted verification passes.
 
 ## T0014 backend adapters 2026-10-17
 

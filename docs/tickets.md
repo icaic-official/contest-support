@@ -425,7 +425,7 @@ No schema change or deployment is part of this ticket.
 ## T0014 backend adapters
 
 Branch: `feature/t0014-backend-adapters`, from updated `main` at `de92d54`.
-Status: implementation and local checks complete. Protected cloud verification and user review remain pending.
+Status: implementation, local checks, and ordinary GitHub checks pass after the merge from `main`. Hosted verification stopped at an invalid Supabase access-token format. User review remains pending.
 
 The user selected shared backend interfaces before the Cloudflare migration.
 This ticket extracts Supabase as the first implementation.
@@ -442,7 +442,7 @@ Acceptance criteria:
 - [x] Live subscriptions release their resources and ignore callbacks after cleanup. The UI retains refresh on reconnect, focus, and polling.
 - [x] Local type, lint, build, database, function, adapter, and browser checks pass.
 - [x] Documentation separates the current Supabase implementation from the selected future Cloudflare backend.
-- [ ] Protected cloud checks pass on the reviewed revision. The `cloud-test` environment has the CI project reference and all four required secret names. Its branch policy permits `main` and `feature/t0014-backend-adapters`. The hosted run remains pending.
+- [ ] Protected cloud checks pass on the reviewed revision. The `cloud-test` environment has the CI project reference and all four required secret names. Its branch policy permits `main` and `feature/t0014-backend-adapters`. Replace the invalid `SUPABASE_ACCESS_TOKEN`, then rerun the hosted check.
 - [ ] The user reviews and merges the pull request.
 
 The [backend reference](backend-contracts.md) defines the interfaces.

@@ -2,6 +2,8 @@
 
 These tickets describe development work, not contestant issues.
 
+T0015 is the active frontend redesign. See [T0015](#t0015--organiser-and-contestant-frontend-redesign).
+
 T0011 is the active documentation-site companion to the open T0007 installation PR.
 The user requested its implementation and deployment on 2026-10-17.
 T0005 merged in PR #19 and T0010 merged in PR #24 on 2026-10-15.
@@ -509,3 +511,41 @@ Acceptance criteria:
 
 Verification is recorded in [current state](current-state.md#t0012-reply-retry-cleanup-2026-10-17).
 Deployment remains a separate step.
+
+## T0015 — Organiser and contestant frontend redesign
+
+Branch: `feature/t0015-frontend-redesign`, from updated `main` at `aaa6bbc`.
+Status: design accepted. Implementation is in progress across several chats. The user reviews and merges the PR.
+
+The user requested a complete frontend redesign on 2026-10-17.
+They reviewed four mockup directions in [`design/redesign/`](../design/redesign/README.md).
+They chose direction A (shadcn/ui console) combined with direction D (phone-first field mode).
+
+### Decisions (2026-10-17)
+
+- Organisers and contestants get **different UIs**. This is not one layout with parts hidden.
+- After sign-in, the membership selects the UI. A membership with `team_id` gets the contestant UI. Every other membership gets the organiser UI.
+- **Organisers** (volunteers, specialists, jury members, session admins) mainly use phones in a browser.
+  - On phones they get the phone-first app from [`e-organiser-phone.html`](../design/redesign/e-organiser-phone.html).
+  - On laptops and tablets they get a **separate desktop console** in the style of [`a-console.html`](../design/redesign/a-console.html), with a sidebar, a queue table, an issue side sheet and admin pages.
+  - Both organiser layouts use the same data hooks and action components.
+- **Contestants** use computers in a browser and get the desktop app from [`f-contestant-desktop.html`](../design/redesign/f-contestant-desktop.html). There is **no phone layout** for contestants.
+- Contestant category tiles show the category name and one generic icon. No category data changes.
+- The UI uses Tailwind CSS v4 and shadcn/ui components copied into the repository, with Radix primitives and lucide icons.
+- These items stay out of scope because the schema has no data for them: "Near me" or helper zones, quick replies, a floor map, configurable aging thresholds, and category icons or descriptions.
+
+### Acceptance criteria
+
+- [ ] All current behavior stays available, and the AGENTS.md "Behavior to preserve" rules still hold.
+- [ ] Contestant views never contain internal notes or staff-only images.
+- [ ] The organiser phone app works at 390 px wide with keyboard and touch. Every gesture has a button alternative.
+- [ ] The organiser desktop console and the contestant desktop app work at 1280 px wide.
+- [ ] Build, lint, type checking, unit tests and the Playwright journey pass. Selectors are updated for the new UI.
+- [ ] README and `docs/` describe the new UI. `docs/manual-verification.md` covers both UIs.
+- [ ] The user reviews and merges the pull request. Deployment remains a separate step.
+
+### Risk
+
+Open PRs for T0006, T0007, T0009 and T0014 change `src/connected/`.
+Whichever merges second needs conflict resolution.
+

@@ -52,9 +52,17 @@ Existing TSX double quotes and component conventions are retained as project sty
 New Starlight content exports follow its required framework interface.
 
 The repository adds docs build, browser, and dependency checks to ordinary CI.
-GitHub's dependency and secret checks passed on the initial source commit; the ordinary check job was still running when this deployment record was prepared.
+GitHub's ordinary, dependency, and secret checks passed on `7007e63`.
+The [ordinary job](https://github.com/GiftedNovaHD/minsky/actions/runs/39009536861) completed in 1 minute 54 seconds. Its protected cloud job was skipped.
 The PR reports results for each subsequent revision.
 Protected Supabase cloud checks are not required for this static site and were not run here.
+
+The final editing-preview check found that Vite blocked the shared font outside `site/`.
+The docs configuration now permits only the site directory and the existing `public/fonts` directory.
+The editing page and font returned HTTP 200, with no browser page errors.
+Lint and the docs build passed after this fix.
+All 57 build files, including the local `_headers` configuration, remained byte-identical to the published build.
+No second deployment was needed for this development-server setting.
 
 ### Current merge status
 

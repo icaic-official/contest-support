@@ -1,10 +1,22 @@
 import {defineConfig} from 'astro/config';
 import starlight from '@astrojs/starlight';
+import {fileURLToPath, URL} from 'node:url';
 
 export default defineConfig({
   site: 'https://minsky-docs.icaic-minsky.workers.dev',
   output: 'static',
   trailingSlash: 'always',
+  vite: {
+    server: {
+      fs: {
+        // Share the app's font without exposing the rest of its checkout.
+        allow: [
+          fileURLToPath(new URL('.', import.meta.url)),
+          fileURLToPath(new URL('../public/fonts', import.meta.url)),
+        ],
+      },
+    },
+  },
   integrations: [starlight({
     title: 'Minsky docs',
     description: 'Guides for contest teams, support staff, and Minsky operators.',

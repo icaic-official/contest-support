@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Minsky · C · Conversation inbox</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500;600&family=Geist+Mono:wght@500&display=swap" rel="stylesheet" />
+<script>tailwind.config = { theme: { extend: { fontFamily: { sans: ["Geist", "sans-serif"], serif: ["Instrument Serif", "serif"], mono: ["Geist Mono", "monospace"] }, colors: { paper: "#f7f5f0", ink: "#1c1a17", line: "#e7e2d8", soft: "#efebe3", clay: "#c2410c" } } } };</script>
+<style>
+  [data-lucide] { width: 16px; height: 16px; stroke-width: 1.75; }
+  .item[aria-current="true"] { background: white; box-shadow: 0 1px 2px rgb(0 0 0 / .06), 0 0 0 1px #e7e2d8; }
+  .dot-open { background:#2563eb } .dot-claimed { background:#7c3aed } .dot-escalated { background:#d97706 } .dot-resolved { background:#059669 }
+  .note { background: #fef7e6; border: 1px solid #f3dfae; }
+  .seg[aria-pressed="true"] { background: white; box-shadow: 0 1px 2px rgb(0 0 0 / .08); color: #1c1a17; }
+</style>
+</head>
+<body class="bg-paper text-ink font-sans antialiased">
+<div class="h-screen flex flex-col">
+  <header class="h-14 flex items-center gap-4 px-5 border-b border-line shrink-0">
+    <span class="font-serif text-2xl leading-none">Minsky</span>
+    <span class="text-sm text-stone-500">Northern Informatics Open · <span class="text-ink">Finals, contest day</span></span>
+    <div class="flex-1"></div>
+    <div class="flex rounded-lg bg-soft p-0.5 text-sm text-stone-500"><button class="seg px-3 h-7 rounded-md" data-mode="staff" aria-pressed="true">Staff inbox</button><button class="seg px-3 h-7 rounded-md" data-mode="team">Contestant view</button></div>
+    <span class="text-xs text-stone-500 flex items-center gap-1.5"><span class="size-1.5 rounded-full bg-emerald-600"></span>Synced</span>
+    <span class="size-8 rounded-full bg-ink text-paper grid place-items-center text-xs font-medium">PR</span>
+  </header>
+  <div id="app" class="flex-1 min-h-0"></div>
+</div>
+<script>
+/*DATA*/
+let mode = "staff", sel = "i29", box = "mine", composer = "public";
+const $ = (s) => document.querySelector(s);
+const boxes = [
+  ["mine", "inbox", "Mine", (i) => i.owner === "Priya Raman" && i.status !== "resolved"],
+  ["unassigned", "circle-dashed", "Unassigned", (i) => i.status === "open"],
+  ["handoff", "arrow-up-right", "Handoffs", (i) => i.status === "escalated"],
+  ["active", "layers", "All active", (i) => i.status !== "resolved"],
+  ["resolved", "archive", "Resolved", (i) => i.status === "resolved"],
+];
+
+function staffView() {
+  const f = boxes.find((b) => b[0] === box)[3];
+  const list = DATA.issues.filter(f);
+  if (!list.find((i) => i.id === sel) && list[0]) sel = list[0].id;
+  const i = DATA.issues.find((x) => x.id === sel);
+  return `<div class="h-full grid grid-cols-[210px_340px_1fr_300px]">
+  <nav class="border-r border-line p-3 space-y-0.5 text-sm">${boxes.map(([k, ic, l, fn]) => `<button data-box="${k}" class="w-full flex items-center gap-2.5 px-2.5 h-8 rounded-md ${box === k ? "bg-soft font-medium" : "text-stone-600 hover:bg-soft"}"><i data-lucide="${ic}"></i>${l}<span class="ml-auto text-xs text-stone-400 tabular-nums">${DATA.issues.filter(fn).length}</span></button>`).join("")}
+    <div class="pt-6 px-2.5 text-xs text-stone-400 uppercase tracking-wider">Session</div>
+    <button class="w-full flex items-center gap-2.5 px-2.5 h-8 rounded-md text-stone-600 hover:bg-soft"><i data-lucide="scale"></i>Awards<span class="ml-auto size-5 rounded-full bg-amber-100 text-amber-800 text-xs grid place-items-center">1</span></button>
+    <button class="w-full flex items-center gap-2.5 px-2.5 h-8 rounded-md text-stone-600 hover:bg-soft"><i data-lucide="users"></i>People</button>
+    <button class="w-full flex items-center gap-2.5 px-2.5 h-8 rounded-md text-stone-600 hover:bg-soft"><i data-lucide="sliders-horizontal"></i>Settings</button>
+    <div class="mt-6 mx-1 rounded-lg border border-line bg-white p-3 text-xs"><div class="flex items-center justify-between font-medium">Intake <span class="text-emerald-700">Open</span></div><p class="text-stone-500 mt-1">Teams can submit reports.</p></div>
+  </nav>
+  <section class="border-r border-line flex flex-col min-h-0"><div class="p-3 border-b border-line"><div class="flex items-center gap-2 rounded-lg bg-white border border-line px-2.5 h-9 text-sm text-stone-400"><i data-lucide="search"></i>Team, table or #number</div></div>
+    <div class="flex-1 overflow-y-auto p-2 space-y-1">${list.map((x) => { const t = teamOf(x); const last = (DATA.history[x.id] ?? []).slice(-1)[0]; return `<button data-sel="${x.id}" aria-current="${x.id === sel}" class="item w-full text-left rounded-lg p-3 hover:bg-white/60"><div class="flex items-center gap-2 text-sm"><span class="size-2 rounded-full dot-${x.status}"></span><span class="font-medium">${t.name}</span><span class="text-stone-400 text-xs">${t.location.replace("Hall ", "").replace(" · Table ", "·")}</span><span class="ml-auto font-mono text-xs ${age(x) === "crit" ? "text-clay" : "text-stone-500"}" data-timer="${x.id}">${clock(elapsedMs(x))}</span></div><div class="text-sm mt-1 text-stone-800 line-clamp-1">${esc(x.description)}</div><div class="text-xs text-stone-500 mt-1 line-clamp-1">${last?.t === "internal" ? "🔒 " : ""}${last?.who ? last.who + ": " : ""}${esc(last?.text ?? "")}</div></button>`; }).join("") || `<p class="text-sm text-stone-500 p-6 text-center">Inbox zero. Nice.</p>`}</div></section>
+  ${i ? thread(i) + context(i) : `<div></div><div></div>`}
+  </div>`;
+}
+
+function thread(i) {
+  const hist = DATA.history[i.id] ?? [];
+  const internal = composer === "internal";
+  return `<section class="flex flex-col min-h-0 bg-white/40"><div class="px-8 pt-6 pb-4 border-b border-line"><div class="text-xs text-stone-500 flex items-center gap-2"><span class="font-mono">ISS-${i.number}</span>·<span>${i.category}</span>·<span>reported by ${i.reporter}</span></div><h1 class="font-serif text-3xl leading-tight mt-1.5">${esc(i.description)}</h1></div>
+  <div class="flex-1 overflow-y-auto px-8 py-6 space-y-5">${hist.map((h) => {
+    if (h.t === "public" || h.t === "internal") { const team = h.who === teamOf(i).name; return `<div class="flex gap-3 ${team ? "" : ""}"><span class="size-8 rounded-full ${team ? "bg-blue-100 text-blue-900" : "bg-stone-200"} grid place-items-center text-xs font-medium shrink-0">${initials(h.who)}</span><div class="flex-1"><div class="text-sm"><span class="font-medium">${h.who}</span><span class="text-stone-400 ml-2 text-xs">${wallTime(h.at)}</span>${h.t === "internal" ? `<span class="ml-2 text-xs text-amber-800 inline-flex items-center gap-1"><i data-lucide="lock" style="width:12px"></i>Internal · the team can't see this</span>` : ""}</div><div class="mt-1 text-[15px] leading-relaxed ${h.t === "internal" ? "note rounded-lg px-3 py-2" : ""}">${esc(h.text)}</div></div></div>`; }
+    if (h.t === "resolve") return `<div class="rounded-xl border border-emerald-200 bg-emerald-50 p-4"><div class="text-xs text-emerald-800 flex items-center gap-1.5"><i data-lucide="check-circle-2" style="width:14px"></i>Resolved by ${h.who} · ${wallTime(h.at)}</div><div class="font-serif text-xl mt-1">${esc(h.text)}</div></div>`;
+    return `<div class="flex items-center gap-3 text-xs text-stone-500"><span class="h-px flex-1 bg-line"></span>${esc(h.text)} · ${wallTime(h.at)}<span class="h-px flex-1 bg-line"></span></div>`;
+  }).join("")}</div>
+  ${i.status !== "resolved" ? `<div class="p-4 border-t border-line"><div class="rounded-xl border ${internal ? "note" : "bg-white border-line"} p-3"><div class="flex gap-1 text-xs mb-2"><button data-composer="public" class="px-2 h-6 rounded-md ${!internal ? "bg-ink text-paper" : "text-stone-500"}">Reply to team</button><button data-composer="internal" class="px-2 h-6 rounded-md flex items-center gap-1 ${internal ? "bg-amber-700 text-white" : "text-stone-500"}"><i data-lucide="lock" style="width:12px"></i>Internal note</button></div><textarea rows="2" class="w-full bg-transparent outline-none text-[15px] resize-none" placeholder="${internal ? "Only staff can read this…" : "Write to " + teamOf(i).name + "…"}"></textarea><div class="flex items-center gap-2 mt-1 text-stone-400"><i data-lucide="image-plus"></i><span class="text-xs">Saved replies</span><div class="flex-1"></div><button class="rounded-lg bg-ink text-paper px-3 h-8 text-sm">${internal ? "Add note" : "Send reply"}</button></div></div></div>` : ""}</section>`;
+}
+
+function context(i) {
+  const t = teamOf(i);
+  const run = i.status !== "resolved";
+  const steps = [["Submitted", wallTime(i.created), true], ["First assigned", i.first ? `${wallTime(i.first)} · after ${clock((i.created - i.first) * 60000)}` : "Waiting", !!i.first], ["Specialist", i.status === "escalated" ? "Requested, not yet accepted" : "Not needed", i.status === "escalated"], ["Resolved", i.resolved ? wallTime(i.resolved) : "Open", !!i.resolved]];
+  return `<aside class="border-l border-line p-5 overflow-y-auto space-y-6 text-sm">
+    <div class="rounded-xl bg-ink text-paper p-4"><div class="text-xs text-stone-400 flex items-center gap-1.5">${run ? `<span class="size-1.5 rounded-full bg-emerald-400 animate-pulse"></span>Clock running` : "Clock stopped"}</div><div class="font-mono text-4xl mt-1" data-timer="${i.id}">${clock(elapsedMs(i))}</div><div class="text-xs text-stone-400 mt-1">Unresolved time. Resolved intervals are not counted.</div></div>
+    <div><div class="text-xs text-stone-500 uppercase tracking-wider mb-2">Team</div><div class="font-medium">${t.name}</div><div class="text-stone-500 flex items-center gap-1.5"><i data-lucide="map-pin" style="width:14px"></i>${t.location}</div><div class="text-xs text-stone-500 mt-1">${(n => n + (n === 1 ? " report" : " reports"))(DATA.issues.filter((x) => x.team === t.id).length)} this session</div></div>
+    <div><div class="text-xs text-stone-500 uppercase tracking-wider mb-2">Owner</div>${i.owner ? `<div class="flex items-center gap-2"><span class="size-7 rounded-full bg-stone-200 grid place-items-center text-xs">${initials(i.owner)}</span>${i.owner}</div>` : `<button class="w-full rounded-lg bg-ink text-paper h-9">Claim this issue</button>`}
+    ${i.status === "escalated" ? `<div class="mt-3 rounded-lg note p-3"><div class="font-medium">Waiting for a specialist</div><div class="text-stone-600 text-xs mt-0.5">${i.owner} stays responsible until someone accepts.</div><button class="mt-2 w-full rounded-md bg-amber-700 text-white h-8">Accept handoff</button></div>` : ""}</div>
+    <div><div class="text-xs text-stone-500 uppercase tracking-wider mb-3">Journey</div><ol class="space-y-3">${steps.map(([l, s, d]) => `<li class="flex gap-3"><span class="mt-1 size-3 rounded-full border-2 ${d ? "bg-ink border-ink" : "border-stone-300"}"></span><div><div class="${d ? "font-medium" : "text-stone-500"}">${l}</div><div class="text-xs text-stone-500">${s}</div></div></li>`).join("")}</ol></div>
+    ${i.status === "claimed" ? `<div class="space-y-2"><button class="w-full rounded-lg bg-emerald-700 text-white h-9">Resolve…</button><button class="w-full rounded-lg border border-line bg-white h-9">Ask a specialist</button></div>` : ""}
+    ${(DATA.images[i.id] ?? []).length ? `<div><div class="text-xs text-stone-500 uppercase tracking-wider mb-2">Images</div><div class="grid grid-cols-3 gap-2">${DATA.images[i.id].map((m) => `<div class="aspect-square rounded-lg relative" style="background:linear-gradient(135deg,hsl(${m.hue} 50% 70%),hsl(${m.hue + 40} 45% 50%))">${m.vis === "internal" ? `<span class="absolute bottom-1 left-1 text-[10px] bg-white/90 rounded px-1">Staff</span>` : ""}</div>`).join("")}</div></div>` : ""}
+    ${i.award ? `<div><div class="text-xs text-stone-500 uppercase tracking-wider mb-2">Time award</div><div class="rounded-xl border border-line bg-white p-4"><div class="font-serif text-3xl">+${i.award.minutes} minutes</div><p class="text-stone-600 mt-1">${esc(i.award.explanation)}</p><div class="mt-3 grid grid-cols-2 gap-2 text-xs"><div class="rounded-md bg-emerald-50 text-emerald-800 p-2">✓ Decided<br>${i.award.by}</div><div class="rounded-md ${i.award.applied ? "bg-emerald-50 text-emerald-800" : "bg-amber-50 text-amber-800"} p-2">${i.award.applied ? "✓ Applied<br>" + i.award.applied.by : "○ Not yet applied<br>externally"}</div></div></div></div>` : ""}
+  </aside>`;
+}
+
+function teamView() {
+  const i = DATA.issues.find((x) => x.id === "i29");
+  const hist = (DATA.history.i29 ?? []).filter((h) => h.t !== "internal");
+  const steps = [["Sent", "We got your report", true], ["Helper on the way", "Priya Raman is handling it", true], ["Fixed", "We'll confirm here", false], ["Time award", "If the jury grants time, it shows here", false]];
+  return `<div class="h-full overflow-y-auto"><div class="max-w-2xl mx-auto py-12 px-6">
+    <div class="text-sm text-stone-500">Team Aurora · Hall A, Table 4</div>
+    <h1 class="font-serif text-5xl mt-2 leading-[1.05]">We're on it. A helper is working on your report.</h1>
+    <div class="mt-8 rounded-2xl bg-white border border-line p-6"><div class="flex items-center justify-between"><div class="text-sm text-stone-500 font-mono">ISS-${i.number} · ${i.category}</div><div class="font-mono text-2xl" data-timer="${i.id}">${clock(elapsedMs(i))}</div></div><p class="mt-2 text-lg">${esc(i.description)}</p>
+      <ol class="mt-6 grid grid-cols-4 gap-2">${steps.map(([l, s, d], n) => `<li><div class="h-1.5 rounded-full ${d ? "bg-ink" : n === 2 ? "bg-stone-300 animate-pulse" : "bg-stone-200"}"></div><div class="mt-2 text-sm ${d ? "font-medium" : "text-stone-500"}">${l}</div><div class="text-xs text-stone-500">${s}</div></li>`).join("")}</ol></div>
+    <h2 class="font-serif text-2xl mt-10">Messages</h2><div class="mt-4 space-y-4">${hist.filter((h) => h.t === "public").map((h) => `<div class="flex ${h.who === "Team Aurora" ? "justify-end" : ""}"><div class="max-w-[80%] rounded-2xl px-4 py-2.5 ${h.who === "Team Aurora" ? "bg-ink text-paper rounded-br-md" : "bg-white border border-line rounded-bl-md"}"><div class="text-xs opacity-60">${h.who} · ${wallTime(h.at)}</div>${esc(h.text)}</div></div>`).join("")}</div>
+    <div class="mt-4 flex gap-2"><input class="flex-1 rounded-full border border-line bg-white px-4 h-11 outline-none" placeholder="Add details for the helper…"><button class="rounded-full bg-ink text-paper px-5">Send</button></div>
+    <div class="mt-12 rounded-2xl border border-dashed border-stone-300 p-6 text-center"><div class="font-serif text-2xl">Something else wrong?</div><p class="text-stone-500 text-sm mt-1">Start a new report. Your timer starts when you send it.</p><button class="mt-4 rounded-full bg-clay text-white px-5 h-10">Report a new issue</button></div>
+  </div></div>`;
+}
+
+function render() {
+  $("#app").innerHTML = mode === "staff" ? staffView() : teamView();
+  document.querySelectorAll("[data-mode]").forEach((b) => b.setAttribute("aria-pressed", b.dataset.mode === mode));
+  lucide.createIcons();
+}
+document.addEventListener("click", (e) => {
+  const g = (s) => e.target.closest(s);
+  if (g("[data-mode]")) mode = g("[data-mode]").dataset.mode;
+  else if (g("[data-box]")) box = g("[data-box]").dataset.box;
+  else if (g("[data-sel]")) sel = g("[data-sel]").dataset.sel;
+  else if (g("[data-composer]")) composer = g("[data-composer]").dataset.composer;
+  else return;
+  render();
+});
+setInterval(() => document.querySelectorAll("[data-timer]").forEach((n) => { n.textContent = clock(elapsedMs(DATA.issues.find((x) => x.id === n.dataset.timer))); }), 1000);
+render();
+</script>
+</body>
+</html>

@@ -1,5 +1,19 @@
 # Minsky planning record
 
+**Parallel provider work, 2026-10-17.** The user authorized T0015 shared provider tests and T0016 Cloudflare design while PR #32 is under review.
+Both branches started from PR #32 at `d158906`.
+PR #32 merged at `ef6a029`, and both branches now include that `main` revision.
+This is a branch exception for these two tasks. The user still reviews and merges.
+T0015 uses `feature/t0015-provider-contract-tests`.
+T0016 uses `feature/t0016-cloudflare-backend-design`.
+Keep their changes separate from PR #32 and reconcile them after its review.
+
+The shared tests call the browser `Backend` contract.
+Provider fixtures own setup, credentials, fault injection, and cleanup.
+The same assertions must apply to Supabase, Cloudflare, and a possible future AWS adapter.
+AWS implementation, Terraform, provider provisioning, and data cutover remain outside this work.
+See [T0015](docs/tickets.md#t0015-shared-provider-tests).
+
 **Backend adapter decision, 2026-10-17.** The user authorized step 1 as T0014 on `feature/t0014-backend-adapters`.
 The branch starts from updated `main` at `de92d54` while the earlier pull requests remain open.
 Define shared interfaces for Minsky operations and extract the existing Supabase integration behind them.

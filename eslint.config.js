@@ -29,4 +29,25 @@ export default tseslint.config(
       }],
     },
   },
+  {
+    files: [
+      "tests/providers/scenarios/**/*.ts", "tests/providers/contracts.ts",
+      "tests/providers/browser-backend.ts", "tests/providers/browser-dispatch.ts",
+      "tests/providers/browser-protocol.ts", "tests/providers/contract.spec.ts",
+    ],
+    rules: {
+      "no-restricted-imports": ["error", {
+        patterns: [{
+          group: [
+            "@supabase/*", "@aws-sdk/*", "cloudflare:*", "@cloudflare/*",
+            "**/backend/index", "**/backend/index.ts",
+            "**/backend/supabase/**", "**/backend/cloudflare/**", "**/backend/aws/**",
+            "**/providers/supabase/**", "**/providers/cloudflare/**", "**/providers/aws/**",
+            "../supabase/**", "../cloudflare/**", "../aws/**", "**/cloud/**",
+          ],
+          message: "Shared provider scenarios use Backend and the test fixture contracts. Keep provider setup and SDK calls in provider fixtures.",
+        }],
+      }],
+    },
+  },
 );

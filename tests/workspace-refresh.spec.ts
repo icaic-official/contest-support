@@ -178,6 +178,28 @@ async function openWorkspace(page: Page, firstWrite?: 'uncertain' | 'rejected') 
   return { state, writes, workflowRequests };
 }
 
+test('waits for a selected session before subscribing to live updates', async ({ page }) => {
+  const sessions: string[] = [];
+  await page.exposeFunction('recordSubscriptionSession', (sessionId: string) => {
+    sessions.push(sessionId);
+  });
+  await page.route('**/src/backend/index.ts', async (route) => {
+    const response = await route.fetch();
+    await route.fulfill({
+      response,
+      body: `${await response.text()}
+const originalSubscribe = backend.updates.subscribe.bind(backend.updates);
+backend.updates.subscribe = (input) => {
+  window.recordSubscriptionSession(input.sessionId);
+  return originalSubscribe(input);
+};`,
+    });
+  });
+  await openWorkspace(page);
+  await expect.poll(() => sessions).toContain(SESSION_ID);
+  expect(sessions.every((sessionId) => sessionId === SESSION_ID)).toBe(true);
+});
+
 test('an uncertain write retains its request ID until the user retries', async ({ page }) => {
   const { workflowRequests } = await openWorkspace(page, 'uncertain');
   await page.getByRole('textbox', { name: 'Message', exact: true }).fill('Preserve this reply.');

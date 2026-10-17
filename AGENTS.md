@@ -22,6 +22,17 @@
 
 ## Current scope
 
+**Parallel provider work, 2026-10-17.** The user authorized T0015 shared provider tests and T0016 Cloudflare design during PR #32 review.
+Both branches started from PR #32 at `d158906` under this explicit branch exception.
+PR #32 merged at `ef6a029`, and both branches now include that `main` revision.
+Use `feature/t0015-provider-contract-tests` for shared assertions and the Supabase fixture implementation.
+Use `feature/t0016-cloudflare-backend-design` for the separate Cloudflare design.
+Keep provider imports and privileged setup outside the shared scenarios.
+Use the same behavior assertions for each provider, including a possible future AWS adapter.
+Do not modify PR #32 as part of either track. Reconcile review changes before merge.
+The user reviews and merges. AWS implementation, Terraform, resource creation, and migration remain deferred.
+See [T0015](docs/tickets.md#t0015-shared-provider-tests).
+
 **T0014 backend adapters, 2026-10-17.** The user authorized the shared interfaces and Supabase extraction before the Cloudflare migration.
 Use `feature/t0014-backend-adapters`, from updated `main` at `de92d54`.
 This start is authorized while the earlier PRs remain open.

@@ -98,7 +98,12 @@ export function createImageTransport(
       });
     },
     async download(path) {
-      const { data, error } = await client.storage.from(bucket).download(path);
+      // Recheck current access instead of reusing a cached authorized response.
+      const { data, error } = await client.storage.from(bucket).download(
+        path,
+        { cacheNonce: crypto.randomUUID() },
+        { cache: 'no-store' },
+      );
       if (error || !data) {
         throw new ImageRequestError('This image could not be opened.');
       }

@@ -490,17 +490,20 @@ function Dashboard({
   useEffect(() => {
     void refresh();
     setConnected(false);
-    const unsubscribe = requireBackend().updates.subscribe({
-      sessionId: session,
-      userId: user.id,
-      onChange: () => {
-        void refresh();
-      },
-      onConnection: (isConnected) => {
-        setConnected(isConnected);
-        if (isConnected) void refresh();
-      },
-    });
+    // The first refresh selects a session. Empty IDs produce invalid live filters.
+    const unsubscribe = session
+      ? requireBackend().updates.subscribe({
+        sessionId: session,
+        userId: user.id,
+        onChange: () => {
+          void refresh();
+        },
+        onConnection: (isConnected) => {
+          setConnected(isConnected);
+          if (isConnected) void refresh();
+        },
+      })
+      : undefined;
     // Poll current membership as a backstop: a revoked subscriber receives no further data.
     const interval = window.setInterval(() => {
       void refresh();
@@ -517,7 +520,7 @@ function Dashboard({
       window.clearInterval(interval);
       window.removeEventListener("focus", focus);
       window.removeEventListener("online", focus);
-      unsubscribe();
+      unsubscribe?.();
     };
   }, [refresh, session, user.id]);
   useEffect(() => {

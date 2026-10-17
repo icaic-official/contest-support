@@ -2,8 +2,9 @@
 
 These tickets describe development work, not contestant issues.
 
-The active implementation is [T0014 backend adapters](#t0014-backend-adapters).
-The user authorized it on 2026-10-17 while earlier pull requests remain open.
+The active implementation is [T0015 shared provider tests](#t0015-shared-provider-tests).
+The user authorized it alongside separate T0016 Cloudflare design work during PR #32 review.
+[PR #32](https://github.com/GiftedNovaHD/minsky/pull/32) merged on 2026-10-17 at `ef6a029`.
 The numbered records below retain their original scope and verification history.
 
 T0011 documentation and deployment automation merged in [PR #29](https://github.com/GiftedNovaHD/minsky/pull/29) on 2026-10-17.
@@ -28,6 +29,42 @@ These items stay deferred and are not part of T0005:
 - Remaining manual acceptance checks.
 
 T0008 fuzzy team search merged into `main` in [PR #22](https://github.com/notbowen/minsky/pull/22) on 2026-10-15 (SGT).
+
+## T0015 shared provider tests
+
+Branch: `feature/t0015-provider-contract-tests`, started at PR #32 revision `d158906` and updated to merged `main` at `ef6a029`.
+
+Status: implemented and verified in [PR #37](https://github.com/GiftedNovaHD/minsky/pull/37). Awaiting user review and merge.
+
+The user authorized this branch exception on 2026-10-17.
+T0015 and separate T0016 Cloudflare design work proceed during PR #32 review.
+Neither task changes PR #32. The user still reviews and merges.
+
+The shared scenarios call the real browser `Backend` contract.
+Each provider supplies isolated accounts, records, clients, fault controls, and cleanup.
+Supabase is the first fixture implementation.
+Cloudflare and a possible future AWS adapter must pass the same behavior assertions.
+Existing Supabase database, function, and hosted UI tests remain separate.
+
+Acceptance criteria:
+
+- [x] Shared scenarios contain no provider SDK, database query, or provider-specific response assertion.
+- [x] Supabase runs the shared scenarios against isolated hosted accounts and records.
+- [x] Tests cover authentication, workflow permissions, retries, images, live updates, and access revocation.
+- [x] The runner requires an explicit provider and isolated target, rejects development, and checks prerequisites before creating fixtures.
+- [x] Fixture cleanup uses recorded identifiers, handles partial setup, and reports cleanup failures without exposing credentials.
+- [x] Ordinary CI runs without hosted credentials. Protected CI runs the hosted contract suite.
+- [x] Documentation explains coverage, limits, and the requirements for another provider fixture.
+- [x] Required local checks and the protected hosted run pass on the implementation revision.
+
+The [protected run on `672ec6d`](https://github.com/GiftedNovaHD/minsky/actions/runs/39036173268) passed all 14 existing hosted UI tests and all eight shared scenarios.
+Cleanup completed without retained recovery files. The run used the existing CI backend and applied no migrations or function deployments.
+
+The shared tests and subsequent verification exposed image and live-update defects.
+Private image reads now bypass cached authorized responses.
+Live subscriptions wait for database readiness before reporting a connected state.
+Each subscriber has its own channel, and the dashboard waits for a selected session before it subscribes.
+Cloudflare resource creation, data migration, AWS implementation, and Terraform remain outside T0015.
 
 ## T0013 — Image preview request handling
 
@@ -425,7 +462,7 @@ No schema change or deployment is part of this ticket.
 ## T0014 backend adapters
 
 Branch: `feature/t0014-backend-adapters`, from updated `main` at `de92d54`.
-Status: implementation, local checks, ordinary GitHub checks, and all 14 hosted Supabase cases pass. Fixture cleanup completed. PR #32 is ready for user review and merge.
+Status: merged in [PR #32](https://github.com/GiftedNovaHD/minsky/pull/32) at `ef6a029` on 2026-10-17. Local checks, ordinary GitHub checks, and all 14 hosted Supabase cases pass. Fixture cleanup completed.
 
 The user selected shared backend interfaces before the Cloudflare migration.
 This ticket extracts Supabase as the first implementation.
@@ -443,13 +480,13 @@ Acceptance criteria:
 - [x] Local type, lint, build, database, function, adapter, and browser checks pass.
 - [x] Documentation separates the current Supabase implementation from the selected future Cloudflare backend.
 - [x] Protected cloud checks pass on the reviewed revision against the existing Supabase backend. The [run on `a3b3c70`](https://github.com/GiftedNovaHD/minsky/actions/runs/39027288113) passes all 14 cases with `existing_backend=true` and successful fixture cleanup. The verification record identifies the backend versions.
-- [ ] The user reviews and merges the pull request.
+- [x] The user merged PR #32.
 
 The [backend reference](backend-contracts.md) defines the interfaces.
 [Current state](current-state.md#t0014-existing-backend-verification-2026-10-17) records the verification results.
 
 The Cloudflare backend, D1 schema rewrite, account migration, R2 copy, and Durable Objects implementation remain later work.
-The next candidate is a shared hosted verification suite for the contracts before the second provider implementation.
+[T0015](#t0015-shared-provider-tests) implements the shared hosted verification suite before the second provider implementation.
 Other provider adapters and Terraform remain deferred.
 This ticket adds no backend schema or provider service and does not migrate user data or deploy the app.
 Hosted verification requires the existing CI project to have the merged backend migrations and functions.

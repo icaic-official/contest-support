@@ -57,7 +57,7 @@ T0008 fuzzy team search merged into `main` in [PR #22](https://github.com/notbow
 ## T0017 D1 transaction proof
 
 Branch: `feature/t0017-d1-transaction-proof`, from updated `main` at `53f9dfd`.
-Status: implementation and verification in progress. The user reviews and merges the PR.
+Status: implemented and verified locally and on hosted D1 in [PR #39](https://github.com/GiftedNovaHD/minsky/pull/39). The user reviews and merges.
 Summary: Prove atomic workflow writes through a provider-independent application-store interface and a D1 adapter. Use `claim` and `message` to check concurrent transitions and private activity.
 
 The owner authorized isolated Cloudflare development and CI resources in the existing account.
@@ -74,18 +74,20 @@ AWS adapters and Terraform remain deferred. Bounded subagent work is authorized.
 
 - [x] Define the necessary SQLite schema and provider-independent application-store interface.
 - [x] Commit a command's state change, receipt, history, and permitted notifications in one D1 batch.
-- [ ] Prove assertion rollback, concurrent claims, concurrent duplicate requests, lost responses, and conflicting request IDs.
-- [ ] Prove current membership, login, account restrictions, event state, and consistent authorized reads.
-- [ ] Prove that private changes do not alter contestant-visible history, revisions, or notification sequences.
-- [ ] Obtain hosted D1 evidence with fictional fixtures and verified scoped cleanup.
-- [ ] Pass the required local checks and update relevant documents.
-- [ ] Prepare a PR for owner review. The owner merges.
+- [x] Prove assertion rollback, concurrent claims, concurrent duplicate requests, lost responses, and conflicting request IDs.
+- [x] Prove current membership, login, account restrictions, event state, and consistent authorized reads.
+- [x] Prove that private changes do not alter contestant-visible history, revisions, or notification sequences.
+- [x] Obtain hosted D1 evidence with fictional fixtures and verified scoped cleanup.
+- [x] Pass the required local checks and update relevant documents.
+- [x] Prepare a PR for owner review. The owner merges.
 
 ### Verification
 
 Use [Run the D1 transaction proof](d1-transaction-proof.md) for exact commands and recovery.
 The [store reference](backend-contracts.md#experimental-application-store) defines its bounded interface.
 The [current-state record](current-state.md#t0017-d1-transaction-proof-2026-10-17) separates local and hosted evidence.
+All 42 focused cases pass locally and on hosted D1 at `edb4bd0`. Ordinary CI passes on that implementation revision.
+The complete Cloudflare connector remains unimplemented.
 
 
 ## T0015 shared provider tests

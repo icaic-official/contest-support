@@ -25,6 +25,9 @@ The remaining phases require the additional cases below.
 ## Prove the database transaction pattern
 
 T0017 uses `feature/t0017-d1-transaction-proof` from updated `main` at `53f9dfd`.
+[PR #39](https://github.com/GiftedNovaHD/minsky/pull/39) implements the bounded proof.
+All 42 local and hosted D1 cases pass on `edb4bd0`, with verified scoped fixture cleanup.
+See [the evidence](current-state.md#t0017-d1-transaction-proof-2026-10-17). Owner review and merge remain pending.
 See [the proof guide](d1-transaction-proof.md) for the focused scope and verification procedure.
 
 1. Define the SQLite schema and the proposed application-store port.
@@ -38,7 +41,7 @@ A losing concurrent request must not create history, an award, or a notification
 Private state conflicts must not change contestant-visible revisions or disclose private activity.
 Test the primary-read snapshot against concurrent authorization changes.
 
-Local emulation supports development. Hosted D1 evidence remains required for completion.
+Local emulation supports development. T0017 supplies hosted D1 evidence for this bounded transaction pattern.
 The owner authorizes isolated development and CI resources in the existing Cloudflare account.
 Keep the resources separate and verify the account before provisioning.
 Check existing Wrangler access before requesting credentials. Keep tokens out of chat and logs.

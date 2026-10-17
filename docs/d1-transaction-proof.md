@@ -17,7 +17,7 @@ npm run test:d1
 
 The suite uses Wrangler's local D1 binding with remote bindings disabled.
 It applies the proof migrations to a temporary database and deletes its fixtures afterward.
-The same local cases also run in `npm test`. No provider credentials are required.
+The same local cases also run in `npm test`. You do not need provider credentials.
 
 ## Check the hosted target
 
@@ -34,7 +34,7 @@ The expected database is `minsky-d1-proof-ci`, ID `06560c1c-8907-47d6-b2b6-f22e1
 Stop if either value differs. Keep tokens out of chat, logs, and repository files.
 
 The owner authorized this isolated CI database on 2026-10-17.
-Development uses local emulation. No hosted development database is needed for this proof.
+Development uses local emulation. This proof needs no hosted development database.
 Do not use this CI database for development records, real accounts, or contest data.
 The static frontend Workers have no binding to it.
 
@@ -102,7 +102,7 @@ npx wrangler d1 execute minsky-d1-proof-ci --remote --config wrangler.d1-proof.j
 
 The event deletion removes its related workflow records before the account deletion.
 Repeat the inspection query and expect no matching accounts or sessions.
-Retain the journal until those checks pass. Recovery commands above were reviewed but not executed during normal verification.
+Retain the journal until those checks pass. Review covered these recovery commands. Normal verification did not execute them.
 Never reset a shared database.
 
 Passing this suite proves the tested transaction pattern on the recorded revision.

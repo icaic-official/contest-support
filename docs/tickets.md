@@ -521,7 +521,7 @@ Status: design accepted. Implementation is in progress across several chats. The
 
 - [x] **Step 1, foundation (2026-10-17).** Tailwind CSS v4, shadcn/ui components and zinc tokens. The data layer moved from `ConnectedApp.tsx` into hooks. Sign-in, password change and session access screens use shadcn/ui. The membership selects `ContestantApp` or `OrganiserApp`. `OrganiserApp` selects the phone or desktop layout by viewport. All three layouts render the existing workflow UI as placeholders. See [frontend architecture](frontend-architecture.md).
 - [ ] Step 2, organiser phone app.
-- [ ] Step 3, contestant desktop app (parallel with step 2).
+- [x] **Step 3, contestant desktop app (2026-10-17).** `ContestantApp` no longer uses the legacy workspace. It has a top bar, the team's reports, an issue page with a live timer and a four-step tracker, an inline reopen form, an award card, chat messages, team-visible images and a report form with category tiles. See [frontend architecture](frontend-architecture.md#contestant-app). The Playwright test `team-search.spec.ts` "a refreshed contestant membership drops the hidden staff team filter" and the cloud specs `journey.spec.ts` and `attachments.spec.ts` still use the old contestant selectors. Step 5 updates them.
 - [ ] Step 4, organiser desktop console.
 - [ ] Step 5, integration: Playwright selectors, documentation and the PR.
 

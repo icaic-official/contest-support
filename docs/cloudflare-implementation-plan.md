@@ -1,23 +1,24 @@
 # Prepare the Cloudflare backend
 
 This plan defines the work needed to implement and verify the [proposed backend](cloudflare-backend-design.md).
-Only T0016's design documents exist in this branch.
+T0016 adds design documents. The branch also includes the merged T0015 tests and Supabase fixes.
 The phases below are acceptance steps, not additional opened development tickets.
 
 ## Complete the current reviews
 
 PR #32 merged on 2026-10-17 at `ef6a029`. T0014's merge step is complete.
 
-1. Review the shared provider tests in T0015 separately.
-2. Review T0016's transaction, image, identity, and notification design.
+T0015 merged in [PR #37](https://github.com/GiftedNovaHD/minsky/pull/37) at `738ef4a` on 2026-10-17.
+Its protected run passed all eight shared scenarios and all 14 existing hosted UI tests.
+Review T0016's transaction, image, identity, and notification design in PR #36.
 
 The user authorized T0015 and T0016 in parallel on 2026-10-17 while PR #32 was under review.
-Both branches started at its `d158906` revision and now include the merge commit `ef6a029`.
-Supabase remains active throughout these reviews.
+Both branches started at its `d158906` revision. T0016 now includes PR #32 and PR #37.
+Supabase remains active.
 
-T0015 is on `feature/t0015-provider-contract-tests`.
-Its files and verification results belong to that separate branch.
-This design does not claim that its shared tests already cover every proposed Cloudflare behavior.
+The [shared suite](provider-test-contracts.md) and its [verification record](current-state.md#t0015-shared-provider-tests-2026-10-17) are available in this branch.
+The suite does not yet cover every proposed Cloudflare behavior.
+The remaining phases require the additional cases below.
 
 ## Prove the database transaction pattern
 

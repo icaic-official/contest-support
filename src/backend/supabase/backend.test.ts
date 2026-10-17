@@ -1,6 +1,7 @@
 import {
   createClient,
   REALTIME_SUBSCRIBE_STATES,
+  RealtimeChannel,
   type Session,
   type User,
 } from '@supabase/supabase-js';
@@ -332,12 +333,68 @@ describe('Supabase administration adapter', () => {
 });
 
 describe('Supabase live updates adapter', () => {
+  it('keeps subscribers independent while an earlier channel is still closing', async () => {
+    const { backend, client } = setup(() => json(null));
+    const subscribe = vi.spyOn(RealtimeChannel.prototype, 'subscribe')
+      .mockImplementation(function (this: RealtimeChannel) {
+        return this;
+      });
+    let finishClose: ((value: 'ok') => void) | undefined;
+    const closing = new Promise<'ok'>((resolve) => {
+      finishClose = resolve;
+    });
+    vi.spyOn(RealtimeChannel.prototype, 'unsubscribe').mockReturnValue(closing);
+    const firstChange = vi.fn();
+    const firstConnection = vi.fn();
+    const subscribeInput = {
+      sessionId: SESSION_ID,
+      userId: USER_ID,
+      onChange: firstChange,
+      onConnection: firstConnection,
+    };
+    const stopFirst = backend.updates.subscribe(subscribeInput);
+    const first = client.getChannels()[0];
+    stopFirst();
+    // The real SDK retains this topic until asynchronous removal completes.
+    expect(client.getChannels()).toContain(first);
+    const nextConnection = vi.fn();
+    const stopNext = backend.updates.subscribe({
+      ...subscribeInput,
+      onConnection: nextConnection,
+    });
+    const siblingConnection = vi.fn();
+    const stopSibling = backend.updates.subscribe({
+      ...subscribeInput,
+      onConnection: siblingConnection,
+    });
+    try {
+      expect(new Set(client.getChannels()).size).toBe(3);
+      const callbacks = subscribe.mock.calls.map(([callback]) => callback);
+      for (const callback of callbacks) {
+        callback?.(REALTIME_SUBSCRIBE_STATES.SUBSCRIBED);
+      }
+      expect(firstConnection).not.toHaveBeenCalled();
+      expect(nextConnection).toHaveBeenCalledExactlyOnceWith(true);
+      expect(siblingConnection).toHaveBeenCalledExactlyOnceWith(true);
+      stopNext();
+      callbacks[1]?.(REALTIME_SUBSCRIBE_STATES.CHANNEL_ERROR);
+      callbacks[2]?.(REALTIME_SUBSCRIBE_STATES.CHANNEL_ERROR);
+      expect(nextConnection).toHaveBeenCalledTimes(1);
+      expect(siblingConnection).toHaveBeenLastCalledWith(false);
+    } finally {
+      stopNext();
+      stopSibling();
+      finishClose?.('ok');
+      await closing;
+    }
+  });
+
   it('listens for public and staff invalidations and ignores all callbacks after cleanup', () => {
     const { backend, client } = setup(() => json(null));
     const channel = client.channel('test-channel');
     const on = vi.spyOn(channel, 'on');
     const subscribe = vi.spyOn(channel, 'subscribe').mockReturnValue(channel);
-    vi.spyOn(client, 'channel').mockReturnValue(channel);
+    const createChannel = vi.spyOn(client, 'channel').mockReturnValue(channel);
     const remove = vi.spyOn(client, 'removeChannel').mockResolvedValue('ok');
     const onChange = vi.fn();
     const onConnection = vi.fn();
@@ -347,6 +404,12 @@ describe('Supabase live updates adapter', () => {
       onChange,
       onConnection,
     });
+    expect(createChannel).toHaveBeenCalledExactlyOnceWith(
+      expect.stringMatching(
+        new RegExp(`^session-${SESSION_ID}-${USER_ID}-[a-f0-9-]+$`),
+      ),
+      { config: { postgres_changes_options: { wait: true } } },
+    );
     expect(on.mock.calls.map((call) => call.slice(0, 2))).toEqual([
       ['postgres_changes', {
         event: '*',

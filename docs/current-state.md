@@ -1,5 +1,20 @@
 # Current state
 
+## PR #36 merge-conflict repair, 2026-10-17
+
+The user merged T0015 in [PR #37](https://github.com/GiftedNovaHD/minsky/pull/37) at `738ef4a` on 2026-10-17 at 13:44:12 UTC.
+PR #36 now includes that `main` revision. Its remaining changes are documentation only.
+The records below retain the original verification results. T0015's hosted results are not a new cloud run for this repair.
+
+1. Summary of changes. Merged `main` into the T0016 branch. Retained the shared provider tests, Supabase fixes, and Cloudflare design. Updated current planning and ticket status after PR #37 merged.
+2. Files changed. Resolved `AGENTS.md`, `PLAN.md`, `README.md`, `docs/current-state.md`, and `docs/tickets.md`. Updated `docs/cloudflare-implementation-plan.md` to use the merged test suite and its coverage limits. Other merged files match `main`.
+3. Commands run. Git status, log, branch, remote, fetch, switch, merge, diff, commit, trailer check, and push. GitHub PR and check queries. Read documents with `cat`, `sed`, and `rg`. Ran Python documentation checks, the STE structural checker, and `git diff --check`. Initial GitHub access and branch switching required sandbox escalation.
+4. Build and test results. Documentation paths, anchors, heading structure, conflict-marker checks, and whitespace checks pass. Application builds, browser tests, and cloud tests were not run for this documentation-only repair.
+5. Manual verification. Compared the resolved records with PR #37's merge and verification evidence. Confirmed that application code, tests, workflows, and dependency files match `main` exactly.
+6. Risks. None added by this repair. The proposed Cloudflare implementation and migration remain unverified, as recorded in T0016.
+7. Follow-up tickets. User review of T0016 in PR #36. T0015 is merged. No new ticket is required for this repair.
+8. Docs that need updating. None for this repair. Record future identity decisions and implementation evidence in T0016's existing plan.
+
 ## T0016 Cloudflare backend design, 2026-10-17
 
 The user authorized this design in parallel with shared provider tests while PR #32 was under review.
@@ -18,6 +33,76 @@ Supabase remains active. No Cloudflare backend, authentication replacement, or d
 6. Risks. The D1 assertion pattern, replacement identity implementation, hash compatibility, hosted limits, notification latency, and post-write rollback require implementation evidence. None is presented as verified.
 7. Follow-up tickets. Review T0015 and T0016. T0014 merged. The implementation plan defines later phases without opening speculative development tickets.
 8. Docs that need updating. Record approved identity settings and measured implementation results when those decisions and tests are complete.
+
+## T0015 shared provider tests, 2026-10-17
+
+[PR #37](https://github.com/GiftedNovaHD/minsky/pull/37) implements and verifies the shared provider suite.
+The [protected run](https://github.com/GiftedNovaHD/minsky/actions/runs/39036173268) passed on code revision `672ec6d` with `existing_backend=true`.
+All 14 existing hosted UI tests passed in 3.0 minutes. All eight shared provider scenarios passed in 2.0 minutes.
+The ordinary checks, secret scan, and dependency audits passed too.
+Fixture cleanup completed without retained recovery files. The run produced no recovery artifact.
+This documentation update changes no application, workflow, or test code.
+
+The user authorized this work in parallel with T0016 Cloudflare design while PR #32 was under review.
+PR #32 then merged at `ef6a029`. Both follow-up branches include that revision.
+T0015 implements [shared test contracts](provider-test-contracts.md) and a [run and recovery guide](run-provider-tests.md).
+Supabase is the first hosted fixture implementation. Cloudflare and AWS implementations remain future work.
+
+The scenarios call the real browser adapter through a typed bridge.
+Each connected account has a separate browser context, including its cookies and storage.
+Six credential-free browser tests check the bridge itself, including HttpOnly cookie isolation and deliberate callback failures.
+Those synthetic tests do not count as hosted provider verification.
+
+The first hosted shared run passed six cases and failed two.
+Image downloads remained available after membership removal, and the live-update case did not receive all required notifications.
+Fixture cleanup completed. Read-only checks found zero remaining records, accounts, receipts, or image objects for the captured first fixture identifiers.
+The strict assertions remain in place. The branch corrects the discovered defects.
+
+The image diagnostic confirmed that `snapshot.membership` was null after removal.
+The original download and a browser-only `no-store` request still returned HTTP 200 with `CF-Cache-Status: HIT`.
+A fresh Supabase `cacheNonce` combined with `cache: no-store` returned HTTP 400 with `DYNAMIC` after revocation.
+The targeted hosted case then passed, including access after membership restoration and complete fixture cleanup.
+The adapter now uses both controls. A focused SDK request test checks them.
+This correction affects new download calls. It cannot retract image bytes already received.
+
+The live diagnostic found a subscription-readiness race.
+All three clients reported connected. Two received the public change, while the third missed it.
+The third account remained valid and its snapshot contained the issue.
+Its database subscription became ready only after the other clients received that change.
+The adapter now sets `postgres_changes_options.wait` to `true`.
+It delays its ready signal until the database subscription is active.
+The focused adapter checks pass. One local attempt hit the provider Auth rate limit during fixture setup and cleaned up without running the scenario.
+The next targeted hosted run passed with unchanged assertions in 25.9 seconds, including setup and cleanup.
+No rate limit or provider setting changed.
+
+The [first protected run](https://github.com/GiftedNovaHD/minsky/actions/runs/39035271460) passed 13 of 14 existing hosted UI tests.
+The layout test remained at `Connecting` during its five-second assertion. The shared suite did not run after that failure.
+Further inspection found that the SDK reuses a channel topic while asynchronous removal is pending.
+A regression test reproduced the collision for independent subscriptions on one `Backend`.
+The adapter now assigns each subscription a unique topic. The regression test passes.
+This also protects rapid unsubscribe and resubscribe, including React StrictMode cleanup.
+The shared live scenario now checks multiple subscriptions on one `Backend` and immediate cancellation followed by replacement.
+
+A targeted UI rerun still failed its original five-second assertion after channel isolation.
+Temporary metadata-only diagnostics found two invalid-input errors for subscriptions with an empty session ID.
+The valid subscription became ready after 9.627 seconds. The UI showed `Live` by 10.041 seconds.
+The dashboard now waits for session selection before it subscribes. Initial reads and polling remain active.
+A browser regression fails before that guard and passes after it.
+The diagnostic code was removed. The original hosted assertion remains unchanged.
+The targeted hosted layout case then passed in 24.2 seconds with complete fixture cleanup.
+
+The separate Cloudflare design is in [PR #36](https://github.com/GiftedNovaHD/minsky/pull/36).
+Its ordinary GitHub checks, secret scan, and dependency audits pass.
+That design does not implement a Cloudflare connector or migrate existing data.
+
+1. Summary of changes. Added provider-neutral behavior scenarios, isolated browser clients, Supabase fixtures, exact-ID recovery, and protected CI execution. Recorded the parallel branch exception and PR #32 merge.
+2. Files changed. Added `tests/providers/`, `tests/provider-bridge.spec.ts`, `playwright.providers.config.ts`, `scripts/provider-test.mjs`, `scripts/provider-test-options.mjs`, `scripts/provider-test-options.test.mjs`, `scripts/provider-fixture.test.mjs`, `docs/provider-test-contracts.md`, and `docs/run-provider-tests.md`. Updated `.github/workflows/checks.yml`, `package.json`, `playwright.config.ts`, `tsconfig.json`, `eslint.config.js`, `tests/landing.spec.ts`, `tests/workspace-refresh.spec.ts`, `src/connected/ConnectedApp.tsx`, `src/backend/supabase/backend.ts`, `src/backend/supabase/backend.test.ts`, `src/backend/supabase/images.ts`, `src/backend/supabase/images.test.ts`, `README.md`, `AGENTS.md`, `PLAN.md`, `docs/backend-contracts.md`, `docs/cloud-onboarding.md`, `docs/tickets.md`, and this record.
+3. Commands run. Git and GitHub inspection, fetch, isolated worktree creation, and fast-forward to merged `main`. Locked npm installs, type checking, lint, build, unit tests, Deno checks, browser tests, docs build and browser checks, scenario discovery, import-boundary checks, documentation link checks, and whitespace checks. Added the exact T0015 branch to the existing `cloud-test` allowlist. Ran the shared suite against Minsky CI and read-only fixture cleanup queries. No development migration or deployment ran.
+4. Build and test results. Type checking, lint, app build, docs build, function checks, 115 unit and database tests, 12 function tests, six browser bridge tests, and three docs browser tests pass. The initial full isolated browser run passed 32 cases and failed a pre-existing keyboard test that pressed Tab before sign-in rendering completed. The corrected test waits for the sign-in heading. All 33 ordinary browser cases then passed on an isolated server. The session-selection regression adds one case, and all 34 now pass. The final protected run passed all 14 hosted UI tests and all eight shared scenarios after the earlier failures recorded above.
+5. Manual verification. Reviewed provider imports, typed errors, cookie isolation, image byte transfer, callback cleanup, and exact fixture ownership. Verified the CI target is `ghtztmovdkhuketcbjmq` and the deployment switch remains `false`. No shared development account journey ran.
+6. Risks. The existing CI backend includes unmerged announcement migration `202610110002`, so these runs use its existing schema and functions. The suite does not verify fresh installation, migration correctness, capacity, or an unimplemented provider. PRs #36 and #37 both update planning documents. Reconcile those documents in the remaining PR after the first merge.
+7. Follow-up tickets. Review T0015 in PR #37 and T0016's architecture in PR #36 before Cloudflare implementation. AWS implementation and Terraform remain deferred.
+8. Docs that need updating. None for this implementation. Reconcile the shared planning documents after the first parallel PR merges.
 
 ## T0014 existing backend verification, 2026-10-17
 

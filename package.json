@@ -14,6 +14,8 @@
     "lint": "eslint .",
     "test": "vitest run",
     "test:e2e": "playwright test",
+    "test:providers": "node scripts/provider-test.mjs",
+    "test:providers:list": "playwright test --config playwright.providers.config.ts --list",
     "deploy": "npm run build && wrangler deploy",
     "deploy:preview": "npm run build && wrangler versions upload",
     "docs:dev": "npm --prefix site run dev --",
@@ -38,12 +40,12 @@
     "@supabase/supabase-js": "2.117.3",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
-    "zod": "^4.1.5"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.5.9",
     "@eslint/js": "^10.0.1",
-    "@playwright/test": "^1.55.0",
+    "@playwright/test": "^1.64.0",
     "@types/node": "^26.6.5",
     "@types/react": "^19.1.12",
     "@types/react-dom": "^19.1.9",
@@ -51,7 +53,7 @@
     "deno": "2.9.6",
     "eslint": "^10.11.0",
     "eslint-plugin-react-hooks": "^7.1.1",
-    "globals": "^17.12.0",
+    "globals": "^17.13.0",
     "supabase": "2.121.0",
     "typescript": "~5.9.2",
     "typescript-eslint": "^8.71.1",

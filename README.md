@@ -58,6 +58,8 @@ See [cloud onboarding](docs/cloud-onboarding.md#contributor-setup) for provider 
 | `npm run test:functions` | Test attachment authorization and file removal with fake clients. |
 | `npm test` | Run unit, script, and embedded database tests without cloud credentials. |
 | `npm run test:e2e` | Run browser tests with mocked cloud responses. |
+| `npm run test:providers:list` | List the shared provider scenarios without hosted credentials. |
+| `npm run test:providers -- --provider=supabase` | Run the shared contracts against an explicitly configured isolated Supabase project. |
 
 Install Chromium once before browser tests:
 
@@ -67,7 +69,8 @@ npx playwright install chromium
 
 Deno and the provider CLIs are pinned npm dependencies.
 For `npm run test:cloud` and `npm run test:hosted`, follow [cloud verification](docs/cloud-onboarding.md#verification-and-protected-cloud-ci).
-If fixture cleanup fails, follow [fixture recovery](docs/cloud-onboarding.md#fixture-recovery).
+For shared adapter checks, follow [Run the shared provider tests](docs/run-provider-tests.md).
+If an existing cloud fixture cleanup fails, follow [fixture recovery](docs/cloud-onboarding.md#fixture-recovery).
 
 ## Documentation
 
@@ -112,5 +115,6 @@ The workflow requires account setup. The first automatic deployments remain unve
 - [Backend contracts](docs/backend-contracts.md) describe the provider interfaces and their behavior.
 - [Cloudflare backend design](docs/cloudflare-backend-design.md) explains the proposed server boundaries and migration decisions.
 - [Cloudflare implementation plan](docs/cloudflare-implementation-plan.md) defines the work and verification required before cutover.
+- [Shared provider test contracts](docs/provider-test-contracts.md) describe reusable assertions, fixture ownership, and provider requirements.
 - [Product direction](docs/product-direction.md) — agreed requirements and open decisions.
 - [Contributor rules](AGENTS.md) and [planning record](PLAN.md).

@@ -157,6 +157,23 @@ describe('Supabase image adapter', () => {
       .toThrow('This image could not be opened.');
   });
 
+  it('uses a fresh CDN cache key and disables browser caching for every private download', async () => {
+    const nonces: string[] = [];
+    const { images } = setup((request) => {
+      expect(request.cache).toBe('no-store');
+      const nonce = new URL(request.url).searchParams.get('cacheNonce');
+      expect(nonce).toMatch(/^[0-9a-f-]{36}$/);
+      if (nonce) nonces.push(nonce);
+      return new Response('image-bytes', {
+        headers: { 'Content-Type': 'image/png' },
+      });
+    });
+    await images.download('session/issue/image/original');
+    await images.download('session/issue/image/original');
+    expect(nonces).toHaveLength(2);
+    expect(nonces[0]).not.toBe(nonces[1]);
+  });
+
   it('uploads with the current token, encoded path, private cache settings, and byte progress', async () => {
     const uploads: TestUpload[] = [];
     class TestUpload {

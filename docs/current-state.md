@@ -1,5 +1,28 @@
 # Current state
 
+## T0014 existing backend verification, 2026-10-17
+
+The owner replaced `SUPABASE_ACCESS_TOKEN` in `cloud-test`.
+The [retry on `1a5349b`](https://github.com/GiftedNovaHD/minsky/actions/runs/39026364030) passed the ordinary checks, connected to Minsky CI, and applied Auth configuration.
+Database preparation then stopped because remote migration `202610110002` is absent from PR #32.
+That version belongs to `202610110002_announcements.sql` in open PR #20.
+The retry deployed no functions and created no fixtures.
+
+PR #32 changes no files under `supabase/` compared with its merge base on `main`.
+The new `existing_backend` workflow input permits a regression check against the already deployed CI backend.
+It records migration and function versions, then skips backend preparation.
+The default remains backend preparation with the migration-history check.
+Neither mode resets the database or repairs its migration history.
+
+1. Summary of changes. Added an explicit existing-backend mode for the hosted connector check after tracing the migration mismatch to PR #20.
+2. Files changed. `.github/workflows/checks.yml`, `docs/cloud-onboarding.md`, `docs/tickets.md`, and `docs/current-state.md`.
+3. Commands run. Git status, fetch, worktree creation, source and migration inspection. GitHub credential metadata, environment, PR, and run queries. `gh workflow run checks.yml`, run monitoring, and failed-log inspection. YAML parsing and branch-selection checks, shell syntax checks, documentation path checks, and `git diff --check` verify this update before commit and push.
+4. Build and test results. The retry passed ordinary CI. The hosted job stopped at the migration mismatch before tests. Verification with `existing_backend=true` remains pending.
+5. Manual verification. Confirmed target `ghtztmovdkhuketcbjmq`, the CI environment branch restrictions, the replacement secret timestamp, and `CLOUDFLARE_DEPLOY_ENABLED=false`. Compared PR #32's Supabase files with `main`.
+6. Risks. A regression run against the existing backend does not verify a fresh backend installation. Minsky CI includes an unmerged announcement migration. Full backend preparation still requires reconciliation of that difference. The existing Cloudflare frontend still needs a configured build.
+7. Follow-up tickets. Complete T0014 hosted verification and user review. Resolve the CI migration history with the PR #20 work before a later backend installation check. Cloudflare connector implementation and data migration follow Supabase verification.
+8. Docs that need updating. Record the hosted regression result and cleanup outcome after the run.
+
 ## T0014 update after the documentation merge, 2026-10-17
 
 The user merged PR #29 at `aaa6bbc` on 2026-10-17 at 10:36:06 UTC.

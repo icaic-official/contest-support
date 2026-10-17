@@ -372,7 +372,25 @@ Configure required reviewers where the repository's GitHub plan supports them.
 Verify plan availability before you treat protection as enabled.
 Then manually dispatch **Checks** for the reviewed branch.
 Record the cloud job result.
-The cloud job applies migrations and deploys both `admin` and `attachments` before running the tests.
+By default, the cloud job applies configuration and migrations, deploys both `admin` and `attachments`, and sets the test origin before the tests.
+The job records the remote migration versions and function versions in its log.
+
+To test a frontend change against the existing CI backend, select `existing_backend` when you dispatch the workflow.
+Use this mode only when the change needs no new backend migration, function, or configuration.
+The existing backend must already allow the test origin `http://127.0.0.1:4174`.
+For T0014, the command is:
+
+```sh
+gh workflow run checks.yml --repo GiftedNovaHD/minsky \
+	--ref feature/t0014-backend-adapters -f existing_backend=true
+```
+
+This mode skips backend preparation. The tests still create and delete isolated fixtures.
+A passing result verifies the frontend against the recorded backend. It does not verify installation of that revision's backend.
+Keep the default mode for changes to migrations, functions, or backend configuration.
+If the migration history differs, resolve that difference before an installation check.
+Do not remove a migration record while its database objects remain.
+
 Automatic frontend deployment is selected but its setup remains unverified.
 An app preview can write to its configured development backend through the authenticated app.
 It does not isolate data. See [preview backend limits](cloudflare-preview-behavior.md).

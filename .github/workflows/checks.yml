@@ -6,6 +6,11 @@ on:
   schedule:
     - cron: "23 3 * * 1"
   workflow_dispatch:
+    inputs:
+      existing_backend:
+        description: Test the existing CI backend without applying configuration, migrations, or functions
+        type: boolean
+        default: false
 permissions:
   contents: read
 concurrency:
@@ -144,10 +149,29 @@ jobs:
           test -n "$MINSKY_TEST_PROJECT_REF"
           test "$MINSKY_TEST_PROJECT_REF" != ovymmobupzowotvrywek
       - run: npx supabase link --project-ref "$MINSKY_TEST_PROJECT_REF"
-      - run: npx supabase config push --project-ref "$MINSKY_TEST_PROJECT_REF" --yes
-      - run: npx supabase db push --linked
-      - run: npx supabase functions deploy admin --project-ref "$MINSKY_TEST_PROJECT_REF" --use-api
-      - run: npx supabase functions deploy attachments --project-ref "$MINSKY_TEST_PROJECT_REF" --use-api
-      - run: npx supabase secrets set ALLOWED_ORIGINS=http://127.0.0.1:4174 --project-ref "$MINSKY_TEST_PROJECT_REF"
+      - name: Record existing CI backend
+        run: |
+          npx supabase migration list --linked
+          npx supabase functions list --project-ref "$MINSKY_TEST_PROJECT_REF"
+      - name: Record test mode
+        env:
+          EXISTING_BACKEND: ${{ inputs.existing_backend }}
+        run: |
+          if [ "$EXISTING_BACKEND" = true ]; then
+            echo "Testing the existing CI backend. Backend preparation is disabled."
+            echo "This run does not verify migration installation or function deployment."
+          else
+            echo "Preparing the CI backend from this revision before testing."
+          fi
+      - if: ${{ !inputs.existing_backend }}
+        run: npx supabase config push --project-ref "$MINSKY_TEST_PROJECT_REF" --yes
+      - if: ${{ !inputs.existing_backend }}
+        run: npx supabase db push --linked
+      - if: ${{ !inputs.existing_backend }}
+        run: npx supabase functions deploy admin --project-ref "$MINSKY_TEST_PROJECT_REF" --use-api
+      - if: ${{ !inputs.existing_backend }}
+        run: npx supabase functions deploy attachments --project-ref "$MINSKY_TEST_PROJECT_REF" --use-api
+      - if: ${{ !inputs.existing_backend }}
+        run: npx supabase secrets set ALLOWED_ORIGINS=http://127.0.0.1:4174 --project-ref "$MINSKY_TEST_PROJECT_REF"
       - run: npx playwright install --with-deps chromium
       - run: npm run test:cloud

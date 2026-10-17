@@ -17,4 +17,16 @@ export default tseslint.config(
       "react-hooks/exhaustive-deps": "warn",
     },
   },
+  {
+    files: ["src/**/*.{ts,tsx}"],
+    ignores: ["src/backend/supabase/**", "src/backend/index.ts"],
+    rules: {
+      "no-restricted-imports": ["error", {
+        patterns: [{
+          group: ["@supabase/*", "**/backend/supabase/**", "./supabase/**"],
+          message: "Use the backend contracts. Provider imports belong in src/backend/supabase or src/backend/index.ts.",
+        }],
+      }],
+    },
+  },
 );

@@ -1,0 +1,143 @@
+# Backend contracts
+
+The browser uses `Backend` in [contracts.ts](../src/backend/contracts.ts) for accounts, workflows, administration, images, and live updates.
+An adapter implements those operations for a provider.
+The Supabase adapter is the only implementation.
+
+The contracts describe Minsky operations.
+They do not expose database queries, access tokens, provider clients, or channel objects.
+The server still checks permissions and applies each workflow command as a transaction.
+A transaction commits all changes for a command together, or commits none.
+
+## Module boundaries
+
+| Module | Responsibility |
+| --- | --- |
+| [contracts.ts](../src/backend/contracts.ts) | Defines `Backend` and each group of operations. |
+| [errors.ts](../src/backend/errors.ts) | Defines workflow rejection and image retry errors. |
+| [index.ts](../src/backend/index.ts) | Creates the selected implementation from public configuration. |
+| [supabase/backend.ts](../src/backend/supabase/backend.ts) | Calls Supabase Auth, database functions, account administration, and Realtime. |
+| [supabase/images.ts](../src/backend/supabase/images.ts) | Calls the attachment function and private Storage bucket. |
+| [model.ts](../src/connected/model.ts) | Defines workflow commands and validates snapshots. It has no provider imports. |
+| [imageFile.ts](../src/connected/imageFile.ts) | Defines file checks, attachment paths, and error classification shared with the attachment function. |
+
+The UI imports the contracts and `requireBackend()`.
+`npm run lint` rejects provider imports outside the Supabase implementation and the backend entry point.
+Server functions and cloud fixture code remain specific to Supabase.
+
+`VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` remain the browser configuration.
+`backend` is `undefined` when either value is missing.
+`requireBackend()` then throws the setup message shown on the login page.
+There is no provider selector or automatic fallback.
+
+## Authentication
+
+`Backend.auth` exposes these operations.
+
+| Operation | Result |
+| --- | --- |
+| `currentUser()` | Returns `AccountIdentity` or `undefined`. The identity contains `id`, optional `email`, and optional `name`. |
+| `subscribe(onChange)` | Reports the current account when authentication changes. Reports `undefined` after sign-out. Returns a cleanup function. |
+| `signIn(username, password)` | Signs in with organizer credentials. The Supabase implementation normalizes usernames and retains existing email login. |
+| `signOut()` | Ends the login through the provider. |
+| `accountStatus()` | Returns `username`, `must_change`, and `session_valid`. |
+| `changePassword(currentPassword, newPassword)` | Updates the password, then completes the mandatory-password check. Resolves only when both operations succeed. |
+
+`currentUser()` restores the browser's login state.
+Its result does not grant access to contest data.
+Server checks enforce password changes, revoked logins, session membership, and roles.
+
+Authentication subscriptions invoke callbacks synchronously.
+Their cleanup function can run more than once.
+No callback runs after cleanup returns.
+
+## Session reads and workflow commands
+
+`Backend.workflows.sessions(userId)` returns the account's accessible session IDs and names.
+The authenticated caller determines access at the server.
+The supplied `userId` does not confer access to another account.
+
+`snapshot(sessionId)` returns a validated `Snapshot`.
+The snapshot includes permitted issues, history, resolutions, awards, image records, members, limits, and server time.
+The server excludes private data that the caller cannot access.
+
+`execute(sessionId, requestId, command)` returns the affected issue ID.
+`Command` retains the existing action names, expected issue revision, and action fields in `model.ts`.
+The request ID identifies one attempted action, including its retries.
+The adapter sends the ID and command unchanged.
+The server prevents a repeated request from creating another action.
+
+`WorkflowRejectedError` means that the server rejected the command.
+The UI can clear the pending request and accept a new command.
+Other failures leave the write outcome unknown.
+The UI retains the request ID and command for **Retry last request**.
+An invalid success response also leaves the outcome unknown because the write may have committed.
+
+The Supabase adapter maps a nonempty database error code to `WorkflowRejectedError`.
+It does not treat a transport error as a confirmed rejection.
+
+## Administration
+
+`Backend.admin.account(sessionId, command)` accepts `create_account`, `set_username`, or `reset_password`.
+`AccountCommand` specifies each action's required fields.
+The result contains `temporaryPassword` when the action creates replacement credentials.
+
+`saveMember()` assigns the team, roles, and admin flag.
+`removeMember()` revokes membership in one session.
+`setIntake()` changes contestant intake.
+`setImageLimits()` sets the file size, image count, and combined size.
+The size inputs use the existing UI convention of 1,048,576 bytes per MB.
+
+Supabase database functions and the account function retain their current authorization rules.
+Account resets and username changes require admin access to every affected session.
+The browser adapter does not implement those checks.
+
+## Images
+
+`Backend.images` implements `ImageTransport`.
+
+| Operation | Result |
+| --- | --- |
+| `begin(input)` | Reserves an image using the request ID, issue, visibility, name, and size. Returns the image ID and original and thumbnail paths. |
+| `upload(path, body, contentType, onProgress)` | Uploads one object and reports the bytes sent. |
+| `finish(sessionId, attachmentId)` | Validates and publishes the reserved image. A repeat after a lost success response does not publish another image. |
+| `remove(sessionId, attachmentId)` | Removes the image through the authorized server operation. A failed file deletion remains retryable. |
+| `abandon(sessionId, attachmentId)` | Cleans up an unfinished upload. |
+| `download(path)` | Returns a `Blob` after the storage service checks access. |
+
+`attachmentPath()` defines the common object key as `sessionId/issueId/attachmentId/original` or `sessionId/issueId/attachmentId/thumbnail`.
+An implementation can translate these keys to its storage system.
+An object key is not a public URL or an access credential.
+
+`ImageRequestError.validation` marks a rejected upload.
+`restart` carries the existing retry classification.
+`incomplete` means that `finish()` requires the original or thumbnail upload to complete first.
+The UI uses `incomplete` to resume upload after a retry check.
+It does not inspect a provider's error text for that decision.
+
+## Live updates
+
+`Backend.updates.subscribe()` accepts the session ID, user ID, `onChange`, and `onConnection`.
+`onChange()` signals that the current snapshot may be stale.
+It does not deliver issue bodies, staff notes, or membership records.
+`onConnection(true)` reports a subscribed connection.
+The UI fetches a new authorized snapshot when that connection opens or reconnects.
+
+The cleanup function can run more than once and stops subsequent callbacks.
+The UI also refreshes every ten seconds and on focus or network restoration.
+Those reads detect revoked access even when the subscriber receives no more events.
+Live notifications do not authorize reads or writes.
+
+## Verification coverage
+
+`npm test` includes Supabase adapter tests with controlled HTTP responses and subscription callbacks.
+Those tests cover request translation, response validation, write outcomes, password completion, image errors, and subscription cleanup.
+The existing embedded PostgreSQL tests continue to check database rules.
+
+`npm run test:e2e` uses the application with mocked provider responses.
+It covers request-ID reuse after an uncertain write and a new request after a definitive rejection.
+The suite also covers the existing account, team-search, image, and refresh behavior.
+
+These checks do not verify a hosted provider or a second implementation.
+Hosted checks use isolated accounts and records through [protected cloud CI](cloud-onboarding.md#verification-and-protected-cloud-ci).
+The latest observed results are in [current state](current-state.md#t0014-backend-adapters-2026-10-17).

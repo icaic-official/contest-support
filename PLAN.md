@@ -1,5 +1,23 @@
 # Minsky planning record
 
+**Backend adapter decision, 2026-10-17.** The user authorized step 1 as T0014 on `feature/t0014-backend-adapters`.
+The branch starts from updated `main` at `de92d54` while the earlier pull requests remain open.
+Define shared interfaces for Minsky operations and extract the existing Supabase integration behind them.
+Preserve account access, workflow rules, image behavior, and live refresh.
+See [T0014](docs/tickets.md#t0014-backend-adapters) and the [backend contracts](docs/backend-contracts.md).
+
+The selected migration target is Cloudflare Workers, D1 with a SQLite rewrite, private R2 storage, and Durable Objects for live updates.
+Supabase remains the active backend during this first step.
+The migration must preserve existing accounts, IDs, history, awards, permissions, and images.
+The Cloudflare implementation, authentication choice, migration tools, other providers, and Terraform remain later work.
+This decision supersedes the older long-term Supabase direction below.
+
+The user confirmed the migration order after PR #29 merged on 2026-10-17.
+First implement the shared interfaces and Supabase adapter.
+Verify that adapter against hosted Supabase before implementing the Cloudflare adapter.
+Test the Cloudflare implementation and rehearse a data-preserving migration before switching the active backend.
+Frontend deployment automation is separate from these acceptance steps.
+
 **Documentation writing rules, 2026-10-17.** The user supplied `unslop` and `technical-writing` principles.
 Apply them to documentation, README text, PR descriptions, and commit messages.
 Use one Diataxis purpose per page and preserve exact code names and commands.

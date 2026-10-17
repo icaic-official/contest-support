@@ -1,20 +1,6 @@
 export const MIB = 1048576;
 export const THUMBNAIL_BYTES = 524288;
 
-export class ImageRequestError extends Error {
-  readonly validation: boolean;
-  readonly restart: boolean;
-  constructor(
-    message: string,
-    options?: { validation?: boolean; restart?: boolean },
-  ) {
-    super(message);
-    this.name = "ImageRequestError";
-    this.validation = options?.validation ?? false;
-    this.restart = options?.restart ?? false;
-  }
-}
-
 export function imageKind(
   bytes: Uint8Array,
 ): "image/jpeg" | "image/png" | "image/webp" | undefined {

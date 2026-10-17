@@ -95,7 +95,7 @@ The schema supports the proof only. Remaining operations, timestamp migration en
 | [imageFile.ts](../src/connected/imageFile.ts) | Defines file checks, attachment paths, and error classification shared with the attachment function. |
 
 The UI imports the contracts and `requireBackend()`.
-`npm run lint` rejects provider imports outside the Supabase implementation and the backend entry point.
+`npm run lint` rejects provider imports outside provider adapter modules and the backend entry point.
 The active application server functions and browser fixture driver remain specific to Supabase.
 The D1 proof has its own persistence adapter and isolated fixtures, with shared workflow decisions.
 

@@ -3,7 +3,7 @@ title: Feature status
 description: Distinguish merged features, pending changes, and unverified operating conditions.
 ---
 
-Status checked on **17 October 2026** against the repository and GitHub pull requests.
+Status checked on **18 October 2026** against the repository and GitHub pull requests.
 This page is a dated record, not a live deployment dashboard.
 
 ## Merged into main
@@ -20,6 +20,7 @@ This page is a dated record, not a live deployment dashboard.
 | [T0014](https://github.com/GiftedNovaHD/minsky/pull/32) | Shared backend interfaces and the active Supabase adapter. |
 | [T0015](https://github.com/GiftedNovaHD/minsky/pull/37) | Shared provider behavior tests, verified against isolated Supabase fixtures. |
 | [T0016](https://github.com/GiftedNovaHD/minsky/pull/36) | Proposed Cloudflare architecture and implementation plan. |
+| [T0017](https://github.com/GiftedNovaHD/minsky/pull/39) | Verified bounded D1 transaction proof for claims and messages. The complete Cloudflare connector remains incomplete. |
 
 ## Pending changes
 
@@ -28,7 +29,11 @@ This page is a dated record, not a live deployment dashboard.
 | [T0006 announcements](https://github.com/GiftedNovaHD/minsky/pull/20) | Open pull request. |
 | [T0007 independent installations](https://github.com/GiftedNovaHD/minsky/pull/21) | Open pull request. Packaging exists on its branch. Container operation remains unverified. |
 | [T0009 jury worklist](https://github.com/GiftedNovaHD/minsky/pull/23) | Draft pull request. |
-| T0017 D1 transaction proof | Experimental store for claims and messages. The Cloudflare connector remains incomplete. Supabase remains active. |
+| [T0018 authentication](https://github.com/GiftedNovaHD/minsky/pull/40) | Open PR. Hosted HTTP verification remains incomplete after a Workers Free resource limit. Workers Paid remains deferred. |
+| [T0019 shared server workflow](https://github.com/GiftedNovaHD/minsky/pull/41) | Open PR. All nine command decisions run through a shared service verified on Supabase CI. D1 still supports only claims and messages. |
+
+Supabase remains the active backend.
+The active browser retains the existing SQL workflow while T0019 verifies its replacement path.
 
 T0011 adds this documentation site.
 The initial docs deployment did not deploy the Minsky application or apply database migrations.

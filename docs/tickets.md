@@ -59,7 +59,7 @@ T0008 fuzzy team search merged into `main` in [PR #22](https://github.com/notbow
 ## T0019 Shared server workflow
 
 Branch: `feature/t0019-shared-server-workflow`, from updated `main` at `0c797ad`.
-Status: implemented; local and hosted Supabase checks pass. Hosted D1 checks also pass. PR preparation is in progress. The owner reviews and merges.
+Status: implemented in [PR #41](https://github.com/GiftedNovaHD/minsky/pull/41). Local, hosted Supabase, and bounded hosted D1 checks pass. Protected GitHub cloud execution remains pending. The owner reviews and merges.
 Summary: Extract the existing issue rules into one shared server service. Exercise all nine commands through a trusted Supabase path before expanding Cloudflare workflow persistence.
 
 The owner authorizes work in parallel with [PR #40](https://github.com/GiftedNovaHD/minsky/pull/40).
@@ -84,7 +84,7 @@ Bounded subagent work is authorized.
 - [x] Align D1's bounded `claim` and `message` proof with the shared service without adding the remaining D1 workflow commands.
 - [x] Verify isolated Supabase execution, concurrent state and permission changes, rollback, lost responses, retries, and database bypass attempts.
 - [x] Pass required checks and record local, hosted Supabase, hosted D1, and protected GitHub Actions evidence separately.
-- [ ] Update affected documents and prepare a PR for owner review.
+- [x] Update affected documents and prepare a PR for owner review.
 
 ### Verification
 

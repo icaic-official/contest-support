@@ -6,7 +6,7 @@ T0019 starts from updated `main` at `0c797ad` on `feature/t0019-shared-server-wo
 The separate worktree is `/tmp/minsky-t0019`.
 The authentication checkout and open PR #40 remain unchanged.
 Its protected HTTP authentication result remains incomplete after the Workers Free resource limit.
-No paid subscription was enabled.
+No paid subscription change occurred.
 
 The [workflow reference](server-workflow.md) inventories all nine existing commands and their effective SQL definitions.
 `WorkflowService` now makes the shared decisions and coordinates request receipts and guarded commits.
@@ -16,16 +16,21 @@ PostgreSQL supplies authoritative commit timestamps and atomic state, history, n
 The active browser adapter retains the legacy SQL path during replacement verification.
 D1 still supports only `claim`, `message`, and its limited issue view. Its commands now use the shared decisions and orchestration.
 
+Review is in [PR #41](https://github.com/GiftedNovaHD/minsky/pull/41).
+The implementation commit is `8f8145c447ff095b68d4f9bdf837df5eae9e1d7f`.
+
 ### Observed verification
 
 - Local: 194 tests pass, including 21 real PostgreSQL shared-path cases, 42 local D1 cases, shared-rule edges, HTTP trust checks, and browser transport outcomes.
 - Local: type checking, lint, application build, Deno function checks, 12 function tests, and all 34 browser regressions pass.
 - Documentation: the build checks 14 pages and 566 local links/assets. All three documentation browser tests pass.
-- Hosted Supabase: all five focused cases pass through the deployed `workflow` function on Minsky CI, `ghtztmovdkhuketcbjmq`. The passing run began at 2026-10-17 17:12:34 UTC and took 43.86 seconds.
+- Hosted Supabase: all five focused cases pass through the deployed `workflow` function on Minsky CI, `ghtztmovdkhuketcbjmq`. The final run checked committed implementation `8f8145c447ff095b68d4f9bdf837df5eae9e1d7f`. It began at 2026-10-17 17:16:20 UTC and took 45.43 seconds.
 - Hosted D1: all 42 changed bounded-proof cases pass against `minsky-d1-proof-ci`, database `06560c1c-8907-47d6-b2b6-f22e129ebbe4`. The run began at 2026-10-17 17:12:57 UTC and took 69.32 seconds. Fixture deletion checks passed.
+- Ordinary GitHub Actions: [implementation run 39053057235](https://github.com/GiftedNovaHD/minsky/actions/runs/39053057235) passed `checks`, `secrets`, and `dependencies` on `8f8145c`. Cloud and deployment jobs did not run.
 - Protected GitHub Actions: not run for T0019. The `cloud-test` branch allowlist excludes this branch. Its existing entries and protection rules remain unchanged.
 
-Hosted Supabase verifies the shared lifecycle, all command variants, persisted history, public/private separation, team/session isolation, duplicate and conflicting request IDs, concurrent claims, and a response lost after commit followed by retry.
+Hosted Supabase verifies the shared lifecycle, all command variants, persisted history, public/private separation, and team/session isolation.
+It also verifies duplicate and conflicting request IDs, concurrent claims, and a response lost after commit followed by retry.
 It also rejects forged browser identity fields, unsigned callers, direct browser commit plans, and a permission change between read and commit.
 The additional local PostgreSQL cases test credential, login, account, event, membership, intake, and private-state changes before commit, repeated resolution timing, rollback, and direct table denial.
 The [verification guide](verify-server-workflow.md) gives exact commands and recovery steps.
@@ -35,9 +40,9 @@ The [verification guide](verify-server-workflow.md) gives exact commands and rec
 The project list confirmed the target as Minsky CI before changes.
 An operational directory fetched its existing migration history, including `202610110002_announcements`.
 The dry run selected only `202610180001_shared_workflow.sql`.
-That migration was applied. No history repair or unrelated migration was applied.
+The CLI applied that migration. It made no history repair or unrelated migration change.
 The applied source matches the repository migration.
-Only the new `workflow` function was deployed, at version 1 with `verify_jwt=false`; its handler verifies every bearer itself.
+The CLI deployed only the new `workflow` function, at version 1 with `verify_jwt=false`. Its handler verifies every bearer itself.
 Its deployment ID is `a8d178ba-7c60-459c-a64e-ba155cc50ddb`.
 The CLI reported bundle SHA-256 `f9f7696cff2a7f675b2b55418ffbd100b223ebb266cdb881578296b3bab53c53`.
 No development backend deployment, real-account change, backend switch, or data export occurred.
@@ -49,17 +54,21 @@ It still completes the real mandatory-password database gate after Auth changes 
 Existing authentication scenarios retain their normal setup and checks.
 The passing run removed its recovery journal after ownership-checked cleanup.
 These results do not verify the user password-change endpoint or live notification delivery.
+The final runner also passed its read-only database and function prerequisites before fixture creation.
+A wrong-target invocation refused to create fixtures.
+Explicit `.ts` imports support the Deno runtime. The no-emit TypeScript check permits these imports.
+Existing D1 and SQL test files retain their local quote style.
 
 ### Run report
 
 1. Summary of changes. Extracted existing workflow decisions and request orchestration. Added a trusted Supabase execution path and aligned the bounded D1 proof.
-2. Files changed. Shared server service and tests; Supabase persistence, HTTP handler, function, migration, and opt-in browser executor; D1 adapter; hosted runner and fixtures; CI and check configuration; planning, contracts, reference, and verification documents. Removed the obsolete bounded `issueRules.ts`.
-3. Commands run. Git and PR inspection, migration and source reads, TypeScript-guide and Supabase-auth documentation reads, typecheck, lint, build, function checks/tests, local tests, browser checks, provider-scenario listing, docs installation/build/tests, and whitespace/link checks. Confirmed provider targets; linked an isolated operational directory; fetched migration records; dry-ran and applied the single CI migration; deployed only the CI workflow function; ran hosted Supabase verification. Initial sandbox Git, sockets, provider access, and Deno downloads needed escalation. Initial test compilation and lint issues were corrected. Playwright discovery needed a hosted-suite exclusion; its missing browser binary was supplied under `/tmp`. Astro required a local locked install instead of a dependency symlink.
-4. Build/test results. Observed passing results are listed above. Initial hosted failures were fixture Auth rate limits. Protected GitHub results remain separate and unverified.
-5. Manual verification steps. Inspected effective migrations, identity boundaries, commit dependencies, provider targets, cleanup scope, and unchanged environment restrictions. Bounded agents independently inventoried rules, implemented persistence/tests, and reviewed the shared service. No manual product UI walkthrough was repeated because the active UI path is unchanged.
-6. Risks. The active backend still uses legacy SQL. The new path is verified on CI only. Full D1 commands, live delivery, installation, migration, and contest capacity remain unverified. PR #40's hosted HTTP check remains incomplete.
+2. Files changed. Created `src/server/workflow.ts`, `src/server/workflow.test.ts`, `src/server/adapters/supabase/store.ts`, `src/server/adapters/supabase/store.test.ts`, `src/server/adapters/supabase/http.ts`, and `src/server/adapters/supabase/http.test.ts`. Created `src/backend/supabase/workflow.ts`, `src/backend/supabase/workflow.test.ts`, `supabase/functions/workflow/index.ts`, `supabase/functions/workflow/deno.json`, and `supabase/functions/workflow/deno.lock`. Created `supabase/migrations/202610180001_shared_workflow.sql`, `tests/workflow/supabase.test.ts`, `scripts/workflow-proof.mjs`, `vitest.workflow.config.ts`, `docs/server-workflow.md`, and `docs/verify-server-workflow.md`. Updated `src/server/adapters/d1/store.ts`, `tests/providers/supabase/fixture.ts`, `.github/workflows/checks.yml`, `supabase/config.toml`, `eslint.config.js`, `package.json`, `playwright.config.ts`, and `tsconfig.json`. Updated `AGENTS.md`, `PLAN.md`, `README.md`, `docs/backend-contracts.md`, `docs/provider-test-contracts.md`, `docs/cloudflare-backend-design.md`, `docs/cloudflare-implementation-plan.md`, `docs/d1-transaction-proof.md`, `docs/product-direction.md`, `docs/tickets.md`, `docs/current-state.md`, and `site/src/content/docs/reference/status.md`. Removed `src/server/issueRules.ts`.
+3. Commands run. Used `git` for status, fetch, worktree creation, diffs, commits, trailer checks, and push. Used `gh` for PR inspection, creation, checks, and environment-policy reads. Read source and migrations with `cat`, `sed`, and `rg`. Read the official TypeScript guide and Supabase Auth documentation. Ran `npm run typecheck`, `lint`, `build`, `check:functions`, `test:functions`, `test:e2e`, `test:providers:list`, `docs:build`, and `docs:test`. Ran `npm test`, `npm ci --prefix site`, and `playwright install chromium`. Ran `npm run test:workflow:hosted` and `npm run test:d1:hosted` with explicit isolated targets. Supabase commands included `projects list`, `link`, `migration list`, `migration fetch`, `db push --dry-run`, `db push --yes`, `functions deploy`, and `functions list`. Confirmed existing Cloudflare access with `wrangler whoami`. Ran documentation path, writing, and whitespace checks. Initial sandbox Git, sockets, provider access, and Deno downloads needed escalation. Corrected initial test compilation and lint issues. Excluded the hosted Vitest suite from Playwright discovery and supplied its missing browser binary under `/tmp`. Astro required a local locked install instead of a dependency symlink.
+4. Build/test results. The list above gives observed passing results. Initial hosted failures were fixture Auth rate limits. Protected GitHub results remain separate and unverified.
+5. Manual verification steps. Inspected effective migrations, identity boundaries, commit dependencies, provider targets, cleanup scope, and unchanged environment restrictions. Bounded agents independently inventoried rules, implemented persistence/tests, and reviewed the shared service. Manual product UI checks: not repeated. The active UI path remains unchanged.
+6. Risks. The active backend still uses legacy SQL. The new path has verification evidence on CI only. Full D1 commands, live delivery, installation, migration, and contest capacity remain unverified. PR #40's hosted HTTP check remains incomplete.
 7. Follow-up tickets. Owner review and merge of T0019. Later candidates are remaining D1 persistence through the shared service, full connector verification, and an approved Supabase-path activation. PR #40 remains separate. AWS, Terraform, R2, and migration tooling remain deferred.
-8. Docs that need updating. Final PR, ordinary CI, and D1 evidence will be added before run completion.
+8. Docs that need updating. None for the completed scope. A later approved protected run must add its separate evidence.
 
 
 ## T0017 D1 transaction proof, 2026-10-17

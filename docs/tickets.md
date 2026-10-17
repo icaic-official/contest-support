@@ -2,6 +2,10 @@
 
 These tickets describe development work, not contestant issues.
 
+T0012 fixes reply cleanup after a successful retry.
+The user requested separate PRs for the reply and image-preview findings on 2026-10-17.
+Each fix starts from updated `main` and can proceed before the other fix merges.
+
 T0004 has two related pull requests.
 [PR #9](https://github.com/notbowen/minsky/pull/9) implements the UI makeover.
 [PR #13](https://github.com/notbowen/minsky/pull/13) rewrites the documentation.
@@ -367,7 +371,7 @@ Deployment is a separate explicit step.
 
 Branch: `feature/t0010-p2-review-fixes`, from updated `main` at `d961f5b`.
 The branch now includes `main` at `9c0341c`, with T0005 issue images.
-Status: implemented and verified locally. The user reviews and merges.
+Status: merged into `main` in [PR #24](https://github.com/GiftedNovaHD/minsky/pull/24).
 
 The user authorized fixes for the three P2 findings from the review of `1ed603a`.
 The branch preserves the merged T0008 team search and stays independent of the other open feature pull requests.
@@ -379,6 +383,29 @@ Acceptance criteria:
 - [x] Failed cloud cleanup retains the fixture file and reports its path. Successful teardown removes it before the wrapper removes the directory.
 - [x] Regression tests use the application UI or the real test runner and assert exact requests and observable file effects.
 - [x] Required local checks pass and documentation records the results.
-- [ ] The user reviews and merges the pull request.
+- [x] The user merged the pull request.
 
 No schema change or deployment is part of this ticket.
+
+## T0012 — Reply retry cleanup
+
+Branch: `feature/t0012-reply-retry-cleanup`, from updated `main` at `de92d54`.
+
+Status: implemented and verified locally. The user reviews and merges.
+
+The pending reply now retains its success cleanup with its request ID and command.
+A successful retry clears the reply text and resets the audience before editing resumes.
+Failed requests preserve the draft.
+The request ID stays the same across retries, so the server can recognize an already recorded reply.
+
+Acceptance criteria:
+
+- [x] Successful retries clear public replies and internal notes. **Send reply** stays disabled until new text is entered.
+- [x] Repeated transport failures preserve the draft, audience, request ID, and command until success.
+- [x] A rejected request preserves an editable draft and does not create a history entry.
+- [x] A new reply after successful retry uses a new request ID and completes normally.
+- [x] Browser regression tests reproduce the original failure and pass with the fix. Required local checks pass.
+- [ ] The user reviews and merges the pull request.
+
+Verification is recorded in [current state](current-state.md#t0012-reply-retry-cleanup-2026-10-17).
+Deployment remains a separate step.

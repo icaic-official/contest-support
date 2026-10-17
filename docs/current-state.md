@@ -1,5 +1,37 @@
 # Current state
 
+## T0012 reply retry cleanup (2026-10-17)
+
+The user selected the reply-retry finding from the review of `main` at `de92d54`.
+The branch is `feature/t0012-reply-retry-cleanup`.
+The user requested an independent PR for each of the two review findings.
+
+The pending reply retains its success cleanup with its request ID and command.
+After a successful retry, the reply text clears and the audience returns to its default.
+**Send reply** stays disabled until new text is entered.
+Repeated transport failures retain the draft and original request.
+A rejected request leaves the draft available for correction.
+
+Checks passed on Node.js `22.22.1` and npm `11.12.0`:
+
+- `npm run typecheck`, `npm run lint`, and `npm run build` passed.
+- `npm test` passed all 49 local tests outside the sandbox.
+- `npm run check:functions` passed, and `npm run test:functions` passed all 12 tests.
+- `npm run test:e2e` passed all 20 Chromium tests outside the sandbox.
+
+The new browser tests lose two responses for the same recorded reply.
+They check public replies, internal notes, exact retry requests, one history entry, cleared controls, and a subsequent new reply.
+Both retry tests failed against the original app because the reply text remained after success.
+The first test attempt needed an accessible combobox selector for **Audience**.
+A separate test checks that server rejection preserves the draft.
+These tests use fictional Auth and database responses. They do not access hosted data.
+The suite also retains the existing phone-width and keyboard checks.
+
+The build retains the existing JavaScript chunk-size warning.
+Hosted checks, real-device checks, and deployment were not run.
+The app keeps its existing double quotes and JSX conventions for consistency with the surrounding code.
+No database migration or function change is required.
+
 ## Supabase CLI upgrade (2026-10-17)
 
 The user approved the existing Supabase CLI update from `2.119.0` to `2.121.0`.
@@ -34,9 +66,11 @@ The user reviews and merges the maintenance PR.
 
 ## Ticket status
 
-T0010 fixes the three P2 review findings on `feature/t0010-p2-review-fixes`.
-The branch started from `main` at `d961f5b` and now includes `main` at `9c0341c`.
-The changes are verified locally and await user review. They are not deployed.
+T0012 implements reply cleanup after successful retry and awaits user review.
+See [T0012 verification](#t0012-reply-retry-cleanup-2026-10-17).
+
+T0010 merged into `main` in [PR #24](https://github.com/GiftedNovaHD/minsky/pull/24).
+It fixes the three earlier P2 findings. Deployment remains a separate step.
 See [T0010 verification](#t0010-p2-review-fixes-2026-10-15).
 
 T0008 fuzzy team search merged into `main` in [PR #22](https://github.com/notbowen/minsky/pull/22) on 2026-10-15 (SGT).

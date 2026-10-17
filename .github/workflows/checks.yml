@@ -173,5 +173,7 @@ jobs:
         run: npx supabase functions deploy attachments --project-ref "$MINSKY_TEST_PROJECT_REF" --use-api
       - if: ${{ !inputs.existing_backend }}
         run: npx supabase secrets set ALLOWED_ORIGINS=http://127.0.0.1:4174 --project-ref "$MINSKY_TEST_PROJECT_REF"
+      - name: Check backend prerequisites before fixture creation
+        run: node scripts/check-cloud-backend.mjs
       - run: npx playwright install --with-deps chromium
       - run: npm run test:cloud

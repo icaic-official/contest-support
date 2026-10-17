@@ -311,7 +311,9 @@ npm run test:cloud
 Review the configuration diff before you apply it.
 Review the migration target before you apply migrations.
 Deploy `attachments` only from a checkout that contains that function.
-T0005 is applied to `Minsky` for the approved preview; it is not applied to `Minsky CI`.
+The merged T0005 image migrations and both functions are installed in `Minsky CI` as of 2026-10-17.
+The CI preparation retained the already applied announcement migration from open PR #20.
+See the [T0014 verification record](current-state.md#t0014-existing-backend-verification-2026-10-17) for the setup and recovery evidence.
 The `cloud:link` and `cloud:functions` npm shortcuts target development.
 Use the explicit CI commands above in the separate checkout.
 
@@ -386,6 +388,9 @@ gh workflow run checks.yml --repo GiftedNovaHD/minsky \
 ```
 
 This mode skips backend preparation. The tests still create and delete isolated fixtures.
+Before fixture creation, `scripts/check-cloud-backend.mjs` requires every local migration version and active `admin` and `attachments` functions.
+The check reads provider metadata and reports additional remote migration versions.
+It stops when prerequisites are missing. It does not compare deployed function source or prove that database objects match migration history.
 A passing result verifies the frontend against the recorded backend. It does not verify installation of that revision's backend.
 Keep the default mode for changes to migrations, functions, or backend configuration.
 If the migration history differs, resolve that difference before an installation check.

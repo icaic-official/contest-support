@@ -425,7 +425,7 @@ No schema change or deployment is part of this ticket.
 ## T0014 backend adapters
 
 Branch: `feature/t0014-backend-adapters`, from updated `main` at `de92d54`.
-Status: implementation, local checks, and ordinary GitHub checks pass after the merge from `main`. The replacement token works. Hosted preparation found the announcement migration from open PR #20 in Minsky CI. Verification against the existing backend and user review remain pending.
+Status: implementation, local checks, and ordinary GitHub checks pass after the merge from `main`. The replacement token works. Minsky CI now has the missing merged image migrations and functions. A failed run's fixtures were recovered and deleted. Hosted verification and user review remain pending.
 
 The user selected shared backend interfaces before the Cloudflare migration.
 This ticket extracts Supabase as the first implementation.
@@ -451,7 +451,8 @@ The [backend reference](backend-contracts.md) defines the interfaces.
 The Cloudflare backend, D1 schema rewrite, account migration, R2 copy, and Durable Objects implementation remain later work.
 The next candidate is a shared hosted verification suite for the contracts before the second provider implementation.
 Other provider adapters and Terraform remain deferred.
-This ticket does not change provider resources, copy data, or deploy the app.
+This ticket adds no backend schema or provider service and does not migrate user data or deploy the app.
+Hosted verification requires the existing CI project to have the merged backend migrations and functions.
 
 ## T0011 — Documentation site
 

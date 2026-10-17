@@ -4,13 +4,14 @@ This plan defines the work needed to implement and verify the [proposed backend]
 T0016 adds design documents. The branch also includes the merged T0015 tests and Supabase fixes.
 The phases below are acceptance steps, not additional opened development tickets.
 
-## Complete the current reviews
+## Use the merged design and provider tests
 
 PR #32 merged on 2026-10-17 at `ef6a029`. T0014's merge step is complete.
 
 T0015 merged in [PR #37](https://github.com/GiftedNovaHD/minsky/pull/37) at `738ef4a` on 2026-10-17.
 Its protected run passed all eight shared scenarios and all 14 existing hosted UI tests.
-Review T0016's transaction, image, identity, and notification design in PR #36.
+T0016 merged in [PR #36](https://github.com/GiftedNovaHD/minsky/pull/36) at `b68ef72` on 2026-10-17 at 13:50:36 UTC.
+The design review is complete. The implementation and verification work below remains pending.
 
 The user authorized T0015 and T0016 in parallel on 2026-10-17 while PR #32 was under review.
 Both branches started at its `d158906` revision. T0016 now includes PR #32 and PR #37.

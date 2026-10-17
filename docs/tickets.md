@@ -2,7 +2,7 @@
 
 These tickets describe development work, not contestant issues.
 
-This branch records [T0016 Cloudflare backend design](#t0016-cloudflare-backend-design) in PR #36.
+T0016 Cloudflare backend design merged in [PR #36](https://github.com/GiftedNovaHD/minsky/pull/36) at `b68ef72` on 2026-10-17.
 [T0015 shared provider tests](#t0015-shared-provider-tests) merged in [PR #37](https://github.com/GiftedNovaHD/minsky/pull/37).
 [PR #32](https://github.com/GiftedNovaHD/minsky/pull/32) merged on 2026-10-17 at `ef6a029`.
 The numbered records below retain their original scope and verification history.
@@ -38,7 +38,7 @@ Status: merged in [PR #37](https://github.com/GiftedNovaHD/minsky/pull/37) at `7
 
 The user authorized this branch exception on 2026-10-17.
 T0015 and separate T0016 Cloudflare design work started during PR #32 review.
-PRs #32 and #37 are now merged. The user still reviews and merges T0016.
+PRs #32 and #37 are now merged. T0016 design merged in PR #36.
 
 The shared scenarios call the real browser `Backend` contract.
 Each provider supplies isolated accounts, records, clients, fault controls, and cleanup.
@@ -463,12 +463,12 @@ No schema change or deployment is part of this ticket.
 ## T0016 Cloudflare backend design
 
 Branch: `feature/t0016-cloudflare-backend-design`, from PR #32 at `d158906`.
-The branch now includes PR #32 at `ef6a029` and T0015 in PR #37 at `738ef4a`.
-Status: design prepared for review. No Cloudflare connector or resources exist in this change.
+The branch included PR #32 at `ef6a029` and T0015 in PR #37 at `738ef4a`.
+Status: design merged in [PR #36](https://github.com/GiftedNovaHD/minsky/pull/36) at `b68ef72` on 2026-10-17 at 13:50:36 UTC. No Cloudflare connector or resources exist in this change.
 
 The user authorized this design in parallel with T0015 shared provider tests while PR #32 was under review.
-This is an explicit exception to the normal branch and merge sequence.
-The user still reviews and merges the dependent work.
+This was an explicit exception to the normal branch and merge sequence.
+The user accepted the design by merging PR #36. This did not authorize Cloudflare resource creation, credential exports, deployment, or data migration.
 
 Acceptance criteria:
 
@@ -479,7 +479,7 @@ Acceptance criteria:
 - [x] Record credential-migration options and decisions required before account cutover.
 - [x] Define bounded implementation phases with provider tests, migration comparison, and rollback acceptance.
 - [x] Keep AWS and Terraform as future work while defining portable interfaces.
-- [ ] The user reviews and accepts the design.
+- [x] The user reviewed and accepted the design by merging PR #36.
 
 The [design](cloudflare-backend-design.md) explains the decisions.
 The [implementation plan](cloudflare-implementation-plan.md) defines acceptance steps.

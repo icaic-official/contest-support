@@ -30,7 +30,8 @@ Its scope is the [backend design](docs/cloudflare-backend-design.md) and [implem
 Keep provider imports and privileged setup outside the shared scenarios.
 Use the same behavior assertions for each provider, including a possible future AWS adapter.
 Keep Supabase active. Design approval does not authorize resource creation, credential exports, deployment, or data migration.
-The user still reviews and merges T0016. AWS implementation and Terraform remain deferred.
+PR #36 merged T0016 on 2026-10-17 at `b68ef72`. The merge accepts the design only. It does not authorize resource creation, credential exports, deployment, or data migration.
+AWS implementation and Terraform remain deferred.
 See [T0015](docs/tickets.md#t0015-shared-provider-tests) for the merged test scope.
 
 **T0014 backend adapters, 2026-10-17.** The user authorized the shared interfaces and Supabase extraction before the Cloudflare migration.

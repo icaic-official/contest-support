@@ -6,7 +6,8 @@ T0016 uses `feature/t0016-cloudflare-backend-design` for the [backend design](do
 Both branches started from PR #32 at `d158906`, as an explicit exception to waiting for its merge.
 The user merged PR #32 at `ef6a029` on 2026-10-17 at 12:51:42 UTC.
 The user then merged T0015 in [PR #37](https://github.com/GiftedNovaHD/minsky/pull/37) at `738ef4a` on 2026-10-17 at 13:44:12 UTC.
-T0016 now includes both merges. The user still reviews and merges T0016.
+The user merged T0016 in [PR #36](https://github.com/GiftedNovaHD/minsky/pull/36) at `b68ef72` on 2026-10-17 at 13:50:36 UTC.
+The merge accepts the design only. It does not authorize Cloudflare resource creation, credential exports, deployment, or data migration.
 
 The shared tests call the browser `Backend` contract.
 Provider fixtures own setup, credentials, fault injection, and cleanup.

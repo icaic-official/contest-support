@@ -21,15 +21,21 @@ jobs:
         with:
           node-version: 22
           cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            site/package-lock.json
       - run: npm ci
+      - run: npm ci --prefix site
       - run: npm run typecheck
       - run: npm run lint
       - run: npm run check:functions
       - run: npm run test:functions
       - run: npm test
       - run: npm run build
+      - run: npm run docs:build
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e
+      - run: npm run docs:test
   cloud:
     if: github.event_name == 'workflow_dispatch'
     needs: checks

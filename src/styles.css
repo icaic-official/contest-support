@@ -452,7 +452,8 @@ small {
   display: grid;
   gap: 10px;
 }
-.sidebar-navigation button {
+.sidebar-navigation button,
+.sidebar-navigation a {
   display: flex;
   align-items: center;
   gap: 16px;
@@ -464,7 +465,13 @@ small {
   font-size: 0.9rem;
   font-weight: 400;
 }
+.sidebar-navigation a {
+  min-height: 44px;
+  border-radius: 5px;
+  text-decoration: none;
+}
 .sidebar-navigation button:hover,
+.sidebar-navigation a:hover,
 .sidebar-navigation button[aria-current="page"] {
   color: var(--accent);
   background: #17281a;

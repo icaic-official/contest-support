@@ -20,6 +20,15 @@
 
 ## Current scope
 
+**T0011 documentation site (2026-10-17):** the user requested implementation, written guides, and deployment.
+Develop on `feature/t0011-documentation-site` from updated `main`, alongside the open T0007 PR.
+Publish a separate static `minsky-docs` Worker in the existing Minsky development account.
+The user's request authorizes this initial docs deployment before merge.
+The user still reviews and merges the source PR.
+This exception does not authorize application, database, or function deployment.
+Maintain public guides under `site/src/content/docs/` and label T0007's pending and unverified steps.
+See [T0011](docs/tickets.md#t0011--documentation-site).
+
 **T0008 team search (2026-10-15):** the user merged [PR #22](https://github.com/notbowen/minsky/pull/22) into `main`.
 It was developed separately on `feature/t0008-team-search` while PR #19 remained open.
 The T0005 branch now includes it through a merge from `main` to resolve conflicts.

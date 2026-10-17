@@ -2,6 +2,11 @@
 
 These tickets describe development work, not contestant issues.
 
+T0011 is the active documentation-site companion to the open T0007 installation PR.
+The user requested its implementation and deployment on 2026-10-17.
+T0005 merged in PR #19 and T0010 merged in PR #24 on 2026-10-15.
+Those merges do not imply application deployment.
+
 T0004 has two related pull requests.
 [PR #9](https://github.com/notbowen/minsky/pull/9) implements the UI makeover.
 [PR #13](https://github.com/notbowen/minsky/pull/13) rewrites the documentation.
@@ -241,7 +246,8 @@ That development deployment preceded merge under the user's exception for T0004.
 
 Branch: `feature/t0005-issue-attachments`, created from updated `main` after T0004 merged.
 
-Status: implemented and verified locally on 2026-10-11.
+Status: merged in [PR #19](https://github.com/GiftedNovaHD/minsky/pull/19) on 2026-10-15.
+The following dated records describe implementation and preview verification.
 The 2026-10-14 review fixes add current-access checks, fixed visibility during retry, exact file paths, saved removal retries, and completion-time count checks.
 See the [review-fix record](current-state.md#t0005-review-fixes-2026-10-14) for local verification and cloud-test limits.
 Review pull request: [PR #19](https://github.com/notbowen/minsky/pull/19).
@@ -367,7 +373,7 @@ Deployment is a separate explicit step.
 
 Branch: `feature/t0010-p2-review-fixes`, from updated `main` at `d961f5b`.
 The branch now includes `main` at `9c0341c`, with T0005 issue images.
-Status: implemented and verified locally. The user reviews and merges.
+Status: merged in [PR #24](https://github.com/GiftedNovaHD/minsky/pull/24) on 2026-10-15.
 
 The user authorized fixes for the three P2 findings from the review of `1ed603a`.
 The branch preserves the merged T0008 team search and stays independent of the other open feature pull requests.
@@ -379,6 +385,39 @@ Acceptance criteria:
 - [x] Failed cloud cleanup retains the fixture file and reports its path. Successful teardown removes it before the wrapper removes the directory.
 - [x] Regression tests use the application UI or the real test runner and assert exact requests and observable file effects.
 - [x] Required local checks pass and documentation records the results.
-- [ ] The user reviews and merges the pull request.
+- [x] The user merged PR #24.
 
 No schema change or deployment is part of this ticket.
+
+## T0011 — Documentation site
+
+Branch: `feature/t0011-documentation-site`, from updated `main` at `de92d54`.
+Status: implemented and verified locally; initial deployment is pending.
+
+The user requested a documentation site to accompany T0007, including written content and Workers deployment.
+This request authorizes the initial `minsky-docs` deployment before the source PR merges.
+The user still reviews and merges the PR.
+T0007 remains a separate open change.
+
+### Selected scope
+
+- Publish user, staff, jury, administrator, operator, and contributor guides from repository Markdown.
+- Label merged features, pending T0007 installation steps, and unverified operating conditions.
+- Use Astro Starlight with local search, keyboard navigation, phone layouts, and a useful 404 page.
+- Keep the docs package and build output under `site/`.
+- Deploy static assets through `wrangler.docs.jsonc` to `minsky-docs.icaic-minsky.workers.dev`.
+- Add documentation links to the README, sign-in footer, and workspace sidebar.
+- Add docs build, local-link, browser, and dependency checks to ordinary CI.
+- Document the exact editing, verification, deployment, and hosted-check commands.
+
+### Outside this ticket
+
+Application deployment, backend changes, T0007 container execution, merging other PRs, paid services, domain purchases, and automatic deployment on merge.
+
+### Acceptance criteria
+
+- [x] Public guides describe the inspected implementation and clearly label T0007's pending status.
+- [x] The site uses a separate Worker and publishes only its generated static files.
+- [x] Required local checks pass, including docs search, navigation, local links, and phone layout.
+- [ ] The deployed site passes HTTP, deep-link, search, and 404 checks.
+- [ ] Deployment evidence and a source PR are available for user review.

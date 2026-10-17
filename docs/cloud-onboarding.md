@@ -8,6 +8,8 @@ The user permits full authorized cloud credential access for contributors.
 
 ## Authentication decision (2026-10-02)
 
+The public documentation has separate hosting. See [documentation hosting](#documentation-hosting-t0011).
+
 The user replaced email invitations and email recovery with organizer-created **usernames and passwords**.
 SMTP and personal email addresses are not prerequisites.
 Team contestants share a team account.
@@ -87,6 +89,36 @@ Previously configured redirect URLs may remain.
 T0003 does not require a sender, domain, or SMTP setup.
 
 ## Ownership and costs
+
+### Documentation hosting (T0011)
+
+The documentation site uses a separate static Worker named `minsky-docs`.
+Its address is `https://minsky-docs.icaic-minsky.workers.dev`.
+Its configuration is `wrangler.docs.jsonc`, with `site/dist` as its only asset directory.
+The account is the existing Minsky development account, `458ad6a930b0fb717796dfa19ca6a2b1`.
+It has no backend binding, Supabase credential, or Worker request handler.
+No paid upgrade or purchased domain is required for this setup.
+
+Use Node.js 22.22 or later. From the repository root:
+
+```sh
+npm ci
+npm ci --prefix site
+npm run docs:build
+npm run docs:test
+npx wrangler whoami
+npx wrangler deploy --config wrangler.docs.jsonc --dry-run
+npm run docs:deploy
+```
+
+Confirm the account and Worker name before the final command.
+The user authorized the initial documentation deployment before merge on 2026-10-17.
+This is a T0011 exception for the docs Worker only.
+Later updates use review, merge, and explicit deployment.
+The app's `npm run deploy` command is separate.
+See [the complete guide](../site/src/content/docs/contributing/documentation.md).
+
+### Existing provider records
 
 On 2026-10-02, the user deferred records of provider ownership and billing details.
 On 2026-10-03, the user moved these scope notes from T0004.

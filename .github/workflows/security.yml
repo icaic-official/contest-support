@@ -44,3 +44,5 @@ jobs:
           node-version: 22
       - name: Audit locked runtime and development dependencies
         run: npm audit --package-lock-only --audit-level=high
+      - name: Audit documentation dependencies
+        run: npm audit --prefix site --package-lock-only --audit-level=high

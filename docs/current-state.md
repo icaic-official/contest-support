@@ -1,5 +1,61 @@
 # Current state
 
+## T0011 documentation site (2026-10-17)
+
+The user requested a written documentation site and its deployment to Cloudflare Workers.
+The branch `feature/t0011-documentation-site` starts from `main` at `de92d54`.
+The user authorized the initial docs deployment before merge. The user still reviews and merges the source PR.
+
+The site contains 13 guides and a 404 page, built from `site/src/content/docs/` with Astro Starlight.
+It covers user workflows, accounts, image rules, T0007 installation steps, verification, troubleshooting, and docs maintenance.
+T0007 remains an open PR, and its container and independent-backend limits are explicit in the guides.
+Search uses a static Pagefind index. The site requires no application backend or credentials.
+
+The Worker target is `minsky-docs`, account `458ad6a930b0fb717796dfa19ca6a2b1`, at `https://minsky-docs.icaic-minsky.workers.dev`.
+`wrangler.docs.jsonc` uploads only `site/dist`.
+Its dry run passed with 77 assets and no bindings.
+The Cloudflare account check passed, and the deployment-list check confirmed the new Worker did not yet exist.
+Initial deployment and hosted verification are pending in this record.
+No application, database, or function deployment is part of this change.
+The app's new documentation links will appear when its frontend is separately deployed.
+
+Local checks used Node.js `22.22.1` and npm `11.12.0`.
+Type checking, ESLint, the app build, both function checks, all 49 unit/database tests, all 12 function tests, and all 17 app browser tests passed.
+The docs build generated 14 HTML pages and checked 569 local links and assets.
+All three docs browser tests passed, including search, keyboard access, direct page reload, 320px navigation, and the 404 page.
+Desktop light and dark screenshots and the 320px phone screenshot were reviewed.
+The local browser reported no page errors or horizontal overflow, and the Public Sans font loaded.
+The final dependency audits reported zero vulnerabilities for both lockfiles.
+
+The initial dependency audit found a CSS selector parsing advisory in the docs build dependencies.
+The site pins `postcss-selector-parser` to `7.1.6` under `postcss-nested` until its upstream dependency range includes the fix.
+The subsequent audit reported zero vulnerabilities.
+This override affects build-time CSS processing and passed the docs build and browser checks.
+
+The first sandboxed unit run hit the existing child-process stderr failure. All tests passed outside the sandbox without source changes.
+Astro initially needed permission to create its local configuration directory.
+Its automatic background preview mode caused the first browser run to stop early; `--ignore-lock` now keeps previews in the foreground.
+The first search assertion used `searchbox`; the rendered control exposes `textbox`. The corrected check passed.
+The link checker now handles Workers' clean URLs for flat HTML files, including `404.html`.
+Astro reports a duplicate `/404` route warning for Starlight's custom error content; the generated error page and 404 response pass the browser checks.
+
+The STE prose check passed structural rules with lexical synonym checks disabled.
+Terms such as Auth confirmation, removal, and verification keep their distinct operational meanings.
+Existing TSX double quotes and component conventions are retained as project style exceptions.
+New Starlight content exports follow its required framework interface.
+
+The repository adds docs build, browser, and dependency checks to ordinary CI.
+Protected Supabase cloud checks are not required for this static site and were not run here.
+
+### Current merge status
+
+T0005 merged through PR #19, T0008 through PR #22, and T0010 through PR #24 on 2026-10-15.
+The Supabase CLI update merged through PR #28 on 2026-10-17.
+T0006, T0007, and T0009 remain separate open PRs.
+The latest recorded main application deployment is still `d1c36fd` from 2026-10-11.
+This docs change does not establish the running application revision.
+The older sections below record their original runs.
+
 ## Supabase CLI upgrade (2026-10-17)
 
 The user approved the existing Supabase CLI update from `2.119.0` to `2.121.0`.
@@ -36,7 +92,7 @@ The user reviews and merges the maintenance PR.
 
 T0010 fixes the three P2 review findings on `feature/t0010-p2-review-fixes`.
 The branch started from `main` at `d961f5b` and now includes `main` at `9c0341c`.
-The changes are verified locally and await user review. They are not deployed.
+The user merged [PR #24](https://github.com/GiftedNovaHD/minsky/pull/24) on 2026-10-15. Application deployment remains a separate step.
 See [T0010 verification](#t0010-p2-review-fixes-2026-10-15).
 
 T0008 fuzzy team search merged into `main` in [PR #22](https://github.com/notbowen/minsky/pull/22) on 2026-10-15 (SGT).

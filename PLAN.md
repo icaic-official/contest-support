@@ -1,5 +1,13 @@
 # Minsky planning record
 
+**Documentation site (2026-10-17):** the user requested implementation, written guides, and deployment to Cloudflare Workers.
+T0011 is a companion to the open T0007 installation work.
+Use `feature/t0011-documentation-site` from updated `main`.
+The user authorizes a separate `minsky-docs` Worker in the existing development account and its initial deployment before merge.
+The user still reviews and merges the source PR.
+This exception does not authorize application, database, or function deployment.
+See [T0011](docs/tickets.md#t0011--documentation-site).
+
 **T0008 team search (2026-10-15):** the user merged [PR #22](https://github.com/notbowen/minsky/pull/22) into `main`.
 Staff match the current session's team names and locations while they investigate issues or report one for a team.
 The T0005 branch includes the accepted search through a merge from `main`.

@@ -15,6 +15,7 @@ import {
 import type { ImageTransport } from "@/connected/imageUpload";
 import type { Snapshot } from "@/connected/model";
 import { cn } from "@/lib/utils";
+import { ActionDialog } from "./ActionDialog";
 import { ActionSheet } from "./ActionSheet";
 
 function uploadedText(item: { uploader_name: string; uploaded_at: string }) {
@@ -308,7 +309,8 @@ export function ImagePreviewDialog({
 
 /**
  * The images of one issue for organisers: the gallery, the preview, an upload
- * sheet and retries for removals that did not finish.
+ * sheet and retries for removals that did not finish. The desktop console
+ * sets `surface="dialog"` to show the upload form in a dialog.
  */
 export function OrganiserImages({
   state,
@@ -319,6 +321,7 @@ export function OrganiserImages({
   onUploadOpenChange,
   onChanged,
   transport,
+  surface = "sheet",
 }: {
   state: Snapshot;
   issueId: string;
@@ -328,7 +331,9 @@ export function OrganiserImages({
   onUploadOpenChange: (open: boolean) => void;
   onChanged: () => Promise<void>;
   transport?: ImageTransport;
+  surface?: "sheet" | "dialog";
 }) {
+  const Surface = surface === "dialog" ? ActionDialog : ActionSheet;
   const session = state.session;
   const archived = Boolean(state.event?.archived);
   const images = useIssueImages({
@@ -392,14 +397,14 @@ export function OrganiserImages({
       )}
       <ImagePreviewDialog images={images} userId={userId} archived={archived} />
       {canUpload && (
-        <ActionSheet
+        <Surface
           open={uploadOpen}
           onOpenChange={onUploadOpenChange}
           title="Add an image"
           description="Choose who can see it. You cannot change this later."
         >
           <ImageUploadForm images={images} />
-        </ActionSheet>
+        </Surface>
       )}
     </section>
   );

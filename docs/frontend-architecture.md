@@ -1,7 +1,7 @@
 # Frontend architecture
 
 This page describes how the T0015 frontend is organized.
-It records the foundation step (step 1 of T0015). Later T0015 steps replace the placeholder layouts.
+It records the foundation (step 1 of T0015) and the three layouts that replaced the placeholders: the organiser phone app, the organiser desktop console and the contestant app.
 See [T0015](tickets.md#t0015--organiser-and-contestant-frontend-redesign) for scope and decisions.
 
 ## Stack
@@ -51,7 +51,8 @@ Every rule applies only inside an element with the `legacy-ui` class.
 Thus the older element rules, such as `button` and `input`, cannot change shadcn components outside `.legacy-ui`.
 
 Do not put shadcn components inside a `.legacy-ui` element.
-When a later step replaces a legacy screen, remove the CSS rules that no other screen uses.
+No workspace screen uses `legacy-ui` any more. Only the image preview page (`src/connected/imagePreview.tsx`, `image-preview.html`) still uses it.
+Step 5 of T0015 removes the rules that the preview page does not use.
 
 ## From sign-in to a UI
 
@@ -181,23 +182,51 @@ These rules apply:
 
 `useIssueImages` (`src/connected/hooks/`) holds the upload, retry, preview and removal logic of `IssueImages`. `IssueImages` uses it with its existing markup.
 
-## Where later steps plug in
+## Organiser desktop console
 
-The organiser shells currently render `LegacyWorkspace` (`src/connected/legacy/`). This is the workflow UI from before T0015, with the same markup and selectors.
-Its root element has `data-ui="contestant"`, `data-ui="organiser-phone"` or `data-ui="organiser-desktop"`.
-`tests/ui-selection.spec.ts` uses this attribute to check the UI selection. Keep the attribute on the root element of each new layout.
+`OrganiserDesktopConsole` (`src/organiser/desktop/`) is the organiser UI at 1024 px and wider. It follows `design/redesign/a-console.html`.
+It uses the same hooks, rules and forms as the phone app. It adds no workflow rules of its own.
 
-| Step | Replace | Mockup |
-| --- | --- | --- |
-| Organiser phone app (done) | `src/organiser/phone/OrganiserPhoneApp.tsx` | `design/redesign/e-organiser-phone.html` |
-| Contestant desktop app (done) | `src/contestant/ContestantApp.tsx` | `design/redesign/f-contestant-desktop.html` |
-| Organiser desktop console | `src/organiser/desktop/OrganiserDesktopConsole.tsx` | `design/redesign/a-console.html` |
-| Integration | Playwright selectors, `docs/manual-verification.md`, README | — |
+| File | Content |
+| --- | --- |
+| `OrganiserDesktopConsole.tsx` | The shell. It holds the page, the sidebar state, the sheet tab, the command palette, the report dialog, the queue team filter and the reply drafts. These stay in memory while the snapshot is missing. It also handles ⌘K or Ctrl+K and the J and K keys. |
+| `ConsoleChrome.tsx` | `ConsoleSidebar` (session switcher, pages by role, intake switch for admins, person menu with **Change password**, **Documentation** and **Sign out**), `ConsoleTopBar` (sidebar button, breadcrumb, palette button, **Live** or **Reconnecting**, theme menu) and `CommandPalette`. |
+| `QueuePages.tsx` | `QueuePage` (status cards, status tabs with counts, T0008 team filter, issue table), `MinePage`, `HandoffsPage`, `TeamsPage` and the shared `PageHeader`. |
+| `IssueTable.tsx` | `IssueTable` (number, status with icon and label, report and category, team and location, owner, aging timer, **Claim** or **Accept**) and `StatCards`. |
+| `IssueSheet.tsx` | The issue side sheet: timer cards, owner, lifecycle steps with times, handoff banner, actions, the Activity, Images and Outcome & award tabs and the reply composer. |
+| `AwardReviewPage.tsx` | Resolved issues in three lists: To decide, To apply and Applied. Each card has the award form or the confirmation form. |
+| `AdminPages.tsx` | `OverviewPage`, `AccountsPage` (table, filter, **Create account** and **Manage** dialogs with the one-time credentials) and `SettingsPage` (intake, image limits, categories). |
+| `consoleModel.ts` | Pure rules: pages by role, sidebar counts, queue tabs, status card numbers, category counts, award totals, owner workload and palette search. `consoleModel.test.ts` tests them. |
+| `consoleProps.ts` | `ConsolePageProps`, which every page receives, and the heading id. |
 
-Put components that both organiser layouts use in `src/organiser/` (for example, the sheets for reply, resolve and award).
-When no shell uses `src/connected/legacy/` any more, delete that directory and `src/styles.css`.
-Only `LegacyWorkspace` in the desktop console still uses `src/connected/legacy/AdminPanel.tsx`. Delete it when the desktop console (step 2b) lands. Use the parts in `src/organiser/admin/` there.
+Shared parts that the console added or changed:
+
+- `actions/ActionDialog.tsx` is a centred dialog with the props of `ActionSheet`. The console uses it for resolve, escalate, reopen, report, accounts and image upload.
+- `OrganiserImages` takes `surface="dialog"` to show the upload form in an `ActionDialog`.
+- `ReplyForm` takes `layout="composer"`: the message first, then the audience switch and **Send**. Ctrl+Enter or ⌘+Enter sends in both layouts.
+- `LifecycleBar` takes `details`. `lifecycleDetails()` gives the submission and first assignment times, "Requested" during a handoff and the resolution time.
+
+These rules apply:
+
+- The sidebar pages follow the combined roles. Volunteers and specialists get Queue, Assigned to me and Handoffs. Jury members get Award review. Every person gets Teams & tables. Admins also get Overview, Accounts and Session settings. Admins without support roles still get Queue. A jury-only member sees resolved issues only.
+- The queue tabs use the shared status filter of `useWorkflowState`. Active is `all`, All is `everything` and the other tabs are statuses. The phone app shows All active for `everything`. A reopened issue sets `claimed`, so In progress shows it.
+- Rows are sorted by unresolved time, longest first. The timer colors are the same as in the phone app.
+- The issue number in each row is a button. Tab reaches it and Enter opens the sheet. A click on the row also opens it. J and K move focus between rows when no field or dialog has focus.
+- **Claim** or **Accept** in a row stays on the page. **Claim** or **Accept handoff** in the sheet keeps the sheet open. A recorded report opens its issue in the sheet.
+- The sheet shows one filled primary action from `primaryAction()`. Other allowed actions are outlined. **Decide award** and **Confirm applied** open the Outcome & award tab. Resolve, escalate and reopen open a dialog.
+- The composer has **Public reply** and **Internal note**. An internal note has the amber striped surface. The draft clears only when the server records the message, also after **Retry last request** (T0012).
+- The command palette finds issues by number (`31`, `#31`, `ISS-31`) or by report text from three characters, teams and tables with the T0008 search, pages and actions. A team opens the queue with that team filter. A jury-only member goes to Teams & tables instead.
+- The intake switch in the sidebar and the admin pages share one `useSessionAdmin`, so one admin request runs at a time. Admin errors and notices show at the top of the page and in the open dialog.
+- The sidebar choice (expanded or collapsed) is kept in local storage under `minsky:console-sidebar`.
+
+## Root elements
+
+The root element of each layout has `data-ui="contestant"`, `data-ui="organiser-phone"` or `data-ui="organiser-desktop"`.
+`tests/ui-selection.spec.ts` uses this attribute to check the UI selection. Keep it on the root element of each layout.
+
+Put components that both organiser layouts use in `src/organiser/`.
 Keep `IssueImages`, `TeamSearch`, `teamSearch.ts`, `model.ts`, `client.ts` and the image modules. Restyle them only.
+The legacy workspace (`src/connected/legacy/`) was removed with the desktop console.
 
 ## Local checks
 

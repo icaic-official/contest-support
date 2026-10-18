@@ -80,8 +80,33 @@ const lifecycleIndex: Record<Issue["status"], number> = {
   resolved: 3,
 };
 
-/** Four steps from submission to resolution. The current step is marked. */
-export function LifecycleBar({ status }: { status: Issue["status"] }) {
+/**
+ * The time or state under each lifecycle step, for the desktop stepper:
+ * submission and first assignment times, "Requested" while a handoff waits,
+ * and the resolution time.
+ */
+export function lifecycleDetails(issue: Issue): string[] {
+  return [
+    wallTime(issue.created_at),
+    issue.first_assigned_at ? wallTime(issue.first_assigned_at) : "—",
+    issue.status === "escalated" ? "Requested" : "—",
+    issue.status === "resolved" && issue.resolved_at
+      ? wallTime(issue.resolved_at)
+      : "—",
+  ];
+}
+
+/**
+ * Four steps from submission to resolution. The current step is marked.
+ * `details` adds one line under each step label.
+ */
+export function LifecycleBar({
+  status,
+  details,
+}: {
+  status: Issue["status"];
+  details?: readonly string[];
+}) {
   const at = lifecycleIndex[status];
   return (
     <ol className="grid grid-cols-4 gap-1" aria-label="Issue progress">
@@ -105,6 +130,11 @@ export function LifecycleBar({ status }: { status: Issue["status"] }) {
           >
             {label}
           </div>
+          {details && (
+            <div className="font-mono text-[11px] text-muted-foreground">
+              {details[index]}
+            </div>
+          )}
         </li>
       ))}
     </ol>

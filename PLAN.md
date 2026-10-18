@@ -1,5 +1,13 @@
 # Minsky planning record
 
+**T0021 resumed after PR #42 merged, 2026-10-18.** The owner merged PR #42 at `104d9d1e3d6c9e58d55121ea07196f066192ec86`, then requested continuation.
+The separate T0021 worktree now includes that main revision and the final T0020 verification records.
+The accepted executable connector remains `2b6f6f0`; PR #42's final `b984e67` adds documentation and evidence.
+The pre-merge local-only limit ended. Dedicated development and separate installation-verification resources are now authorized.
+Supabase remains active and intact. The development URL switch still requires approval of exact resources, revision, commands, checks, and recovery.
+T0021 has no authorization to change protected environment rules or branch entries without a separate owner decision.
+Earlier preparation and pause records retain their original scope.
+
 **Fresh Cloudflare development installation, 2026-10-18.** The owner authorized T0021 before PR #42 merges.
 Use `feature/t0021-cloudflare-development-install` in a separate worktree from PR #42's latest head, `2b6f6f0`.
 PR #42 was open at the start of this run. Keep its checkout and branch untouched.

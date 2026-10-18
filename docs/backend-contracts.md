@@ -87,8 +87,7 @@ See [installation](../site/src/content/docs/operators/installation.md), [provide
 | [imageFile.ts](../src/connected/imageFile.ts) | Defines file checks, attachment paths, and error classification shared with the attachment function. |
 
 The UI imports the contracts and `requireBackend()`.
-`npm run lint` rejects provider imports outside provider adapter modules and the backend entry point.
-The active application server functions remain specific to Supabase.
+ESLint restricts Supabase imports in shared application code and provider imports in shared server and test modules.
 Both complete browser adapters have provider-owned fixture drivers.
 
 `Backend` defines behavior without requiring a distinct browser transport for every hosting provider.

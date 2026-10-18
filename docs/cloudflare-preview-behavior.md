@@ -15,7 +15,6 @@ That implementation is outside T0021.
 
 Docs contain no authenticated application data.
 Their branch previews remain independent and continue to use `minsky-docs`.
-The T0021 preparation branch blocks all publication until its dependency merges and the hold is reviewed.
 
 ## Why backend selection needs a deployment guard
 
@@ -28,6 +27,7 @@ The Supabase upload path therefore inspects the deployed Worker before changing 
 If application bindings exist, it refuses the upload even when a repository variable is absent or changed.
 The Cloudflare path validates the provider-generated config and exact hosted targets before publishing.
 The same command checks the built revision and backend before upload.
+After upload, it checks the published targets, live bindings, and anonymous rejection at the authentication API.
 
 ## Why docs and application jobs are independent
 

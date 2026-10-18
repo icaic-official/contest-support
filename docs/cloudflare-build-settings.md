@@ -9,8 +9,7 @@ The [activation guide](activate-cloudflare-development.md) owns the backend swit
 | Event | Publication after passing checks |
 | --- | --- |
 | Push to `main` | Stable docs and selected development application, in independent jobs. |
-| Trusted repository branch push | Docs preview only. Application previews are disabled. |
-| T0021 preparation branch push | None, while the dependent preparation hold remains. |
+| Trusted repository branch push | Docs preview only. The workflow skips application previews. |
 | Pull request, fork, or Dependabot push | None. |
 | Weekly schedule | None. Security jobs only. |
 | Manual workflow dispatch | None. Separate protected cloud checks can run. |
@@ -18,16 +17,15 @@ The [activation guide](activate-cloudflare-development.md) owns the backend swit
 
 Both `deploy` and `deploy-app` require `checks`, `secrets`, and `dependencies`.
 Both require `CLOUDFLARE_DEPLOY_ENABLED=true`.
-The preparation branch guard blocks `feature/t0021-cloudflare-development-install` in both the workflow and script.
-Remove that hold only after PR #42 merges and T0021 reconciles its changes.
-No protected environment rule or branch allowlist changes belong to this preparation.
+Protected cloud checks have separate environment rules and branch allowlists.
+Deployment eligibility does not authorize a change to those rules.
 
 ## Repository settings
 
 | Kind | Name | Value |
 | --- | --- | --- |
 | Actions secret | `CLOUDFLARE_API_TOKEN` | Private account-scoped deployment token. |
-| Actions variable | `CLOUDFLARE_DEPLOY_ENABLED` | `true` enables eligible publishing; missing or `false` disables it. |
+| Actions variable | `CLOUDFLARE_DEPLOY_ENABLED` | `true` enables eligible publishing. Missing or `false` disables it. |
 | Actions variable | `MINSKY_DEV_BACKEND` | Missing or `supabase` preserves the current frontend. `cloudflare` selects the complete Worker after approval. |
 | Actions variable | `VITE_SUPABASE_URL` | `https://ovymmobupzowotvrywek.supabase.co`, required in Supabase mode. |
 | Actions variable | `VITE_SUPABASE_PUBLISHABLE_KEY` | Development public publishable key or legacy `anon` key, required in Supabase mode. |
@@ -72,17 +70,17 @@ The removed `deploy:preview` command cannot upload an assets-only app version.
 The stable URLs are `https://minsky-dev.icaic-minsky.workers.dev` and `https://minsky-docs.icaic-minsky.workers.dev`.
 The app build always sets `VITE_BACKEND` from `MINSKY_DEV_BACKEND`.
 Cloudflare mode omits Supabase public settings and uses same-origin cookie authentication.
-The selected Cloudflare config must have the exact stable name, origin, account, D1 UUID/name, and bucket name.
-CI, test, and installation resource names are rejected.
+The selected Cloudflare config must have the exact stable name, origin, account, D1 UUID, database name, and bucket name.
+The script rejects CI, test, and installation resource names.
 The provider validator rejects extra bindings, unknown variables, and environment overrides.
 
 The generated full Worker includes application code, static assets, `DB`, `IMAGES`, `LIVE_UPDATES`, and `ASSETS`.
 It includes Durable Object migration tag `v1`, a one-minute recovery cron, and a 1,000 ms CPU cap.
-Its preview URLs are disabled. Application previews receive no stable data bindings.
+The config disables its preview URLs. Application previews receive no stable data bindings.
 
 ## Publication checks
 
-`dist/minsky-build.json` records the app build's revision, backend, config path, and D1 UUID.
+`dist/minsky-build.json` records the app build's revision, backend, config path, D1 UUID, bucket name, and origin.
 The upload requires those fields to match the selected deployment.
 Before a Supabase assets upload, the script reads the stable Worker's current bindings.
 Any D1, R2, or Durable Object binding blocks that upload. Failed or malformed metadata also blocks it.
@@ -95,11 +93,20 @@ GitHub errors fail the job. Deleted or outdated branches skip remaining uploads.
 Uploads for one push branch run in sequence across push runs.
 A newer push does not cancel an upload already in progress.
 
-`minsky-revision.json` records the published Git revision.
-Its HTTP check retries up to 12 times with five-second intervals and a ten-second request timeout.
+For the app, `minsky-revision.json` records `sha`, `backend`, `databaseId`, `bucketName`, and `origin`.
+Supabase mode uses null database and bucket values. Cloudflare mode records the exact selected targets.
+The docs record contains only `sha`.
+The HTTP check compares every expected field.
+It retries up to 12 times with five-second intervals and a ten-second request timeout.
 The summary records the URL and result.
-The app build record also identifies the backend and D1 UUID.
-These checks verify publication and selection. Authentication, authorization, private images, recovery, and live updates require application checks.
+
+After a Cloudflare upload, the script checks the deployed `DB`, `IMAGES`, `LIVE_UPDATES`, `AUTH_ORIGIN`, and `AUTH_SECRET` bindings.
+The database UUID, bucket name, origin, and binding types must match the reviewed configuration.
+The live binding must name `SessionLiveCoordinator` and a namespace within this Worker.
+An anonymous `/api/auth/session` request must return `401` and `Sign in to continue.`.
+A mismatch fails the deployment job. The script withholds provider diagnostics and secret values.
+These checks verify publication, selection, bindings, and an anonymous denial.
+Authenticated authorization, private images, recovery, and live updates require the separate application checks.
 
 Docs previews use a normalized branch name with a 12-character SHA-256 suffix.
 The script runs `wrangler preview` with `--ignore-base-config`, the revision tag, and JSON output.

@@ -122,7 +122,7 @@ GitHub Actions runs CI for pull requests and all branch pushes.
 Independent docs and app deployment jobs wait for `checks`, `secrets`, and `dependencies`.
 See [deployment setup](docs/cloudflare-builds.md) for credentials, activation, and backend limits.
 Cloudflare app activation and subsequent automated deployment remain unverified during T0021 preparation.
-The T0021 branch blocks all publishing until its PR #42 dependency merges and the hold is reviewed.
+PR #42 merged at `104d9d1`. T0021 includes the accepted connector and its final verification records.
 
 ### Repository records
 

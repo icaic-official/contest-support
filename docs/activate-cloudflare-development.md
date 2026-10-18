@@ -7,18 +7,17 @@ This page owns the repository's activation approval and deployment sequence.
 
 ## Observe the preparation gates
 
-While PR #42 is open, perform implementation, documentation, and local verification only.
-Keep its branch, checkout, and hosted verification targets unchanged.
-The T0021 branch cannot publish app or docs deployments.
-
-After the owner merges PR #42, update this branch from main:
+PR #42 merged at `104d9d1` on 18 October 2026. T0021 includes that main revision.
+The earlier restriction to local preparation ended at the merge.
+Keep the earlier ticket's checkout and unrelated resources unchanged.
+For subsequent main updates, use:
 
 ```sh
 git fetch origin main
 git merge origin/main
 ```
 
-Reconcile review changes. Remove the T0021 deployment hold only after that merge.
+Reconcile review changes. The pre-merge T0021 deployment hold is removed.
 Repeat the required checks on the reconciled revision before marking the PR ready.
 Do not change the protected `cloud-test` rules or branch allowlist under T0020's authorization.
 If T0021 needs a new protected branch entry, obtain authorization for that exact entry.
@@ -43,7 +42,7 @@ Document a concrete need and price before proposing another upgrade.
 Follow the installation procedure with a new development candidate Worker and dedicated D1 and private R2 resources.
 Do not use `minsky-dev` for that initial deployment.
 Record the actual names and IDs after creation. Resource names in a proposal do not establish that a resource is unused.
-Keep these three groups separate:
+Keep these resource groups separate:
 
 | Purpose | Resources |
 | --- | --- |
@@ -153,7 +152,7 @@ It does not run migrations, bootstrap accounts, or rotate secrets.
 
 Require all of these results:
 
-1. `/minsky-revision.json` reports the approved revision. `/minsky-build.json` reports that revision, the Cloudflare backend, and the approved D1 UUID.
+1. `/minsky-revision.json` reports the approved revision, Cloudflare backend, D1 UUID, bucket name, and origin. `/minsky-build.json` also records the configuration path.
 2. Anonymous `/api/sessions` returns `401` with `Cache-Control: no-store`. Private source paths return `404`.
 3. The new owner can sign in. Its temporary-password change and recovery gates hold. Supabase credentials do not grant access.
 4. The fictional application journey passes at the stable URL, including public/internal separation, jury decisions, private images, and reconnects.

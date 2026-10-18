@@ -24,9 +24,9 @@
 
 Continue **T0021 fresh Cloudflare development installation** on `feature/t0021-cloudflare-development-install`.
 The owner authorized parallel preparation from PR #42's head, `2b6f6f0`, in `/tmp/minsky-t0021`.
-Keep PR #42's branch and checkout untouched. Record the dependency in the new draft PR.
-Before PR #42 merges, perform implementation, documentation, and local verification only.
-After its merge, update from main, reconcile review changes, and run fresh checks before marking T0021 ready.
+Keep PR #42's branch and checkout untouched.
+The owner merged PR #42 at `104d9d1` on 2026-10-18. T0021 now includes that main revision.
+The earlier restriction to local preparation ended at that merge. Reconcile review changes and run fresh checks before marking T0021 ready.
 The [ticket](docs/tickets.md#t0021-fresh-cloudflare-development-installation) records the acceptance gates.
 
 The owner requested all review fixes, cleanup, and fresh verification before the PR is ready.

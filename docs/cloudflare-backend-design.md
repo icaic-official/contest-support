@@ -101,7 +101,7 @@ Timeouts, unexpected statuses, and malformed responses preserve the unknown outc
 The response contains no raw SQL, provider error objects, or identity credentials.
 An HTTP status alone does not prove that a command failed before commit.
 
-AWS compatibility means implementing these semantics with another provider and passing the same tests.
+Provider compatibility means implementing these semantics and passing the same tests.
 It does not mean every provider has the same transaction or storage API.
 Terraform can later provision selected resources. Terraform does not replace application adapters or behavior tests.
 

@@ -98,7 +98,6 @@ jobs:
       github.repository == 'GiftedNovaHD/minsky' &&
       github.actor != 'dependabot[bot]' &&
       github.event.deleted == false &&
-      github.ref != 'refs/heads/feature/t0021-cloudflare-development-install' &&
       vars.CLOUDFLARE_DEPLOY_ENABLED == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -141,7 +140,6 @@ jobs:
       github.repository == 'GiftedNovaHD/minsky' &&
       github.actor != 'dependabot[bot]' &&
       github.event.deleted == false &&
-      github.ref != 'refs/heads/feature/t0021-cloudflare-development-install' &&
       vars.CLOUDFLARE_DEPLOY_ENABLED == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15

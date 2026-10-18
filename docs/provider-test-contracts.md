@@ -89,7 +89,7 @@ See [current state](current-state.md) for exact case counts and revisions.
 
 The existing SQL and function suites retain lower-level permission and failure cases.
 The hosted UI suite still checks the app's account journey and provider-specific integration.
-Passing shared scenarios on Supabase does not establish Cloudflare or AWS conformance.
+Passing shared scenarios on one provider does not establish another provider's conformance.
 The focused T0019 suite adds direct plan rejection and captured-state race checks for the shared Supabase execution path.
 Local embedded PostgreSQL covers additional commit guards and rollback cases.
 Record local, hosted Supabase, hosted D1, and protected GitHub Actions results separately.

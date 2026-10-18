@@ -242,10 +242,11 @@ Record the tested source revision and installation result in the current-state r
 
 1. Configure the existing `cloud-test` environment as described in [cloud onboarding](cloud-onboarding.md#verification-and-protected-cloud-ci).
 2. Check that the environment permits the reviewed branch. Preserve the existing entries and protection rules.
-3. To check Supabase against the prepared CI backend, dispatch the reviewed ticket branch:
+3. Select the branch that contains the reviewed revision. The example below selects merged `main`:
 
    ```sh
-   gh workflow run checks.yml --repo GiftedNovaHD/minsky --ref feature/t0020-cloudflare-connector -f existing_backend=true
+   MINSKY_REVIEW_REF='main'
+   gh workflow run checks.yml --repo GiftedNovaHD/minsky --ref "$MINSKY_REVIEW_REF" -f existing_backend=true
    ```
 
 4. Check both the existing hosted suite and the shared provider suite in the `cloud` job.
@@ -256,11 +257,14 @@ It does not skip fixture creation or cleanup and does not check a fresh installa
 Use the default preparation mode only when the remote migration history matches the intended backend revision.
 The [earlier CI preparation record](current-state.md#t0014-existing-backend-verification-2026-10-17) includes an extra announcement migration.
 Inspect the live migration history before preparation rather than assuming it matches a clean checkout.
+For an unmerged ticket, set `MINSKY_REVIEW_REF` to its reviewed branch.
+Check that the protected environment permits that exact branch before dispatch.
+If it does not, obtain authorization before changing an allowlist entry or protection rule.
 
 For the complete Cloudflare connector, select its separate input:
 
 ```sh
-gh workflow run checks.yml --repo GiftedNovaHD/minsky --ref feature/t0020-cloudflare-connector -f cloudflare_connector=true
+gh workflow run checks.yml --repo GiftedNovaHD/minsky --ref "$MINSKY_REVIEW_REF" -f cloudflare_connector=true
 ```
 
 Use only the connector mode for that dispatch.
@@ -271,8 +275,8 @@ It prepares the separate full connector database before it builds and deploys th
 It runs the shared contracts and React journey against that full connector.
 The private bucket, service activation, and initial Worker secret must exist before this job can pass.
 The workflow does not activate a paid service or create the bucket.
-Record the protected result and tested revision in [current state](current-state.md#t0020-connector-implementation-2026-10-18), separately from hosted CLI results.
-The existing allowlist includes the T0020 branch. Preserve the other entries and protection rules.
+Record the protected result and tested revision in [current state](current-state.md), separately from hosted CLI results.
+Preserve unrelated allowlist entries and protection rules.
 Earlier protected authentication runs do not check this complete connector job.
 Record protected Supabase verification separately from Cloudflare CLI runs and the protected connector job.
 

@@ -12,8 +12,7 @@ Leave existing Supabase resources and accounts intact. Do not export or reset th
 Preserve the application's workflow and authorization rules when configuring the new instance.
 
 For the project's development URL, use the separate [activation procedure](https://github.com/GiftedNovaHD/minsky/blob/main/docs/activate-cloudflare-development.md).
-While PR #42 is open, T0021 permits local preparation only. Do not run hosted commands from that dependent branch.
-After PR #42 merges, update from main and repeat verification before provisioning dedicated development resources.
+PR #42 merged at `104d9d1`. T0021 includes that revision and permits dedicated hosted development verification.
 Preparation PR merge does not approve switching `minsky-dev`.
 
 :::note[Development installation]

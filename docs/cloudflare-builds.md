@@ -11,7 +11,6 @@ This preserves the current development application during preparation.
 The app build sets `VITE_BACKEND` explicitly. A shell's inherited value cannot select a different backend.
 
 Before activation, do not set `MINSKY_DEV_BACKEND=cloudflare` or deploy a full Worker to `minsky-dev`.
-The T0021 branch blocks all publishing while PR #42 is under review.
 Preparation PR merge does not approve the backend switch.
 
 ## Prepare the Workers and repository settings
@@ -22,7 +21,7 @@ Keep independent Cloudflare Git builds disabled for `minsky-dev` and `minsky-doc
 A separate provider build could bypass CI or replace the complete application with static assets.
 
 For docs branch previews, enable preview routing on the existing `minsky-docs` Worker.
-Application branch previews are disabled. No preview receives stable development database bindings.
+The workflow disables application branch previews. No preview receives stable development database bindings.
 A future app preview needs independent provider resources and separate verification.
 
 Store the deployment API token privately as the repository Actions secret `CLOUDFLARE_API_TOKEN`.
@@ -50,7 +49,7 @@ Pull request runs and manual dispatch do not publish stable sites or previews.
 The manual protected cloud jobs remain separate.
 
 On an eligible feature branch, confirm that `deploy` publishes only the docs preview.
-Confirm that the app upload is skipped.
+Confirm that the script skips the app upload.
 On `main`, confirm that `deploy` publishes docs and `deploy-app` publishes the selected application.
 The two jobs are independent. Invalid app configuration must not block docs publication.
 Check each job's run summary and `/minsky-revision.json`.
@@ -60,13 +59,14 @@ If Cloudflare is already active, this check refuses the static upload.
 An absent backend variable cannot silently replace an activated full Worker.
 
 For approved Cloudflare activation, follow the exact sequence in the activation guide.
-That process commits a generated public config with real identifiers and sets the five Cloudflare target variables.
+That process commits a generated public config with real identifiers and sets the required Cloudflare deployment variables.
 The app job then confirms the account, database metadata, migration list, private bucket target, and `AUTH_SECRET` metadata before upload.
-Its build and upload must agree on the backend, source revision, configuration, and D1 UUID.
+Its build and upload must agree on the backend, revision, config path, D1 UUID, bucket name, and origin.
 No job applies development migrations, initializes an administrator, or rotates authentication secrets.
+After upload, the job checks the deployed bindings and anonymous rejection at `/api/auth/session`.
 
 After each deployment, run the appropriate application checks at the reported URL.
-A matching revision proves publication only. It does not prove authenticated behavior or private bucket settings.
+A matching publication record and binding check do not prove authenticated behavior.
 For docs, run the read-only browser checks:
 
 ```sh
@@ -74,7 +74,8 @@ MINSKY_DOCS_URL=https://minsky-docs.icaic-minsky.workers.dev npm run docs:test
 ```
 
 Record source revisions, run URLs, deployed versions, and observed results in `docs/current-state.md`.
-The new guarded Cloudflare deployment path remains unverified on hosted resources during parallel preparation.
+The guarded Cloudflare deployment path requires hosted verification on the final revision.
+Use the current-state record to determine which deployment checks passed.
 
 ## Pause, retry, and recover
 

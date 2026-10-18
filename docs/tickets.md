@@ -3,8 +3,8 @@
 These tickets describe development work, not contestant issues.
 
 The active preparation ticket is [T0021 fresh Cloudflare development installation](#t0021-fresh-cloudflare-development-installation).
-It depends on [T0020](#t0020-complete-cloudflare-connector) in open [PR #42](https://github.com/GiftedNovaHD/minsky/pull/42).
-The owner authorized parallel local preparation. Supabase remains active until separately approved activation.
+It includes [T0020](#t0020-complete-cloudflare-connector), merged in [PR #42](https://github.com/GiftedNovaHD/minsky/pull/42) at `104d9d1`.
+The owner authorized parallel local preparation and resumed hosted work after that merge. Supabase remains active until separately approved activation.
 Existing Supabase trial data will not transfer. Leave its resources and accounts intact.
 
 T0016 Cloudflare backend design merged in [PR #36](https://github.com/GiftedNovaHD/minsky/pull/36) at `b68ef72` on 2026-10-17.
@@ -58,7 +58,7 @@ T0008 fuzzy team search merged into `main` in [PR #22](https://github.com/notbow
 ## T0021 Fresh Cloudflare development installation
 
 Branch: `feature/t0021-cloudflare-development-install`, from PR #42 head `2b6f6f0` in a separate worktree.
-Status: Local preparation in progress. Depends on open PR #42. Not ready for merge or activation.
+Status: Main integration and fresh verification in progress after PR #42 merged at `104d9d1`. Activation still requires separate owner approval.
 Summary: Prepare a fresh Cloudflare development installation and guarded deployment automation. Keep Supabase intact and active until the owner approves the concrete URL switch.
 
 The owner authorizes this ticket before PR #42 merges.
@@ -91,12 +91,13 @@ Do not merge either PR or activate the development URL without owner approval.
 ### Verification
 
 See [the run report](t0021-run-report.md) for this preparation run.
-Hosted work waits for PR #42's merge. Activation requires a later, concrete owner approval.
+PR #42 merged at `104d9d1` on 2026-10-18. T0021 includes that revision.
+Activation requires a later, concrete owner approval.
 
 ## T0020 Complete Cloudflare connector
 
 Branch: `feature/t0020-cloudflare-connector`, from updated `main` at `7d19b00`.
-Status: implementation, review fixes, cleanup, protected verification, and fresh installation are complete in [PR #42](https://github.com/GiftedNovaHD/minsky/pull/42). Final ordinary PR checks gate the documentation update. The owner reviews and merges.
+Status: merged in [PR #42](https://github.com/GiftedNovaHD/minsky/pull/42) at `104d9d1` on 2026-10-18. Review fixes, cleanup, protected verification, and fresh installation passed before merge.
 Summary: Complete every Cloudflare backend operation and verify the application with isolated resources. Verify installation into an empty Cloudflare environment.
 
 The owner authorized the complete connector after PR #41 merged.

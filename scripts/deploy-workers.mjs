@@ -6,6 +6,7 @@ import process from "node:process";
 import { setTimeout } from "node:timers/promises";
 import { pathToFileURL, URL } from "node:url";
 import { isAbsolute, relative, resolve } from "node:path";
+import { isDeepStrictEqual } from "node:util";
 import { readInstallationTarget } from "../src/server/adapters/cloudflare/tooling/configuration.mjs";
 import { assertCurrentMigrations } from "../src/server/adapters/cloudflare/tooling/migrations.mjs";
 import { confirmTarget } from "../src/server/adapters/cloudflare/tooling/operations.mjs";
@@ -28,9 +29,6 @@ export function deploymentPlan(env) {
   }
   const branch = env.GITHUB_REF.slice("refs/heads/".length);
   if (!branch || /[\r\n]/.test(branch)) throw new Error("Missing or invalid branch name.");
-  if (branch === "feature/t0021-cloudflare-development-install") {
-    throw new Error("Hosted deployment is disabled on the dependent preparation branch until PR #42 merges and this guard is reviewed.");
-  }
   // A hash distinguishes branches that normalize to the same lowercase name.
   const suffix = createHash("sha256").update(branch).digest("hex").slice(0, 12);
   const slug = branch.toLowerCase().replace(/[^a-z0-9]+/g, "-")
@@ -94,14 +92,18 @@ export function previewAddress(output) {
   return new URL(address).origin;
 }
 
-export async function verifyRevision(url, sha, request = globalThis.fetch, pause = setTimeout) {
+export async function verifyRevision(url, expected, request = globalThis.fetch, pause = setTimeout) {
+  const marker = typeof expected === "string" ? { sha: expected } : expected;
   // New preview DNS records can take time to become available.
   for (let attempt = 0; attempt < 12; attempt++) {
     try {
-      const response = await request(`${url}/minsky-revision.json?sha=${sha}`, {
+      const response = await request(`${url}/minsky-revision.json?sha=${marker.sha}`, {
         cache: "no-store", signal: globalThis.AbortSignal.timeout(10_000),
       });
-      if (response.ok && (await response.json()).sha === sha) return;
+      if (response.ok) {
+        const published = await response.json();
+        if (Object.entries(marker).every(([key, value]) => published[key] === value)) return;
+      }
     } catch { /* Retry network, DNS, and non-JSON responses within this limit. */ }
     if (attempt < 11) await pause(5000);
   }
@@ -158,23 +160,74 @@ export async function deploymentTargets(env, site = "both", {
   return targets;
 }
 
+async function workerSettings(env, request) {
+  const response = await request(`https://api.cloudflare.com/client/v4/accounts/${account}/workers/scripts/minsky-dev/settings`, {
+    headers: { Authorization: `Bearer ${env.CLOUDFLARE_API_TOKEN}` },
+    signal: globalThis.AbortSignal.timeout(15_000),
+  });
+  const body = await response.json();
+  if (!response.ok || body.success !== true || !Array.isArray(body.result?.bindings)) {
+    throw new Error("Worker metadata unavailable");
+  }
+  return body.result;
+}
+
 /** A changed repository variable cannot replace an activated Worker with static assets. */
 export async function assertStaticApplication(env, request = globalThis.fetch) {
   try {
-    const response = await request(`https://api.cloudflare.com/client/v4/accounts/${account}/workers/scripts/minsky-dev/settings`, {
-      headers: { Authorization: `Bearer ${env.CLOUDFLARE_API_TOKEN}` },
-      signal: globalThis.AbortSignal.timeout(15_000),
-    });
-    const body = await response.json();
-    if (!response.ok || body.success !== true || !Array.isArray(body.result?.bindings) ||
-        body.result.bindings.some((binding) => !binding || typeof binding.type !== "string" ||
-          ["d1", "r2_bucket", "durable_object_namespace"].includes(binding.type) ||
-          ["DB", "IMAGES", "LIVE_UPDATES"].includes(binding.name))) {
+    const settings = await workerSettings(env, request);
+    if (settings.bindings.some((binding) => !binding || typeof binding.name !== "string" || !binding.name ||
+        !["plain_text", "secret_text", "assets"].includes(binding.type) ||
+        ["DB", "IMAGES", "LIVE_UPDATES"].includes(binding.name))) {
       throw new Error("Unsafe Worker settings");
     }
   } catch {
     throw new Error("The stable Worker could not be confirmed as static. A Supabase asset upload is forbidden. Inspect the deployed bindings privately.");
   }
+}
+
+/** Check deployed metadata and API behavior without creating a session or fixture. */
+export async function verifyApplicationDeployment(worker, env, request = globalThis.fetch) {
+  try {
+    const settings = await workerSettings(env, request);
+    const byName = new Map();
+    for (const binding of settings.bindings) {
+      if (!binding || typeof binding.name !== "string" || byName.has(binding.name)) {
+        throw new Error("Invalid binding metadata");
+      }
+      byName.set(binding.name, binding);
+    }
+    const database = byName.get("DB");
+    const images = byName.get("IMAGES");
+    const live = byName.get("LIVE_UPDATES");
+    const origin = byName.get("AUTH_ORIGIN");
+    if (database?.type !== "d1" || database.id !== worker.settings.databaseId ||
+        images?.type !== "r2_bucket" || images.bucket_name !== worker.settings.bucketName ||
+        live?.type !== "durable_object_namespace" || live.class_name !== "SessionLiveCoordinator" ||
+        typeof live.namespace_id !== "string" || !live.namespace_id ||
+        live.script_name && live.script_name !== worker.name ||
+        origin?.type !== "plain_text" || origin.text !== worker.settings.origin ||
+        byName.get("AUTH_SECRET")?.type !== "secret_text") {
+      throw new Error("Deployed binding mismatch");
+    }
+    const response = await request(`${worker.settings.origin}/api/auth/session`, {
+      headers: { Origin: worker.settings.origin }, cache: "no-store",
+      signal: globalThis.AbortSignal.timeout(15_000),
+    });
+    if (response.status !== 401 || (await response.json()).error !== "Sign in to continue.") {
+      throw new Error("The application API did not reject an anonymous session");
+    }
+  } catch {
+    throw new Error("The deployed Cloudflare bindings or application API could not be verified. Provider output was withheld. Inspect the target before recovery.");
+  }
+}
+
+function applicationMarker(worker, sha) {
+  return {
+    sha, backend: worker.backend, databaseId: worker.settings?.databaseId ?? null,
+    bucketName: worker.settings?.bucketName ?? null,
+    origin: worker.settings?.origin ?? "https://minsky-dev.icaic-minsky.workers.dev",
+  };
 }
 
 export async function confirmApplication(worker, env, execute = execFileSync, request = globalThis.fetch) {
@@ -235,8 +288,7 @@ export async function buildWorkers(env, {
     }
     execute("npm", ["run", worker.backend ? "build" : "docs:build"], { env: childEnv, stdio: "inherit" });
     if (worker.backend) write("dist/minsky-build.json", JSON.stringify({
-      sha: plan.sha, backend: worker.backend, config: worker.config,
-      databaseId: worker.settings?.databaseId ?? null,
+      ...applicationMarker(worker, plan.sha), config: worker.config,
     }) + "\n");
   }
 }
@@ -245,6 +297,7 @@ export async function deployWorkers(env, {
   site = "both", current = isCurrentRevision, execute = execFileSync, verify = verifyRevision,
   read = readFileSync, write = writeFileSync, report = summary, targets = deploymentTargets,
   staticApplication = assertStaticApplication, application = confirmApplication,
+  deployedApplication = verifyApplicationDeployment,
 } = {}) {
   const plan = deploymentPlan(env);
   if (!env.CLOUDFLARE_API_TOKEN) throw new Error("Missing CLOUDFLARE_API_TOKEN.");
@@ -265,14 +318,14 @@ export async function deployWorkers(env, {
     if (worker.backend) {
       let build;
       try { build = JSON.parse(read("dist/minsky-build.json", "utf8")); } catch { /* Reject below. */ }
-      if (build?.sha !== plan.sha || build.backend !== worker.backend || build.config !== worker.config ||
-          build.databaseId !== (worker.settings?.databaseId ?? null)) {
+      if (!isDeepStrictEqual(build, { ...applicationMarker(worker, plan.sha), config: worker.config })) {
         throw new Error("Build the selected backend and revision with the guarded deployment build command before upload.");
       }
       if (worker.settings) await application(worker, childEnv, execute);
       else if (!plan.preview) await staticApplication(childEnv);
     }
-    write(`${worker.assets}/minsky-revision.json`, `${JSON.stringify({ sha: plan.sha })}\n`);
+    const marker = worker.backend ? applicationMarker(worker, plan.sha) : { sha: plan.sha };
+    write(`${worker.assets}/minsky-revision.json`, `${JSON.stringify(marker)}\n`);
     let output;
     try {
       output = execute("node_modules/.bin/wrangler", wranglerArguments(worker, plan), {
@@ -284,8 +337,9 @@ export async function deployWorkers(env, {
     }
     const url = plan.preview ? previewAddress(output) : `https://${worker.name}.icaic-minsky.workers.dev`;
     report(`Published [${worker.name}](${url}) from \`${plan.sha}\`.`, env);
-    await verify(url, plan.sha);
-    report(`The revision check passed for ${worker.name}.`, env);
+    await verify(url, marker);
+    if (worker.settings) await deployedApplication(worker, childEnv);
+    report(`The revision and deployment checks passed for ${worker.name}.`, env);
   }
 }
 

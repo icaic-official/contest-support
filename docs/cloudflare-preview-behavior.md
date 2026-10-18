@@ -1,58 +1,51 @@
-# Why CI controls Worker deployment
+# Why deployment separates docs and application previews
 
-Minsky needs previews for branch work and stable sites after merges.
-Both must use source that passed the repository checks.
-GitHub Actions can express that dependency directly with `needs` in the same workflow.
-A separate Cloudflare Git build starts independently and can publish before those checks finish.
-For this reason, automatic Cloudflare Git builds must remain disabled for these two Workers.
+GitHub Actions publishes reviewed revisions only after `checks`, `secrets`, and `dependencies` pass.
+Independent Cloudflare Git builds could publish before those jobs finish or replace a full application with static assets.
+Keep those builds disabled.
 
-The selected workflow rebuilds the exact checked commit with the development app's public settings.
-Tests and builds use committed dependency lockfiles.
-The browser tests use mocked responses. They do not prove that the hosted backend matches a new frontend contract.
-The frontend deployment does not replace the separate cloud integration tests.
+## Why app previews are disabled
 
-## Why previews share development data
+A frontend preview can change shared data when it uses a stable backend.
+Earlier Supabase previews used the development project directly.
+The fresh-installation preparation stops automatic application previews in both backend modes.
+Cloudflare previews receive no stable D1, R2, or Durable Object bindings.
+A future preview implementation needs its own resources, credentials, fixture ownership, and cleanup checks.
+That implementation is outside T0021.
 
-Cloudflare hosts Minsky's static frontend. Supabase stores its accounts, issues, history, awards, and images.
-A new frontend preview changes website assets. It does not copy the Supabase database.
-The selected build variables point previews at the existing Minsky development project.
-An authenticated preview action therefore changes that project's shared data.
-The isolated CI project remains reserved for automated fixtures.
+Docs contain no authenticated application data.
+Their branch previews remain independent and continue to use `minsky-docs`.
+The T0021 preparation branch blocks all publication until its dependency merges and the hold is reviewed.
 
-## Why an app preview can load but reject function calls
+## Why backend selection needs a deployment guard
 
-The `admin` and `attachments` functions check `ALLOWED_ORIGINS` against the browser's origin.
-A new preview address does not appear in that list automatically.
-The page can load while account and image requests fail.
-The [setup guide](cloudflare-builds.md#enable-account-and-image-checks-on-an-app-preview) includes origin registration before those checks.
+The browser selects its backend at build time through `VITE_BACKEND`.
+The app deployment command sets that value from the explicit deployment setting.
+A Cloudflare app also needs its API code, database, private image bucket, and live coordinator.
+An assets-only upload would remove that application code and its bindings.
 
-A proposed improvement is a reviewed registry of app preview origins.
-An operator-controlled process could synchronize approved entries to the development functions and remove them when previews retire.
-That process needs separate backend changes and authorization tests.
-This workflow does not implement the registry or broaden accepted origins.
+The Supabase upload path therefore inspects the deployed Worker before changing it.
+If application bindings exist, it refuses the upload even when a repository variable is absent or changed.
+The Cloudflare path validates the provider-generated config and exact hosted targets before publishing.
+The same command checks the built revision and backend before upload.
 
-## Why fork pull requests do not deploy
+## Why docs and application jobs are independent
 
-Public contributors can change build commands in a pull request.
-Those commands must not receive credentials for Minsky's Cloudflare account.
-Pull request jobs run checks without deployment credentials.
-Publishing requires a branch push in `GiftedNovaHD/minsky` from an actor other than Dependabot.
-Maintainers can copy reviewed external changes to a repository branch when they need a preview.
+A broken app target must not block documentation publication.
+Separate jobs share the same required CI checks but validate only their own settings.
+One site can publish while the other fails. Each job reports its own revision and URL.
 
-Users with write access to repository branches remain trusted publishers.
-Passing tests does not prove that a branch's code is safe.
-The repository's review rules still apply, and the user still merges changes.
-This setup does not establish remote merge enforcement.
+Neither publication result verifies authenticated behavior.
+The installation and activation procedures require full application checks.
+Migrations, bootstrap, and secret creation stay explicit provider operations.
+The owner must approve the concrete backend switch even after the preparation PR merges.
 
-## Why backend deployment remains separate
+## Why contributor pull requests do not publish
 
-The automatic commands publish static assets only.
-They do not apply SQL migrations, deploy Supabase functions, or change backend secrets.
-A frontend that depends on a new backend contract needs that backend in place before the frontend deploys.
-Maintainers can pause frontend deployment through `CLOUDFLARE_DEPLOY_ENABLED` when the release needs coordinated steps.
+Pull request code can change build commands.
+Pull request jobs receive no deployment credentials.
+Publishing requires a trusted repository branch push from an actor other than Dependabot.
+Repository write access remains a trusted publishing capability.
+Passing checks does not replace review or establish remote merge enforcement.
 
-App and docs uploads are separate operations.
-If the second upload fails, the first site can already contain the new commit.
-The run summary identifies each completed upload. A retry publishes the current branch revision again.
-An old run cannot deliberately roll a branch back because the script checks the current commit before each upload.
-A push that arrives during an upload can make that upload briefly outdated until the newer run completes.
+See [deployment settings](cloudflare-build-settings.md) for exact events, variables, and commands.

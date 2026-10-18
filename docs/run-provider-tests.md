@@ -7,6 +7,9 @@ For the suite's responsibilities and limits, see [the test contracts](provider-t
 Both drivers use the same eight shared scenarios.
 Record local checks, CLI runs against hosted resources, and protected GitHub runs separately.
 See [current state](current-state.md) for tested revisions, results, and cleanup evidence.
+For a new implementation, complete [Add a backend provider](add-provider.md) before using this runner.
+The runner currently accepts only `supabase` and `cloudflare`.
+The commands below verify existing implementations. They do not register a provider or provision a new installation.
 
 ## List the scenarios without credentials
 

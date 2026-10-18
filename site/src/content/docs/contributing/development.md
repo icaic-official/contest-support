@@ -61,3 +61,11 @@ Include the required co-author trailer in each Codex-created commit for this rep
 Follow the Google TypeScript Style Guide for TypeScript changes, with documented project exceptions.
 
 For this site, use the separate [documentation workflow](/contributing/documentation/).
+
+## Add a provider
+
+Use the repository's [provider contribution guide](https://github.com/GiftedNovaHD/minsky/blob/main/docs/add-provider.md).
+It identifies the shared interfaces, registration points, installation responsibilities, fixture cleanup, and required verification.
+Providers must preserve the same application behavior and pass the unchanged shared scenarios.
+Servers with the same HTTP protocol can reuse the existing browser transport.
+Supabase and Cloudflare have implementations. AWS, GCP, and Azure remain future contributions.

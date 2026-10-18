@@ -22,10 +22,12 @@
 
 ## Current scope
 
-Continue **T0020 complete Cloudflare connector** on `feature/t0020-cloudflare-connector` and [PR #42](https://github.com/GiftedNovaHD/minsky/pull/42).
-The branch started from merged PR #41 at `7d19b00` and includes the jury worklist merge at `c144a2a`.
-Preserve both features and verify the combined application.
-The [ticket](docs/tickets.md#t0020-complete-cloudflare-connector) records acceptance criteria and the remaining review checks.
+Continue **T0021 fresh Cloudflare development installation** on `feature/t0021-cloudflare-development-install`.
+The owner authorized parallel preparation from PR #42's head, `2b6f6f0`, in `/tmp/minsky-t0021`.
+Keep PR #42's branch and checkout untouched. Record the dependency in the new draft PR.
+Before PR #42 merges, perform implementation, documentation, and local verification only.
+After its merge, update from main, reconcile review changes, and run fresh checks before marking T0021 ready.
+The [ticket](docs/tickets.md#t0021-fresh-cloudflare-development-installation) records the acceptance gates.
 
 The owner requested all review fixes, cleanup, and fresh verification before the PR is ready.
 Remove obsolete proof paths, duplicate helpers, stale instructions, and repeated evidence summaries.
@@ -36,12 +38,17 @@ Record PR #21 reuse and recommend its disposition. The owner decides whether to 
 Isolated Cloudflare development, CI, and installation resources are authorized in account `458ad6a930b0fb717796dfa19ca6a2b1`.
 Confirm that account and the exact target before provider changes.
 Keep development, CI, and installation resources separate.
-Only this ticket branch may be added to the protected `cloud-test` allowlist. Preserve all other entries and protection rules.
+T0020's earlier allowlist authorization does not extend to T0021. Do not change protected environment rules or branch allowlists without authorization.
 Workers Paid and R2 are active. Document the concrete need and cost before any further paid upgrade.
 Bounded subagent work is authorized.
 
-Supabase remains active. Docker packaging, AWS, Terraform, real-data exports, migration, account resets, and backend cutover remain deferred.
-The owner reviews and merges T0020.
+Existing Supabase trial data is disposable. Transfer no accounts, passwords, records, images, or IDs.
+Preserve application behavior and database rules. Bootstrap a new administrator through the existing installation tool.
+Leave Supabase intact. Do not export data, reset its accounts, or delete its resources.
+Supabase remains active until the owner approves the concrete development URL switch.
+Preparation PR merge does not authorize activation. Follow [the activation procedure](docs/activate-cloudflare-development.md).
+Docker packaging, AWS, GCP, Azure, Terraform, and data migration tooling remain deferred.
+The owner reviews and merges both PRs.
 Earlier ticket decisions and authorization limits remain in [PLAN.md](PLAN.md) and their dated verification records.
 
 ## Code and documentation cleanup
@@ -133,7 +140,7 @@ For each ticket, use this sequence:
 5. Prepare the PR.
 6. Run cloud integration checks on the reviewed revision.
 7. Let the user review and merge.
-8. After automation setup, let GitHub Actions deploy both static frontends when the `main` CI checks pass. Coordinate backend deployment separately.
+8. After automation setup, let GitHub Actions deploy docs and the selected application when the `main` CI checks pass. A Cloudflare application deployment includes the complete Worker. Coordinate migrations, bootstrap, secrets, and activation separately.
 
 Automatic frontend deployment requires GitHub deployment settings and passing `checks`, `secrets`, and `dependencies` jobs.
 Before setup is verified, report deployment separately from merge.

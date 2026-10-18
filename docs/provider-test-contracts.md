@@ -3,7 +3,7 @@
 The shared suite checks Minsky behavior through the browser `Backend` interface.
 Supabase and Cloudflare supply browser adapters and fixture drivers.
 The same eight scenarios apply to both providers without weaker Cloudflare assertions.
-AWS has no implementation.
+AWS, GCP, and Azure have no implementation.
 
 The complete D1 suite checks `WorkflowPersistence` directly.
 Direct persistence and account suites use a D1-only database. Their records cannot enter the application's live delivery process.
@@ -129,10 +129,27 @@ Its cleanup owns provider-specific tables, accounts, objects, and test resources
 The lost-response control must discard a committed response, not fake a successful write.
 
 Cloudflare passes the current complete scenario registry through its guarded hosted CLI runner.
-A future AWS driver must pass the same registry.
+Every new provider must pass the same registry.
 A driver cannot skip a failing behavior because its database or identity provider differs.
 A missing operation means that the provider implementation is incomplete.
-Provider-specific consistency, storage recovery, and migration tests remain additional requirements.
+The [provider implementation guide](add-provider.md) lists interfaces, registration points, and commands.
+
+Shared scenarios do not replace these provider-specific checks:
+
+| Area | Additional required checks |
+| --- | --- |
+| Authentication and authorization | Test exact origins, request protection, expiry, revocation, temporary-password gates, credential races, and rejected attempts to forge a caller. Test direct database or storage access where the provider exposes it. |
+| Atomic persistence | Race ownership, membership, role, archive, intake, and credential changes against commits and receipt replay. Verify rollback and no partial state, history, award, receipt, or notification writes. |
+| Account administration | Test account creation, cross-session reset permissions, last-admin protection, interrupted credential changes, and superseded recovery operations. |
+| Private storage | Race reservations and completion against limits and revocation. Test interrupted transfers, late writes, deletion failures, exact-object cleanup, and current authorization on downloads. |
+| Live delivery | Test reconnect refresh, expired connections, revoked access, audience isolation, duplicate hints, failed delivery retries, and cleanup of persisted coordinator state. |
+| Installation and recovery | Apply repository migrations to an empty isolated target. Bootstrap a new administrator, complete the mandatory password change, and recover that owner. Test wrong targets and partial failures without a shared reset. |
+| Tooling and fixtures | Reject target substitutions. Keep credentials private. Recover interrupted setup and cleanup, and prove that unrelated records and objects remain intact. |
+
+Use the actual provider's transaction and identity boundaries for these tests.
+A browser adapter with mocked responses cannot establish those guarantees.
+List the exact local and hosted commands with expected results in the provider's verification guide.
+Report unsupported upgrade, backup, restoration, or capacity behavior explicitly.
 
 No generic database API or infrastructure provisioning layer is part of this test boundary.
 Terraform can later create resources. It cannot establish the behavior that these scenarios verify.

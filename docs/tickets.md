@@ -2,12 +2,10 @@
 
 These tickets describe development work, not contestant issues.
 
-The active ticket is [T0020 complete Cloudflare connector](#t0020-complete-cloudflare-connector).
-The owner merged T0019 in PR #41 at `7d19b00` before authorizing this ticket.
-T0020 completes Cloudflare persistence, the browser connector, and independent installation verification.
-The owner merged the parallel T0009 jury worklist in PR #23 at `c144a2a` during this ticket.
-T0020 includes that main revision and repeats the affected application checks.
-Real-data migration tooling follows connector verification. Supabase remains active.
+The active preparation ticket is [T0021 fresh Cloudflare development installation](#t0021-fresh-cloudflare-development-installation).
+It depends on [T0020](#t0020-complete-cloudflare-connector) in open [PR #42](https://github.com/GiftedNovaHD/minsky/pull/42).
+The owner authorized parallel local preparation. Supabase remains active until separately approved activation.
+Existing Supabase trial data will not transfer. Leave its resources and accounts intact.
 
 T0016 Cloudflare backend design merged in [PR #36](https://github.com/GiftedNovaHD/minsky/pull/36) at `b68ef72` on 2026-10-17.
 [T0015 shared provider tests](#t0015-shared-provider-tests) merged in [PR #37](https://github.com/GiftedNovaHD/minsky/pull/37).
@@ -56,6 +54,44 @@ These items stay deferred and are not part of T0005:
 - Remaining manual acceptance checks.
 
 T0008 fuzzy team search merged into `main` in [PR #22](https://github.com/notbowen/minsky/pull/22) on 2026-10-15 (SGT).
+
+## T0021 Fresh Cloudflare development installation
+
+Branch: `feature/t0021-cloudflare-development-install`, from PR #42 head `2b6f6f0` in a separate worktree.
+Status: Local preparation in progress. Depends on open PR #42. Not ready for merge or activation.
+Summary: Prepare a fresh Cloudflare development installation and guarded deployment automation. Keep Supabase intact and active until the owner approves the concrete URL switch.
+
+The owner authorizes this ticket before PR #42 merges.
+Before that merge, perform implementation, documentation, and local checks only.
+After the merge, update from main, reconcile review changes, and repeat verification.
+Do not transfer Supabase accounts, passwords, issues, history, images, or IDs.
+Bootstrap a new administrator through the existing provider tool.
+Preserve the shared contracts, workflow decisions, database rules, and jury worklist.
+Keep development, CI, and installation-verification resources separate.
+Use account `458ad6a930b0fb717796dfa19ca6a2b1` and confirm each exact target before mutation.
+The earlier T0020 branch allowlist authorization does not cover this branch.
+Do not merge either PR or activate the development URL without owner approval.
+
+### Acceptance criteria
+
+- [ ] Deployment preparation preserves Supabase mode until approved activation and tests both backend selections.
+- [ ] Activated deployments retain the full Worker, selected frontend, bindings, migration tags, origin, private secret, cron, and CPU cap.
+- [ ] Static deployment cannot overwrite an activated application Worker. Docs deployment remains independent.
+- [ ] App previews cannot use stable development resources.
+- [ ] One installation procedure provides exact creation, migration, bootstrap, password-change, recovery, and verification commands.
+- [ ] Contributor documentation identifies provider interfaces, registration, configuration, migrations, bootstrap, cleanup, shared scenarios, and provider checks.
+- [ ] After PR #42 merges, current main is integrated and local required checks pass on the reconciled revision.
+- [ ] A fresh dedicated development installation passes authentication, authorization, workflow, jury, private image, and live-update checks with fictional records.
+- [ ] Local hosted checks and protected GitHub Actions checks are recorded separately on the final revision.
+- [ ] A concrete activation record lists exact identifiers, approved revision, settings, commands, checks, and recovery.
+- [ ] The owner approves the backend switch. The development URL then passes application checks.
+- [ ] A subsequent automated deployment retains Cloudflare mode and the exact resource bindings.
+- [ ] The owner reviews and merges the preparation PR. Supabase resources remain intact.
+
+### Verification
+
+See [the run report](t0021-run-report.md) for this preparation run.
+Hosted work waits for PR #42's merge. Activation requires a later, concrete owner approval.
 
 ## T0020 Complete Cloudflare connector
 

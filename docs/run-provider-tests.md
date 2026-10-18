@@ -258,13 +258,15 @@ npm run test:connector:accounts:hosted -- \
 
 The expected result is `Hosted connector accounts: 82 passed, 0 failed, 0 skipped.`
 The API option uses the same files, assertions, case counts, and timeouts as the binding transport.
-The account suite still uses up to four workers. The runner adds no retries or case filters.
+The API transport runs files in sequence with one worker. Native account checks retain four workers.
+Tests can still run concurrent operations inside each case. The runner adds no retries or case filters.
 Each database batch uses one API request and retains transaction rollback, result metadata, numeric values, and null values.
 
 Run these API commands in sequence. Do not run another API store check concurrently.
-The workflow suite spaces request starts by 300 milliseconds.
-Each of the four account files spaces request starts by 1,200 milliseconds.
-Either suite can make about 1,000 requests in five minutes at that pace.
+Both API suites space request starts by 300 milliseconds.
+One active file can make about 1,000 requests in five minutes at that pace.
+A four-file API run passed 81 cases and timed out one case.
+Sequential files give each case the full request budget without increasing that timeout.
 Cloudflare's [shared API limit](https://developers.cloudflare.com/fundamentals/api/reference/limits/) is 1,200 requests in five minutes.
 Other API activity can use the same allowance. An HTTP 429 response fails the check without a retry.
 

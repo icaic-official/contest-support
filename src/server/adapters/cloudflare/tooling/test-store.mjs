@@ -64,6 +64,9 @@ export async function runHostedStore(arguments_, dependencies = {}) {
     throw new Error('Select --transport=binding or --transport=api once.');
   }
   const transport = transportArguments[0]?.slice('--transport='.length) ?? 'binding';
+  // One API file can use the shared rate budget without making each account
+  // operation wait behind four separately paced files. Test limits stay intact.
+  const maxWorkers = transport === 'api' ? 1 : suite.maxWorkers;
   const options = storeArguments(targetArguments.filter((argument) => !argument.startsWith('--transport=')));
   const settings = await readStoreTarget(options);
   const runWrangler = dependencies.runWrangler ?? wranglerRunner(settings, settings.configPath);
@@ -90,7 +93,7 @@ export async function runHostedStore(arguments_, dependencies = {}) {
       test: {
         include: suite.include.map((file) => resolve(repositoryRoot, file)),
         testTimeout: 120_000, hookTimeout: 120_000,
-        fileParallelism: suite.maxWorkers > 1, maxWorkers: suite.maxWorkers,
+        fileParallelism: maxWorkers > 1, maxWorkers,
         reporters: [['json', { stdout: true }],
           [resolve(repositoryRoot, 'src/server/adapters/cloudflare/tooling/hosted-progress-reporter.mjs'), { total: suite.total }]],
       },
@@ -109,7 +112,7 @@ export async function runHostedStore(arguments_, dependencies = {}) {
     delete environment.MINSKY_CONNECTOR_D1_DATABASE_ID;
     if (transport === 'api') {
       environment.MINSKY_CONNECTOR_D1_API_TOKEN = apiToken;
-      environment.MINSKY_CONNECTOR_D1_API_INTERVAL_MS = String(300 * suite.maxWorkers);
+      environment.MINSKY_CONNECTOR_D1_API_INTERVAL_MS = '300';
       environment.MINSKY_CONNECTOR_D1_DATABASE_ID = settings.databaseId;
     }
     const execute = dependencies.execute ?? ((argumentsChild, commandOptions) =>

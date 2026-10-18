@@ -94,7 +94,7 @@ for (const suite of suites) test(`${suite.name} API transport retains cases and 
   setup.dependencies.execute = async (args, options) => {
     assert.equal(options.env.MINSKY_CONNECTOR_D1_TRANSPORT, 'api');
     assert.equal(options.env.MINSKY_CONNECTOR_D1_API_TOKEN, secret);
-    assert.equal(options.env.MINSKY_CONNECTOR_D1_API_INTERVAL_MS, String(300 * suite.maxWorkers));
+    assert.equal(options.env.MINSKY_CONNECTOR_D1_API_INTERVAL_MS, '300');
     assert.equal(options.env.MINSKY_CONNECTOR_D1_DATABASE_ID, storeTarget.databaseId);
     const text = await readFile(args[3], 'utf8');
     assert.equal(text.includes(secret), false);
@@ -102,7 +102,8 @@ for (const suite of suites) test(`${suite.name} API transport retains cases and 
     assert.deepEqual(config.test.include, suite.include.map((file) => join(repositoryRoot, file)));
     assert.equal(config.test.testTimeout, 120_000);
     assert.equal(config.test.hookTimeout, 120_000);
-    assert.equal(config.test.maxWorkers, suite.maxWorkers);
+    assert.equal(config.test.maxWorkers, 1);
+    assert.equal(config.test.fileParallelism, false);
     assert.equal(config.test.retry, undefined);
     return result(suite.total);
   };

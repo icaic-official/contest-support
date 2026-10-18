@@ -209,6 +209,11 @@ The first full API workflow run on `6e20cc1` passes 36 cases and fails 34 assert
 Its safe error mapping removes two fixed rollback identifiers that the workflow needs to distinguish retryable rollbacks from unknown outcomes.
 The mapping now retains those exact identifiers. A focused test exercises the existing persistence commit with known and unknown failures.
 No original workflow assertion or application rule changes.
+The next API workflow run passes all 70 cases. The API account run on `ecad8b1` passes 81 cases and times out one.
+It reports no network or API error. The read-only cleanup audit confirms all 27 application tables are empty.
+The four-worker API runner gave each file a 1,200-millisecond request interval to share the API allowance.
+API files now run in sequence at 300 milliseconds per request. Native checks retain four workers.
+This change removes that per-file pacing penalty. It preserves all cases, assertions, within-case concurrency, and the original timeouts.
 Fresh complete API-suite results and protected native-binding results on the final source are recorded separately in PR #43.
 
 ## 5. Manual verification steps

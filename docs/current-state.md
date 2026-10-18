@@ -96,6 +96,9 @@ The test tooling now provides explicit `--transport=api` for direct workflow and
 The default and protected GitHub path retain native bindings.
 The API option uses the same cases, assertions, target guards, fixture ownership, and timeouts.
 It sends each batch in one request, spaces request starts below the API limit, and never retries a request.
+API files run in sequence at 300 milliseconds between request starts. Native account checks retain four workers.
+The first four-worker API account run on `ecad8b1` passes 81 cases and times out one, without connection errors.
+All 27 application tables are empty afterward. Sequential API files remove the per-file pacing penalty and retain the original timeouts.
 Before implementation, a scoped API probe verifies native-equivalent number and null binding, ordered results, failed-batch rollback, and write metadata.
 That probe removes its only UUID-owned authentication-limit record and recovery journal.
 This transport avoids the faulty preview hop. It does not repair the underlying Cloudflare connection.

@@ -31,6 +31,12 @@ Repair preserves the fresh database, images, administrator, and stable authentic
 No application workflow, database rule, migration, or Supabase resource changed.
 No TypeScript or TSX production file changed, so this run introduces no new TypeScript style exception.
 
+After the owner requested connection diagnosis, added an explicit D1 API transport for the two isolated hosted store suites.
+The original native binding transport remains the default and the protected GitHub path.
+Both transports retain all cases, assertions, timeouts, and fixture ownership checks.
+The API path keeps batches atomic, preserves values and metadata, spaces request starts, and never retries requests.
+Only the two TypeScript test integration files change. No production rule, workflow, schema, or frontend behavior changes.
+
 ## 2. Files changed
 
 - `.github/workflows/checks.yml`
@@ -57,6 +63,13 @@ No TypeScript or TSX production file changed, so this run introduces no new Type
 - `site/src/content/docs/operators/installation.md`
 - `src/server/adapters/cloudflare/deploy/development.settings.json`
 - `src/server/adapters/cloudflare/deploy/development.wrangler.jsonc`
+- `src/server/adapters/cloudflare/authenticationCases.ts`
+- `src/server/adapters/cloudflare/tooling/store-database.mjs`
+- `src/server/adapters/cloudflare/tooling/store-database.d.mts`
+- `src/server/adapters/cloudflare/tooling/store-database.test.mjs`
+- `src/server/adapters/cloudflare/tooling/test-store.mjs`
+- `src/server/adapters/cloudflare/tooling/test-store.test.mjs`
+- `src/server/adapters/d1/store.test.ts`
 
 ## 3. Commands run
 
@@ -123,6 +136,20 @@ They import the current React journey and unchanged shared scenarios.
 Private fixture copies retain their current code with an exact installation target guard. Committed CI target guards remain unchanged.
 The phone walkthrough ran through another private Playwright wrapper with UUID-owned setup and cleanup.
 
+Connection diagnosis later ran private `connection-probe.mjs`, `proxy-hop-probe.mjs`, and `d1-api-semantics.mjs` wrappers.
+The first two issue only `SELECT 1` queries against the confirmed store CI target.
+The semantic probe writes only its UUID-owned authentication-limit record, verifies rollback and metadata, then verifies its removal.
+Diagnostic setup errors and an incorrect response-shape assumption were corrected in those private probes.
+They did not change application assertions or fixture data.
+The provider output stayed in memory. Public evidence contains fixed categories, counts, and source locations only.
+The implementation checks include 17 focused API-transport tests and 19 runner tests.
+The first full local suite could not open loopback ports inside the sandbox and reports `listen EPERM`.
+Its host-context repeat passes all 645 cases. No assertion or timeout changed for that repeat.
+Concurrent ordinary and authentication browser runs share Playwright's output directory.
+The ordinary run passes 44 assertions, then fails one artifact teardown with `ENOENT`.
+The separate complete repeat passes all 45 cases. The authentication browser suite passes all three cases.
+Later browser commands run in sequence.
+
 Direct hosted checks ran the complete `test:connector:workflow:hosted` and `test:connector:accounts:hosted` commands against `connector-store-ci.wrangler.jsonc`, account `458ad6a930b0fb717796dfa19ca6a2b1`, database `341350ba-7c74-4c46-8b21-edfdcda475f5`.
 Read-only deployment checks exercised the actual static guard, complete preflight, binding checks, private bucket checks, and anonymous denial against the candidate.
 The Builds API read used exact Worker tags and returned `403` for both stable Workers.
@@ -173,6 +200,13 @@ The authorization/evidence commits change documentation only.
 The latest protected result is linked from PR #43. Local hosted results do not replace it.
 Activation and subsequent automated stable deployment are not run. Both remain behind the explicit activation approval.
 
+The later [connection diagnosis](current-state.md#local-verification-connection-diagnosis) identifies Wrangler's outgoing preview-proxy hop.
+Five read-only remote calls fail while all 4,000 local D1 and local HTTP calls pass.
+A later unchanged 6,000-call remote comparison passes, so this remains an intermittent fault.
+The separate API semantic proof passes value binding, ordering, atomic rollback, metadata, and scoped cleanup.
+The API transport is a verification workaround. It does not establish the underlying network cause or repair the preview proxy.
+Fresh complete API-suite results and protected native-binding results on the final source are recorded separately in PR #43.
+
 ## 5. Manual verification steps
 
 Reviewed current provider boundaries, workflow reuse, generated bindings, private credentials, CI conditions, and target checks.
@@ -180,6 +214,7 @@ Inspected actual hosted volunteer screenshots at 320 × 740 and 390 × 844.
 Keyboard opening of an issue, refresh, and horizontal overflow checks pass in that walkthrough.
 The complete journeys separately verify persisted timers, public/internal separation, images, roles, jury actions, and reconnects.
 No separate human acceptance run occurred.
+Reviewed the direct API endpoint, exact target guards, batch boundaries, request pacing, credential handling, and no-retry behavior.
 
 Before activation, confirm independent Cloudflare Git builds in the dashboard.
 Have the owner approve the exact main revision and switch.
@@ -193,6 +228,8 @@ Current access cannot read Workers Builds settings. The earlier owner confirmati
 The first stable activation has no earlier complete stable Worker. Repair must use verified candidate code with the stable configuration and preserve the stable secret.
 Two active Workers sharing these notifications could deliver hints to the wrong namespace. The activation procedure stops the candidate first.
 Live-contest capacity and backup restoration remain unverified. This run makes no claim about either.
+The Wrangler preview connection fault remains unresolved. The API option avoids that hop only for isolated store verification.
+API checks share the provider's rate allowance. Run them sequentially and retain journals after any failed or interrupted write.
 
 ## 7. Follow-up tickets
 

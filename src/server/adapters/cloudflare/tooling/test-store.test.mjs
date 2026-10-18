@@ -62,6 +62,67 @@ test('only the complete workflow and accounts suites accept the three explicit t
   ]) await assert.rejects(runHostedStore([name, ...args]));
 });
 
+test('invalid or repeated transports stop before any provider access', async () => {
+  const setup = await fixture();
+  for (const extra of [['--transport=other'], ['--transport=api', '--transport=api'],
+    ['--transport=api', '--transport=binding']]) {
+    await assert.rejects(runHostedStore(['accounts', ...setup.arguments, ...extra], setup.dependencies), /Select --transport/);
+  }
+  assert.equal(setup.calls.length, 0);
+});
+
+test('the default binding transport discards inherited API credentials and selection', async () => {
+  for (const key of ['MINSKY_CONNECTOR_D1_TRANSPORT', 'MINSKY_CONNECTOR_D1_API_TOKEN',
+    'MINSKY_CONNECTOR_D1_API_INTERVAL_MS', 'MINSKY_CONNECTOR_D1_DATABASE_ID']) vi.stubEnv(key, 'untrusted-shell-value');
+  const setup = await fixture();
+  setup.dependencies.execute = async (_args, options) => {
+    assert.equal(options.env.MINSKY_CONNECTOR_D1_TRANSPORT, 'binding');
+    for (const key of ['MINSKY_CONNECTOR_D1_API_TOKEN', 'MINSKY_CONNECTOR_D1_API_INTERVAL_MS',
+      'MINSKY_CONNECTOR_D1_DATABASE_ID']) assert.equal(options.env[key], undefined);
+    return result(70);
+  };
+  await runHostedStore(['workflow', ...setup.arguments], setup.dependencies);
+  assert.equal(setup.calls.some((args) => args[0] === 'auth'), false);
+});
+
+for (const suite of suites) test(`${suite.name} API transport retains cases and keeps the existing credential out of files and reports`, async () => {
+  const setup = await fixture();
+  const secret = 'test-private-api-credential';
+  const originalRunner = setup.dependencies.runWrangler;
+  setup.dependencies.runWrangler = async (args) => args[0] === 'auth'
+    ? JSON.stringify({ type: 'oauth', token: secret }) : originalRunner(args);
+  setup.dependencies.execute = async (args, options) => {
+    assert.equal(options.env.MINSKY_CONNECTOR_D1_TRANSPORT, 'api');
+    assert.equal(options.env.MINSKY_CONNECTOR_D1_API_TOKEN, secret);
+    assert.equal(options.env.MINSKY_CONNECTOR_D1_API_INTERVAL_MS, String(300 * suite.maxWorkers));
+    assert.equal(options.env.MINSKY_CONNECTOR_D1_DATABASE_ID, storeTarget.databaseId);
+    const text = await readFile(args[3], 'utf8');
+    assert.equal(text.includes(secret), false);
+    const config = JSON.parse(text.slice('export default '.length).trim().replace(/;$/, ''));
+    assert.deepEqual(config.test.include, suite.include.map((file) => join(repositoryRoot, file)));
+    assert.equal(config.test.testTimeout, 120_000);
+    assert.equal(config.test.hookTimeout, 120_000);
+    assert.equal(config.test.maxWorkers, suite.maxWorkers);
+    assert.equal(config.test.retry, undefined);
+    return result(suite.total);
+  };
+  await runHostedStore([suite.name, ...setup.arguments, '--transport=api'], setup.dependencies);
+  assert.equal(JSON.stringify(setup.reports).includes(secret), false);
+  assert.equal(JSON.stringify(setup.calls).includes(secret), false);
+});
+
+test('API access errors stop before fixtures without exposing the private response', async () => {
+  const setup = await fixture();
+  const originalRunner = setup.dependencies.runWrangler;
+  setup.dependencies.execute = () => assert.fail('Fixtures must not start');
+  for (const credential of ['private-provider-body', JSON.stringify({ type: 'other', token: 'private-provider-body' }),
+    JSON.stringify({ type: 'oauth', token: '' })]) {
+    setup.dependencies.runWrangler = (args) => args[0] === 'auth' ? credential : originalRunner(args);
+    await assert.rejects(runHostedStore(['accounts', ...setup.arguments, '--transport=api'], setup.dependencies),
+      (error) => error.message.includes('No fixtures started') && !error.message.includes('private-provider-body'));
+  }
+});
+
 for (const suite of suites) {
   test(`${suite.name} runs the full suite with the reviewed D1-only configuration and private output`, async () => {
     vi.stubEnv('MINSKY_AUTH_REMOTE', '1');

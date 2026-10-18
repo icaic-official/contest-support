@@ -181,7 +181,7 @@ npm run test:connector:workflow:hosted -- \
   --database=341350ba-7c74-4c46-8b21-edfdcda475f5
 ```
 
-The runner must report every workflow case passed, with zero failures or skipped cases.
+The expected result is `Hosted full D1 workflow: 70 passed, 0 failed, 0 skipped.`
 This runner uses production identity guards and the reviewed D1-only configuration.
 It requires the checkout's exact applied migration list, but applies no migrations itself.
 Its result does not check Worker execution, images, the product UI, or live delivery.
@@ -195,7 +195,7 @@ npm run test:connector:accounts:hosted -- \
   --database=341350ba-7c74-4c46-8b21-edfdcda475f5
 ```
 
-The runner must report every account case passed, with zero failures or skipped cases.
+The expected result is `Hosted connector accounts: 82 passed, 0 failed, 0 skipped.`
 This command checks current permissions, identity expiry, credential generation, revocation, and rollback inside account batches.
 It uses maintained password hashing and the same reviewed D1-only configuration.
 The runner includes four fixed authentication files:
@@ -210,7 +210,7 @@ Each case creates its own UUID-scoped fixture. Each file owns its identity servi
 Fixture setup, credential snapshots, and cleanup checks use D1 batches with the same row assertions.
 The local `npm run test:auth` suite includes one additional execution-clock probe and must pass all 83 cases.
 Record that local result separately from the 82 hosted cases.
-Both connector runners reject test filters, count overrides, and configuration overrides beyond the required target options.
+Both connector runners reject test filters, count overrides, and configuration overrides beyond the documented target and transport options.
 Both direct D1 runners retain their own fixture journals if cleanup fails. They use the original reviewed repository configuration.
 
 Both runners report numeric progress at least every 15 seconds while their test process runs.
@@ -220,6 +220,60 @@ Accumulated call time can exceed elapsed time because database calls can overlap
 Reported SQL time is partial. Calls such as `first()` return rows without provider timing metadata.
 Progress excludes case names, SQL text, bound values, result rows, credentials, and raw provider errors.
 The final result still requires every case to pass without failures or skips.
+
+### Use the D1 API transport
+
+The commands above use native D1 bindings through the local Wrangler preview proxy.
+This remains the default transport and the transport used by protected GitHub checks.
+If that local proxy disconnects, you can select `--transport=api` for these two store suites.
+Read-only probes reproduced a failure while the local proxy forwarded requests to the remote preview Worker.
+The underlying connection fault remains unresolved. This option bypasses that proxy for database requests.
+
+Use the same prepared D1-only CI target and existing Wrangler access.
+The runner confirms the account, database, configuration, and applied migrations before it starts fixtures.
+It reads the existing Wrangler token into memory and passes it privately to the test process.
+Do not export a token manually or put credentials in commands, Git, frontend builds, logs, or ordinary CI artifacts.
+This option creates no hosted resources.
+
+Run the complete workflow suite first:
+
+```sh
+npm run test:connector:workflow:hosted -- \
+  --transport=api \
+  --config=src/server/adapters/cloudflare/deploy/connector-store-ci.wrangler.jsonc \
+  --account=458ad6a930b0fb717796dfa19ca6a2b1 \
+  --database=341350ba-7c74-4c46-8b21-edfdcda475f5
+```
+
+The expected result is `Hosted full D1 workflow: 70 passed, 0 failed, 0 skipped.`
+After that command finishes, run the complete account suite:
+
+```sh
+npm run test:connector:accounts:hosted -- \
+  --transport=api \
+  --config=src/server/adapters/cloudflare/deploy/connector-store-ci.wrangler.jsonc \
+  --account=458ad6a930b0fb717796dfa19ca6a2b1 \
+  --database=341350ba-7c74-4c46-8b21-edfdcda475f5
+```
+
+The expected result is `Hosted connector accounts: 82 passed, 0 failed, 0 skipped.`
+The API option uses the same files, assertions, case counts, and timeouts as the binding transport.
+The account suite still uses up to four workers. The runner adds no retries or case filters.
+Each database batch uses one API request and retains transaction rollback, result metadata, numeric values, and null values.
+
+Run these API commands in sequence. Do not run another API store check concurrently.
+The workflow suite spaces request starts by 300 milliseconds.
+Each of the four account files spaces request starts by 1,200 milliseconds.
+Either suite can make about 1,000 requests in five minutes at that pace.
+Cloudflare's [shared API limit](https://developers.cloudflare.com/fundamentals/api/reference/limits/) is 1,200 requests in five minutes.
+Other API activity can use the same allowance. An HTTP 429 response fails the check without a retry.
+
+Keep the same progress and fixture-journal requirements described above.
+If a request loses its response, its database outcome can be unknown. Inspect retained journals before cleanup.
+Follow [direct D1 fixture recovery](#recover-direct-d1-fixtures) if cleanup is incomplete.
+Record the selected transport with the result.
+An API result checks database behavior through the D1 HTTP API.
+It does not replace protected native-binding checks, Worker execution checks, or browser checks.
 
 ## Check the hosted React application
 

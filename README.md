@@ -88,6 +88,8 @@ npx playwright install chromium
 Deno and the provider CLIs are pinned npm dependencies.
 For `npm run test:cloud` and `npm run test:hosted`, follow [cloud verification](docs/cloud-onboarding.md#verification-and-protected-cloud-ci).
 For shared adapter checks, follow [Run the shared provider tests](docs/run-provider-tests.md).
+The two hosted store commands accept the optional [D1 API transport](docs/run-provider-tests.md#use-the-d1-api-transport).
+Run those API commands in sequence. Default binding checks and protected CI keep their existing transport.
 `VITE_BACKEND` defaults to `supabase`. An isolated Cloudflare application build sets `VITE_BACKEND=cloudflare` and uses its own origin.
 Cloudflare cookies and API requests require the same origin. A plain Vite server does not supply that API.
 If an existing cloud fixture cleanup fails, follow [fixture recovery](docs/cloud-onboarding.md#fixture-recovery).

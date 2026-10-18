@@ -76,6 +76,32 @@ The [run report](t0021-run-report.md) owns the full command and file lists.
 Activation and a subsequent automated stable deployment remain incomplete.
 The latest protected result is recorded separately in PR #43.
 
+### Local verification connection diagnosis
+
+The owner requested diagnosis of the local account failures after the protected account suite passed.
+Read-only probes on source `6d6e054` isolate the failure from account records and password operations.
+In 4,000 checks per path, local HTTP and local D1 pass every check.
+Wrangler's remote D1 path passes 3,995 checks and reports five connection losses.
+Independent Wrangler D1 API queries after the failures pass.
+These checks use only `minsky-connector-store-ci`, UUID `341350ba-7c74-4c46-8b21-edfdcda475f5`, in the authorized account.
+
+A second probe calls the same remote proxy through a native binding and direct Node HTTP.
+Private debug output identifies `Error inside ProxyWorker` when its outgoing preview request fails.
+The direct caller receives HTTP 500 with `Network connection lost`.
+That diagnostic initially checks the wrong response shape. Its response-value failures are not application failures or verification results.
+After correction, all 3,000 native calls and 3,000 direct calls pass.
+The fault is intermittent. The evidence identifies the outgoing preview-proxy hop, but not the underlying peer or network cause.
+
+The test tooling now provides explicit `--transport=api` for direct workflow and account verification.
+The default and protected GitHub path retain native bindings.
+The API option uses the same cases, assertions, target guards, fixture ownership, and timeouts.
+It sends each batch in one request, spaces request starts below the API limit, and never retries a request.
+Before implementation, a scoped API probe verifies native-equivalent number and null binding, ordered results, failed-batch rollback, and write metadata.
+That probe removes its only UUID-owned authentication-limit record and recovery journal.
+This transport avoids the faulty preview hop. It does not repair the underlying Cloudflare connection.
+See [the verification procedure](run-provider-tests.md#use-the-d1-api-transport) for exact commands and limits.
+PR #43 records the final revision and fresh verification results separately for each transport.
+
 ### Final executable verification and protected access
 
 Ordinary [push CI](https://github.com/GiftedNovaHD/minsky/actions/runs/39126910216) and [PR CI](https://github.com/GiftedNovaHD/minsky/actions/runs/39126913307) pass on `33e76b2e5d75e5650c2397829460cd6bd78643b0`.

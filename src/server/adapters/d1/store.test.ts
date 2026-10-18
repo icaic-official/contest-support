@@ -1,7 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { readFileSync, readdirSync } from "node:fs";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { getPlatformProxy, unstable_splitSqlQuery as splitSqlQuery } from "wrangler";
+import { unstable_splitSqlQuery as splitSqlQuery } from "wrangler";
+import { openStoreDatabase } from '../cloudflare/tooling/store-database.mjs';
 import type { Caller } from '../../authentication';
 import { WorkflowService } from '../../workflow';
 import { D1ApplicationService } from '../cloudflare/application';
@@ -44,12 +45,10 @@ describe("D1 workflow persistence", () => {
   let application: D1ApplicationService;
 
   beforeAll(async () => {
-    const platform = await getPlatformProxy<{ DB: D1Connection }>({
-      configPath, persist: false, remoteBindings: remote, envFiles: [],
-    });
+    const platform = await openStoreDatabase({ configPath, remoteBindings: remote });
     const metrics = process.env.MINSKY_D1_METRICS === '1'
-      ? measureD1(platform.env.DB, (line) => process.stdout.write(line + '\n')) : undefined;
-    db = metrics?.db ?? platform.env.DB;
+      ? measureD1(platform.db, (line) => process.stdout.write(line + '\n')) : undefined;
+    db = metrics?.db ?? platform.db;
     dispose = async () => { metrics?.flush(); await platform.dispose(); };
     if (!remote) {
       const directory = "src/server/adapters/d1/migrations";

@@ -17,9 +17,9 @@ After PR #42 merges, update from main and repeat verification before provisionin
 Preparation PR merge does not approve switching `minsky-dev`.
 
 :::note[Development installation]
-The recorded empty-installation trial passed on 18 October 2026 at source `25b2033`.
-Review fixes after that revision require fresh verification.
-See the [dated evidence](https://github.com/GiftedNovaHD/minsky/blob/main/docs/current-state.md#current-source-empty-installation) for the tested source, resources, and results.
+The empty-installation procedure passed on 18 October 2026 at source `2b6f6f0`.
+The trial checked the complete React workflow, first-owner password gates, trusted owner recovery, and scoped cleanup.
+See the [dated evidence](https://github.com/GiftedNovaHD/minsky/blob/main/docs/current-state.md#fresh-installation-after-review-fixes) for the tested source, resources, and results.
 This procedure does not establish production capacity or real-data migration.
 :::
 
@@ -47,9 +47,13 @@ From the checkout root, install the locked tools:
 npm ci
 node --version
 npx wrangler --version
+unset CLOUDFLARE_ENV
+export WRANGLER_LOG_SANITIZE=true WRANGLER_WRITE_LOGS=false WRANGLER_SEND_METRICS=false
 npx wrangler whoami
 ```
 
+Use this shell for the remaining commands.
+The environment settings prevent inherited target selection and private Wrangler log files.
 The lockfile pins Wrangler and the password implementation.
 Confirm that `whoami` lists the intended account.
 If you lack a current login, run `npx wrangler login`, then repeat `whoami`.
@@ -329,7 +333,7 @@ Use the [shared provider guide](https://github.com/GiftedNovaHD/minsky/blob/main
 | Secret command fails | Confirm that the selected Worker exists and secret metadata is readable. Check whether `AUTH_SECRET` already exists. The installation command does not rotate it. |
 | Credential output already exists | Retain that file. Select a new private destination for a new operation. Existing files are never overwritten. |
 | Bootstrap fails or its response is lost | Retain any private result file. Inspect the installation marker through trusted D1 access before another attempt. An existing marker requires owner recovery. |
-| A full workflow fixture leaves a journal | Retain its runtime configuration and journal. Follow [scoped fixture recovery](https://github.com/GiftedNovaHD/minsky/blob/main/docs/run-provider-tests.md#recover-direct-d1-fixtures). Never reset the database. |
+| A full workflow fixture leaves a journal | Retain its reviewed repository configuration and IDs-only journal. Follow [scoped fixture recovery](https://github.com/GiftedNovaHD/minsky/blob/main/docs/run-provider-tests.md#recover-direct-d1-fixtures). Never reset the database. |
 
 To inspect a possible committed bootstrap, run this read-only query:
 

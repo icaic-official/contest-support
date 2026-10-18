@@ -23,10 +23,81 @@ The [review run report](t0020-run-report.md) lists changes, commands, checks, an
 
 Local verification passes all 612 tests across 40 files without skips, all 45 ordinary browser cases, three authentication browser cases, the complete HTTPS runtime, and the complete local React journey.
 Type checks, lint, both builds, 12 function tests, three documentation browser cases, and locked dependency audits pass.
-The documentation build verifies 527 local links and assets across 13 pages.
+The documentation build verifies 528 local links and assets across 13 pages.
 The new expiry and environment-isolation regressions fail before their fixes and pass afterward.
-New hosted, protected, and empty-installation results remain pending for the published executable revision.
+Executable source is `2b6f6f093eabec159857863c295ab21fd04bae83`.
+Ordinary [push CI](https://github.com/GiftedNovaHD/minsky/actions/runs/39114654044) and [PR CI](https://github.com/GiftedNovaHD/minsky/actions/runs/39114656733) pass on that source.
+Protected Cloudflare verification, protected Supabase compatibility verification, and fresh installation pass as recorded below.
+The final evidence update changes documentation only. Its ordinary PR checks must pass before merge.
 Earlier records below apply to their recorded source revisions.
+
+### Protected verification after review fixes
+
+Protected [Cloudflare run 39114678438](https://github.com/GiftedNovaHD/minsky/actions/runs/39114678438) passes on executable source `2b6f6f0`.
+Its ordinary checks, secret scan, and dependency audits also pass.
+All 70 hosted D1 workflow cases and 82 account cases pass with zero failures or skips.
+The workflow step runs from 09:24:53 to 09:28:35 UTC. The account step runs from 09:28:35 to 09:32:49 UTC.
+The job deploys CI Worker version `222b1998-5aa6-4e53-aab7-cdefa78ed16f`.
+All eight shared browser scenarios pass in 2.9 minutes.
+The complete hosted React journey passes with zero failures, skips, or flaky results.
+Its step runs from 09:36:43 to 09:39:01 UTC.
+The runners verify scoped fixture cleanup. No incomplete marker, retained recovery journal, or recovery artifact remains.
+The artifact step checks provider, hosted UI, and per-child D1 journal paths.
+This protected run uses the separate store and application CI targets recorded below. It does not deploy the active development backend.
+
+Protected [Supabase run 39114729684, attempt 1](https://github.com/GiftedNovaHD/minsky/actions/runs/39114729684/attempts/1) passes its prerequisite checks, but two of 16 hosted browser cases fail at five-second UI assertions.
+The specialist queue is present without an error alert in the immediate post-failure diagnostics. This establishes a late transition, but not the delayed request.
+The reset failure has no response status, timing, or final admin state. Its cause remains undiagnosed.
+No relevant Supabase browser, admin, migration, or fixture runtime changed in this review follow-up.
+The two failed cases then pass unchanged in a local hosted run in 1.1 minutes.
+A separate complete ordered local hosted run passes all 16 cases in 2.5 minutes, with unchanged assertions and scoped cleanup.
+Temporary credential-free request instrumentation does not reproduce either failure and is not committed.
+Protected [attempt 2](https://github.com/GiftedNovaHD/minsky/actions/runs/39114729684/attempts/2) passes on the same `2b6f6f0` source.
+All 16 browser cases pass in 3.5 minutes, all eight shared scenarios pass in 2.2 minutes, and all five trusted workflow cases pass.
+Assertion deadlines and retry settings remain unchanged. The original reset failure's cause remains undiagnosed.
+The target is the existing Minsky CI project, `ghtztmovdkhuketcbjmq`.
+Configuration changes, migrations, function deployments, and secret updates are skipped.
+Scoped cleanup passes, with no retained fixture journal or recovery artifact.
+
+### Fresh installation after review fixes
+
+A clean checkout of `2b6f6f0` followed the public installation procedure in account `458ad6a930b0fb717796dfa19ca6a2b1`.
+The locked dependency installation reports zero vulnerabilities.
+All nine migrations, the isolated Cloudflare build, deployment dry run, deployment, bootstrap, and initial secret creation pass.
+D1 reports APAC placement. The Worker reports `aws:ap-southeast-1` placement.
+The private R2 bucket has no public development URL or custom domain.
+
+| Resource | Identity |
+| --- | --- |
+| Worker and D1 name | `minsky-install-pr42-18af3da3` |
+| Application origin | `https://minsky-install-pr42-18af3da3.icaic-minsky.workers.dev` |
+| D1 database | `a212a06c-3827-43fd-bfac-85a18e8dca23` |
+| Private R2 bucket | `minsky-install-pr42-18af3da3-images` |
+| Installation | `ad0bae25-1255-4235-8b5a-5aab38f0ea7c` |
+| Initial owner | `6d053c11-42c6-42a1-b5ac-19b26924b7f7` |
+| Initial Worker version | `527f5ade-fbb7-41fb-b3c2-8c4b5ed14774` |
+| Active Worker version after secret creation | `ec659c7b-ac50-4ed9-9c79-efc2e9728798` |
+
+Before initialization, the landing page returns 200, `/.env` returns 404, and sign-in returns 503.
+Accounts, installation markers, and rate-limit rows are empty at that boundary.
+The first owner must change the temporary password. The configured event, session, categories, roster, and closed intake match the input.
+Repeated initialization and initial-secret creation refuse safely.
+
+The complete React trial runs from 09:18:20.830 to 09:22:30.030 UTC on 18 October 2026.
+Its browser case passes in 248.574 seconds, with no failures, skips, flaky results, infrastructure errors, or retries.
+It covers the jury worklist, workflow, images, live updates, phone layout, keyboard behavior, and authorization changes.
+Trusted sole-owner recovery revokes the old session and requires a replacement-password change.
+Full installation, membership, role, issue, and history rows match before and after recovery.
+
+Scoped cleanup removes only this trial's fictional records and confirms empty fixture coordinators before removing its recovery journal.
+The final read-only audit passes at 09:24:06.795 UTC.
+One owner, identity, credential, event, session, and admin membership remain with two configured teams.
+The installation retains 20 delivered notifications, three monotonic audience counters, and seven audit rows.
+Workflow records, staff roles, images, deletion tasks, pending notifications, and R2 objects are zero.
+Intake remains closed. The initialized installation remains available for owner review.
+A final read-only refusal proof passes at 09:24:53.362 UTC without provider or database writes.
+Earlier installations remain untouched. No paid upgrade occurred.
+Private credential files have mode `0600`; their contents were not printed or committed.
 
 ## T0020 connector implementation, 2026-10-18
 

@@ -14,7 +14,7 @@ Both providers use the same workflow decisions. The active Supabase browser path
 
 [Read the user and operator guides](https://minsky-docs.icaic-minsky.workers.dev).
 Use [the installation guide](site/src/content/docs/operators/installation.md) for an isolated Cloudflare instance.
-T0021 prepares a fresh Cloudflare development installation while PR #42 is under review.
+T0021 prepares a fresh Cloudflare development installation after PR #42 merged at `104d9d1`.
 It transfers no existing Supabase records or accounts. Supabase stays intact and active until the owner approves the concrete backend switch.
 See [current state](docs/current-state.md) for source-specific checks and [activation](docs/activate-cloudflare-development.md) for the remaining gates.
 These are development installations that require connectivity. Live-contest readiness and capacity for 800 simultaneous users remain unverified.

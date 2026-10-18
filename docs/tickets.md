@@ -58,7 +58,7 @@ T0008 fuzzy team search merged into `main` in [PR #22](https://github.com/notbow
 ## T0021 Fresh Cloudflare development installation
 
 Branch: `feature/t0021-cloudflare-development-install`, from PR #42 head `2b6f6f0` in a separate worktree.
-Status: Main integration and fresh verification in progress after PR #42 merged at `104d9d1`. Activation still requires separate owner approval.
+Status: [Draft PR #43](https://github.com/GiftedNovaHD/minsky/pull/43) includes merged main at `104d9d1`. Fresh development and separate installation verification pass. Protected final checks and activation remain pending authorization.
 Summary: Prepare a fresh Cloudflare development installation and guarded deployment automation. Keep Supabase intact and active until the owner approves the concrete URL switch.
 
 The owner authorizes this ticket before PR #42 merges.
@@ -74,14 +74,14 @@ Do not merge either PR or activate the development URL without owner approval.
 
 ### Acceptance criteria
 
-- [ ] Deployment preparation preserves Supabase mode until approved activation and tests both backend selections.
+- [x] Deployment preparation preserves Supabase mode until approved activation and tests both backend selections.
 - [ ] Activated deployments retain the full Worker, selected frontend, bindings, migration tags, origin, private secret, cron, and CPU cap.
-- [ ] Static deployment cannot overwrite an activated application Worker. Docs deployment remains independent.
-- [ ] App previews cannot use stable development resources.
-- [ ] One installation procedure provides exact creation, migration, bootstrap, password-change, recovery, and verification commands.
-- [ ] Contributor documentation identifies provider interfaces, registration, configuration, migrations, bootstrap, cleanup, shared scenarios, and provider checks.
-- [ ] After PR #42 merges, current main is integrated and local required checks pass on the reconciled revision.
-- [ ] A fresh dedicated development installation passes authentication, authorization, workflow, jury, private image, and live-update checks with fictional records.
+- [x] Static deployment cannot overwrite an activated application Worker. Docs deployment remains independent.
+- [x] App previews cannot use stable development resources.
+- [x] One installation procedure provides exact creation, migration, bootstrap, password-change, recovery, and verification commands.
+- [x] Contributor documentation identifies provider interfaces, registration, configuration, migrations, bootstrap, cleanup, shared scenarios, and provider checks.
+- [x] After PR #42 merges, current main is integrated and local required checks pass on the reconciled revision.
+- [x] A fresh dedicated development installation passes authentication, authorization, workflow, jury, private image, and live-update checks with fictional records.
 - [ ] Local hosted checks and protected GitHub Actions checks are recorded separately on the final revision.
 - [ ] A concrete activation record lists exact identifiers, approved revision, settings, commands, checks, and recovery.
 - [ ] The owner approves the backend switch. The development URL then passes application checks.

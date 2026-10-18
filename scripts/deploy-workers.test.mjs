@@ -400,3 +400,25 @@ it("verifies live application bindings and the anonymous API denial after upload
     await expect(verifyApplicationDeployment(worker, cloudflare, request)).rejects.toThrow(/could not be verified/);
   }
 });
+
+it("validates the committed development target without credentials and leaves activation disabled by default", async () => {
+  const config = "src/server/adapters/cloudflare/deploy/development.wrangler.jsonc";
+  const expected = {
+    accountId: "458ad6a930b0fb717796dfa19ca6a2b1", workerName: "minsky-dev",
+    databaseName: "minsky-development", databaseId: "a1832f97-4d4c-45c2-a848-8d3dfd0b74f5",
+    bucketName: "minsky-development-images", origin: "https://minsky-dev.icaic-minsky.workers.dev",
+  };
+  const prepared = {
+    ...development, CLOUDFLARE_API_TOKEN: "", GH_TOKEN: "",
+    MINSKY_DEV_CLOUDFLARE_CONFIG: config, MINSKY_DEV_DATABASE_ID: expected.databaseId,
+    MINSKY_DEV_DATABASE_NAME: expected.databaseName, MINSKY_DEV_BUCKET_NAME: expected.bucketName,
+  };
+  const enabled = await deploymentTargets({ ...prepared, MINSKY_DEV_BACKEND: "cloudflare" }, "app");
+  expect(enabled).toHaveLength(1);
+  expect(enabled[0]).toMatchObject({ name: "minsky-dev", config, backend: "cloudflare", settings: expected });
+  expect(enabled[0].settings).toEqual(JSON.parse(readFileSync(
+    "src/server/adapters/cloudflare/deploy/development.settings.json", "utf8",
+  )));
+  const disabled = await deploymentTargets(prepared, "app");
+  expect(disabled).toEqual([{ name: "minsky-dev", config: "wrangler.jsonc", assets: "dist", backend: "supabase" }]);
+});

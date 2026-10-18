@@ -12,13 +12,12 @@ Leave existing Supabase resources and accounts intact. Do not export or reset th
 Preserve the application's workflow and authorization rules when configuring the new instance.
 
 For the project's development URL, use the separate [activation procedure](https://github.com/GiftedNovaHD/minsky/blob/main/docs/activate-cloudflare-development.md).
-PR #42 merged at `104d9d1`. T0021 includes that revision and permits dedicated hosted development verification.
 Preparation PR merge does not approve switching `minsky-dev`.
 
 :::note[Development installation]
-The empty-installation procedure passed on 18 October 2026 at source `2b6f6f0`.
-The trial checked the complete React workflow, first-owner password gates, trusted owner recovery, and scoped cleanup.
-See the [dated evidence](https://github.com/GiftedNovaHD/minsky/blob/main/docs/current-state.md#fresh-installation-after-review-fixes) for the tested source, resources, and results.
+Fresh development and separate installation-verification trials passed on 18 October 2026 at source `f6864f6`.
+Both checked the complete React workflow, all eight shared provider scenarios, first-owner password gates, expiry, trusted recovery, and scoped cleanup.
+See the [dated evidence](https://github.com/GiftedNovaHD/minsky/blob/main/docs/current-state.md#t0021-fresh-development-installation-2026-10-18) for the tested source, resources, and results.
 This procedure does not establish production capacity or real-data migration.
 :::
 

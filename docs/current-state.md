@@ -1,5 +1,79 @@
 # Current state
 
+## T0021 fresh development installation, 2026-10-18
+
+The owner merged PR #42 at `104d9d1` at 11:39:27 UTC, then resumed T0021.
+The separate `feature/t0021-cloudflare-development-install` worktree includes that main revision and its accepted verification records.
+[PR #43](https://github.com/GiftedNovaHD/minsky/pull/43) contains the preparation. The owner reviews and merges.
+Supabase and the stable development URL remain unchanged. No source records or credentials were exported, transferred, reset, or deleted.
+The [activation procedure](activate-cloudflare-development.md) identifies the proposed switch and remaining approval gates.
+
+Wrangler confirmed existing access to account `458ad6a930b0fb717796dfa19ca6a2b1` before creation.
+Exact Worker, D1, and bucket name checks confirmed that each new target was absent.
+Both databases report an APAC primary. Both generated Workers use `aws:ap-southeast-1` placement and the existing paid services.
+No subscription or paid upgrade changed.
+
+| Purpose | Worker | D1 name and UUID | Private R2 bucket |
+| --- | --- | --- | --- |
+| Fresh development candidate | `minsky-development-candidate` | `minsky-development`, `a1832f97-4d4c-45c2-a848-8d3dfd0b74f5` | `minsky-development-images` |
+| Separate installation verification | `minsky-install-t0021-dfb62e4d` | `minsky-install-t0021-dfb62e4d`, `d37dc03c-8927-4c1e-b24f-6d0b8b131beb` | `minsky-install-t0021-dfb62e4d-images` |
+
+Both installations use executable source `f6864f6ea29e663e78483d0cfd28a8f4e3299c2c`.
+Their initial deployments, all nine migrations, Cloudflare builds, deployment dry runs, new-owner bootstrap, and private secret creation pass.
+A separate clean clone of that source passes `npm ci` and the Cloudflare build.
+Each new owner must change the temporary password before application access.
+The competition, categories, roster, and closed intake match the supplied configuration.
+Repeated bootstrap and initial-secret creation refuse for their documented reasons.
+The operator checked those reasons through read-only wrappers that forbid writes and password hashing.
+
+The development trial runs from 11:48:49 to 11:58:42 UTC and passes one complete case in 592.127 seconds.
+The separate installation trial runs from 11:59:00 to 12:04:37 UTC and passes one complete case in 336.816 seconds.
+Neither trial has a failure, skip, retry, flaky result, or infrastructure error.
+Each imports the current React journey and all eight unchanged shared provider scenarios.
+The trials verify the jury worklist, all issue transitions, timers, history, awards, external confirmation, private images, roles, public/internal separation, and live reconnection.
+An additional expiry check denies reads and writes after the fixture identity expires.
+Trusted owner recovery revokes the earlier session, requires another password change, and preserves installation, membership, role, issue, and history rows.
+
+Scoped cleanup verifies exact D1 records, R2 keys, and empty fixture coordinator state before removing recovery journals.
+Each installation retains one owner, identity, credential, event, session, admin membership, and two configured teams.
+Trial issues, history, resolutions, awards, receipts, image records, R2 objects, deletion tasks, and pending notifications are zero.
+Each retains its seven audit rows, 20 delivered notifications, and three monotonic audience counters.
+The final read-only audits pass at 11:59:47 UTC for development and 12:06:25 UTC for installation verification.
+Private credential files remain outside Git with mode `0600` in `0700` directories. Their contents were not printed or uploaded.
+An additional private browser walkthrough checks keyboard opening, refresh, and overflow, then verifies its UUID-owned cleanup.
+Visual review of its actual hosted volunteer screens at 320 × 740 and 390 × 844 finds no horizontal overflow.
+
+The candidate's active version is `c15b6ab7-bba0-4e9f-9292-2c2bd345e9a3`.
+The separate installation version is `42abf7b9-7b45-4338-9f33-dc9fef62d40b`.
+Read-only checks confirm the candidate's exact D1, private R2, Durable Object class and namespace, authentication origin, secret name, 1,000 ms cap, and one-minute cron.
+The new static-upload guard accepts the existing static `minsky-dev` and rejects the complete candidate.
+The complete deployment preflight and anonymous API checks pass against the candidate.
+
+All 70 direct hosted workflow cases and 82 hosted account cases pass on the separate D1-only CI target, with zero failures or skips.
+An additional read-only audit at 12:17:40 UTC confirms zero application rows across all 27 tables and the current migration list.
+These CLI results are separate from the fresh-installation trials and protected GitHub Actions.
+Local checks pass 622 unit, database, and tooling cases on the reconciled implementation.
+All 45 ordinary browser cases, three authentication browser cases, the complete local HTTPS runtime, complete local React journey, 12 function tests, and three docs browser cases pass.
+Type checking, lint, both builds, shared scenario discovery, workflow YAML validation, and locked dependency audits pass.
+The full Git-history secret scan passes for all 132 commits present at that check.
+
+Ordinary [push CI](https://github.com/GiftedNovaHD/minsky/actions/runs/39124689827) and [PR CI](https://github.com/GiftedNovaHD/minsky/actions/runs/39124726035) pass on `f6864f6`.
+Both publication jobs skip because `CLOUDFLARE_DEPLOY_ENABLED=false`.
+Protected T0021 checks remain pending authorization for its exact branch entry, or later execution on approved `main`.
+The six existing branch entries and protection rule `69128862` remain unchanged.
+The five Cloudflare selection variables remain absent. The stable Worker has no application bindings.
+Independent Cloudflare Git builds were disabled by the owner's earlier confirmation.
+Current read-only Builds API checks return `403` for both Workers, so that setting requires dashboard confirmation before activation.
+
+The stable public configuration now identifies the prepared development D1 and R2 resources without activating them.
+A credential-free test verifies the actual generated file and confirms that public target settings alone keep the Supabase default.
+The final local suite passes 623 cases, including all 30 deployment cases, with no skips.
+Final type, lint, both builds, Deno checks, and all 12 function cases pass too.
+The final source adds this configuration test, public configuration, and operational records.
+Its ordinary CI results are available in [PR #43 checks](https://github.com/GiftedNovaHD/minsky/pull/43/checks).
+The [run report](t0021-run-report.md) owns the full command and file lists.
+Activation, protected final verification, and a subsequent automated stable deployment remain incomplete.
+
 ## PR #42 review fixes and cleanup, 2026-10-18
 
 The owner requested the review fixes, removal of obsolete tests and code, and fresh verification before PR #42 is ready.

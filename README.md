@@ -121,7 +121,8 @@ Docs branch previews remain available. App branch previews are disabled until in
 GitHub Actions runs CI for pull requests and all branch pushes.
 Independent docs and app deployment jobs wait for `checks`, `secrets`, and `dependencies`.
 See [deployment setup](docs/cloudflare-builds.md) for credentials, activation, and backend limits.
-Cloudflare app activation and subsequent automated deployment remain unverified during T0021 preparation.
+The fresh Cloudflare development candidate and a separate empty installation pass the complete application checks.
+Stable URL activation and subsequent automated deployment remain unverified and require owner approval.
 PR #42 merged at `104d9d1`. T0021 includes the accepted connector and its final verification records.
 
 ### Repository records

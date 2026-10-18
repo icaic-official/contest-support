@@ -9,12 +9,14 @@ import {
   isJuryOnly,
   issueAbilities,
   issuesByNumber,
+  issueThatLeft,
   matchesChip,
   openableIssues,
   organiserTabs,
   placeOf,
   primaryAction,
   queueChips,
+  sheetAllowed,
   sortByUnresolved,
   visibleIssues,
 } from "./organiserModel";
@@ -402,5 +404,35 @@ describe("jury award lists (T0009)", () => {
     expect(
       openableIssues(snapshot, member({ roles: ["volunteer"] })),
     ).toHaveLength(3);
+  });
+});
+
+describe("issue view closing rules", () => {
+  it("closes a sheet when its action is no longer allowed", () => {
+    const resolved = issue({ status: "resolved", resolved_at: "2026-10-17T10:05:00Z" });
+    const jury = member({ roles: ["jury"] });
+    const state = { awards: [], event: null };
+    const can = issueAbilities(resolved, state, jury);
+    expect(sheetAllowed("award", can)).toBe(true);
+    const lost = issueAbilities(resolved, state, member({ roles: ["volunteer"] }));
+    expect(sheetAllowed("award", lost)).toBe(false);
+    expect(sheetAllowed("reopen", lost)).toBe(true);
+    expect(sheetAllowed("image", lost)).toBe(true);
+    const archived = issueAbilities(
+      resolved,
+      { awards: [], event: { id: "event", name: "Event", archived: true } },
+      jury,
+    );
+    expect(sheetAllowed("award", archived)).toBe(false);
+    expect(sheetAllowed("more", archived)).toBe(true);
+  });
+
+  it("reports an open issue that leaves the lists, not one the person closed", () => {
+    const open = issue({ id: "a", number: 4 });
+    expect(issueThatLeft("a", open, undefined)).toBe(open);
+    expect(issueThatLeft("a", open, open)).toBeUndefined();
+    expect(issueThatLeft("", open, undefined)).toBeUndefined();
+    expect(issueThatLeft("b", open, undefined)).toBeUndefined();
+    expect(issueThatLeft("a", undefined, undefined)).toBeUndefined();
   });
 });

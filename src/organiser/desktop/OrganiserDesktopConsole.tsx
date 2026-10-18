@@ -1,4 +1,10 @@
-import { type ReactNode, useEffect, useState } from "react";
+import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { Archive } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -20,6 +26,7 @@ import {
   openableIssues,
   visibleIssues,
 } from "../organiserModel";
+import { useLeftIssueNotice } from "../useLeftIssueNotice";
 import { AccountsPage, OverviewPage, SettingsPage } from "./AdminPages";
 import { AwardReviewPage } from "./AwardReviewPage";
 import {
@@ -123,6 +130,10 @@ export function OrganiserDesktopConsole({
   const [replyDrafts, setReplyDrafts] = useState<Record<string, ReplyDraft>>(
     {},
   );
+  // The control that opened the issue sheet gets focus when it closes.
+  const sheetOpener = useRef<{ element: Element | null; issueId: string }>(
+    undefined,
+  );
 
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
@@ -155,6 +166,22 @@ export function OrganiserDesktopConsole({
     return () => document.removeEventListener("keydown", onKey);
   }, []);
 
+  const openedIssue =
+    state && member
+      ? openableIssues(state, member).find(
+          (issue) => issue.id === workflow.selectedIssueId,
+        )
+      : undefined;
+  const leftNotice = useLeftIssueNotice(
+    workflow.selectedIssueId,
+    workflow.selectIssue,
+    openedIssue,
+    useCallback(() => {
+      sheetOpener.current = undefined;
+      focusLater(consoleHeadingId);
+    }, []),
+  );
+
   if (!state || !member || !state.session) {
     return (
       <NoSessionAccess
@@ -171,9 +198,6 @@ export function OrganiserDesktopConsole({
   const pages = groups.flatMap((group) => group.pages);
   const currentPage = pages.includes(page) ? page : pages[0];
   const issues = visibleIssues(state.issues, member);
-  const openedIssue = openableIssues(state, member).find(
-    (issue) => issue.id === workflow.selectedIssueId,
-  );
   const archived = Boolean(state.event?.archived);
   const canReport = isSupport(member);
   const personName =
@@ -207,8 +231,31 @@ export function OrganiserDesktopConsole({
   }
 
   function openIssue(issueId: string, tab: SheetTab = "activity") {
+    if (!openedIssue) {
+      sheetOpener.current = { element: document.activeElement, issueId };
+    }
     setSheetTab(tab);
     workflow.selectIssue(issueId);
+  }
+
+  /**
+   * Returns focus to the control that opened the sheet. A control that is
+   * gone, such as a card that moved to another award list, gives focus to
+   * the issue row or the page heading.
+   */
+  function returnSheetFocus() {
+    const opener = sheetOpener.current;
+    sheetOpener.current = undefined;
+    const element = opener?.element;
+    const target =
+      (element instanceof HTMLElement &&
+      element.isConnected &&
+      element !== document.body
+        ? element
+        : null) ??
+      (opener ? document.getElementById(issueRowId(opener.issueId)) : null) ??
+      document.getElementById(consoleHeadingId);
+    target?.focus();
   }
 
   function openReport(teamId?: string) {
@@ -321,6 +368,11 @@ export function OrganiserDesktopConsole({
                       </Alert>
                     )}
                     <CommandFeedback command={command} />
+                    {leftNotice && (
+                      <p role="status" className="text-sm text-muted-foreground">
+                        {leftNotice}
+                      </p>
+                    )}
                     {command.notice && (
                       <p role="status" className="text-xs text-muted-foreground">
                         {command.notice}
@@ -374,6 +426,7 @@ export function OrganiserDesktopConsole({
               tab={sheetTab}
               onTab={setSheetTab}
               onClose={() => workflow.selectIssue("")}
+              onClosed={returnSheetFocus}
               replyDraft={
                 (openedIssue && replyDrafts[openedIssue.id]) || emptyReply
               }

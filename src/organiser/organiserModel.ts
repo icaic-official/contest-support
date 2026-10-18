@@ -67,6 +67,14 @@ export function openableIssues(state: Snapshot, member: Membership): Issue[] {
 /** A list of the jury award pages. */
 export type AwardList = "decide" | "apply" | "done";
 
+export const awardListOrder: readonly AwardList[] = ["decide", "apply", "done"];
+
+export const awardListLabels: Record<AwardList, string> = {
+  decide: "To decide",
+  apply: "To apply",
+  done: "Applied",
+};
+
 /**
  * The jury award lists. "decide" and "apply" are the T0009 worklists:
  * resolved issues without an award, oldest resolution first, and every award
@@ -288,6 +296,47 @@ export function primaryAction(
   if (abilities.apply) return "apply";
   if (abilities.reopen) return "reopen";
   return undefined;
+}
+
+/** A sheet of the phone issue view. Each sheet except More runs one task. */
+export type IssueSheetKind =
+  | "reply"
+  | "resolve"
+  | "escalate"
+  | "reopen"
+  | "award"
+  | "apply"
+  | "image"
+  | "more";
+
+/**
+ * Whether a sheet of the issue view can stay open. A sheet closes when its
+ * action is no longer allowed, for example after the person loses the jury
+ * role or the event is archived. The More sheet lists only allowed actions.
+ */
+export function sheetAllowed(
+  sheet: IssueSheetKind,
+  abilities: IssueAbilities,
+): boolean {
+  if (sheet === "more") return true;
+  if (sheet === "image") return abilities.upload;
+  return abilities[sheet];
+}
+
+/**
+ * The issue that left the person's lists while it was open, if any. This
+ * happens, for example, when a jury-only member confirms the award of a
+ * reopened issue or when someone reopens an issue live. `last` is the issue
+ * that was open at the previous render. A person who closed the issue has no
+ * selection, so nothing left.
+ */
+export function issueThatLeft(
+  selectedIssueId: string,
+  last: Issue | undefined,
+  opened: Issue | undefined,
+): Issue | undefined {
+  if (opened || !last || !selectedIssueId) return undefined;
+  return last.id === selectedIssueId ? last : undefined;
 }
 
 /** Initials for an avatar, for example "PR" for "Priya Raman". */

@@ -36,7 +36,11 @@ import {
   ResolutionHistory,
 } from "../components/IssueDetails";
 import { PlaceTile, StatusBadge } from "../components/issueDisplay";
-import { issueAbilities, primaryAction } from "../organiserModel";
+import {
+  issueAbilities,
+  primaryAction,
+  sheetAllowed,
+} from "../organiserModel";
 import { PhoneStatus } from "./PhoneParts";
 import type { IssueSheet, PhoneTabProps } from "./PhoneTabs";
 
@@ -131,6 +135,12 @@ export function PhoneIssueView({
   useEffect(() => {
     if (!initialSheet) headingRef.current?.focus();
   }, [initialSheet]);
+  // A live change, such as a lost jury role or an archived event, can remove
+  // the action of the open sheet. The server would reject it, so close it.
+  const allowed = !sheet || sheetAllowed(sheet, can);
+  useEffect(() => {
+    if (!allowed) setSheetOpen(false);
+  }, [allowed]);
 
   const moreItems: ReactNode[] = [];
   if (can.escalate) {

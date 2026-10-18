@@ -74,6 +74,7 @@ export function IssueSheet({
   tab,
   onTab,
   onClose,
+  onClosed,
   replyDraft,
   onReplyDraft,
 }: {
@@ -83,6 +84,8 @@ export function IssueSheet({
   tab: SheetTab;
   onTab: (tab: SheetTab) => void;
   onClose: () => void;
+  /** Moves focus after the sheet closes. */
+  onClosed: () => void;
   replyDraft: ReplyDraft;
   onReplyDraft: (draft: ReplyDraft) => void;
 }) {
@@ -96,6 +99,12 @@ export function IssueSheet({
       <SheetContent
         side="right"
         showCloseButton={false}
+        // Radix returns focus only to a Dialog.Trigger. The sheet opens from
+        // many controls, so the console moves focus itself.
+        onCloseAutoFocus={(event) => {
+          event.preventDefault();
+          onClosed();
+        }}
         className="w-[min(680px,100vw)] gap-0 p-0 sm:max-w-[680px]"
       >
         {issue && (

@@ -28,11 +28,14 @@ import {
 } from "../components/issueDisplay";
 import {
   type AwardList,
+  awardListLabels,
+  awardListOrder,
   awardLists,
   chipForFilter,
   filterForChip,
   isJuryOnly,
   issuesByNumber,
+  type IssueSheetKind,
   matchesChip,
   queueChips,
   roleNames,
@@ -42,15 +45,7 @@ import {
 import { type CardAction, EmptyList, IssueCard } from "./PhoneParts";
 
 /** A sheet that the issue view opens when it appears. */
-export type IssueSheet =
-  | "reply"
-  | "resolve"
-  | "escalate"
-  | "reopen"
-  | "award"
-  | "apply"
-  | "image"
-  | "more";
+export type IssueSheet = IssueSheetKind;
 
 /** What every phone tab needs from the app. */
 export interface PhoneTabProps {
@@ -388,13 +383,7 @@ export function AwardsTab(props: PhoneTabProps) {
         aria-label="Award lists"
         className="grid grid-cols-3 gap-1 rounded-lg bg-muted p-1"
       >
-        {(
-          [
-            ["decide", "To decide"],
-            ["apply", "To apply"],
-            ["done", "Applied"],
-          ] as const
-        ).map(([value, label]) => (
+        {awardListOrder.map((value) => (
           <button
             key={value}
             type="button"
@@ -405,12 +394,13 @@ export function AwardsTab(props: PhoneTabProps) {
               list === value && "bg-background shadow-sm",
             )}
           >
-            {label} <span className="opacity-60">{lists[value].length}</span>
+            {awardListLabels[value]}{" "}
+            <span className="opacity-60">{lists[value].length}</span>
           </button>
         ))}
       </div>
       {lists[list].length ? (
-        <ul className="space-y-2.5">
+        <ul aria-label={awardListLabels[list]} className="space-y-2.5">
           {lists[list].map((row) => {
             const { issue, team, award } = row;
             return (

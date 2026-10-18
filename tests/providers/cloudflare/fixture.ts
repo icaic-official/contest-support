@@ -7,7 +7,7 @@ import { z } from 'zod';
 import type { D1Connection, D1Statement } from '../../../src/server/adapters/d1/connection';
 import { attachmentPath } from '../../../src/connected/imageFile';
 import { passwordHasher, randomSecret } from '../../../src/server/adapters/cloudflare/password';
-import type { Actor, ScenarioData, TestAccount } from '../contracts';
+import { createdAccountMarkers, type Actor, type ScenarioData, type TestAccount } from '../contracts';
 import { confirmFixtureTarget, readFixtureTarget, type FixtureTarget } from './target.mjs';
 import { readD1AuthFlags } from './diagnostics';
 
@@ -17,6 +17,7 @@ const journalSchema = z.strictObject({
   version: z.literal(1), provider: z.literal('cloudflare'), runId: uuid, eventId: uuid,
   sessionIds: z.tuple([uuid, uuid]), teamIds: z.tuple([uuid, uuid, uuid]),
   accountIds: z.record(z.enum(actors), uuid),
+  createdAccounts: z.array(z.strictObject({ name: z.string(), username: z.string(), id: uuid.optional() })).default([]),
   images: z.array(z.strictObject({ id: uuid, session_id: uuid, issue_id: uuid })).default([]),
   target: z.strictObject({
     accountId: z.string(), databaseId: uuid, databaseName: z.string(), workerName: z.string(),
@@ -24,7 +25,12 @@ const journalSchema = z.strictObject({
   }),
 }).refine((journal) => {
   const ids = [journal.runId, journal.eventId, ...journal.sessionIds, ...journal.teamIds, ...Object.values(journal.accountIds)];
-  return new Set(ids).size === ids.length && new Set(journal.images.map((image) => image.id)).size === journal.images.length &&
+  const markers = Object.values(createdAccountMarkers(journal.runId));
+  const createdIds = journal.createdAccounts.flatMap((account) => account.id ? [account.id] : []);
+  return new Set([...ids, ...createdIds]).size === ids.length + createdIds.length &&
+    new Set(journal.createdAccounts.map((account) => account.username)).size === journal.createdAccounts.length &&
+    journal.createdAccounts.every((account) => markers.some((marker) => marker.name === account.name && marker.username === account.username)) &&
+    new Set(journal.images.map((image) => image.id)).size === journal.images.length &&
     journal.images.every((image) => journal.sessionIds.includes(image.session_id));
 });
 type Journal = z.infer<typeof journalSchema>;
@@ -128,8 +134,10 @@ export async function createFixture(path: string, dependencies: Dependencies = {
     const journal: Journal = {
       version: 1, provider: 'cloudflare', target, runId: crypto.randomUUID(), eventId: crypto.randomUUID(),
       sessionIds: [crypto.randomUUID(), crypto.randomUUID()],
-      teamIds: [crypto.randomUUID(), crypto.randomUUID(), crypto.randomUUID()], accountIds, images: [],
+      teamIds: [crypto.randomUUID(), crypto.randomUUID(), crypto.randomUUID()], accountIds, images: [], createdAccounts: [],
     };
+    const createdAccounts = createdAccountMarkers(journal.runId);
+    journal.createdAccounts = Object.values(createdAccounts);
     const accounts = {} as Record<Actor, TestAccount>;
     const hashes = new Map<Actor, string>();
     // Maintained production hashing stays outside D1. Passwords and hashes
@@ -178,7 +186,7 @@ export async function createFixture(path: string, dependencies: Dependencies = {
       );
     }
     await db.batch(queries);
-    return { sessionId: journal.sessionIds[0], otherSessionId: journal.sessionIds[1], teamId: journal.teamIds[0], accounts, origin: target.origin };
+    return { sessionId: journal.sessionIds[0], otherSessionId: journal.sessionIds[1], teamId: journal.teamIds[0], accounts, createdAccounts, origin: target.origin };
   } catch {
     if (saved && existsSync(path)) {
       try {
@@ -221,8 +229,30 @@ export async function inspectFixtureAuthentication(path: string, accountId: stri
 
 interface OwnedImage { id: string; session_id: string; issue_id: string; original_path: string; thumbnail_path: string }
 
+function ownedAccountIds(journal: Journal): string[] {
+  return [...actors.map((actor) => journal.accountIds[actor]), ...journal.createdAccounts.flatMap((account) => account.id ? [account.id] : [])];
+}
+
+async function discoverCreatedAccounts(db: D1Connection, journal: Journal): Promise<void> {
+  for (const marker of journal.createdAccounts) {
+    const rows = (await statement(db, `SELECT id FROM accounts WHERE name = ? AND username = ?
+      UNION SELECT id FROM ba_user WHERE name = ? AND username = ? AND email = ?`,
+    marker.name, marker.username, marker.name, marker.username, `${marker.username}@accounts.minsky.invalid`).all<{ id: string }>()).results;
+    if (rows.length > 1 || rows.some((row) => !uuid.safeParse(row.id).success || marker.id && row.id !== marker.id || Object.values(journal.accountIds).includes(row.id))) {
+      throw new Error('A created fixture account has an ambiguous ownership marker.');
+    }
+    if (!marker.id && rows[0]) {
+      const related = await statement(db, `SELECT 1 FROM memberships m JOIN account_operations o ON o.account_id = m.account_id
+        WHERE m.account_id = ? AND m.session_id = ? AND o.session_id = m.session_id AND o.actor = ? AND o.action = 'create_account'`,
+      rows[0].id, journal.sessionIds[0], journal.accountIds.admin).first();
+      if (!related) throw new Error('A created account does not have this fixture creation and membership.');
+      marker.id = rows[0].id;
+    }
+  }
+}
+
 async function validateOwnership(db: D1Connection, journal: Journal): Promise<OwnedImage[]> {
-  const ids = actors.map((actor) => journal.accountIds[actor]);
+  const ids = ownedAccountIds(journal);
   const idSet = new Set(ids);
   const event = await statement(db, 'SELECT name FROM events WHERE id = ?', journal.eventId).first<{ name: string }>();
   if (event && event.name !== `Provider contract ${journal.runId}`) throw new Error('Recovery event does not belong to this run.');
@@ -239,14 +269,16 @@ async function validateOwnership(db: D1Connection, journal: Journal): Promise<Ow
   const accounts = (await statement(db, `SELECT id, name, username FROM accounts WHERE id IN (${marks(ids.length)})`, ...ids)
     .all<{ id: string; name: string; username: string }>()).results;
   for (const row of accounts) {
-    const actor = actors.find((actor) => journal.accountIds[actor] === row.id)!;
-    if (row.name !== name(journal, actor) || row.username !== username(journal, actor)) throw new Error('Recovery account does not belong to this run.');
+    const actor = actors.find((actor) => journal.accountIds[actor] === row.id);
+    const marker = journal.createdAccounts.find((account) => account.id === row.id);
+    if (row.name !== (actor ? name(journal, actor) : marker?.name) || row.username !== (actor ? username(journal, actor) : marker?.username)) throw new Error('Recovery account does not belong to this run.');
   }
   const identities = (await statement(db, `SELECT id, name, username, email FROM ba_user WHERE id IN (${marks(ids.length)})`, ...ids)
     .all<{ id: string; name: string; username: string; email: string }>()).results;
   for (const row of identities) {
-    const actor = actors.find((actor) => journal.accountIds[actor] === row.id)!;
-    if (row.name !== name(journal, actor) || row.username !== username(journal, actor) || row.email !== `${row.username}@accounts.minsky.invalid`) {
+    const actor = actors.find((actor) => journal.accountIds[actor] === row.id);
+    const marker = journal.createdAccounts.find((account) => account.id === row.id);
+    if (row.name !== (actor ? name(journal, actor) : marker?.name) || row.username !== (actor ? username(journal, actor) : marker?.username) || row.email !== `${row.username}@accounts.minsky.invalid`) {
       throw new Error('Recovery identity does not belong to this run.');
     }
   }
@@ -297,8 +329,13 @@ async function maintain(platform: Platform, journal: Journal, phase: 'prepare' |
 async function cleanupOnPlatform(path: string, platform: Platform, target: FixtureTarget): Promise<void> {
   const journal = await readJournal(path, target);
   const db = platform.env.DB;
+  await discoverCreatedAccounts(db, journal);
   await validateOwnership(db, journal);
-  const ids = actors.map((actor) => journal.accountIds[actor]);
+  // Retain discovered UUIDs before any deletion, including a lost create response.
+  const discoveredPath = `${path}.${crypto.randomUUID()}.next`;
+  await writeFile(discoveredPath, JSON.stringify(journal), { flag: 'wx', mode: 0o600 });
+  await rename(discoveredPath, path);
+  const ids = ownedAccountIds(journal);
   // Fence new commands and reservations before collecting the final object IDs.
   // These UUID-owned accounts have no membership outside the validated fixture.
   await db.batch([
@@ -317,7 +354,8 @@ async function cleanupOnPlatform(path: string, platform: Platform, target: Fixtu
   // No list or prefix deletion can reach another fixture's objects.
   for (let index = 0; index < keys.length; index += 1000) await platform.env.IMAGES.delete(keys.slice(index, index + 1000));
   for (const key of keys) if (await platform.env.IMAGES.head(key)) throw new Error('Fixture image cleanup is incomplete.');
-  const rateKeys = actors.flatMap((actor) => [`username:${username(journal, actor)}`, `change:${journal.accountIds[actor]}`]);
+  const rateKeys = [...actors.map((actor) => `username:${username(journal, actor)}`),
+    ...journal.createdAccounts.map((account) => `username:${account.username}`), ...ids.map((id) => `change:${id}`)];
   await db.batch([
     statement(db, 'DELETE FROM events WHERE id = ?', journal.eventId),
     statement(db, `DELETE FROM account_operations WHERE account_id IN (${marks(ids.length)}) OR actor IN (${marks(ids.length)})`, ...ids, ...ids),

@@ -1,5 +1,22 @@
 # Current state
 
+## T0021 maintainability follow-up, 2026-10-19
+
+The owner requests a review follow-up in open [PR #43](https://github.com/GiftedNovaHD/minsky/pull/43).
+The PR is draft while these changes receive fresh verification.
+Workflow conditions now name the relevant capabilities. D1 commit stages are explicit.
+The SQL strings, statement order, bound values, assertions, and atomic batch remain unchanged.
+UI lint rules now reject provider SDKs and implementation imports. The contributor guide documents the existing boundaries and reuse.
+The shared registry retains its original eight cases and adds account creation, image-limit boundaries, and reconnect recovery.
+The duplicate committed-response fault handlers now share one implementation. The progress reporter derives duration from its existing active-case map.
+
+The follow-up passes 656 local unit/database/tooling tests, 46 ordinary browser cases, 70 local D1 cases, 12 function cases, three authentication browser cases, three docs browser cases, and both complete local runtime journeys. Types, lint, app build, and docs build pass.
+The earlier source `0254f60` passed 646 local tests, both API store suites, ordinary CI, and [protected native verification](https://github.com/GiftedNovaHD/minsky/actions/runs/39143728239).
+Those results do not verify this follow-up. Fresh results belong in the [run report](t0021-run-report.md#maintainability-review-follow-up-2026-10-19) and PR checks.
+The owner reports no extra Cloudflare charges on 2026-10-19. Required verification stays bounded; no optional stress test or paid upgrade is planned.
+Billing API access still returns `403`. This is an owner dashboard observation, not an independently measured usage allowance.
+Supabase remains intact and active at the stable development URL. Activation still requires separate approval.
+
 ## T0021 fresh development installation, 2026-10-18
 
 The owner merged PR #42 at `104d9d1` at 11:39:27 UTC, then resumed T0021.

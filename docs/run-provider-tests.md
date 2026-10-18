@@ -4,7 +4,9 @@ Use this guide to check an implemented provider against Minsky's shared behavior
 Use an isolated test backend. Never use development or production accounts.
 For the suite's responsibilities and limits, see [the test contracts](provider-test-contracts.md).
 
-Both drivers use the same eight shared scenarios.
+Both drivers use the same 11 shared scenarios.
+The added account-creation, image-limit, and reconnect cases require fresh hosted verification.
+Earlier eight-case results do not verify these additions.
 Record local checks, CLI runs against hosted resources, and protected GitHub runs separately.
 See [current state](current-state.md) for tested revisions, results, and cleanup evidence.
 For a new implementation, complete [Add a backend provider](add-provider.md) before using this runner.
@@ -98,9 +100,9 @@ The runner checks the generated configuration, live target metadata, and the pro
 Fixture setup checks required migrations and schema fields before creating records.
 Each browser context uses real hosted cookies, API requests, and WebSockets.
 Only test bridge assets come from the local Vite server.
-Both providers run the same eight behavior assertions.
+Both providers run the same 11 behavior scenarios.
 
-A passing run exits with code zero after all eight cases and cleanup.
+A passing run exits with code zero after all 11 cases and cleanup.
 Cleanup verifies the owned D1 records, exact R2 keys, and Durable Object state before deleting the identifiers-only journal.
 The selected Worker must expose the trusted `SessionMaintenance` service entrypoint from this revision.
 The fixture checks that internal binding before it creates records. It does not use a public setup or cleanup route.

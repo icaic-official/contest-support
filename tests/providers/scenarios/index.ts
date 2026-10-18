@@ -1,6 +1,6 @@
-import { authentication, revocation } from './authentication';
-import { imageRevocation, images } from './images';
-import { liveUpdates } from './live-updates';
+import { accountCreation, authentication, revocation } from './authentication';
+import { imageLimits, imageRevocation, images } from './images';
+import { liveUpdates, reconnectRecovery } from './live-updates';
 import { accessSeparation, idempotency, lifecycle } from './workflows';
 import type { ScenarioContext } from '../contracts';
 
@@ -13,6 +13,9 @@ export const scenarios = {
   'image access after membership revocation': imageRevocation,
   'live invalidation and subscription cleanup': liveUpdates,
   'membership removal and password reset': revocation,
+  'account creation, temporary access, combined roles, and lost responses': accountCreation,
+  'image file, count, combined size, and changed-limit boundaries': imageLimits,
+  'transport interruption and missed-change recovery': reconnectRecovery,
 } satisfies Record<string, (context: ScenarioContext) => Promise<void>>;
 
 export type ScenarioName = keyof typeof scenarios;

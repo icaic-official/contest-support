@@ -9,6 +9,9 @@ import {
   WorkflowRejectedError,
 } from '../src/backend/errors';
 import { createBrowserBackend } from './providers/browser-backend';
+import { createHash } from 'node:crypto';
+import { createServer } from 'node:http';
+import type { Duplex } from 'node:stream';
 
 // Even a fixture failure must not write a DOM snapshot or call arguments.
 process.env.PLAYWRIGHT_NO_COPY_PROMPT = '1';
@@ -287,10 +290,6 @@ test('provider bridge loads real adapters through Vite at a remote HTTPS browser
       preferenceCookieReceived = (await route.request().headerValue('cookie') ?? '').includes('bridge_preference=compact');
       await route.fulfill({ status: 401, contentType: 'application/json', body: '{}' });
     });
-    await context.routeWebSocket((url) => url.origin === origin.replace('https:', 'wss:') && url.pathname === '/api/updates', (socket) => {
-      updateSockets.push(socket.url());
-      socket.send('{"type":"ready"}');
-    });
     return context;
   };
   let client;
@@ -304,6 +303,10 @@ test('provider bridge loads real adapters through Vite at a remote HTTPS browser
   }
   const context = browser.contexts().find((candidate) => !previous.has(candidate));
   if (!context) throw new Error('The remote bridge context was not created.');
+  await context.routeWebSocket((url) => url.origin === origin.replace('https:', 'wss:') && url.pathname === '/api/updates', (socket) => {
+    updateSockets.push(socket.url());
+    socket.send('{"type":"ready"}');
+  });
   try {
     expect(await client.backend.auth.currentUser()).toBeUndefined();
     expect(context.pages()[0].url()).toBe(`${origin}/tests/providers/browser.html`);
@@ -328,4 +331,85 @@ test('provider bridge loads real adapters through Vite at a remote HTTPS browser
     } finally { stop(); }
     expect(failures).toEqual([]);
   } finally { await client.close(); }
+});
+
+test('provider bridge interrupts a real socket, retains missed state, and resumes invalidation', async ({ browser, baseURL }) => {
+  if (!baseURL) throw new Error('The reconnect regression requires local Vite assets.');
+  const sessionId = crypto.randomUUID();
+  const eventId = crypto.randomUUID();
+  const sockets = new Set<Duplex>();
+  let connections = 0;
+  let revision = 0;
+  const server = createServer((request, response) => {
+    response.setHeader('Content-Type', 'application/json');
+    if (request.url?.startsWith('/api/snapshot')) {
+      response.end(JSON.stringify({
+        session: { id: sessionId, event_id: eventId, name: 'Local reconnect control', intake_open: true,
+          categories: ['Other'], revision, max_image_bytes: 1_048_576, max_images_per_issue: 1, max_image_bytes_per_issue: 1_048_576 },
+        event: null, membership: null, teams: [], issues: [], resolutions: [], history: [],
+        awards: [], members: [], audit: [], server_time: new Date().toISOString(),
+      }));
+    } else { response.statusCode = 401; response.end('{"error":"Local fixture signed out."}'); }
+  });
+  const send = (socket: Duplex, message: string) => {
+    const body = Buffer.from(message);
+    socket.write(Buffer.concat([Buffer.from([0x81, body.length]), body]));
+  };
+  server.on('upgrade', (request, socket) => {
+    const key = request.headers['sec-websocket-key'];
+    if (typeof key !== 'string' || !request.url?.startsWith('/api/updates')) { socket.destroy(); return; }
+    const accept = createHash('sha1').update(key + '258EAFA5-E914-47DA-95CA-C5AB0DC85B11').digest('base64');
+    socket.write(`HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: ${accept}\r\n\r\n`);
+    sockets.add(socket);
+    connections++;
+    socket.on('close', () => sockets.delete(socket));
+    socket.on('error', () => sockets.delete(socket));
+    socket.on('end', () => { sockets.delete(socket); socket.destroy(); });
+    socket.on('data', (data: Buffer) => {
+      if ((data[0] & 0x0f) === 8) socket.end(Buffer.from([0x88, 0]), () => socket.destroy());
+    });
+    send(socket, '{"type":"ready"}');
+  });
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const address = server.address();
+  if (!address || typeof address === 'string') throw new Error('The local socket fixture did not bind.');
+  const origin = `http://127.0.0.1:${address.port}`;
+  const localBrowser = Object.create(browser) as Browser;
+  localBrowser.newContext = async (options) => {
+    const context = await browser.newContext(options);
+    // Chromium otherwise blocks a routed document's loopback WebSocket.
+    await context.grantPermissions(['local-network-access'], { origin });
+    return context;
+  };
+  let client: Awaited<ReturnType<typeof createBrowserBackend>> | undefined;
+  let stop = () => {};
+  try {
+    client = await createBrowserBackend(localBrowser, { origin, assetOrigin: baseURL,
+      module: '/tests/providers/cloudflare/browser.ts', configuration: { origin } });
+    let connected = false;
+    let changes = 0;
+    stop = client.backend.updates.subscribe({ sessionId, userId: crypto.randomUUID(),
+      onConnection: (value) => { connected = value; }, onChange: () => { changes++; } });
+    await expect.poll(() => connected, { message: 'The local TCP WebSocket must complete its ready handshake.' }).toBe(true);
+    expect((await client.backend.workflows.snapshot(sessionId)).session?.revision).toBe(0);
+    await client.setLiveUpdatesPaused(true);
+    await expect.poll(() => connected).toBe(false);
+    await expect.poll(() => sockets.size).toBe(0);
+    revision = 1;
+    expect(changes).toBe(0);
+    await client.setLiveUpdatesPaused(false);
+    await expect.poll(() => connected).toBe(true);
+    expect(connections).toBeGreaterThan(1);
+    expect((await client.backend.workflows.snapshot(sessionId)).session?.revision).toBe(1);
+    revision = 2;
+    for (const socket of sockets) send(socket, '{"type":"change"}');
+    await expect.poll(() => changes).toBe(1);
+    expect((await client.backend.workflows.snapshot(sessionId)).session?.revision).toBe(2);
+  } finally {
+    stop();
+    await client?.close();
+    for (const socket of sockets) socket.destroy();
+    server.closeAllConnections();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
 });

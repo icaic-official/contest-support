@@ -61,6 +61,12 @@ Branch: `feature/t0021-cloudflare-development-install`, from PR #42 head `2b6f6f
 Status: [PR #43](https://github.com/GiftedNovaHD/minsky/pull/43) includes merged main at `104d9d1`. Fresh development and separate installation verification pass. The owner approved its exact protected branch entry. Its current final verification result is recorded in the PR. Activation still requires separate approval.
 Summary: Prepare a fresh Cloudflare development installation and guarded deployment automation. Keep Supabase intact and active until the owner approves the concrete URL switch.
 
+The owner requests a maintainability review follow-up on 2026-10-19, after verification of `0254f60`.
+PR #43 is draft while this follow-up runs. Earlier passes verify their recorded revision.
+Clarify authorization and transaction stages, strengthen provider boundaries, and complete shared account, image-limit, and reconnect assertions.
+Keep existing behavior and atomic execution. Add only abstractions required by current callers.
+The owner limits Cloudflare spending to the existing $5 plan. Billing access returns `403`. The owner reports no extra charges on 2026-10-19; use bounded required verification and no optional stress tests.
+
 The owner authorizes this ticket before PR #42 merges.
 Before that merge, perform implementation, documentation, and local checks only.
 After the merge, update from main, reconcile review changes, and repeat verification.
@@ -74,6 +80,8 @@ Do not merge either PR or activate the development URL without owner approval.
 
 ### Acceptance criteria
 
+- [x] Review follow-up preserves workflow behavior and transaction boundaries while reducing reader load.
+- [x] UI provider restrictions cover both implementations, and shared tests cover account creation, image limits, and reconnect recovery. Hosted results are recorded separately in PR #43.
 - [x] Deployment preparation preserves Supabase mode until approved activation and tests both backend selections.
 - [ ] Activated deployments retain the full Worker, selected frontend, bindings, migration tags, origin, private secret, cron, and CPU cap.
 - [x] Static deployment cannot overwrite an activated application Worker. Docs deployment remains independent.

@@ -2,7 +2,10 @@ import { WorkflowRejectedError } from '../../../src/backend/errors';
 import type { ScenarioContext } from '../contracts';
 import { change, check, issue, rejects, submit } from './assertions';
 
-export async function lifecycle(context: ScenarioContext): Promise<void> {
+export type WorkflowScenarioContext = Pick<ScenarioContext,
+  'sessionId' | 'otherSessionId' | 'teamId' | 'accounts' | 'connect' | 'discardNextWorkflowResponse' | 'close'>;
+
+export async function lifecycle(context: WorkflowScenarioContext): Promise<void> {
   const contestant = await context.connect('contestant');
   const volunteer = await context.connect('volunteer');
   const specialist = await context.connect('specialist');
@@ -154,7 +157,7 @@ export async function lifecycle(context: ScenarioContext): Promise<void> {
 }
 
 export async function accessSeparation(
-  context: ScenarioContext,
+  context: WorkflowScenarioContext,
 ): Promise<void> {
   const contestant = await context.connect('contestant');
   const volunteer = await context.connect('volunteer');
@@ -222,7 +225,7 @@ export async function accessSeparation(
   await rejects(() => contestant.admin.setIntake(context.sessionId, false));
 }
 
-export async function idempotency(context: ScenarioContext): Promise<void> {
+export async function idempotency(context: WorkflowScenarioContext): Promise<void> {
   const backend = await context.connect('contestant');
   const command = {
     type: 'submit' as const,

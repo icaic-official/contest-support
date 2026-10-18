@@ -119,3 +119,30 @@ export async function liveUpdates(context: ScenarioContext): Promise<void> {
     staff.stop();
   }
 }
+
+export async function reconnectRecovery(context: ScenarioContext): Promise<void> {
+  const writer = await context.connect('volunteer');
+  const reader = await context.connect('contestant');
+  const subscription = observeChanges(reader, context.sessionId, context.accounts.contestant.id);
+  try {
+    await eventually(() => subscription.state.connected, 'The subscription must connect before the transport interruption.');
+    await context.setLiveUpdatesPaused(reader, true);
+    await eventually(() => !subscription.state.connected, 'Closing the real socket must report a disconnected subscription.');
+    const missed = await submit(writer, context.sessionId, context.teamId);
+    check((await writer.workflows.snapshot(context.sessionId)).issues.some((issue) => issue.id === missed),
+      'The issue must commit while the reader transport is unavailable.');
+    await context.setLiveUpdatesPaused(reader, false);
+    await eventually(() => subscription.state.connected, 'The existing subscription must reconnect without replacement.');
+    const recovered = await reader.workflows.snapshot(context.sessionId);
+    check(recovered.issues.some((issue) => issue.id === missed), 'An authorized refresh after reconnect must recover a missed commit.');
+    const before = subscription.state.changes;
+    const following = await submit(writer, context.sessionId, context.teamId);
+    await eventually(() => subscription.state.changes > before, 'The reconnected subscription must deliver subsequent invalidation.');
+    check((await reader.workflows.snapshot(context.sessionId)).issues.some((issue) => issue.id === following),
+      'The authorized refresh must include changes delivered after reconnect.');
+    check(subscription.state.payloadCount === 0, 'Reconnection must preserve invalidation without issue payloads.');
+  } finally {
+    subscription.stop();
+    await context.setLiveUpdatesPaused(reader, false);
+  }
+}

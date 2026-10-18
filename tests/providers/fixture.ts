@@ -73,6 +73,16 @@ export const test = base.extend<
         }
         connection.discardNextWorkflowResponse();
       },
+      discardNextAccountResponse(backend) {
+        const connection = clients.get(backend);
+        if (!connection) throw new Error('The backend does not belong to this fixture.');
+        connection.discardNextAccountResponse();
+      },
+      async setLiveUpdatesPaused(backend, paused) {
+        const connection = clients.get(backend);
+        if (!connection) throw new Error('The backend does not belong to this fixture.');
+        await connection.setLiveUpdatesPaused(paused);
+      },
       async close() {
         const results = await Promise.allSettled(
           [...clients.values()].map((client) => client.close()),

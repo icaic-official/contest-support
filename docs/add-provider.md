@@ -34,7 +34,13 @@ Use these interfaces and components:
 Place provider clients, credentials, storage bindings, deployment settings, and maintenance code inside the provider implementation and its tooling.
 Use `src/backend/<provider>/` for browser adapters and `src/server/adapters/<provider>/` for server adapters.
 Keep shared UI code and workflow rules free of provider imports.
-Extend the existing ESLint import restrictions when you add a provider module or SDK.
+Implementation paths under `src/backend/<provider>/` and adapter paths are already restricted in shared code.
+Add an unrecognized SDK to `providerImportPattern` in [`eslint.config.js`](../eslint.config.js).
+That pattern applies to shared UI, server rules, and scenario imports.
+The UI uses the contracts, shared errors, and selected backend factory.
+Use literal dynamic import paths. ESLint rejects computed UI paths and checks literal imports and re-exports.
+Run `npx vitest run scripts/provider-boundaries.test.mjs` to check this boundary.
+This lint check does not prove the behavior of a new provider. Run the shared and provider-specific checks below.
 
 Use `WorkflowService` for issue decisions. Do not copy its rules into a new server.
 An authorized read supplies the captured state and an adapter-owned `dependency` value.
@@ -111,7 +117,7 @@ Update these registration points:
 | File | Required change |
 | --- | --- |
 | [`tests/providers/<provider>/fixture.ts`](../tests/providers/) | Implement isolated fixture creation and cleanup. Verify ownership before deletion and verify cleanup afterward. |
-| [`tests/providers/<provider>/browser.ts`](../tests/providers/) | Export `createBrowserProvider(configuration)` returning the real `Backend`, committed-response fault control, and `close()`. |
+| [`tests/providers/<provider>/browser.ts`](../tests/providers/) | Export `createBrowserProvider(configuration)` returning the real `Backend`, workflow and account response-loss controls, and `close()`. |
 | [`tests/providers/drivers.ts`](../tests/providers/drivers.ts) | Register fixture creation, cleanup, browser module, public browser configuration, and any required browser origin. |
 | [`scripts/provider-test-options.mjs`](../scripts/provider-test-options.mjs) | Accept the explicit provider and target. Reject development targets and runner overrides that weaken isolation or expose credentials. |
 | [`scripts/provider-test.mjs`](../scripts/provider-test.mjs) | Add provider prerequisite checks and private environment forwarding. Preserve journal retention and nonzero cleanup failure status. |
@@ -119,7 +125,9 @@ Update these registration points:
 | [`eslint.config.js`](../eslint.config.js) | Extend provider import restrictions for shared scenarios, contracts, browser bridge, and server rules. |
 | [`.github/workflows/checks.yml`](../.github/workflows/checks.yml) | Add authorized hosted verification with isolated credentials. Keep ordinary PR checks credential-free. |
 
-The browser bridge already supports cookies, separate contexts, image bytes, typed errors, and subscription callbacks.
+The browser bridge already supports cookies, separate contexts, image bytes, typed errors, subscription callbacks, and real WebSocket interruption.
+Reuse `tests/providers/support/response-fault.ts` when the provider exposes HTTP workflow and account endpoints. Supply the endpoint paths.
+Save the planned account markers from `ScenarioData` before creation. Discover a lost-response account by exact ownership evidence during cleanup.
 Reuse that bridge and the unchanged [`scenarios` registry](../tests/providers/scenarios/index.ts).
 Implement response loss after the real server commits. Do not simulate a write or skip an assertion.
 Make cleanup reject another target or any relationship outside the fixture's ownership.

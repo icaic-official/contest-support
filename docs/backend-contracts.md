@@ -87,7 +87,12 @@ See [installation](../site/src/content/docs/operators/installation.md), [provide
 | [imageFile.ts](../src/connected/imageFile.ts) | Defines file checks, attachment paths, and error classification shared with the attachment function. |
 
 The UI imports the contracts and `requireBackend()`.
-ESLint restricts Supabase imports in shared application code and provider imports in shared server and test modules.
+ESLint restricts provider SDKs, browser implementations, and server adapters in shared application code.
+The UI can import the contracts, shared errors, and selected backend factory.
+The same provider pattern protects shared server rules and test scenarios.
+ESLint checks static imports, re-exports, and literal dynamic UI imports.
+ESLint rejects computed dynamic UI paths because it cannot determine their provider.
+Provider modules and the backend registration file retain access to their implementation dependencies.
 Both complete browser adapters have provider-owned fixture drivers.
 
 `Backend` defines behavior without requiring a distinct browser transport for every hosting provider.

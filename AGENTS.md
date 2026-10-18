@@ -28,6 +28,10 @@ Keep PR #42's branch and checkout untouched.
 The owner merged PR #42 at `104d9d1` on 2026-10-18. T0021 now includes that main revision.
 The earlier restriction to local preparation ended at that merge. Reconcile review changes and run fresh checks before marking T0021 ready.
 The [ticket](docs/tickets.md#t0021-fresh-cloudflare-development-installation) records the acceptance gates.
+The owner requests a maintainability review follow-up in open PR #43 after verification of `0254f60`.
+Clarify existing workflow and transaction code, strengthen provider boundaries, and complete shared behavior assertions.
+Keep changes small. Reduce reader load without new speculative layers, interfaces, or synchronized state.
+The Cloudflare budget is the existing $5 monthly plan. Billing reads return `403`. The owner reports no extra charges on 2026-10-19 and permits bounded required verification. Do not run optional stress tests or add paid services.
 
 The owner requested all review fixes, cleanup, and fresh verification before the PR is ready.
 Remove obsolete proof paths, duplicate helpers, stale instructions, and repeated evidence summaries.
@@ -58,6 +62,8 @@ Earlier ticket decisions and authorization limits remain in [PLAN.md](PLAN.md) a
 - Keep one authoritative procedure or reference for each task. Update incoming links when you remove a duplicate page.
 - Preserve unique decisions and evidence in dated records. Do not present historical probes as current instructions.
 - Add an abstraction only when current callers need it.
+- Measure reader load by layers to trace and mutable context to remember. Remove pass-through wrappers that hide no meaningful decision.
+- Prefer local derived values. Before adding a layer or state, check that it reduces reader load elsewhere.
 - State which bounded behavior may temporarily break during a change and how the change remains reversible.
 - Run focused checks for touched behavior during implementation. Keep checks that detect material failures.
 - At completion, run the full static checks and required runtime suites before calling the PR ready.

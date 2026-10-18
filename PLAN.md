@@ -1,5 +1,14 @@
 # Minsky planning record
 
+**T0021 maintainability review follow-up, 2026-10-19.** The owner requests small changes in open PR #43 after verification of `0254f60`.
+Clarify workflow authorization and D1 transaction stages without changing behavior or atomic execution.
+Extend UI provider boundaries and shared account, image-limit, and reconnect assertions.
+Assess remaining cleanup after merged PR #42. Preserve unique historical evidence and the existing provider guide.
+Reduce the layers and mutable state a reader must understand. Add no speculative interfaces or provider implementations.
+PR #43 is draft during this follow-up. The owner reviews and merges. Activation still requires separate approval.
+The owner limits Cloudflare spending to the existing $5 monthly plan.
+Existing billing API access returns `403`. The owner then checks the dashboard and reports no extra charges on 2026-10-19. Continue bounded required verification within the existing plan. Do not run optional stress tests or add paid services.
+
 **T0021 resumed after PR #42 merged, 2026-10-18.** The owner merged PR #42 at `104d9d1e3d6c9e58d55121ea07196f066192ec86`, then requested continuation.
 The separate T0021 worktree now includes that main revision and the final T0020 verification records.
 The accepted executable connector remains `2b6f6f0`; PR #42's final `b984e67` adds documentation and evidence.

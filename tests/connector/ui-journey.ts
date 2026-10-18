@@ -2,7 +2,7 @@ import { expect, type Browser, type BrowserContext, type Locator, type Page } fr
 import type { ScenarioData } from '../providers/contracts';
 import type { Actor } from '../providers/contracts';
 
-export interface UiFixture extends ScenarioData { origin: string }
+export interface UiFixture extends Pick<ScenarioData, 'sessionId' | 'otherSessionId' | 'teamId' | 'accounts'> { origin: string }
 
 interface Probe { ready: number; changes: number; closed: number; invalid: boolean }
 interface Workspace { page: Page; context: BrowserContext; probe: Probe }

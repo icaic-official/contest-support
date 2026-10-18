@@ -6,7 +6,8 @@ import { createServerWorkflowExecutor } from '../../src/backend/supabase/workflo
 import { createSupabaseWorkflowPersistence } from '../../src/server/adapters/supabase/store';
 import { WorkflowService, type WorkflowPersistence } from '../../src/server/workflow';
 import type { Backend } from '../../src/backend/contracts';
-import type { Actor, ScenarioContext } from '../providers/contracts';
+import type { Actor } from '../providers/contracts';
+import type { WorkflowScenarioContext } from '../providers/scenarios/workflows';
 import { createFixture, cleanupFixture, type SupabaseFixture } from '../providers/supabase/fixture';
 import { lifecycle, accessSeparation, idempotency } from '../providers/scenarios/workflows';
 
@@ -25,7 +26,7 @@ function checked(error: unknown): void {
 }
 
 /** A real Supabase login and a real deployed workflow function per connection. */
-function context(fixture: SupabaseFixture): ScenarioContext {
+function context(fixture: SupabaseFixture): WorkflowScenarioContext {
   const clients: SupabaseClient[] = [];
   const discard = new WeakMap<Backend, () => void>();
   return {
@@ -71,7 +72,7 @@ function context(fixture: SupabaseFixture): ScenarioContext {
 // accounts to avoid repeated mandatory-password changes hitting Auth rate limits.
 describe('shared workflow on hosted Supabase', () => {
   let fixture: SupabaseFixture;
-  let run: ScenarioContext;
+  let run: WorkflowScenarioContext;
   beforeAll(async () => { fixture = await createFixture(journalPath, { organizerPasswordSetup: true }); run = context(fixture); });
   afterAll(async () => {
     try { if (run) await run.close(); } finally {

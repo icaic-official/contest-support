@@ -2,7 +2,10 @@
 
 The shared suite checks Minsky behavior through the browser `Backend` interface.
 Supabase and Cloudflare supply browser adapters and fixture drivers.
-The same eight scenarios apply to both providers without weaker Cloudflare assertions.
+The same 11 scenarios apply to both providers without weaker assertions.
+The three new cases cover account creation, image-limit boundaries, and reconnect recovery.
+See [current state](current-state.md) and [PR #43](https://github.com/GiftedNovaHD/minsky/pull/43) for source-specific hosted results.
+Earlier eight-case results verify the recorded revisions only.
 AWS, GCP, and Azure have no implementation.
 
 The complete D1 suite checks `WorkflowPersistence` directly.
@@ -30,7 +33,7 @@ It does not replace provider-specific policy tests or prove capacity, installati
 
 | Component | Responsibility |
 | --- | --- |
-| `tests/providers/contracts.ts` | Fixture accounts, session identifiers, authenticated connections, and the required fault control. |
+| `tests/providers/contracts.ts` | Fixture accounts, session identifiers, authenticated connections, planned account markers, and transport fault controls. |
 | `tests/providers/scenarios/` | Shared assertions against `Backend`, with no provider SDK or database calls. |
 | `tests/providers/drivers.ts` | Explicit selection of an implemented fixture driver. |
 | `tests/providers/browser-backend.ts` | A separate browser context for each connection and a typed Node proxy for `Backend`. |
@@ -50,8 +53,11 @@ Separate contexts permit both bearer-token providers and cookie-based providers 
 The Supabase driver disables persisted browser sessions and uses each account's real login.
 The service key stays in Node fixture setup and cleanup.
 The browser receives only the public key and temporary fixture credentials.
-The fault control discards one successful workflow response after the server commits it.
-This tests the adapter's uncertain-outcome behavior without replacing the workflow operation.
+The response fault control discards one successful workflow or account response after the server commits it.
+Both providers reuse `tests/providers/support/response-fault.ts` with their actual endpoint paths.
+This tests uncertain outcomes without replacing the operation.
+The browser bridge can also close real provider WebSockets and reject reconnects until the scenario resumes them.
+It leaves HTTP requests available so another connection can commit changes during the interruption.
 
 The Cloudflare driver keeps generated passwords and hashes in memory during setup.
 It creates fictional application and Better Auth records in its dedicated D1 database.
@@ -71,14 +77,18 @@ The scenario registry is the source for the current case names.
 The suite checks these behaviors:
 
 - Login, logout, temporary-password restrictions, password changes, and authentication callback cleanup.
+- Organizer account creation, rejected creation, combined staff roles, lost create responses, and organizer recovery.
 - Submission, assignment, handoff, resolution, awards, external application, reopening, and persisted history.
 - Team and session access, staff-note separation, and forbidden workflow transitions.
 - Lost responses, request-ID reuse, conflicting request content, and concurrent claims.
 - Image reservation retries, incomplete uploads, visibility, removal, abandonment, and revoked access.
+- File-size, image-count, and combined-size boundaries; released reservations; removed images; and limits lowered before completion.
 - Live invalidation, independent subscribers, immediate resubscription, authorized reads after notification, and callback cleanup.
+- Transport interruption, reconnecting the existing subscription, reading missed changes, and receiving later invalidations.
 - Membership removal and account password resets.
 
-The shared suite does not yet cover account creation through `Backend.admin.account`, every image-limit edge, reconnect recovery, or every authorization race.
+The shared suite does not cover every authorization race or storage failure.
+It checks reconnect recovery through an authorized refresh, not replay of missed notifications.
 The private-note notification check observes a bounded interval after a positive staff notification.
 It does not prove delivery latency or the absence of arbitrarily delayed messages.
 
@@ -97,7 +107,9 @@ Record local, hosted Supabase, hosted D1, and protected GitHub Actions results s
 ## Fixture ownership and recovery
 
 Each run generates UUID identifiers for its event, sessions, and teams.
-Each created account carries the exact run UUID in its fixture metadata.
+Initial accounts carry the exact run UUID in their fixture metadata.
+Accounts created through the application use exact name and username markers saved before the create request.
+The name includes the full run UUID. Cleanup discovers their IDs after a lost create response and checks their memberships before deletion.
 Cleanup checks those ownership records before deletion.
 The Supabase account scan also finds a creation whose response was lost before the runner saved its account ID.
 Cloudflare records its generated account IDs before its first fixture write.
@@ -126,9 +138,11 @@ It skips the migration prerequisite check so a changed backend does not prevent 
 A provider driver supplies the same account roles, session relationships, temporary-password state, and disposable records.
 Its browser factory returns the real application adapter.
 Its cleanup owns provider-specific tables, accounts, objects, and test resources.
-The lost-response control must discard a committed response, not fake a successful write.
+The lost-response controls must discard committed workflow and account responses. They must not fake a successful write.
+The reconnect control must interrupt the real subscription transport, hold reconnect attempts, then permit recovery.
 
-Cloudflare passes the current complete scenario registry through its guarded hosted CLI runner.
+Cloudflare passed the earlier eight-case registry through its guarded hosted CLI runner.
+The expanded 11-case registry requires fresh hosted verification on both implementations.
 Every new provider must pass the same registry.
 A driver cannot skip a failing behavior because its database or identity provider differs.
 A missing operation means that the provider implementation is incomplete.

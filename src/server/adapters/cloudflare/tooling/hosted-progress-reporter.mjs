@@ -8,24 +8,22 @@ export default class HostedProgressReporter {
     if (!Number.isSafeInteger(total) || total < 1) throw new Error('Set the fixed hosted case count for progress.');
     this.total = total;
     this.completed = 0;
-    this.started = new WeakMap();
     this.finished = new WeakSet();
     this.active = new Map();
   }
 
   onTestCaseReady(testCase) {
-    if (this.started.has(testCase) || this.finished.has(testCase)) return;
-    this.started.set(testCase, performance.now());
-    this.active.set(testCase, this.started.get(testCase));
+    if (this.active.has(testCase) || this.finished.has(testCase)) return;
+    this.active.set(testCase, performance.now());
     this.emit(0, 0);
   }
 
   onTestCaseResult(testCase) {
     if (this.finished.has(testCase)) return;
+    const start = this.active.get(testCase);
     this.finished.add(testCase);
     this.active.delete(testCase);
     this.completed++;
-    const start = this.started.get(testCase);
     this.emit(1, start === undefined ? 0 : Math.max(0, Math.round(performance.now() - start)));
   }
 

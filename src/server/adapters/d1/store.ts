@@ -109,6 +109,7 @@ export class D1ApplicationStore implements WorkflowPersistence {
     const assertion = (suffix: string, condition: string, ...values: Array<string | number | null>) =>
       this.statement(`INSERT INTO command_assertions (id, valid) VALUES (?, CASE WHEN ${condition} THEN 1 ELSE 0 END)`,
         `${assertionId}:${suffix}`, ...values);
+    // Reuse the authorized read query for access checks inside either batch.
     const currentAccess = `EXISTS (SELECT 1 FROM (${workflowSql}) current WHERE current.archived = 0)`;
     if (read.receipt) {
       // Receipt replay crosses the same atomic boundary as a new write. This
@@ -132,11 +133,16 @@ export class D1ApplicationStore implements WorkflowPersistence {
     const issueId = decision.issueId ?? crypto.randomUUID();
     // The generated UUID is safe SQL text. All request data uses bound values.
     const at = `(SELECT at FROM workflow_commit_times WHERE id = '${assertionId}')`;
+
+    // Build one batch in execution order. First reject stale dependencies and
+    // lost access, then capture one database timestamp for every effect.
     const statements = [
       assertion('read', `EXISTS (SELECT 1 FROM (${workflowSql}) current WHERE current.archived = 0 AND current.dependency = ?)`,
         ...parameters, read.dependency),
       this.statement('INSERT INTO workflow_commit_times (id) VALUES (?)', assertionId),
     ];
+
+    // Create or update the issue before its dependent records.
     if (decision.submission) {
       statements.push(
         this.statement(`INSERT INTO session_issue_sequences (session_id, number)
@@ -161,24 +167,33 @@ export class D1ApplicationStore implements WorkflowPersistence {
       decision.issue?.owner ?? null, read.state.actor.name, command.type, command.type, command.type,
       decision.history.visibility === 'public' ? 1 : 0, issueId, sessionId));
     }
+    // Keep this assertion immediately after the issue write. changes() checks
+    // that write and must reject a missing issue before later effects execute.
     statements.push(assertion('write', 'changes() = 1'));
-    if (decision.resolution) statements.push(this.statement(`INSERT INTO resolutions
+
+    // Preserve resolution history and the separate award/application records.
+    if (decision.resolution) {
+      statements.push(this.statement(`INSERT INTO resolutions
       (id, session_id, issue_id, actor, actor_name, at, summary) VALUES (?, ?, ?, ?, ?, ${at}, ?)`,
-    crypto.randomUUID(), sessionId, issueId, caller.accountId, read.state.actor.name, decision.resolution.summary));
+      crypto.randomUUID(), sessionId, issueId, caller.accountId, read.state.actor.name, decision.resolution.summary));
+    }
     if (decision.reopen) {
       statements.push(this.statement(`UPDATE resolutions SET reopened_at = ${at}, reopened_by = ?,
         reopened_name = ?, reason = ? WHERE issue_id = ? AND reopened_at IS NULL`,
       caller.accountId, read.state.actor.name, decision.reopen.reason, issueId), assertion('reopen', 'changes() = 1'));
     }
-    if (decision.award) statements.push(this.statement(`INSERT INTO awards
+    if (decision.award) {
+      statements.push(this.statement(`INSERT INTO awards
       (id, session_id, issue_id, resolution_id, minutes, explanation, actor, actor_name, at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ${at})`, crypto.randomUUID(), sessionId, issueId,
-    decision.award.resolutionId, decision.award.minutes, decision.award.explanation, caller.accountId, read.state.actor.name));
+      decision.award.resolutionId, decision.award.minutes, decision.award.explanation, caller.accountId, read.state.actor.name));
+    }
     if (decision.apply) {
       statements.push(this.statement(`UPDATE awards SET applied_at = ${at}, applied_by = ?, applied_name = ?
         WHERE id = ? AND issue_id = ? AND applied_at IS NULL`, caller.accountId, read.state.actor.name,
       decision.apply.awardId, issueId), assertion('apply', 'changes() = 1'));
     }
+    // Record authenticated history and the receipt in the same transaction.
     statements.push(
       this.statement(`INSERT INTO history (id, issue_id, actor, actor_name, at, text, visibility)
         VALUES (?, ?, ?, ?, ${at}, ?, ?)`, crypto.randomUUID(), issueId, caller.accountId,
@@ -186,7 +201,10 @@ export class D1ApplicationStore implements WorkflowPersistence {
       this.statement('INSERT INTO command_receipts (actor, request_id, session_id, command, issue_id) VALUES (?, ?, ?, ?, ?)',
         caller.accountId, requestId, sessionId, JSON.stringify(command), issueId),
     );
-    for (const audience of decision.history.visibility === 'public' ? ['staff', `team:${decision.teamId}`] : ['staff']) {
+    // Queue delivery for the permitted audiences. External delivery happens
+    // after this batch commits, so it cannot publish a rolled-back command.
+    const audiences = decision.history.visibility === 'public' ? ['staff', `team:${decision.teamId}`] : ['staff'];
+    for (const audience of audiences) {
       statements.push(
         this.statement(`INSERT INTO audience_sequences (session_id, audience, sequence) VALUES (?, ?, 1)
           ON CONFLICT (session_id, audience) DO UPDATE SET sequence = sequence + 1`, sessionId, audience),
@@ -196,14 +214,15 @@ export class D1ApplicationStore implements WorkflowPersistence {
       );
     }
     statements.push(
-      // The final statement also rejects expiry during a long batch. Unlike the
-      // first assertion, it does not compare state changed by this command.
+      // Recheck access after all effects to reject expiry during a long batch.
+      // Do not compare dependencies changed by this command.
       assertion('access', currentAccess, ...parameters),
       this.statement(`DELETE FROM command_assertions WHERE id IN (?, ?, ?, ?, ?)`,
         `${assertionId}:read`, `${assertionId}:write`, `${assertionId}:reopen`, `${assertionId}:apply`, `${assertionId}:access`),
       this.statement('DELETE FROM workflow_commit_times WHERE id = ?', assertionId),
     );
     try {
+      // Execute every stage together. A failed assertion rolls back all effects.
       await this.db.batch(statements);
       return { outcome: 'committed', issueId };
     } catch (error) {

@@ -10,7 +10,11 @@ function queryFailure(status, body) {
     ...(Array.isArray(body?.errors) ? body.errors.map((error) => error?.message) : []),
     ...(Array.isArray(body?.result) ? body.result.map((result) => result?.error) : []),
   ].filter((message) => typeof message === 'string');
-  for (const expected of ['CHECK constraint failed', 'FOREIGN KEY constraint failed',
+  // WorkflowPersistence distinguishes these proven rollbacks from an unknown
+  // write outcome. Keep their complete fixed identifiers before broader errors.
+  for (const expected of ['CHECK constraint failed: valid = 1',
+    'UNIQUE constraint failed: command_receipts.actor, command_receipts.request_id',
+    'CHECK constraint failed', 'FOREIGN KEY constraint failed',
     'UNIQUE constraint failed', 'NOT NULL constraint failed', 'Issue versions must advance with each write']) {
     if (messages.some((message) => message.includes(expected))) return new Error(`D1_ERROR: ${expected}`);
   }

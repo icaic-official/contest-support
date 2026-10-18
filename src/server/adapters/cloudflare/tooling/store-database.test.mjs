@@ -3,6 +3,7 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, test, vi } from 'vitest';
+import { D1ApplicationStore } from '../../d1/store.ts';
 import { createD1ApiConnection, openStoreDatabase } from './store-database.mjs';
 import { renderStoreConfiguration, storeTarget } from './store-target.mjs';
 
@@ -217,6 +218,40 @@ test('constraint failures retain only the fixed rule needed by shared assertions
       assert.equal(setup.calls.length, 1);
     }
   }
+});
+
+test('workflow commits retain known rollback identities and preserve unknown outcomes for other failures', async () => {
+  const command = { type: 'claim', issue_id: 'fictional-issue', revision: 1 };
+  const caller = { accountId: 'fictional-account', loginId: 'fictional-login' };
+  const read = {
+    state: {
+      actor: { id: caller.accountId, name: 'Fictional organizer' },
+      membership: { team_id: null, roles: ['volunteer'], is_admin: false },
+      session: { id: 'fictional-session', intake_open: true, categories: ['Devices'] },
+      archived: false, teams: ['fictional-team'],
+      issue: { id: command.issue_id, team_id: 'fictional-team', status: 'open', owner: null, revision: 1 },
+      resolution: null, award: null,
+    },
+    dependency: 'captured-state',
+    receipt: { sessionId: 'fictional-session', issueId: command.issue_id, command },
+  };
+  const decision = { type: 'claim', issueId: command.issue_id, teamId: 'fictional-team',
+    history: { text: 'Issue claimed.', visibility: 'public' } };
+  for (const [message, outcome] of [
+    ['CHECK constraint failed: valid = 1', 'retry'],
+    ['UNIQUE constraint failed: command_receipts.actor, command_receipts.request_id', 'retry'],
+    ['CHECK constraint failed: unrelated_guard', 'unknown'],
+    ['UNIQUE constraint failed: unrelated_table.id', 'unknown'],
+  ]) {
+    const setup = fixture({ fetch: () => response({ success: false, errors: [{ message: `${message}: ${privateDetails}` }] }, 400) });
+    const store = new D1ApplicationStore(setup.db);
+    assert.deepEqual(await store.commit(caller, 'fictional-session', 'fictional-request', command, read, decision), { outcome });
+    assert.equal(setup.calls.length, 1);
+  }
+  const disconnected = fixture({ fetch: () => { throw new Error(privateDetails); } });
+  assert.deepEqual(await new D1ApplicationStore(disconnected.db).commit(caller,
+    'fictional-session', 'fictional-request', command, read, decision), { outcome: 'unknown' });
+  assert.equal(disconnected.calls.length, 1);
 });
 
 test('request starts respect both reviewed intervals without actual sleeps', async () => {

@@ -205,6 +205,10 @@ Five read-only remote calls fail while all 4,000 local D1 and local HTTP calls p
 A later unchanged 6,000-call remote comparison passes, so this remains an intermittent fault.
 The separate API semantic proof passes value binding, ordering, atomic rollback, metadata, and scoped cleanup.
 The API transport is a verification workaround. It does not establish the underlying network cause or repair the preview proxy.
+The first full API workflow run on `6e20cc1` passes 36 cases and fails 34 assertions. Fixture cleanup completes.
+Its safe error mapping removes two fixed rollback identifiers that the workflow needs to distinguish retryable rollbacks from unknown outcomes.
+The mapping now retains those exact identifiers. A focused test exercises the existing persistence commit with known and unknown failures.
+No original workflow assertion or application rule changes.
 Fresh complete API-suite results and protected native-binding results on the final source are recorded separately in PR #43.
 
 ## 5. Manual verification steps

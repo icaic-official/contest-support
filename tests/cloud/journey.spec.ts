@@ -321,6 +321,7 @@ test("queue and issue views show timers, handoffs and internal notes on desktop 
   });
   await sheet.getByRole("button", { name: "Close issue", exact: true }).click();
   await expect(sheet).toBeHidden();
+  await expect(byId(page, `issue-row-${selected}`)).toBeFocused();
   await page.setViewportSize({ width: 1280, height: 900 });
   expect(await fitsWidth(page)).toBe(true);
   await page.screenshot({

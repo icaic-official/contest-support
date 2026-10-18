@@ -109,9 +109,11 @@ export async function signOut(page: Page) {
 /**
  * Checks a radio button or checkbox that is visually hidden inside a styled
  * label. The label covers the input, so a pointer click cannot reach it.
- * Space on the focused input is what a keyboard user does.
+ * Space on the focused input is what a keyboard user does. A form can stay
+ * disabled while the refresh after its last request runs, so wait first.
  */
 export async function choose(control: Locator) {
+  await expect(control).toBeEnabled();
   if (!(await control.isChecked())) await control.press("Space");
   await expect(control).toBeChecked();
 }

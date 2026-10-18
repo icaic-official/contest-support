@@ -89,8 +89,10 @@ test("hosted jury Awards tab preserves zero-minute decisions and retries through
   await sheet.getByLabel("Public award explanation").fill("No adjustment required after jury review");
   const awardRequests = await loseNextResponse(page, "award");
   await sheet.getByRole("button", { name: "Record 0 minutes", exact: true }).click();
-  await sheet.getByRole("button", { name: "Retry last request", exact: true }).click();
+  // The refresh after the lost response already shows the award, so the
+  // award sheet closes and the retry button is in the issue view.
   await expect(sheet).toBeHidden();
+  await page.getByRole("button", { name: "Retry last request", exact: true }).click();
   await expect(page.getByRole("button", { name: "Retry last request", exact: true })).toHaveCount(0);
   expect(awardRequests).toHaveLength(2);
   expect(awardRequests[1]).toEqual(awardRequests[0]);
@@ -121,6 +123,7 @@ test("hosted jury Awards tab preserves zero-minute decisions and retries through
   await page.unroute("**/rpc/workflow");
   // The applied award leaves the jury lists, so the reopened issue closes.
   await expect(awardsHeading).toBeVisible();
+  await expect(page.getByRole("status").filter({ hasText: /^ISS-\d+ is no longer in your lists\.$/ })).toBeVisible();
   await lists.getByRole("button", { name: /^To apply/ }).click();
   await expect(card).toHaveCount(0);
   await issue.action("resolve", { summary: "Connection restored again" });
@@ -185,6 +188,7 @@ test("two hosted clients update the award lists while preserving drafts, focus a
     await expect(draft).toBeFocused();
     await page.keyboard.press("Escape");
     await expect(sheet).toBeHidden();
+    await expect(byId(page, `award-issue-${first.id}`)).toBeFocused();
     const lists = page.getByRole("group", { name: "Award lists" });
     await lists.getByRole("button", { name: /^To apply/ }).click();
     await expect(byId(page, `award-issue-${second.id}`)).toBeVisible();

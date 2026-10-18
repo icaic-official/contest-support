@@ -36,18 +36,20 @@ export function ContestantApp(props: ShellProps) {
   });
   const [replyDrafts, setReplyDrafts] = useState<Record<string, string>>({});
   const [reopenDrafts, setReopenDrafts] = useState<Record<string, string>>({});
-  const focusRequest = useRef(false);
+  // Counts focus requests. State, not a ref: the effect then runs after the
+  // commit that shows the new heading. With a ref, pending effects of an
+  // earlier refresh could focus the old heading, which has the same ID.
+  const [focusRequests, setFocusRequests] = useState(0);
   const reportButton = useRef<HTMLButtonElement>(null);
 
   /** Moves focus to the main heading after the next render. */
   const requestFocus = useCallback(() => {
-    focusRequest.current = true;
+    setFocusRequests((count) => count + 1);
   }, []);
   useEffect(() => {
-    if (!focusRequest.current) return;
-    focusRequest.current = false;
+    if (focusRequests === 0) return;
     document.getElementById(contestantHeadingId)?.focus();
-  });
+  }, [focusRequests]);
 
   const state = data.snapshot;
   const membership = state?.membership;

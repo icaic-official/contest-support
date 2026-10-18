@@ -37,8 +37,17 @@ Contestants can see both the decision and its application status.
 If the issue is reopened, its award and external application status remain.
 Reopening does not authorize a second award for the same issue.
 
-## Planned jury work
+## Pending jury worklist
 
-T0009 proposes a dedicated jury worklist.
-It remains separate from the current award-review workflow.
-See [feature status](/reference/status/) before you expect those controls in an installation.
+[T0009 in PR #23](https://github.com/GiftedNovaHD/minsky/pull/23) adds a separate **Jury worklist**.
+The PR remains under review. Check [feature status](/reference/status/) before you expect it in an installation.
+
+The worklist has two sections:
+
+- **Needs decision** lists resolved issues without an award, oldest resolution first.
+- **Pending external application** lists unapplied awards, oldest decision first, including zero-minute awards and reopened issues.
+
+Use **View issue** to open the existing details and forms.
+Use **Back to jury worklist** to return to the originating row or section.
+The worklist covers the authorized session independently of ordinary queue filters.
+Jury-only membership permits review and external confirmation without support capabilities.

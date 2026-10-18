@@ -33,6 +33,19 @@ Isolated Cloudflare development, CI, and installation resources are authorized i
 Only this ticket branch may be added to the protected cloud-test branch allowlist. Preserve all other entries and protection rules.
 Supabase remains active. Docker packaging, AWS, Terraform, real-data migration, and backend cutover remain deferred.
 Bounded subagent work is authorized.
+The owner merged T0009's jury worklist in PR #23 at `c144a2a` during T0020 verification.
+This branch now includes that main revision. Preserve the jury worklist and verify the combined application.
+
+**Parallel T0009 maintenance, 2026-10-18.** The owner requested an update to [PR #23](https://github.com/GiftedNovaHD/minsky/pull/23).
+Use its existing `feature/t0009-jury-worklist` branch in a separate worktree.
+Merge current `main` at `7d19b00` and verify current behavior before owner review.
+Preserve the separate T0020 connector checkout and scope.
+Use the existing `Backend` contracts, authorized snapshots, and shared server workflow rules.
+Keep Supabase active. Add no schema, backend feature, provider implementation, or runtime dependency.
+Use only UUID-owned fictional fixtures in Minsky CI, `ghtztmovdkhuketcbjmq`, for hosted acceptance.
+The owner approved the exact T0009 `cloud-test` branch addition on 2026-10-18. Preserve all other entries and protection rules.
+Do not deploy the application, merge the PR, or migrate data.
+Required checks and hosted acceptance must pass before PR #23 is ready for owner review.
 
 **T0019 shared server workflow, 2026-10-18.** Use `feature/t0019-shared-server-workflow` from updated `main` at `0c797ad`.
 The owner authorized this extraction while PR #40 was open. The branch started independently of its authentication branch.

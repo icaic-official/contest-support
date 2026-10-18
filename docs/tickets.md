@@ -5,6 +5,8 @@ These tickets describe development work, not contestant issues.
 The active ticket is [T0020 complete Cloudflare connector](#t0020-complete-cloudflare-connector).
 The owner merged T0019 in PR #41 at `7d19b00` before authorizing this ticket.
 T0020 completes Cloudflare persistence, the browser connector, and independent installation verification.
+The owner merged the parallel T0009 jury worklist in PR #23 at `c144a2a` during this ticket.
+T0020 includes that main revision and repeats the affected application checks.
 Real-data migration tooling follows connector verification. Supabase remains active.
 
 T0016 Cloudflare backend design merged in [PR #36](https://github.com/GiftedNovaHD/minsky/pull/36) at `b68ef72` on 2026-10-17.
@@ -846,3 +848,45 @@ The request ID stays the same across retries, so the server can recognize an alr
 
 Verification is recorded in [current state](current-state.md#t0012-reply-retry-cleanup-2026-10-17).
 Deployment remains a separate step.
+
+## T0009 — Jury worklist
+
+Branch: `feature/t0009-jury-worklist`, from updated `main` at `1ed603a`.
+
+Status: merged in [PR #23](https://github.com/GiftedNovaHD/minsky/pull/23) at `c144a2a` on 2026-10-18 after parallel maintenance and verification.
+Current `main` at `7d19b00` is the integration baseline. Fast checks, 276 unit/database tests, 44 application browser cases, and authentication/documentation browser checks pass. Hosted jury acceptance, protected checks, and scoped cleanup pass on runtime source `f45d03f`. The final follow-up changes documentation only.
+Summary: Provide separate outstanding decision and external-application lists through the existing issue details and actions.
+
+The first implementation and local checks date from 2026-10-15.
+Those results are historical and do not establish compatibility with current `main`.
+The owner reviews and merges. This task does not authorize deployment.
+The [jury worklist specification](jury-worklist.md) defines the behavior.
+T0020 remains the separate active connector goal. Do not edit its checkout.
+No schema, backend feature, provider implementation, or runtime dependency is part of T0009 maintenance.
+
+### Selected scope
+
+- Add a separate **Jury worklist** screen for current jury and combined-role members.
+- Show **Needs decision** for resolved issues without an award and **Pending
+  external application** for every unapplied award, including zero-minute awards
+  and awards on reopened issues.
+- Show team/location, issue/status, unresolved time, resolution evidence, and
+  relevant award attribution. Order by the oldest outstanding resolution or award.
+- Open existing issue details and actions with a return path to the worklist.
+  Preserve discretionary awards, separate confirmation, and one award per issue.
+- Reuse authorized snapshots, updates, timing, and workflow operations. No schema
+  change or dependency on the other open feature branches is expected.
+
+### Acceptance criteria
+
+- [x] Role, session, archive, and live-access rules pass local browser/database checks.
+- [x] Both lists, counts, ordering, fields, zero-minute decisions, and reopening
+  behavior match the specification and its eligibility table.
+- [x] Existing issue actions work from the new screen, including jury-only access
+  to a reopened issue's pending confirmation and accessible return navigation.
+- [x] Simulated two-client updates, preserved drafts, refresh, phone layout,
+  keyboard use, and existing database workflow protections pass locally.
+- [x] Fast checks and documentation validation pass with actual results recorded.
+- [x] Hosted jury acceptance on Minsky CI and protected CI pass. Fixture cleanup is verified.
+- [x] Remaining physical-device and assistive-technology limits are recorded without implying completed checks.
+- [x] PR #23 reflects passing required verification and is prepared for owner review. The owner reviews and merges.

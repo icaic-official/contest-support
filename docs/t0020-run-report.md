@@ -215,7 +215,7 @@ The complete permitted run then passes all 611 tests across 41 files, without fa
 No progress test, reporter, or runner change is needed for that local permission limit.
 No automatic approval review rejected an authorized action.
 A local Supabase replay on `25b2033` was not run because the earlier private CLI credential source was unavailable.
-No credentials were read or fixtures created during that discovery. Protected existing-backend mode supplies the final-head replay through existing CI credentials.
+No credentials were read or fixtures created during that discovery. Protected existing-backend mode supplies the final Supabase replay through existing CI credentials.
 That mode applies no Supabase configuration, migrations, secrets, or functions. Its results are published in PR #42.
 
 ## 4. Build and test results
@@ -322,7 +322,7 @@ It confirms the initial IDs, two teams, closed intake, all nine migration names,
 Baseline records include 20 delivered notifications, three audience counters, seven audits, and four completed account operations.
 No pending notifications or account operations remain. Journey workflow and image rows remain absent.
 A new clean checkout repeats the current installation procedure at `e44cb69`, including its generated Smart Placement configuration.
-The [current-source trial](current-state.md#current-source-empty-installation) passes the complete React journey, merged jury worklist, first-owner gate, closed intake, and repeated-operation refusals.
+The [Smart Placement trial on e44cb69](current-state.md#smart-placement-empty-installation) passes the complete React journey, merged jury worklist, first-owner gate, closed intake, and repeated-operation refusals.
 Trusted owner recovery returns HTTP 401 for the old session, enforces another password change, and preserves exact IDs, membership, issue, and history.
 The trial passes once with zero failures, skips, retries, flaky results, or infrastructure errors at 06:51:33 UTC.
 Exact proof cleanup passes at 06:52:56 UTC. Final read-only source, target, version, privacy, and baseline checks pass at 06:53:29 UTC.

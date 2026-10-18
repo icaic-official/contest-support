@@ -4,6 +4,7 @@ import { fileURLToPath, URL } from 'node:url';
 
 export const repositoryRoot = fileURLToPath(new URL('../../../../..', import.meta.url));
 const fields = ['accountId', 'workerName', 'databaseName', 'databaseId', 'bucketName', 'origin'];
+const placementRegion = /^(?:aws|gcp|azure):[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const name = /^[a-z][a-z0-9-]{1,61}[a-z0-9]$/;
 const placeholder = /replace|your[-_]|placeholder|<|>/i;
@@ -15,8 +16,13 @@ function loopback(hostname) {
 /** Public settings only. Credentials have no field in this format. */
 export function validateProviderConfiguration(input, { allowLocal = false } = {}) {
   if (!input || typeof input !== 'object' || Array.isArray(input) ||
-      Object.keys(input).length !== fields.length || fields.some((key) => typeof input[key] !== 'string')) {
+      Object.keys(input).some((key) => !fields.includes(key) && key !== 'placementRegion') ||
+      fields.some((key) => !Object.hasOwn(input, key) || typeof input[key] !== 'string')) {
     throw new Error('Provide exactly the documented public Cloudflare settings.');
+  }
+  const optional = Object.hasOwn(input, 'placementRegion') ? ['placementRegion'] : [];
+  if (optional.length && (typeof input.placementRegion !== 'string' || !placementRegion.test(input.placementRegion))) {
+    throw new Error('Set placementRegion to a documented aws, gcp, or azure region identifier.');
   }
   if (!/^[a-f0-9]{32}$/.test(input.accountId) || !uuid.test(input.databaseId)) {
     throw new Error('Set the Cloudflare account ID and D1 database UUID.');
@@ -43,7 +49,7 @@ export function validateProviderConfiguration(input, { allowLocal = false } = {}
       (origin.hostname.split('.').length !== 4 || origin.hostname.split('.')[0] !== input.workerName)) {
     throw new Error('The workers.dev origin must identify the configured Worker name.');
   }
-  return Object.fromEntries(fields.map((key) => [key, input[key]]));
+  return Object.fromEntries([...fields, ...optional].map((key) => [key, input[key]]));
 }
 
 function relativePath(configPath, target) {
@@ -65,7 +71,7 @@ export function renderWranglerConfiguration(input, configPath, { allowLocal = fa
     compatibility_flags: ['nodejs_compat'],
     workers_dev: true,
     preview_urls: false,
-    placement: { mode: 'smart' },
+    placement: settings.placementRegion ? { region: settings.placementRegion } : { mode: 'smart' },
     limits: { cpu_ms: 1000 },
     observability: { enabled: false },
     triggers: { crons: ['* * * * *'] },
@@ -116,6 +122,8 @@ export async function readInstallationTarget(configPath) {
       accountId: config.account_id, workerName: config.name,
       databaseName: config.d1_databases[0].database_name, databaseId: config.d1_databases[0].database_id,
       bucketName: config.r2_buckets[0].bucket_name, origin: config.vars.AUTH_ORIGIN,
+      ...(config.placement && Object.hasOwn(config.placement, 'region')
+        ? { placementRegion: config.placement.region } : {}),
     });
   } catch {
     throw new Error('The installation configuration is invalid. Regenerate it from public settings.');

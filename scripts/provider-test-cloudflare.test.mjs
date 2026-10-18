@@ -183,6 +183,13 @@ describe('Cloudflare provider runner safety', () => {
     }
   });
 
+  test('placement configuration preserves the exact resource identity used by fixture journals', async () => {
+    await writeFile(config, JSON.stringify(renderWranglerConfiguration({
+      ...connectorTarget, placementRegion: 'aws:ap-southeast-1',
+    }, config)));
+    expect(await readFixtureTarget(options())).toEqual({ ...connectorTarget, configPath: config });
+  });
+
   test('preflights account, exact database metadata, and the protected full entry using read-only calls', async () => {
     const calls = [];
     const request = vi.fn(async () => new globalThis.Response(JSON.stringify({ error: 'Sign in to continue.' }),

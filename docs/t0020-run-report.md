@@ -192,7 +192,7 @@ The repeated hosted account run passes all 82 cases in 148 seconds, without skip
 The original 35 account test definitions retain their complete bodies and parameter lists across four isolated files.
 New progress checks verify numeric redaction, concurrent counters, intermediate output, timeout handling, and timer cleanup.
 A temporary Chromium probe repeats the shared temporary-password and full lifecycle cases against the local Worker with maintenance before every HTTP request.
-That probe passes. All 19 lifecycle snapshots and 20 authentication-session reads return 200. It does not reproduce the protected rejection.
+That probe passes. All 19 lifecycle snapshots and 20 authentication-session reads return 200. It does not reproduce the protected timeout.
 Provider-owned browser diagnostics now record safe endpoint timings and fixture authentication flags before logout.
 Their local tests verify redaction, ownership, and teardown ordering. The first browser mock used the wrong `page.evaluate` signature and was corrected.
 The repeated hosted CLI suite passes all eight shared scenarios with those diagnostics on the changes committed as `ab4a8ff`.
@@ -267,6 +267,8 @@ The [duration investigation](current-state.md#hosted-check-duration) records mea
 Protected run `39102298675` passes all 82 corrected account cases in 5 minutes 21 seconds.
 The earlier protected account phase takes 20 minutes 6 seconds. The observed reduction is 73.4%.
 The corrected workflow phase passes all 70 cases in 4 minutes 36 seconds.
+The next protected run, `39105044129` on `e44cb69`, passes all 82 account cases in 5 minutes 9 seconds and all 70 workflow cases in 4 minutes 19 seconds.
+The account phase is 74.4% shorter than the original phase. Password parameters and case assertions are unchanged.
 Ordinary push [run 39098769818](https://github.com/GiftedNovaHD/minsky/actions/runs/39098769818) passes on that revision.
 The direct CLI workflow suite passes all 70 cases on the dedicated store database with verified scoped cleanup.
 The direct account CLI suite also passes all 82 cases there on `9b0ef6b`, with zero skips and verified scoped cleanup.
@@ -292,12 +294,36 @@ Older generated application configurations must be regenerated from the same pub
 The candidate CLI suite passes all eight unchanged scenarios in 3.5 minutes, with verified scoped cleanup.
 Its 29 clients record 290 requests totaling 135,640 milliseconds, with a maximum of 2,837 milliseconds and no resource authentication rejection.
 That Singapore-origin run does not establish a protected GitHub latency improvement.
+Protected run `39105044129` tests the Smart Placement candidate on `e44cb69` and fails its shared step after 10 minutes 30 seconds.
+The hosted React step is skipped. The deployed version is `32077ca5-1f36-4d66-a7ce-3dce1fea61d8`.
+Read-only analytics for 07:02 to 07:08 UTC report 237 invocations in MSP and six in ORD, with zero runtime errors.
+Median request duration remains 1,537.415 milliseconds, with median CPU time of 8.192 milliseconds.
+Placement metadata reports `SUCCESS`, but the measured North American execution does not correct the wait to APAC D1.
+The [current-state record](current-state.md#hosted-browser-duration) records the official placement limitation and subsequent comparisons.
+An exact-target metadata query confirms the D1 APAC primary, with 0.1465 milliseconds of SQL execution.
+Added optional public `placementRegion` configuration and selected `aws:ap-southeast-1` for the separate CI Worker.
+Existing six-field configurations retain Smart Placement. Strict target checks and fixture journal identity remain intact.
+All 79 focused tooling and provider-safety tests pass across seven files. Type checking, focused lint, and whitespace checks pass.
+Target checks, the Cloudflare build, the deployment dry run, and isolated deployment pass.
+The candidate version is `48827ab3-7931-4733-95df-12060185c326`. The default Supabase build is restored afterward.
+The placement identifier controls Cloudflare execution. No AWS resource or additional subscription is created.
+The full-history secret scan passes across 125 commits through `e44cb69`.
 After the preflight error correction, the complete local suite passes all 610 tests across 41 files, without skips, in 104.54 seconds.
 Global lint passes again.
 The independent installation's final read-only audit passes at 06:06:54 UTC.
 It confirms the initial IDs, two teams, closed intake, all nine migration names, and an empty private bucket.
 Baseline records include 20 delivered notifications, three audience counters, seven audits, and four completed account operations.
 No pending notifications or account operations remain. Journey workflow and image rows remain absent.
+A new clean checkout repeats the current installation procedure at `e44cb69`, including its generated Smart Placement configuration.
+The [current-source trial](current-state.md#current-source-empty-installation) passes the complete React journey, merged jury worklist, first-owner gate, closed intake, and repeated-operation refusals.
+Trusted owner recovery returns HTTP 401 for the old session, enforces another password change, and preserves exact IDs, membership, issue, and history.
+The trial passes once with zero failures, skips, retries, flaky results, or infrastructure errors at 06:51:33 UTC.
+Exact proof cleanup passes at 06:52:56 UTC. Final read-only source, target, version, privacy, and baseline checks pass at 06:53:29 UTC.
+Its separate Worker and database are `minsky-install-t0020-b1b80054`; D1 is `771001e6-9735-4320-94fd-38d320a26bee`.
+The private Standard bucket is `minsky-install-t0020-b1b80054-images`, and active Worker version is `9b48ef91-299b-4a88-9602-2a4837dfacc8`.
+Journey records, exact images, and coordinator state are removed before journal deletion. The bucket is empty.
+The initialized owner, two-team roster, closed intake, audits, delivered baseline notifications, and monotonic transport state remain for review.
+The earlier `59121f7` installation remains intact.
 
 ## 5. Manual verification
 
@@ -309,7 +335,7 @@ The private screenshot run also passes the complete React journey and scoped cle
 Automated browser tests check keyboard behavior, persistence, and public/private separation.
 The hosted application and independent installation checks use automated real-browser assertions.
 The initialized fictional installation remains available for the owner's review.
-Its current owner password is in `/tmp/minsky-empty-install-b4b578a2/private/owner-recovered-current.json`, with mode `0600`.
+Its current-source owner password is in `/tmp/minsky-empty-install-b1b80054/private/owner-recovered-current.json`, with mode `0600`.
 Open that file privately. Earlier generated temporary passwords are stale after the tested changes.
 If the private file is lost, use the documented trusted owner recovery command.
 

@@ -10,7 +10,7 @@
   "workers_dev": true,
   "preview_urls": false,
   "placement": {
-    "mode": "smart"
+    "region": "aws:ap-southeast-1"
   },
   "limits": {
     "cpu_ms": 1000

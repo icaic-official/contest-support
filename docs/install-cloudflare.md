@@ -1,8 +1,9 @@
 # Install an isolated Cloudflare instance
 
-**Verified for an isolated development installation on 2026-10-18, source `59121f7`.**
+**Verified for an isolated development installation on 2026-10-18, source `e44cb69`.**
 The empty hosted trial passed this procedure, the complete React journey, and trusted owner recovery.
-The [trial record](current-state.md#empty-hosted-installation) lists resources, versions, results, and scoped cleanup.
+The [trial record](current-state.md#current-source-empty-installation) lists resources, versions, results, and scoped cleanup.
+That trial uses Smart Placement. The optional explicit-region setting below is under hosted verification.
 Use new, isolated resources. This procedure does not establish production capacity or real-data migration.
 Supabase remains the project's active development backend.
 
@@ -100,12 +101,21 @@ Edit `provider.json` with these exact settings:
 | `databaseId` | `MINSKY_INSTALL_DATABASE_ID`. |
 | `bucketName` | `MINSKY_INSTALL_BUCKET`. |
 | `origin` | `MINSKY_INSTALL_ORIGIN`, without a trailing slash or path. |
+| `placementRegion` | Optional. A supported Cloudflare placement region near the D1 primary, such as `aws:ap-southeast-1` for Singapore. |
 
-All six values are public settings.
+The six required values and optional region are public settings.
 Do not add credentials to this file.
 The validator rejects placeholders, unknown fields, and inconsistent `workers.dev` names.
 Hosted operations require HTTPS.
 The explicit `--local` option permits loopback origins for planning and configuration only.
+
+Choose an explicit placement region when you know the database location.
+For an APAC primary, `"placementRegion": "aws:ap-southeast-1"` selects Worker execution near Singapore.
+The identifier selects a Cloudflare execution location. It does not create an AWS resource or require an AWS account.
+Use a [supported placement region](https://developers.cloudflare.com/workers/configuration/placement/#specify-a-cloud-region) near your own database.
+Do not copy the APAC choice for a database in another region.
+If the location is unknown, omit `placementRegion` to use Smart Placement.
+Smart Placement does not guarantee execution beside D1.
 
 ## Generate and review the configuration
 
@@ -126,8 +136,9 @@ node src/server/adapters/cloudflare/tooling/install.mjs configure --settings=.wr
 Expected output is `Created the public Cloudflare configuration. No provider resources changed.`
 The command refuses an existing destination file.
 It configures D1, private R2 access, the live-update coordinator, static assets, and a recovery cron each minute.
-It enables Smart Placement for application requests. Cloudflare can then run database-heavy handlers closer to their backend services.
-Placement analysis can take 15 minutes and requires traffic from multiple locations.
+An explicit `placementRegion` produces a `placement.region` setting for application requests.
+Without that option, the generator enables Smart Placement.
+Smart Placement analysis can take 15 minutes and requires traffic from multiple locations.
 See [Cloudflare placement](https://developers.cloudflare.com/workers/configuration/placement/).
 It disables preview URLs and includes no authentication secret.
 Do not hand-edit bindings or add environment overrides.

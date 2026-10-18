@@ -4,7 +4,7 @@ description: Prepare an isolated Cloudflare application with its own accounts, d
 ---
 
 :::note[Verified development installation]
-T0020's complete hosted procedure passed on 18 October 2026 at source `59121f7`.
+T0020's complete hosted procedure passed on 18 October 2026 at source `e44cb69`.
 The isolated trial checked the full React workflow, private images, live updates, owner recovery, and fixture cleanup.
 Use new isolated resources. Production capacity and real-data migration remain unverified.
 Supabase remains the project's active development backend.

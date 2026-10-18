@@ -17,13 +17,13 @@ Supabase remains the active development backend.
 | Private R2 images | Reservations, immutable transfers, completion, authorized downloads, removal, abandonment, expiry, and exact-key recovery. | All 59 local image cases pass. Hosted shared scenarios and the complete React journey verify private R2 image behavior and scoped cleanup. |
 | Durable Object updates | Audience-specific delivery from the D1 outbox, current-access checks, duplicate handling, reconnect refresh, and retry recovery. | Local delivery and cleanup-binding checks pass. Hosted shared scenarios verify audience separation and independent subscribers. The hosted React journey verifies reconnection and refreshed state. |
 | Shared provider assertions | Both fixture drivers use the same eight scenarios. | Both providers pass all eight unchanged scenarios with verified fixture cleanup. The Cloudflare CLI run verifies `1ee8cbf`. |
-| Empty installation | Provider-owned configuration, explicit target checks, atomic bootstrap, and trusted owner recovery. | Local bootstrap, recovery, and tooling cases pass. The separate documented hosted journey passes on `59121f7`, with verified scoped fixture cleanup. |
+| Empty installation | Provider-owned configuration, explicit target checks, atomic bootstrap, and trusted owner recovery. | Local bootstrap, recovery, and tooling cases pass. The separate documented hosted journey passes on `e44cb69`, with verified scoped fixture cleanup. |
 
 The owner activated R2 after the initial provider error `10042`.
 The isolated Standard CI bucket has public access disabled and passes hosted image journeys.
 Workers Paid is active.
 Direct workflow and account cases use the D1-only store target. The application keeps its separate database and live bindings.
-The complete hosted React and separate empty-installation journeys pass on `59121f7`.
+The complete hosted React and separate empty-installation journeys pass on `e44cb69`.
 The shared CLI run verifies `1ee8cbf`. Its bridge correction leaves the application Worker source unchanged.
 Protected Cloudflare connector CI on `9b0ef6b` passes both direct suites, then fails two shared browser scenarios. Record this result separately from CLI evidence.
 Record each result with its actual revision and target in [current state](current-state.md).

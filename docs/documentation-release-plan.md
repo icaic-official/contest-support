@@ -83,8 +83,8 @@ Keep isolated fixtures and preserve the decision to retire the local demo.
 The guide correctly labels container startup and a fresh independent backend as unverified.
 Its three hosting options do not have equivalent verification evidence.
 This was the 2026-10-17 observation. The current guide links to T0020's verified Cloudflare development procedure.
-The hosted empty-installation trial passed on `59121f7`, including the complete application and owner recovery.
-See its [evidence record](current-state.md#empty-hosted-installation). Container packaging remains deferred.
+The current hosted empty-installation trial passed on `e44cb69`, including the complete application and owner recovery.
+See its [evidence record](current-state.md#current-source-empty-installation). Container packaging remains deferred.
 
 **Complete when:** select a release revision and test a clean installation using only the published instructions.
 Record prerequisites, exact tool versions, account requirements, commands, expected results, and the tested revision.

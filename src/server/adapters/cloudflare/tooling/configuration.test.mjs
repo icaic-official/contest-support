@@ -52,9 +52,35 @@ test('configuration contains only public independent settings and complete Cloud
 
 test('committed connector CI configuration matches the full configuration generator', async () => {
   const path = resolve(repositoryRoot, 'src/server/adapters/cloudflare/deploy/connector-ci.wrangler.jsonc');
-  const settings = await readInstallationTarget(path);
+  const settings = JSON.parse(await readFile(resolve(dirname(path), 'connector-ci.settings.json'), 'utf8'));
+  assert.deepEqual(await readInstallationTarget(path), settings);
   const config = JSON.parse(await readFile(path, 'utf8'));
   assert.deepEqual(config, renderWranglerConfiguration(settings, path));
+});
+
+test('optional placement regions round-trip without changing other installation settings', async () => {
+  const path = join(await directory(), 'wrangler.jsonc');
+  const original = renderWranglerConfiguration(settings, path);
+  for (const placementRegion of ['aws:ap-southeast-1', 'gcp:asia-east1', 'azure:southeastasia']) {
+    const input = { ...settings, placementRegion };
+    assert.deepEqual(validateProviderConfiguration(input), input);
+    const config = renderWranglerConfiguration(input, path);
+    assert.deepEqual(config, { ...original, placement: { region: placementRegion } });
+    await writeFile(path, JSON.stringify(config));
+    assert.deepEqual(await readInstallationTarget(path), input);
+  }
+});
+
+test('placement regions reject malformed values without echoing rejected input', () => {
+  for (const placementRegion of [
+    undefined, null, false, 12, {}, [], '', 'APAC', 'aws:', 'AWS:ap-southeast-1',
+    'other:ap-southeast-1', 'aws: ap-southeast-1', ' aws:ap-southeast-1',
+    'aws:ap-southeast-1 ', 'aws:ap-southeast-1:443', 'gcp:asia-east1/path',
+    'azure:southeastasia?token=private-placeholder', 'https://private-placeholder',
+  ]) assert.throws(() => validateProviderConfiguration({ ...settings, placementRegion }), (error) => {
+    assert.equal(error.message.includes('private-placeholder'), false);
+    return true;
+  });
 });
 
 test('configuration rejects credentials, placeholders, and malformed resource names and identifiers', () => {
@@ -138,6 +164,11 @@ test('hosted operations reject modified entry points, placement, bindings, origi
     (value) => { delete value.placement; },
     (value) => { value.placement.mode = 'off'; },
     (value) => { value.placement.region = 'aws:us-east-1'; },
+    (value) => { value.placement = { host: 'db.example.org:5432' }; },
+    (value) => { value.placement = { hostname: 'db.example.org' }; },
+    (value) => { value.placement = { region: 'aws:ap-southeast-1', mode: 'smart' }; },
+    (value) => { value.placement = { region: 'aws:ap-southeast-1', host: 'db.example.org:5432' }; },
+    (value) => { value.placement = { region: 'aws:ap-southeast-1', extra: true }; },
   ]) {
     const modified = globalThis.structuredClone(original);
     change(modified);

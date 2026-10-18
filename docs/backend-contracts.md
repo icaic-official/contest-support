@@ -285,9 +285,9 @@ That runner permits only the approved Minsky CI project. It does not activate th
 Hosted checks use isolated accounts and records through [protected cloud CI](cloud-onboarding.md#verification-and-protected-cloud-ci).
 The [shared provider suite](provider-test-contracts.md) checks these contracts through real browser adapters.
 Supabase and Cloudflare have separate fixture implementations with the same scenario assertions.
-The Cloudflare CLI run passes all eight unchanged shared scenarios on `1ee8cbf` with verified fixture cleanup.
-The complete hosted React journey passes on `59121f7`, which has the same application Worker source.
-The separate documented empty-installation journey also passes on `59121f7`, with verified fixture cleanup.
+The Cloudflare CLI run passes all eight unchanged shared scenarios on `e44cb69` with verified fixture cleanup.
+The complete hosted React journey passes on `e44cb69`.
+The separate documented empty-installation journey also passes on `e44cb69`, with verified fixture cleanup.
 Protected Cloudflare CI on `9b0ef6b` passes both direct suites, then fails two shared browser scenarios. Final acceptance remains pending.
 [Run the shared checks](run-provider-tests.md) separately from the provider-specific hosted UI suite.
 The latest observed results are in [current state](current-state.md).

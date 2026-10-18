@@ -4,5 +4,6 @@
   "databaseName": "minsky-connector-ci",
   "databaseId": "de43cf95-c024-4e44-860d-8ff179e4e08d",
   "bucketName": "minsky-connector-ci-images",
-  "origin": "https://minsky-connector-ci.icaic-minsky.workers.dev"
+  "origin": "https://minsky-connector-ci.icaic-minsky.workers.dev",
+  "placementRegion": "aws:ap-southeast-1"
 }

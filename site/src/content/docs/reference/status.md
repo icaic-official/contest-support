@@ -55,7 +55,7 @@ There is no provisioned Minsky production project in the recorded setup.
 
 - Ordinary repository checks use embedded databases and fictional browser responses.
 - Protected Supabase checks use the separate **Minsky CI** project. Cloudflare checks use separate connector CI resources. A skipped job is not a passing check.
-- The fresh independent Cloudflare installation passed on `59121f7`. T0007 container startup remains unverified and deferred.
+- The fresh independent Cloudflare installation passed on `e44cb69`. T0007 container startup remains unverified and deferred.
 - Live-contest readiness and capacity for 800 simultaneous users remain unverified.
 - Offline capture, outage operation, and venue-local resilience remain deferred.
 - An application license remains a decision before an open-source release.

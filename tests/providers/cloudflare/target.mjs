@@ -21,7 +21,7 @@ export async function readFixtureTarget(options) {
   if (Object.entries(connectorTarget).some(([key, value]) => settings[key] !== value)) {
     throw new Error('The configuration does not identify the isolated Cloudflare connector CI resources.');
   }
-  return { ...settings, configPath };
+  return { ...connectorTarget, configPath };
 }
 
 /** Provider commands are read-only. R2 cleanup uses exact keys without a list grant. */

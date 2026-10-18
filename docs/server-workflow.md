@@ -162,8 +162,8 @@ The full hosted runner uses `MINSKY_CONNECTOR_D1_CONFIG`, modern fixtures, and t
 T0020 also implements application reads, administration, private images, live updates, and the Cloudflare browser adapter.
 Both providers pass the same eight shared scenarios with verified fixture cleanup.
 The Cloudflare CLI run verifies `1ee8cbf`.
-The complete hosted React journey passes on `59121f7`, with the same application Worker source.
-The separate documented empty-installation journey also passes on `59121f7`.
+The complete hosted React journey passes on `e44cb69`.
+The separate documented empty-installation journey also passes on `e44cb69`.
 Scoped fixture cleanup passes for both hosted journeys. Protected Cloudflare connector CI remains pending.
 Record these results separately from hosted D1, hosted Supabase, and earlier protected authentication runs.
 Real-data migration, cutover, AWS, and Terraform remain deferred.

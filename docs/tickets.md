@@ -116,7 +116,7 @@ Corrected ordinary CI passes 579 tests across 35 files on `9b0ef6b`. Checked beh
 The same eight shared provider scenarios pass against Supabase and Cloudflare.
 The local complete HTTPS Worker journey and all 45 ordinary browser regressions pass.
 The complete local React journey also passes through the merged jury worklist.
-The complete hosted React journey passes on `59121f7`.
+The complete hosted React journey passes on `e44cb69`.
 A separate clean checkout passes the documented empty installation, complete React assertions, and trusted owner recovery on that source.
 Scoped D1, R2, and coordinator cleanup passes for both hosted targets.
 The owner enabled R2 after the initial provider error `10042`.

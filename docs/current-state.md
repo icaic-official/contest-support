@@ -4,11 +4,11 @@
 
 T0020 starts from merged PR #41 at `7d19b00`.
 The active branch is `feature/t0020-cloudflare-connector`.
-Earlier hosted CLI connector and fresh-installation checks pass. The latest protected connector run has two shared-scenario failures.
+Hosted CLI, protected Cloudflare verification, and the current empty-installation trial pass on `25b2033`.
 Supabase remains active.
 During final verification, the owner merged PR #23 at `c144a2a`.
 T0020 includes that main revision and preserves the jury worklist.
-The combined source passes 611 unit and database tests across 41 files and all 45 ordinary browser cases.
+The combined source passes 614 unit and database tests across 41 files and all 45 ordinary browser cases.
 The complete local React journey also passes through the merged jury worklist.
 The [ticket](tickets.md#t0020-complete-cloudflare-connector) records the complete acceptance criteria.
 The [PR #21 component record](pr21-installation-disposition.md) explains installation reuse decisions.
@@ -28,7 +28,7 @@ The full Worker supplies maintained authentication, authorized snapshots, admini
 The browser can select this connector with `VITE_BACKEND=cloudflare` for an isolated build.
 The default remains Supabase.
 Provider-owned installation tooling validates public configuration, checks the exact target, and creates one initial owner only in an empty database.
-The [installation guide](install-cloudflare.md) passed its current hosted empty-installation trial on source `e44cb69`.
+The [installation guide](install-cloudflare.md) passed its current hosted empty-installation trial on source `25b2033`.
 This evidence supports isolated development installations. It does not establish production capacity or a migration path.
 
 Observed results during implementation are separate from final PR verification:
@@ -40,13 +40,13 @@ Observed results during implementation are separate from final PR verification:
 - All eight unchanged shared provider scenarios pass against Minsky CI on Supabase, `ghtztmovdkhuketcbjmq`. Fixture cleanup passes.
 - The same eight scenarios pass against the deployed Cloudflare connector on `1ee8cbf`, with scoped D1, R2, and Durable Object cleanup.
 - The complete hosted React journey passes on `59121f7`, with zero failures, skips, or flaky results.
-- A separate empty hosted installation passes the documented procedure and complete React journey on `e44cb69`.
+- A separate empty hosted installation passes the documented procedure and complete React journey on `25b2033`.
 - The local complete HTTPS Worker journey passes with actual authentication, D1, R2, and Durable Object bindings.
 - The complete local React journey passes through actual HTTPS and emulated bindings, including phone keyboard checks and exact fixture cleanup.
 - All 45 ordinary application browser regressions pass after main integration. Three local HTTPS authentication browser cases pass at the earlier revision.
 - Both frontend builds, type checking, lint, Deno checks, and all 12 function tests pass after the review corrections.
 - Both locked dependency audits report zero vulnerabilities.
-- The full-history secret scan passes across 124 commits through `ab4a8ff`.
+- Full-history secret scanning passes in both ordinary CI runs on `25b2033`.
 
 The hosted D1 run uses the new `minsky-connector-ci` database, `de43cf95-c024-4e44-860d-8ff179e4e08d`.
 All nine repository D1 migrations are applied there.
@@ -73,7 +73,7 @@ Protected [run 39098783172](https://github.com/GiftedNovaHD/minsky/actions/runs/
 It deploys CI Worker version `33977804-a8c2-475d-ad52-27906df0a136`, then passes six of eight shared scenarios.
 Both failing scenarios exceed their 90-second limit. The lifecycle then reports a sign-in message, and the image case reports a closed page.
 The static sign-in message does not establish HTTP 401. The hosted React step is not reached.
-Fixture cleanup reports no retained recovery marker or artifact. The timeout cause requires correction before owner review.
+Fixture cleanup reports no retained recovery marker or artifact. The later region-selected run below corrects these timeouts.
 Ordinary push CI passes on that corrected revision in [run 39098769818](https://github.com/GiftedNovaHD/minsky/actions/runs/39098769818).
 
 The `cloud-test` environment now permits `feature/t0020-cloudflare-connector`.
@@ -120,7 +120,7 @@ Its [object listing](https://developers.cloudflare.com/api/resources/durable_obj
 No object reported stored data. No stored orphan state was observed at that check.
 The audit made no cleanup mutation and did not inspect the separate installation baseline.
 The repeated audit at 04:53:09 UTC returned the same storage flags and zero queried application rows after the second failed run.
-Final protected verification will use the corrected isolation.
+The later protected runs use the corrected isolation.
 The guarded migration command applied all nine migrations to the new store database.
 All 70 direct workflow cases pass there, with zero skips and verified scoped cleanup, using the changes committed as `9b0ef6b`.
 All 82 account CLI cases also pass on that store target at `9b0ef6b`, with zero skips and verified scoped cleanup.
@@ -163,6 +163,10 @@ Its workflow phase passes all 70 cases in 4 minutes 36 seconds.
 The next protected run, `39105044129` on `e44cb69`, passes all 82 account cases in 5 minutes 9 seconds.
 That is 14 minutes 57 seconds, or 74.4%, shorter than the original phase.
 Its workflow phase passes all 70 cases in 4 minutes 19 seconds.
+Protected run `39107250938` on `25b2033` passes all 82 account cases in 5 minutes, from 07:30:06 to 07:35:06 UTC.
+That is 15 minutes 6 seconds, or 75.1%, shorter than the original phase.
+Its workflow phase passes all 70 cases in 4 minutes 17 seconds.
+The later application-placement setting does not change this separate store target.
 The elapsed comparison combines batching and concurrency changes. It does not isolate their individual effects.
 
 The remaining shared-scenario failures now have provider-owned HTTP diagnostics.
@@ -224,7 +228,7 @@ Median request duration is 1,537.415 milliseconds. Median CPU time is 8.192 mill
 The placement status reports `SUCCESS`, but execution remains in North America. This candidate does not correct the observed wait.
 Cloudflare's [2025-02-13 change](https://developers.cloudflare.com/workers/platform/changelog/#2025-02-13) removed automatic placement beside a bound D1 database.
 The current placement logic uses traffic measurements and previously observed execution locations.
-An explicit region near the database requires a separate measured comparison.
+The next comparison tests an explicit region near the database.
 
 The exact-target `SELECT 1` metadata confirms `served_by_region=APAC` and `served_by_primary=true`, with 0.1465 milliseconds of SQL time.
 This result identifies the serving region, not a physical database city.
@@ -236,7 +240,40 @@ The CI candidate uses `aws:ap-southeast-1`, which selects Cloudflare execution n
 All 79 focused tooling and provider-safety tests pass, with type checking and focused lint.
 Target checks, both builds, and the deployment dry run pass.
 The isolated deployment produces version `48827ab3-7931-4733-95df-12060185c326`.
-The default local build is restored to Supabase. Hosted improvement remains unverified until the controlled run finishes.
+The default local build is restored to Supabase. The protected comparison below supplies the separate hosted improvement evidence.
+The region candidate's complete hosted CLI command passes all eight unchanged scenarios in 169.449 seconds, including startup.
+Its 29 clients record 290 requests totaling 110,006 milliseconds, with a maximum of 1,594 milliseconds.
+No resource authentication rejection occurs. Scoped D1, R2, and coordinator cleanup passes without a retained journal.
+The tested source is committed as `25b2033`. Protected [run 39107250938](https://github.com/GiftedNovaHD/minsky/actions/runs/39107250938) supplies the separate GitHub comparison.
+Ordinary [PR run 39107232566](https://github.com/GiftedNovaHD/minsky/actions/runs/39107232566) passes on that source.
+It reports 614 unit and database tests across 41 files, 45 ordinary browser cases, three authentication browser cases, and three docs cases.
+The local HTTPS runtime and complete local React journey each pass their required case, with no failures, skips, or flaky results.
+
+### Final protected connector verification
+
+Protected [run 39107250938](https://github.com/GiftedNovaHD/minsky/actions/runs/39107250938) passes on `25b2033`.
+Its ordinary checks report 614 unit and database tests across 41 files. Secret and dependency checks pass.
+The hosted job passes all 70 workflow cases, all 82 account cases, all eight unchanged shared scenarios, and one complete React journey.
+The hosted React result has zero failures, skips, or flaky results.
+The shared step takes 3 minutes 9 seconds. The hosted React step takes 2 minutes 27 seconds.
+The deployed CI Worker version is `f47c52c7-2487-4a2b-a5d4-97d225cbdb52`.
+Scoped cleanup reports no incomplete marker, retained journal, or recovery artifact.
+
+The lifecycle completes 59 requests totaling 26,932 milliseconds. The image case completes 66 requests totaling 32,638 milliseconds.
+All scenarios complete. The 29 client summaries cover 290 requests, with a maximum of 1,417 milliseconds and no unexpected resource HTTP 401.
+The earlier Smart Placement lifecycle and image cases time out after fewer completed requests totaling about 88 seconds each.
+Assertions, the 90-second scenario limit, password parameters, and current-access checks remain unchanged.
+
+Read-only analytics for 07:36 to 07:38 UTC report 305 invocations in SIN and two in ORD, with zero runtime errors or client disconnects.
+Median request duration is 125.215 milliseconds, compared with 1,537.415 milliseconds in the earlier Smart Placement sample.
+The 95th percentile is 472.854 milliseconds, compared with 3,339.228 milliseconds.
+Median CPU time is 14.754 milliseconds. The analytics window includes all invocation types.
+The two ORD entries report zero request duration and no subrequests.
+Measured execution location, lower request times, and completed assertions support repeated distant database calls as the timeout cause.
+This comparison verifies the isolated correction. It does not establish contest capacity or latency targets for other installations.
+
+Ordinary [push run 39107229711](https://github.com/GiftedNovaHD/minsky/actions/runs/39107229711) and [PR run 39107232566](https://github.com/GiftedNovaHD/minsky/actions/runs/39107232566) also pass separately on `25b2033`.
+Final documentation changes preserve that executable source and configuration. Final-head checks are published in [PR #42](https://github.com/GiftedNovaHD/minsky/pull/42).
 
 ### Documentation search verification
 
@@ -314,7 +351,7 @@ The retained baseline includes 20 delivered notifications, three audience counte
 There are zero pending notifications or account operations. Journey workflow and image rows remain absent.
 The audit reads no private credentials and makes no provider changes.
 
-### Current-source empty installation
+### Smart Placement empty installation
 
 A second clean checkout follows the current guide at `e44cb69b8f72499d5ba9e5c1d35e1b64bd0b4fe9`.
 Its generated configuration includes Smart Placement. The earlier installation remains intact.
@@ -322,7 +359,7 @@ The account and exact name absence are checked before any resource creation.
 `npm ci` installs 262 packages and reports zero vulnerabilities.
 All nine migrations, build, deployment dry run, deployment, atomic bootstrap, and initial secret creation pass in order.
 
-| Resource | Current trial value |
+| Resource | Trial value |
 | --- | --- |
 | Worker and D1 name | `minsky-install-t0020-b1b80054` |
 | Origin | `https://minsky-install-t0020-b1b80054.icaic-minsky.workers.dev` |
@@ -351,6 +388,50 @@ The browser trial passes at 06:51:33 UTC. Proof cleanup passes at 06:52:56 UTC, 
 The fictional installation remains available for owner review. No real data or active backend is changed.
 Current owner credentials remain in the private mode `0600` file `/tmp/minsky-empty-install-b1b80054/private/owner-recovered-current.json`.
 Earlier password files are stale. Open the current file privately.
+
+### Current-source empty installation
+
+A new clean checkout of `25b2033aef57fce8900487e4afa7df7c12c76100` repeats the complete installation procedure with explicit placement.
+The exact account and resource-name absence checks precede provisioning. Both earlier installations remain intact.
+Database creation requests `--location=apac`. A real `SELECT 1` confirms an APAC primary, with 0.3967 milliseconds of SQL execution.
+Public settings include `placementRegion: "aws:ap-southeast-1"`. Deployed service metadata confirms the targeted mode and region.
+`npm ci` installs 262 packages with zero reported vulnerabilities.
+All nine migrations, build, deployment dry run, deployment, bootstrap, and initial secret creation pass in order.
+
+| Resource | Current trial value |
+| --- | --- |
+| Worker and D1 name | `minsky-install-t0020-a0dd9afc` |
+| Origin | `https://minsky-install-t0020-a0dd9afc.icaic-minsky.workers.dev` |
+| D1 UUID | `4a96403e-99ea-4b07-b581-fe06ace879aa` |
+| Private Standard R2 bucket | `minsky-install-t0020-a0dd9afc-images` |
+| Initial Worker version | `ff7ff6ab-c8bd-4f7d-83f5-ba5ca61b21aa` |
+| Active version after initial secret | `0a39a579-6be3-4c71-b2ed-c268fa592534` |
+| Installation UUID | `fa6029d0-63a6-48cb-a9a2-4ce15c56f69b` |
+| Owner UUID | `62055103-98b6-4bea-9653-ebb851aedea2` |
+
+The complete trial passes once in 178.275 seconds, with zero failures, skips, retries, flaky results, or infrastructure errors.
+It includes the unchanged current React journey, merged jury worklist, phone and keyboard checks, workflow, private images, live updates, and revocation.
+First-owner password gates, configured roster, closed intake, and repeated bootstrap and secret refusals pass.
+Trusted owner recovery rejects the old session with HTTP 401 and requires another UI password change.
+The exact installation and account IDs, administrator membership, issue, and history remain identical across recovery.
+The private fixture checks the explicit region separately and retains the unchanged strict journal identity.
+No browser request uses Supabase.
+
+UUID-scoped cleanup verifies the journey's D1 records, exact R2 objects, and empty fixture coordinator state before journal removal.
+Atomic ownership guards then delete only the separate recovery-proof rows. Browser contexts close.
+Final counts retain one installation, account, identity, credential, event, session, and administrator membership, plus two teams.
+Workflow fixture rows, staff roles, images, deletion records, pending notifications, and bucket objects are zero.
+Twenty delivered baseline notifications, seven audits, and three monotonic audience counters remain with matching baseline coordinator cursors.
+Intake remains closed. The owner is enabled and ready after the final password change.
+The bucket's public development URL is disabled, and no public custom domain exists.
+
+The browser trial passes at 07:26:14 UTC. Proof cleanup passes at 07:27:19 UTC, and final read-only checks pass at 07:28:01 UTC.
+A separate refusal check passes at 07:28:36 UTC with writes forbidden and no password hashing started.
+At 07:31:53 UTC, both documented metadata commands also pass with the provisioning configuration, without a D1 binding.
+They confirm the exact database name and UUID, then return `1` from the APAC primary. Neither command changes data.
+Current owner credentials remain only in the private mode `0600` file `/tmp/minsky-empty-install-a0dd9afc/private/owner-recovered-current.json`.
+Open that file privately. Earlier password files for this trial are stale.
+The initialized fictional installation remains available for owner review. This trial does not replace protected GitHub verification or establish production capacity.
 
 ### R2 need and cost
 

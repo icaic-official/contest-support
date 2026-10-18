@@ -1,9 +1,9 @@
 # Install an isolated Cloudflare instance
 
-**Verified for an isolated development installation on 2026-10-18, source `e44cb69`.**
+**Verified for an isolated development installation on 2026-10-18, source `25b2033`.**
 The empty hosted trial passed this procedure, the complete React journey, and trusted owner recovery.
 The [trial record](current-state.md#current-source-empty-installation) lists resources, versions, results, and scoped cleanup.
-That trial uses Smart Placement. The optional explicit-region setting below is under hosted verification.
+That trial requests an APAC D1 primary and uses explicit Worker placement near Singapore.
 Use new, isolated resources. This procedure does not establish production capacity or real-data migration.
 Supabase remains the project's active development backend.
 
@@ -84,12 +84,24 @@ npx wrangler whoami --config=.wrangler/installation/provision.jsonc
 npx wrangler d1 create "$MINSKY_INSTALL_DATABASE" --config=.wrangler/installation/provision.jsonc --update-config=false
 ```
 
+For an APAC installation, add `--location=apac` to the creation command.
+A [D1 location hint](https://developers.cloudflare.com/d1/configuration/data-location/#provide-a-location-hint) requests a region. It does not guarantee a physical location.
 The creation result gives the new database UUID.
 Record that UUID in a public shell variable:
 
 ```sh
 MINSKY_INSTALL_DATABASE_ID='REPLACE_WITH_NEW_DATABASE_UUID'
 ```
+
+Confirm the database name, UUID, and actual serving region:
+
+```sh
+npx wrangler d1 info "$MINSKY_INSTALL_DATABASE" --config=.wrangler/installation/provision.jsonc --json
+npx wrangler d1 execute "$MINSKY_INSTALL_DATABASE" --config=.wrangler/installation/provision.jsonc --remote --command='SELECT 1' --json
+```
+
+The metadata must match the new UUID. The query metadata reports `served_by_region` and `served_by_primary`.
+The APAC trial reports `APAC` and `true`. This read creates no application records.
 
 Edit `provider.json` with these exact settings:
 
@@ -143,7 +155,7 @@ See [Cloudflare placement](https://developers.cloudflare.com/workers/configurati
 It disables preview URLs and includes no authentication secret.
 Do not hand-edit bindings or add environment overrides.
 If public settings need correction, generate a new configuration path and review that result.
-After updating this checkout, regenerate older configuration files from the same public settings at a new path.
+If current operator commands reject an older configuration, regenerate it from the same public settings at a new path.
 Review the account and resource IDs before using the new file. Current operator commands require this checkout's complete generated configuration.
 
 Create the new R2 bucket through this explicit target:
@@ -336,4 +348,4 @@ A later trusted attempt with a new output file supersedes the interrupted operat
 
 Do not delete retained result files until you establish the operation's outcome and secure the current credentials.
 The installer performs no automatic resource deletion or PR closure.
-See the [PR #21 component record](pr21-installation-disposition.md) for the conditional disposition recommendation.
+See the [PR #21 component record](pr21-installation-disposition.md) for the recommendation that the owner close that PR as superseded for Cloudflare installation.

@@ -4,7 +4,7 @@ description: Prepare an isolated Cloudflare application with its own accounts, d
 ---
 
 :::note[Verified development installation]
-T0020's complete hosted procedure passed on 18 October 2026 at source `e44cb69`.
+T0020's complete hosted procedure passed on 18 October 2026 at source `25b2033`.
 The isolated trial checked the full React workflow, private images, live updates, owner recovery, and fixture cleanup.
 Use new isolated resources. Production capacity and real-data migration remain unverified.
 Supabase remains the project's active development backend.
@@ -70,5 +70,5 @@ Use the [verification guide](/operators/verification/) to distinguish completed 
 T0020 reuses its suitable configuration checks and bootstrap safeguards.
 It replaces its Supabase-specific installation code.
 The PR remains open for the owner's disposition decision.
-The T0020 component record recommends closure after the remaining protected connector checks pass.
+The T0020 component record recommends that the owner close PR #21 as superseded for Cloudflare installation.
 Container packaging, AWS, Terraform, and real-data migration remain outside this procedure.

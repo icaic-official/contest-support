@@ -5,7 +5,7 @@ T0016 added design documents. T0015 added shared tests and Supabase fixes.
 The phases below are acceptance steps, not additional opened development tickets.
 
 T0020 uses `feature/t0020-cloudflare-connector`, from updated `main` at `7d19b00` after PR #41 merged.
-The complete connector passes hosted development journeys with verified fixture cleanup. Protected connector CI remains pending.
+The complete connector passes hosted development journeys and protected connector CI, with verified scoped fixture cleanup.
 Supabase remains the active development backend.
 
 ## Current milestone evidence
@@ -16,16 +16,16 @@ Supabase remains the active development backend.
 | Complete application boundary | Authenticated routes, session lists, authorized snapshots, administration, and every browser `Backend` group. | Application cases, the local HTTPS runtime, and local and hosted complete React journeys pass. All 82 hosted D1 account cases pass. |
 | Private R2 images | Reservations, immutable transfers, completion, authorized downloads, removal, abandonment, expiry, and exact-key recovery. | All 59 local image cases pass. Hosted shared scenarios and the complete React journey verify private R2 image behavior and scoped cleanup. |
 | Durable Object updates | Audience-specific delivery from the D1 outbox, current-access checks, duplicate handling, reconnect refresh, and retry recovery. | Local delivery and cleanup-binding checks pass. Hosted shared scenarios verify audience separation and independent subscribers. The hosted React journey verifies reconnection and refreshed state. |
-| Shared provider assertions | Both fixture drivers use the same eight scenarios. | Both providers pass all eight unchanged scenarios with verified fixture cleanup. The Cloudflare CLI run verifies `1ee8cbf`. |
-| Empty installation | Provider-owned configuration, explicit target checks, atomic bootstrap, and trusted owner recovery. | Local bootstrap, recovery, and tooling cases pass. The separate documented hosted journey passes on `e44cb69`, with verified scoped fixture cleanup. |
+| Shared provider assertions | Both fixture drivers use the same eight scenarios. | Both providers pass all eight unchanged scenarios with verified fixture cleanup. The Cloudflare CLI run verifies `25b2033`. |
+| Empty installation | Provider-owned configuration, explicit target checks, atomic bootstrap, and trusted owner recovery. | Local bootstrap, recovery, and tooling cases pass. The separate documented hosted journey passes on `25b2033`, with verified scoped fixture cleanup. |
 
 The owner activated R2 after the initial provider error `10042`.
 The isolated Standard CI bucket has public access disabled and passes hosted image journeys.
 Workers Paid is active.
 Direct workflow and account cases use the D1-only store target. The application keeps its separate database and live bindings.
-The complete hosted React and separate empty-installation journeys pass on `e44cb69`.
-The shared CLI run verifies `1ee8cbf`. Its bridge correction leaves the application Worker source unchanged.
-Protected Cloudflare connector CI on `9b0ef6b` passes both direct suites, then fails two shared browser scenarios. Record this result separately from CLI evidence.
+The complete hosted React and separate empty-installation journeys pass on `25b2033`.
+The shared CLI run verifies `25b2033`. Its explicit application placement is also verified by protected CI.
+Protected Cloudflare connector CI passes all 70 workflow cases, 82 account cases, eight shared scenarios, and the complete React journey on `25b2033`.
 Record each result with its actual revision and target in [current state](current-state.md).
 Earlier aggregate test counts describe those runs and do not replace checks of the final PR revision.
 
@@ -111,7 +111,7 @@ Current evidence remains in the [T0018 record](current-state.md#t0018-cloudflare
 The initial protected run passed 28 hosted D1 account cases, then reached the Workers Free HTTP resource limit.
 The owner initially deferred subscription activation on 2026-10-18, then activated Workers Paid during PR #41 review.
 The isolated authentication Worker accepted the 1,000 ms CPU cap and passed later hosted HTTP and protected authentication checks.
-Keep those results separate from the complete T0020 connector, whose protected job remains pending.
+Keep those earlier results separate from the complete T0020 connector, whose protected job passes on `25b2033`.
 T0020 retains the maintained Better Auth implementation and its password parameters.
 Data migration remains later work.
 The owner selected organizer-issued replacement temporary passwords on 2026-10-17.
@@ -147,7 +147,7 @@ The hosted CLI verification has completed this sequence:
 5. Verify the documented empty installation and owner recovery procedure.
 
 Scoped installation fixture cleanup passes. The installed baseline remains intact, and both test Durable Objects are empty.
-Protected connector CI on `9b0ef6b` fails two shared browser scenarios after passing both direct suites. A corrected job must pass before final acceptance.
+The [final protected connector job](current-state.md#final-protected-connector-verification) passes both direct suites, all eight shared scenarios, and the complete React journey.
 
 Keep provider imports in the corresponding adapter modules.
 Pass dependencies and authenticated context explicitly.
@@ -179,7 +179,7 @@ Keep generated credentials in exclusive private files outside the checkout.
 
 The [PR #21 record](pr21-installation-disposition.md) identifies reused, replaced, and deferred components.
 Do not merge its old branch wholesale.
-The final recommendation to close that PR remains conditional on the complete goal passing.
+The final record recommends that the owner close PR #21 as superseded for Cloudflare installation.
 The owner decides whether to close it.
 Docker packaging remains outside this ticket.
 

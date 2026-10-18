@@ -10,9 +10,9 @@ T0020 extends that store to every workflow command and adds the complete Cloudfl
 The full D1 suite passes all 70 cases on local and isolated hosted D1, with cleanup.
 Direct persistence and account suites use a D1-only database. Their records cannot enter the application's live delivery process.
 Both providers pass the same eight shared scenarios with verified fixture cleanup.
-The Cloudflare CLI run verifies `e44cb69` through the hosted Worker, D1, private R2, and Durable Objects.
+The Cloudflare CLI run verifies `25b2033` through the hosted Worker, D1, private R2, and Durable Objects.
 The owner enabled R2 after the earlier provider error `10042`.
-Protected Cloudflare CI remains pending. Keep its result separate from the passing CLI run.
+Protected Cloudflare CI also passes on `25b2033`. Keep its result separate from the passing CLI run.
 
 T0019 reuses the workflow scenarios against the [shared server service](server-workflow.md).
 The focused [hosted Supabase suite](../tests/workflow/supabase.test.ts) replaces only the workflow executor in a real Supabase connection.
@@ -62,7 +62,7 @@ It creates fictional application and Better Auth records in its dedicated D1 dat
 Its browser contexts use the hosted application origin for API calls, cookies, request protection, and WebSockets.
 Playwright supplies only bridge and source assets from the local Vite server under that browser origin.
 Those intercepted assets do not replace application HTTP operations or become public deployment routes.
-The separate hosted product UI journey passes on `e44cb69`.
+The separate hosted product UI journey passes on `25b2033`.
 
 ESLint rejects provider imports in shared scenarios, fixture contracts, and the browser bridge.
 Provider implementations register outside those files.
@@ -90,7 +90,7 @@ It does not prove delivery latency or the absence of arbitrarily delayed message
 The Cloudflare-specific suites additionally test current credential guards, atomic administration, concurrent image limits, partial storage failures, and live reconnect recovery.
 Local checks cover application reads, image limits and recovery, live updates, and the complete HTTPS runtime.
 Installation and tooling tests cover bootstrap, owner recovery, exact target selection, and credential handling.
-The separate documented hosted empty-installation journey passes on `e44cb69`.
+The separate documented hosted empty-installation journey passes on `25b2033`.
 Its scoped fixture cleanup also passes. The installed baseline remains intact, and both test Durable Objects are empty.
 See [current state](current-state.md) for exact case counts and revisions.
 
@@ -152,4 +152,4 @@ The Supabase scenario retains its workflow hooks. Cloudflare supplies its real a
 Both providers use the same identity, temporary-password, password-change, logout, stale-password, and subscription-cleanup assertions.
 That earlier bounded reuse did not establish complete Cloudflare `Backend` conformance.
 T0020's complete driver now passes all eight unchanged scenarios against the hosted Cloudflare application.
-The protected connector job remains a separate pending verification gate.
+The [protected connector job](current-state.md#final-protected-connector-verification) passes as a separate verification gate.

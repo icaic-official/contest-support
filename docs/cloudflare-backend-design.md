@@ -9,10 +9,10 @@ T0020 implements the complete Cloudflare connector and isolated installation too
 All 70 production D1 cases pass locally and against the separate hosted D1-only store database, with cleanup.
 Local HTTPS runtime, application, image, live-update, and installation checks also pass.
 Both providers pass the same eight shared scenarios with verified fixture cleanup.
-The Cloudflare CLI run verifies `1ee8cbf`.
-The complete hosted React journey passes on `e44cb69`.
-The documented empty-installation journey also passes on `e44cb69`, including trusted owner recovery.
-Scoped fixture cleanup passes for both hosted journeys. Protected Cloudflare connector CI remains pending.
+The Cloudflare CLI run verifies `25b2033`.
+The complete hosted React journey passes on `25b2033`.
+The documented empty-installation journey also passes on `25b2033`, including trusted owner recovery.
+Scoped fixture cleanup and protected Cloudflare connector CI pass. See the [final hosted record](current-state.md#final-protected-connector-verification).
 The owner activated R2 after the initial provider error `10042`. Hosted image and live-update journeys now pass.
 Direct persistence and account tests use a database without a deployed Worker.
 Application checks use the complete CI Worker, with R2, Durable Objects, and scheduled recovery enabled.
@@ -358,7 +358,7 @@ T0018 supplied bounded authentication after the D1 proof.
 T0019 verified the shared rules through Supabase before T0020's complete D1 persistence.
 T0020's [installation tooling](install-cloudflare.md) requires an empty isolated database and explicit provider targets.
 Its local bootstrap and recovery checks pass.
-The documented hosted empty-installation journey passes on `e44cb69`, including owner recovery, old-session rejection, and preserved application records.
+The documented hosted empty-installation journey passes on `25b2033`, including owner recovery, old-session rejection, and preserved application records.
 Scoped fixture cleanup passes, including empty test Durable Objects.
 The installed owner, event, session, roster, and administrator membership remain intact.
 The [PR #21 record](pr21-installation-disposition.md) identifies reused, replaced, and deferred components.

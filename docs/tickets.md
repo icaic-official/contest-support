@@ -60,7 +60,7 @@ T0008 fuzzy team search merged into `main` in [PR #22](https://github.com/notbow
 ## T0020 Complete Cloudflare connector
 
 Branch: `feature/t0020-cloudflare-connector`, from updated `main` at `7d19b00`.
-Status: implemented in draft [PR #42](https://github.com/GiftedNovaHD/minsky/pull/42). Hosted provider, complete React, and empty-installation checks pass. The latest protected connector run has two shared-scenario failures. The owner reviews and merges.
+Status: implemented and verified for owner review in [PR #42](https://github.com/GiftedNovaHD/minsky/pull/42). Hosted provider, protected Cloudflare, complete React, and empty-installation checks pass. The owner reviews and merges.
 Summary: Complete every Cloudflare backend operation and verify the application with isolated resources. Verify installation into an empty Cloudflare environment.
 
 The owner authorized the complete connector after PR #41 merged.
@@ -101,27 +101,30 @@ Do not claim contest capacity without separate evidence.
 - [x] The same required shared scenarios pass against Supabase and Cloudflare.
 - [x] Complete hosted application journeys pass with fictional accounts and images.
 - [x] The documented installation procedure succeeds in an empty isolated Cloudflare environment.
-- [ ] PR #21 reuse decisions and the final disposition recommendation are documented.
+- [x] PR #21 reuse decisions and the final disposition recommendation are documented.
 - [x] Fixture cleanup is verified and deletes only UUID-owned data.
-- [ ] Required type, lint, build, database, function, browser, documentation, and hosted checks pass.
-- [ ] Local, hosted CLI, and protected GitHub Actions evidence are recorded separately.
-- [ ] The final PR revision has passing required checks and accurate documentation for owner review.
+- [x] Required type, lint, build, database, function, browser, documentation, and hosted checks pass.
+- [x] Local, hosted CLI, and protected GitHub Actions evidence are recorded separately.
+- [x] The final PR revision has passing required checks and accurate documentation for owner review.
 
 ### Verification
 
 All 70 full-workflow cases pass locally and on the separate hosted connector D1 database.
 All 82 hosted account cases pass there, with zero skips and verified cleanup.
-The local merged-main run passes 566 tests across 34 files.
-Corrected ordinary CI passes 579 tests across 35 files on `9b0ef6b`. Checked behavior criteria include local and hosted evidence.
+Both ordinary CI runs on `25b2033` pass 614 tests across 41 files.
 The same eight shared provider scenarios pass against Supabase and Cloudflare.
 The local complete HTTPS Worker journey and all 45 ordinary browser regressions pass.
 The complete local React journey also passes through the merged jury worklist.
-The complete hosted React journey passes on `e44cb69`.
+The complete hosted React journey passes on `25b2033`.
 A separate clean checkout passes the documented empty installation, complete React assertions, and trusted owner recovery on that source.
 Scoped D1, R2, and coordinator cleanup passes for both hosted targets.
 The owner enabled R2 after the initial provider error `10042`.
-Protected Supabase verification passes on `de1ecbd`. Protected connector verification on `9b0ef6b` passes both direct suites, then fails two shared browser scenarios.
-The [current-state record](current-state.md#t0020-connector-implementation-2026-10-18) separates observed results from pending acceptance work.
+Protected Supabase verification passes on its recorded revision, `de1ecbd`.
+Protected Cloudflare [run 39107250938](https://github.com/GiftedNovaHD/minsky/actions/runs/39107250938) passes all 70 workflow cases, 82 account cases, eight shared scenarios, and the complete React journey on `25b2033`.
+The account phase falls from 20 minutes 6 seconds to 5 minutes without changing case assertions or password parameters.
+Explicit application placement near the APAC primary corrects the two earlier shared-scenario timeouts. The 90-second limit remains unchanged.
+The [current-state record](current-state.md#t0020-connector-implementation-2026-10-18) separates local, hosted CLI, and protected evidence.
+Final-head checks are published in PR #42. Its final documentation changes preserve the verified executable source and configuration.
 
 ## T0019 Shared server workflow
 

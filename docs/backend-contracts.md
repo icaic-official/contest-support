@@ -6,7 +6,7 @@ Supabase remains the active implementation.
 T0020 implements every Cloudflare operation.
 The same eight shared scenarios pass against Supabase and Cloudflare through their real browser adapters.
 The complete hosted Cloudflare React journey and a separate empty-installation journey also pass.
-Scoped fixture cleanup passes for both hosted journeys. Protected Cloudflare CI remains pending.
+Scoped fixture cleanup and protected Cloudflare CI pass. See the [final hosted record](current-state.md#final-protected-connector-verification).
 These results verify isolated development resources.
 
 The contracts describe Minsky operations.
@@ -285,9 +285,9 @@ That runner permits only the approved Minsky CI project. It does not activate th
 Hosted checks use isolated accounts and records through [protected cloud CI](cloud-onboarding.md#verification-and-protected-cloud-ci).
 The [shared provider suite](provider-test-contracts.md) checks these contracts through real browser adapters.
 Supabase and Cloudflare have separate fixture implementations with the same scenario assertions.
-The Cloudflare CLI run passes all eight unchanged shared scenarios on `e44cb69` with verified fixture cleanup.
-The complete hosted React journey passes on `e44cb69`.
-The separate documented empty-installation journey also passes on `e44cb69`, with verified fixture cleanup.
-Protected Cloudflare CI on `9b0ef6b` passes both direct suites, then fails two shared browser scenarios. Final acceptance remains pending.
+The Cloudflare CLI run passes all eight unchanged shared scenarios on `25b2033` with verified fixture cleanup.
+The complete hosted React journey passes on `25b2033`.
+The separate documented empty-installation journey also passes on `25b2033`, with verified fixture cleanup.
+Protected Cloudflare CI passes both direct suites, all eight shared scenarios, and the complete React journey on `25b2033`.
 [Run the shared checks](run-provider-tests.md) separately from the provider-specific hosted UI suite.
 The latest observed results are in [current state](current-state.md).

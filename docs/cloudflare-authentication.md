@@ -5,7 +5,7 @@ Supabase remains the active application backend.
 T0020 adds the complete connector and passes all 82 hosted D1 account cases.
 The complete hosted React journey verifies account gates and organizer recovery through the application.
 A separate empty-installation journey verifies owner bootstrap, password change, and trusted recovery.
-Scoped installation fixture cleanup passes. Protected Cloudflare connector CI remains pending.
+Scoped installation fixture cleanup and protected Cloudflare connector CI pass. See the [final hosted record](current-state.md#final-protected-connector-verification).
 Real-data migration remains later work.
 This reference describes the implemented API. Use the [installation guide](install-cloudflare.md) for the separate setup procedure.
 

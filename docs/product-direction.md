@@ -73,7 +73,7 @@ The active application retains the legacy PostgreSQL workflow during this transi
 T0020 implements the complete Cloudflare connector and provider-owned installation tooling.
 Its local checks, hosted D1 tests, and all eight shared scenarios pass.
 The complete hosted React journey and a separate documented empty-installation journey also pass.
-Scoped fixture cleanup passes. Protected Cloudflare connector CI remains pending.
+Scoped fixture cleanup and protected Cloudflare connector CI pass.
 
 Supabase manages the services.
 Minsky still requires repository-owned migrations and functions that implement its schema, authorization policies, and business rules.
@@ -83,7 +83,7 @@ Those rules require tests.
 It includes cloud onboarding, Supabase authentication behind username and password login, shared Postgres workflows, role dashboards, and minimal account administration.
 It also includes reproducible local contribution.
 Protected Supabase CI passes at its recorded revision.
-The complete protected Cloudflare connector job remains pending.
+The complete protected Cloudflare connector job passes on `25b2033`.
 
 T0004 implements the selected UI makeover.
 T0005 implements issue images.

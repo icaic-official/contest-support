@@ -6,7 +6,7 @@ For the suite's responsibilities and limits, see [the test contracts](provider-t
 
 Both drivers use the same eight shared scenarios.
 Record local checks, CLI runs against hosted resources, and protected GitHub runs separately.
-The final protected Cloudflare connector check remains pending.
+The [protected Cloudflare connector check](current-state.md#final-protected-connector-verification) passes on `25b2033`.
 See [current state](current-state.md) for tested revisions, results, and cleanup evidence.
 
 ## List the scenarios without credentials
@@ -269,7 +269,7 @@ It prepares the separate full connector database before it builds and deploys th
 It runs the shared contracts and React journey against that full connector.
 The private bucket, service activation, and initial Worker secret must exist before this job can pass.
 The workflow does not activate a paid service or create the bucket.
-The final protected connector result remains pending. CLI results do not establish that protected result.
+The protected connector job passes on `25b2033`. This result is separate from the passing hosted CLI scenarios.
 The existing allowlist includes the T0020 branch. Preserve the other entries and protection rules.
 Earlier protected authentication runs do not check this complete connector job.
 Record protected Supabase verification separately from Cloudflare CLI runs and the protected connector job.

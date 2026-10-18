@@ -15,8 +15,10 @@ The local checkout had no tags.
 PRs #20, #21, #23, and #29 remained open.
 The docs site's earlier build and browser checks passed. Those checks do not establish release-quality content.
 
-The entries below are acceptance work within T0011 and its T0007 dependency, not newly created development tickets.
-They do not authorize new cloud resources, repository publication, license selection, or deployment.
+The entries below record the original T0011 audit and its T0007 dependency.
+T0020 now owns complete Cloudflare installation verification and the [PR #21 component review](pr21-installation-disposition.md).
+T0020's authorization and limits are in the [active ticket](tickets.md#t0020-complete-cloudflare-connector).
+This audit does not authorize repository publication or license selection.
 Capacity validation and outage features retain their existing scope and remain separate work.
 
 ## Reader structure
@@ -80,18 +82,23 @@ Keep isolated fixtures and preserve the decision to retire the local demo.
 **Observed:** [installation](../site/src/content/docs/operators/installation.md) requires the unmerged T0007 branch.
 The guide correctly labels container startup and a fresh independent backend as unverified.
 Its three hosting options do not have equivalent verification evidence.
+This was the 2026-10-17 observation. The current guide links to T0020's verified Cloudflare development procedure.
+The review-fix hosted empty-installation trial passes on `2b6f6f0`, including the complete application and owner recovery.
+See its [evidence record](current-state.md#fresh-installation-after-review-fixes). Container packaging remains deferred.
 
 **Complete when:** select a release revision and test a clean installation using only the published instructions.
 Record prerequisites, exact tool versions, account requirements, commands, expected results, and the tested revision.
 Complete the authenticated journey with fictional accounts and both image visibility modes.
 Keep other hosting paths labeled experimental until their own checks pass.
-T0007 owns the missing container and independent-installation evidence.
+T0020 owns the independent Cloudflare installation evidence. Container packaging is outside its scope.
 
 ### 5. Make first-administrator setup reproducible
 
-**Observed:** [backend setup](../site/src/content/docs/operators/backend.md) says to create and confirm an account through trusted administration.
+**Observed:** [the historical backend setup](https://github.com/GiftedNovaHD/minsky/blob/88ea5020a0f9dfc34a32ed7fbd84dfea07423297/site/src/content/docs/operators/backend.md) says to create and confirm an account through trusted administration.
 It then tells the reader to apply generated SQL through trusted database access.
-Neither task has a complete procedure or an expected result.
+Neither task had a complete procedure or an expected result in that earlier guide.
+The current [Cloudflare installation procedure](../site/src/content/docs/operators/installation.md) supplies bootstrap, expected results, target checks, and trusted recovery.
+See the [dated verification record](current-state.md) for the exact tested revision and installation results.
 
 **Complete when:** specify the supported account-creation method, confirmation setting, UUID lookup, SQL execution method, and target check.
 Use fictional values and explain each replacement.
@@ -311,7 +318,7 @@ The broader permission table and account-guide work in findings 7 and 8 remain i
 ## Recommended order
 
 1. Complete factual corrections, audience separation, and the contributor path within T0011.
-2. Use T0007's verified revision to finish installation, configuration, recovery, and operating procedures.
+2. Preserve T0020's verified independent Cloudflare development procedure and its recorded configuration, workflow, and owner-recovery evidence.
 3. Resolve owner decisions about licensing, publication, support, and the canonical address before announcing a public release.
 4. Review the complete reader journey, run applicable checks, and publish through the selected deployment workflow.
 

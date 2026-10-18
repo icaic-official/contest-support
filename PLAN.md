@@ -1,6 +1,18 @@
 # Minsky planning record
 
-**Parallel T0009 maintenance, 2026-10-18.** The owner requested an update to [PR #23](https://github.com/GiftedNovaHD/minsky/pull/23).
+**PR #42 review fixes and cleanup, 2026-10-18.** The owner requested all review fixes, cleanup, and tests before the existing T0020 PR is ready.
+Continue on `feature/t0020-cloudflare-connector`. Preserve Supabase as the active backend and preserve the merged jury worklist.
+Subtract before adding. Remove obsolete proof modes, duplicate helpers, stale instructions, and redundant references or stubs.
+Converge on the current `Backend` and `WorkflowPersistence` architecture.
+Keep one installation procedure and one current reference for each responsibility.
+Preserve unique historical decisions, authorization limits, and verification evidence.
+Retire executable historical proof paths instead of weakening current identity guards for compatibility.
+Run the required checks after the fixes. Record new local, hosted CLI, and protected results separately.
+Earlier passing runs do not verify the changed revision.
+The owner reviews and merges. Bounded subagent work remains authorized.
+The [earlier agent instructions](https://github.com/GiftedNovaHD/minsky/blob/88ea5020a0f9dfc34a32ed7fbd84dfea07423297/AGENTS.md) preserve the full ticket-specific scope record.
+
+**Completed T0009 maintenance request, 2026-10-18.** The owner requested an update to [PR #23](https://github.com/GiftedNovaHD/minsky/pull/23).
 Use its existing `feature/t0009-jury-worklist` branch in a separate worktree.
 Merge current `main` at `7d19b00` and verify current behavior before owner review.
 Preserve the separate T0020 connector checkout and scope.
@@ -9,7 +21,7 @@ Keep Supabase active. Add no schema, backend feature, provider implementation, o
 Use only UUID-owned fictional fixtures in Minsky CI, `ghtztmovdkhuketcbjmq`, for hosted acceptance.
 The owner approved the exact T0009 `cloud-test` branch addition on 2026-10-18. Preserve all other entries and protection rules.
 Do not deploy the application, merge the PR, or migrate data.
-Required checks and hosted acceptance must pass before PR #23 is ready for owner review.
+Required checks and hosted acceptance were prerequisites for that review. The owner later merged PR #23 at `c144a2a`.
 
 **Complete Cloudflare connector, 2026-10-18.** T0020 starts from updated `main` at `7d19b00` after PR #41 merged.
 Use `feature/t0020-cloudflare-connector` for the complete connector and empty-installation verification.
@@ -22,6 +34,8 @@ Isolated Cloudflare development, CI, and installation resources are authorized i
 Only T0020's branch may be added to the protected cloud-test allowlist. Preserve other entries and rules.
 Supabase remains active. Docker packaging, AWS, Terraform, real-data migration, and backend cutover remain deferred.
 The owner reviews and merges. Bounded subagent work is authorized.
+The owner merged T0009's jury worklist in PR #23 at `c144a2a` during T0020 verification.
+T0020 now includes that main revision and verifies the combined application before owner review.
 
 **PR #41 review follow-up, 2026-10-18.** The owner requested review fixes, code cleanup, and completion of authentication verification on the existing PR.
 Use `feature/t0019-shared-server-workflow`.
@@ -76,7 +90,7 @@ The branch starts from updated `main` at `53f9dfd`.
 Prove one D1 command that commits its state change, retry receipt, history, and notification record together.
 Define the SQLite schema and a provider-independent application-store interface.
 Use fictional fixtures and obtain hosted D1 evidence before claiming verification.
-See [the proof guide](docs/d1-transaction-proof.md) and [implementation plan](docs/cloudflare-implementation-plan.md).
+See [the historical proof guide](https://github.com/GiftedNovaHD/minsky/blob/88ea5020a0f9dfc34a32ed7fbd84dfea07423297/docs/d1-transaction-proof.md) and [historical implementation plan](https://github.com/GiftedNovaHD/minsky/blob/88ea5020a0f9dfc34a32ed7fbd84dfea07423297/docs/cloudflare-implementation-plan.md).
 
 Authentication and the remaining Cloudflare operations follow the proof.
 Full migration tooling follows connector verification.
@@ -101,7 +115,7 @@ This decision adds resource authorization for T0017 without authorizing real-dat
 
 **Parallel provider work, 2026-10-17.** The user authorized shared provider tests and Cloudflare design while PR #32 was under review.
 T0015 uses `feature/t0015-provider-contract-tests`.
-T0016 uses `feature/t0016-cloudflare-backend-design` for the [backend design](docs/cloudflare-backend-design.md) and [implementation plan](docs/cloudflare-implementation-plan.md).
+T0016 uses `feature/t0016-cloudflare-backend-design` for the [backend design](docs/cloudflare-backend-design.md) and [historical implementation plan](https://github.com/GiftedNovaHD/minsky/blob/88ea5020a0f9dfc34a32ed7fbd84dfea07423297/docs/cloudflare-implementation-plan.md).
 Both branches started from PR #32 at `d158906`, as an explicit exception to waiting for its merge.
 The user merged PR #32 at `ef6a029` on 2026-10-17 at 12:51:42 UTC.
 The user then merged T0015 in [PR #37](https://github.com/GiftedNovaHD/minsky/pull/37) at `738ef4a` on 2026-10-17 at 13:44:12 UTC.

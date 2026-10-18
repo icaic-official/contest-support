@@ -40,8 +40,7 @@ export default defineConfig({
         {label: 'Accounts and sessions', slug: 'guides/administration'},
       ]},
       {label: 'Operate an installation', items: [
-        {label: 'Installation options', slug: 'operators/installation'},
-        {label: 'Configure the backend', slug: 'operators/backend'},
+        {label: 'Install Cloudflare', slug: 'operators/installation'},
         {label: 'Verify and maintain', slug: 'operators/verification'},
         {label: 'Troubleshooting', slug: 'operators/troubleshooting'},
       ]},

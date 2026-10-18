@@ -79,6 +79,7 @@
         "npm:clsx@^2.1.1",
         "npm:cmdk@^1.1.1",
         "npm:deno@2.9.6",
+        "npm:esbuild@0.28.2",
         "npm:eslint-plugin-react-hooks@^7.1.1",
         "npm:eslint@^10.11.0",
         "npm:globals@^17.13.0",

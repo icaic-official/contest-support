@@ -1,4 +1,4 @@
-import type { Browser, BrowserContext } from '@playwright/test';
+import type { Browser, BrowserContext, Request as BrowserRequest } from '@playwright/test';
 import type { Backend, Unsubscribe } from '../../src/backend/contracts';
 import {
   ImageRequestError,
@@ -14,8 +14,17 @@ export interface BrowserBackend {
 
 interface Options {
   origin: string;
+  assetOrigin?: string;
   module: string;
   configuration: unknown;
+  diagnostics?: BrowserDiagnostics;
+}
+
+export interface BrowserDiagnostics {
+  observe(input: { method: string; url: string; status: number;
+    durationMilliseconds: number; hasSessionCookie: boolean }): Promise<void>;
+  flush(): Promise<void>;
+  summary(): unknown;
 }
 
 /** Each connection has its own cookie jar, storage, and real browser adapter. */
@@ -27,6 +36,48 @@ export async function createBrowserBackend(
     baseURL: options.origin,
   });
   const page = await context.newPage();
+  const diagnosticTasks = new Set<Promise<void>>();
+  if (options.diagnostics) {
+    const started = new WeakMap<BrowserRequest, number>();
+    page.on('request', (request) => { started.set(request, performance.now()); });
+    const observe = (request: BrowserRequest, status: number) => {
+      const url = new URL(request.url());
+      if (url.origin !== options.origin || !url.pathname.startsWith('/api/')) return;
+      const start = started.get(request);
+      const operation = (async () => {
+        if (start === undefined) throw new Error('The provider request start was not recorded.');
+        const cookie = await request.headerValue('cookie');
+        await options.diagnostics!.observe({ method: request.method(), url: url.href, status,
+          durationMilliseconds: performance.now() - start,
+          hasSessionCookie: /(?:^|;\s*)(?:__Host-)?minsky-session=/.test(cookie ?? '') });
+      })();
+      diagnosticTasks.add(operation);
+      // Keep rejected tasks until teardown. They must remain visible failures.
+      void operation.then(() => diagnosticTasks.delete(operation), () => undefined);
+    };
+    page.on('response', (response) => { observe(response.request(), response.status()); });
+    page.on('requestfailed', (request) => { observe(request, 0); });
+  }
+  const assetOrigin = options.assetOrigin ?? options.origin;
+  if (new URL(assetOrigin).origin !== new URL(options.origin).origin) {
+    // Only test and source assets come from Vite. API requests, WebSockets,
+    // cookies, and request-forgery protection retain the hosted browser origin.
+    // Vite's injected dynamic-import helper loads its client runtime from
+    // node_modules/vite, outside the optimized .vite dependency directory.
+    await context.route((url) => url.origin === new URL(options.origin).origin &&
+      /^\/(?:tests\/providers\/|src\/|@vite\/|@id\/|@fs\/|@react-refresh$|node_modules\/(?:\.vite\/|vite\/dist\/client\/))/.test(url.pathname), async (route) => {
+      const incoming = new URL(route.request().url());
+      const target = new URL(incoming.pathname + incoming.search, assetOrigin);
+      const response = await fetch(target, { redirect: 'error', headers: { Accept: route.request().headers().accept ?? '*/*' } });
+      let body = Buffer.from(await response.arrayBuffer());
+      if (incoming.pathname.endsWith('.html')) {
+        // The bridge does not use hot reload. Avoid a development WebSocket on
+        // the hosted origin when Vite inserts its optional client into HTML.
+        body = Buffer.from(body.toString().replace(/<script\b[^>]*src=["']\/@vite\/client["'][^>]*><\/script>/g, ''));
+      }
+      await route.fulfill({ status: response.status, contentType: response.headers.get('Content-Type') ?? 'application/octet-stream', body });
+    });
+  }
   const callbacks = new Map<string, (event: BrowserEvent) => void>();
   const pending = new Set<Promise<void>>();
   let callbackFailure: unknown;
@@ -211,6 +262,12 @@ export async function createBrowserBackend(
       closed = true;
       callbacks.clear();
       try {
+        const diagnosticResults = await Promise.allSettled([...diagnosticTasks]);
+        await options.diagnostics?.flush();
+        if (options.diagnostics) console.log('Provider HTTP diagnostics: ' + JSON.stringify(options.diagnostics.summary()));
+        if (diagnosticResults.some((result) => result.status === 'rejected')) {
+          throw new Error('Provider HTTP diagnostics failed. Private details were withheld.');
+        }
         await Promise.allSettled([...pending]);
         await send<void>({ type: 'close' });
       } finally {

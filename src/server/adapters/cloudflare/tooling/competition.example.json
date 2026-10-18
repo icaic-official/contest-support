@@ -1,0 +1,10 @@
+{
+  "adminUsername": "organizer",
+  "adminName": "Competition organizer",
+  "eventName": "Your competition",
+  "sessionName": "Main session",
+  "categories": ["Problem statement", "Devices", "Backend", "Other"],
+  "teams": [
+    { "name": "Your first team", "location": "Your team location" }
+  ]
+}

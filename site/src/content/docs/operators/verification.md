@@ -51,7 +51,9 @@ Inspect their target checks before adapting them for another installation.
 
 Read the changes and migration instructions for the selected revision.
 Validate that revision in development and an isolated CI project first.
-For a provisioned production installation, apply migrations, deploy account and attachment functions and configuration, then deploy the frontend.
+For Supabase, apply migrations, deploy account and attachment functions and configuration, then deploy the frontend.
+For Cloudflare, apply reviewed D1 migrations, then deploy the complete Worker and its assets with the selected configuration.
+Preserve its authentication secret, R2 objects, and Durable Object migration history.
 Verify the complete installation afterward.
 Merging a pull request does not deploy the app.
 

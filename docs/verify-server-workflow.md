@@ -149,7 +149,7 @@ It is separate from protected GitHub Actions checks and hosted D1 verification.
 Protected execution also requires the reviewed branch in the `cloud-test` environment's branch allowlist.
 This ticket does not change that allowlist or its protection rules.
 T0017's recorded hosted D1 result does not verify a changed adapter.
-Record any new hosted D1 result separately through the [D1 proof guide](d1-transaction-proof.md).
+Run current D1 checks through [the full provider guide](run-provider-tests.md). Record new results separately from the historical proof.
 
 ## Recover an incomplete fixture
 

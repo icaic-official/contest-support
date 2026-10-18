@@ -1,5 +1,10 @@
-import type { AccountCommand, AccountIdentity, AccountResult, AccountStatus, SessionSummary } from '../backend/contracts';
-import type { Caller } from './applicationStore';
+import type { AccountCommand, AccountIdentity, AccountResult, AccountStatus, SessionSummary } from '../backend/contracts.ts';
+
+export interface Caller {
+  /** Supplied by a trusted identity adapter, never accepted from a request body. */
+  accountId: string;
+  loginId: string;
+}
 
 /** Opaque cookie credentials stay in the identity adapter and HTTP boundary. */
 export interface AuthenticationSession {

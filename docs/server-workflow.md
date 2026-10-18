@@ -1,6 +1,6 @@
 # Server workflow reference
 
-T0019 extracts the existing issue decisions into [workflow.ts](../src/server/workflow.ts).
+T0019 extracted the existing issue decisions into [workflow.ts](../src/server/workflow.ts).
 `WorkflowService` accepts all nine existing `Command` variants.
 Its rules contain no provider SDK, SQL, environment configuration, or provider selection.
 The [verification guide](verify-server-workflow.md) describes the checks.
@@ -10,7 +10,8 @@ Supabase remains the active backend.
 The active browser adapter still calls the legacy `public.workflow` RPC.
 The separate `workflow` Edge Function runs the shared service against Supabase for replacement verification.
 An opt-in [browser executor](../src/backend/supabase/workflow.ts) calls that function with the existing `Backend.workflows.execute` signature.
-This ticket does not activate that executor in the application or deploy to the development backend.
+T0020 retains that active Supabase path and uses the same service for the complete Cloudflare workflow.
+It does not switch the development backend.
 
 ## Existing compatibility baseline
 
@@ -100,7 +101,8 @@ Triggers maintain that version for legacy writers while both paths exist.
 The legacy `public.workflow` and `app_private.workflow_before_usernames` remain during replacement verification.
 Their protective SQL checks remain intact.
 Administration, images, snapshots, and Realtime still use their existing Supabase implementations.
-The complete application server is therefore not provider-independent.
+Issue decisions share one application service.
+Other application operations retain their provider-specific adapters.
 
 ## Requests, conflicts, and visibility
 
@@ -120,12 +122,38 @@ Internal notes advance only the private version and staff notification counter.
 Contestant snapshots omit internal history and private versions.
 Private conflicts cannot reveal the private version or advance contestant-visible counters.
 
-## Bounded D1 support
+## Complete D1 workflow persistence
 
-The [D1 adapter](../src/server/adapters/d1/store.ts) invokes the same service and decision rules for `claim` and `message`.
-It retains its database access checks, captured versions, atomic batch, and notification records.
-SQLite statements apply the shared decision and enforce commit conditions.
-The adapter does not implement the other seven commands.
+The [D1 adapter](../src/server/adapters/d1/store.ts) persists all nine decisions from the same `WorkflowService`.
+The store requires current application and Better Auth sessions.
+The [application Worker](../src/server/adapters/cloudflare/applicationWorker.ts) constructs this adapter for authenticated HTTP commands.
+The browser cannot supply a trusted caller.
 
-The [D1 proof](d1-transaction-proof.md) remains separate from hosted Supabase and protected GitHub Actions results.
-Full D1 workflow persistence, a complete Cloudflare connector, R2, notification delivery, migration tooling, and AWS remain later work.
+Each new command uses one guarded D1 batch:
+
+1. Check current access and the dependencies captured by the authorized read.
+2. Obtain one database timestamp and apply the issue, resolution, or award effects.
+3. Record authenticated history, the request receipt, audience sequences, and pending notifications.
+4. Check current access again before completion, then remove temporary assertion and timestamp rows.
+
+Submission allocates an issue number inside that batch.
+Resolution, reopening, awards, and external application retain their separate records and timestamps.
+Internal notes change the private issue version and staff sequence without changing the public revision.
+Foreign keys, unique constraints, and assertions prevent partial or stale effects from committing.
+A false or missing assertion fails the batch and rolls back its writes.
+
+The commit checks current membership, roles, team, event, session settings, account restrictions, and captured workflow state.
+It also checks credential state, credential generation, login revocation and expiry, and the identity session's account and expiry.
+Receipt replay crosses an atomic access check too.
+A previously successful request cannot authorize replay after access expires or is revoked.
+
+The [full hosted runner](../src/server/adapters/cloudflare/tooling/test-store.mjs) requires an explicit D1-only CI target.
+It executes the same current identity guards as the application.
+Direct tests use a database without an application Worker or background delivery.
+Hosted application journeys use separate complete connector resources.
+Use [the provider verification guide](run-provider-tests.md) for commands, target checks, and fixture recovery.
+
+The historical bounded proof is retired from current execution paths.
+Its [frozen guide](https://github.com/GiftedNovaHD/minsky/blob/88ea5020a0f9dfc34a32ed7fbd84dfea07423297/docs/d1-transaction-proof.md) and [dated evidence](current-state.md#t0017-d1-transaction-proof-2026-10-17) remain available.
+Current verification covers the complete workflow through `WorkflowPersistence`.
+Record results in [current state](current-state.md#t0020-connector-implementation-2026-10-18), with local, hosted CLI, and protected runs kept separate.

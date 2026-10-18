@@ -10,6 +10,9 @@ import {
 } from '../src/backend/errors';
 import { createBrowserBackend } from './providers/browser-backend';
 
+// Even a fixture failure must not write a DOM snapshot or call arguments.
+process.env.PLAYWRIGHT_NO_COPY_PROMPT = '1';
+
 async function connection(
   browser: Browser,
   origin: string | undefined,
@@ -242,4 +245,87 @@ test('provider bridge closes its browser context when provider cleanup fails', a
   await expect(client.close()).rejects.toThrow('Fixture close failure.');
   expect(browser.contexts()).not.toContain(context);
   await expect(client.close()).resolves.toBeUndefined();
+});
+
+test('provider bridge loads real adapters through Vite at a remote HTTPS browser origin without credentials', async ({ browser, baseURL }) => {
+  if (!baseURL) throw new Error('The bridge regression requires local Vite assets.');
+  const origin = 'https://provider-bridge.invalid';
+  const failures: Array<{ path: string; kind: string }> = [];
+  const apiRequests: Array<{ origin: string; path: string }> = [];
+  const responses: Array<{ path: string; status: number; mime: string | undefined }> = [];
+  const consoleKinds: string[] = [];
+  const assetRequests: string[] = [];
+  const updateSockets: string[] = [];
+  let preferenceCookieReceived = false;
+  const previous = new Set(browser.contexts());
+  // Observe the actual context before the bridge's first navigation. This
+  // wrapper changes no response for the Vite module graph under test.
+  const observedBrowser = Object.create(browser) as Browser;
+  observedBrowser.newContext = async (options) => {
+    const context = await browser.newContext(options);
+    context.on('page', (page) => {
+      page.on('response', (response) => { responses.push({ path: new URL(response.url()).pathname,
+        status: response.status(), mime: response.headers()['content-type'] }); });
+      page.on('console', (message) => { if (message.type() === 'error') consoleKinds.push(
+        message.text().includes('MIME') ? 'mime' : message.text().includes('CORS') ? 'cors' : 'other'); });
+      page.on('requestfailed', (request) => {
+        failures.push({ path: new URL(request.url()).pathname, kind: request.failure()?.errorText ?? 'unknown' });
+      });
+      page.on('request', (request) => {
+        const url = new URL(request.url());
+        if (url.pathname.startsWith('/api/')) apiRequests.push({ origin: url.origin, path: url.pathname });
+        else assetRequests.push(url.pathname);
+      });
+    });
+    // This harmless preference tests same-origin cookie transport. It grants
+    // no identity or session access and is never sent to a real provider.
+    await context.addCookies([{ name: 'bridge_preference', value: 'compact', url: origin,
+      secure: true, httpOnly: true, sameSite: 'Strict' }]);
+    // No account or credentials are used. API/socket responses are test probes;
+    // every JavaScript module comes from the real local Vite server.
+    await context.route(`${origin}/api/auth/session`, async (route) => {
+      preferenceCookieReceived = (await route.request().headerValue('cookie') ?? '').includes('bridge_preference=compact');
+      await route.fulfill({ status: 401, contentType: 'application/json', body: '{}' });
+    });
+    await context.routeWebSocket((url) => url.origin === origin.replace('https:', 'wss:') && url.pathname === '/api/updates', (socket) => {
+      updateSockets.push(socket.url());
+      socket.send('{"type":"ready"}');
+    });
+    return context;
+  };
+  let client;
+  try {
+    client = await createBrowserBackend(observedBrowser, {
+      origin, assetOrigin: baseURL, module: '/tests/providers/cloudflare/browser.ts', configuration: { origin },
+    });
+  } catch (error) {
+    console.log(JSON.stringify({ failures, responses, consoleKinds }));
+    throw error;
+  }
+  const context = browser.contexts().find((candidate) => !previous.has(candidate));
+  if (!context) throw new Error('The remote bridge context was not created.');
+  try {
+    expect(await client.backend.auth.currentUser()).toBeUndefined();
+    expect(context.pages()[0].url()).toBe(`${origin}/tests/providers/browser.html`);
+    expect(await context.pages()[0].evaluate(() => location.origin)).toBe(origin);
+    expect(apiRequests.length).toBeGreaterThan(0);
+    expect(apiRequests.every((request) => request.origin === origin && request.path === '/api/auth/session')).toBe(true);
+    expect(assetRequests).toContain('/tests/providers/browser-dispatch.ts');
+    expect(assetRequests).toContain('/src/backend/cloudflare/backend.ts');
+    expect(assetRequests.some((path) => path.startsWith('/node_modules/.vite/'))).toBe(true);
+    expect(assetRequests).toContain('/node_modules/vite/dist/client/env.mjs');
+    expect(preferenceCookieReceived).toBe(true);
+    expect(await context.pages()[0].evaluate(() => document.cookie)).toBe('');
+    expect((await context.cookies()).map((cookie) => ({ name: cookie.name, domain: cookie.domain, httpOnly: cookie.httpOnly })))
+      .toEqual([{ name: 'bridge_preference', domain: 'provider-bridge.invalid', httpOnly: true }]);
+    let connected = false;
+    const sessionId = crypto.randomUUID();
+    const stop = client.backend.updates.subscribe({ sessionId, userId: crypto.randomUUID(),
+      onChange: () => {}, onConnection: (value) => { connected = value; } });
+    try {
+      await expect.poll(() => connected).toBe(true);
+      expect(updateSockets).toEqual([`${origin.replace('https:', 'wss:')}/api/updates?sessionId=${sessionId}`]);
+    } finally { stop(); }
+    expect(failures).toEqual([]);
+  } finally { await client.close(); }
 });

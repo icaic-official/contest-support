@@ -20,10 +20,10 @@ This page is a dated record, not a live deployment dashboard.
 | [T0014](https://github.com/GiftedNovaHD/minsky/pull/32) | Shared backend interfaces and the active Supabase adapter. |
 | [T0015](https://github.com/GiftedNovaHD/minsky/pull/37) | Shared provider behavior tests, verified against isolated Supabase fixtures. |
 | [T0016](https://github.com/GiftedNovaHD/minsky/pull/36) | Proposed Cloudflare architecture and implementation plan. |
-| [T0017](https://github.com/GiftedNovaHD/minsky/pull/39) | Verified bounded D1 transaction proof for claims and messages. The complete Cloudflare connector remains incomplete. |
-| [T0018 Cloudflare authentication](https://github.com/GiftedNovaHD/minsky/pull/40) | Experimental username authentication, cookie sessions, and organizer recovery. Hosted HTTP checks pass on Workers Paid with isolated fictional fixtures. The full connector and migration remain incomplete. |
-| [T0009 jury worklist](https://github.com/GiftedNovaHD/minsky/pull/23) | Merged at `c144a2a`. Lists award decisions and external confirmations that are still needed. T0015 moves these lists into the redesigned award screens. |
-| [T0019 shared server workflow](https://github.com/GiftedNovaHD/minsky/pull/41) | Merged at `7d19b00`. All nine command decisions use a shared service on the isolated Supabase verification path. D1 still supports only claims and messages. |
+| [T0017](https://github.com/GiftedNovaHD/minsky/pull/39) | Verified bounded D1 transaction proof for claims and messages. T0020 implements the complete connector separately. |
+| [T0018 Cloudflare authentication](https://github.com/GiftedNovaHD/minsky/pull/40) | Experimental username authentication, cookie sessions, and organizer recovery. Hosted HTTP checks pass on Workers Paid with isolated fictional fixtures. T0020 implements the complete connector separately. Real-data migration remains future work. |
+| [T0019 shared server workflow](https://github.com/GiftedNovaHD/minsky/pull/41) | All nine issue decisions use one shared service, verified through isolated Supabase execution. |
+| [T0009 jury worklist](https://github.com/GiftedNovaHD/minsky/pull/23) | Merged at `c144a2a`. Separate lists show outstanding award decisions and external confirmations through the existing issue actions. T0015 moves these lists into the redesigned award screens. |
 
 ## Pending changes
 
@@ -31,11 +31,11 @@ This page is a dated record, not a live deployment dashboard.
 | --- | --- |
 | [T0006 announcements](https://github.com/GiftedNovaHD/minsky/pull/20) | Open pull request. |
 | [T0007 independent installations](https://github.com/GiftedNovaHD/minsky/pull/21) | Open pull request. Packaging exists on its branch. Container operation remains unverified. |
-| T0015 organiser and contestant frontend redesign | In progress on `feature/t0015-frontend-redesign`. Separate contestant desktop app, organiser phone app and organiser desktop console. The guides describe this interface. |
-| T0020 complete Cloudflare connector | Active development. Supabase remains the active application backend. |
+| T0015 organiser and contestant frontend redesign | Pull request open for review from `feature/t0015-frontend-redesign`. Separate contestant desktop app, organiser phone app and organiser desktop console. The guides describe this interface. |
+| [T0020 complete Cloudflare connector](https://github.com/GiftedNovaHD/minsky/pull/42) | Implements every backend group and provider-owned installation tooling. Review fixes pass local checks, protected Cloudflare verification, and empty-installation verification on `2b6f6f0`. The repository records each run separately. The owner reviews and merges. |
 
 Supabase remains the active backend.
-The active browser retains the existing SQL workflow. The shared-service replacement path remains opt-in.
+The active browser retains the existing SQL workflow during Cloudflare replacement verification.
 
 T0011 adds this documentation site.
 The initial docs deployment did not deploy the Minsky application or apply database migrations.
@@ -55,8 +55,8 @@ There is no provisioned Minsky production project in the recorded setup.
 ## Verification limits
 
 - Ordinary repository checks use embedded databases and fictional browser responses.
-- Protected cloud checks use the separate **Minsky CI** project. A skipped cloud job is not a passing cloud test.
-- T0007 container startup and a fresh independent backend's complete workflow still need operator verification.
+- Protected Supabase checks use the separate **Minsky CI** project. Cloudflare checks use separate connector CI resources. A skipped job is not a passing check.
+- The independent Cloudflare installation passes on review-fix source `2b6f6f0`, including the complete React workflow and owner recovery. T0007 container startup remains unverified and deferred.
 - Live-contest readiness and capacity for 800 simultaneous users remain unverified.
 - Offline capture, outage operation, and venue-local resilience remain deferred.
 - An application license remains a decision before an open-source release.

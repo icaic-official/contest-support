@@ -1,7 +1,7 @@
 import { test as base } from '@playwright/test';
 import { existsSync } from 'node:fs';
 import type { Backend } from '../../src/backend/contracts';
-import { type BrowserBackend, createBrowserBackend } from './browser-backend';
+import { type BrowserBackend, type BrowserDiagnostics, createBrowserBackend } from './browser-backend';
 import type { ScenarioContext, ScenarioData } from './contracts';
 import { providerDriver } from './drivers';
 
@@ -9,6 +9,9 @@ interface PreparedFixture {
   data: ScenarioData;
   module: string;
   configuration: unknown;
+  origin: string;
+  assetOrigin?: string;
+  diagnostics?(accountId?: string): BrowserDiagnostics | undefined;
 }
 
 export const test = base.extend<
@@ -33,6 +36,9 @@ export const test = base.extend<
         data: fixture.data,
         module: driver.browserModule,
         configuration: fixture.browserConfiguration,
+        origin: driver.browserOrigin ?? 'http://127.0.0.1:4174',
+        assetOrigin: driver.assetOrigin,
+        diagnostics: (accountId) => driver.diagnostics?.(path, accountId),
       });
     } finally {
       if (existsSync(path)) await driver.cleanup(path);
@@ -44,9 +50,11 @@ export const test = base.extend<
       ...prepared.data,
       async connect(actor) {
         const connection = await createBrowserBackend(browser, {
-          origin: 'http://127.0.0.1:4174',
+          origin: prepared.origin,
+          assetOrigin: prepared.assetOrigin,
           module: prepared.module,
           configuration: prepared.configuration,
+          diagnostics: prepared.diagnostics?.(actor ? prepared.data.accounts[actor].id : undefined),
         });
         clients.set(connection.backend, connection);
         if (actor) {

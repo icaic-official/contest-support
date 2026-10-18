@@ -1,9 +1,9 @@
 # Cloudflare authentication reference
 
-T0018 implements experimental authentication and account sessions for Workers and D1.
-Supabase remains the active application backend.
-The Cloudflare workflow connector, migration, images, and live delivery remain incomplete.
-This reference describes the implemented API. It does not describe a supported independent installation.
+The Cloudflare application uses maintained Better Auth identity operations and guarded D1 account records.
+Supabase remains the active development backend.
+This reference describes the authentication API and its access rules.
+Use the [installation guide](../site/src/content/docs/operators/installation.md) for setup and [current state](current-state.md) for dated verification evidence.
 
 The [identity choice](cloudflare-authentication-choice.md) explains Better Auth, cryptographic components, limitations, and measured resource costs.
 The [verification guide](verify-cloudflare-authentication.md) gives exact test commands and fixture recovery steps.
@@ -17,9 +17,9 @@ The [verification guide](verify-cloudflare-authentication.md) gives exact test c
 The raw Better Auth router is not exposed.
 
 `createCloudflareAuthentication()` implements the existing browser `Authentication` contract.
-Its additional `account()` and `sessions()` methods support this bounded API.
-It does not implement or select a complete `Backend`.
-The application's backend entry point still creates the Supabase adapter.
+Its additional `account()` and `sessions()` methods support account administration and session reads.
+The complete `createCloudflareBackend()` factory wraps this authentication adapter and supplies the remaining operation groups.
+The application's backend entry point defaults to Supabase. Isolated Cloudflare builds explicitly select `VITE_BACKEND=cloudflare`.
 
 ## HTTP endpoints
 
@@ -35,8 +35,8 @@ Authenticated endpoints read the HttpOnly cookie. Request bodies cannot supply a
 | `GET /api/auth/sessions` | Cookie | Returns the account's current contest-session memberships. Requires a completed password change. |
 | `POST /api/accounts` | `sessionId`, `command` | Performs `create_account`, `set_username`, or `reset_password`. Uses existing `AccountCommand` fields. |
 
-The experimental D1 session table has no display name. Session summaries currently use the session ID as the name.
-The complete connector must supply contest-session names.
+The historical authentication Worker uses the session ID as its summary name.
+The complete application Worker routes session reads through the named application schema.
 Account creation and reset return `temporaryPassword` only in their authorized success response.
 No endpoint retrieves an earlier temporary password.
 Passwords and password hashes do not appear in audit records, responses for other actions, or application logs.
@@ -132,6 +132,8 @@ A lost database response can leave the commit outcome unknown and earlier logins
 This lets a sole organizer retry an interrupted temporary-password change.
 A committed change with a lost response allows login with the new password. Try that password before requesting recovery.
 The browser receives a fresh session only after the credential commit.
+The final self-change guard retains both original session deadlines while the batch deliberately revokes and deletes the old sessions.
+Login creation also rechecks the captured credential generation and both current session expiries before completion.
 
 Daily maintenance removes password-attempt counters and expired login records after a one-day retention period.
 Login attempts allow ten attempts per normalized username per 15-minute window.

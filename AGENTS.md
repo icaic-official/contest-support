@@ -22,156 +22,39 @@
 
 ## Current scope
 
-**Parallel T0009 maintenance, 2026-10-18.** The owner requested an update to [PR #23](https://github.com/GiftedNovaHD/minsky/pull/23).
-Use its existing `feature/t0009-jury-worklist` branch in a separate worktree.
-Merge current `main` at `7d19b00` and verify current behavior before owner review.
-Preserve the separate T0020 connector checkout and scope.
-Use the existing `Backend` contracts, authorized snapshots, and shared server workflow rules.
-Keep Supabase active. Add no schema, backend feature, provider implementation, or runtime dependency.
-Use only UUID-owned fictional fixtures in Minsky CI, `ghtztmovdkhuketcbjmq`, for hosted acceptance.
-The owner approved the exact T0009 `cloud-test` branch addition on 2026-10-18. Preserve all other entries and protection rules.
-Do not deploy the application, merge the PR, or migrate data.
-Required checks and hosted acceptance must pass before PR #23 is ready for owner review.
+Continue **T0020 complete Cloudflare connector** on `feature/t0020-cloudflare-connector` and [PR #42](https://github.com/GiftedNovaHD/minsky/pull/42).
+The branch started from merged PR #41 at `7d19b00` and includes the jury worklist merge at `c144a2a`.
+Preserve both features and verify the combined application.
+The [ticket](docs/tickets.md#t0020-complete-cloudflare-connector) records acceptance criteria and the remaining review checks.
 
-**Active T0020 connector, 2026-10-18.** The separate connector goal remains active on `feature/t0020-cloudflare-connector`.
-Its scope includes all backend operations, isolated hosted verification, and an empty Cloudflare installation.
-Keep its checkout unchanged during T0009 maintenance. See [T0020](docs/tickets.md#t0020-complete-cloudflare-connector).
+The owner requested all review fixes, cleanup, and fresh verification before the PR is ready.
+Remove obsolete proof paths, duplicate helpers, stale instructions, and repeated evidence summaries.
+Keep provider configuration and bootstrap inside the provider implementation.
+Preserve unique historical evidence in the planning and run records.
+Record PR #21 reuse and recommend its disposition. The owner decides whether to close PR #21.
 
-**T0019 shared server workflow, 2026-10-18.** Use `feature/t0019-shared-server-workflow` from updated `main` at `0c797ad`.
-The owner authorized this extraction while PR #40 was open. The branch started independently of its authentication branch.
-PR #40 merged at `68e8642` on 2026-10-17 at 17:16:41 UTC. This branch now includes that updated `main`.
-Preserve the merged authentication behavior. The owner also requested code cleanup and completion of its hosted verification during PR #41 review.
-PR #39 merged the bounded D1 transaction proof.
-Extract the existing nine issue commands into one provider-independent server service.
-Verify an actual trusted Supabase execution path with isolated fictional CI fixtures before expanding D1 workflow persistence.
-Retain database constraints, atomic commits, current-access checks, and stale-state guards.
-Align the bounded D1 `claim` and `message` proof with the same shared decisions.
-See [the workflow reference](docs/server-workflow.md) and [verification guide](docs/verify-server-workflow.md).
-Keep Supabase active and its legacy browser path available during replacement verification.
-Do not deploy to the development backend without the required authorization.
-The owner reviews and merges. Bounded subagent work is authorized.
-The owner confirmed Workers Paid activation during PR #41 review.
-The isolated authentication Worker accepts its 1,000 ms CPU cap. Local hosted HTTP and protected authentication on merged `main` pass.
-Record PR #41's hosted results separately from that protected `main` run.
-Full D1 workflow persistence, R2, notification delivery, migration tooling, AWS, and Terraform remain later work.
-Do not export real data, reset real accounts, or switch backends.
+Isolated Cloudflare development, CI, and installation resources are authorized in account `458ad6a930b0fb717796dfa19ca6a2b1`.
+Confirm that account and the exact target before provider changes.
+Keep development, CI, and installation resources separate.
+Only this ticket branch may be added to the protected `cloud-test` allowlist. Preserve all other entries and protection rules.
+Workers Paid and R2 are active. Document the concrete need and cost before any further paid upgrade.
+Bounded subagent work is authorized.
 
-**T0018 Cloudflare authentication, 2026-10-18.** PR #39 merged at `0c797ad` on 2026-10-17 at 15:49:49 UTC.
-PR #40 merged T0018 at `68e8642` on 2026-10-17 at 17:16:41 UTC.
-Use `feature/t0018-cloudflare-authentication` from that updated `main`.
-Implement the bounded authentication API and browser adapter with maintained Better Auth, D1 credential guards, and fictional fixtures.
-See [the reference](docs/cloudflare-authentication.md), [identity choice](docs/cloudflare-authentication-choice.md), and [verification guide](docs/verify-cloudflare-authentication.md).
-Keep Supabase active. The complete connector, real-account migration, exports, and backend switch remain later work.
-Use local development databases and the separate hosted `minsky-auth-ci` database.
-The owner approved adding only `feature/t0018-cloudflare-authentication` to the existing `cloud-test` branch allowlist on 2026-10-18. Preserve the other entries and protection rules.
-Measured password CPU exceeds Workers Free's allowance. The initial protected HTTP check hit a runtime resource limit.
-The owner initially deferred the paid subscription on 2026-10-18, then confirmed activation during PR #41 review.
-The configuration requests a 1,000 ms CPU cap. Paid accepts that setting; the earlier Free deployment rejected it with error `100328`.
-Use the current-state record for the later paid verification results.
-The owner reviewed and merged T0018. Bounded subagent work remains authorized within the active ticket.
+Supabase remains active. Docker packaging, AWS, Terraform, real-data exports, migration, account resets, and backend cutover remain deferred.
+The owner reviews and merges T0020.
+Earlier ticket decisions and authorization limits remain in [PLAN.md](PLAN.md) and their dated verification records.
 
-**T0017 D1 transaction proof, 2026-10-17.** Start `feature/t0017-d1-transaction-proof` from updated `main` at `53f9dfd`.
-Implement one complete command through a provider-independent application-store interface and a D1 adapter.
-Commit the state change, retry receipt, history, and notification record together.
-Use fictional fixtures. Obtain hosted D1 evidence before calling the transaction pattern verified.
-See [the proof guide](docs/d1-transaction-proof.md) and [implementation plan](docs/cloudflare-implementation-plan.md).
-Keep Supabase active. Authentication and the remaining connector operations follow the proof.
-Migration tooling follows connector verification. Real-data exports and the backend switch remain later work.
-AWS adapters and Terraform remain deferred.
+## Code and documentation cleanup
 
-The owner selected organizer-issued replacement temporary passwords for the later migration.
-Require a password change before contest access.
-Preserve account IDs, memberships, permissions, and history. Existing passwords and password-hash import are not required.
-
-The owner authorizes isolated Cloudflare development and CI resources in the existing account for this work.
-Keep development and CI resources separate. Confirm the account before provisioning.
-Check existing Wrangler access before requesting credentials. Keep tokens out of chat and logs.
-
-The existing Wrangler OAuth login was checked against account `458ad6a930b0fb717796dfa19ca6a2b1`, which matches the repository configuration.
-Document the concrete need and cost before any paid upgrade.
-Subagents may perform independent, bounded tasks.
-
-The earlier scope records below retain the authorization limits of those tickets.
-T0017 supplies the later resource authorization above. It does not authorize real-data exports or a backend switch.
-
-**Parallel provider work, 2026-10-17.** The user authorized T0015 shared provider tests and T0016 Cloudflare design during PR #32 review.
-Both branches started from PR #32 at `d158906` under this explicit branch exception.
-PR #32 merged at `ef6a029`. T0015 then merged in [PR #37](https://github.com/GiftedNovaHD/minsky/pull/37) at `738ef4a`.
-T0016 uses `feature/t0016-cloudflare-backend-design`, which now includes both merges.
-Its scope is the [backend design](docs/cloudflare-backend-design.md) and [implementation plan](docs/cloudflare-implementation-plan.md).
-Keep provider imports and privileged setup outside the shared scenarios.
-Use the same behavior assertions for each provider, including a possible future AWS adapter.
-Keep Supabase active. Design approval does not authorize resource creation, credential exports, deployment, or data migration.
-PR #36 merged T0016 on 2026-10-17 at `b68ef72`. The merge accepts the design only. It does not authorize resource creation, credential exports, deployment, or data migration.
-AWS implementation and Terraform remain deferred.
-See [T0015](docs/tickets.md#t0015-shared-provider-tests) for the merged test scope.
-
-**T0014 backend adapters, 2026-10-17.** The user authorized the shared interfaces and Supabase extraction before the Cloudflare migration.
-Use `feature/t0014-backend-adapters`, from updated `main` at `de92d54`.
-This start is authorized while the earlier PRs remain open.
-Preserve existing server authorization, transactions, accounts, and image behavior.
-The selected future target is Workers, D1 with a SQLite rewrite, private R2, and Durable Objects for live updates.
-Preserve existing data during that later migration.
-Other providers, Terraform, provider resource changes, and deployment remain outside T0014.
-See [T0014](docs/tickets.md#t0014-backend-adapters) and [backend contracts](docs/backend-contracts.md).
-
-**Automatic frontend builds (2026-10-17):** the user authorized branch previews and automatic stable deployments after merges to `main`.
-Use GitHub Actions to publish the existing `minsky-dev` and `minsky-docs` Workers after all required CI jobs pass.
-Keep independent Cloudflare Git builds disabled.
-See [setup and verification](docs/cloudflare-builds.md).
-Until credentials, activation, and hosted checks pass, do not claim that automatic deployment is verified.
-The user still reviews and merges. Backend changes retain explicit deployment and target checks.
-
-**T0011 documentation site (2026-10-17):** the user requested implementation, written guides, and deployment.
-Develop on `feature/t0011-documentation-site` from updated `main`, alongside the open T0007 PR.
-Publish a separate static `minsky-docs` Worker in the existing Minsky development account.
-The user's request authorizes this initial docs deployment before merge.
-The user still reviews and merges the source PR.
-This exception does not authorize application, database, or function deployment.
-Maintain public guides under `site/src/content/docs/` and label T0007's pending and unverified steps.
-See [T0011](docs/tickets.md#t0011--documentation-site).
-
-**T0008 team search (2026-10-15):** the user merged [PR #22](https://github.com/notbowen/minsky/pull/22) into `main`.
-It was developed separately on `feature/t0008-team-search` while PR #19 remained open.
-The T0005 branch now includes it through a merge from `main` to resolve conflicts.
-Deployment is a separate explicit step.
-See [T0008](docs/tickets.md#t0008--fuzzy-team-search).
-
-**T0004 merge status (2026-10-11):** the user merged [PR #9](https://github.com/notbowen/minsky/pull/9) into `main` and deleted its branch.
-The user merged the documentation rewrite in [PR #13](https://github.com/notbowen/minsky/pull/13) on 2026-10-11 (SGT).
-See [the merge record](docs/current-state.md#t0004-merge-and-documentation-follow-up-2026-10-11) for the revision and timestamp.
-
-**Latest ticket decision (2026-10-11):** implement T0005 issue images on `feature/t0005-issue-attachments`.
-Start from updated `main` after T0004.
-Staff can attach JPEG, PNG, and WebP images to an issue.
-The uploader chooses team visibility or staff-only visibility at upload.
-Session admins set the image size and count limits.
-See [docs/tickets.md](docs/tickets.md#t0005--issue-images).
-
-These items stay deferred.
-They are not part of T0005:
-
-- Provider ownership and billing records.
-- GitHub merge enforcement and vulnerability alerts.
-- Remaining manual acceptance checks.
-- Event, roster, and category editors.
-
-**T0004 deployment exception (2026-10-03):** the user explicitly requested "Deploy first" while PR #9 was open.
-The completed T0004 frontend deployed to the existing development Worker `minsky-dev` before merge.
-Hosted verification passed there.
-This exception applies to T0004's development frontend.
-See [deployment evidence](docs/current-state.md#t0004-development-deployment-2026-10-03).
-
-**Demo retirement decision (2026-10-02):** remove the old local demo and these related parts:
-
-- Its command.
-- Persona, reset, and storage code.
-- Tests and fixtures that apply only to the demo.
-- The obsolete walkthrough and specification.
-
-Maintain the connected app, public login landing page, and sidebar.
-Maintain workflow and authorization tests that use real accounts.
-Do not restore the demo runtime or reset tooling.
+- Subtract before adding. Remove code that the current architecture no longer needs.
+- Use the current shared contracts and application paths. Remove obsolete proof modes, duplicate helpers, and unused stubs.
+- Keep one authoritative procedure or reference for each task. Update incoming links when you remove a duplicate page.
+- Preserve unique decisions and evidence in dated records. Do not present historical probes as current instructions.
+- Add an abstraction only when current callers need it.
+- State which bounded behavior may temporarily break during a change and how the change remains reversible.
+- Run focused checks for touched behavior during implementation. Keep checks that detect material failures.
+- At completion, run the full static checks and required runtime suites before calling the PR ready.
+- Test changed behavior and material failure cases. Do not add application tests only to test prose.
 
 ## TypeScript style
 
@@ -210,14 +93,10 @@ Do not restore the demo runtime or reset tooling.
 - Preserve the primary author and any other co-author trailers.
 - Before each push, check that every new Codex-created commit contains the required trailer exactly once.
 - Distinguish development tickets from contestant issues in code, documentation, and communication.
-- The first implementation ticket is **T0001 — Local workflow demo and project guidance**. Its branch is `feature/t0001-local-demo`.
 - Start each development ticket from updated `main`.
-- Use `feature/tNNNN-description` for later ticket branches.
+- Use `feature/tNNNN-description` for ticket branches.
 
-The user approved one branch exception for T0002.
-Plan and implement T0002 on `feature/t0001-local-demo` without waiting for the T0001 merge.
-The user still reviews and merges.
-Use the normal branch workflow for later tickets unless the user instructs otherwise.
+Historical branch exceptions remain in [PLAN.md](PLAN.md). Use the normal ticket workflow unless the user gives a newer instruction.
 
 Complete these steps in sequence:
 
@@ -291,7 +170,7 @@ They are not part of the T0005 issue-image ticket:
 ## Verification
 
 - Inspect available scripts before you invoke them.
-- During T0001, provide npm scripts for development, production builds, type checking, linting, and focused tests.
+- Keep npm scripts for development, production builds, type checking, linting, and focused tests.
 - Document their exact names in README.md.
 - Test lifecycle transitions, ownership during handoff, timestamp calculations, persistence, awards, and external application status.
 - Include one browser test for the complete journey across authenticated test accounts.
@@ -316,75 +195,31 @@ Label development, experimental, and unverified behavior explicitly.
 Update affected guides with behavior changes. Keep historical run reports separate from current instructions.
 Do not call an installation path supported until its documented procedure passes on an isolated installation.
 
-During T0001, create the remaining documentation.
-Keep it concise and consistent with implemented behavior.
-
-| Document | Responsibility |
-| --- | --- |
-| `README.md` | Project introduction, exact setup and check commands, demo limitations, and documentation links. |
-| `docs/product-direction.md` | Agreed longer-term requirements, provisional architecture, and unresolved decisions. |
-| `docs/tickets.md` | Active development ticket, status, acceptance criteria, and a short follow-up queue. |
-| `docs/current-state.md` | Implemented and verified capabilities, limitations, and next work. |
-| `docs/manual-verification.md` | Repeatable verification steps, expected results, and required fictional personas and data. |
-| `docs/cloud-onboarding.md` | Provider setup, costs, and contributor onboarding for T0003. Distinguish planned steps from verified results. |
-
 Update relevant documents in the same change as behavior or workflow changes.
 Distinguish proposed, implemented, and verified capabilities.
 Use PLAN.md as the initial baseline.
 Record later decisions explicitly in the appropriate document.
 Do not leave conflicting instructions.
 
-## Deferred decisions and production direction
+## Product and provider constraints
 
-**Cloud first, features first (2026-10-02).**
-The user deferred outage handling and resilience until after cloud features.
-Assume connectivity during the developer phase.
-Do not block backend work on manual fallback, offline capture, or venue-local operation.
-Ordinary error reporting and correct shared data remain product requirements.
+Use [the product direction](docs/product-direction.md) for agreed requirements and deferred work.
+Assume connectivity during development. Offline capture and venue-local resilience remain deferred.
+Do not restore the retired local demo runtime, persona controls, or shared-data reset tooling.
+Use organizer-created usernames, temporary passwords, and organizer-assisted recovery.
+Require temporary-password changes at the database boundary. Personal email and SMTP are not prerequisites.
 
-**Authentication revision (2026-10-02).**
-Use organizer-created usernames and passwords.
-Use temporary credentials and organizer-assisted recovery.
-Enforce temporary-password changes at the database boundary.
-SMTP and personal email addresses are not prerequisites.
-Preserve existing account IDs and history during the transition.
+Staff can attach JPEG, PNG, and WebP images while the event is active.
+The uploader chooses team visibility or staff-only visibility. That choice stays fixed.
+Only the uploader can remove a ready image during that time.
+Session admins set the file size, image count, and combined size limits. There is no upload-disable control.
+Contestants can view only team-visible images on their own team's issues.
 
-**Cloud contributor access (2026-10-02).**
-The user permits full cloud credential access for contributors.
-Docker is optional.
-Use hosted Supabase for connected development.
-Use embedded PostgreSQL for fast policy and transaction checks.
-Use isolated cloud fixtures for integration tests.
-
-Use `supabase functions deploy --use-api` for server-side bundling.
-Keep privileged credentials outside Git and frontend builds.
-Privileged CI uses a protected, separate test project.
-
-Use Cloudflare Workers and Supabase.
-Prefer free tiers.
-The user accepts necessary costs.
-Before a paid upgrade, document the concrete need and cost.
-Do not treat free tiers as a hard limit.
-Do not enable speculative paid services.
-
-T0005 links staff images to issues.
-The uploader chooses team-visible or staff-only visibility, and the choice stays fixed.
-Every staff member can upload while the event is active.
-Only the uploader can remove an image during that time.
-Session admins set the file size, image count, and combined size limits.
-Contestants can view team-visible images on their own team's issues.
-There is no control that disables uploads.
-
-A free-tier pilot and production capacity validation are separate milestones.
-Future targets on a healthy venue connection are:
-
-- 800 simultaneous users.
-- 95% of ordinary actions complete within two seconds.
-- Live updates arrive within three seconds.
-
-Consult the product direction in PLAN.md when you record future requirements.
-These include configurable roles and categories, shared incidents, award ledgers, and browser push.
-Do not automatically add these features to T0001.
+Keep hosted Supabase active and use embedded PostgreSQL for fast policy and transaction checks.
+Docker is optional. Privileged credentials stay outside Git and frontend builds.
+Cloud CI uses isolated fictional fixtures. Provider access does not grant application membership.
+A free-tier pilot does not establish production capacity.
+The future healthy-connection targets remain 800 simultaneous users, 95% of ordinary actions within two seconds, and live updates within three seconds.
 
 ## Required end-of-run report
 

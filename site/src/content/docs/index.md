@@ -25,7 +25,7 @@ Jury members record time awards, and staff record when someone applies them to t
 | Claim, investigate, or hand off an issue | [Staff guide](/guides/staff/) |
 | Review a resolved issue and record an award | [Jury guide](/guides/jury/) |
 | Create accounts and manage access | [Administration guide](/guides/administration/) |
-| Run Minsky for another competition | [Installation options](/operators/installation/) |
+| Run Minsky for another competition | [Install Cloudflare](/operators/installation/) |
 | Change these pages and publish them | [Documentation workflow](/contributing/documentation/) |
 
 ## Know which version you are using
@@ -41,5 +41,6 @@ Ask your organizer for your competition's address.
 :::note[Development stage]
 Live-contest readiness and capacity for 800 simultaneous users remain unverified.
 Minsky currently requires a working network connection.
-Independent installation packaging is pending review in T0007.
+The [Cloudflare development installation](/operators/installation/) has a verified procedure.
+T0007 container packaging remains deferred.
 :::

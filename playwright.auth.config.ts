@@ -1,5 +1,8 @@
 import { defineConfig } from '@playwright/test';
 
+// Error-page DOM snapshots can contain one-time fictional credentials.
+process.env.PLAYWRIGHT_NO_COPY_PROMPT = '1';
+
 export default defineConfig({
   testDir: './tests/auth',
   testMatch: '**/*.spec.ts',

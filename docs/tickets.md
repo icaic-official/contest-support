@@ -111,9 +111,10 @@ Do not claim contest capacity without separate evidence.
 
 All 70 full-workflow cases pass locally and on the separate hosted connector D1 database.
 All 82 hosted account cases pass there, with zero skips and verified cleanup.
-All 554 local tests pass on `59121f7`. Checked behavior criteria above include local and hosted evidence.
+All 566 local tests pass across 34 files after main integration. Checked behavior criteria above include local and hosted evidence.
 The same eight shared provider scenarios pass against Supabase and Cloudflare.
-The local complete HTTPS Worker journey and all 34 ordinary browser regressions pass.
+The local complete HTTPS Worker journey and all 45 ordinary browser regressions pass.
+The complete local React journey also passes through the merged jury worklist.
 The complete hosted React journey passes on `59121f7`.
 A separate clean checkout passes the documented empty installation, complete React assertions, and trusted owner recovery on that source.
 Scoped D1, R2, and coordinator cleanup passes for both hosted targets.

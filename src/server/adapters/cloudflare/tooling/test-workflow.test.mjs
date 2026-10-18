@@ -3,7 +3,8 @@ import { mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promise
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterEach, test } from 'vitest';
-import { renderWranglerConfiguration, repositoryRoot } from './configuration.mjs';
+import { repositoryRoot } from './configuration.mjs';
+import { renderStoreConfiguration, storeTarget } from './store-target.mjs';
 import { runHostedWorkflow, workflowArguments, workflowReport } from './test-workflow.mjs';
 
 const temporaryDirectories = [];
@@ -11,24 +12,20 @@ afterEach(async () => {
   await Promise.all(temporaryDirectories.splice(0).map((path) => rm(path, { recursive: true, force: true })));
 });
 
-const settings = {
-  accountId: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', workerName: 'fictional-contest-ci',
-  databaseName: 'fictional-contest-ci', databaseId: '00000000-0000-4000-8000-000000000001',
-  bucketName: 'fictional-contest-ci-images', origin: 'https://fictional-contest-ci.fictional-account.workers.dev',
-};
+const settings = storeTarget;
 
 async function fixture() {
   const directory = await mkdtemp(join(tmpdir(), 'minsky-workflow-runner-test-'));
   temporaryDirectories.push(directory);
   const config = join(directory, 'wrangler.jsonc');
-  await writeFile(config, JSON.stringify(renderWranglerConfiguration(settings, config)));
+  await writeFile(config, JSON.stringify(renderStoreConfiguration(config)));
   const migrations = (await readdir(join(repositoryRoot, 'src/server/adapters/d1/migrations')))
     .filter((name) => name.endsWith('.sql')).sort();
   const calls = [];
   const reports = [];
   return {
     arguments: [`--account=${settings.accountId}`, `--database=${settings.databaseId}`, `--config=${config}`],
-    calls, reports,
+    config, calls, reports,
     dependencies: {
       report: (message) => reports.push(message),
       runWrangler: async (args) => {
@@ -75,7 +72,7 @@ test('full hosted workflow uses only the confirmed D1 binding and production tes
     assert.equal(parsed.test.include[0].endsWith('/d1/store.test.ts'), true);
     return result();
   };
-  assert.deepEqual(await runHostedWorkflow(setup.arguments, setup.dependencies), { total: 70, passed: 70, failed: 0, skipped: 0, success: true });
+  assert.deepEqual(await runHostedWorkflow(setup.arguments, setup.dependencies), { total: 70, passed: 70, failed: 0, skipped: 0, success: true, failedPositions: [] });
   assert.deepEqual(setup.calls.map((args) => args.slice(0, 2)), [['whoami'], ['d1', 'info'], ['d1', 'execute']]);
   assert.equal(setup.calls[2].at(-1), 'SELECT name FROM d1_migrations ORDER BY id');
   assert.equal(setup.calls.some((args) => args.includes('apply') || args.includes('deploy') || args.includes('create')), false);
@@ -87,8 +84,10 @@ test('mismatched target or migration metadata prevents fixture execution', async
   const setup = await fixture();
   let executed = false;
   setup.dependencies.execute = () => { executed = true; return result(); };
-  const wrongTarget = setup.arguments.map((arg) => arg.startsWith('--database=') ? '--database=00000000-0000-4000-8000-000000000002' : arg);
-  await assert.rejects(runHostedWorkflow(wrongTarget, setup.dependencies), /exactly match/);
+  for (const database of ['de43cf95-c024-4e44-860d-8ff179e4e08d', '00000000-0000-4000-8000-000000000002']) {
+    const wrongTarget = setup.arguments.map((arg) => arg.startsWith('--database=') ? `--database=${database}` : arg);
+    await assert.rejects(runHostedWorkflow(wrongTarget, setup.dependencies), /exact isolated dedicated store/);
+  }
   assert.equal(setup.calls.length, 0);
   const original = setup.dependencies.runWrangler;
   setup.dependencies.runWrangler = (args) => args[1] === 'execute' ? JSON.stringify([{ success: true, results: [] }]) : original(args);
@@ -108,6 +107,40 @@ test('runner rejects failed, skipped, or narrowed reports without relaying provi
   }
   assert.equal(setup.reports.some((message) => message.includes('private-provider')), false);
   assert.throws(() => workflowReport('private-provider-diagnostic'), /could not be read/);
+});
+
+test('failed workflow diagnostics expose only numeric positions and counters from credential-bearing reports', async () => {
+  const setup = await fixture();
+  const secret = 'sb_secret_fixture-password-cookie-provider-body';
+  const assertions = Array.from({ length: 70 }, (_, index) => ({
+    status: index === 2 || index === 50 ? 'failed' : 'passed',
+    title: `${secret} title`, fullName: `${secret} full name`,
+    ancestorTitles: [secret], failureMessages: [`${secret} message and stack`],
+  }));
+  const report = result({ numPassedTests: 68, numFailedTests: 2, success: false,
+    testResults: [
+      { name: secret, message: secret, assertionResults: assertions.slice(0, 35) },
+      { name: secret, message: secret, assertionResults: assertions.slice(35) },
+    ],
+  });
+  report.stdout = `${secret}\n${report.stdout}`;
+  report.stderr = secret;
+  setup.dependencies.execute = () => report;
+  await assert.rejects(runHostedWorkflow(setup.arguments, setup.dependencies), /70 full D1 workflow cases/);
+  assert.deepEqual(setup.reports, [
+    'Hosted full D1 workflow: 68 passed, 2 failed, 0 skipped.',
+    'Failed workflow assertion positions (1-based): 3, 51.',
+  ]);
+  assert.equal(JSON.stringify(workflowReport(report.stdout)).includes(secret), false);
+});
+
+test('an incomplete assertion list cannot produce misleading workflow failure positions', async () => {
+  const setup = await fixture();
+  setup.dependencies.execute = () => result({ numPassedTests: 69, numFailedTests: 1, success: false,
+    testResults: [{ assertionResults: [{ status: 'failed', title: 'private-fixture-value' }] }],
+  });
+  await assert.rejects(runHostedWorkflow(setup.arguments, setup.dependencies), /70 full D1 workflow cases/);
+  assert.deepEqual(setup.reports, ['Hosted full D1 workflow: 69 passed, 1 failed, 0 skipped.']);
 });
 
 test('surviving fixture journals preserve the runtime configuration and prevent a cleanup pass', async () => {

@@ -4,23 +4,16 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
-import { readInstallationTarget, repositoryRoot } from './configuration.mjs';
+import { repositoryRoot } from './configuration.mjs';
 import { confirmTarget, wranglerRunner } from './operations.mjs';
 import { safeWranglerEnvironment } from './safe-environment.mjs';
 import { assertCurrentMigrations } from './migrations.mjs';
+import { readStoreTarget, storeArguments } from './store-target.mjs';
 
 const expectedCases = 70;
 
 export function workflowArguments(arguments_) {
-  const result = {};
-  for (const argument of arguments_) {
-    const match = /^--(account|database|config)=(.+)$/.exec(argument);
-    if (!match || Object.hasOwn(result, match[1])) throw new Error('Supply --account, --database, and --config once. Test filters are forbidden.');
-    result[match[1]] = match[2];
-  }
-  if (Object.keys(result).length !== 3) throw new Error('Supply the explicit full-connector account, database, and configuration.');
-  result.config = resolve(result.config);
-  return result;
+  return storeArguments(arguments_);
 }
 
 export function workflowReport(output) {
@@ -37,10 +30,17 @@ export function workflowReport(output) {
   if (counters.some((key) => !Number.isInteger(result[key]) || result[key] < 0)) {
     throw new Error('The hosted workflow result has invalid test counts.');
   }
+  const assertions = Array.isArray(result.testResults) ? result.testResults.flatMap((suite) =>
+    Array.isArray(suite?.assertionResults) ? suite.assertionResults : []) : [];
+  // Positions identify cases in this checkout without exposing fixture values
+  // from titles, assertion messages, stacks, or provider response bodies.
+  const failedPositions = assertions.length === result.numTotalTests ? assertions.flatMap((assertion, index) =>
+    assertion?.status === 'failed' ? [index + 1] : []) : [];
   return {
     total: result.numTotalTests, passed: result.numPassedTests, failed: result.numFailedTests,
     skipped: result.numPendingTests + result.numTodoTests,
     success: result.success === true,
+    failedPositions,
   };
 }
 
@@ -67,7 +67,7 @@ async function retainedJournals(runtimeConfig, before) {
 /** Exact hosted target only. This runner never deploys or changes migrations. */
 export async function runHostedWorkflow(arguments_, dependencies = {}) {
   const options = workflowArguments(arguments_);
-  const settings = await readInstallationTarget(options.config);
+  const settings = await readStoreTarget(options);
   const runWrangler = dependencies.runWrangler ?? wranglerRunner(settings, options.config);
   await confirmTarget(options, settings, runWrangler);
   await assertCurrentMigrations(settings, runWrangler);
@@ -106,6 +106,9 @@ export async function runHostedWorkflow(arguments_, dependencies = {}) {
     });
     summary = workflowReport(result.stdout ?? '');
     report(`Hosted full D1 workflow: ${summary.passed} passed, ${summary.failed} failed, ${summary.skipped} skipped.`);
+    if (summary.failed && summary.failedPositions.length) {
+      report(`Failed workflow assertion positions (1-based): ${summary.failedPositions.join(', ')}.`);
+    }
     if (result.error || result.status !== 0 || !summary.success || summary.total !== expectedCases ||
         summary.passed !== expectedCases || summary.failed !== 0 || summary.skipped !== 0) {
       throw new Error(`All ${expectedCases} full D1 workflow cases must pass without skips. Provider output was withheld.`);

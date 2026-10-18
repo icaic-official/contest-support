@@ -3,8 +3,8 @@ import { mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promise
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterEach, test } from 'vitest';
-import { connectorTarget } from '../../../../../tests/providers/cloudflare/target.mjs';
-import { renderWranglerConfiguration, repositoryRoot } from './configuration.mjs';
+import { repositoryRoot } from './configuration.mjs';
+import { renderStoreConfiguration, storeTarget } from './store-target.mjs';
 import { accountArguments, accountReport, runHostedAccounts } from './test-accounts.mjs';
 
 const directories = [];
@@ -16,20 +16,20 @@ async function fixture() {
   const directory = await mkdtemp(join(tmpdir(), 'minsky-account-runner-test-'));
   directories.push(directory);
   const config = join(directory, 'wrangler.jsonc');
-  await writeFile(config, JSON.stringify(renderWranglerConfiguration(connectorTarget, config)));
+  await writeFile(config, JSON.stringify(renderStoreConfiguration(config)));
   const migrations = (await readdir(join(repositoryRoot, 'src/server/adapters/d1/migrations')))
     .filter((name) => name.endsWith('.sql')).sort();
   const calls = [];
   const reports = [];
   return {
     config, calls, reports,
-    arguments: [`--account=${connectorTarget.accountId}`, `--database=${connectorTarget.databaseId}`, `--config=${config}`],
+    arguments: [`--account=${storeTarget.accountId}`, `--database=${storeTarget.databaseId}`, `--config=${config}`],
     dependencies: {
       report: (message) => reports.push(message),
       runWrangler: async (args) => {
         calls.push(args);
-        if (args[0] === 'whoami') return connectorTarget.accountId;
-        if (args[1] === 'info') return JSON.stringify({ uuid: connectorTarget.databaseId, name: connectorTarget.databaseName });
+        if (args[0] === 'whoami') return storeTarget.accountId;
+        if (args[1] === 'info') return JSON.stringify({ uuid: storeTarget.databaseId, name: storeTarget.databaseName });
         return JSON.stringify([{ success: true, results: migrations.map((name) => ({ name })) }]);
       },
     },
@@ -56,12 +56,12 @@ test('hosted accounts use the complete suite, private logging, and only the conf
   setup.dependencies.execute = async (args, options) => {
     runtime = options.env.MINSKY_CONNECTOR_D1_CONFIG;
     const proxy = JSON.parse(await readFile(runtime, 'utf8'));
-    assert.equal(proxy.account_id, connectorTarget.accountId);
-    assert.deepEqual(proxy.d1_databases, [{ binding: 'DB', database_name: connectorTarget.databaseName,
-      database_id: connectorTarget.databaseId, remote: true }]);
+    assert.equal(proxy.account_id, storeTarget.accountId);
+    assert.deepEqual(proxy.d1_databases, [{ binding: 'DB', database_name: storeTarget.databaseName,
+      database_id: storeTarget.databaseId, remote: true }]);
     for (const binding of ['r2_buckets', 'durable_objects', 'assets', 'vars']) assert.equal(Object.hasOwn(proxy, binding), false);
     for (const variable of ['MINSKY_D1_REMOTE', 'MINSKY_AUTH_REMOTE', 'MINSKY_AUTH_LEGACY']) assert.equal(options.env[variable], undefined);
-    assert.equal(options.env.CLOUDFLARE_ACCOUNT_ID, connectorTarget.accountId);
+    assert.equal(options.env.CLOUDFLARE_ACCOUNT_ID, storeTarget.accountId);
     assert.equal(options.env.WRANGLER_LOG_SANITIZE, 'true');
     assert.equal(options.env.WRANGLER_WRITE_LOGS, 'false');
     assert.equal((await stat(runtime)).mode & 0o777, 0o600);
@@ -85,10 +85,11 @@ test('hosted accounts use the complete suite, private logging, and only the conf
   await assert.rejects(stat(runtime), { code: 'ENOENT' });
 });
 
-test('unapproved account, authentication, proof, or development databases stop before provider execution', async () => {
+test('live connector, authentication, proof, and unapproved databases stop before provider execution', async () => {
   const setup = await fixture();
   setup.dependencies.execute = () => { throw new Error('Fixtures must not start'); };
-  for (const database of ['5d746d29-0a66-4346-96a6-4974126685d7', '00000000-0000-4000-8000-000000000001']) {
+  for (const database of ['de43cf95-c024-4e44-860d-8ff179e4e08d', '5d746d29-0a66-4346-96a6-4974126685d7',
+    '06560c1c-8907-47d6-b2b6-f22e129ebbe4', '00000000-0000-4000-8000-000000000001']) {
     await assert.rejects(runHostedAccounts(setup.arguments.map((arg) => arg.startsWith('--database=') ? `--database=${database}` : arg), setup.dependencies), /exact isolated/);
   }
   await assert.rejects(runHostedAccounts(setup.arguments.map((arg) => arg.startsWith('--account=') ? '--account=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' : arg), setup.dependencies), /exact isolated/);
@@ -100,9 +101,9 @@ test('changed configuration resources or Worker entry stop before provider execu
   for (const change of [
     (config) => { config.d1_databases[0].database_name = 'minsky-dev'; },
     (config) => { config.main = '../authWorker.ts'; },
-    (config) => { config.r2_buckets[0].bucket_name = 'minsky-dev-images'; },
+    (config) => { config.r2_buckets = [{ binding: 'IMAGES', bucket_name: 'minsky-dev-images' }]; },
   ]) {
-    const config = renderWranglerConfiguration(connectorTarget, setup.config);
+    const config = renderStoreConfiguration(setup.config);
     change(config);
     await writeFile(setup.config, JSON.stringify(config));
     await assert.rejects(runHostedAccounts(setup.arguments, setup.dependencies));
@@ -116,8 +117,8 @@ test('live account or database metadata mismatch prevents fixture execution', as
   setup.dependencies.execute = () => { executed = true; return result(); };
   setup.dependencies.runWrangler = async () => 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
   await assert.rejects(runHostedAccounts(setup.arguments, setup.dependencies), /could not be confirmed/);
-  setup.dependencies.runWrangler = async (args) => args[0] === 'whoami' ? connectorTarget.accountId
-    : JSON.stringify({ name: connectorTarget.databaseName, uuid: '00000000-0000-4000-8000-000000000001' });
+  setup.dependencies.runWrangler = async (args) => args[0] === 'whoami' ? storeTarget.accountId
+    : JSON.stringify({ name: storeTarget.databaseName, uuid: '00000000-0000-4000-8000-000000000001' });
   await assert.rejects(runHostedAccounts(setup.arguments, setup.dependencies), /does not match/);
   assert.equal(executed, false);
 });
@@ -161,7 +162,7 @@ test('fixture cleanup failure retains its credential-free runtime configuration 
     const directory = await mkdtemp(join(tmpdir(), 'minsky-d1-proof-'));
     directories.push(directory);
     await writeFile(join(directory, 'fixture.json'), JSON.stringify({ config: runtime, remote: true,
-      accountId: connectorTarget.accountId, databaseId: connectorTarget.databaseId,
+      accountId: storeTarget.accountId, databaseId: storeTarget.databaseId,
       eventId: '00000000-0000-4000-8000-000000000001' }), { mode: 0o600 });
     return result();
   };

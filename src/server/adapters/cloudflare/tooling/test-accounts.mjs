@@ -4,24 +4,16 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
-import { connectorTarget, readFixtureTarget } from '../../../../../tests/providers/cloudflare/target.mjs';
 import { repositoryRoot } from './configuration.mjs';
 import { assertCurrentMigrations } from './migrations.mjs';
 import { confirmTarget, wranglerRunner } from './operations.mjs';
 import { safeWranglerEnvironment } from './safe-environment.mjs';
+import { readStoreTarget, storeArguments } from './store-target.mjs';
 
 const expectedCases = 82;
 
 export function accountArguments(arguments_) {
-  const options = {};
-  for (const argument of arguments_) {
-    const match = /^--(account|database|config)=(.+)$/.exec(argument);
-    if (!match || Object.hasOwn(options, match[1])) throw new Error('Supply --account, --database, and --config once. Test filters and count overrides are forbidden.');
-    options[match[1]] = match[2];
-  }
-  if (Object.keys(options).length !== 3) throw new Error('Supply the explicit connector CI account, database, and configuration.');
-  options.config = resolve(options.config);
-  return options;
+  return storeArguments(arguments_);
 }
 
 export function accountReport(output) {
@@ -58,10 +50,10 @@ async function retainedJournals(runtimeConfig, before) {
   return retained;
 }
 
-/** The approved connector CI target only. No Worker, bucket, or schema mutation. */
+/** The dedicated store CI target only. No Worker, bucket, or schema mutation. */
 export async function runHostedAccounts(arguments_, dependencies = {}) {
   const options = accountArguments(arguments_);
-  const settings = await readFixtureTarget({ ...options, origin: connectorTarget.origin });
+  const settings = await readStoreTarget(options);
   const runWrangler = dependencies.runWrangler ?? wranglerRunner(settings, options.config);
   await confirmTarget(options, settings, runWrangler);
   await assertCurrentMigrations(settings, runWrangler);

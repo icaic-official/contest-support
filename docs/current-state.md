@@ -8,7 +8,8 @@ The complete hosted connector and fresh installation pass. Protected connector C
 Supabase remains active.
 During final verification, the owner merged PR #23 at `c144a2a`.
 T0020 includes that main revision and preserves the jury worklist.
-The affected application checks will run again on the combined source.
+The combined source passes 566 unit and database tests across 34 files and all 45 ordinary browser cases.
+The complete local React journey also passes through the merged jury worklist.
 The [ticket](tickets.md#t0020-complete-cloudflare-connector) records the complete acceptance criteria.
 The [PR #21 component record](pr21-installation-disposition.md) explains installation reuse decisions.
 The [run report](t0020-run-report.md) lists changed files, commands, results, and remaining work.
@@ -41,7 +42,7 @@ Observed results during implementation are separate from final PR verification:
 - A separate empty hosted installation passes the documented procedure and complete React journey on `59121f7`.
 - The local complete HTTPS Worker journey passes with actual authentication, D1, R2, and Durable Object bindings.
 - The complete local React journey passes through actual HTTPS and emulated bindings, including phone keyboard checks and exact fixture cleanup.
-- All 34 ordinary application browser regressions and three local HTTPS authentication browser cases pass.
+- All 45 ordinary application browser regressions pass after main integration. Three local HTTPS authentication browser cases pass at the earlier revision.
 - Both frontend builds, type checking, lint, Deno checks, and all 12 function tests pass after the review corrections.
 - Both locked dependency audits report zero vulnerabilities.
 - The latest local secret scan passes across 119 commits through `1ee8cbf`.
@@ -54,6 +55,7 @@ The shared Supabase CLI suite passes again on `1ee8cbf`, with all eight scenario
 After both D1 runners finish, a separate read-only query confirms zero rows in all 27 application tables.
 The D1 migration records remain intact. No fixture recovery journals remain from these successful runs.
 The existing authentication and bounded-proof databases remain separate.
+The direct D1 suites now require a separate store CI target, described below.
 The isolated connector Worker is deployed at `https://minsky-connector-ci.icaic-minsky.workers.dev`.
 Its initial version is `2a3fe2f1-7b4e-4017-bd45-43c3fdf8cbeb`.
 Initial secret creation produced active version `6133f70f-5762-479b-88d6-dfa3f2b376e7`.
@@ -82,7 +84,37 @@ Installation commands reject missing or foreign migrations and override inherite
 An initial shared Cloudflare browser run stopped before login because its test bridge omitted a Vite runtime asset.
 The narrow asset correction and a real module-loading regression pass. The repeated hosted suite passes all eight scenarios.
 No application route or deployed source changed for that correction.
-No development backend deployment, real-account reset, data export, migration, or active backend switch occurred.
+No development backend deployment, real-account reset, real-data export or migration, or active backend switch occurred.
+
+### Direct D1 test isolation
+
+Protected [run 39097062812](https://github.com/GiftedNovaHD/minsky/actions/runs/39097062812) on `1ee8cbf` passed 69 workflow cases and failed one.
+Its per-case assertion output was withheld to protect credentials. The exact failed assertion is unavailable.
+Its D1 cleanup completed, and no recovery artifact remained.
+Protected [run 39097803510](https://github.com/GiftedNovaHD/minsky/actions/runs/39097803510) on the integrated `c1530bb` source also reported 69 passed and one failed.
+Its cleanup completed without retained artifacts. It did not reach deployment or hosted browser checks.
+Both ordinary checks pass on `c1530bb`, in [push run 39097793939](https://github.com/GiftedNovaHD/minsky/actions/runs/39097793939) and [PR run 39097795860](https://github.com/GiftedNovaHD/minsky/actions/runs/39097795860).
+
+A separate controlled local test confirmed a test-isolation defect after deploying the complete CI Worker.
+Scheduled outbox delivery can change `attempts`, `delivered`, and `last_attempt_at` between a direct test's snapshots.
+It can also create coordinator cursors that the direct D1 fixture cannot remove.
+The controlled test establishes this hazard. It does not identify the historical failed assertion.
+
+The direct workflow and account suites therefore use `minsky-connector-store-ci`, database `341350ba-7c74-4c46-8b21-edfdcda475f5`.
+The account and name were checked before creation. The new database is in APAC.
+Its configuration has only a D1 binding. It has no Worker entry point, assets, R2, live namespace, or scheduled trigger.
+This adds no subscription upgrade. The database uses the existing D1 service and its usage charges.
+The hosted application retains its separate `minsky-connector-ci` database and all real delivery behavior.
+Full notification snapshot comparisons remain intact in the direct suites.
+Runner diagnostics expose only failed assertion positions as numbers. Provider output and credential values remain withheld.
+
+A read-only audit at 04:45:45 UTC found zero application rows in the connector CI database.
+The Worker's live namespace is `aa46f35cf51440bfaa9fe6d5dc6ff6b8`.
+Its [object listing](https://developers.cloudflare.com/api/resources/durable_objects/subresources/namespaces/subresources/objects/methods/list/) returned one object with `hasStoredData=false`.
+No object reported stored data. No stored orphan state was observed at that check.
+The audit made no cleanup mutation and did not inspect the separate installation baseline.
+The repeated audit at 04:53:09 UTC returned the same storage flags and zero queried application rows after the second failed run.
+Final protected verification will use the corrected isolation.
 
 ### Empty hosted installation
 

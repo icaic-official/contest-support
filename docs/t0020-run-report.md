@@ -72,6 +72,7 @@ The implementation changes these files:
 - `src/server/adapters/cloudflare/authentication.ts`
 - `src/server/adapters/cloudflare/deploy/connector-ci.settings.json`
 - `src/server/adapters/cloudflare/deploy/connector-ci.wrangler.jsonc`
+- `src/server/adapters/cloudflare/deploy/connector-store-ci.wrangler.jsonc`
 - `src/server/adapters/cloudflare/http.test.ts`
 - `src/server/adapters/cloudflare/http.ts`
 - `src/server/adapters/cloudflare/images.test.ts`
@@ -92,6 +93,8 @@ The implementation changes these files:
 - `src/server/adapters/cloudflare/tooling/provider.example.json`
 - `src/server/adapters/cloudflare/tooling/provision.example.jsonc`
 - `src/server/adapters/cloudflare/tooling/safe-environment.mjs`
+- `src/server/adapters/cloudflare/tooling/store-target.mjs`
+- `src/server/adapters/cloudflare/tooling/store-target.test.mjs`
 - `src/server/adapters/cloudflare/tooling/test-accounts.mjs`
 - `src/server/adapters/cloudflare/tooling/test-accounts.test.mjs`
 - `src/server/adapters/cloudflare/tooling/test-ui.mjs`
@@ -133,6 +136,8 @@ Provider and review inspection used `gh api`, `gh pr view`, Wrangler `whoami`, D
 R2 `bucket list`, `create`, and `dev-url get` confirmed new private Standard buckets.
 Worker `deployments list` confirmed name absence before initial deployment.
 The isolated connector D1 database received only repository migrations and fictional fixture records.
+The later D1-only `minsky-connector-store-ci` database received the same nine migrations through `store-target.mjs migrate`.
+An exact name check preceded creation. Wrangler confirms that no store CI Worker exists.
 The GitHub environment change added only this ticket branch.
 
 Local verification used `npm test -- --maxWorkers=2`, focused Vitest runs, `typecheck`, `lint`, and both frontend builds.
@@ -158,12 +163,18 @@ The supported command initially failed with Cloudflare code `10042`. It passed a
 The initial hosted shared Cloudflare run stopped before login because the bridge omitted Vite's runtime asset.
 The narrow asset correction, its new ordinary browser regression, and the repeated hosted eight-case suite pass.
 The earlier protected connector dispatch on `59121f7` was canceled before its cloud job. It supplies no passing hosted evidence.
+Protected `1ee8cbf` and `c1530bb` verification each passed 69 workflow cases and failed one.
+Their assertion details were withheld, and D1 cleanup completed without retained artifacts.
+A controlled local reproduction established that scheduled delivery can mutate direct-test snapshots and create coordinator state outside direct-fixture cleanup.
+Direct suites now use a separate D1-only CI database. Their complete workflow comparisons remain unchanged.
+Independent hosted namespace audits observed no stored orphan state after either failed run.
 Initial local socket and Git metadata operations needed sandbox escalation.
 No automatic approval review rejected an authorized action.
 
 ## 4. Build and test results
 
-The complete local suite passes 554 tests across 33 files on `59121f7`, including the image cleanup-fairness regression.
+After current-main integration, the complete local suite passes 566 tests across 34 files.
+The earlier `59121f7` run passes 554 tests, including the image cleanup-fairness regression.
 The full local account suite also passes all 83 cases against the historical authentication schema.
 The final local HTTPS connector journey, including actual D1, R2, and live bindings, passes.
 The complete local React journey also passes with the same assertions as the hosted journey.
@@ -171,7 +182,7 @@ It checks all nine commands, images, live connections, administration, persisted
 All 59 image cases pass after the additional cleanup-fairness correction.
 Both frontend builds, types, lint, Deno checks, and all 12 function tests pass.
 After current-main integration, all 45 ordinary application browser cases pass.
-Three authentication browser cases and three documentation browser cases also pass at the earlier recorded revision.
+Three authentication browser cases pass at the earlier recorded revision. All three documentation browser cases pass again after main integration.
 The complete local React journey passes again with the merged jury worklist, including decision, external-confirmation, and focus checks.
 The documentation build checks 14 pages and 562 local links and assets.
 Both locked dependency audits report zero vulnerabilities.

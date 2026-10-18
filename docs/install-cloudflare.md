@@ -270,17 +270,10 @@ The [shared provider guide](run-provider-tests.md) describes the repository's pr
 Its Cloudflare target guard restricts automated runs to the dedicated connector CI resources.
 Do not redirect that suite to an unrelated installation by bypassing its guard.
 
-For the selected isolated CI target, the full D1 workflow runner uses this command:
-
-```sh
-node src/server/adapters/cloudflare/tooling/test-workflow.mjs --config="$MINSKY_INSTALL_CONFIG" --account="$MINSKY_INSTALL_ACCOUNT_ID" --database="$MINSKY_INSTALL_DATABASE_ID"
-```
-
-Expected output is `Hosted full D1 workflow: 70 passed, 0 failed, 0 skipped.`
-The runner requires the checkout's exact migration list and uses the complete production store.
-It creates no provider resources and applies no migrations.
-Its fixtures delete only their own UUID-scoped records.
-A remaining recovery journal prevents a cleanup pass.
+The repository's direct D1 suites use a separate database without a deployed Worker.
+Their target guard refuses a live application database.
+Scheduled notification delivery must not change transaction snapshots or create coordinators for database-only fixtures.
+Use the [shared provider guide](run-provider-tests.md) for the exact CI commands and scoped recovery rules.
 
 ## Recover after installation failures
 
@@ -292,7 +285,7 @@ A remaining recovery journal prevents a cleanup pass.
 | Secret command fails | Confirm that the selected Worker exists and secret metadata is readable. Check whether `AUTH_SECRET` already exists. The installation command does not rotate it. |
 | Credential output already exists | Retain that file. Select a new private destination for a new operation. Existing files are never overwritten. |
 | Bootstrap fails or its response is lost | Retain any private result file. Inspect the installation marker through trusted D1 access before another attempt. An existing marker requires owner recovery. |
-| A full workflow fixture leaves a journal | Retain its runtime configuration and journal. Follow [scoped fixture recovery](d1-transaction-proof.md#recover-a-failed-run). Never reset the database. |
+| A full workflow fixture leaves a journal | Retain its runtime configuration and journal. Follow [scoped fixture recovery](run-provider-tests.md#recover-direct-d1-fixtures). Never reset the database. |
 
 To inspect a possible committed bootstrap, run this read-only query:
 

@@ -263,21 +263,27 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Confirm and migrate only the connector CI database
+      - name: Confirm and migrate only the D1 store CI database
         run: >-
-          npm run cloudflare:install -- migrate
-          --config=src/server/adapters/cloudflare/deploy/connector-ci.wrangler.jsonc
+          node src/server/adapters/cloudflare/tooling/store-target.mjs migrate
+          --config=src/server/adapters/cloudflare/deploy/connector-store-ci.wrangler.jsonc
           --account=458ad6a930b0fb717796dfa19ca6a2b1
-          --database=de43cf95-c024-4e44-860d-8ff179e4e08d
+          --database=341350ba-7c74-4c46-8b21-edfdcda475f5
       - name: Test the complete guarded workflow on hosted D1
         run: >-
           npm run test:connector:workflow:hosted --
-          --config=src/server/adapters/cloudflare/deploy/connector-ci.wrangler.jsonc
+          --config=src/server/adapters/cloudflare/deploy/connector-store-ci.wrangler.jsonc
           --account=458ad6a930b0fb717796dfa19ca6a2b1
-          --database=de43cf95-c024-4e44-860d-8ff179e4e08d
-      - name: Test account guards on the isolated hosted connector D1 schema
+          --database=341350ba-7c74-4c46-8b21-edfdcda475f5
+      - name: Test account guards on the isolated hosted D1 store
         run: >-
           npm run test:connector:accounts:hosted --
+          --config=src/server/adapters/cloudflare/deploy/connector-store-ci.wrangler.jsonc
+          --account=458ad6a930b0fb717796dfa19ca6a2b1
+          --database=341350ba-7c74-4c46-8b21-edfdcda475f5
+      - name: Confirm and migrate only the connector application CI database
+        run: >-
+          npm run cloudflare:install -- migrate
           --config=src/server/adapters/cloudflare/deploy/connector-ci.wrangler.jsonc
           --account=458ad6a930b0fb717796dfa19ca6a2b1
           --database=de43cf95-c024-4e44-860d-8ff179e4e08d

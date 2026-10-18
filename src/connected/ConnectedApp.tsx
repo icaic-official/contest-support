@@ -107,7 +107,7 @@ export function ConnectedApp() {
       <div className="flex min-h-dvh flex-col">
         <a
           href="#main"
-          className="sr-only z-50 rounded-md bg-background px-4 py-3 text-sm font-medium shadow-md focus:not-sr-only focus:fixed focus:top-3 focus:left-3"
+          className="sr-only z-50 rounded-md bg-background text-sm font-medium shadow-md focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:px-4 focus:py-3"
         >
           Skip to main content
         </a>

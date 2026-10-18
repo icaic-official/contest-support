@@ -27,6 +27,8 @@ export function useAuthSession(): AuthSession {
     const unsubscribe = backend.auth.subscribe((nextUser) => {
       if (!active) return;
       setUser(nextUser);
+      // A new sign-in replaces an earlier restore or sign-out error.
+      if (nextUser) setError("");
       setLoading(false);
     });
     void backend.auth

@@ -89,6 +89,11 @@ export function IssueSheet({
   replyDraft: ReplyDraft;
   onReplyDraft: (draft: ReplyDraft) => void;
 }) {
+  // Keep the last issue on screen while the sheet slides out, so the panel
+  // does not go blank during the close animation.
+  const [lastIssue, setLastIssue] = useState(issue);
+  if (issue && issue !== lastIssue) setLastIssue(issue);
+  const shown = issue ?? lastIssue;
   return (
     <Sheet
       open={Boolean(issue)}
@@ -107,10 +112,10 @@ export function IssueSheet({
         }}
         className="w-[min(680px,100vw)] gap-0 p-0 sm:max-w-[680px]"
       >
-        {issue && (
+        {shown && (
           <IssueSheetBody
-            key={issue.id}
-            issue={issue}
+            key={shown.id}
+            issue={shown}
             props={props}
             tab={tab}
             onTab={onTab}

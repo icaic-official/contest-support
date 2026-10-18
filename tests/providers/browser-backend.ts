@@ -32,8 +32,10 @@ export async function createBrowserBackend(
   if (new URL(assetOrigin).origin !== new URL(options.origin).origin) {
     // Only test and source assets come from Vite. API requests, WebSockets,
     // cookies, and request-forgery protection retain the hosted browser origin.
+    // Vite's injected dynamic-import helper loads its client runtime from
+    // node_modules/vite, outside the optimized .vite dependency directory.
     await context.route((url) => url.origin === new URL(options.origin).origin &&
-      /^\/(?:tests\/providers\/|src\/|@vite\/|@id\/|@fs\/|@react-refresh$|node_modules\/\.vite\/)/.test(url.pathname), async (route) => {
+      /^\/(?:tests\/providers\/|src\/|@vite\/|@id\/|@fs\/|@react-refresh$|node_modules\/(?:\.vite\/|vite\/dist\/client\/))/.test(url.pathname), async (route) => {
       const incoming = new URL(route.request().url());
       const target = new URL(incoming.pathname + incoming.search, assetOrigin);
       const response = await fetch(target, { redirect: 'error', headers: { Accept: route.request().headers().accept ?? '*/*' } });

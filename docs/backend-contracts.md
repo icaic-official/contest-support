@@ -10,17 +10,41 @@ They do not expose database queries, access tokens, provider clients, or channel
 The server still checks permissions and applies each workflow command as a transaction.
 A transaction commits all changes for a command together, or commits none.
 
-## Experimental application store
+## Shared server workflow
 
-T0017 adds a separate server interface in [applicationStore.ts](../src/server/applicationStore.ts).
+T0019 adds [WorkflowService](../src/server/workflow.ts) for all nine existing issue commands.
+The service validates input, applies the existing decisions, handles receipts, and bounds conflict retries.
+`WorkflowPersistence` supplies authorized reads and guarded atomic commits.
+Its operation-level methods expose no SQL or generic transaction callback.
+The [workflow reference](server-workflow.md) records the compatibility baseline and each responsibility.
+
+The opt-in [Supabase workflow function](../supabase/functions/workflow/index.ts) authenticates the bearer token through Auth `getUser()`.
+It constructs `Caller` from the verified account and login, then executes the shared service.
+Its [persistence adapter](../src/server/adapters/supabase/store.ts) calls service-only read and commit RPCs.
+PostgreSQL rechecks current access and captured dependencies before committing state, receipt, history, and notification counters together.
+Private versions detect concurrent changes without exposing private activity through public revisions.
+
+[createServerWorkflowExecutor()](../src/backend/supabase/workflow.ts) preserves the `Backend.workflows.execute` signature for replacement verification.
+The active application adapter still calls the legacy `public.workflow` RPC.
+The old SQL rules remain protective during this transition.
+Administration, snapshots, images, and live updates also retain their existing Supabase paths.
+The complete application server is not provider-independent.
+Use [the verification guide](verify-server-workflow.md) for the isolated execution path and separate evidence categories.
+
+## Bounded D1 application store
+
+T0017 added a separate server interface in [applicationStore.ts](../src/server/applicationStore.ts).
 It defines `execute()` for `claim` and `message`, plus a limited `issue()` view.
 This interface does not replace the full browser `Backend` or select a different active provider.
 The [proof guide](d1-transaction-proof.md) describes local and hosted checks.
 
 `Caller` contains an account ID and login ID from a trusted identity adapter.
 These values must never come directly from an HTTP request body.
-T0018 supplies trusted callers through the [Cloudflare authentication service](cloudflare-authentication.md).
-The D1 adapter checks the login, expiry, account restrictions, membership, team, roles, and event inside the database.
+T0018 adds a [Cloudflare authentication service](cloudflare-authentication.md) that can construct trusted callers.
+Its experimental Worker exposes authentication routes only. It does not expose a workflow route.
+T0019 connects the D1 adapter to the same `WorkflowService` and decisions used by the Supabase server path.
+The D1 adapter still implements only `claim` and `message`.
+It checks the login, expiry, account restrictions, membership, team, roles, and event inside the database.
 The issue view uses one primary query for its permission check, permitted history, and audience sequence.
 An archived event permits reads but prevents command commits and receipt replay.
 
@@ -43,9 +67,9 @@ A failed assertion rolls back the receipt and every later write.
 D1 documents atomic [batch rollback](https://developers.cloudflare.com/d1/worker-api/d1-database/#batch).
 The adapter uses ordinary primary bindings. It does not use read replicas or the Sessions API.
 
-The receipt compares the session ID and parsed command content with fixed object key order.
+The service compares the receipt's session ID and original JSON command content without depending on object key order.
 It preserves original text, including whitespace, for comparison.
-The adapter trims message text before writing history and limits the trimmed value to 2,000 characters.
+Shared text validation removes surrounding spaces and limits the saved value to 2,000 Unicode code points, matching PostgreSQL.
 Current access checks precede receipt replay.
 A private message changes the internal issue version and staff sequence only.
 Contestant views omit internal history and versions. Team sequence values change only for public activity.
@@ -56,6 +80,11 @@ The experimental [schema](../src/server/adapters/d1/migrations/0001_transaction_
 Triggers advance access and membership versions when permissions change.
 The [version guard](../src/server/adapters/d1/migrations/0002_version_guards.sql) requires every issue writer to advance its internal version.
 T0018 extends this schema for bounded authentication. Remaining operations, timestamp migration encoding, and the complete connector schema require later work.
+The local bounded proof loads the merged authentication migrations too.
+Its hosted proof still uses the separate `minsky-d1-proof-ci` schema with migrations `0001` and `0002`.
+Neither proof verifies a complete authentication-backed Cloudflare workflow route.
+That connector must guard current credential state, credential generation, and identity-session existence and expiry at commit.
+The bounded adapter currently checks application login state and captured access versions.
 
 ## Module boundaries
 
@@ -66,13 +95,16 @@ T0018 extends this schema for bounded authentication. Remaining operations, time
 | [index.ts](../src/backend/index.ts) | Creates the selected implementation from public configuration. |
 | [supabase/backend.ts](../src/backend/supabase/backend.ts) | Calls Supabase Auth, database functions, account administration, and Realtime. |
 | [supabase/images.ts](../src/backend/supabase/images.ts) | Calls the attachment function and private Storage bucket. |
+| [supabase/workflow.ts](../src/backend/supabase/workflow.ts) | Provides the opt-in Edge Function executor for shared workflow verification. |
+| [server/workflow.ts](../src/server/workflow.ts) | Defines shared decisions, orchestration, and the operation-level persistence interface. |
+| [server/adapters/supabase/store.ts](../src/server/adapters/supabase/store.ts) | Calls service-only guarded persistence RPCs from trusted server code. |
 | [model.ts](../src/connected/model.ts) | Defines workflow commands and validates snapshots. It has no provider imports. |
 | [imageFile.ts](../src/connected/imageFile.ts) | Defines file checks, attachment paths, and error classification shared with the attachment function. |
 
 The UI imports the contracts and `requireBackend()`.
-`npm run lint` rejects provider imports outside the Supabase implementation and the backend entry point.
+`npm run lint` rejects provider imports outside provider adapter modules and the backend entry point.
 The active application server functions and browser fixture driver remain specific to Supabase.
-The separate D1 proof has its own server adapter and isolated fixtures.
+The D1 proof has its own persistence adapter and isolated fixtures, with shared workflow decisions.
 
 `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` remain the browser configuration.
 `backend` is `undefined` when either value is missing.
@@ -129,6 +161,8 @@ An invalid success response also leaves the outcome unknown because the write ma
 
 The Supabase adapter maps a nonempty database error code to `WorkflowRejectedError`.
 It does not treat a transport error as a confirmed rejection.
+The opt-in Edge executor maps only a validated typed rejection to `WorkflowRejectedError`.
+Unexpected HTTP responses and malformed bodies retain an unknown outcome.
 
 ## Administration
 
@@ -202,6 +236,9 @@ The suite also covers the existing account, team-search, image, and refresh beha
 
 These checks do not verify a hosted provider or a second complete browser adapter.
 `npm test` also includes the local D1 application-store proof described above.
+It includes shared-service rules and Supabase persistence tests with embedded PostgreSQL.
+`npm run test:workflow:hosted` exercises the deployed opt-in Supabase function with the shared workflow scenarios and additional boundary checks.
+That runner permits only the approved Minsky CI project. It does not activate the replacement in development.
 Hosted checks use isolated accounts and records through [protected cloud CI](cloud-onboarding.md#verification-and-protected-cloud-ci).
 The [shared provider suite](provider-test-contracts.md) checks these contracts through real browser adapters.
 Supabase supplies the first fixture implementation. Other providers remain unimplemented.

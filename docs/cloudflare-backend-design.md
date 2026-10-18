@@ -2,7 +2,9 @@
 
 This page explains the proposed Cloudflare backend and its provider boundaries.
 T0016 began while PR #32 was under review. The user merged PR #32 on 2026-10-17.
-T0017 starts the [D1 transaction proof](d1-transaction-proof.md).
+T0017's bounded [D1 transaction proof](d1-transaction-proof.md) merged in PR #39.
+T0019 extracts the existing workflow into shared server code and verifies it through Supabase before further D1 workflow implementation.
+T0018 authentication merged in PR #40 at `68e8642`. T0019 now includes that updated `main`.
 The complete Cloudflare connector and migration tools remain later work.
 The owner authorizes isolated development and CI resources for this implementation.
 That authorization does not establish a hosted verification result.
@@ -23,8 +25,9 @@ A future Cloudflare adapter translates the same operations into authenticated HT
 
 The server needs a separate boundary.
 Moving browser calls behind `Backend` does not make PostgreSQL functions portable.
-The Cloudflare server must implement their permission checks and atomic writes in SQLite.
-A later AWS server can reuse domain rules without importing Cloudflare bindings.
+T0019 supplies one [shared workflow service](server-workflow.md) for the existing issue commands.
+The Cloudflare server must reuse those decisions and enforce their commit conditions through its SQLite adapter.
+A later AWS server can reuse the same service without importing Cloudflare bindings.
 
 ```mermaid
 flowchart TD
@@ -32,6 +35,8 @@ flowchart TD
     Contract --> SB[Supabase browser adapter]
     Contract --> CF[Cloudflare browser adapter]
     SB --> Current[Existing Supabase services]
+    SB -.-> SF[Opt-in Supabase workflow function]
+    SF --> Domain
     CF --> API[Worker HTTP handlers]
     API --> Identity[Identity and login sessions]
     API --> Domain[Minsky command and access rules]
@@ -40,18 +45,27 @@ flowchart TD
     Images --> Store
     Images --> Blobs[Private blob store]
     Store --> D1[D1 adapter]
+    Store --> SP[Supabase persistence adapter]
+    SP --> PG[Guarded PostgreSQL commit]
     Blobs --> R2[R2 adapter]
     D1 --> Pending[Committed notification records]
     Pending --> Live[Durable Object delivery adapter]
     Live --> CF
 ```
 
-The diagram shows the complete target. T0017 implements only the D1 transaction proof.
-The Supabase path remains the active application backend.
+The diagram includes the complete target and the separate Supabase verification path.
+T0019's Supabase function executes every issue command through the shared service.
+The bounded D1 adapter reuses that service for `claim` and `message` only.
+The merged authentication Worker has no workflow route.
+The complete connector must also guard current identity sessions and credential generations inside each workflow commit.
+The active Supabase browser workflow still calls the legacy RPC.
+The dotted connection identifies the opt-in executor used for replacement verification.
 
 ## Modules have explicit responsibilities
 
-The table proposes module responsibilities. It does not describe files already in the repository.
+The table defines the boundaries.
+The [workflow reference](server-workflow.md) identifies implemented workflow modules and remaining provider-specific paths.
+Identity, image, and delivery entries still include proposed Cloudflare work.
 
 | Boundary | Responsibility | Provider details excluded from callers |
 | --- | --- | --- |
@@ -68,7 +82,8 @@ Ports describe complete Minsky operations, such as committing a workflow command
 They do not expose a generic `save(table, record)` API.
 The application store owns the transaction needed by each operation.
 
-Domain decisions use supplied state, time, and generated IDs.
+Workflow decisions use explicit authorized state.
+The persistence adapter supplies authoritative timestamps and generated IDs during commit.
 The provider store verifies that the state remains current when it commits the decision.
 Typed commit results distinguish a conflict, a confirmed rejection, and an unknown outcome.
 Database constraints still protect relationships and uniqueness.
@@ -91,7 +106,8 @@ Terraform can later provision selected resources. Terraform does not replace app
 
 ## D1 stores the authoritative application state
 
-The first implementation uses one application database per environment.
+The complete target uses one application database per environment.
+The existing bounded proof does not yet implement the complete schema or every workflow command.
 The same database contains account access state and all memberships.
 This permits password-reset authorization across every session assigned to an account.
 Splitting databases by contest session would require a separate consistency design for that rule.
@@ -167,6 +183,13 @@ Their implementation must define retry semantics before adding automatic retries
 
 ## Authentication uses replacement temporary passwords
 
+T0018 implements bounded authentication in [PR #40](https://github.com/GiftedNovaHD/minsky/pull/40).
+The owner merged that PR at `68e8642` on 2026-10-17 at 17:16:41 UTC.
+T0019 preserves the merged authentication behavior.
+The initial protected hosted HTTP check reached a Workers Free resource limit.
+The owner activated Workers Paid during PR #41 review. The local hosted HTTP suite now passes.
+See [current state](current-state.md) for the separate protected GitHub result.
+
 Account preservation and password preservation are different requirements.
 The owner selected organizer-issued replacement temporary passwords on 2026-10-17.
 Users must change these passwords before contest access.
@@ -175,7 +198,7 @@ Existing passwords do not need to survive. Password-hash import is no longer req
 
 T0018 selects maintained Better Auth behind the identity adapter.
 See [the implementation reference](cloudflare-authentication.md) and [choice with costs](cloudflare-authentication-choice.md).
-The proposed final boundary is a maintained identity implementation behind a small server port.
+The identity boundary does not activate Cloudflare authentication in the application.
 Minsky retains its username rules, organizer recovery, mandatory password changes, and cross-session authorization.
 
 T0018 implements authentication after the merged D1 proof.
@@ -304,7 +327,9 @@ Record hosted evidence in [the proof guide](d1-transaction-proof.md) before clai
 Passing that suite does not prove a fresh installation, a data migration, or capacity for 800 simultaneous users.
 Each claim needs its own evidence.
 
-T0018 adds authentication after the D1 proof. Remaining connector operations follow T0018.
+T0018 adds bounded authentication after the D1 proof.
+Shared-rule verification through Supabase precedes further Cloudflare workflow persistence.
+Authentication verification and the remaining connector operations remain separate requirements.
 Full migration tooling follows connector verification. Real-data exports and the backend switch remain later phases.
 AWS adapters and Terraform remain deferred.
 

@@ -1,15 +1,50 @@
 # Minsky planning record
 
+**PR #41 review follow-up, 2026-10-18.** The owner requested review fixes, code cleanup, and completion of authentication verification on the existing PR.
+Use `feature/t0019-shared-server-workflow`.
+Correct Supabase login expiry after lock waits with an additive migration. Preserve the installed migration source.
+The owner confirmed Workers Paid activation. The isolated authentication Worker accepts the 1,000 ms cap.
+Its local hosted HTTP suite and protected authentication on merged `main` pass.
+Record that protected result separately from the PR #41 hosted runs.
+Retain the maintained password parameters and the 1,000 ms CPU cap.
+Supabase remains active. The owner reviews and merges.
+
+**Shared server workflow, 2026-10-18.** T0019 extracts the existing issue rules before further Cloudflare workflow implementation.
+Use `feature/t0019-shared-server-workflow` from updated `main` at `0c797ad`.
+The owner authorized this ticket while [PR #40](https://github.com/GiftedNovaHD/minsky/pull/40) was open.
+The branch started independently of the authentication branch.
+The owner merged PR #40 at `68e8642` on 2026-10-17 at 17:16:41 UTC.
+T0019 now includes that updated `main` and preserves the merged authentication implementation.
+PR #39 merged the bounded D1 proof. Its merge does not make the complete server workflow portable.
+
+Use one shared application service for all existing issue commands.
+Exercise that service through a trusted Supabase entry point and isolated CI fixtures.
+Keep database constraints, atomic writes, current-access checks, and stale-state detection in provider adapters.
+Align D1's existing `claim` and `message` proof with those same decisions.
+Do not design a separate Cloudflare workflow.
+See [the workflow reference](docs/server-workflow.md) and [verification guide](docs/verify-server-workflow.md).
+
+Supabase remains active. The legacy browser workflow stays available during replacement verification.
+Development backend deployment requires separate authorization.
+The owner reviews and merges. Bounded subagent work is authorized.
+PR #40's initial protected HTTP verification hit the Workers Free resource limit.
+The owner activated Workers Paid under the PR #41 follow-up above. See current-state records for the later verification results.
+Remaining D1 commands, R2, notification delivery, migration tooling, AWS, and Terraform remain later work.
+No real-data export, real-account reset, or backend switch is authorized.
+
 **Cloudflare authentication, 2026-10-18.** The owner selected the next focused ticket after PR #39 merged.
 T0018 uses `feature/t0018-cloudflare-authentication` from updated `main` at `0c797ad`.
+The owner merged T0018 in PR #40 at `68e8642` on 2026-10-17 at 17:16:41 UTC.
 Implement username login, bounded cookie sessions, mandatory password changes, and organizer-assisted recovery behind the shared contracts.
 Preserve account IDs, memberships, permissions, and history. Check current permissions and revoked credentials at the server.
 Use maintained Better Auth and cryptographic components, explicit origins, request-forgery protection, and isolated fictional fixtures.
 See [the authentication reference](docs/cloudflare-authentication.md) and [verification guide](docs/verify-cloudflare-authentication.md).
-Isolated development and CI resources remain authorized in the confirmed account. No paid upgrade occurred.
+Isolated development and CI resources remain authorized in the confirmed account.
+The owner confirmed Workers Paid activation during PR #41 review.
 The measured hash requires more CPU than Workers Free permits. The identity choice records the concrete Standard plan cost.
-The protected run passed all 28 hosted D1 account cases, then hit a Worker resource limit during HTTP password change.
-The owner deferred the subscription on 2026-10-18. Keep the protected HTTP result incomplete until paid verification passes.
+The initial protected run passed all 28 hosted D1 account cases, then hit a Worker resource limit during HTTP password change.
+The owner initially deferred the subscription on 2026-10-18, then activated it during PR #41 review.
+Record the later paid verification separately from that failed run.
 Supabase remains active. The remaining connector, real-data exports, migration, and backend switch remain later work.
 The owner reviews and merges.
 

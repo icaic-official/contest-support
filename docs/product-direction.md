@@ -61,6 +61,9 @@ The implemented architecture uses Supabase Auth, Postgres, Realtime, and private
 Database functions enforce workflow transactions and permissions.
 Edge Functions handle privileged account administration and image operations.
 T0014 places the browser integration behind [backend contracts](backend-contracts.md).
+T0019 extracts the existing issue decisions into a [shared server service](server-workflow.md).
+An opt-in Supabase function executes that service for replacement verification.
+The active application retains the legacy PostgreSQL workflow during this transition.
 
 Supabase manages the services.
 Minsky still requires repository-owned migrations and functions that implement its schema, authorization policies, and business rules.
@@ -139,12 +142,18 @@ The selected target has these responsibilities.
 D1 remains the source of saved workflow state.
 Live messages do not grant access and do not carry private issue data.
 A later implementation must define how committed changes reach subscribers and how clients recover missed notifications.
-The transaction and permission rules currently enforced in Postgres must also hold in the SQLite implementation.
+The SQLite adapter must preserve the existing decisions through the same shared service and guarded commits.
 
 The shared Minsky interfaces, Supabase adapter, provider tests, and Cloudflare design merged before T0017.
 Hosted Supabase contract checks provide the comparison point for the replacement backend.
-T0017 proved the bounded D1 transaction pattern and merged in PR #39 at `0c797ad`.
-T0018 implements and verifies authentication. The remaining connector operations follow this ticket.
+T0017's bounded D1 transaction proof merged in PR #39 at `0c797ad`.
+T0018 authentication merged in PR #40 at `68e8642` on 2026-10-17 at 17:16:41 UTC.
+Its initial hosted HTTP verification reached a Workers Free resource limit.
+The owner activated Workers Paid during PR #41 review. The hosted HTTP suite now passes.
+See [current state](current-state.md) for separate local hosted and protected GitHub results.
+T0019 verifies the extracted server workflow through Supabase before further D1 workflow persistence.
+Its branch started independently at `0c797ad` and preserves the merged authentication behavior.
+The remaining connector operations follow that shared-rule verification.
 Full migration tooling follows connector verification. Real-data exports and the backend switch remain later phases.
 See [the proof guide](d1-transaction-proof.md) and [implementation plan](cloudflare-implementation-plan.md).
 

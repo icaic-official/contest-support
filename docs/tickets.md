@@ -2,9 +2,11 @@
 
 These tickets describe development work, not contestant issues.
 
-The active ticket is [T0018 Cloudflare authentication](#t0018-cloudflare-authentication).
-PR #39 merged the D1 proof at `0c797ad` on 2026-10-17 at 15:49:49 UTC.
-The remaining Cloudflare operations follow authentication.
+The active ticket is [T0019 shared server workflow](#t0019-shared-server-workflow).
+The owner authorized this extraction while T0018 authentication PR #40 was open.
+The owner merged PR #40 at `68e8642` on 2026-10-17 at 17:16:41 UTC.
+PR #39 merged T0017's bounded D1 proof at `0c797ad`.
+Further Cloudflare workflow persistence follows shared-rule verification through Supabase.
 Migration tooling follows connector verification. Supabase remains active.
 
 T0016 Cloudflare backend design merged in [PR #36](https://github.com/GiftedNovaHD/minsky/pull/36) at `b68ef72` on 2026-10-17.
@@ -55,10 +57,56 @@ These items stay deferred and are not part of T0005:
 
 T0008 fuzzy team search merged into `main` in [PR #22](https://github.com/notbowen/minsky/pull/22) on 2026-10-15 (SGT).
 
+## T0019 Shared server workflow
+
+Branch: `feature/t0019-shared-server-workflow`, from updated `main` at `0c797ad`.
+Status: implemented in [PR #41](https://github.com/GiftedNovaHD/minsky/pull/41). Local, hosted Supabase, and bounded hosted D1 checks pass. Protected GitHub cloud execution remains pending. The owner reviews and merges.
+Summary: Extract the existing issue rules into one shared server service. Exercise all nine commands through a trusted Supabase path before expanding Cloudflare workflow persistence.
+
+The owner authorized work while [PR #40](https://github.com/GiftedNovaHD/minsky/pull/40) was open.
+This branch started independently at `0c797ad`.
+It now includes that PR's merge at `68e8642`, from 2026-10-17 at 17:16:41 UTC.
+T0019 preserves the merged authentication behavior.
+The initial protected authentication HTTP check failed with a Workers Free resource limit.
+The owner activated Workers Paid during PR #41 review. The local hosted HTTP suite now passes.
+
+Supabase remains active. The legacy browser workflow and protective SQL remain available during replacement verification.
+The new Supabase path is opt-in and uses the approved CI project, `ghtztmovdkhuketcbjmq`.
+No active development backend deployment or backend switch is part of this ticket.
+Full D1 workflow support, R2, notification delivery, migration tooling, AWS, and Terraform remain outside this scope.
+Bounded subagent work is authorized.
+
+### Acceptance criteria
+
+- [x] Inventory every existing command against effective migrations, browser contracts, constraints, policies, receipts, and tests.
+- [x] Implement one shared service with explicit decisions and operation-level persistence methods for all nine existing commands.
+- [x] Execute that service through an authenticated Supabase server boundary and guarded atomic commits.
+- [x] Preserve access, roles, ownership, lifecycle, persisted timestamps, resolution history, awards, and external application records.
+- [x] Preserve request identity across uncertain retries and reject conflicting request reuse.
+- [x] Preserve public and private history and notification visibility under concurrent requests.
+- [x] Align D1's bounded `claim` and `message` proof with the shared service without adding the remaining D1 workflow commands.
+- [x] Verify isolated Supabase execution, concurrent state and permission changes, rollback, lost responses, retries, and database bypass attempts.
+- [x] Pass required checks and record local, hosted Supabase, hosted D1, and protected GitHub Actions evidence separately.
+- [x] Update affected documents and prepare a PR for owner review.
+
+### Verification
+
+The [workflow reference](server-workflow.md) records the existing behavior and implemented boundaries.
+The [verification guide](verify-server-workflow.md) gives the local and CI-only commands and recovery procedure.
+[Current state](current-state.md) records observed results.
+An interface or an uncalled rule module does not complete this extraction.
+
+The PR #41 review found a login-expiry race after lock waits.
+An additive migration corrects the final access check for writes and receipt replays.
+Both new regression cases failed before the correction and pass afterward.
+The owner also requested bounded cleanup and completion of T0018's hosted HTTP verification.
+The owner activated Workers Paid. The isolated authentication Worker accepts its 1,000 ms CPU cap, and its local hosted HTTP suite passes.
+Protected verification on `main` is recorded separately from the PR #41 hosted runs.
+
 ## T0018 Cloudflare authentication
 
 Branch: `feature/t0018-cloudflare-authentication`, from updated `main` at `0c797ad` after PR #39 merged.
-Status: implemented in [PR #40](https://github.com/GiftedNovaHD/minsky/pull/40). Local and protected hosted D1 checks pass. Protected HTTP verification awaits Workers Paid, which the owner deferred. The owner reviews and merges.
+Status: merged in [PR #40](https://github.com/GiftedNovaHD/minsky/pull/40) at `68e8642` on 2026-10-17 at 17:16:41 UTC. Local, hosted D1, and protected HTTP checks pass on Workers Paid. The PR #41 follow-up records the paid verification.
 Summary: Add Workers and D1 authentication, temporary passwords, account sessions, and organizer-assisted recovery. Keep Supabase active.
 
 Better Auth `1.7.10` supplies username login and signed cookie sessions.
@@ -68,7 +116,8 @@ The [identity choice](cloudflare-authentication-choice.md) records maintained cr
 Use the [verification guide](verify-cloudflare-authentication.md) for local and isolated hosted checks.
 
 The isolated `minsky-auth-ci` database and Worker use confirmed account `458ad6a930b0fb717796dfa19ca6a2b1`.
-Development databases remain local and separate. No real accounts, real-data exports, backend switch, or paid upgrade are included.
+Development databases remain local and separate. No real accounts, real-data exports, or backend switch are included.
+The owner activated Workers Paid during the PR #41 verification follow-up.
 The remaining workflow connector, R2, Durable Object delivery, migration tooling, AWS, and Terraform remain later work.
 
 ### Acceptance criteria
@@ -83,17 +132,18 @@ The remaining workflow connector, R2, Durable Object delivery, migration tooling
 - [x] Reuse provider-neutral authentication assertions and verify browser cookie and request protection.
 - [x] Measure password cost in Workers and record the CPU allowance and paid-plan need.
 - [x] Complete local checks, protected hosted D1 checks, scoped cleanup, and verification records.
-- [ ] Complete protected HTTP verification after the owner activates Workers Paid.
+- [x] Complete protected HTTP verification after the owner activates Workers Paid.
 - [x] Prepare a PR for owner review. The owner merges.
 
 ### Verification
 
 See [the current-state record](current-state.md#t0018-cloudflare-authentication-2026-10-18) for separate local, hosted D1, Worker HTTP, and protected CI results.
+The newer [PR #41 follow-up](current-state.md#pr-41-review-corrections-and-paid-authentication-2026-10-18) records the passing paid-plan verification.
 
 ## T0017 D1 transaction proof
 
 Branch: `feature/t0017-d1-transaction-proof`, from updated `main` at `53f9dfd`.
-Status: merged in [PR #39](https://github.com/GiftedNovaHD/minsky/pull/39) at `0c797ad` on 2026-10-17 at 15:49:49 UTC. Local and hosted D1 checks passed.
+Status: merged in [PR #39](https://github.com/GiftedNovaHD/minsky/pull/39) at `0c797ad` on 2026-10-17 at 15:49:49 UTC. Local and hosted D1 checks passed. Its recorded hosted verification remains bounded to that proof revision.
 Summary: Prove atomic workflow writes through a provider-independent application-store interface and a D1 adapter. Use `claim` and `message` to check concurrent transitions and private activity.
 
 The owner authorized isolated Cloudflare development and CI resources in the existing account.
@@ -120,7 +170,7 @@ AWS adapters and Terraform remain deferred. Bounded subagent work is authorized.
 ### Verification
 
 Use [Run the D1 transaction proof](d1-transaction-proof.md) for exact commands and recovery.
-The [store reference](backend-contracts.md#experimental-application-store) defines its bounded interface.
+The [store reference](backend-contracts.md#bounded-d1-application-store) defines its bounded interface.
 The [current-state record](current-state.md#t0017-d1-transaction-proof-2026-10-17) separates local and hosted evidence.
 All 42 focused cases pass locally and on hosted D1 at `edb4bd0`. Ordinary CI passes on that implementation revision.
 The complete Cloudflare connector remains unimplemented.

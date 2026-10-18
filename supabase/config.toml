@@ -24,3 +24,6 @@ enable_confirmations = true
 verify_jwt = false
 [functions.attachments]
 verify_jwt = false
+[functions.workflow]
+# The handler verifies the bearer token with Auth before using the service client.
+verify_jwt = false

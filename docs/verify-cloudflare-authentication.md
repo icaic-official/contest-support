@@ -47,8 +47,7 @@ Development uses local databases. Neither the active Supabase projects nor the e
 The committed Worker configuration requests a 1,000 ms CPU cap per request.
 Cloudflare requires Workers Paid for that setting.
 The protected D1 cases pass, but a protected password-change request exceeded runtime resources.
-Before deploying the Worker, activate the selected paid plan through an authorized account owner.
-The owner started activation during PR #41 review. Confirm completion before deployment.
+Before deploying the Worker, confirm that an authorized account owner activated Workers Paid for the configured account.
 On Free, deployment fails with error `100328`. Do not reduce password cost to bypass that requirement.
 
 Only authorized maintainers apply schema or deploy this isolated CI Worker:
@@ -123,8 +122,11 @@ Select the reviewed branch revision and enable that option.
 The protected `cloud-test` environment controls the hosted job.
 Its deployment branch policy must permit the exact reviewed ticket branch.
 An authorized owner must approve that allowlist change before the job can start.
-The current allowlist includes the exact T0018 branch with owner approval.
+The current allowlist includes `main` and the exact T0018 branch with owner approval.
+To repeat the merged T0018 check, dispatch `cloudflare_auth=true` on `main`.
+The T0019 branch remains outside that allowlist. Its local hosted results do not replace protected execution on that revision.
 See [the run record](current-state.md#t0018-cloudflare-authentication-2026-10-18) for the initial rejection and later hosted resource limit.
+The [PR #41 follow-up](current-state.md#pr-41-review-corrections-and-paid-authentication-2026-10-18) records the passing protected run on Workers Paid.
 The existing `CLOUDFLARE_API_TOKEN` needs D1 access and deployment access to the isolated authentication Worker.
 The Worker must already have its private `AUTH_SECRET`.
 The job checks the target, applies CI migrations, deploys that revision, and runs both hosted suites.

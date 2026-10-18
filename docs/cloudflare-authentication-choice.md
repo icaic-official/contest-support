@@ -139,6 +139,11 @@ The owner selected subscription activation later. No paid upgrade occurred.
 The committed configuration retains the bounded CPU setting for verification after activation.
 The earlier successful HTTP runs do not establish dependable operation on Free.
 
-During PR #41 review, the owner requested completion of this verification and started Workers Paid activation.
-The 1,000 ms cap and maintained password parameters remain unchanged.
-Activation and a passing hosted run must precede a verified result.
+### Paid verification after PR #41 review
+
+During PR #41 review, the owner activated Workers Paid and requested completion of hosted verification.
+The isolated `minsky-auth-ci` Worker then accepted the 1,000 ms cap.
+The maintained password parameters remain unchanged.
+The local hosted HTTP suite passes on implementation `7abaf2e`, including password change and organizer-assisted recovery.
+Protected [run 39089988536](https://github.com/GiftedNovaHD/minsky/actions/runs/39089988536) also passes all 30 account cases and the complete HTTP case on merged `main`.
+See [current state](current-state.md) for exact deployment versions and separate protected GitHub evidence.

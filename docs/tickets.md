@@ -66,9 +66,9 @@ Summary: Extract the existing issue rules into one shared server service. Exerci
 The owner authorized work while [PR #40](https://github.com/GiftedNovaHD/minsky/pull/40) was open.
 This branch started independently at `0c797ad`.
 It now includes that PR's merge at `68e8642`, from 2026-10-17 at 17:16:41 UTC.
-T0019 preserves the merged authentication implementation.
-The protected authentication HTTP check failed with a Workers Free resource limit.
-Workers Paid remains deferred, and the HTTP verification remains incomplete.
+T0019 preserves the merged authentication behavior.
+The initial protected authentication HTTP check failed with a Workers Free resource limit.
+The owner activated Workers Paid during PR #41 review. The local hosted HTTP suite now passes.
 
 Supabase remains active. The legacy browser workflow and protective SQL remain available during replacement verification.
 The new Supabase path is opt-in and uses the approved CI project, `ghtztmovdkhuketcbjmq`.
@@ -100,12 +100,13 @@ The PR #41 review found a login-expiry race after lock waits.
 An additive migration corrects the final access check for writes and receipt replays.
 Both new regression cases failed before the correction and pass afterward.
 The owner also requested bounded cleanup and completion of T0018's hosted HTTP verification.
-The owner is activating Workers Paid. Hosted authentication verification remains pending until activation and passing checks.
+The owner activated Workers Paid. The isolated authentication Worker accepts its 1,000 ms CPU cap, and its local hosted HTTP suite passes.
+Protected verification on `main` is recorded separately from the PR #41 hosted runs.
 
 ## T0018 Cloudflare authentication
 
 Branch: `feature/t0018-cloudflare-authentication`, from updated `main` at `0c797ad` after PR #39 merged.
-Status: merged in [PR #40](https://github.com/GiftedNovaHD/minsky/pull/40) at `68e8642` on 2026-10-17 at 17:16:41 UTC. Local and protected hosted D1 checks pass. Protected HTTP verification awaits Workers Paid, which the owner deferred.
+Status: merged in [PR #40](https://github.com/GiftedNovaHD/minsky/pull/40) at `68e8642` on 2026-10-17 at 17:16:41 UTC. Local, hosted D1, and protected HTTP checks pass on Workers Paid. The PR #41 follow-up records the paid verification.
 Summary: Add Workers and D1 authentication, temporary passwords, account sessions, and organizer-assisted recovery. Keep Supabase active.
 
 Better Auth `1.7.10` supplies username login and signed cookie sessions.
@@ -115,7 +116,8 @@ The [identity choice](cloudflare-authentication-choice.md) records maintained cr
 Use the [verification guide](verify-cloudflare-authentication.md) for local and isolated hosted checks.
 
 The isolated `minsky-auth-ci` database and Worker use confirmed account `458ad6a930b0fb717796dfa19ca6a2b1`.
-Development databases remain local and separate. No real accounts, real-data exports, backend switch, or paid upgrade are included.
+Development databases remain local and separate. No real accounts, real-data exports, or backend switch are included.
+The owner activated Workers Paid during the PR #41 verification follow-up.
 The remaining workflow connector, R2, Durable Object delivery, migration tooling, AWS, and Terraform remain later work.
 
 ### Acceptance criteria
@@ -130,12 +132,13 @@ The remaining workflow connector, R2, Durable Object delivery, migration tooling
 - [x] Reuse provider-neutral authentication assertions and verify browser cookie and request protection.
 - [x] Measure password cost in Workers and record the CPU allowance and paid-plan need.
 - [x] Complete local checks, protected hosted D1 checks, scoped cleanup, and verification records.
-- [ ] Complete protected HTTP verification after the owner activates Workers Paid.
+- [x] Complete protected HTTP verification after the owner activates Workers Paid.
 - [x] Prepare a PR for owner review. The owner merges.
 
 ### Verification
 
 See [the current-state record](current-state.md#t0018-cloudflare-authentication-2026-10-18) for separate local, hosted D1, Worker HTTP, and protected CI results.
+The newer [PR #41 follow-up](current-state.md#pr-41-review-corrections-and-paid-authentication-2026-10-18) records the passing paid-plan verification.
 
 ## T0017 D1 transaction proof
 

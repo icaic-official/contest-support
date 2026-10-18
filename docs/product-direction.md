@@ -148,10 +148,11 @@ The shared Minsky interfaces, Supabase adapter, provider tests, and Cloudflare d
 Hosted Supabase contract checks provide the comparison point for the replacement backend.
 T0017's bounded D1 transaction proof merged in PR #39 at `0c797ad`.
 T0018 authentication merged in PR #40 at `68e8642` on 2026-10-17 at 17:16:41 UTC.
-Its hosted HTTP verification remains incomplete after a Workers Free resource limit.
-Workers Paid remains deferred.
+Its initial hosted HTTP verification reached a Workers Free resource limit.
+The owner activated Workers Paid during PR #41 review. The hosted HTTP suite now passes.
+See [current state](current-state.md) for separate local hosted and protected GitHub results.
 T0019 verifies the extracted server workflow through Supabase before further D1 workflow persistence.
-Its branch started independently at `0c797ad` and now includes the merged authentication implementation unchanged.
+Its branch started independently at `0c797ad` and preserves the merged authentication behavior.
 The remaining connector operations follow that shared-rule verification.
 Full migration tooling follows connector verification. Real-data exports and the backend switch remain later phases.
 See [the proof guide](d1-transaction-proof.md) and [implementation plan](cloudflare-implementation-plan.md).

@@ -21,7 +21,7 @@ This page is a dated record, not a live deployment dashboard.
 | [T0015](https://github.com/GiftedNovaHD/minsky/pull/37) | Shared provider behavior tests, verified against isolated Supabase fixtures. |
 | [T0016](https://github.com/GiftedNovaHD/minsky/pull/36) | Proposed Cloudflare architecture and implementation plan. |
 | [T0017](https://github.com/GiftedNovaHD/minsky/pull/39) | Verified bounded D1 transaction proof for claims and messages. The complete Cloudflare connector remains incomplete. |
-| [T0018 Cloudflare authentication](https://github.com/GiftedNovaHD/minsky/pull/40) | Experimental username authentication, cookie sessions, and organizer recovery. Protected HTTP verification remains incomplete after a Workers Free resource limit. Workers Paid remains deferred. The full connector and migration remain incomplete. |
+| [T0018 Cloudflare authentication](https://github.com/GiftedNovaHD/minsky/pull/40) | Experimental username authentication, cookie sessions, and organizer recovery. Hosted HTTP checks pass on Workers Paid with isolated fictional fixtures. The full connector and migration remain incomplete. |
 
 ## Pending changes
 

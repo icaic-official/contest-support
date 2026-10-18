@@ -47,6 +47,9 @@ These checks do not establish hosted Supabase or hosted D1 results.
 
 ## Prepare the isolated Supabase target
 
+The CI backend must already contain the migrations through `202610140001_attachment_fixes.sql`.
+This procedure installs only the shared workflow additions.
+
 1. Confirm that the selected project is Minsky CI, `ghtztmovdkhuketcbjmq`.
 
    ```sh
@@ -70,7 +73,7 @@ These checks do not establish hosted Supabase or hosted D1 results.
 
 4. Copy the shared workflow migrations that are absent remotely.
    Keep the fetched source for each migration that is already installed.
-   For an empty target, copy both files:
+   If neither workflow migration is installed, copy both files:
 
    ```sh
    cp supabase/migrations/202610180001_shared_workflow.sql "$workflow_ci_dir/supabase/migrations/"
@@ -78,7 +81,7 @@ These checks do not establish hosted Supabase or hosted D1 results.
    npx supabase db push --workdir "$workflow_ci_dir" --dry-run
    ```
 
-   The existing CI target needs only `202610180002_shared_workflow_expiry.sql`.
+   If the initial workflow migration is already installed, copy only `202610180002_shared_workflow_expiry.sql`.
    The first migration remains unchanged from its installed source.
 
 5. If the dry run lists only the expected missing workflow migrations, apply them.

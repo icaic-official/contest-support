@@ -35,8 +35,9 @@ See [the workflow reference](docs/server-workflow.md) and [verification guide](d
 Keep Supabase active and its legacy browser path available during replacement verification.
 Do not deploy to the development backend without the required authorization.
 The owner reviews and merges. Bounded subagent work is authorized.
-PR #40's hosted HTTP check remains incomplete after a Workers Free resource limit.
-The owner is activating Workers Paid. Wait for confirmation before deploying the isolated authentication Worker and repeating hosted checks.
+The owner confirmed Workers Paid activation during PR #41 review.
+The isolated authentication Worker accepts its 1,000 ms CPU cap. Local hosted HTTP and protected authentication on merged `main` pass.
+Record PR #41's hosted results separately from that protected `main` run.
 Full D1 workflow persistence, R2, notification delivery, migration tooling, AWS, and Terraform remain later work.
 Do not export real data, reset real accounts, or switch backends.
 
@@ -48,10 +49,10 @@ See [the reference](docs/cloudflare-authentication.md), [identity choice](docs/c
 Keep Supabase active. The complete connector, real-account migration, exports, and backend switch remain later work.
 Use local development databases and the separate hosted `minsky-auth-ci` database.
 The owner approved adding only `feature/t0018-cloudflare-authentication` to the existing `cloud-test` branch allowlist on 2026-10-18. Preserve the other entries and protection rules.
-Measured password CPU exceeds Workers Free's allowance. The protected HTTP check hit a runtime resource limit.
-The owner initially deferred the paid subscription on 2026-10-18, then started activation during PR #41 review.
-Keep that check incomplete until Workers Paid is active and verification passes.
-The configuration requests a 1,000 ms CPU cap. Free rejects it with error `100328`. No paid upgrade occurred.
+Measured password CPU exceeds Workers Free's allowance. The initial protected HTTP check hit a runtime resource limit.
+The owner initially deferred the paid subscription on 2026-10-18, then confirmed activation during PR #41 review.
+The configuration requests a 1,000 ms CPU cap. Paid accepts that setting; the earlier Free deployment rejected it with error `100328`.
+Use the current-state record for the later paid verification results.
 The owner reviewed and merged T0018. Bounded subagent work remains authorized within the active ticket.
 
 **T0017 D1 transaction proof, 2026-10-17.** Start `feature/t0017-d1-transaction-proof` from updated `main` at `53f9dfd`.

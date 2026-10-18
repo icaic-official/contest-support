@@ -185,9 +185,10 @@ Their implementation must define retry semantics before adding automatic retries
 
 T0018 implements bounded authentication in [PR #40](https://github.com/GiftedNovaHD/minsky/pull/40).
 The owner merged that PR at `68e8642` on 2026-10-17 at 17:16:41 UTC.
-T0019 preserves the merged authentication implementation.
-Its protected hosted HTTP check reached a Workers Free resource limit.
-The owner deferred Workers Paid. That verification remains incomplete.
+T0019 preserves the merged authentication behavior.
+The initial protected hosted HTTP check reached a Workers Free resource limit.
+The owner activated Workers Paid during PR #41 review. The local hosted HTTP suite now passes.
+See [current state](current-state.md) for the separate protected GitHub result.
 
 Account preservation and password preservation are different requirements.
 The owner selected organizer-issued replacement temporary passwords on 2026-10-17.

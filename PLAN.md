@@ -3,7 +3,9 @@
 **PR #41 review follow-up, 2026-10-18.** The owner requested review fixes, code cleanup, and completion of authentication verification on the existing PR.
 Use `feature/t0019-shared-server-workflow`.
 Correct Supabase login expiry after lock waits with an additive migration. Preserve the installed migration source.
-The owner is activating Workers Paid. Wait for confirmation before deploying the isolated authentication Worker and repeating hosted checks.
+The owner confirmed Workers Paid activation. The isolated authentication Worker accepts the 1,000 ms cap.
+Its local hosted HTTP suite and protected authentication on merged `main` pass.
+Record that protected result separately from the PR #41 hosted runs.
 Retain the maintained password parameters and the 1,000 ms CPU cap.
 Supabase remains active. The owner reviews and merges.
 
@@ -25,8 +27,8 @@ See [the workflow reference](docs/server-workflow.md) and [verification guide](d
 Supabase remains active. The legacy browser workflow stays available during replacement verification.
 Development backend deployment requires separate authorization.
 The owner reviews and merges. Bounded subagent work is authorized.
-PR #40's protected HTTP verification remains incomplete after the Workers Free resource limit.
-The owner now handles Workers Paid activation under the PR #41 follow-up above. Hosted verification remains incomplete until activation and passing checks.
+PR #40's initial protected HTTP verification hit the Workers Free resource limit.
+The owner activated Workers Paid under the PR #41 follow-up above. See current-state records for the later verification results.
 Remaining D1 commands, R2, notification delivery, migration tooling, AWS, and Terraform remain later work.
 No real-data export, real-account reset, or backend switch is authorized.
 
@@ -37,11 +39,12 @@ Implement username login, bounded cookie sessions, mandatory password changes, a
 Preserve account IDs, memberships, permissions, and history. Check current permissions and revoked credentials at the server.
 Use maintained Better Auth and cryptographic components, explicit origins, request-forgery protection, and isolated fictional fixtures.
 See [the authentication reference](docs/cloudflare-authentication.md) and [verification guide](docs/verify-cloudflare-authentication.md).
-Isolated development and CI resources remain authorized in the confirmed account. No paid upgrade occurred.
+Isolated development and CI resources remain authorized in the confirmed account.
+The owner confirmed Workers Paid activation during PR #41 review.
 The measured hash requires more CPU than Workers Free permits. The identity choice records the concrete Standard plan cost.
-The protected run passed all 28 hosted D1 account cases, then hit a Worker resource limit during HTTP password change.
-The owner initially deferred the subscription on 2026-10-18, then started activation during PR #41 review.
-Keep the protected HTTP result incomplete until paid verification passes.
+The initial protected run passed all 28 hosted D1 account cases, then hit a Worker resource limit during HTTP password change.
+The owner initially deferred the subscription on 2026-10-18, then activated it during PR #41 review.
+Record the later paid verification separately from that failed run.
 Supabase remains active. The remaining connector, real-data exports, migration, and backend switch remain later work.
 The owner reviews and merges.
 

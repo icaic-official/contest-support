@@ -338,6 +338,9 @@ test("two simulated Realtime clients refresh decisions and confirmations without
   browser,
   local,
 }) => {
+  // Two clients run many steps. Under a full parallel run this takes more
+  // than the default 30 seconds.
+  test.slow();
   const other = await browser.newContext();
   await local.attach(other);
   const second = await other.newPage();

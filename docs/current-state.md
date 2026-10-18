@@ -7,7 +7,8 @@ The newest record appears first. Older sections describe their own revisions and
 The owner requested current-main integration and verification of [PR #23](https://github.com/GiftedNovaHD/minsky/pull/23).
 Work uses the existing `feature/t0009-jury-worklist` branch in `/tmp/minsky-t0009`.
 The integration baseline is `main` at `7d19b00`, which includes PR #41.
-The separate connector checkout remains unchanged. T0020 retains its complete-connector and empty-installation scope.
+This T0009 run did not edit the separate connector checkout.
+T0020 retains its complete-connector and empty-installation scope.
 
 The worklist uses provider-neutral `Backend` contracts and authorized snapshots.
 Existing workflow operations enforce current permissions, transitions, stale revisions, and request receipts at the server.
@@ -29,14 +30,10 @@ The owner reviews and merges. No application deployment or data migration is aut
 | Repository Markdown links | Checked 181 local links in eight affected root documents. Passed. |
 | `npm run test:auth:browser -- --output=/tmp/minsky-t0009-auth-results` | Passed all three cases in 9.6 seconds. The local HTTPS Worker logged expected self-signed TLS alerts. |
 
-The first default-parallel unit run passed 275 tests before one superseded-authentication-reset test exceeded its five-second limit.
-Its cleanup then hit an authentication-limit assertion.
-Resource-heavy checks ran concurrently during that attempt.
-Serial file scheduling passed the complete suite without assertion or timeout changes.
-Initial authentication and documentation browser attempts failed before cases because the Chromium installation was missing or incomplete.
-Installing the pinned browser corrected that prerequisite.
-The default-parallel suite also passed after the resource-heavy browser suites ended.
-The failed attempt resulted from resource contention. No test timeout or assertion changed.
+Initial setup attempts hit sandbox `esbuild` `EPERM`, loopback restrictions, and missing or incomplete Chromium binaries.
+The checks passed after correcting permissions and installing the pinned browser.
+One default-parallel unit attempt timed out during resource-heavy concurrent checks and then hit a cleanup assertion.
+Both serial and default-parallel execution passed afterward. No timeout or assertion changed.
 
 The application suite covers eligibility, ordering, zero-minute decisions, reopening, two-client updates, and uncertain retries.
 It checks drafts, focus, queue independence, role and session changes, membership removal, archival, failed reads, and isolation.
@@ -58,29 +55,55 @@ Separate `/tmp` output directories corrected the artifact collision without chan
 The hosted-service CLI run targets only Minsky CI, `ghtztmovdkhuketcbjmq`.
 Prerequisite inspection found all nine local migrations and the account and attachment functions already present.
 An unrelated remote migration, `202610110002`, remains unchanged.
-The first full hosted-service CLI run passed 15 of 16 cases.
-The zero-minute, reopening, lost-award-response, and lost-confirmation-response journey passed.
-The second new jury case failed at a status-selector locator before completing.
-The exact label included wrapped option text. The locator now uses the exact **Status** combobox role.
+The final full local CLI run against hosted services passed all 16 cases in 2.3 minutes.
+It started at `2026-10-18T03:06:52.639Z` and used runtime source revision `f45d03f`.
+Two real jury cases check Realtime updates and wait for the confirmed snapshot before checking draft and focus preservation.
+They also cover zero-minute decisions, reopening, re-resolution, and committed actions whose responses are deliberately dropped.
+Award and external-confirmation retries retain identical request IDs.
+The tests confirm one award, one confirmation, and one history entry for each action.
+
+The first full hosted attempt passed 15 of 16 cases.
+Its second new jury case failed at a status-selector locator before completing.
+The exact label included wrapped option text. The corrected locator uses the exact **Status** combobox role.
 This correction changes no application assertion.
-Exact-owned cleanup checks found zero remaining fixture rows across 15 tables.
-The first-run audit is `/tmp/t0009-cloud-audit-1792292637288.json`.
-The second full hosted run is in progress.
-Hosted acceptance remains incomplete until the complete suite and its cleanup pass.
+
+Cleanup checks found zero remaining run-owned records in all 16 categories, including Storage, Auth, and request receipts.
+Both the completed run and the failed attempt were checked.
+Audit records are `/tmp/t0009-cloud-audit-1792292812639-cleanup.json` and `/tmp/t0009-cloud-audit-1792292637288-cleanup.json`.
+Unrelated fixtures, migrations, and provider configuration remain unchanged.
 
 The owner approved adding only `feature/t0009-jury-worklist` to the protected `cloud-test` branch allowlist.
 The branch policy was added as ID `63431065`.
 The four existing entries and branch protection ID `69128862` remain unchanged.
-Protected GitHub Actions results remain pending and separate from local hosted-service CLI results.
+Ordinary [push checks](https://github.com/GiftedNovaHD/minsky/actions/runs/39092550990) and [PR checks](https://github.com/GiftedNovaHD/minsky/actions/runs/39092552506) passed on `f45d03f`.
+The protected `existing_backend=true` check passed on `f45d03f` in [run 39092567628](https://github.com/GiftedNovaHD/minsky/actions/runs/39092567628).
+Its results are separate from the local hosted-service CLI run:
+
+| Protected check | Observed result |
+| --- | --- |
+| Unit and database tests | All 276 passed. |
+| Function tests | All 12 passed. |
+| Application browser tests | All 44 passed. |
+| Authentication and documentation browser tests | All three cases in each suite passed. |
+| Hosted application journey | All 16 cases passed in 2.9 minutes. |
+| Supabase shared provider scenarios | All eight passed in 1.8 minutes. |
+| Hosted shared server workflow | All five passed. |
+
+No recovery journals remained after provider and workflow cleanup.
+The deployment job and all six backend preparation steps were skipped.
 Repository variable `CLOUDFLARE_DEPLOY_ENABLED=false` is confirmed. No application deployment was performed.
 
 ### Integration boundaries and remaining checks
 
 The worklist changes overlap T0020 at `ConnectedApp.tsx` navigation, selection, and issue-detail return handling.
 Shared styles contain a separate jury-worklist block.
-Planning-document changes preserve T0020's connector scope. The connector checkout remains unchanged.
+Planning-document changes preserve T0020's connector scope. This T0009 run did not edit that checkout.
 
-Current-revision acceptance remains incomplete. PR #23 remains a draft.
+Required verification and hosted acceptance pass for runtime source `f45d03f`.
+PR #23 is prepared for owner review.
+The final follow-up changes documentation only. It does not change that verified runtime source.
+Checks for the documentation follow-up must be reported against its own revision after the commit exists.
+No required runtime verification remains outstanding.
 The 2026-10-15 results below are historical and do not establish current-main compatibility.
 Record local browser simulations, hosted-service CLI runs, and protected GitHub Actions results separately.
 Physical devices, native browser zoom, screen readers, and other browser engines remain unverified.

@@ -838,8 +838,8 @@ Deployment remains a separate step.
 
 Branch: `feature/t0009-jury-worklist`, from updated `main` at `1ed603a`.
 
-Status: parallel maintenance of [draft PR #23](https://github.com/GiftedNovaHD/minsky/pull/23), authorized on 2026-10-18.
-Current `main` at `7d19b00` is the integration baseline. Fast checks, 276 unit/database tests, 44 application browser cases, and authentication/documentation browser checks pass. Hosted and protected verification remain incomplete.
+Status: parallel maintenance of [PR #23](https://github.com/GiftedNovaHD/minsky/pull/23), authorized on 2026-10-18. Verified and prepared for owner review.
+Current `main` at `7d19b00` is the integration baseline. Fast checks, 276 unit/database tests, 44 application browser cases, and authentication/documentation browser checks pass. Hosted jury acceptance, protected checks, and scoped cleanup pass on runtime source `f45d03f`. The final follow-up changes documentation only.
 Summary: Provide separate outstanding decision and external-application lists through the existing issue details and actions.
 
 The first implementation and local checks date from 2026-10-15.
@@ -872,6 +872,6 @@ No schema, backend feature, provider implementation, or runtime dependency is pa
 - [x] Simulated two-client updates, preserved drafts, refresh, phone layout,
   keyboard use, and existing database workflow protections pass locally.
 - [x] Fast checks and documentation validation pass with actual results recorded.
-- [ ] Hosted jury acceptance on Minsky CI and protected CI pass. Fixture cleanup is verified.
+- [x] Hosted jury acceptance on Minsky CI and protected CI pass. Fixture cleanup is verified.
 - [x] Remaining physical-device and assistive-technology limits are recorded without implying completed checks.
-- [ ] PR #23 reflects current results and is ready only after required verification passes. The owner reviews and merges.
+- [x] PR #23 reflects passing required verification and is prepared for owner review. The owner reviews and merges.

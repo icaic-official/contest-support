@@ -22,7 +22,7 @@ Its deployment is separate from the application.
 
 T0009 adds a separate **Jury worklist** in [PR #23](https://github.com/GiftedNovaHD/minsky/pull/23).
 It lists outstanding award decisions and external confirmations, including zero-minute awards and reopened issues.
-The PR is under parallel maintenance against current `main`. Local checks pass. Hosted and protected verification remain pending.
+The PR includes current `main` and is prepared for owner review. Local, hosted, and protected checks pass on runtime source `f45d03f`.
 See [the worklist specification](docs/jury-worklist.md).
 
 ## Local development
@@ -125,7 +125,7 @@ The workflow requires account setup. The first automatic deployments remain unve
 - [Development tickets](docs/tickets.md) — ticket scope, status, and acceptance criteria.
 - [Current state](docs/current-state.md) — implementation details, verification records, and limitations.
 - [Cloud onboarding](docs/cloud-onboarding.md) — provider setup, costs, accounts, and deployment.
-- [Jury worklist specification](docs/jury-worklist.md) records pending T0009 behavior and acceptance.
+- [Jury worklist specification](docs/jury-worklist.md) records T0009 behavior and verified acceptance.
 - [Manual verification](docs/manual-verification.md) — workflow and interface checks.
 - [Code quality](docs/code-quality.md) — CI checks and review requirements.
 - [Server workflow reference](docs/server-workflow.md) inventories existing rules and the shared service and persistence boundaries.

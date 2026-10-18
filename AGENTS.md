@@ -31,7 +31,7 @@ Keep Supabase active. Add no schema, backend feature, provider implementation, o
 Use only UUID-owned fictional fixtures in Minsky CI, `ghtztmovdkhuketcbjmq`, for hosted acceptance.
 The owner approved the exact T0009 `cloud-test` branch addition on 2026-10-18. Preserve all other entries and protection rules.
 Do not deploy the application, merge the PR, or migrate data.
-Keep PR #23 a draft until required checks and hosted acceptance pass.
+Required checks and hosted acceptance must pass before PR #23 is ready for owner review.
 
 **Active T0020 connector, 2026-10-18.** The separate connector goal remains active on `feature/t0020-cloudflare-connector`.
 Its scope includes all backend operations, isolated hosted verification, and an empty Cloudflare installation.

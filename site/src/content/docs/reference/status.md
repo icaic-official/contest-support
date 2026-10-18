@@ -30,7 +30,7 @@ This page is a dated record, not a live deployment dashboard.
 | --- | --- |
 | [T0006 announcements](https://github.com/GiftedNovaHD/minsky/pull/20) | Open pull request. |
 | [T0007 independent installations](https://github.com/GiftedNovaHD/minsky/pull/21) | Open pull request. Packaging exists on its branch. Container operation remains unverified. |
-| [T0009 jury worklist](https://github.com/GiftedNovaHD/minsky/pull/23) | Parallel maintenance against current main. Local checks pass. Hosted acceptance and protected CI remain pending. |
+| [T0009 jury worklist](https://github.com/GiftedNovaHD/minsky/pull/23) | Includes current main. Local checks, hosted acceptance, protected CI, and scoped cleanup pass on runtime source `f45d03f`. Prepared for owner review. |
 | T0020 complete Cloudflare connector | Active development. Supabase remains the active application backend. |
 
 Supabase remains the active backend.

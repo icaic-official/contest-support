@@ -3,8 +3,9 @@
 Status: implemented on 2026-10-15. Current-main maintenance started on 2026-10-18.
 Branch: `feature/t0009-jury-worklist`, originally from `main` at `1ed603a`.
 Integration baseline: current `main` at `7d19b00`, including PR #41.
-Review: [draft PR #23](https://github.com/GiftedNovaHD/minsky/pull/23).
-Current local checks pass. Hosted jury acceptance and protected CI remain pending.
+Review: [PR #23](https://github.com/GiftedNovaHD/minsky/pull/23), prepared for owner review.
+Current local checks, hosted jury acceptance, protected CI, and scoped cleanup pass on runtime source `f45d03f`.
+The final follow-up changes documentation only.
 Historical results do not establish current compatibility.
 See [current state](current-state.md#t0009-parallel-maintenance-2026-10-18).
 
@@ -161,7 +162,7 @@ leave unavailable checks explicitly unverified.
 Update README, tickets, current state, and manual verification with implemented
 behavior and observed results. Update product direction and this specification
 when implementation changes an agreed detail. Prepare the PR after fast checks;
-the owner reviews and merges. Keep PR #23 a draft until required verification passes.
+the owner reviews and merges. Required checks must pass before owner review.
 This maintenance does not authorize deployment. Existing automatic frontend deployment rules remain separate.
 
 ### Acceptance criteria
@@ -178,10 +179,10 @@ This maintenance does not authorize deployment. Existing automatic frontend depl
   changes pass locally, including two-client changes and an open explanation draft.
 - [x] Desktop, 320/390px phone, keyboard, return-focus, and CSS zoom/reflow checks
   are recorded. Physical devices and native browser zoom remain unverified.
-- [ ] Required checks, current workflow regressions, and hosted jury acceptance pass.
+- [x] Required checks, current workflow regressions, and hosted jury acceptance pass.
   Fixture cleanup is verified. Evidence distinguishes simulations, hosted CLI, and protected GitHub runs.
-- [ ] Documentation and PR #23 describe current results.
-  The PR becomes ready only after required verification passes.
+- [x] Documentation and PR #23 describe current results.
+  Required runtime verification passes. The owner reviews and merges.
 
 ## Exclusions
 

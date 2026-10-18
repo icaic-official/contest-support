@@ -14,6 +14,7 @@ export interface BrowserBackend {
 
 interface Options {
   origin: string;
+  assetOrigin?: string;
   module: string;
   configuration: unknown;
 }
@@ -27,6 +28,24 @@ export async function createBrowserBackend(
     baseURL: options.origin,
   });
   const page = await context.newPage();
+  const assetOrigin = options.assetOrigin ?? options.origin;
+  if (new URL(assetOrigin).origin !== new URL(options.origin).origin) {
+    // Only test and source assets come from Vite. API requests, WebSockets,
+    // cookies, and request-forgery protection retain the hosted browser origin.
+    await context.route((url) => url.origin === new URL(options.origin).origin &&
+      /^\/(?:tests\/providers\/|src\/|@vite\/|@id\/|@fs\/|@react-refresh$|node_modules\/\.vite\/)/.test(url.pathname), async (route) => {
+      const incoming = new URL(route.request().url());
+      const target = new URL(incoming.pathname + incoming.search, assetOrigin);
+      const response = await fetch(target, { redirect: 'error', headers: { Accept: route.request().headers().accept ?? '*/*' } });
+      let body = Buffer.from(await response.arrayBuffer());
+      if (incoming.pathname.endsWith('.html')) {
+        // The bridge does not use hot reload. Avoid a development WebSocket on
+        // the hosted origin when Vite inserts its optional client into HTML.
+        body = Buffer.from(body.toString().replace(/<script\b[^>]*src=["']\/@vite\/client["'][^>]*><\/script>/g, ''));
+      }
+      await route.fulfill({ status: response.status, contentType: response.headers.get('Content-Type') ?? 'application/octet-stream', body });
+    });
+  }
   const callbacks = new Map<string, (event: BrowserEvent) => void>();
   const pending = new Set<Promise<void>>();
   let callbackFailure: unknown;

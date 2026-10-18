@@ -1,5 +1,76 @@
 # Current state
 
+## T0020 connector implementation, 2026-10-18
+
+T0020 starts from merged PR #41 at `7d19b00`.
+The active branch is `feature/t0020-cloudflare-connector`.
+Implementation and verification continue. Supabase remains active.
+The [ticket](tickets.md#t0020-complete-cloudflare-connector) records the complete acceptance criteria.
+The [PR #21 component record](pr21-installation-disposition.md) explains installation reuse decisions.
+The [run report](t0020-run-report.md) lists changed files, commands, results, and remaining work.
+
+Wrangler `whoami` confirmed account `458ad6a930b0fb717796dfa19ca6a2b1` before resource changes.
+The database list contains the existing, separate authentication and bounded-proof CI databases.
+No complete connector or installation database existed at that check.
+The supported `wrangler r2 bucket list` command failed with Cloudflare code `10042`.
+The response requires R2 activation through the Cloudflare dashboard.
+Hosted private-image and empty-installation checks require that activation.
+Local implementation and verification can continue without it.
+
+### Implementation and observed checks
+
+The D1 adapter implements all nine commands through `WorkflowService`.
+The full Worker supplies maintained authentication, authorized snapshots, administration, private R2 images, and Durable Object invalidations.
+The browser can select this connector with `VITE_BACKEND=cloudflare` for an isolated build.
+The default remains Supabase.
+Provider-owned installation tooling validates public configuration, checks the exact target, and creates one initial owner only in an empty database.
+The [installation guide](install-cloudflare.md) remains experimental until its hosted empty-installation procedure passes.
+
+Observed results during implementation are separate from final PR verification:
+
+- All 70 workflow tests pass locally and on hosted D1. Hosted fixture cleanup passes.
+- All eight unchanged shared provider scenarios pass against Minsky CI on Supabase, `ghtztmovdkhuketcbjmq`. Fixture cleanup passes.
+- The local complete HTTPS Worker journey passes with actual authentication, D1, R2, and Durable Object bindings.
+- All 34 ordinary application browser regressions and three local HTTPS authentication browser cases pass.
+- The application build, type checking, lint, Deno checks, and all 12 function tests pass before the final review corrections.
+- Both locked dependency audits report zero vulnerabilities.
+
+The hosted D1 run uses the new `minsky-connector-ci` database, `de43cf95-c024-4e44-860d-8ff179e4e08d`.
+All nine repository D1 migrations are applied there.
+The test executes production persistence through a remote D1 binding. It does not test the deployed application Worker.
+The existing authentication and bounded-proof databases remain separate.
+The connector Worker has passed a deployment dry run, but has not been deployed.
+Its proposed image bucket does not exist because R2 is not enabled.
+Hosted Cloudflare shared scenarios, the hosted React journey, and the empty installation remain unverified.
+Protected T0020 GitHub Actions checks have not run.
+
+The `cloud-test` environment now permits `feature/t0020-cloudflare-connector`.
+The API showed five existing branch entries before this change. All five entries and their IDs remain unchanged.
+The existing protection rule, `69128862`, remains unchanged.
+The new entry is `63431697`.
+This later API observation does not rewrite the earlier four-entry record below.
+
+Review added final credential checks to administration, image, login, and account commits.
+Self-password changes retain both original deadlines while deliberately revoking the old session.
+Review also added fair notification retries, late-upload cleanup, and complete Durable Object fixture cursor cleanup through a trusted service binding.
+The internal cleanup binding has passed a local runtime test. The public application has no cleanup route.
+Installation commands reject missing or foreign migrations and override inherited Wrangler settings that could log credentials.
+Final verification is in progress.
+No development backend deployment, real-account reset, data export, migration, or active backend switch occurred.
+
+### R2 need and cost
+
+The connector needs private R2 buckets for fictional image uploads and deletion-recovery checks.
+The empty installation needs a separate bucket to prove resource isolation.
+Use Standard storage. Do not enable Infrequent Access or other storage products.
+[Cloudflare pricing](https://developers.cloudflare.com/r2/pricing/) was checked on 2026-10-18.
+Standard includes 10 GB-month of storage, one million Class A operations, and ten million Class B operations each month.
+Usage above those allowances costs US$0.015 per GB-month, US$4.50 per million Class A operations, and US$0.36 per million Class B operations.
+Internet egress is free. These are account-wide allowances, not separate allowances for each bucket.
+Small fictional fixtures should fit within them, but this estimate does not prove the account's remaining allowance.
+Workers Paid is already active. No further Workers plan upgrade is proposed.
+The owner must activate R2 through the provider dashboard before hosted bucket checks can pass.
+
 The newest record appears first. Older sections describe their own revisions and targets.
 
 ## PR #41 review corrections and paid authentication, 2026-10-18

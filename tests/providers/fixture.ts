@@ -9,6 +9,8 @@ interface PreparedFixture {
   data: ScenarioData;
   module: string;
   configuration: unknown;
+  origin: string;
+  assetOrigin?: string;
 }
 
 export const test = base.extend<
@@ -33,6 +35,8 @@ export const test = base.extend<
         data: fixture.data,
         module: driver.browserModule,
         configuration: fixture.browserConfiguration,
+        origin: driver.browserOrigin ?? 'http://127.0.0.1:4174',
+        assetOrigin: driver.assetOrigin,
       });
     } finally {
       if (existsSync(path)) await driver.cleanup(path);
@@ -44,7 +48,8 @@ export const test = base.extend<
       ...prepared.data,
       async connect(actor) {
         const connection = await createBrowserBackend(browser, {
-          origin: 'http://127.0.0.1:4174',
+          origin: prepared.origin,
+          assetOrigin: prepared.assetOrigin,
           module: prepared.module,
           configuration: prepared.configuration,
         });

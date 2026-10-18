@@ -73,6 +73,7 @@
         "npm:@vitejs/plugin-react@^5.0.2",
         "npm:better-auth@1.7.10",
         "npm:deno@2.9.6",
+        "npm:esbuild@0.28.2",
         "npm:eslint-plugin-react-hooks@^7.1.1",
         "npm:eslint@^10.11.0",
         "npm:globals@^17.13.0",

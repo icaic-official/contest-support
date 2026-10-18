@@ -1,10 +1,11 @@
 ---
-title: Configure the backend and first administrator
-description: Prepare a separate backend, apply versioned setup, and initialize a competition.
+title: Configure a Supabase backend
+description: Prepare the earlier Supabase installation trial and its first administrator.
 ---
 
-These instructions accompany the [T0007 installation trial](/operators/installation/).
+These instructions describe the earlier [T0007 Supabase trial](https://github.com/GiftedNovaHD/minsky/pull/21).
 They require its source branch for the first-install generator.
+For the current Cloudflare path, use [independent installation](/operators/installation/).
 Choose a fresh backend for your competition.
 Keep its data and credentials separate from Minsky development and CI.
 

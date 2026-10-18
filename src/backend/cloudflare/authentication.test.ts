@@ -52,7 +52,7 @@ describe('Cloudflare browser authentication transport', () => {
   it('returns no user for expired or revoked sessions and validates server status', async () => {
     const unauthorized = setup(() => json({ error: 'Sign in to continue.' }, 401));
     await expect(unauthorized.auth.currentUser()).resolves.toBeUndefined();
-    await expect(unauthorized.auth.accountStatus()).rejects.toThrow('Sign in');
+    expect(await unauthorized.auth.accountStatus()).toEqual({ username: null, must_change: true, session_valid: false });
     const malformed = setup(() => json({ user, status: { ...status, must_change: 'no' }, csrf: 'test' }));
     await expect(malformed.auth.currentUser()).rejects.toThrow();
   });

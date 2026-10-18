@@ -15,6 +15,10 @@ on:
         description: Run authentication checks on the isolated Cloudflare CI target
         type: boolean
         default: false
+      cloudflare_connector:
+        description: Run the complete connector on its separate isolated Cloudflare CI target
+        type: boolean
+        default: false
 permissions:
   contents: read
 concurrency:
@@ -50,6 +54,7 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e
       - run: npm run test:auth:browser
+      - run: npm run test:connector:runtime
       - run: npm run docs:test
   secrets:
     runs-on: ubuntu-latest
@@ -130,7 +135,7 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: node scripts/deploy-workers.mjs
   cloud:
-    if: github.event_name == 'workflow_dispatch' && !inputs.cloudflare_auth
+    if: github.event_name == 'workflow_dispatch' && !inputs.cloudflare_auth && !inputs.cloudflare_connector
     needs: [checks, secrets, dependencies]
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -200,7 +205,7 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
   cloudflare-auth:
-    if: github.event_name == 'workflow_dispatch' && inputs.cloudflare_auth
+    if: github.event_name == 'workflow_dispatch' && inputs.cloudflare_auth && !inputs.cloudflare_connector
     needs: [checks, secrets, dependencies]
     runs-on: ubuntu-latest
     timeout-minutes: 35
@@ -234,5 +239,77 @@ jobs:
         with:
           name: auth-recovery-${{ github.run_id }}-${{ github.run_attempt }}
           path: /tmp/minsky-d1-proof-*/fixture.json
+          if-no-files-found: ignore
+          retention-days: 7
+  cloudflare-connector:
+    if: github.event_name == 'workflow_dispatch' && inputs.cloudflare_connector
+    needs: [checks, secrets, dependencies]
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment: cloud-test
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: 458ad6a930b0fb717796dfa19ca6a2b1
+      WRANGLER_SEND_METRICS: 'false'
+      WRANGLER_LOG_SANITIZE: 'true'
+      WRANGLER_WRITE_LOGS: 'false'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v4.3.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Confirm and migrate only the connector CI database
+        run: >-
+          npm run cloudflare:install -- migrate
+          --config=src/server/adapters/cloudflare/deploy/connector-ci.wrangler.jsonc
+          --account=458ad6a930b0fb717796dfa19ca6a2b1
+          --database=de43cf95-c024-4e44-860d-8ff179e4e08d
+      - name: Test the complete guarded workflow on hosted D1
+        run: >-
+          npm run test:connector:workflow:hosted --
+          --config=src/server/adapters/cloudflare/deploy/connector-ci.wrangler.jsonc
+          --account=458ad6a930b0fb717796dfa19ca6a2b1
+          --database=de43cf95-c024-4e44-860d-8ff179e4e08d
+      - name: Test account guards on the isolated hosted connector D1 schema
+        run: >-
+          npm run test:connector:accounts:hosted --
+          --config=src/server/adapters/cloudflare/deploy/connector-ci.wrangler.jsonc
+          --account=458ad6a930b0fb717796dfa19ca6a2b1
+          --database=de43cf95-c024-4e44-860d-8ff179e4e08d
+      - name: Build the isolated Cloudflare application
+        env:
+          VITE_BACKEND: cloudflare
+        run: npm run build
+      - name: Deploy only the connector CI Worker
+        run: npx wrangler deploy --config src/server/adapters/cloudflare/deploy/connector-ci.wrangler.jsonc
+      - run: npx playwright install --with-deps chromium
+      - name: Test the shared contracts through the hosted Cloudflare browser adapter
+        run: >-
+          npm run test:providers -- --provider=cloudflare
+          --config=src/server/adapters/cloudflare/deploy/connector-ci.wrangler.jsonc
+          --account=458ad6a930b0fb717796dfa19ca6a2b1
+          --database=de43cf95-c024-4e44-860d-8ff179e4e08d
+          --origin=https://minsky-connector-ci.icaic-minsky.workers.dev
+      - name: Test the complete hosted React application
+        run: >-
+          npm run test:connector:ui --
+          --config=src/server/adapters/cloudflare/deploy/connector-ci.wrangler.jsonc
+          --account=458ad6a930b0fb717796dfa19ca6a2b1
+          --database=de43cf95-c024-4e44-860d-8ff179e4e08d
+          --origin=https://minsky-connector-ci.icaic-minsky.workers.dev
+      - name: Retain credential-free recovery identifiers after incomplete cleanup
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: connector-recovery-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/minsky-provider-*/recovery.json
+            /tmp/minsky-d1-proof-*/fixture.json
+            /tmp/minsky-connector-workflow-*/wrangler.jsonc
+            /tmp/minsky-connector-accounts-*/wrangler.jsonc
           if-no-files-found: ignore
           retention-days: 7

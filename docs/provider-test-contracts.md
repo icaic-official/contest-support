@@ -1,13 +1,16 @@
 # Shared provider test contracts
 
 The shared suite checks Minsky behavior through the browser `Backend` interface.
-Supabase supplies the first hosted test implementation.
-Cloudflare and AWS implementations do not exist in this change.
+Supabase and Cloudflare supply browser adapters and fixture drivers.
+The same eight scenarios apply to both providers without weaker Cloudflare assertions.
+AWS has no implementation.
 
-T0017 adds a separate [D1 transaction proof](d1-transaction-proof.md).
-It checks the experimental application store directly, with local and hosted D1 bindings.
-It does not add a Cloudflare browser adapter or fixture driver for this shared suite.
-The complete Cloudflare connector must later pass the same shared scenarios as Supabase.
+T0017's separate [D1 transaction proof](d1-transaction-proof.md) checks the application store directly.
+T0020 extends that store to every workflow command and adds the complete Cloudflare fixture driver.
+The full D1 suite passes all 70 cases on local and isolated hosted D1, with cleanup.
+The Supabase shared suite passes all eight scenarios with cleanup.
+The Cloudflare shared run remains pending because R2 is not activated in the isolated account.
+Error `10042` is a blocked prerequisite, not a passing image or connector result.
 
 T0019 reuses the workflow scenarios against the [shared server service](server-workflow.md).
 The focused [hosted Supabase suite](../tests/workflow/supabase.test.ts) replaces only the workflow executor in a real Supabase connection.
@@ -35,6 +38,7 @@ It does not replace provider-specific policy tests or prove capacity, installati
 | `tests/providers/browser-backend.ts` | A separate browser context for each connection and a typed Node proxy for `Backend`. |
 | `tests/providers/browser-dispatch.ts` | Calls to the real browser adapter, serialized errors and image bytes, and callback forwarding. |
 | `tests/providers/supabase/` | Supabase fixture creation, the real browser adapter, transport fault injection, and scoped cleanup. |
+| `tests/providers/cloudflare/` | Exact Cloudflare CI target checks, D1 and identity fixtures, the real browser adapter, committed-response loss, and exact R2 object cleanup. |
 | `scripts/provider-test.mjs` | Target checks, backend prerequisites, process status, and recovery-journal retention. |
 | `playwright.providers.config.ts` | Hosted suite isolation and disabled credential-bearing captures. |
 | `tests/workflow/supabase.test.ts` | Reuses workflow scenarios through the opt-in shared server path and adds trusted-boundary checks. |
@@ -50,6 +54,13 @@ The service key stays in Node fixture setup and cleanup.
 The browser receives only the public key and temporary fixture credentials.
 The fault control discards one successful workflow response after the server commits it.
 This tests the adapter's uncertain-outcome behavior without replacing the workflow operation.
+
+The Cloudflare driver keeps generated passwords and hashes in memory during setup.
+It creates fictional application and Better Auth records in its dedicated D1 database.
+Its browser contexts use the hosted application origin for API calls, cookies, request protection, and WebSockets.
+Playwright supplies only bridge and source assets from the local Vite server under that browser origin.
+Those intercepted assets do not replace application HTTP operations or become public deployment routes.
+The hosted product UI still requires its separate journey check.
 
 ESLint rejects provider imports in shared scenarios, fixture contracts, and the browser bridge.
 Provider implementations register outside those files.
@@ -74,6 +85,11 @@ The shared suite does not yet cover account creation through `Backend.admin.acco
 The private-note notification check observes a bounded interval after a positive staff notification.
 It does not prove delivery latency or the absence of arbitrarily delayed messages.
 
+The Cloudflare-specific suites additionally test current credential guards, atomic administration, concurrent image limits, partial storage failures, and live reconnect recovery.
+Local checks passed 37 application cases, 34 image cases, nine live-update cases, and one complete HTTPS runtime case.
+Installation passed 15 local cases, and its provider tooling passed 24 cases at the recorded revision.
+These results do not establish hosted Cloudflare shared-suite or empty-installation success.
+
 The existing SQL and function suites retain lower-level permission and failure cases.
 The hosted UI suite still checks the app's account journey and provider-specific integration.
 Passing shared scenarios on Supabase does not establish Cloudflare or AWS conformance.
@@ -86,15 +102,24 @@ Record local, hosted Supabase, hosted D1, and protected GitHub Actions results s
 Each run generates UUID identifiers for its event, sessions, and teams.
 Each created account carries the exact run UUID in its fixture metadata.
 Cleanup checks those ownership records before deletion.
-The account scan also finds a creation whose response was lost before the runner saved its account ID.
+The Supabase account scan also finds a creation whose response was lost before the runner saved its account ID.
+Cloudflare records its generated account IDs before its first fixture write.
 
 The recovery journal contains identifiers and the provider target. It contains no credentials.
 The runner saves the journal before creating records and replaces it atomically after account creation.
 Cleanup removes only that run's records and image objects.
-Deleting fixture people also deletes their command receipts through the existing foreign key.
+Cloudflare verifies the event, sessions, teams, memberships, identities, and exact image keys before deletion.
+It refuses records that cross a fixture boundary, including an installation marker for those IDs.
+It checks D1 cleanup counts, R2 object absence, and Durable Object cursor and alarm removal before removing the journal.
+It deletes exact object keys without a bucket-wide list or prefix deletion.
+The Cloudflare fixture uses the named `SessionMaintenance` service entrypoint through trusted account access.
+The public application has no maintenance route.
+Cleanup first proves fixture ownership and blocks late live messages. It then removes owned D1 rows and verifies empty coordinator storage.
+An interrupted cleanup retains its identifiers-only journal for retry.
+Supabase receipt cleanup retains its existing foreign-key behavior.
 
 A cleanup failure fails the run and retains the journal.
-The protected workflow retains remaining journals as an artifact for seven days.
+The protected workflows retain remaining identifiers in provider-specific recovery artifacts for seven days.
 Forced runner termination can prevent artifact upload. Exact run metadata remains the basis for manual recovery in that case.
 Recovery refuses a different target or ownership mismatch.
 It skips the migration prerequisite check so a changed backend does not prevent a cleanup attempt.
@@ -106,7 +131,8 @@ Its browser factory returns the real application adapter.
 Its cleanup owns provider-specific tables, accounts, objects, and test resources.
 The lost-response control must discard a committed response, not fake a successful write.
 
-Cloudflare and AWS drivers must run the complete scenario registry.
+Cloudflare must pass the complete scenario registry before it claims conformance.
+A future AWS driver must pass the same registry.
 A driver cannot skip a failing behavior because its database or identity provider differs.
 A missing operation means that the provider implementation is incomplete.
 Provider-specific consistency, storage recovery, and migration tests remain additional requirements.
@@ -115,10 +141,10 @@ No generic database API or infrastructure provisioning layer is part of this tes
 Terraform can later create resources. It cannot establish the behavior that these scenarios verify.
 
 
-## Bounded Cloudflare authentication reuse
+## Earlier bounded authentication reuse
 
 T0018 extracts `verifyTemporaryAuthentication()` from the existing authentication scenario.
 The Supabase scenario retains its workflow hooks. Cloudflare supplies its real authentication adapter and protected session-list hooks.
 Both providers use the same identity, temporary-password, password-change, logout, stale-password, and subscription-cleanup assertions.
-This bounded reuse does not establish complete Cloudflare `Backend` conformance.
-The remaining workflow, image, and live-update scenarios still require the complete connector.
+That earlier bounded reuse did not establish complete Cloudflare `Backend` conformance.
+T0020 now provides the complete driver, but its hosted shared-suite result remains pending.

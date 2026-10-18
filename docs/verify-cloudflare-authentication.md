@@ -19,6 +19,9 @@ The first suite creates a temporary local D1 database and runs account, permissi
 The browser suite creates a separate temporary D1 database and a local HTTPS Worker on port 8788.
 It uses Chromium with a self-signed local certificate.
 Expect all focused cases and three browser cases to pass.
+The short SQLite execution-clock probe runs locally. It checks expiry after a password change deletes the original identity session.
+Hosted account cases inject expiry inside the actual batch instead, so transport latency does not determine that assertion.
+Record the local and hosted case counts separately.
 No provider credentials are needed. Local socket access is required.
 `npm test` also runs the account suite and browser-adapter unit tests. Browser tests run separately.
 The account suite checks password changes after the final allowed username login and retains the separate password-change limit.
@@ -159,5 +162,6 @@ Do not reset the database or delete another run's records.
 
 For an interrupted account operation in an authorized fixture, use organizer-assisted reset after checking current permissions.
 The organizer must administer every assigned session. Archived memberships block recovery through the account API.
-Lost sole-organizer credentials need a future Cloudflare owner-recovery procedure before independent installations are supported.
+T0020 adds trusted, provider-owned [installation-owner recovery](install-cloudflare.md#recover-the-installation-owner).
+The empty hosted installation must pass before that path is supported.
 The current Supabase owner-recovery command does not operate on Cloudflare.

@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { readFileSync, readdirSync } from 'node:fs';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { getPlatformProxy, unstable_splitSqlQuery as splitSqlQuery } from 'wrangler';
@@ -12,7 +12,12 @@ import { createAuthenticationHandler } from '../../authenticationHttp';
 import { createCloudflareAuthentication } from '../../../backend/cloudflare/authentication';
 import { verifyTemporaryAuthentication } from '../../../../tests/providers/scenarios/authentication-lifecycle';
 
-const remote = process.env.MINSKY_AUTH_REMOTE === '1';
+const connectorConfig = process.env.MINSKY_CONNECTOR_D1_CONFIG;
+const historicalRemote = process.env.MINSKY_AUTH_REMOTE === '1';
+const legacy = process.env.MINSKY_AUTH_LEGACY === '1';
+if (connectorConfig && (historicalRemote || legacy)) throw new Error('Select the full connector account target or historical authentication verification.');
+const remote = historicalRemote || Boolean(connectorConfig);
+const configPath = connectorConfig ?? 'wrangler.auth-ci.jsonc';
 const origin = 'http://127.0.0.1:8788';
 
 /** Failed rejection assertions must never print a password or cookie result. */
@@ -32,19 +37,21 @@ describe('Cloudflare account authentication', () => {
   let extraIds: string[];
   let usernames: string[];
   let created: boolean;
+  let fullApplication = false;
 
   beforeAll(async () => {
     const platform = await getPlatformProxy<{ DB: D1Connection }>({
-      configPath: 'wrangler.auth-ci.jsonc', persist: false, remoteBindings: remote, envFiles: [],
+      configPath, persist: false, remoteBindings: remote, envFiles: [],
     });
     db = platform.env.DB;
     dispose = platform.dispose;
     if (!remote) {
       const dir = 'src/server/adapters/d1/migrations';
-      for (const file of readdirSync(dir).filter((file) => file.endsWith('.sql')).sort()) {
+      for (const file of readdirSync(dir).filter((file) => file.endsWith('.sql') && (!legacy || Number(file.slice(0, 4)) <= 4)).sort()) {
         await db.batch(splitSqlQuery(readFileSync(`${dir}/${file}`, 'utf8')).map((sql) => db.prepare(sql)));
       }
     }
+    fullApplication = !!await db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'admin_audit'").first();
     identity = createBetterAuthIdentity(db as Parameters<typeof createBetterAuthIdentity>[0], {
       origin, secret: randomSecret(), secureCookies: false,
     });
@@ -62,11 +69,54 @@ describe('Cloudflare account authentication', () => {
     return new Headers({ cookie: signed.cookie.split(';')[0] });
   }
 
+  async function credentialEffects(): Promise<string> {
+    const people = `SELECT id FROM accounts WHERE id IN (?, ?) OR name = ?`;
+    const values = [fixture.staff.accountId, fixture.contestant.accountId, `auth-fixture:${fixture.eventId}`];
+    const rows = await Promise.all([
+      ...[
+        ['accounts', 'id'], ['logins', 'account_id'], ['ba_user', 'id'],
+        ['ba_account', 'userId'], ['ba_session', 'userId'], ['account_operations', 'account_id'],
+      ].map(([table, column]) => fixture.rows(`SELECT * FROM ${table} WHERE ${column} IN (${people}) ORDER BY id`, ...values)),
+      ...['memberships', 'membership_roles', 'notifications', 'audience_sequences']
+        .map((table) => fixture.rows(`SELECT * FROM ${table} WHERE session_id IN (?, ?) ORDER BY 1, 2`, fixture.sessionId, fixture.secondSessionId)),
+      ...(fullApplication ? [fixture.rows('SELECT * FROM admin_audit WHERE session_id IN (?, ?) ORDER BY id', fixture.sessionId, fixture.secondSessionId)] : []),
+    ]);
+    // Failed comparisons must not print maintained password hashes or cookies.
+    return createHash('sha256').update(JSON.stringify(rows)).digest('hex');
+  }
+
+  function changeAtFinalGuard(change: D1Statement, batchNumber = 1, checkpoint?: () => Promise<void>): D1AuthenticationService {
+    let batches = 0;
+    return new D1AuthenticationService({ prepare: (sql) => db.prepare(sql), batch: async (statements) => {
+      if (++batches !== batchNumber) return db.batch(statements);
+      if (checkpoint) await checkpoint();
+      // These are actual writes inside the SQLite transaction. The final check
+      // follows them, so a failure must undo the credential effects as well.
+      const finalGuard = statements.length - 2;
+      return db.batch([...statements.slice(0, finalGuard), change, ...statements.slice(finalGuard)]);
+    } }, identity, passwordHasher);
+  }
+
+  async function actorRestriction(restriction: string): Promise<D1Statement> {
+    const current = await service.current(adminHeaders);
+    const changes: Record<string, D1Statement> = {
+      expired_login: stmt('UPDATE logins SET expires_at = unixepoch() - 1 WHERE id = ?', current!.caller.loginId),
+      expired_identity: stmt("UPDATE ba_session SET expiresAt = '2000-01-01T00:00:00.000Z' WHERE userId = ?", fixture.staff.accountId),
+      revoked: stmt('UPDATE logins SET revoked = 1 WHERE id = ?', current!.caller.loginId),
+      generation: stmt('UPDATE accounts SET credential_generation = credential_generation + 1 WHERE id = ?', fixture.staff.accountId),
+      must_change: stmt('UPDATE accounts SET must_change = 1 WHERE id = ?', fixture.staff.accountId),
+      disabled: stmt('UPDATE accounts SET disabled = 1 WHERE id = ?', fixture.staff.accountId),
+      pending: stmt("UPDATE accounts SET must_change = 1, credential_state = 'pending' WHERE id = ?", fixture.staff.accountId),
+      permission: stmt('UPDATE memberships SET is_admin = 0 WHERE account_id = ?', fixture.staff.accountId),
+    };
+    return changes[restriction];
+  }
+
   beforeEach(async () => {
     created = false;
     extraIds = [];
     usernames = [];
-    fixture = new D1Fixture(db, 'wrangler.auth-ci.jsonc');
+    fixture = new D1Fixture(db, configPath);
     await fixture.create();
     created = true;
     password = randomSecret();
@@ -96,6 +146,9 @@ describe('Cloudflare account authentication', () => {
     usernames.push(...extra.results.map((row) => row.username));
     const ids = [fixture.staff.accountId, fixture.contestant.accountId, ...extraIds];
     await db.batch([
+      // Full local schemas also retain account audit targets. Remove only the
+      // owned event's audit rows before deleting its extra fixture accounts.
+      ...(fullApplication ? [stmt('DELETE FROM admin_audit WHERE session_id IN (?, ?)', fixture.sessionId, fixture.secondSessionId)] : []),
       ...ids.map((id) => stmt('DELETE FROM account_operations WHERE account_id = ?', id)),
       ...extraIds.map((id) => stmt('DELETE FROM accounts WHERE id = ? AND name = ?', id, `auth-fixture:${fixture.eventId}`)),
       ...ids.map((id) => stmt('DELETE FROM ba_user WHERE id = ?', id)),
@@ -118,6 +171,24 @@ describe('Cloudflare account authentication', () => {
     expect(current?.status).toMatchObject({ must_change: false, session_valid: true });
     expect((await service.sessions(headers)).map((session) => session.id)).toEqual([fixture.sessionId]);
   });
+
+  it.each(['expired_login', 'expired_identity', 'revoked', 'generation', 'disabled', 'pending'])(
+    'rolls back a new application login when %s changes at its final check', async (restriction) => {
+      const target = fixture.contestant.accountId;
+      const changes: Record<string, D1Statement> = {
+        expired_login: stmt('UPDATE logins SET expires_at = unixepoch() - 1 WHERE account_id = ?', target),
+        expired_identity: stmt("UPDATE ba_session SET expiresAt = '2000-01-01T00:00:00.000Z' WHERE userId = ?", target),
+        revoked: stmt('UPDATE logins SET revoked = 1 WHERE account_id = ?', target),
+        generation: stmt('UPDATE accounts SET credential_generation = credential_generation + 1 WHERE id = ?', target),
+        disabled: stmt('UPDATE accounts SET disabled = 1 WHERE id = ?', target),
+        pending: stmt("UPDATE accounts SET must_change = 1, credential_state = 'pending' WHERE id = ?", target),
+      };
+      let before: string | undefined;
+      const racing = changeAtFinalGuard(changes[restriction], 1, async () => { before = await credentialEffects(); });
+      await expectFailure(signIn(username, password, racing)).toMatchObject({ status: 409 });
+      expect(before).toBeDefined();
+      expect(await credentialEffects()).toBe(before);
+    });
 
   it('rejects incorrect passwords and nonexistent usernames', async () => {
     await expectFailure(signIn(username, randomSecret())).toMatchObject({ status: 401 });
@@ -189,6 +260,104 @@ describe('Cloudflare account authentication', () => {
     expect((await stmt('SELECT count(*) n FROM account_operations WHERE account_id = ?', fixture.contestant.accountId).first<{n: number}>())?.n).toBe(0);
   });
 
+  const restrictions = ['expired_login', 'expired_identity', 'revoked', 'generation', 'must_change', 'disabled', 'pending', 'permission'];
+
+  for (const action of ['set_username', 'create_account', 'reset_password'] as const) {
+    it.each(restrictions)(`rolls back ${action} initiation when %s changes at the final check`, async (restriction) => {
+      await signIn();
+      const accountUsername = `late_${randomSecret().slice(0, 20)}`;
+      if (action === 'set_username') {
+        await db.batch([
+          stmt('UPDATE accounts SET username = NULL WHERE id = ?', fixture.contestant.accountId),
+          stmt('UPDATE ba_user SET username = NULL WHERE id = ?', fixture.contestant.accountId),
+        ]);
+      }
+      const before = await credentialEffects();
+      const racing = changeAtFinalGuard(await actorRestriction(restriction));
+      const command = action === 'create_account'
+        ? { action, username: accountUsername, name: `auth-fixture:${fixture.eventId}`, teamId: fixture.teamId, roles: [], isAdmin: false }
+        : action === 'set_username' ? { action, userId: fixture.contestant.accountId, username: accountUsername }
+          : { action, userId: fixture.contestant.accountId };
+      await expectFailure(racing.account(adminHeaders, fixture.sessionId, command)).toMatchObject({ status: 409 });
+      expect(await credentialEffects()).toBe(before);
+      expect((await service.current(adminHeaders))?.status.must_change).toBe(false);
+    });
+  }
+
+  for (const action of ['create_account', 'reset_password'] as const) {
+    it.each(restrictions)(`rolls back ${action} credential completion when %s changes at the final check`, async (restriction) => {
+      await signIn();
+      let pending: string | undefined;
+      const racing = changeAtFinalGuard(await actorRestriction(restriction), 2, async () => { pending = await credentialEffects(); });
+      const accountUsername = `late_${randomSecret().slice(0, 20)}`;
+      const command = action === 'create_account'
+        ? { action, username: accountUsername, name: `auth-fixture:${fixture.eventId}`, teamId: fixture.teamId, roles: [], isAdmin: false }
+        : { action, userId: fixture.contestant.accountId };
+      await expectFailure(racing.account(adminHeaders, fixture.sessionId, command)).toMatchObject({ status: 409 });
+      expect(pending).toBeDefined();
+      expect(await credentialEffects()).toBe(pending);
+      const account = await stmt('SELECT credential_state, must_change FROM accounts WHERE username = ?',
+        action === 'create_account' ? accountUsername : username).first<{ credential_state: string; must_change: number }>();
+      expect(account).toMatchObject({ credential_state: 'pending', must_change: 1 });
+      expect((await service.current(adminHeaders))?.status.must_change).toBe(false);
+    });
+
+    it(`rolls back ${action} completion when the target credential generation changes at the final check`, async () => {
+      const accountUsername = action === 'create_account' ? `late_${randomSecret().slice(0, 20)}` : username;
+      let pending: string | undefined;
+      const racing = changeAtFinalGuard(stmt('UPDATE accounts SET credential_generation = credential_generation + 1 WHERE username = ?', accountUsername),
+        2, async () => { pending = await credentialEffects(); });
+      const command = action === 'create_account'
+        ? { action, username: accountUsername, name: `auth-fixture:${fixture.eventId}`, teamId: fixture.teamId, roles: [], isAdmin: false }
+        : { action, userId: fixture.contestant.accountId };
+      await expectFailure(racing.account(adminHeaders, fixture.sessionId, command)).toMatchObject({ status: 409 });
+      expect(pending).toBeDefined();
+      expect(await credentialEffects()).toBe(pending);
+    });
+  }
+
+  it.each(['expired_login', 'generation', 'disabled', 'pending'])(
+    'rolls back a self password change when %s changes after old sessions are revoked', async (restriction) => {
+      const before = await credentialEffects();
+      const replacement = randomSecret();
+      const racing = changeAtFinalGuard(await actorRestriction(restriction));
+      await expectFailure(racing.changePassword(adminHeaders, password, replacement)).toMatchObject({ status: 409 });
+      expect(await credentialEffects()).toBe(before);
+      expect((await service.current(adminHeaders))?.status.must_change).toBe(false);
+      expect((await service.current(await signIn(`${username}_a`)))?.status.must_change).toBe(false);
+    });
+
+  // Register this clock probe only for local SQLite. Hosted cases above inject
+  // expiry in the actual batch without depending on request latency.
+  if (!remote) {
+    describe('local SQLite expiry clock', () => {
+      it('rejects a self change whose original identity expires after its row is deliberately deleted', async () => {
+        const replacement = randomSecret();
+        const hash = await passwordHasher.hash(replacement);
+        const deadline = new Date(Date.now() + 1500).toISOString();
+        await stmt('UPDATE ba_session SET expiresAt = ? WHERE userId = ?', deadline, fixture.staff.accountId).run();
+        const before = await credentialEffects();
+        let checkedBeforeExpiry = false;
+        const racing = new D1AuthenticationService({ prepare: (sql) => db.prepare(sql), batch: async (statements) => {
+          const live = await stmt("SELECT expiresAt > strftime('%Y-%m-%dT%H:%M:%fZ', 'now') AS valid FROM ba_session WHERE userId = ?", fixture.staff.accountId).first<{ valid: number }>();
+          checkedBeforeExpiry = live?.valid === 1;
+          const finalGuard = statements.length - 2;
+          // This SELECT consumes real SQLite time after the credential writes.
+          // It does not modify the captured deadline or restore the old row.
+          const delay = db.prepare(`WITH RECURSIVE work(n) AS (
+            VALUES(0) UNION ALL SELECT n + 1 FROM work WHERE n < 18000000
+          ) SELECT sum(n) FROM work`);
+          return db.batch([...statements.slice(0, finalGuard), delay, ...statements.slice(finalGuard)]);
+        } }, identity, { ...passwordHasher, hash: async () => hash });
+        await expectFailure(racing.changePassword(adminHeaders, password, replacement)).toMatchObject({ status: 409 });
+        expect(checkedBeforeExpiry).toBe(true);
+        expect(new Date().toISOString() > deadline).toBe(true);
+        expect(await credentialEffects()).toBe(before);
+        expect((await stmt('SELECT id FROM ba_session WHERE userId = ?', fixture.staff.accountId).all()).results).toHaveLength(1);
+      });
+    });
+  }
+
   it('keeps reset restricted if the organizer loses permission during hashing', async () => {
     const interrupted = new D1AuthenticationService(db, identity, { ...passwordHasher, hash: async (value) => {
       await stmt('UPDATE memberships SET is_admin = 0 WHERE account_id = ?', fixture.staff.accountId).run();
@@ -247,7 +416,7 @@ describe('Cloudflare account authentication', () => {
     const current = await service.current(headers);
     expect(current?.status.must_change).toBe(true);
     await expectFailure(service.sessions(headers)).toMatchObject({ status: 403 });
-    expect(await new D1ApplicationStore(db).issue(current!.caller, fixture.sessionId, fixture.issueId)).toBeUndefined();
+    expect(await new D1ApplicationStore(db, fullApplication ? {} : { mode: 'transaction-proof' }).issue(current!.caller, fixture.sessionId, fixture.issueId)).toBeUndefined();
     await expectFailure(service.account(headers, fixture.sessionId, { action: 'reset_password', userId: fixture.staff.accountId })).toMatchObject({ status: 403 });
   });
 
@@ -347,7 +516,7 @@ describe('Cloudflare account authentication', () => {
   it('resets through the organizer and preserves IDs, membership, and issue history', async () => {
     const oldHeaders = await signIn();
     const caller = (await service.current(oldHeaders))!.caller;
-    expect(await new D1ApplicationStore(db).execute(caller, fixture.sessionId, randomUUID(), {
+    expect(await new D1ApplicationStore(db, fullApplication ? {} : { mode: 'transaction-proof' }).execute(caller, fixture.sessionId, randomUUID(), {
       type: 'message', issue_id: fixture.issueId, revision: 1,
       text: 'Fictional history retained through password reset.', visibility: 'public',
     })).toMatchObject({ outcome: 'committed' });
@@ -361,7 +530,13 @@ describe('Cloudflare account authentication', () => {
     const current = await service.current(newHeaders);
     expect(current?.user.id).toBe(fixture.contestant.accountId);
     expect(current?.status.must_change).toBe(true);
-    expect(await fixture.durableState()).toEqual(before);
+    const after = await fixture.durableState();
+    for (const key of ['issues', 'receipts', 'history']) expect(after[key]).toEqual(before[key]);
+    for (const key of ['sequences', 'notifications']) {
+      expect(after[key].filter((row) => String(row.audience).startsWith('team:')))
+        .toEqual(before[key].filter((row) => String(row.audience).startsWith('team:')));
+    }
+    expect(after.notifications.filter((row) => row.audience === 'staff')).toHaveLength(fullApplication ? 2 : 1);
     expect((await stmt('SELECT team_id FROM memberships WHERE account_id = ?', fixture.contestant.accountId).first<{team_id: string}>())?.team_id).toBe(fixture.teamId);
     expect((await stmt("SELECT count(*) n FROM account_operations WHERE account_id = ? AND state = 'completed'", fixture.contestant.accountId).first<{n: number}>())?.n).toBe(1);
   });

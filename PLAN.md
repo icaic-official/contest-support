@@ -1,5 +1,17 @@
 # Minsky planning record
 
+**Complete Cloudflare connector, 2026-10-18.** T0020 starts from updated `main` at `7d19b00` after PR #41 merged.
+Use `feature/t0020-cloudflare-connector` for the complete connector and empty-installation verification.
+The [ticket](docs/tickets.md#t0020-complete-cloudflare-connector) records milestones and acceptance criteria before implementation.
+Reuse the shared workflow and merged authentication implementation.
+Inspect PR #21 before installation tooling. Reuse suitable parts without merging its branch wholesale.
+Keep provider configuration and bootstrap inside provider implementations.
+Document reuse decisions and recommend a PR #21 disposition. The owner decides whether to close it.
+Isolated Cloudflare development, CI, and installation resources are authorized in the confirmed account.
+Only T0020's branch may be added to the protected cloud-test allowlist. Preserve other entries and rules.
+Supabase remains active. Docker packaging, AWS, Terraform, real-data migration, and backend cutover remain deferred.
+The owner reviews and merges. Bounded subagent work is authorized.
+
 **PR #41 review follow-up, 2026-10-18.** The owner requested review fixes, code cleanup, and completion of authentication verification on the existing PR.
 Use `feature/t0019-shared-server-workflow`.
 Correct Supabase login expiry after lock waits with an additive migration. Preserve the installed migration source.

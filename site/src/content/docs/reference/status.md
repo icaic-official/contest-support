@@ -22,6 +22,7 @@ This page is a dated record, not a live deployment dashboard.
 | [T0016](https://github.com/GiftedNovaHD/minsky/pull/36) | Proposed Cloudflare architecture and implementation plan. |
 | [T0017](https://github.com/GiftedNovaHD/minsky/pull/39) | Verified bounded D1 transaction proof for claims and messages. The complete Cloudflare connector remains incomplete. |
 | [T0018 Cloudflare authentication](https://github.com/GiftedNovaHD/minsky/pull/40) | Experimental username authentication, cookie sessions, and organizer recovery. Hosted HTTP checks pass on Workers Paid with isolated fictional fixtures. The full connector and migration remain incomplete. |
+| [T0019 shared server workflow](https://github.com/GiftedNovaHD/minsky/pull/41) | All nine issue decisions use one shared service, verified through isolated Supabase execution. |
 
 ## Pending changes
 
@@ -30,10 +31,10 @@ This page is a dated record, not a live deployment dashboard.
 | [T0006 announcements](https://github.com/GiftedNovaHD/minsky/pull/20) | Open pull request. |
 | [T0007 independent installations](https://github.com/GiftedNovaHD/minsky/pull/21) | Open pull request. Packaging exists on its branch. Container operation remains unverified. |
 | [T0009 jury worklist](https://github.com/GiftedNovaHD/minsky/pull/23) | Draft pull request. |
-| [T0019 shared server workflow](https://github.com/GiftedNovaHD/minsky/pull/41) | Open PR. All nine command decisions run through a shared service verified on Supabase CI. D1 still supports only claims and messages. |
+| T0020 complete Cloudflare connector | Implements every backend group and provider-owned installation tooling. Local HTTPS and all 70 hosted D1 workflow cases pass. Complete hosted browser and empty-installation verification remain pending. |
 
 Supabase remains the active backend.
-The active browser retains the existing SQL workflow while T0019 verifies its replacement path.
+The active browser retains the existing SQL workflow during Cloudflare replacement verification.
 
 T0011 adds this documentation site.
 The initial docs deployment did not deploy the Minsky application or apply database migrations.

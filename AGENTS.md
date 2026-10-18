@@ -22,6 +22,18 @@
 
 ## Current scope
 
+**T0020 complete Cloudflare connector, 2026-10-18.** The owner authorized the complete connector after PR #41 merged.
+Use `feature/t0020-cloudflare-connector` from updated `main` at `7d19b00`.
+The [ticket](docs/tickets.md#t0020-complete-cloudflare-connector) records all five milestones and acceptance criteria.
+Inspect PR #21 before installation tooling. Reuse suitable parts without merging its branch wholesale.
+Keep provider configuration and bootstrap inside the corresponding provider implementation.
+Verify the full application and an empty isolated installation. Record PR #21 reuse and recommend its disposition.
+The owner decides whether to close PR #21 and reviews and merges T0020.
+Isolated Cloudflare development, CI, and installation resources are authorized in the confirmed account.
+Only this ticket branch may be added to the protected cloud-test branch allowlist. Preserve all other entries and protection rules.
+Supabase remains active. Docker packaging, AWS, Terraform, real-data migration, and backend cutover remain deferred.
+Bounded subagent work is authorized.
+
 **T0019 shared server workflow, 2026-10-18.** Use `feature/t0019-shared-server-workflow` from updated `main` at `0c797ad`.
 The owner authorized this extraction while PR #40 was open. The branch started independently of its authentication branch.
 PR #40 merged at `68e8642` on 2026-10-17 at 17:16:41 UTC. This branch now includes that updated `main`.

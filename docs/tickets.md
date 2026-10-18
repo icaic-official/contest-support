@@ -2,12 +2,10 @@
 
 These tickets describe development work, not contestant issues.
 
-The active ticket is [T0019 shared server workflow](#t0019-shared-server-workflow).
-The owner authorized this extraction while T0018 authentication PR #40 was open.
-The owner merged PR #40 at `68e8642` on 2026-10-17 at 17:16:41 UTC.
-PR #39 merged T0017's bounded D1 proof at `0c797ad`.
-Further Cloudflare workflow persistence follows shared-rule verification through Supabase.
-Migration tooling follows connector verification. Supabase remains active.
+The active ticket is [T0020 complete Cloudflare connector](#t0020-complete-cloudflare-connector).
+The owner merged T0019 in PR #41 at `7d19b00` before authorizing this ticket.
+T0020 completes Cloudflare persistence, the browser connector, and independent installation verification.
+Real-data migration tooling follows connector verification. Supabase remains active.
 
 T0016 Cloudflare backend design merged in [PR #36](https://github.com/GiftedNovaHD/minsky/pull/36) at `b68ef72` on 2026-10-17.
 [T0015 shared provider tests](#t0015-shared-provider-tests) merged in [PR #37](https://github.com/GiftedNovaHD/minsky/pull/37).
@@ -57,10 +55,69 @@ These items stay deferred and are not part of T0005:
 
 T0008 fuzzy team search merged into `main` in [PR #22](https://github.com/notbowen/minsky/pull/22) on 2026-10-15 (SGT).
 
+## T0020 Complete Cloudflare connector
+
+Branch: `feature/t0020-cloudflare-connector`, from updated `main` at `7d19b00`.
+Status: implementation in progress. The owner reviews and merges.
+Summary: Complete every Cloudflare backend operation and verify the application with isolated resources. Verify installation into an empty Cloudflare environment.
+
+The owner authorized the complete connector after PR #41 merged.
+Supabase remains the active development backend.
+Use the existing Cloudflare account, `458ad6a930b0fb717796dfa19ca6a2b1`.
+Keep new development, CI, and installation resources separate from existing verification resources.
+Bounded subagent work is authorized.
+Only this ticket branch may be added to the existing `cloud-test` branch allowlist.
+Preserve every other entry and protection rule.
+Document the need and cost before any additional paid upgrade.
+
+Inspect [PR #21](https://github.com/GiftedNovaHD/minsky/pull/21) before installation tooling changes.
+Reuse suitable configuration, validation, bootstrap safeguards, and tests.
+Keep provider configuration and bootstrap code inside its provider implementation.
+Record which old components are reused, replaced, or deferred.
+Recommend a disposition for PR #21 after verification. The owner decides whether to close it.
+
+Docker packaging, AWS, Terraform, real-data migration, account resets, and backend cutover remain outside this ticket.
+Do not merge the old installation branch wholesale.
+Do not claim contest capacity without separate evidence.
+
+### Implementation milestones
+
+1. Complete D1 persistence for all nine commands through the existing `WorkflowService`.
+2. Complete authenticated HTTP routes, authorized snapshots, administration, and the browser adapter.
+3. Implement private R2 images and recovery from partial failures.
+4. Deliver audience-specific invalidations through Durable Objects and the D1 outbox.
+5. Verify both providers, hosted application journeys, and an empty isolated installation.
+
+### Acceptance criteria
+
+- [ ] Every workflow command uses shared decisions and atomic state, history, receipt, and notification commits.
+- [ ] Commits recheck permissions, credential generation, identity-session expiry, and revocation.
+- [ ] Every `Backend` capability has a working Cloudflare implementation with existing behavior preserved.
+- [ ] Authorized snapshots include complete permitted workflow, account, image, and timing data.
+- [ ] Private images preserve visibility, ownership, limits, archival rules, retries, and scoped cleanup.
+- [ ] Live updates preserve audience separation, revocation, reconnect refresh, duplicate handling, and failure recovery.
+- [ ] The same required shared scenarios pass against Supabase and Cloudflare.
+- [ ] Complete hosted application journeys pass with fictional accounts and images.
+- [ ] The documented installation procedure succeeds in an empty isolated Cloudflare environment.
+- [ ] PR #21 reuse decisions and the final disposition recommendation are documented.
+- [ ] Fixture cleanup is verified and deletes only UUID-owned data.
+- [ ] Required type, lint, build, database, function, browser, documentation, and hosted checks pass.
+- [ ] Local, hosted CLI, and protected GitHub Actions evidence are recorded separately.
+- [ ] The final PR revision has passing required checks and accurate documentation for owner review.
+
+### Verification
+
+All 70 full-workflow cases pass locally and on the separate hosted connector D1 database.
+All eight shared provider scenarios pass against Supabase.
+The local complete HTTPS Worker journey and all 34 ordinary browser regressions pass.
+These results do not replace the required hosted Cloudflare browser and installation runs.
+R2 activation is pending. Cloudflare returns code `10042` until the owner enables R2 through the dashboard.
+The [current-state record](current-state.md#t0020-connector-implementation-2026-10-18) separates observed results from pending acceptance work.
+
 ## T0019 Shared server workflow
 
 Branch: `feature/t0019-shared-server-workflow`, from updated `main` at `0c797ad`.
-Status: implemented in [PR #41](https://github.com/GiftedNovaHD/minsky/pull/41). Local, hosted Supabase, and bounded hosted D1 checks pass. Protected GitHub cloud execution remains pending. The owner reviews and merges.
+Status: merged in [PR #41](https://github.com/GiftedNovaHD/minsky/pull/41) at `7d19b00`. Local, hosted Supabase, and bounded hosted D1 checks pass. Protected authentication passes on the earlier merged `main` revision. T0019's protected Supabase job was not run.
 Summary: Extract the existing issue rules into one shared server service. Exercise all nine commands through a trusted Supabase path before expanding Cloudflare workflow persistence.
 
 The owner authorized work while [PR #40](https://github.com/GiftedNovaHD/minsky/pull/40) was open.

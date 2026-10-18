@@ -1,5 +1,6 @@
 import { cleanupFixture, createFixture } from './supabase/fixture';
 import type { ScenarioData } from './contracts';
+import { cleanupFixture as cleanupCloudflareFixture, createFixture as createCloudflareFixture } from './cloudflare/fixture';
 
 interface PreparedFixture {
   data: ScenarioData;
@@ -9,6 +10,8 @@ interface PreparedFixture {
 /** Providers own fixture setup, browser construction, and recovery. */
 interface ProviderDriver {
   browserModule: string;
+  browserOrigin?: string;
+  assetOrigin?: string;
   create(path: string): Promise<PreparedFixture>;
   cleanup(path: string): Promise<void>;
 }
@@ -21,6 +24,16 @@ const drivers: Record<string, ProviderDriver> = {
       return { data, browserConfiguration: { url, publicKey } };
     },
     cleanup: cleanupFixture,
+  },
+  cloudflare: {
+    assetOrigin: 'http://127.0.0.1:4174',
+    browserModule: '/tests/providers/cloudflare/browser.ts',
+    get browserOrigin() { return process.env.MINSKY_CF_TEST_ORIGIN; },
+    async create(path) {
+      const { origin, ...data } = await createCloudflareFixture(path);
+      return { data, browserConfiguration: { origin } };
+    },
+    cleanup: cleanupCloudflareFixture,
   },
 };
 

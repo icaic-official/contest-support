@@ -1,0 +1,64 @@
+{
+  "$schema": "../../../../../node_modules/wrangler/config-schema.json",
+  "name": "minsky-connector-ci",
+  "main": "../applicationWorker.ts",
+  "account_id": "458ad6a930b0fb717796dfa19ca6a2b1",
+  "compatibility_date": "2026-10-13",
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "workers_dev": true,
+  "preview_urls": false,
+  "limits": {
+    "cpu_ms": 1000
+  },
+  "observability": {
+    "enabled": false
+  },
+  "triggers": {
+    "crons": [
+      "* * * * *"
+    ]
+  },
+  "vars": {
+    "AUTH_ORIGIN": "https://minsky-connector-ci.icaic-minsky.workers.dev"
+  },
+  "assets": {
+    "directory": "../../../../../dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": true
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "minsky-connector-ci",
+      "database_id": "de43cf95-c024-4e44-860d-8ff179e4e08d",
+      "migrations_dir": "../../d1/migrations",
+      "remote": true
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "IMAGES",
+      "bucket_name": "minsky-connector-ci-images",
+      "remote": true
+    }
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "LIVE_UPDATES",
+        "class_name": "SessionLiveCoordinator"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": [
+        "SessionLiveCoordinator"
+      ]
+    }
+  ]
+}

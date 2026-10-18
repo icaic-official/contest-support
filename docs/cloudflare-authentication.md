@@ -2,7 +2,8 @@
 
 T0018 implements experimental authentication and account sessions for Workers and D1.
 Supabase remains the active application backend.
-The Cloudflare workflow connector, migration, images, and live delivery remain incomplete.
+T0020 adds the complete connector. Local HTTPS and hosted D1 checks pass; complete hosted verification remains pending.
+Real-data migration remains later work.
 This reference describes the implemented API. It does not describe a supported independent installation.
 
 The [identity choice](cloudflare-authentication-choice.md) explains Better Auth, cryptographic components, limitations, and measured resource costs.
@@ -18,8 +19,8 @@ The raw Better Auth router is not exposed.
 
 `createCloudflareAuthentication()` implements the existing browser `Authentication` contract.
 Its additional `account()` and `sessions()` methods support this bounded API.
-It does not implement or select a complete `Backend`.
-The application's backend entry point still creates the Supabase adapter.
+The complete `createCloudflareBackend()` factory wraps this authentication adapter and supplies the remaining operation groups.
+The application's backend entry point defaults to Supabase. Isolated Cloudflare builds explicitly select `VITE_BACKEND=cloudflare`.
 
 ## HTTP endpoints
 
@@ -35,8 +36,8 @@ Authenticated endpoints read the HttpOnly cookie. Request bodies cannot supply a
 | `GET /api/auth/sessions` | Cookie | Returns the account's current contest-session memberships. Requires a completed password change. |
 | `POST /api/accounts` | `sessionId`, `command` | Performs `create_account`, `set_username`, or `reset_password`. Uses existing `AccountCommand` fields. |
 
-The experimental D1 session table has no display name. Session summaries currently use the session ID as the name.
-The complete connector must supply contest-session names.
+The historical authentication Worker uses the session ID as its summary name.
+The complete application Worker routes session reads through the named application schema.
 Account creation and reset return `temporaryPassword` only in their authorized success response.
 No endpoint retrieves an earlier temporary password.
 Passwords and password hashes do not appear in audit records, responses for other actions, or application logs.

@@ -1,13 +1,14 @@
-import { isAbsolute } from 'node:path';
+import { isAbsolute, resolve } from 'node:path';
+import { connectorTarget } from '../tests/providers/cloudflare/target.mjs';
 
 /** Validate the explicit target before a browser or privileged client starts. */
 export function providerTestOptions(arguments_, environment) {
   const providers = arguments_.filter((argument) =>
     argument.startsWith('--provider=')
   );
-  if (providers.length !== 1 || providers[0] !== '--provider=supabase') {
+  if (providers.length !== 1 || !['--provider=supabase', '--provider=cloudflare'].includes(providers[0])) {
     throw new Error(
-      'Select one implemented provider with --provider=supabase.',
+      'Select one implemented provider with --provider=supabase or --provider=cloudflare.',
     );
   }
   const recovery = arguments_.filter((argument) =>
@@ -18,32 +19,51 @@ export function providerTestOptions(arguments_, environment) {
   if (recoveryPath !== undefined && !isAbsolute(recoveryPath)) {
     throw new Error('Use an absolute path for the recovery journal.');
   }
+  const provider = providers[0].slice('--provider='.length);
+  const target = {};
+  if (provider === 'cloudflare') {
+    for (const field of ['account', 'database', 'config', 'origin']) {
+      const values = arguments_.filter((argument) => argument.startsWith(`--${field}=`));
+      if (values.length !== 1 || values[0] === `--${field}=`) {
+        throw new Error('Cloudflare tests require one explicit --account, --database, --config, and --origin.');
+      }
+      target[field] = values[0].slice(field.length + 3);
+    }
+    if (target.account !== connectorTarget.accountId || target.database !== connectorTarget.databaseId ||
+        target.origin !== connectorTarget.origin) {
+      throw new Error('Select only the confirmed isolated Cloudflare connector CI target. Development, authentication, and proof resources are forbidden.');
+    }
+    target.config = resolve(target.config);
+  }
   const project = environment.MINSKY_TEST_PROJECT_REF ?? '';
-  if (!/^[a-z]{20}$/.test(project) || project === 'ovymmobupzowotvrywek') {
-    throw new Error(
-      'Select an isolated Supabase project with MINSKY_TEST_PROJECT_REF. Development is forbidden.',
-    );
-  }
-  if (
-    !environment.SUPABASE_ANON_KEY || !environment.SUPABASE_SERVICE_ROLE_KEY
-  ) {
-    throw new Error(
-      'Set SUPABASE_ANON_KEY and SUPABASE_SERVICE_ROLE_KEY for the isolated test project.',
-    );
-  }
-  if (!recoveryPath && !environment.SUPABASE_ACCESS_TOKEN) {
-    throw new Error(
-      'Set SUPABASE_ACCESS_TOKEN for the read-only backend prerequisite check.',
-    );
+  if (provider === 'supabase') {
+    if (!/^[a-z]{20}$/.test(project) || project === 'ovymmobupzowotvrywek') {
+      throw new Error(
+        'Select an isolated Supabase project with MINSKY_TEST_PROJECT_REF. Development is forbidden.',
+      );
+    }
+    if (
+      !environment.SUPABASE_ANON_KEY || !environment.SUPABASE_SERVICE_ROLE_KEY
+    ) {
+      throw new Error(
+        'Set SUPABASE_ANON_KEY and SUPABASE_SERVICE_ROLE_KEY for the isolated test project.',
+      );
+    }
+    if (!recoveryPath && !environment.SUPABASE_ACCESS_TOKEN) {
+      throw new Error(
+        'Set SUPABASE_ACCESS_TOKEN for the read-only backend prerequisite check.',
+      );
+    }
   }
   const forwarded = arguments_.filter((argument) =>
-    !argument.startsWith('--provider=') && !argument.startsWith('--recover=')
+    !argument.startsWith('--provider=') && !argument.startsWith('--recover=') &&
+      !(provider === 'cloudflare' && ['account', 'database', 'config', 'origin'].some((field) => argument.startsWith(`--${field}=`)))
   );
   // More than one worker would overwrite the run journal and share fixture accounts.
   // Trace files can contain authentication arguments or provider credentials.
   if (
     forwarded.some((argument) =>
-      /^--(?:config|workers|fully-parallel|trace|reporter|output|repeat-each|retries|shard|debug|ui)(?:=|$)/
+      /^--(?:config|workers|fully-parallel|trace|reporter|output|repeat-each|retries|shard|debug|ui|password|token|secret|key)(?:=|$)/
         .test(argument) || /^-[cj]/.test(argument)
     )
   ) {
@@ -56,5 +76,6 @@ export function providerTestOptions(arguments_, environment) {
       'Recovery does not accept test filters or runner overrides.',
     );
   }
-  return { project, recoveryPath, arguments: forwarded };
+  return provider === 'supabase' ? { project, recoveryPath, arguments: forwarded }
+    : { provider, ...target, recoveryPath, arguments: forwarded };
 }

@@ -1,8 +1,30 @@
 # Prepare the Cloudflare backend
 
-This plan defines the work needed to implement and verify the [proposed backend](cloudflare-backend-design.md).
+This plan defines implementation and verification of the [Cloudflare connector](cloudflare-backend-design.md).
 T0016 added design documents. T0015 added shared tests and Supabase fixes.
 The phases below are acceptance steps, not additional opened development tickets.
+
+T0020 uses `feature/t0020-cloudflare-connector`, from updated `main` at `7d19b00` after PR #41 merged.
+The complete connector is implemented, but its hosted acceptance work remains incomplete.
+Supabase remains the active development backend.
+
+## Current milestone evidence
+
+| Milestone | Implemented behavior | Observed verification and remaining gate |
+| --- | --- | --- |
+| Complete D1 workflow | All nine commands persist shared `WorkflowService` decisions with atomic effects and current identity guards. | All 70 local and hosted D1 cases pass with scoped cleanup. Hosted target: separate `minsky-connector-ci`, database `de43cf95-c024-4e44-860d-8ff179e4e08d`. |
+| Complete application boundary | Authenticated routes, session lists, authorized snapshots, administration, and every browser `Backend` group. | 37 local application cases and one local HTTPS runtime case pass. Complete hosted UI verification remains pending. |
+| Private R2 images | Reservations, immutable transfers, completion, authorized downloads, removal, abandonment, expiry, and exact-key recovery. | 34 cases pass against local D1 and R2 bindings. Hosted image journeys remain pending. |
+| Durable Object updates | Audience-specific delivery from the D1 outbox, current-access checks, duplicate handling, reconnect refresh, and retry recovery. | Nine local live-update cases and the local runtime case pass. Complete hosted delivery remains pending. |
+| Shared provider assertions | Both fixture drivers use the same eight scenarios. | Supabase passes all eight with cleanup. The Cloudflare hosted shared run remains pending. |
+| Empty installation | Provider-owned configuration, explicit target checks, atomic bootstrap, and trusted owner recovery. | 15 local installation cases and 24 tooling cases pass at the recorded revision. The documented hosted empty installation remains pending. |
+
+R2 activation is the current hosted prerequisite.
+Cloudflare returned error `10042` for the isolated account.
+Workers Paid is active. That does not activate R2.
+Do not count blocked image, shared-suite, UI, installation, or protected connector checks as passes.
+Record each later result with its actual revision and target in [current state](current-state.md).
+Earlier aggregate test counts describe those runs and do not replace checks of the final PR revision.
 
 ## Use the merged design and provider tests
 
@@ -12,32 +34,31 @@ T0015 merged in [PR #37](https://github.com/GiftedNovaHD/minsky/pull/37) at `738
 Its protected run passed all eight shared scenarios and all 14 existing hosted UI tests.
 T0016 merged in [PR #36](https://github.com/GiftedNovaHD/minsky/pull/36) at `b68ef72` on 2026-10-17 at 13:50:36 UTC.
 The design review and bounded T0017 proof are complete.
-T0019 extracts the existing server workflow before further Cloudflare workflow persistence.
-Authentication in PR #40 merged at `68e8642`. T0019 now includes that updated `main`.
+T0019 extracted the existing server workflow before further Cloudflare persistence and merged in PR #41.
+Authentication in PR #40 merged at `68e8642`.
 
 The user authorized T0015 and T0016 in parallel on 2026-10-17 while PR #32 was under review.
-Both branches started at its `d158906` revision. T0016 now includes PR #32 and PR #37.
+Both branches started at its `d158906` revision. The design branch later included PR #32 and PR #37.
 Supabase remains active.
 
 The [shared suite](provider-test-contracts.md) and its [verification record](current-state.md#t0015-shared-provider-tests-2026-10-17) are available in this branch.
-The suite does not yet cover every proposed Cloudflare behavior.
-The remaining phases require the additional cases below.
+The shared suite does not cover every provider-specific race or failure.
+Focused D1, image, authentication, administration, and live-update tests supply additional coverage.
 
 ## Prove the database transaction pattern
 
-T0017 uses `feature/t0017-d1-transaction-proof` from updated `main` at `53f9dfd`.
+T0017 used `feature/t0017-d1-transaction-proof` from updated `main` at `53f9dfd`.
 [PR #39](https://github.com/GiftedNovaHD/minsky/pull/39) implements the bounded proof.
-All 42 local and hosted D1 cases pass on `edb4bd0`, with verified scoped fixture cleanup.
+The recorded `edb4bd0` run passed all 42 local and hosted D1 cases, with verified scoped fixture cleanup.
 See [the evidence](current-state.md#t0017-d1-transaction-proof-2026-10-17).
 The owner merged PR #39 at `0c797ad` on 2026-10-17 at 15:49:49 UTC.
 Those hosted results apply to the recorded proof revision, not later adapter changes.
 See [the proof guide](d1-transaction-proof.md) for the focused scope and verification procedure.
 
-1. Define the SQLite schema and the proposed application-store port.
-2. Implement one complete command with an atomic receipt, history, and notification record.
-3. Test concurrent calls, including the same request ID with equal and different commands.
-4. Interrupt the response after commit and retry the original request.
-5. Race the command against membership revocation, account restriction, and event archival.
+That bounded phase defined the schema and application-store interface.
+It verified atomic command effects, concurrent receipts, response loss, and access races.
+Its historical constructor mode remains explicit and separate from production guards.
+T0020 extends the same shared service to every command and verifies current identity state at commit and replay.
 
 Completion requires hosted D1 evidence that a failed assertion rolls back the entire batch.
 A losing concurrent request must not create history, an award, or a notification.
@@ -55,10 +76,11 @@ Subagents may perform independent, bounded tasks.
 
 ## Extract and verify the existing workflow
 
-T0019 uses `feature/t0019-shared-server-workflow` from `main` at `0c797ad`.
+T0019 used `feature/t0019-shared-server-workflow` from `main` at `0c797ad`.
 The owner authorized this ticket while authentication PR #40 was open.
 The branch started independently of that authentication branch.
-It now includes PR #40's merge at `68e8642` and preserves the merged authentication implementation.
+It included PR #40's merge at `68e8642` and preserved the authentication implementation.
+The completed phase used these steps:
 
 1. Inventory the effective PostgreSQL functions and all existing browser commands.
 2. Extract the existing decisions and application orchestration into shared server modules.
@@ -71,28 +93,29 @@ The [workflow reference](server-workflow.md) defines the implemented boundaries.
 The [verification guide](verify-server-workflow.md) gives the checks and recovery steps.
 The active Supabase browser adapter retains its legacy workflow RPC during replacement verification.
 The new Edge executor is opt-in. Development backend activation requires separate authorization.
-Do not independently translate the remaining rules into D1 SQL.
+Keep workflow decisions in the shared service. Do not duplicate those rules in D1 SQL.
 
 Completion requires actual Supabase execution through the shared service and evidence that existing behavior remains intact.
 An unused interface or design document is insufficient.
-Further D1 workflow persistence follows that verification.
+That verified shared service now supplies T0020's complete D1 decisions.
 
 ## Select and verify identity
 
-T0018 implements this phase on `feature/t0018-cloudflare-authentication` from merged PR #39.
+T0018 implemented this phase on `feature/t0018-cloudflare-authentication` from merged PR #39.
 PR #40 merged T0018 at `68e8642` on 2026-10-17 at 17:16:41 UTC.
 See the [reference](cloudflare-authentication.md), [choice and costs](cloudflare-authentication-choice.md), and [verification guide](verify-cloudflare-authentication.md).
 Current evidence remains in the [T0018 record](current-state.md#t0018-cloudflare-authentication-2026-10-18).
-The complete connector and migration remain later phases.
-T0018 passed all 28 protected hosted D1 account cases. Protected HTTP verification needs a paid Worker CPU allowance.
-The owner deferred subscription activation on 2026-10-18. Keep that result incomplete until the paid check passes.
-
-T0019 changes neither the authentication implementation nor the subscription decision.
-This phase follows the D1 proof.
+The initial protected run passed 28 hosted D1 account cases, then reached the Workers Free HTTP resource limit.
+The owner initially deferred subscription activation on 2026-10-18, then activated Workers Paid during PR #41 review.
+The isolated authentication Worker accepted the 1,000 ms CPU cap and passed later hosted HTTP and protected authentication checks.
+Keep those results separate from the complete T0020 connector, whose protected job remains pending.
+T0020 retains the maintained Better Auth implementation and its password parameters.
+Data migration remains later work.
 The owner selected organizer-issued replacement temporary passwords on 2026-10-17.
 Users must change these passwords before contest access.
 Preserve account IDs, memberships, permissions, and history.
 Existing passwords do not need to survive. Password-hash import is no longer required.
+The bounded identity phase required these checks:
 
 1. Evaluate a maintained identity implementation that can run in the selected Worker environment.
 2. Use fictional accounts to verify temporary passwords, mandatory changes, and preserved account IDs.
@@ -107,14 +130,19 @@ Completion requires a selected identity implementation and tests for both curren
 Cookie scope, lifetime, preview origins, and cross-site request protection need recorded settings and browser tests.
 An identity update that fails midway must leave a recoverable, restricted account.
 
-## Implement the remaining Cloudflare operations
+## Verify the implemented connector
 
-1. Add persistence for the remaining workflow commands through the shared service, after T0019 verification.
-2. Implement the remaining administration operations through explicit server boundaries.
-3. Implement the Cloudflare browser adapter behind `Backend`.
-4. Implement private R2 upload, completion, reads, abandonment, and deletion recovery.
-5. Implement Durable Object connections and delivery from the D1 outbox.
-6. Add the Cloudflare fixture driver to the shared provider tests.
+The [application Worker](../src/server/adapters/cloudflare/applicationWorker.ts) constructs the complete server implementation.
+The [browser adapter](../src/backend/cloudflare/backend.ts) implements every `Backend` group.
+The [Cloudflare fixture driver](../tests/providers/cloudflare/fixture.ts) supplies fictional setup, exact target checks, and scoped D1 and R2 cleanup.
+The remaining hosted sequence is:
+
+1. Complete R2 activation and prepare the new isolated bucket without changing existing resources.
+2. Deploy the reviewed complete Worker and its private secret to the selected CI target.
+3. Run every shared provider scenario through real hosted endpoints and browser cookies.
+4. Run the complete hosted product journey, including fictional accounts, images, and live updates.
+5. Verify the documented empty installation and owner recovery procedure.
+6. Run protected connector CI on the reviewed revision and record its independent result.
 
 Keep provider imports in the corresponding adapter modules.
 Pass dependencies and authenticated context explicitly.
@@ -135,18 +163,27 @@ Required cases include these behaviors:
 - Reconnect refreshes the snapshot after missed notifications. Duplicate deliveries do not repeat writes.
 - One provider instance cannot change another instance's account, subscription, or configuration.
 
-## Rehearse installation and migration
+## Verify an empty installation
 
-Full migration tooling starts only after connector verification.
-Real-data exports and the backend switch remain later phases with separate target checks and owner approval.
+Follow [Install an isolated Cloudflare instance](install-cloudflare.md) against new resources with fictional data.
+Use the provider-owned [operator command](../src/server/adapters/cloudflare/tooling/install.mjs).
+Confirm the account and exact database before migrations, secret creation, bootstrap, or owner recovery.
+Bootstrap must reject nonempty and partially initialized foreign databases rather than deleting records.
+Verify the mandatory-password gate, closed intake, full application journey, and lost-credential recovery.
+Keep generated credentials in exclusive private files outside the checkout.
 
-1. Install the selected Cloudflare revision into an empty isolated environment.
-2. Export a protected migration snapshot after the owner approves access to existing data.
-3. Import account IDs and application records without replacing their identifiers.
-4. Copy image objects and verify their hashes and metadata.
-5. Compare source and destination relationships, receipt results, timestamps, and authorized snapshots.
-6. Exercise the approved credential migration and recovery procedure.
-7. Rehearse the write pause, final synchronization, and rollback procedure.
+The [PR #21 record](pr21-installation-disposition.md) identifies reused, replaced, and deferred components.
+Do not merge its old branch wholesale.
+The final recommendation to close that PR remains conditional on the complete goal passing.
+The owner decides whether to close it.
+Docker packaging remains outside this ticket.
+
+## Defer data migration and cutover
+
+Full data-migration tooling starts only after connector verification.
+Real-data exports and the backend switch require separate target checks and owner approval.
+The later rehearsal must preserve identifiers, relationships, timestamp precision, receipt results, image hashes, permissions, and historical actor names.
+It must also verify replacement temporary passwords, recovery, the write pause, final synchronization, and rollback.
 
 The migration manifest records the source revision, schema versions, export time, counts, and comparison results.
 Counts alone are insufficient. The comparison checks values and relationships too.
@@ -155,6 +192,18 @@ Encrypted exports stay outside repository files and test artifacts.
 Completion requires no unexplained differences and a successful restoration rehearsal.
 After new Cloudflare writes, rollback must preserve those writes or keep the application paused.
 The owner approves the cutover window and rollback procedure before any live switch.
+
+## Finish the active ticket
+
+Keep local emulation, hosted CLI, and protected GitHub Actions evidence separate.
+The protected `cloudflare_connector` input selects only the connector CI resources.
+Its environment retains the existing protection rules and allowlist entries, with the T0020 branch added.
+The job definition alone is not a passing protected run.
+
+Before presenting the PR as ready, pass the required type, lint, build, database, function, browser, documentation, and hosted checks.
+Verify the final reviewed revision and fixture cleanup.
+Update the current instructions and verification records, then prepare the PR for the owner.
+The owner reviews and merges.
 
 ## Authorize cutover after evidence is complete
 

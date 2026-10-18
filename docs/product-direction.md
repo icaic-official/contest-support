@@ -64,6 +64,8 @@ T0014 places the browser integration behind [backend contracts](backend-contract
 T0019 extracts the existing issue decisions into a [shared server service](server-workflow.md).
 An opt-in Supabase function executes that service for replacement verification.
 The active application retains the legacy PostgreSQL workflow during this transition.
+T0020 implements the complete Cloudflare connector and provider-owned installation tooling.
+Its local checks and hosted D1 tests pass. Complete hosted application and empty-installation checks remain pending.
 
 Supabase manages the services.
 Minsky still requires repository-owned migrations and functions that implement its schema, authorization policies, and business rules.
@@ -132,7 +134,7 @@ Supabase remains active during Cloudflare implementation and verification.
 
 The selected target has these responsibilities.
 
-| Component | Planned responsibility |
+| Component | Selected responsibility |
 | --- | --- |
 | Workers | Serve the frontend and authenticated backend operations. Check current access before reads and commands. |
 | D1 | Store accounts' application records, memberships, issues, activity, resolutions, awards, and image metadata. |
@@ -141,7 +143,9 @@ The selected target has these responsibilities.
 
 D1 remains the source of saved workflow state.
 Live messages do not grant access and do not carry private issue data.
-A later implementation must define how committed changes reach subscribers and how clients recover missed notifications.
+T0020 implements a D1 notification outbox and authenticated Durable Object connections.
+Clients refresh their authorized snapshots after connection or reconnection.
+Hosted live-delivery verification remains pending.
 The SQLite adapter must preserve the existing decisions through the same shared service and guarded commits.
 
 The shared Minsky interfaces, Supabase adapter, provider tests, and Cloudflare design merged before T0017.
@@ -151,10 +155,9 @@ T0018 authentication merged in PR #40 at `68e8642` on 2026-10-17 at 17:16:41 UTC
 Its initial hosted HTTP verification reached a Workers Free resource limit.
 The owner activated Workers Paid during PR #41 review. The hosted HTTP suite now passes.
 See [current state](current-state.md) for separate local hosted and protected GitHub results.
-T0019 verifies the extracted server workflow through Supabase before further D1 workflow persistence.
-Its branch started independently at `0c797ad` and preserves the merged authentication behavior.
-The remaining connector operations follow that shared-rule verification.
-Full migration tooling follows connector verification. Real-data exports and the backend switch remain later phases.
+T0019 merged in PR #41 at `7d19b00` after shared-rule verification through Supabase.
+T0020 implements the remaining connector operations and verifies an independent Cloudflare installation.
+Real-data migration tooling follows connector verification. Real-data exports and the backend switch remain later phases.
 See [the proof guide](d1-transaction-proof.md) and [implementation plan](cloudflare-implementation-plan.md).
 
 The migration preserves account IDs, relationships, historical actors, timestamps, resolution cycles, awards, external application status, image visibility, and file contents.
@@ -172,5 +175,6 @@ T0015 contains the test work on its own branch.
 T0016 records the [proposed architecture](cloudflare-backend-design.md) and [implementation plan](cloudflare-implementation-plan.md).
 Neither design work nor provider tests migrate existing data.
 Possible AWS testing motivates separate domain rules, transactional persistence, identity, image storage, and live-delivery interfaces.
-Cloudflare implementation still requires a verified D1 transaction pattern and a selected identity implementation.
+T0017 verified the bounded D1 transaction pattern. T0018 selected and verified maintained Better Auth identity operations.
+T0020 must still verify the complete hosted application and independent installation before the connector is accepted.
 The owner selected replacement temporary passwords rather than password-hash import for the later migration.

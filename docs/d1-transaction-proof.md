@@ -1,11 +1,14 @@
 # Run the D1 transaction proof
 
 Use this guide to test the experimental application store in T0017.
-The store implements `claim` and `message` only. Supabase remains the active backend.
+The historical hosted proof implements `claim` and `message` only. Supabase remains the active backend.
 The [store reference](backend-contracts.md#bounded-d1-application-store) defines the interface and transaction rules.
 The [current-state record](current-state.md#t0017-d1-transaction-proof-2026-10-17) records observed results.
 T0019 aligns this bounded adapter with the [shared workflow service](server-workflow.md).
-The adapter still implements only `claim` and `message`.
+T0020 adds all nine commands to the default D1 store. The historical hosted runner explicitly selects its smaller compatibility mode.
+The local suite now checks all 70 current workflow cases with production identity guards.
+The separate complete hosted command is `npm run test:connector:workflow:hosted`.
+See [the shared provider guide](run-provider-tests.md) for its exact connector target and result categories.
 Record new adapter checks separately from T0017's historical hosted result.
 
 ## Run without cloud access

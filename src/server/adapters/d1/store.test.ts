@@ -6,9 +6,20 @@ import type { Caller, IssueCommand } from "../../applicationStore";
 import type { D1Connection, D1Statement } from "./connection";
 import { D1ApplicationStore } from "./store";
 import { D1Fixture } from "./testFixture";
+import type { Command } from "../../../connected/model";
 
 const timeout = 120_000;
-const remote = process.env.MINSKY_D1_REMOTE === "1";
+const connectorConfig = process.env.MINSKY_CONNECTOR_D1_CONFIG;
+const historicalProof = process.env.MINSKY_D1_REMOTE === "1";
+if (connectorConfig && historicalProof) throw new Error('Select either the full connector or the historical D1 proof.');
+const remote = historicalProof || Boolean(connectorConfig);
+const configPath = connectorConfig ?? 'wrangler.d1-proof.jsonc';
+
+// The historical hosted proof retains its smaller schema. Local verification
+// exercises the production identity guards and complete workflow persistence.
+function applicationStore(db: D1Connection) {
+  return new D1ApplicationStore(db, historicalProof ? { mode: 'transaction-proof' } : {});
+}
 
 /** Insert a real competing commit after the store reads and before its batch. */
 function beforeBatch(db: D1Connection, action: () => Promise<void>, repeat = false): D1Connection {
@@ -34,7 +45,7 @@ describe("D1 application-store transaction proof", () => {
 
   beforeAll(async () => {
     const platform = await getPlatformProxy<{ DB: D1Connection }>({
-      configPath: "wrangler.d1-proof.jsonc", persist: false, remoteBindings: remote, envFiles: [],
+      configPath, persist: false, remoteBindings: remote, envFiles: [],
     });
     db = platform.env.DB;
     dispose = platform.dispose;
@@ -51,10 +62,10 @@ describe("D1 application-store transaction proof", () => {
 
   beforeEach(async () => {
     creationComplete = false;
-    fixture = new D1Fixture(db);
+    fixture = new D1Fixture(db, configPath, !historicalProof);
     await fixture.create();
     creationComplete = true;
-    store = new D1ApplicationStore(db);
+    store = applicationStore(db);
   }, timeout);
 
   afterEach(async () => { if (creationComplete) await fixture.cleanup(); }, timeout);
@@ -135,7 +146,7 @@ describe("D1 application-store transaction proof", () => {
 
   it("preserves an unknown outcome after committed response loss and safely retries", async () => {
     let lost = false;
-    store = new D1ApplicationStore({
+    store = applicationStore({
       prepare: (sql) => db.prepare(sql),
       batch: async (statements) => {
         const result = await db.batch(statements);
@@ -194,7 +205,7 @@ describe("D1 application-store transaction proof", () => {
 
   it.each(accessChanges)("rolls back a command raced with %s changes inside the batch boundary", async (change) => {
     const before = await fixture.durableState();
-    store = new D1ApplicationStore(beforeBatch(db, () => changeAccess(change)));
+    store = applicationStore(beforeBatch(db, () => changeAccess(change)));
     const result = await execute(change === "team" ? message("public") : claim(),
       change === "team" ? fixture.contestant : fixture.staff);
     expect(result.outcome).toBe("rejected");
@@ -207,7 +218,7 @@ describe("D1 application-store transaction proof", () => {
     const raced = beforeBatch(db, async () => {
       await fixture.statement("UPDATE sessions SET intake_open = 1 WHERE id = ?", fixture.sessionId).run();
     });
-    store = new D1ApplicationStore({
+    store = applicationStore({
       prepare: (sql) => raced.prepare(sql),
       batch: async (statements) => { batches++; return raced.batch(statements); },
     });
@@ -246,7 +257,7 @@ describe("D1 application-store transaction proof", () => {
         return statement.first<T>();
       },
     });
-    store = new D1ApplicationStore({
+    store = applicationStore({
       prepare: (sql) => wrap(db.prepare(sql)),
       batch: (statements) => db.batch(statements),
     });
@@ -289,8 +300,8 @@ describe("D1 application-store transaction proof", () => {
   }, timeout);
 
   it("rereads after a private change and commits the public command without exposing a private conflict", async () => {
-    store = new D1ApplicationStore(beforeBatch(db, async () => {
-      const privateStore = new D1ApplicationStore(db);
+    store = applicationStore(beforeBatch(db, async () => {
+      const privateStore = applicationStore(db);
       expect(await privateStore.execute(fixture.staff, fixture.sessionId, randomUUID(), message("internal")))
         .toEqual({ outcome: "committed", issueId: fixture.issueId });
     }));
@@ -309,9 +320,9 @@ describe("D1 application-store transaction proof", () => {
   it("bounds retries without changing the public view during repeated private conflicts", async () => {
     const before = await store.issue(fixture.contestant, fixture.sessionId, fixture.issueId);
     let attempts = 0;
-    store = new D1ApplicationStore(beforeBatch(db, async () => {
+    store = applicationStore(beforeBatch(db, async () => {
       attempts++;
-      expect(await new D1ApplicationStore(db).execute(fixture.staff, fixture.sessionId, randomUUID(), message("internal")))
+      expect(await applicationStore(db).execute(fixture.staff, fixture.sessionId, randomUUID(), message("internal")))
         .toEqual({ outcome: "committed", issueId: fixture.issueId });
     }, true));
     expect(await execute(message("public"), fixture.contestant)).toEqual({ outcome: "unknown" });
@@ -325,7 +336,7 @@ describe("D1 application-store transaction proof", () => {
 
   it("rolls back all writes when a late assertion fails after history and notification writes", async () => {
     const before = await fixture.durableState();
-    store = new D1ApplicationStore({
+    store = applicationStore({
       prepare: (sql) => db.prepare(sql),
       batch: (statements) => db.batch([
         ...statements,
@@ -339,7 +350,7 @@ describe("D1 application-store transaction proof", () => {
 
   it("rejects a NULL assertion instead of treating it as a successful SQLite CHECK", async () => {
     const before = await fixture.durableState();
-    store = new D1ApplicationStore({
+    store = applicationStore({
       prepare: (sql) => db.prepare(sql),
       batch: (statements) => db.batch([
         ...statements,
@@ -393,8 +404,8 @@ describe("D1 application-store transaction proof", () => {
   }, timeout);
 
   it("rejects a claim after another command changes the issue state before its batch", async () => {
-    store = new D1ApplicationStore(beforeBatch(db, async () => {
-      expect(await new D1ApplicationStore(db).execute(fixture.specialist, fixture.sessionId, randomUUID(), claim()))
+    store = applicationStore(beforeBatch(db, async () => {
+      expect(await applicationStore(db).execute(fixture.specialist, fixture.sessionId, randomUUID(), claim()))
         .toEqual({ outcome: "committed", issueId: fixture.issueId });
     }));
     expect(await execute(claim())).toEqual({ outcome: "rejected", reason: "state" });
@@ -409,10 +420,10 @@ describe("D1 application-store transaction proof", () => {
   it("cleans only its own fixture while preserving another run's workflow and access records", async () => {
     expect(await execute(claim())).toEqual({ outcome: "committed", issueId: fixture.issueId });
     const ownState = await fixture.durableState();
-    const other = new D1Fixture(db);
+    const other = new D1Fixture(db, configPath, !historicalProof);
     await other.create();
     try {
-      expect(await new D1ApplicationStore(db).execute(other.staff, other.sessionId, randomUUID(), {
+      expect(await applicationStore(db).execute(other.staff, other.sessionId, randomUUID(), {
         type: "claim", issue_id: other.issueId, revision: 1,
       })).toEqual({ outcome: "committed", issueId: other.issueId });
     } finally {
@@ -422,4 +433,259 @@ describe("D1 application-store transaction proof", () => {
     expect(await store.issue(fixture.staff, fixture.sessionId, fixture.issueId))
       .toMatchObject({ status: "claimed", owner: fixture.staff.accountId });
   }, timeout);
+
+  describe.skipIf(historicalProof)('complete D1 workflow with current identity', () => {
+    async function command(input: Command, caller = fixture.staff, requestId = randomUUID()) {
+      return store.execute(caller, fixture.sessionId, requestId, input);
+    }
+
+    async function next(type: 'claim' | 'escalate' | 'accept' | 'apply', issueId: string, caller = fixture.staff) {
+      const view = await store.issue(caller, fixture.sessionId, issueId);
+      expect(view).toBeDefined();
+      return command({ type, issue_id: issueId, revision: view!.revision }, caller);
+    }
+
+    async function submit(caller = fixture.contestant, requestId = randomUUID()) {
+      await fixture.statement('UPDATE sessions SET intake_open = 1 WHERE id = ?', fixture.sessionId).run();
+      return command({ type: 'submit', category: 'Devices', description: ' Fictional keyboard failure ', team_id: fixture.teamId }, caller, requestId);
+    }
+
+    async function resolvedIssue() {
+      expect(await command(claim())).toEqual({ outcome: 'committed', issueId: fixture.issueId });
+      expect(await command({ type: 'resolve', issue_id: fixture.issueId, revision: 2, summary: 'Fixed fixture' }))
+        .toEqual({ outcome: 'committed', issueId: fixture.issueId });
+    }
+
+    async function giveJury() {
+      await fixture.statement("INSERT INTO membership_roles (session_id, account_id, role) VALUES (?, ?, 'jury')",
+        fixture.sessionId, fixture.staff.accountId).run();
+    }
+
+    it('persists all nine commands, ownership, timing, repeated resolutions, and an applied award', async () => {
+      const submitted = await submit();
+      expect(submitted.outcome).toBe('committed');
+      if (submitted.outcome !== 'committed') throw new Error('Submission failed.');
+      const issueId = submitted.issueId;
+      const initial = (await fixture.rows('SELECT * FROM issues WHERE id = ?', issueId))[0];
+      expect(initial).toMatchObject({ reporter: fixture.contestant.accountId, category: 'Devices',
+        description: 'Fictional keyboard failure', status: 'open', public_revision: 1, number: 3 });
+      expect(initial.created_at).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+      expect(await next('claim', issueId)).toMatchObject({ outcome: 'committed' });
+      const assigned = (await fixture.rows('SELECT * FROM issues WHERE id = ?', issueId))[0];
+      expect(assigned.owner).toBe(fixture.staff.accountId);
+      const claimHistory = (await fixture.rows("SELECT * FROM history WHERE issue_id = ? AND text = 'Issue claimed.'", issueId))[0];
+      expect(assigned.first_assigned_at).toBe(claimHistory.at);
+      expect(await command({ type: 'message', issue_id: issueId, revision: 2, text: 'Private fixture', visibility: 'internal' }))
+        .toMatchObject({ outcome: 'committed' });
+      expect(await command({ type: 'message', issue_id: issueId, revision: 2, text: 'Public fixture', visibility: 'public' }, fixture.contestant))
+        .toMatchObject({ outcome: 'committed' });
+      expect(await next('escalate', issueId)).toMatchObject({ outcome: 'committed' });
+      expect((await store.issue(fixture.staff, fixture.sessionId, issueId))?.owner).toBe(fixture.staff.accountId);
+      expect(await next('accept', issueId, fixture.specialist)).toMatchObject({ outcome: 'committed' });
+      expect(await command({ type: 'resolve', issue_id: issueId, revision: 5, summary: ' First resolution ' }, fixture.specialist))
+        .toMatchObject({ outcome: 'committed' });
+      const firstResolution = (await fixture.rows('SELECT * FROM resolutions WHERE issue_id = ?', issueId))[0];
+      const firstResolved = (await fixture.rows('SELECT * FROM issues WHERE id = ?', issueId))[0];
+      expect(firstResolved).toMatchObject({ resolved_at: firstResolution.at, owner: fixture.specialist.accountId,
+        first_assigned_at: assigned.first_assigned_at });
+      await giveJury();
+      expect(await command({ type: 'award', issue_id: issueId, revision: 6, minutes: 7, explanation: ' Fixture delay ' }))
+        .toMatchObject({ outcome: 'committed' });
+      expect(await next('apply', issueId)).toMatchObject({ outcome: 'committed' });
+      const award = (await fixture.rows('SELECT * FROM awards WHERE issue_id = ?', issueId))[0];
+      expect(award).toMatchObject({ resolution_id: firstResolution.id, minutes: 7, explanation: 'Fixture delay', applied_by: fixture.staff.accountId });
+      expect(award.applied_at).toMatch(/^\d{4}-/);
+      expect(await command({ type: 'reopen', issue_id: issueId, revision: 8, reason: ' Fixture recurred ' }, fixture.contestant))
+        .toMatchObject({ outcome: 'committed' });
+      const reopened = (await fixture.rows('SELECT * FROM issues WHERE id = ?', issueId))[0];
+      expect(reopened).toMatchObject({ status: 'claimed', resolved_at: null, owner: fixture.specialist.accountId,
+        first_assigned_at: assigned.first_assigned_at, created_at: initial.created_at });
+      const reopenedResolution = (await fixture.rows('SELECT * FROM resolutions WHERE id = ?', String(firstResolution.id)))[0];
+      expect(reopenedResolution).toMatchObject({ reopened_by: fixture.contestant.accountId, reason: 'Fixture recurred', summary: 'First resolution' });
+      expect(await command({ type: 'resolve', issue_id: issueId, revision: 9, summary: 'Second resolution' }, fixture.specialist))
+        .toMatchObject({ outcome: 'committed' });
+      expect(await fixture.rows('SELECT * FROM resolutions WHERE issue_id = ?', issueId)).toHaveLength(2);
+      expect(await fixture.rows('SELECT * FROM awards WHERE issue_id = ?', issueId)).toEqual([award]);
+      expect(await command({ type: 'award', issue_id: issueId, revision: 10, minutes: 8, explanation: 'Duplicate fixture' }))
+        .toEqual({ outcome: 'rejected', reason: 'state' });
+      expect(await next('apply', issueId)).toEqual({ outcome: 'rejected', reason: 'state' });
+      const publicView = await store.issue(fixture.contestant, fixture.sessionId, issueId);
+      expect(publicView?.history.some((row) => row.text === 'Private fixture')).toBe(false);
+      expect(publicView?.history).toHaveLength(10);
+      const durable = await fixture.durableState();
+      expect(durable.receipts).toHaveLength(11);
+      expect(durable.notifications).toHaveLength(21);
+      expect(await fixture.rows('SELECT * FROM workflow_commit_times')).toEqual([]);
+      await expectNoAssertions();
+    }, timeout);
+
+    it('assigns unique persisted numbers to concurrent submissions and replays a lost submission response', async () => {
+      await fixture.statement('UPDATE sessions SET intake_open = 1 WHERE id = ?', fixture.sessionId).run();
+      const input: Command = { type: 'submit', category: 'Other', description: 'Fictional new issue' };
+      const results = await Promise.all([command(input, fixture.contestant), command(input, fixture.otherContestant)]);
+      expect(results.every((result) => result.outcome === 'committed')).toBe(true);
+      expect((await fixture.rows("SELECT number FROM issues WHERE description = 'Fictional new issue' AND session_id = ? ORDER BY number", fixture.sessionId)))
+        .toEqual([{ number: 3 }, { number: 4 }]);
+      const requestId = randomUUID();
+      let lost = false;
+      store = new D1ApplicationStore({ prepare: (sql) => db.prepare(sql), batch: async (statements) => {
+        const result = await db.batch(statements);
+        if (!lost) { lost = true; throw new Error('Response lost after submission commit.'); }
+        return result;
+      } });
+      expect(await command(input, fixture.contestant, requestId)).toEqual({ outcome: 'unknown' });
+      const committed = await fixture.durableState();
+      expect(await command(input, fixture.contestant, requestId)).toMatchObject({ outcome: 'committed' });
+      expect(await fixture.durableState()).toEqual(committed);
+      expect(committed.issue_sequences).toEqual([{ session_id: fixture.sessionId, number: 5 }]);
+    }, timeout);
+
+    it('replays the same submit request concurrently without leaving an extra issue or number', async () => {
+      await fixture.statement('UPDATE sessions SET intake_open = 1 WHERE id = ?', fixture.sessionId).run();
+      const requestId = randomUUID();
+      const input: Command = { type: 'submit', category: 'Other', description: 'Same fictional issue' };
+      const results = await Promise.all([command(input, fixture.contestant, requestId), command(input, fixture.contestant, requestId)]);
+      expect(results[0]).toEqual(results[1]);
+      expect(results[0].outcome).toBe('committed');
+      const durable = await fixture.durableState();
+      expect(durable.issues).toHaveLength(4);
+      expect(durable.history).toHaveLength(1);
+      expect(durable.issue_sequences).toEqual([{ session_id: fixture.sessionId, number: 3 }]);
+    }, timeout);
+
+    it('rolls back a batch when its identity expires after the first access check', async () => {
+      const before = await fixture.durableState();
+      store = new D1ApplicationStore({
+        prepare: (sql) => db.prepare(sql),
+        batch: (statements) => db.batch([
+          ...statements.slice(0, -3),
+          fixture.statement("UPDATE ba_session SET expiresAt = '2000-01-01T00:00:00.000Z' WHERE id = ?", fixture.staff.loginId),
+          ...statements.slice(-3),
+        ]),
+      });
+      expect(await command(claim())).toEqual({ outcome: 'unknown' });
+      expect(await fixture.durableState()).toEqual(before);
+      expect(await fixture.rows('SELECT * FROM workflow_commit_times')).toEqual([]);
+      await expectNoAssertions();
+    }, timeout);
+
+    const credentialChanges = ['generation', 'login_generation', 'pending', 'identity_expiry', 'identity_removed', 'identity_account', 'identity_missing'] as const;
+    async function changeCredential(change: typeof credentialChanges[number]) {
+      const statements: Record<typeof credentialChanges[number], D1Statement> = {
+        generation: fixture.statement('UPDATE accounts SET credential_generation = credential_generation + 1 WHERE id = ?', fixture.staff.accountId),
+        login_generation: fixture.statement('UPDATE logins SET credential_generation = credential_generation + 1 WHERE id = ?', fixture.staff.loginId),
+        pending: fixture.statement("UPDATE accounts SET credential_state = 'pending' WHERE id = ?", fixture.staff.accountId),
+        identity_expiry: fixture.statement("UPDATE ba_session SET expiresAt = '2000-01-01T00:00:00.000Z' WHERE id = ?", fixture.staff.loginId),
+        identity_removed: fixture.statement('DELETE FROM ba_session WHERE id = ?', fixture.staff.loginId),
+        identity_account: fixture.statement('UPDATE ba_session SET userId = ? WHERE id = ?', fixture.specialist.accountId, fixture.staff.loginId),
+        identity_missing: fixture.statement('UPDATE logins SET identity_session_id = NULL WHERE id = ?', fixture.staff.loginId),
+      };
+      await statements[change].run();
+    }
+
+    it.each(credentialChanges)('checks %s at the atomic write boundary', async (change) => {
+      const before = await fixture.durableState();
+      store = new D1ApplicationStore(beforeBatch(db, () => changeCredential(change)));
+      expect(await command(claim())).toEqual({ outcome: 'rejected', reason: 'access' });
+      expect(await fixture.durableState()).toEqual(before);
+      expect(await store.issue(fixture.staff, fixture.sessionId, fixture.issueId)).toBeUndefined();
+      await expectNoAssertions();
+    }, timeout);
+
+    it.each(credentialChanges)('checks %s at the atomic receipt replay boundary', async (change) => {
+      const requestId = randomUUID();
+      expect(await command(claim(), fixture.staff, requestId)).toMatchObject({ outcome: 'committed' });
+      const before = await fixture.durableState();
+      store = new D1ApplicationStore(beforeBatch(db, () => changeCredential(change)));
+      expect(await command(claim(), fixture.staff, requestId)).toEqual({ outcome: 'rejected', reason: 'access' });
+      expect(await fixture.durableState()).toEqual(before);
+      await expectNoAssertions();
+    }, timeout);
+
+    it.each(['categories', 'intake', 'team'] as const)('rejects submission when %s changes before its commit', async (change) => {
+      await fixture.statement('UPDATE sessions SET intake_open = 1 WHERE id = ?', fixture.sessionId).run();
+      const before = await fixture.durableState();
+      store = new D1ApplicationStore(beforeBatch(db, async () => {
+        if (change === 'categories') await fixture.statement("UPDATE sessions SET categories = '[]' WHERE id = ?", fixture.sessionId).run();
+        if (change === 'intake') await fixture.statement('UPDATE sessions SET intake_open = 0 WHERE id = ?', fixture.sessionId).run();
+        if (change === 'team') await fixture.statement('DELETE FROM teams WHERE id = ?', fixture.otherTeamId).run();
+      }));
+      const input: Command = { type: 'submit', category: 'Devices', description: 'Fictional report', team_id: fixture.otherTeamId };
+      // Staff can submit with intake closed, so that case uses a team contestant.
+      if (change === 'team') {
+        await fixture.statement('DELETE FROM memberships WHERE session_id = ? AND account_id = ?', fixture.sessionId, fixture.otherContestant.accountId).run();
+      }
+      const result = await command(input, change === 'intake' ? fixture.contestant : fixture.staff);
+      expect(result.outcome).toBe('rejected');
+      expect(await fixture.durableState()).toEqual(before);
+    }, timeout);
+
+    it.each(['resolve', 'reopen', 'award', 'apply'] as const)('rolls back every %s effect on a late batch failure', async (type) => {
+      await resolvedIssue();
+      await giveJury();
+      let input: Command;
+      if (type === 'resolve') {
+        expect(await command({ type: 'reopen', issue_id: fixture.issueId, revision: 3, reason: 'Fixture recurrence' }, fixture.contestant))
+          .toMatchObject({ outcome: 'committed' });
+        input = { type, issue_id: fixture.issueId, revision: 4, summary: 'Second fixture resolution' };
+      } else if (type === 'reopen') input = { type, issue_id: fixture.issueId, revision: 3, reason: 'Fixture recurrence' };
+      else if (type === 'award') input = { type, issue_id: fixture.issueId, revision: 3, minutes: 1, explanation: 'Fixture award' };
+      else {
+        expect(await command({ type: 'award', issue_id: fixture.issueId, revision: 3, minutes: 1, explanation: 'Fixture award' }))
+          .toMatchObject({ outcome: 'committed' });
+        input = { type, issue_id: fixture.issueId, revision: 4 };
+      }
+      const before = await fixture.durableState();
+      store = new D1ApplicationStore({ prepare: (sql) => db.prepare(sql), batch: (statements) => db.batch([
+        ...statements, fixture.statement('INSERT INTO command_assertions (id, valid) VALUES (?, 0)', randomUUID()),
+      ]) });
+      expect(await command(input)).toEqual({ outcome: 'unknown' });
+      expect(await fixture.durableState()).toEqual(before);
+      expect(await fixture.rows('SELECT * FROM workflow_commit_times')).toEqual([]);
+      await expectNoAssertions();
+    }, timeout);
+
+    it('records credential-operation audit and account invalidations without team notifications', async () => {
+      const operationId = randomUUID();
+      await fixture.statement(`INSERT INTO account_operations
+        (id, account_id, actor, session_id, action, state) VALUES (?, ?, ?, ?, 'reset_password', 'pending')`,
+      operationId, fixture.contestant.accountId, fixture.staff.accountId, fixture.sessionId).run();
+      expect(await fixture.rows('SELECT actor, action, target, detail FROM admin_audit WHERE id = ?', operationId))
+        .toEqual([{ actor: fixture.staff.accountId, action: 'reset_password', target: fixture.contestant.accountId, detail: '{"state":"pending"}' }]);
+      await fixture.statement("UPDATE account_operations SET state = 'completed' WHERE id = ?", operationId).run();
+      expect(await fixture.rows('SELECT detail FROM admin_audit WHERE id = ?', operationId)).toEqual([{ detail: '{"state":"completed"}' }]);
+      await fixture.statement('UPDATE accounts SET credential_generation = credential_generation + 1 WHERE id = ?', fixture.contestant.accountId).run();
+      const signals = await fixture.rows('SELECT audience FROM notifications WHERE session_id = ? ORDER BY audience', fixture.sessionId);
+      expect(signals).toEqual([{ audience: `account:${fixture.contestant.accountId}` },
+        { audience: `account:${fixture.contestant.accountId}` }, { audience: 'staff' }]);
+      expect(await fixture.rows("SELECT * FROM notifications WHERE audience LIKE 'team:%' AND session_id = ?", fixture.sessionId)).toEqual([]);
+      await fixture.statement('DELETE FROM account_operations WHERE id = ?', operationId).run();
+    }, timeout);
+
+    it('rejects incomplete reopening and application records at the database boundary', async () => {
+      await resolvedIssue();
+      await giveJury();
+      expect(await command({ type: 'award', issue_id: fixture.issueId, revision: 3, minutes: 1, explanation: 'Fixture award' }))
+        .toMatchObject({ outcome: 'committed' });
+      const before = await fixture.durableState();
+      await expect(fixture.statement(`UPDATE resolutions SET reopened_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'),
+        reopened_by = ?, reopened_name = 'Fictional person', reason = NULL WHERE issue_id = ?`,
+      fixture.staff.accountId, fixture.issueId).run()).rejects.toThrow('CHECK constraint failed');
+      await expect(fixture.statement("UPDATE awards SET applied_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE issue_id = ?",
+        fixture.issueId).run()).rejects.toThrow('CHECK constraint failed');
+      expect(await fixture.durableState()).toEqual(before);
+    }, timeout);
+
+    it('rereads a concurrent resolution change before recording an award', async () => {
+      await resolvedIssue();
+      await giveJury();
+      store = new D1ApplicationStore(beforeBatch(db, async () => {
+        await fixture.statement("UPDATE resolutions SET reopened_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), reopened_by = ?, reopened_name = 'Fictional person', reason = 'Fixture recurrence' WHERE issue_id = ?",
+          fixture.contestant.accountId, fixture.issueId).run();
+      }));
+      expect(await command({ type: 'award', issue_id: fixture.issueId, revision: 3, minutes: 2, explanation: 'Fixture award' }))
+        .toEqual({ outcome: 'rejected', reason: 'state' });
+      expect((await fixture.durableState()).awards).toEqual([]);
+    }, timeout);
+  });
 });

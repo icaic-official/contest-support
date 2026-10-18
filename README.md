@@ -11,13 +11,15 @@ Cloudflare Workers hosts the frontend.
 The browser uses shared [backend contracts](docs/backend-contracts.md), with Supabase as the current implementation.
 The [shared server workflow](docs/server-workflow.md) now supplies all nine issue decisions for a separate Supabase verification path.
 The active browser path retains its guarded SQL workflow during the transition.
-The selected future backend uses Workers, D1, R2, and Durable Objects.
+T0020 adds a separate Cloudflare implementation with Workers, D1, private R2 images, and Durable Object live updates.
+All nine workflow commands use the same server service.
+Supabase remains active. Complete hosted Cloudflare and empty-installation verification remain pending.
 See [the migration direction](docs/product-direction.md#backend-migration-direction) for the agreed scope and pending decisions.
 This is a **development deployment** that requires connectivity.
 Live-contest readiness and capacity for 800 simultaneous users remain unverified.
 
 [Read the user and operator guides](https://minsky-docs.icaic-minsky.workers.dev).
-The documentation site describes merged features and labels pending T0007 installation work.
+The documentation site describes merged features and labels T0020's pending installation verification.
 Its deployment is separate from the application.
 
 ## Local development
@@ -59,7 +61,12 @@ See [cloud onboarding](docs/cloud-onboarding.md#contributor-setup) for provider 
 | `npm run check:functions` | Check the account, attachment, and workflow functions with Deno. |
 | `npm run test:functions` | Test attachment authorization and file removal with fake clients. |
 | `npm test` | Run unit, script, and embedded database tests without cloud credentials. |
-| `npm run test:d1` | Run the experimental D1 transaction proof with local emulation. |
+| `npm run test:d1` | Run every D1 workflow case with local emulation and current identity guards. |
+| `npm run test:connector:runtime` | Run the complete connector through a temporary local HTTPS Worker, D1, R2, and Durable Objects. |
+| `npm run test:connector:ui -- --config=… --account=… --database=… --origin=…` | Run the complete React journey against the confirmed hosted Cloudflare CI application. |
+| `npm run test:connector:workflow:hosted -- --config=… --account=… --database=…` | Run every workflow case on an explicitly confirmed isolated hosted D1 target. |
+| `npm run test:connector:accounts:hosted -- --config=… --account=… --database=…` | Check account guards on the separate hosted connector D1 schema, without a Worker deployment. |
+| `npm run cloudflare:install -- plan --settings=… --config=…` | Inspect an independent Cloudflare installation plan without provider changes. See the [installation guide](docs/install-cloudflare.md). |
 | `npm run test:d1:hosted -- --account=… --database=…` | Run the proof against its explicit isolated hosted D1 target. See the proof guide for exact values. |
 | `npm run test:workflow:hosted` | Verify the shared server through the deployed Supabase function on approved Minsky CI. See the [verification guide](docs/verify-server-workflow.md). |
 | `npm run test:auth` | Run experimental Cloudflare account and permission tests on local D1. |
@@ -70,6 +77,7 @@ See [cloud onboarding](docs/cloud-onboarding.md#contributor-setup) for provider 
 | `npm run test:e2e` | Run browser tests with mocked cloud responses. |
 | `npm run test:providers:list` | List the shared provider scenarios without hosted credentials. |
 | `npm run test:providers -- --provider=supabase` | Run the shared contracts against an explicitly configured isolated Supabase project. |
+| `npm run test:providers -- --provider=cloudflare --config=… --account=… --database=… --origin=…` | Run the same contracts through the isolated Cloudflare browser adapter. |
 
 Install Chromium once before browser tests:
 
@@ -80,6 +88,8 @@ npx playwright install chromium
 Deno and the provider CLIs are pinned npm dependencies.
 For `npm run test:cloud` and `npm run test:hosted`, follow [cloud verification](docs/cloud-onboarding.md#verification-and-protected-cloud-ci).
 For shared adapter checks, follow [Run the shared provider tests](docs/run-provider-tests.md).
+`VITE_BACKEND` defaults to `supabase`. An isolated Cloudflare application build sets `VITE_BACKEND=cloudflare` and uses its own origin.
+Cloudflare cookies and API requests require the same origin. A plain Vite server does not supply that API.
 If an existing cloud fixture cleanup fails, follow [fixture recovery](docs/cloud-onboarding.md#fixture-recovery).
 
 ## Documentation
@@ -131,6 +141,8 @@ The workflow requires account setup. The first automatic deployments remain unve
 - [Authentication choice](docs/cloudflare-authentication-choice.md) records Better Auth, maintained crypto, resource measurements, and costs.
 - [Verify Cloudflare authentication](docs/verify-cloudflare-authentication.md) gives local, hosted, and protected CI procedures.
 - [D1 transaction proof](docs/d1-transaction-proof.md) gives the local and isolated hosted verification commands.
+- [Cloudflare installation](docs/install-cloudflare.md) gives the experimental empty-installation procedure and owner recovery.
+- [PR #21 component record](docs/pr21-installation-disposition.md) records reused safeguards and replaced or deferred scaffolding.
 - [Shared provider test contracts](docs/provider-test-contracts.md) describe reusable assertions, fixture ownership, and provider requirements.
 - [Product direction](docs/product-direction.md) — agreed requirements and open decisions.
 - [Contributor rules](AGENTS.md) and [planning record](PLAN.md).

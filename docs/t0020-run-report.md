@@ -2,6 +2,8 @@
 
 This record describes the complete connector implementation on `feature/t0020-cloudflare-connector`.
 The branch starts at merged PR #41, `7d19b00`.
+During verification, the owner merged PR #23 at `c144a2a`.
+This branch includes that main revision and preserves its jury worklist.
 The [current-state record](current-state.md#t0020-connector-implementation-2026-10-18) lists resource targets and observed evidence.
 The complete hosted application and empty-installation checks pass.
 Protected connector CI and final PR checks remain in progress.
@@ -123,7 +125,9 @@ The implementation changes these files:
 ## 3. Commands run
 
 Repository inspection used `git status`, `log`, `diff`, `fetch`, `switch`, `rg`, `cat`, and `sed`.
-Git `add`, `commit`, and `push` published `de1ecbd`, `59121f7`, and `1ee8cbf` with the required co-author trailer exactly once each.
+Git `add`, `commit`, and `push` published the implementation and verification changes with the required co-author trailer exactly once each.
+`git merge --no-commit --no-ff origin/main` included the owner's jury worklist merge.
+Four documentation conflicts required resolution. Both tickets' implementation and historical verification records remain intact.
 GitHub commands created draft [PR #42](https://github.com/GiftedNovaHD/minsky/pull/42) and started protected verification against the existing Supabase CI backend.
 Provider and review inspection used `gh api`, `gh pr view`, Wrangler `whoami`, D1 `list`, `info`, `create`, and `migrations apply`.
 R2 `bucket list`, `create`, and `dev-url get` confirmed new private Standard buckets.
@@ -166,7 +170,9 @@ The complete local React journey also passes with the same assertions as the hos
 It checks all nine commands, images, live connections, administration, persisted state, and 320 px keyboard behavior.
 All 59 image cases pass after the additional cleanup-fairness correction.
 Both frontend builds, types, lint, Deno checks, and all 12 function tests pass.
-All 34 ordinary application browser cases, three authentication browser cases, and three documentation browser cases pass.
+After current-main integration, all 45 ordinary application browser cases pass.
+Three authentication browser cases and three documentation browser cases also pass at the earlier recorded revision.
+The complete local React journey passes again with the merged jury worklist, including decision, external-confirmation, and focus checks.
 The documentation build checks 14 pages and 562 local links and assets.
 Both locked dependency audits report zero vulnerabilities.
 

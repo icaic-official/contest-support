@@ -263,14 +263,36 @@ export async function runUiJourney(browser: Browser, fixture: UiFixture, options
     await expect(contestant.page.locator('.detail .timer-state')).toContainText('Stopped');
     const stoppedTimer = (await contestant.page.locator('.detail .elapsed-time').textContent())!;
     const firstAssignment = (await contestant.page.locator('.detail .facts > div').filter({ hasText: 'First assignment' }).locator('dd').textContent())!;
-    await chooseIssue(jury.page, description);
+    const issueReference = (await contestant.page.locator('.detail-heading > strong').textContent())!.trim();
+    expect(issueReference).toMatch(/^ISS-\d+$/);
+    await jury.page.getByRole('navigation', { name: 'Workspace navigation' })
+      .getByRole('button', { name: 'Jury worklist', exact: true }).click();
+    await expect(jury.page.getByRole('heading', { name: 'Jury worklist', exact: true })).toBeVisible();
+    const decisionRow = jury.page.locator('#jury-decision').getByRole('article', { name: `Issue ${issueReference}`, exact: true });
+    const applicationRow = jury.page.locator('#jury-application').getByRole('article', { name: `Issue ${issueReference}`, exact: true });
+    await expect(decisionRow).toBeVisible();
+    await expect(applicationRow).toHaveCount(0);
+    await decisionRow.getByRole('button', { name: `View issue ${issueReference}`, exact: true }).click();
+    await expect(jury.page.locator('#issue-heading')).toHaveText(description);
+    await expect(jury.page.locator('#issue-heading')).toBeFocused();
     await jury.page.getByRole('combobox', { name: 'Award minutes', exact: true }).selectOption('5');
     await jury.page.getByLabel('Public award explanation', { exact: true }).fill('Fictional device delay');
     await jury.page.getByRole('button', { name: 'Record award', exact: true }).click();
     await expect(contestant.page.getByRole('heading', { name: '5 minutes awarded', exact: true })).toBeVisible();
+    await jury.page.getByRole('button', { name: 'Back to jury worklist', exact: true }).click();
+    await expect(decisionRow).toHaveCount(0);
+    await expect(applicationRow).toBeVisible();
+    await applicationRow.getByRole('button', { name: `View issue ${issueReference}`, exact: true }).click();
+    await expect(jury.page.locator('#issue-heading')).toHaveText(description);
+    await expect(jury.page.locator('#issue-heading')).toBeFocused();
     await jury.page.getByRole('checkbox', { name: /I confirm this award was applied/ }).check();
     await jury.page.getByRole('button', { name: 'Confirm applied externally', exact: true }).click();
     await expect(contestant.page.getByText('Applied externally', { exact: true })).toBeVisible();
+    await expect(decisionRow).toHaveCount(0);
+    await expect(applicationRow).toHaveCount(0);
+    await expect(jury.page.locator('.jury-worklist').getByRole('status'))
+      .toHaveText(`${issueReference} is no longer in the worklist. Its current status has been refreshed.`);
+    await expect(jury.page.locator('#jury-application-heading')).toBeFocused();
     await expect(contestant.page.locator('.detail .elapsed-time')).toHaveText(stoppedTimer);
     phase = 'reopening and persisted refresh';
     await contestant.page.getByLabel('Public reopening reason', { exact: true }).fill('Fictional device failure returned');

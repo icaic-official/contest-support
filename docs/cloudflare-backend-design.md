@@ -6,7 +6,7 @@ T0017's bounded [D1 transaction proof](d1-transaction-proof.md) merged in PR #39
 T0019 extracted the shared workflow and verified its Supabase execution path before further D1 persistence.
 T0018 authentication merged in PR #40 at `68e8642`. T0019 merged in PR #41.
 T0020 implements the complete Cloudflare connector and isolated installation tooling.
-All 70 production D1 cases pass locally and against the separate hosted connector CI database, with cleanup.
+All 70 production D1 cases pass locally and against the separate hosted D1-only store database, with cleanup.
 Local HTTPS runtime, application, image, live-update, and installation checks also pass.
 Both providers pass the same eight shared scenarios with verified fixture cleanup.
 The Cloudflare CLI run verifies `1ee8cbf`.
@@ -14,6 +14,8 @@ The complete hosted React journey passes on `59121f7`, with the same application
 The documented empty-installation journey also passes on `59121f7`, including trusted owner recovery.
 Scoped fixture cleanup passes for both hosted journeys. Protected Cloudflare connector CI remains pending.
 The owner activated R2 after the initial provider error `10042`. Hosted image and live-update journeys now pass.
+Direct persistence and account tests use a database without a deployed Worker.
+Application checks use the complete CI Worker, with R2, Durable Objects, and scheduled recovery enabled.
 Data migration tools remain later work.
 The owner authorizes isolated development and CI resources for this implementation.
 Supabase remains the active backend.

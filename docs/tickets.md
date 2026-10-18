@@ -60,7 +60,7 @@ T0008 fuzzy team search merged into `main` in [PR #22](https://github.com/notbow
 ## T0020 Complete Cloudflare connector
 
 Branch: `feature/t0020-cloudflare-connector`, from updated `main` at `7d19b00`.
-Status: implemented in draft [PR #42](https://github.com/GiftedNovaHD/minsky/pull/42). Hosted provider, complete React, and empty-installation checks pass. Protected connector CI is running. The owner reviews and merges.
+Status: implemented in draft [PR #42](https://github.com/GiftedNovaHD/minsky/pull/42). Hosted provider, complete React, and empty-installation checks pass. The latest protected connector run has two shared-scenario failures. The owner reviews and merges.
 Summary: Complete every Cloudflare backend operation and verify the application with isolated resources. Verify installation into an empty Cloudflare environment.
 
 The owner authorized the complete connector after PR #41 merged.
@@ -111,7 +111,8 @@ Do not claim contest capacity without separate evidence.
 
 All 70 full-workflow cases pass locally and on the separate hosted connector D1 database.
 All 82 hosted account cases pass there, with zero skips and verified cleanup.
-All 566 local tests pass across 34 files after main integration. Checked behavior criteria above include local and hosted evidence.
+The local merged-main run passes 566 tests across 34 files.
+Corrected ordinary CI passes 579 tests across 35 files on `9b0ef6b`. Checked behavior criteria include local and hosted evidence.
 The same eight shared provider scenarios pass against Supabase and Cloudflare.
 The local complete HTTPS Worker journey and all 45 ordinary browser regressions pass.
 The complete local React journey also passes through the merged jury worklist.
@@ -119,7 +120,7 @@ The complete hosted React journey passes on `59121f7`.
 A separate clean checkout passes the documented empty installation, complete React assertions, and trusted owner recovery on that source.
 Scoped D1, R2, and coordinator cleanup passes for both hosted targets.
 The owner enabled R2 after the initial provider error `10042`.
-Protected Supabase verification passes on `de1ecbd`. Protected connector verification is running on `1ee8cbf`.
+Protected Supabase verification passes on `de1ecbd`. Protected connector verification on `9b0ef6b` passes both direct suites, then fails two shared browser scenarios.
 The [current-state record](current-state.md#t0020-connector-implementation-2026-10-18) separates observed results from pending acceptance work.
 
 ## T0019 Shared server workflow

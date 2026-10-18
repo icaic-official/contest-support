@@ -4,6 +4,10 @@ This page explains the identity choice for T0018.
 Supabase remains the active application backend.
 Cloudflare authentication uses fictional fixtures until the connector and migration pass their later checks.
 
+Better Auth is a free library under the [MIT licence](https://github.com/better-auth/better-auth/blob/main/LICENSE.md).
+Minsky runs it inside its own Worker with D1. This implementation requires no Better Auth subscription or hosted account.
+Cloudflare hosting has separate charges. The [resource and cost evidence](#resource-evidence-and-deployment-cost) explains the Workers Paid requirement.
+
 ## Use Better Auth behind the identity adapter
 
 T0018 selects Better Auth `1.7.10`, pinned in `package.json` and `package-lock.json`.
@@ -12,6 +16,11 @@ Its username plugin permits username login while its user schema retains an emai
 Minsky uses a synthetic address under `accounts.minsky.invalid` for that required field.
 Personal email addresses and SMTP are not required.
 See [the username plugin](https://better-auth.com/docs/plugins/username).
+
+This fits the required organizer-issued usernames and passwords on Workers and D1.
+Maintained password verification and session cookies reduce the authentication code Minsky must own.
+The main tradeoff is database-schema coupling for Minsky's guarded credential operations, described below.
+This choice does not establish that Better Auth is the best option for every deployment.
 
 The server adapter exposes three operations: `signIn()`, `session()`, and `signOut()`.
 The Worker does not expose Better Auth's HTTP router.

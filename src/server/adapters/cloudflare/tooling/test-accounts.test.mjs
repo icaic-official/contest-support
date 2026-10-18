@@ -71,8 +71,14 @@ test('hosted accounts use the complete suite, private logging, and only the conf
     assert.equal(options.stdio.join(','), 'ignore,pipe,pipe');
     const text = await readFile(args[3], 'utf8');
     const config = JSON.parse(text.slice('export default '.length).trim().replace(/;$/, ''));
-    assert.deepEqual(config.test.reporters, [['json', { stdout: true }]]);
-    assert.deepEqual(config.test.include, [join(repositoryRoot, 'src/server/adapters/cloudflare/authentication.test.ts')]);
+    assert.deepEqual(config.test.reporters, [['json', { stdout: true }],
+      [join(repositoryRoot, 'src/server/adapters/cloudflare/tooling/hosted-progress-reporter.mjs'), { total: 82 }]]);
+    assert.deepEqual(config.test.include, ['authentication.test.ts', 'authenticationRecovery.test.ts',
+      'authenticationInitiation.test.ts', 'authenticationCompletion.test.ts']
+      .map((file) => join(repositoryRoot, 'src/server/adapters/cloudflare', file)));
+    assert.equal(config.test.fileParallelism, true);
+    assert.equal(config.test.maxWorkers, 4);
+    assert.equal(options.env.MINSKY_D1_METRICS, '1');
     return result();
   };
   assert.deepEqual(await runHostedAccounts(setup.arguments, setup.dependencies), {

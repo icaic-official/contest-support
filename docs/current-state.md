@@ -4,7 +4,7 @@
 
 T0020 starts from merged PR #41 at `7d19b00`.
 The active branch is `feature/t0020-cloudflare-connector`.
-The complete hosted connector and fresh installation pass. Protected connector CI is running.
+Earlier hosted CLI connector and fresh-installation checks pass. The latest protected connector run has two shared-scenario failures.
 Supabase remains active.
 During final verification, the owner merged PR #23 at `c144a2a`.
 T0020 includes that main revision and preserves the jury worklist.
@@ -36,6 +36,7 @@ Observed results during implementation are separate from final PR verification:
 - All 70 workflow tests pass locally and on hosted D1. Hosted fixture cleanup passes.
 - All 82 hosted account tests pass on the new connector D1 schema, with zero skips and verified fixture cleanup.
 - All 554 local tests pass across 33 files on `59121f7`. The local account suite includes 83 cases, including its separate execution-clock probe.
+- Corrected ordinary CI passes 579 tests across 35 files on `9b0ef6b`, plus all 45 application browser regressions and the complete local React journey.
 - All eight unchanged shared provider scenarios pass against Minsky CI on Supabase, `ghtztmovdkhuketcbjmq`. Fixture cleanup passes.
 - The same eight scenarios pass against the deployed Cloudflare connector on `1ee8cbf`, with scoped D1, R2, and Durable Object cleanup.
 - The complete hosted React journey passes on `59121f7`, with zero failures, skips, or flaky results.
@@ -68,7 +69,12 @@ Ordinary push CI passes `checks`, `secrets`, and `dependencies` in [run 39095244
 Ordinary PR CI also passes in [run 39095267935](https://github.com/GiftedNovaHD/minsky/actions/runs/39095267935).
 Protected Supabase verification passes on that revision in [run 39095319959](https://github.com/GiftedNovaHD/minsky/actions/runs/39095319959).
 The protected Supabase run uses the existing CI backend without changing its configuration, migrations, or functions.
-The protected complete Cloudflare job is running on `1ee8cbf`.
+Protected [run 39098783172](https://github.com/GiftedNovaHD/minsky/actions/runs/39098783172) on `9b0ef6b` passes all 70 workflow and 82 account cases.
+It deploys CI Worker version `33977804-a8c2-475d-ad52-27906df0a136`, then passes six of eight shared scenarios.
+The lifecycle scenario receives an unexpected authentication rejection before its contestant snapshot.
+The image scenario exceeds its 90-second limit during uploader removal. The hosted React step is not reached.
+Fixture cleanup reports no retained recovery marker or artifact. Both failures require correction before owner review.
+Ordinary push CI passes on that corrected revision in [run 39098769818](https://github.com/GiftedNovaHD/minsky/actions/runs/39098769818).
 
 The `cloud-test` environment now permits `feature/t0020-cloudflare-connector`.
 The API showed five existing branch entries before this change. All five entries and their IDs remain unchanged.
@@ -115,6 +121,42 @@ No object reported stored data. No stored orphan state was observed at that chec
 The audit made no cleanup mutation and did not inspect the separate installation baseline.
 The repeated audit at 04:53:09 UTC returned the same storage flags and zero queried application rows after the second failed run.
 Final protected verification will use the corrected isolation.
+The guarded migration command applied all nine migrations to the new store database.
+All 70 direct workflow cases pass there, with zero skips and verified scoped cleanup, using the changes committed as `9b0ef6b`.
+All 82 account CLI cases also pass on that store target at `9b0ef6b`, with zero skips and verified scoped cleanup.
+
+### Hosted check duration
+
+The owner requested a root-cause correction after the account phase exceeded 17 minutes.
+In protected run `39098783172`, that phase passed all 82 cases but took 20 minutes 6 seconds.
+Its preceding 70-case workflow phase took 4 minutes 55 seconds.
+
+A local instrumented baseline counted 5,323 D1 binding calls across the 82 account cases.
+Fixture setup used 987 calls. Case bodies used 3,135. Cleanup used 1,201.
+The runner serialized these independent UUID fixtures in one file.
+It also captured all progress until the child process exited.
+
+A read-only hosted probe compared twelve separate `SELECT 1` calls with one twelve-statement batch.
+Separate calls took about 1.63 seconds. The batch took 133 milliseconds.
+The database reported less than two milliseconds of SQL execution for the separate calls.
+This sample measures transport overhead. It does not establish application latency or capacity.
+
+Batching the same fixture writes, credential snapshots, and cleanup reads reduces account calls to 3,410, a 35.9% reduction.
+All 82 local baseline and corrected cases pass. Maintained password operations remain 122 hashes and 183 verifications.
+All unique-key cleanup assertions remain. Twenty-two duplicate username absence reads are removed.
+The same correction reduces the workflow suite from 992 calls to 850 without changing its SQL statement count.
+All 70 cases pass before and after the correction.
+
+Four explicit account files now own separate fixtures and can run concurrently.
+Their groups contain 21 session cases, 15 recovery cases, 24 initiation cases, and 22 completion cases.
+Cases within each file remain serial. Every original case body and parameter list remains intact.
+The local-only execution-clock case remains separate, for a local total of 83.
+Both direct runners now report completed cases, active cases, elapsed time, and numeric database measurements during execution.
+Reported SQL time covers provider metadata from `all`, `run`, and `batch`. It excludes `first`, which returns no metadata.
+Summed call wall time can exceed elapsed time when files run concurrently.
+The corrected account CLI run passes all 82 cases with zero skips and verified cleanup in 148 seconds from this machine.
+Its measured totals include 3,423 calls and 10,536 statements, including suite initialization and maintained schema checks.
+This result is separate from GitHub timing. A corrected protected comparison remains required.
 
 ### Empty hosted installation
 

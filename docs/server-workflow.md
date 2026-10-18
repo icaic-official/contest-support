@@ -147,7 +147,8 @@ It also checks credential state, credential generation, login revocation and exp
 Receipt replay crosses an atomic access check too.
 A previously successful request cannot authorize replay after access expires or is revoked.
 
-The complete 70-case D1 suite passes locally and against isolated `minsky-connector-ci`, with scoped fixture cleanup.
+The complete 70-case D1 suite passes locally and against isolated `minsky-connector-store-ci`, with scoped fixture cleanup.
+That direct-test database has no deployed Worker. Hosted application journeys use the separate complete connector resources.
 The [full hosted runner](../src/server/adapters/cloudflare/tooling/test-workflow.mjs) requires an explicit target and runs production guards without skips.
 See the [D1 guide](d1-transaction-proof.md) for the separate commands and recorded scope.
 

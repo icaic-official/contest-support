@@ -6,7 +6,7 @@ During verification, the owner merged PR #23 at `c144a2a`.
 This branch includes that main revision and preserves its jury worklist.
 The [current-state record](current-state.md#t0020-connector-implementation-2026-10-18) lists resource targets and observed evidence.
 The complete hosted application and empty-installation checks pass.
-Protected connector CI and final PR checks remain in progress.
+The latest protected connector run has two shared-scenario failures. Correction and final PR checks remain in progress.
 
 ## 1. Summary of changes
 
@@ -27,6 +27,7 @@ The implementation changes these files:
 - `README.md`
 - `deno.lock`
 - `docs/backend-contracts.md`
+- `docs/cloudflare-authentication-choice.md`
 - `docs/cloudflare-authentication.md`
 - `docs/cloudflare-backend-design.md`
 - `docs/cloudflare-implementation-plan.md`
@@ -50,8 +51,8 @@ The implementation changes these files:
 - `playwright.connector-local.config.ts`
 - `playwright.connector.config.ts`
 - `playwright.providers.config.ts`
-- `scripts/connector-runtime-test.mjs`
 - `scripts/connector-local-ui-test.mjs`
+- `scripts/connector-runtime-test.mjs`
 - `scripts/provider-test-cloudflare.test.mjs`
 - `scripts/provider-test-options.mjs`
 - `scripts/provider-test.mjs`
@@ -70,9 +71,14 @@ The implementation changes these files:
 - `src/server/adapters/cloudflare/applicationWorker.ts`
 - `src/server/adapters/cloudflare/authentication.test.ts`
 - `src/server/adapters/cloudflare/authentication.ts`
+- `src/server/adapters/cloudflare/authenticationCases.ts`
+- `src/server/adapters/cloudflare/authenticationCompletion.test.ts`
+- `src/server/adapters/cloudflare/authenticationInitiation.test.ts`
+- `src/server/adapters/cloudflare/authenticationRecovery.test.ts`
 - `src/server/adapters/cloudflare/deploy/connector-ci.settings.json`
 - `src/server/adapters/cloudflare/deploy/connector-ci.wrangler.jsonc`
 - `src/server/adapters/cloudflare/deploy/connector-store-ci.wrangler.jsonc`
+- `src/server/adapters/cloudflare/hostedHttp.test.ts`
 - `src/server/adapters/cloudflare/http.test.ts`
 - `src/server/adapters/cloudflare/http.ts`
 - `src/server/adapters/cloudflare/images.test.ts`
@@ -85,6 +91,9 @@ The implementation changes these files:
 - `src/server/adapters/cloudflare/tooling/competition.example.json`
 - `src/server/adapters/cloudflare/tooling/configuration.mjs`
 - `src/server/adapters/cloudflare/tooling/configuration.test.mjs`
+- `src/server/adapters/cloudflare/tooling/hosted-progress-reporter.mjs`
+- `src/server/adapters/cloudflare/tooling/hosted-progress.mjs`
+- `src/server/adapters/cloudflare/tooling/hosted-progress.test.mjs`
 - `src/server/adapters/cloudflare/tooling/install.mjs`
 - `src/server/adapters/cloudflare/tooling/migrations.mjs`
 - `src/server/adapters/cloudflare/tooling/operation-runner.mjs`
@@ -108,6 +117,8 @@ The implementation changes these files:
 - `src/server/adapters/d1/store.test.ts`
 - `src/server/adapters/d1/store.ts`
 - `src/server/adapters/d1/testFixture.ts`
+- `src/server/adapters/d1/testMetrics.test.ts`
+- `src/server/adapters/d1/testMetrics.ts`
 - `tests/connector/hosted-ui.spec.ts`
 - `tests/connector/local-ui-fixture.ts`
 - `tests/connector/local-ui.spec.ts`
@@ -123,6 +134,7 @@ The implementation changes these files:
 - `tests/providers/fixture.ts`
 - `tsconfig.json`
 - `vite.config.ts`
+- `vitest.auth.config.ts`
 - `vitest.connector-runtime.config.ts`
 
 ## 3. Commands run
@@ -169,11 +181,22 @@ A controlled local reproduction established that scheduled delivery can mutate d
 Direct suites now use a separate D1-only CI database. Their complete workflow comparisons remain unchanged.
 Independent hosted namespace audits observed no stored orphan state after either failed run.
 Initial local socket and Git metadata operations needed sandbox escalation.
+The account-duration investigation measured local fixture calls before and after batching, then ran the four-file hosted account suite.
+The first read-only timing probe failed in Node evaluation mode. The supported CommonJS probe passed without changing data.
+The first instrumented account run failed all 82 cases because the metrics wrapper hid native D1 capabilities.
+It completed fixture cleanup. A forwarding proxy and real Better Auth regression correct that instrumentation fault.
+The repeated hosted account run passes all 82 cases in 148 seconds, without skips, and verifies cleanup.
+The original 35 account test definitions retain their complete bodies and parameter lists across four isolated files.
+New progress checks verify numeric redaction, concurrent counters, intermediate output, timeout handling, and timer cleanup.
 No automatic approval review rejected an authorized action.
 
 ## 4. Build and test results
 
 After current-main integration, the complete local suite passes 566 tests across 34 files.
+Corrected ordinary CI passes 579 tests across 35 files on `9b0ef6b`.
+The duration correction passes all 591 local tests across 40 files in 51.34 seconds.
+Types, lint, and the default Supabase frontend build also pass after that correction.
+The new hosted-runner and store-target checks pass all 28 focused cases locally.
 The earlier `59121f7` run passes 554 tests, including the image cleanup-fairness regression.
 The full local account suite also passes all 83 cases against the historical authentication schema.
 The final local HTTPS connector journey, including actual D1, R2, and live bindings, passes.
@@ -207,7 +230,14 @@ Ordinary push CI passes `checks`, `secrets`, and `dependencies` on `de1ecbd` in 
 Ordinary PR CI and protected Supabase verification also pass on that revision in [run 39095267935](https://github.com/GiftedNovaHD/minsky/actions/runs/39095267935) and [run 39095319959](https://github.com/GiftedNovaHD/minsky/actions/runs/39095319959).
 The protected Supabase run passes 14 cloud browser cases, eight shared provider scenarios, and five shared server workflow cases.
 Both ordinary runs on `59121f7` pass in [run 39096348143](https://github.com/GiftedNovaHD/minsky/actions/runs/39096348143) and [run 39096350260](https://github.com/GiftedNovaHD/minsky/actions/runs/39096350260).
-Protected connector [run 39097062812](https://github.com/GiftedNovaHD/minsky/actions/runs/39097062812) is running on `1ee8cbf`.
+Protected connector [run 39098783172](https://github.com/GiftedNovaHD/minsky/actions/runs/39098783172) fails on `9b0ef6b` after passing all 70 workflow and 82 account cases.
+Its account phase takes 20 minutes 6 seconds. Its shared browser phase passes six cases and fails two in 10 minutes 56 seconds.
+The lifecycle case receives an unexpected authentication rejection. The image case times out during uploader removal.
+The hosted React step is not reached. No cleanup marker or recovery artifact remains.
+The [duration investigation](current-state.md#hosted-check-duration) records measured transport costs and the correction.
+Ordinary push [run 39098769818](https://github.com/GiftedNovaHD/minsky/actions/runs/39098769818) passes on that revision.
+The direct CLI workflow suite passes all 70 cases on the dedicated store database with verified scoped cleanup.
+The direct account CLI suite also passes all 82 cases there on `9b0ef6b`, with zero skips and verified scoped cleanup.
 
 ## 5. Manual verification
 

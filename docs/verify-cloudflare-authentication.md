@@ -3,6 +3,8 @@
 Use this guide for T0018's fictional authentication fixtures.
 Supabase remains active. These procedures do not migrate accounts or deploy the application.
 See the [API reference](cloudflare-authentication.md) and [identity choice](cloudflare-authentication-choice.md) for behavior and resource limits.
+For T0020's complete connector, use the separate [direct store procedure](run-provider-tests.md#run-direct-cloudflare-store-checks).
+That procedure requires the D1-only `minsky-connector-store-ci` target and all 82 hosted account cases.
 
 ## Run local checks
 
@@ -15,10 +17,23 @@ npm run test:auth
 npm run test:auth:browser
 ```
 
-The first suite creates a temporary local D1 database and runs account, permission, failure, and race cases.
+The first suite runs all 83 local account, permission, failure, and race cases.
+The suite uses four fixed files under `src/server/adapters/cloudflare/`:
+
+| File | Cases |
+| --- | --- |
+| `authentication.test.ts` | Login, sessions, and password changes. |
+| `authenticationRecovery.test.ts` | Organizer account operations, interrupted operations, and recovery. |
+| `authenticationInitiation.test.ts` | Current-access races when account operations start. |
+| `authenticationCompletion.test.ts` | Current-access races when credential operations complete. |
+
+Cases run serially within each file. Up to four files run concurrently.
+Each file owns a temporary local D1 database and identity service.
+Each case creates new UUID-scoped records. Fixture setup, credential snapshots, and cleanup checks use D1 batches.
+These batches retain the row assertions, maintained password hashing, and exact fixture ownership checks.
 The browser suite creates a separate temporary D1 database and a local HTTPS Worker on port 8788.
 It uses Chromium with a self-signed local certificate.
-Expect all focused cases and three browser cases to pass.
+Expect all 83 account cases and three browser cases to pass.
 The short SQLite execution-clock probe runs locally. It checks expiry after a password change deletes the original identity session.
 Hosted account cases inject expiry inside the actual batch instead, so transport latency does not determine that assertion.
 Record the local and hosted case counts separately.
@@ -94,6 +109,14 @@ npm run test:auth:http -- \
 The runners reject missing or different targets before fixture writes.
 For a focused D1 rerun, append `--test-name-pattern=PATTERN` using a test-name expression.
 The target arguments remain mandatory. Record focused results separately from a complete run.
+This filter applies only to the historical `test:auth:hosted` runner.
+The complete connector account runner rejects filters and overrides. It requires all 82 hosted cases without failures or skips.
+Its numeric progress reports appear at least every 15 seconds while the test process runs.
+Reports include completed and total cases, active cases, elapsed time, and the age of the oldest active case.
+They also include database call counts, statement counts, accumulated call time, partial provider-reported SQL time, and calls in progress.
+Accumulated call time can exceed elapsed time when calls overlap.
+Calls such as `first()` omit timing metadata, so reported SQL time does not cover every statement.
+Progress omits case names, SQL text, values, rows, credentials, and raw provider errors.
 Expect passing assertions and verified scoped cleanup. Credentials do not appear in results.
 Do not run these suites against shared development or real contest data.
 

@@ -8,6 +8,7 @@ AWS has no implementation.
 T0017's separate [D1 transaction proof](d1-transaction-proof.md) checks the application store directly.
 T0020 extends that store to every workflow command and adds the complete Cloudflare fixture driver.
 The full D1 suite passes all 70 cases on local and isolated hosted D1, with cleanup.
+Direct persistence and account suites use a D1-only database. Their records cannot enter the application's live delivery process.
 Both providers pass the same eight shared scenarios with verified fixture cleanup.
 The Cloudflare CLI run verifies `1ee8cbf` through the hosted Worker, D1, private R2, and Durable Objects.
 The owner enabled R2 after the earlier provider error `10042`.

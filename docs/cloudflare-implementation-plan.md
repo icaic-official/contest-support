@@ -12,7 +12,7 @@ Supabase remains the active development backend.
 
 | Milestone | Implemented behavior | Observed verification and remaining gate |
 | --- | --- | --- |
-| Complete D1 workflow | All nine commands persist shared `WorkflowService` decisions with atomic effects and current identity guards. | All 70 local and hosted D1 cases pass with scoped cleanup. Hosted target: separate `minsky-connector-ci`, database `de43cf95-c024-4e44-860d-8ff179e4e08d`. |
+| Complete D1 workflow | All nine commands persist shared `WorkflowService` decisions with atomic effects and current identity guards. | All 70 local and hosted D1 cases pass with scoped cleanup. Direct hosted target: D1-only `minsky-connector-store-ci`, database `341350ba-7c74-4c46-8b21-edfdcda475f5`. |
 | Complete application boundary | Authenticated routes, session lists, authorized snapshots, administration, and every browser `Backend` group. | Application cases, the local HTTPS runtime, and local and hosted complete React journeys pass. All 82 hosted D1 account cases pass. |
 | Private R2 images | Reservations, immutable transfers, completion, authorized downloads, removal, abandonment, expiry, and exact-key recovery. | All 59 local image cases pass. Hosted shared scenarios and the complete React journey verify private R2 image behavior and scoped cleanup. |
 | Durable Object updates | Audience-specific delivery from the D1 outbox, current-access checks, duplicate handling, reconnect refresh, and retry recovery. | Local delivery and cleanup-binding checks pass. Hosted shared scenarios verify audience separation and independent subscribers. The hosted React journey verifies reconnection and refreshed state. |
@@ -22,9 +22,10 @@ Supabase remains the active development backend.
 The owner activated R2 after the initial provider error `10042`.
 The isolated Standard CI bucket has public access disabled and passes hosted image journeys.
 Workers Paid is active.
+Direct workflow and account cases use the D1-only store target. The application keeps its separate database and live bindings.
 The complete hosted React and separate empty-installation journeys pass on `59121f7`.
 The shared CLI run verifies `1ee8cbf`. Its bridge correction leaves the application Worker source unchanged.
-Protected Cloudflare connector CI on `1ee8cbf` remains pending. Record its result separately from CLI evidence.
+Protected Cloudflare connector CI on `9b0ef6b` passes both direct suites, then fails two shared browser scenarios. Record this result separately from CLI evidence.
 Record each result with its actual revision and target in [current state](current-state.md).
 Earlier aggregate test counts describe those runs and do not replace checks of the final PR revision.
 
@@ -146,7 +147,7 @@ The hosted CLI verification has completed this sequence:
 5. Verify the documented empty installation and owner recovery procedure.
 
 Scoped installation fixture cleanup passes. The installed baseline remains intact, and both test Durable Objects are empty.
-Protected connector CI on `1ee8cbf` is also pending. The job must pass before final acceptance.
+Protected connector CI on `9b0ef6b` fails two shared browser scenarios after passing both direct suites. A corrected job must pass before final acceptance.
 
 Keep provider imports in the corresponding adapter modules.
 Pass dependencies and authenticated context explicitly.

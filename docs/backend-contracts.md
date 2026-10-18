@@ -122,7 +122,8 @@ The local D1 suite loads every current migration and checks the production ident
 Its hosted proof still uses the separate `minsky-d1-proof-ci` schema with migrations `0001` and `0002`.
 The historical hosted proof does not verify the complete HTTP workflow route.
 The complete local HTTPS suite separately checks that route, R2, authentication, and live delivery.
-Its hosted D1 suite checks every workflow case against the separate connector database.
+Its hosted D1 suite checks every workflow case against the separate D1-only store CI database.
+That database has no application Worker or background delivery. Complete application tests use different resources.
 
 ## Module boundaries
 
@@ -287,6 +288,6 @@ Supabase and Cloudflare have separate fixture implementations with the same scen
 The Cloudflare CLI run passes all eight unchanged shared scenarios on `1ee8cbf` with verified fixture cleanup.
 The complete hosted React journey passes on `59121f7`, which has the same application Worker source.
 The separate documented empty-installation journey also passes on `59121f7`, with verified fixture cleanup.
-Protected Cloudflare CI on `1ee8cbf` remains pending.
+Protected Cloudflare CI on `9b0ef6b` passes both direct suites, then fails two shared browser scenarios. Final acceptance remains pending.
 [Run the shared checks](run-provider-tests.md) separately from the provider-specific hosted UI suite.
 The latest observed results are in [current state](current-state.md).

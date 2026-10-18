@@ -191,8 +191,28 @@ npm run test:connector:accounts:hosted -- \
 Expected output is `Hosted connector accounts: 82 passed, 0 failed, 0 skipped.`
 This command checks current permissions, identity expiry, credential generation, revocation, and rollback inside account batches.
 It uses maintained password hashing and a D1-only proxy.
-The local account suite includes one additional execution-clock probe. Record that local result separately.
+The runner includes four fixed authentication files:
+
+- `src/server/adapters/cloudflare/authentication.test.ts`
+- `src/server/adapters/cloudflare/authenticationRecovery.test.ts`
+- `src/server/adapters/cloudflare/authenticationInitiation.test.ts`
+- `src/server/adapters/cloudflare/authenticationCompletion.test.ts`
+
+Cases run serially within each file. Up to four files run concurrently.
+Each case creates its own UUID-scoped fixture. Each file owns its identity service and database proxy.
+Fixture setup, credential snapshots, and cleanup checks use D1 batches with the same row assertions.
+The local `npm run test:auth` suite includes one additional execution-clock probe and must pass all 83 cases.
+Record that local result separately from the 82 hosted cases.
+Both connector runners reject test filters, count overrides, and configuration overrides beyond the required target options.
 Both direct D1 runners retain fixture journals and proxy configurations if cleanup fails.
+
+Both runners report numeric progress at least every 15 seconds while their test process runs.
+Progress includes completed and total cases, elapsed time, active cases, and the age of the oldest active case.
+Database totals include calls, statements, accumulated call time (`wall`), provider-reported SQL time (`reported SQL`), and calls in progress.
+Accumulated call time can exceed elapsed time because database calls can overlap.
+Reported SQL time is partial. Calls such as `first()` return rows without provider timing metadata.
+Progress excludes case names, SQL text, bound values, result rows, credentials, and raw provider errors.
+The final result still requires every case to pass without failures or skips.
 
 ## Check the hosted React application
 

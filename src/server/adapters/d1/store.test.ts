@@ -6,6 +6,7 @@ import type { Caller, IssueCommand } from "../../applicationStore";
 import type { D1Connection, D1Statement } from "./connection";
 import { D1ApplicationStore } from "./store";
 import { D1Fixture } from "./testFixture";
+import { measureD1 } from './testMetrics';
 import type { Command } from "../../../connected/model";
 
 const timeout = 120_000;
@@ -47,8 +48,10 @@ describe("D1 application-store transaction proof", () => {
     const platform = await getPlatformProxy<{ DB: D1Connection }>({
       configPath, persist: false, remoteBindings: remote, envFiles: [],
     });
-    db = platform.env.DB;
-    dispose = platform.dispose;
+    const metrics = process.env.MINSKY_D1_METRICS === '1'
+      ? measureD1(platform.env.DB, (line) => process.stdout.write(line + '\n')) : undefined;
+    db = metrics?.db ?? platform.env.DB;
+    dispose = async () => { metrics?.flush(); await platform.dispose(); };
     if (!remote) {
       const directory = "src/server/adapters/d1/migrations";
       for (const filename of readdirSync(directory).filter((name) => name.endsWith(".sql")).sort()) {

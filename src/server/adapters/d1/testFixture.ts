@@ -134,9 +134,7 @@ export class D1Fixture {
     }
   }
 
-  /** Compare workflow effects. Account-only invalidations belong to credential operations. */
-  async durableState(): Promise<Record<string, Row[]>> {
-    const sessions = [this.sessionId, this.secondSessionId];
+  private durableQueries(): Array<[string, string]> {
     const queries: Array<[string, string]> = [
       ["issues", "SELECT * FROM issues WHERE session_id IN (?, ?) ORDER BY id"],
       ["receipts", "SELECT * FROM command_receipts WHERE session_id IN (?, ?) ORDER BY actor, request_id"],
@@ -149,7 +147,14 @@ export class D1Fixture {
       ["awards", "SELECT * FROM awards WHERE session_id IN (?, ?) ORDER BY id"],
       ["issue_sequences", "SELECT * FROM session_issue_sequences WHERE session_id IN (?, ?) ORDER BY session_id"],
     );
-    const rows = await this.rowsBatch(queries.map(([, sql]) => this.statement(sql, ...sessions)));
+    return queries;
+  }
+
+  /** Compare workflow effects. Account-only invalidations belong to credential operations. */
+  async durableState(): Promise<Record<string, Row[]>> {
+    const queries = this.durableQueries();
+    const rows = await this.rowsBatch(queries.map(([, sql]) =>
+      this.statement(sql, this.sessionId, this.secondSessionId)));
     const result: Record<string, Row[]> = {};
     queries.forEach(([name], index) => { result[name] = rows[index]; });
     return result;
@@ -188,11 +193,9 @@ export class D1Fixture {
       ...(this.workflow ? accounts.map((caller) => this.statement("DELETE FROM ba_user WHERE id = ?", caller.accountId)) : []),
       ...accounts.map((caller) => this.statement("DELETE FROM accounts WHERE id = ?", caller.accountId)),
     ]);
-    const remaining = await this.durableState();
-    if (Object.values(remaining).some((rows) => rows.length !== 0)) {
-      throw new Error(`Fixture workflow records remain for ${this.eventId}.`);
-    }
-    const [people, logins, memberships, events, remainingSessions, sequences, notifications] = await this.rowsBatch([
+    const workflowQueries = this.durableQueries();
+    const checks = await this.rowsBatch([
+      ...workflowQueries.map(([, sql]) => this.statement(sql, this.sessionId, this.secondSessionId)),
       this.statement("SELECT id FROM accounts WHERE id IN (?, ?, ?, ?)",
         ...accounts.map((caller) => caller.accountId)),
       this.statement("SELECT id FROM logins WHERE id IN (?, ?, ?, ?)",
@@ -203,12 +206,17 @@ export class D1Fixture {
       this.statement("SELECT id FROM sessions WHERE id IN (?, ?)", this.sessionId, this.secondSessionId),
       this.statement("SELECT * FROM audience_sequences WHERE session_id IN (?, ?)", this.sessionId, this.secondSessionId),
       this.statement("SELECT * FROM notifications WHERE session_id IN (?, ?)", this.sessionId, this.secondSessionId),
-    ]);
-    if (this.workflow) {
-      const [identityUsers, identitySessions] = await this.rowsBatch([
+      ...(this.workflow ? [
         this.statement("SELECT id FROM ba_user WHERE id IN (?, ?, ?, ?)", ...accounts.map((caller) => caller.accountId)),
         this.statement("SELECT id FROM ba_session WHERE userId IN (?, ?, ?, ?)", ...accounts.map((caller) => caller.accountId)),
-      ]);
+      ] : []),
+    ]);
+    if (checks.slice(0, workflowQueries.length).some((rows) => rows.length !== 0)) {
+      throw new Error(`Fixture workflow records remain for ${this.eventId}.`);
+    }
+    const [people, logins, memberships, events, remainingSessions, sequences, notifications,
+      identityUsers, identitySessions] = checks.slice(workflowQueries.length);
+    if (this.workflow) {
       if (identityUsers.length || identitySessions.length) throw new Error(`Fixture identities remain for ${this.eventId}.`);
     }
     if (people.length !== 0) throw new Error(`Fixture accounts remain for ${this.eventId}.`);

@@ -1,4 +1,3 @@
-import { spawnSync } from 'node:child_process';
 import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -9,6 +8,7 @@ import { assertCurrentMigrations } from './migrations.mjs';
 import { confirmTarget, wranglerRunner } from './operations.mjs';
 import { safeWranglerEnvironment } from './safe-environment.mjs';
 import { readStoreTarget, storeArguments } from './store-target.mjs';
+import { runHostedChild } from './hosted-progress.mjs';
 
 const expectedCases = 82;
 
@@ -75,17 +75,21 @@ export async function runHostedAccounts(arguments_, dependencies = {}) {
     await writeFile(testConfig, `export default ${JSON.stringify({
       root: repositoryRoot,
       test: {
-        include: [resolve(repositoryRoot, 'src/server/adapters/cloudflare/authentication.test.ts')],
-        testTimeout: 120_000, hookTimeout: 120_000, fileParallelism: false, maxWorkers: 1,
-        reporters: [['json', { stdout: true }]],
+        include: ['authentication.test.ts', 'authenticationRecovery.test.ts',
+          'authenticationInitiation.test.ts', 'authenticationCompletion.test.ts']
+          .map((file) => resolve(repositoryRoot, 'src/server/adapters/cloudflare', file)),
+        testTimeout: 120_000, hookTimeout: 120_000, fileParallelism: true, maxWorkers: 4,
+        reporters: [['json', { stdout: true }],
+          [resolve(repositoryRoot, 'src/server/adapters/cloudflare/tooling/hosted-progress-reporter.mjs'), { total: expectedCases }]],
       },
     })};\n`, { mode: 0o600 });
     const environment = { ...safeWranglerEnvironment(), MINSKY_CONNECTOR_D1_CONFIG: runtimeConfig,
-      CLOUDFLARE_ACCOUNT_ID: settings.accountId, WRANGLER_SEND_METRICS: 'false' };
+      CLOUDFLARE_ACCOUNT_ID: settings.accountId, WRANGLER_SEND_METRICS: 'false', MINSKY_D1_METRICS: '1' };
     delete environment.MINSKY_D1_REMOTE;
     delete environment.MINSKY_AUTH_REMOTE;
     delete environment.MINSKY_AUTH_LEGACY;
-    const execute = dependencies.execute ?? ((argumentsChild, commandOptions) => spawnSync(process.execPath, argumentsChild, commandOptions));
+    const execute = dependencies.execute ?? ((argumentsChild, commandOptions) =>
+      runHostedChild(argumentsChild, commandOptions, { report, expectedTotal: expectedCases }));
     const result = await execute([resolve(repositoryRoot, 'node_modules/vitest/vitest.mjs'), 'run', '--config', testConfig], {
       cwd: repositoryRoot, env: environment, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'],
       timeout: 30 * 60_000, maxBuffer: 16 * 1024 * 1024,

@@ -67,7 +67,11 @@ test('full hosted workflow uses only the confirmed D1 binding and production tes
     assert.equal((await stat(runtime)).mode & 0o777, 0o600);
     const testConfig = await readFile(args[3], 'utf8');
     const parsed = JSON.parse(testConfig.slice('export default '.length).trim().replace(/;$/, ''));
-    assert.deepEqual(parsed.test.reporters, [['json', { stdout: true }]]);
+    assert.deepEqual(parsed.test.reporters, [['json', { stdout: true }],
+      [join(repositoryRoot, 'src/server/adapters/cloudflare/tooling/hosted-progress-reporter.mjs'), { total: 70 }]]);
+    assert.equal(parsed.test.fileParallelism, false);
+    assert.equal(parsed.test.maxWorkers, 1);
+    assert.equal(options.env.MINSKY_D1_METRICS, '1');
     assert.equal(parsed.test.include.length, 1);
     assert.equal(parsed.test.include[0].endsWith('/d1/store.test.ts'), true);
     return result();

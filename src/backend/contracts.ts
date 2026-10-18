@@ -1,4 +1,4 @@
-import type { Command, Role, Snapshot } from '../connected/model';
+import type { Command, Role, Snapshot } from '../connected/model.ts';
 
 export interface AccountIdentity {
   id: string;

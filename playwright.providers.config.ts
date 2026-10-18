@@ -12,7 +12,7 @@ export default defineConfig({
   reporter: 'line',
   outputDir: 'test-results/providers',
   use: {
-    baseURL: 'http://127.0.0.1:4174',
+    baseURL: process.env.MINSKY_CF_TEST_ORIGIN || 'http://127.0.0.1:4174',
     trace: 'off',
     screenshot: 'off',
     video: 'off',

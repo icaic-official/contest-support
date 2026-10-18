@@ -137,7 +137,9 @@ export function createCloudflareAuthentication(options: {
     },
     async accountStatus() {
       const current = await session();
-      if (!current) throw new Error('Sign in to continue.');
+      // A reset removes the identity session. Report a restricted status without
+      // recovering an account ID from an invalid cookie or browser memory.
+      if (!current) return { username: null, must_change: true, session_valid: false };
       return current.status;
     },
     async changePassword(currentPassword, newPassword) {

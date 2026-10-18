@@ -124,14 +124,12 @@ describe('isolated hosted Cloudflare authentication HTTP', () => {
           stmt('DELETE FROM authentication_limits WHERE key IN (?, ?, ?, ?)',
             `username:${username}`, `username:${adminUsername}`, `change:${fixture.staff.accountId}`, `change:${fixture.contestant.accountId}`),
         ]);
-        for (const id of ids) {
-          const remaining = await stmt(`SELECT
+        const checks = await db.batch(ids.map((id) => stmt(`SELECT
             (SELECT count(*) FROM ba_user WHERE id = ?) +
             (SELECT count(*) FROM ba_account WHERE userId = ?) +
             (SELECT count(*) FROM ba_session WHERE userId = ?) +
-            (SELECT count(*) FROM account_operations WHERE account_id = ?) AS n`).bind(id, id, id, id).first<{ n: number }>();
-          expect(remaining?.n).toBe(0);
-        }
+            (SELECT count(*) FROM account_operations WHERE account_id = ?) AS n`).bind(id, id, id, id))) as Array<{ results: Array<{ n: number }> }>;
+        for (const check of checks) expect(check.results).toEqual([{ n: 0 }]);
         await fixture.cleanup();
       }
     } finally {

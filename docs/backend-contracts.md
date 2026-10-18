@@ -2,8 +2,9 @@
 
 The browser uses `Backend` in [contracts.ts](../src/backend/contracts.ts) for accounts, workflows, administration, images, and live updates.
 An adapter implements those operations for a provider.
-The Supabase adapter is the only complete implementation.
-T0018 adds an experimental Cloudflare authentication adapter without changing the active backend.
+Supabase remains the active implementation.
+The Cloudflare adapter implements the same contract for isolated installations.
+See [current state](current-state.md#t0020-connector-implementation-2026-10-18) for source-specific verification and limits.
 
 The contracts describe Minsky operations.
 They do not expose database queries, access tokens, provider clients, or channel objects.
@@ -12,7 +13,7 @@ A transaction commits all changes for a command together, or commits none.
 
 ## Shared server workflow
 
-T0019 adds [WorkflowService](../src/server/workflow.ts) for all nine existing issue commands.
+[WorkflowService](../src/server/workflow.ts) applies all nine existing issue commands.
 The service validates input, applies the existing decisions, handles receipts, and bounds conflict retries.
 `WorkflowPersistence` supplies authorized reads and guarded atomic commits.
 Its operation-level methods expose no SQL or generic transaction callback.
@@ -28,63 +29,41 @@ Private versions detect concurrent changes without exposing private activity thr
 The active application adapter still calls the legacy `public.workflow` RPC.
 The old SQL rules remain protective during this transition.
 Administration, snapshots, images, and live updates also retain their existing Supabase paths.
-The complete application server is not provider-independent.
+Issue decisions use one shared service. Other operations remain inside their provider implementations.
 Use [the verification guide](verify-server-workflow.md) for the isolated execution path and separate evidence categories.
 
-## Bounded D1 application store
+## Complete Cloudflare implementation
 
-T0017 added a separate server interface in [applicationStore.ts](../src/server/applicationStore.ts).
-It defines `execute()` for `claim` and `message`, plus a limited `issue()` view.
-This interface does not replace the full browser `Backend` or select a different active provider.
-The [proof guide](d1-transaction-proof.md) describes local and hosted checks.
+[createCloudflareBackend()](../src/backend/cloudflare/backend.ts) implements the complete browser contract through same-origin HTTP and cookies.
+[applicationWorker.ts](../src/server/adapters/cloudflare/applicationWorker.ts) serves the application and its API.
+The Worker obtains `Caller` from the maintained identity service. Request bodies cannot supply that identity.
+Mutation routes check the exact origin, current session, and request-protection token.
+JSON bodies are limited to 16 KiB. Image transfers require an exact length and an R2-verified SHA-256 checksum.
 
-`Caller` contains an account ID and login ID from a trusted identity adapter.
-These values must never come directly from an HTTP request body.
-T0018 adds a [Cloudflare authentication service](cloudflare-authentication.md) that can construct trusted callers.
-Its experimental Worker exposes authentication routes only. It does not expose a workflow route.
-T0019 connects the D1 adapter to the same `WorkflowService` and decisions used by the Supabase server path.
-The D1 adapter still implements only `claim` and `message`.
-It checks the login, expiry, account restrictions, membership, team, roles, and event inside the database.
-The issue view uses one primary query for its permission check, permitted history, and audience sequence.
-An archived event permits reads but prevents command commits and receipt replay.
+The [D1 store](../src/server/adapters/d1/store.ts) persists all nine `WorkflowService` commands.
+Its batches recheck credentials, generation, identity-session expiry, application-login expiry, current permissions, and captured state.
+One database timestamp supplies each workflow commit's ledger and history records.
+State, receipts, history, resolutions, awards, and audience notifications commit together.
+The complete schema adds migrations `0005` through `0009` to the authentication foundation.
 
-`execute()` returns a committed issue ID, a confirmed rejection, or an unknown outcome.
-An unknown outcome retains the original request ID and command for retry.
-Only a known assertion rollback or duplicate receipt permits internal reevaluation, with at most three attempts.
-Exhausted attempts return `unknown`. They expose no private conflict or internal version.
-Unexpected database errors and transport failures also preserve an unknown outcome.
+[D1ApplicationService](../src/server/adapters/cloudflare/application.ts) returns each authorized snapshot in one database statement.
+Snapshots preserve names, timestamps, history, awards, image metadata, limits, and administrator records.
+A valid login with removed membership receives an empty snapshot with null membership.
+An invalid login cannot authorize that read.
+Administration batches recheck current access and protect the last administrator.
 
-The [D1 adapter](../src/server/adapters/d1/store.ts) commits these records in one `batch()`:
+[R2ImageService](../src/server/adapters/cloudflare/images.ts) owns immutable reservations, private transfers, completion, and deletion recovery.
+Reservations count toward concurrent quotas. Completion rechecks current access and limits.
+Downloads check access again after the storage read.
+Deletion tasks retain exact object keys after successful cleanup, so recovery can remove a late interrupted transfer.
 
-1. Reserve the unique actor and request ID with the canonical command and result ID.
-2. Assert current access and captured account, login, membership, session, event, and issue versions.
-3. Update the issue and assert that exactly one row changed.
-4. Insert authenticated history and advance the permitted audience sequences.
-5. Insert notification records and remove the assertion rows.
+[SessionLiveCoordinator](../src/server/adapters/cloudflare/live.ts) delivers only `ready` and `change` hints.
+It rechecks current permissions before each delivery and closes expired or revoked connections.
+Persisted audience cursors suppress old duplicate delivery. A reconnect signals a fresh authorized snapshot.
+The outbox remains pending until the coordinator accepts delivery. Minutely maintenance retries delivery and image cleanup.
 
-Assertion rows use `NOT NULL` and `CHECK (valid = 1)` so false or missing conditions raise an error.
-A failed assertion rolls back the receipt and every later write.
-D1 documents atomic [batch rollback](https://developers.cloudflare.com/d1/worker-api/d1-database/#batch).
-The adapter uses ordinary primary bindings. It does not use read replicas or the Sessions API.
-
-The service compares the receipt's session ID and original JSON command content without depending on object key order.
-It preserves original text, including whitespace, for comparison.
-Shared text validation removes surrounding spaces and limits the saved value to 2,000 Unicode code points, matching PostgreSQL.
-Current access checks precede receipt replay.
-A private message changes the internal issue version and staff sequence only.
-Contestant views omit internal history and versions. Team sequence values change only for public activity.
-Notification rows contain audience and sequence values, without issue text.
-Notification delivery remains later work.
-
-The experimental [schema](../src/server/adapters/d1/migrations/0001_transaction_proof.sql) retains UUID identifiers and combined role records.
-Triggers advance access and membership versions when permissions change.
-The [version guard](../src/server/adapters/d1/migrations/0002_version_guards.sql) requires every issue writer to advance its internal version.
-T0018 extends this schema for bounded authentication. Remaining operations, timestamp migration encoding, and the complete connector schema require later work.
-The local bounded proof loads the merged authentication migrations too.
-Its hosted proof still uses the separate `minsky-d1-proof-ci` schema with migrations `0001` and `0002`.
-Neither proof verifies a complete authentication-backed Cloudflare workflow route.
-That connector must guard current credential state, credential generation, and identity-session existence and expiry at commit.
-The bounded adapter currently checks application login state and captured access versions.
+Provider-owned [installation tooling](../src/server/adapters/cloudflare/tooling/install.mjs) checks exact targets and protects returned credentials.
+See [installation](../site/src/content/docs/operators/installation.md), [provider verification](run-provider-tests.md), and [current evidence](current-state.md).
 
 ## Module boundaries
 
@@ -96,6 +75,11 @@ The bounded adapter currently checks application login state and captured access
 | [supabase/backend.ts](../src/backend/supabase/backend.ts) | Calls Supabase Auth, database functions, account administration, and Realtime. |
 | [supabase/images.ts](../src/backend/supabase/images.ts) | Calls the attachment function and private Storage bucket. |
 | [supabase/workflow.ts](../src/backend/supabase/workflow.ts) | Provides the opt-in Edge Function executor for shared workflow verification. |
+| [cloudflare/backend.ts](../src/backend/cloudflare/backend.ts) | Calls the same-origin API and manages independent live connections. |
+| [server/adapters/cloudflare/applicationWorker.ts](../src/server/adapters/cloudflare/applicationWorker.ts) | Constructs Cloudflare services and handles application and maintenance requests. |
+| [server/adapters/cloudflare/application.ts](../src/server/adapters/cloudflare/application.ts) | Reads authorized snapshots and commits guarded administration changes. |
+| [server/adapters/cloudflare/images.ts](../src/server/adapters/cloudflare/images.ts) | Manages private image reservations, transfers, publication, and cleanup. |
+| [server/adapters/cloudflare/live.ts](../src/server/adapters/cloudflare/live.ts) | Delivers audience-specific invalidations and manages current connection access. |
 | [server/workflow.ts](../src/server/workflow.ts) | Defines shared decisions, orchestration, and the operation-level persistence interface. |
 | [server/adapters/supabase/store.ts](../src/server/adapters/supabase/store.ts) | Calls service-only guarded persistence RPCs from trusted server code. |
 | [model.ts](../src/connected/model.ts) | Defines workflow commands and validates snapshots. It has no provider imports. |
@@ -103,13 +87,14 @@ The bounded adapter currently checks application login state and captured access
 
 The UI imports the contracts and `requireBackend()`.
 `npm run lint` rejects provider imports outside provider adapter modules and the backend entry point.
-The active application server functions and browser fixture driver remain specific to Supabase.
-The D1 proof has its own persistence adapter and isolated fixtures, with shared workflow decisions.
+The active application server functions remain specific to Supabase.
+Both complete browser adapters have provider-owned fixture drivers.
 
-`VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` remain the browser configuration.
-`backend` is `undefined` when either value is missing.
+Supabase builds use `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY`.
+For a Supabase build, `backend` is `undefined` when either value is missing.
 `requireBackend()` then throws the setup message shown on the login page.
-There is no provider selector or automatic fallback.
+`VITE_BACKEND` defaults to `supabase`. The explicit `cloudflare` value selects the same-origin Cloudflare adapter.
+Other values fail configuration. There is no automatic fallback between providers.
 
 ## Authentication
 
@@ -132,9 +117,10 @@ Authentication subscriptions invoke callbacks synchronously.
 Their cleanup function can run more than once.
 No callback runs after cleanup returns.
 
-The experimental Cloudflare adapter implements this same authentication contract through same-origin HTTP and HttpOnly cookies.
+The Cloudflare adapter implements this same authentication contract through same-origin HTTP and HttpOnly cookies.
 Password changes return a fresh session after the atomic credential commit. All earlier sessions are revoked.
-Its extra `account()` and `sessions()` methods cover this bounded ticket. Other `Backend` groups remain incomplete.
+The complete browser factory supplies the other `Backend` groups.
+After a reset removes an identity session, `accountStatus()` returns a restricted status with no account identity.
 See the [authentication reference](cloudflare-authentication.md) for current checks, endpoints, expiry, and request protection.
 
 ## Session reads and workflow commands
@@ -234,13 +220,13 @@ The existing embedded PostgreSQL tests continue to check database rules.
 It covers request-ID reuse after an uncertain write and a new request after a definitive rejection.
 The suite also covers the existing account, team-search, image, and refresh behavior.
 
-These checks do not verify a hosted provider or a second complete browser adapter.
-`npm test` also includes the local D1 application-store proof described above.
+Those mocked checks establish request and UI behavior. Hosted provider checks run separately.
+`npm test` also checks complete D1 persistence through `WorkflowPersistence`.
 It includes shared-service rules and Supabase persistence tests with embedded PostgreSQL.
 `npm run test:workflow:hosted` exercises the deployed opt-in Supabase function with the shared workflow scenarios and additional boundary checks.
 That runner permits only the approved Minsky CI project. It does not activate the replacement in development.
 Hosted checks use isolated accounts and records through [protected cloud CI](cloud-onboarding.md#verification-and-protected-cloud-ci).
 The [shared provider suite](provider-test-contracts.md) checks these contracts through real browser adapters.
-Supabase supplies the first fixture implementation. Other providers remain unimplemented.
+Supabase and Cloudflare have separate fixture implementations with the same scenario assertions.
 [Run the shared checks](run-provider-tests.md) separately from the provider-specific hosted UI suite.
 The latest observed results are in [current state](current-state.md).

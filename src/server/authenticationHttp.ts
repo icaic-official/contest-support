@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { readJsonBody } from './http';
 import { roleSchema } from '../connected/model';
 import { AuthenticationError, type AuthenticationService } from './authentication';
 
@@ -29,38 +30,6 @@ function json(body: unknown, status = 200, cookie?: string): Response {
   });
   if (cookie) headers.set('Set-Cookie', cookie);
   return new Response(JSON.stringify(body), { status, headers });
-}
-
-/** Read a bounded body before JSON parsing. Do not retain request credentials. */
-async function readBody(request: Request): Promise<unknown> {
-  const reader = request.body?.getReader();
-  if (!reader) throw new AuthenticationError(400, 'A JSON request body is required.');
-  const chunks: Uint8Array[] = [];
-  let size = 0;
-  try {
-    while (true) {
-      const { value, done } = await reader.read();
-      if (done) break;
-      size += value.byteLength;
-      if (size > 16_384) {
-        await reader.cancel();
-        throw new AuthenticationError(400, 'The request body is too large.');
-      }
-      chunks.push(value);
-    }
-    const bytes = new Uint8Array(size);
-    let offset = 0;
-    for (const chunk of chunks) {
-      bytes.set(chunk, offset);
-      offset += chunk.byteLength;
-    }
-    return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
-  } catch (error) {
-    if (error instanceof AuthenticationError) throw error;
-    throw new AuthenticationError(400, 'The JSON request body is invalid.');
-  } finally {
-    reader.releaseLock();
-  }
 }
 
 function permittedOrigin(value: string): string {
@@ -101,7 +70,7 @@ export function createAuthenticationHandler(
           request.headers.get('Sec-Fetch-Site') === 'cross-site') {
         throw new AuthenticationError(403, 'The request protection checks failed.');
       }
-      const body = await readBody(request);
+      const body = await readJsonBody(request);
       if (url.pathname === '/api/auth/sign-in') {
         const parsed = signInSchema.safeParse(body);
         if (!parsed.success) throw new AuthenticationError(400, 'Enter a username and password.');

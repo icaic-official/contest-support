@@ -32,11 +32,19 @@ interface Account {
 interface Login extends Account {
   login_id: string;
   csrf: string;
+  login_expires_at: number;
+  identity_expires_at: string;
+}
+
+interface SqlCheck {
+  sql: string;
+  values: Array<string | number | null>;
 }
 
 // This query is also evaluated inside each privileged batch. No browser claim
 // or earlier permission read grants access to a later credential mutation.
-const currentLoginSql = `SELECT a.*, l.id AS login_id, l.csrf
+const currentLoginSql = `SELECT a.*, l.id AS login_id, l.csrf,
+    l.expires_at AS login_expires_at, b.expiresAt AS identity_expires_at
   FROM accounts a JOIN logins l ON l.account_id = a.id
   JOIN ba_session b ON b.id = l.identity_session_id AND b.userId = a.id
   WHERE b.id = ? AND a.id = ? AND a.disabled = 0
@@ -122,7 +130,9 @@ export class D1AuthenticationService implements AuthenticationService {
         SELECT ?, a.id, unixepoch(b.expiresAt), b.id, a.credential_generation, ?
         FROM accounts a JOIN ba_session b ON b.userId = a.id WHERE a.id = ? AND b.id = ?`,
       loginId, randomSecret(), signed.accountId, signed.identitySessionId),
-      this.statement('DELETE FROM command_assertions WHERE id = ?', assertionId),
+      this.assertion(`${assertionId}:final`, `SELECT 1 FROM (${currentLoginSql}) WHERE login_id = ? AND credential_generation = ?`,
+        signed.identitySessionId, signed.accountId, loginId, before?.credential_generation ?? -1),
+      this.cleanupAssertions(assertionId),
     ]);
     return { cookie: signed.cookie };
   }
@@ -162,7 +172,7 @@ export class D1AuthenticationService implements AuthenticationService {
   }
 
   private async adminAssertions(headers: Headers, sessionId: string, target?: string): Promise<{
-    current: AuthenticationSession; statements: D1Statement[]; assertionId: string;
+    current: AuthenticationSession; statements: D1Statement[]; assertionId: string; finalCheck: SqlCheck;
   }> {
     const current = await this.requireCurrent(headers);
     const identity = await this.identity.session(headers);
@@ -170,14 +180,17 @@ export class D1AuthenticationService implements AuthenticationService {
     const [sql, values] = this.adminCondition(sessionId, current.user.id, target);
     if (!(await this.statement(sql, ...values).first())) throw new AuthenticationError(403, 'Account changes require admin access to all assigned sessions. Archived accounts cannot be changed.');
     const assertionId = crypto.randomUUID();
-    return { current, assertionId, statements: [
+    return { current, assertionId, finalCheck: {
+      sql: `SELECT 1 FROM (${currentLoginSql}) WHERE must_change = 0 AND login_id = ? AND EXISTS (${sql})`,
+      values: [identity.identitySessionId, identity.accountId, current.caller.loginId, ...values],
+    }, statements: [
       this.assertion(assertionId, `SELECT 1 FROM (${currentLoginSql}) WHERE must_change = 0`, identity.identitySessionId, identity.accountId),
       this.assertion(`${assertionId}:admin`, sql, ...values),
     ] };
   }
 
   private cleanupAssertions(id: string): D1Statement {
-    return this.statement('DELETE FROM command_assertions WHERE id = ? OR id = ?', id, `${id}:admin`);
+    return this.statement('DELETE FROM command_assertions WHERE id IN (?, ?, ?)', id, `${id}:admin`, `${id}:final`);
   }
 
   async account(headers: Headers, sessionId: string, input: AccountCommand): Promise<AccountResult> {
@@ -196,8 +209,9 @@ export class D1AuthenticationService implements AuthenticationService {
         this.statement(`UPDATE ba_user SET username = ?, email = ?, updatedAt = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ?`, command.username, `${command.username}@accounts.minsky.invalid`, target),
         this.statement(`INSERT INTO account_operations (id, account_id, actor, session_id, action, state, completed_at)
           VALUES (?, ?, ?, ?, 'set_username', 'completed', unixepoch())`, operationId, target, gate.current.user.id, sessionId),
-        this.cleanupAssertions(gate.assertionId),
         this.statement('DELETE FROM command_assertions WHERE id = ?', `${operationId}:username`),
+        this.assertion(`${gate.assertionId}:final`, gate.finalCheck.sql, ...gate.finalCheck.values),
+        this.cleanupAssertions(gate.assertionId),
       ]);
       return {};
     }
@@ -217,6 +231,7 @@ export class D1AuthenticationService implements AuthenticationService {
     }
     gate.statements.push(
       this.statement(`INSERT INTO account_operations (id, account_id, actor, session_id, action, state) VALUES (?, ?, ?, ?, ?, 'pending')`, operationId, target, gate.current.user.id, sessionId, command.action),
+      this.assertion(`${gate.assertionId}:final`, gate.finalCheck.sql, ...gate.finalCheck.values),
       this.cleanupAssertions(gate.assertionId),
     );
     await this.guarded(gate.statements);
@@ -235,7 +250,7 @@ export class D1AuthenticationService implements AuthenticationService {
     ];
   }
 
-  private async completeCredentials(headers: Headers, target: string, operationId: string, password: string, temporary: boolean, sessionId?: string, prepared?: { hash: string; statements: D1Statement[] }): Promise<void> {
+  private async completeCredentials(headers: Headers, target: string, operationId: string, password: string, temporary: boolean, sessionId?: string, prepared?: { hash: string; statements: D1Statement[]; finalCheck: SqlCheck }): Promise<void> {
     // Hash outside the transaction. A failed hash leaves the persisted gate and
     // revoked sessions intact. An organizer can issue another reset.
     const hash = prepared?.hash ?? await this.passwords.hash(password);
@@ -243,14 +258,19 @@ export class D1AuthenticationService implements AuthenticationService {
     if (!account?.username) throw new AuthenticationError(409, 'Set a username before resetting this account.');
     const assertions: D1Statement[] = prepared?.statements ?? [];
     let adminAssertion: string | undefined;
+    let finalCheck = prepared?.finalCheck;
     if (sessionId) {
       const gate = await this.adminAssertions(headers, sessionId, target);
       assertions.push(...gate.statements);
       adminAssertion = gate.assertionId;
+      finalCheck = gate.finalCheck;
     }
+    if (!finalCheck) throw new AuthenticationError(409, 'Account changed. Check its status before retrying.');
     const assertionId = crypto.randomUUID();
+    const generation = account.credential_generation + (prepared ? 1 : 0);
     assertions.push(
-      this.assertion(assertionId, `SELECT 1 FROM accounts WHERE id = ? AND credential_operation = ? AND credential_state = 'pending' AND disabled = 0`, target, operationId),
+      this.assertion(assertionId, `SELECT 1 FROM accounts WHERE id = ? AND credential_operation = ?
+        AND credential_generation = ? AND credential_state = 'pending' AND disabled = 0`, target, operationId, generation),
       this.statement(`INSERT INTO ba_user (id, name, email, emailVerified, createdAt, updatedAt, username)
         VALUES (?, ?, ?, 1, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), ?)
         ON CONFLICT(id) DO UPDATE SET username = excluded.username, email = excluded.email, updatedAt = excluded.updatedAt`,
@@ -265,6 +285,14 @@ export class D1AuthenticationService implements AuthenticationService {
       this.statement('DELETE FROM command_assertions WHERE id = ?', assertionId),
     );
     if (adminAssertion) assertions.push(this.cleanupAssertions(adminAssertion));
+    assertions.push(
+      this.assertion(`${assertionId}:final`, `SELECT 1 FROM accounts a JOIN account_operations o ON o.account_id = a.id
+        WHERE a.id = ? AND a.credential_generation = ? AND a.credential_state = 'ready'
+          AND a.credential_operation IS NULL AND a.disabled = 0 AND a.must_change = ?
+          AND o.id = ? AND o.state = 'completed' AND EXISTS (${finalCheck.sql})`,
+      target, generation, Number(temporary), operationId, ...finalCheck.values),
+      this.cleanupAssertions(assertionId),
+    );
     await this.guarded(assertions);
   }
 
@@ -277,15 +305,26 @@ export class D1AuthenticationService implements AuthenticationService {
     await this.limit(`change:${current.user.id}`, 10);
     const identity = await this.identity.session(headers);
     if (!identity) throw new AuthenticationError(401, 'Sign in again.');
-    const before = await this.statement('SELECT a.*, c.password FROM accounts a JOIN ba_account c ON c.userId = a.id AND c.providerId = \'credential\' WHERE a.id = ?', current.user.id).first<Account & { password: string }>();
+    const before = await this.statement(`SELECT l.*, c.password FROM (${currentLoginSql}) l
+      JOIN ba_account c ON c.userId = l.id AND c.providerId = 'credential' WHERE l.login_id = ?`,
+    identity.identitySessionId, identity.accountId, current.caller.loginId).first<Login & { password: string }>();
     if (!before || !(await this.passwords.verify(currentPassword, before.password))) throw new AuthenticationError(400, 'Current password is incorrect.');
     const operationId = crypto.randomUUID();
     const assertionId = crypto.randomUUID();
     // Self changes have no external identity update. Hash before the atomic
     // batch so a lone organizer can retry a failed change with the old login.
     const hash = await this.passwords.hash(newPassword);
-    await this.completeCredentials(headers, current.user.id, operationId, newPassword, false, undefined, { hash, statements: [
-      this.assertion(assertionId, `SELECT 1 FROM (${currentLoginSql}) WHERE credential_generation = ?`, identity.identitySessionId, identity.accountId, before.credential_generation),
+    await this.completeCredentials(headers, current.user.id, operationId, newPassword, false, undefined, { hash, finalCheck: {
+      // The change deliberately deletes the old identity session and revokes its
+      // login. Retain both original deadlines and verify the old login's exact
+      // generation while the final completion check verifies its replacement.
+      sql: `SELECT 1 FROM logins WHERE id = ? AND account_id = ? AND identity_session_id = ?
+        AND credential_generation = ? AND revoked = 1 AND expires_at > unixepoch()
+        AND ? > unixepoch() AND ? > strftime('%Y-%m-%dT%H:%M:%fZ', 'now')`,
+      values: [current.caller.loginId, current.user.id, identity.identitySessionId,
+        before.credential_generation, before.login_expires_at, before.identity_expires_at],
+    }, statements: [
+      this.assertion(assertionId, `SELECT 1 FROM (${currentLoginSql}) WHERE login_id = ? AND credential_generation = ?`, identity.identitySessionId, identity.accountId, current.caller.loginId, before.credential_generation),
       ...this.beginOperation(current.user.id, operationId),
       this.statement(`INSERT INTO account_operations (id, account_id, actor, action, state) VALUES (?, ?, ?, 'change_password', 'pending')`, operationId, current.user.id, current.user.id),
       this.statement('DELETE FROM command_assertions WHERE id = ?', assertionId),

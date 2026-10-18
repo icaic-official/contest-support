@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { Caller } from "../../applicationStore";
+import type { Caller } from '../../authentication';
 import type { D1Connection, D1Statement } from "./connection";
 
 type Row = Record<string, unknown>;
@@ -24,7 +24,11 @@ export class D1Fixture {
   readonly otherContestant: Caller = { accountId: randomUUID(), loginId: randomUUID() };
   private journalDirectory: string | undefined;
 
-  constructor(readonly db: D1Connection, private readonly configPath = 'wrangler.d1-proof.jsonc') {}
+  constructor(
+    readonly db: D1Connection,
+    private readonly configPath: string,
+    private readonly workflow = false,
+  ) {}
 
   statement(sql: string, ...values: Array<string | number | null>): D1Statement {
     return this.db.prepare(sql).bind(...values);
@@ -46,7 +50,7 @@ export class D1Fixture {
   private recoveryDetails() {
     const config = JSON.parse(readFileSync(this.configPath, "utf8"));
     return {
-      config: this.configPath, remote: process.env.MINSKY_D1_REMOTE === "1" || process.env.MINSKY_AUTH_REMOTE === "1",
+      config: this.configPath, workflow: this.workflow, remote: process.env.MINSKY_AUTH_REMOTE === "1" || Boolean(process.env.MINSKY_CONNECTOR_D1_CONFIG),
       accountId: config.account_id, databaseId: config.d1_databases[0].database_id,
       databaseName: config.d1_databases[0].database_name,
       eventId: this.eventId, sessionIds: [this.sessionId, this.secondSessionId],
@@ -84,6 +88,20 @@ export class D1Fixture {
           this.sessionId, caller.accountId, index === 2 ? this.teamId : index === 3 ? this.otherTeamId : null),
       );
     }
+    if (this.workflow) {
+      for (const caller of this.accounts()) {
+        statements.push(
+          this.statement(`INSERT INTO ba_user (id, name, email, createdAt, updatedAt)
+            SELECT id, name, id || '@workflow.minsky.invalid', strftime('%Y-%m-%dT%H:%M:%fZ', 'now'),
+              strftime('%Y-%m-%dT%H:%M:%fZ', 'now') FROM accounts WHERE id = ?`, caller.accountId),
+          this.statement(`INSERT INTO ba_session (id, userId, token, expiresAt, createdAt, updatedAt)
+            VALUES (?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '+1 hour'),
+              strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`,
+          caller.loginId, caller.accountId, randomUUID()),
+          this.statement('UPDATE logins SET identity_session_id = ? WHERE id = ?', caller.loginId, caller.loginId),
+        );
+      }
+    }
     statements.push(
       this.statement("INSERT INTO membership_roles (session_id, account_id, role) VALUES (?, ?, 'volunteer'), (?, ?, 'specialist')",
         this.sessionId, this.staff.accountId, this.sessionId, this.specialist.accountId),
@@ -91,10 +109,24 @@ export class D1Fixture {
         this.secondSessionId, this.staff.accountId),
       this.statement("INSERT INTO membership_roles (session_id, account_id, role) VALUES (?, ?, 'volunteer')",
         this.secondSessionId, this.staff.accountId),
-      this.statement("INSERT INTO issues (id, session_id, team_id, status) VALUES (?, ?, ?, 'open'), (?, ?, ?, 'open'), (?, ?, ?, 'open')",
-        this.issueId, this.sessionId, this.teamId, this.otherIssueId, this.sessionId, this.teamId,
-        this.secondSessionIssueId, this.secondSessionId, this.secondSessionTeamId),
     );
+    if (this.workflow) {
+      for (const [id, session, team, number] of [
+        [this.issueId, this.sessionId, this.teamId, 1],
+        [this.otherIssueId, this.sessionId, this.teamId, 2],
+        [this.secondSessionIssueId, this.secondSessionId, this.secondSessionTeamId, 1],
+      ] as const) {
+        statements.push(this.statement(`INSERT INTO issues
+          (id, session_id, team_id, status, number, reporter, reporter_name, category, description, created_at)
+          SELECT ?, ?, ?, 'open', ?, id, name, 'Devices', 'Fictional existing issue',
+            strftime('%Y-%m-%dT%H:%M:%fZ', 'now') FROM accounts WHERE id = ?`,
+        id, session, team, number, this.staff.accountId));
+      }
+    } else {
+      statements.push(this.statement("INSERT INTO issues (id, session_id, team_id, status) VALUES (?, ?, ?, 'open'), (?, ?, ?, 'open'), (?, ?, ?, 'open')",
+        this.issueId, this.sessionId, this.teamId, this.otherIssueId, this.sessionId, this.teamId,
+        this.secondSessionIssueId, this.secondSessionId, this.secondSessionTeamId));
+    }
     try {
       await this.db.batch(statements);
     } catch (error) {
@@ -102,17 +134,27 @@ export class D1Fixture {
     }
   }
 
-  /** Compare every command effect, including public and private counters. */
-  async durableState(): Promise<Record<string, Row[]>> {
-    const sessions = [this.sessionId, this.secondSessionId];
+  private durableQueries(): Array<[string, string]> {
     const queries: Array<[string, string]> = [
       ["issues", "SELECT * FROM issues WHERE session_id IN (?, ?) ORDER BY id"],
       ["receipts", "SELECT * FROM command_receipts WHERE session_id IN (?, ?) ORDER BY actor, request_id"],
       ["history", "SELECT h.* FROM history h JOIN issues i ON i.id = h.issue_id WHERE i.session_id IN (?, ?) ORDER BY h.id"],
-      ["sequences", "SELECT * FROM audience_sequences WHERE session_id IN (?, ?) ORDER BY session_id, audience"],
-      ["notifications", "SELECT * FROM notifications WHERE session_id IN (?, ?) ORDER BY id"],
+      ["sequences", "SELECT * FROM audience_sequences WHERE session_id IN (?, ?) AND audience NOT LIKE 'account:%' ORDER BY session_id, audience"],
+      ["notifications", "SELECT * FROM notifications WHERE session_id IN (?, ?) AND audience NOT LIKE 'account:%' ORDER BY id"],
     ];
-    const rows = await this.rowsBatch(queries.map(([, sql]) => this.statement(sql, ...sessions)));
+    if (this.workflow) queries.push(
+      ["resolutions", "SELECT * FROM resolutions WHERE session_id IN (?, ?) ORDER BY id"],
+      ["awards", "SELECT * FROM awards WHERE session_id IN (?, ?) ORDER BY id"],
+      ["issue_sequences", "SELECT * FROM session_issue_sequences WHERE session_id IN (?, ?) ORDER BY session_id"],
+    );
+    return queries;
+  }
+
+  /** Compare workflow effects. Account-only invalidations belong to credential operations. */
+  async durableState(): Promise<Record<string, Row[]>> {
+    const queries = this.durableQueries();
+    const rows = await this.rowsBatch(queries.map(([, sql]) =>
+      this.statement(sql, this.sessionId, this.secondSessionId)));
     const result: Record<string, Row[]> = {};
     queries.forEach(([name], index) => { result[name] = rows[index]; });
     return result;
@@ -148,13 +190,12 @@ export class D1Fixture {
     // Remove owned history before deleting its authenticated actors.
     await this.db.batch([
       this.statement("DELETE FROM events WHERE id = ?", this.eventId),
+      ...(this.workflow ? accounts.map((caller) => this.statement("DELETE FROM ba_user WHERE id = ?", caller.accountId)) : []),
       ...accounts.map((caller) => this.statement("DELETE FROM accounts WHERE id = ?", caller.accountId)),
     ]);
-    const remaining = await this.durableState();
-    if (Object.values(remaining).some((rows) => rows.length !== 0)) {
-      throw new Error(`Fixture workflow records remain for ${this.eventId}.`);
-    }
-    const [people, logins, memberships, events, remainingSessions] = await this.rowsBatch([
+    const workflowQueries = this.durableQueries();
+    const checks = await this.rowsBatch([
+      ...workflowQueries.map(([, sql]) => this.statement(sql, this.sessionId, this.secondSessionId)),
       this.statement("SELECT id FROM accounts WHERE id IN (?, ?, ?, ?)",
         ...accounts.map((caller) => caller.accountId)),
       this.statement("SELECT id FROM logins WHERE id IN (?, ?, ?, ?)",
@@ -163,9 +204,23 @@ export class D1Fixture {
         ...accounts.map((caller) => caller.accountId)),
       this.statement("SELECT id FROM events WHERE id = ?", this.eventId),
       this.statement("SELECT id FROM sessions WHERE id IN (?, ?)", this.sessionId, this.secondSessionId),
+      this.statement("SELECT * FROM audience_sequences WHERE session_id IN (?, ?)", this.sessionId, this.secondSessionId),
+      this.statement("SELECT * FROM notifications WHERE session_id IN (?, ?)", this.sessionId, this.secondSessionId),
+      ...(this.workflow ? [
+        this.statement("SELECT id FROM ba_user WHERE id IN (?, ?, ?, ?)", ...accounts.map((caller) => caller.accountId)),
+        this.statement("SELECT id FROM ba_session WHERE userId IN (?, ?, ?, ?)", ...accounts.map((caller) => caller.accountId)),
+      ] : []),
     ]);
+    if (checks.slice(0, workflowQueries.length).some((rows) => rows.length !== 0)) {
+      throw new Error(`Fixture workflow records remain for ${this.eventId}.`);
+    }
+    const [people, logins, memberships, events, remainingSessions, sequences, notifications,
+      identityUsers, identitySessions] = checks.slice(workflowQueries.length);
+    if (this.workflow) {
+      if (identityUsers.length || identitySessions.length) throw new Error(`Fixture identities remain for ${this.eventId}.`);
+    }
     if (people.length !== 0) throw new Error(`Fixture accounts remain for ${this.eventId}.`);
-    if (logins.length || memberships.length || events.length || remainingSessions.length) {
+    if (logins.length || memberships.length || events.length || remainingSessions.length || sequences.length || notifications.length) {
       throw new Error(`Fixture access records remain for ${this.eventId}.`);
     }
   }

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { Caller } from '../../applicationStore.ts';
+import type { Caller } from '../../authentication.ts';
 import type { Command } from '../../../connected/model.ts';
 import type { WorkflowCommitResult, WorkflowDecision, WorkflowPersistence, WorkflowRead } from '../../workflow.ts';
 

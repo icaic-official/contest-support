@@ -2,11 +2,12 @@
 
 These tickets describe development work, not contestant issues.
 
-The active connector ticket is [T0020 complete Cloudflare connector](#t0020-complete-cloudflare-connector).
-The owner also authorized [T0009 jury worklist maintenance](#t0009--jury-worklist) in parallel on its existing PR branch.
-The two checkouts and scopes remain separate. Supabase remains active.
-PR #41 merged the shared server workflow at `7d19b00` on 2026-10-18.
-Migration tooling and backend cutover remain outside both current tasks.
+The active ticket is [T0020 complete Cloudflare connector](#t0020-complete-cloudflare-connector).
+The owner merged T0019 in PR #41 at `7d19b00` before authorizing this ticket.
+T0020 completes Cloudflare persistence, the browser connector, and independent installation verification.
+The owner merged the parallel T0009 jury worklist in PR #23 at `c144a2a` during this ticket.
+T0020 includes that main revision and repeats the affected application checks.
+Real-data migration tooling follows connector verification. Supabase remains active.
 
 T0016 Cloudflare backend design merged in [PR #36](https://github.com/GiftedNovaHD/minsky/pull/36) at `b68ef72` on 2026-10-17.
 [T0015 shared provider tests](#t0015-shared-provider-tests) merged in [PR #37](https://github.com/GiftedNovaHD/minsky/pull/37).
@@ -59,7 +60,7 @@ T0008 fuzzy team search merged into `main` in [PR #22](https://github.com/notbow
 ## T0020 Complete Cloudflare connector
 
 Branch: `feature/t0020-cloudflare-connector`, from updated `main` at `7d19b00`.
-Status: implementation in progress. The owner reviews and merges.
+Status: implementation, review fixes, cleanup, protected verification, and fresh installation are complete in [PR #42](https://github.com/GiftedNovaHD/minsky/pull/42). Final ordinary PR checks gate the documentation update. The owner reviews and merges.
 Summary: Complete every Cloudflare backend operation and verify the application with isolated resources. Verify installation into an empty Cloudflare environment.
 
 The owner authorized the complete connector after PR #41 merged.
@@ -91,25 +92,38 @@ Do not claim contest capacity without separate evidence.
 
 ### Acceptance criteria
 
-- [ ] Every workflow command uses shared decisions and atomic state, history, receipt, and notification commits.
-- [ ] Commits recheck permissions, credential generation, identity-session expiry, and revocation.
-- [ ] Every `Backend` capability has a working Cloudflare implementation with existing behavior preserved.
-- [ ] Authorized snapshots include complete permitted workflow, account, image, and timing data.
-- [ ] Private images preserve visibility, ownership, limits, archival rules, retries, and scoped cleanup.
-- [ ] Live updates preserve audience separation, revocation, reconnect refresh, duplicate handling, and failure recovery.
-- [ ] The same required shared scenarios pass against Supabase and Cloudflare.
-- [ ] Complete hosted application journeys pass with fictional accounts and images.
-- [ ] The documented installation procedure succeeds in an empty isolated Cloudflare environment.
-- [ ] PR #21 reuse decisions and the final disposition recommendation are documented.
-- [ ] Fixture cleanup is verified and deletes only UUID-owned data.
-- [ ] Required type, lint, build, database, function, browser, documentation, and hosted checks pass.
-- [ ] Local, hosted CLI, and protected GitHub Actions evidence are recorded separately.
-- [ ] The final PR revision has passing required checks and accurate documentation for owner review.
+- [x] Every workflow command uses shared decisions and atomic state, history, receipt, and notification commits.
+- [x] Commits recheck permissions, credential generation, identity-session expiry, and revocation.
+- [x] Every `Backend` capability has a working Cloudflare implementation with existing behavior preserved.
+- [x] Authorized snapshots include complete permitted workflow, account, image, and timing data.
+- [x] Private images preserve visibility, ownership, limits, archival rules, retries, and scoped cleanup.
+- [x] Live updates preserve audience separation, revocation, reconnect refresh, duplicate handling, and failure recovery.
+- [x] The same required shared scenarios pass against Supabase and Cloudflare.
+- [x] Complete hosted application journeys pass with fictional accounts and images.
+- [x] The documented installation procedure succeeds in an empty isolated Cloudflare environment.
+- [x] PR #21 reuse decisions and the final disposition recommendation are documented.
+- [x] Fixture cleanup is verified and deletes only UUID-owned data.
+- [x] Required type, lint, build, database, function, browser, documentation, and hosted checks pass on executable source `2b6f6f0`.
+- [x] Local, hosted CLI, and protected GitHub Actions evidence are recorded separately.
+- [x] The final PR is prepared with accurate documentation and required CI checks for owner review.
+
+### Review fixes and verification
+
+The owner requested all review fixes and cleanup before this PR is ready.
+Correct the confirmed review findings, including image-expiry cleanup and generated configuration safety.
+Remove the retired bounded proof path and duplicate store runners.
+Use the current `WorkflowPersistence` and consolidate the installation procedure and reference material.
+Preserve the merged jury worklist, earlier installation resources, and unique historical evidence.
+
+The [dated verification record](current-state.md#t0020-connector-implementation-2026-10-18) preserves earlier local, hosted CLI, protected, and empty-installation results.
+Those runs do not verify later review fixes.
+Fresh checks and scoped cleanup pass on executable source `2b6f6f0`.
+The [review verification record](current-state.md#pr-42-review-fixes-and-cleanup-2026-10-18) separates the first Supabase failure, its passing unchanged repeats, protected Cloudflare results, and the new empty installation.
 
 ## T0019 Shared server workflow
 
 Branch: `feature/t0019-shared-server-workflow`, from updated `main` at `0c797ad`.
-Status: implemented in [PR #41](https://github.com/GiftedNovaHD/minsky/pull/41). Local, hosted Supabase, and bounded hosted D1 checks pass. Protected GitHub cloud execution remains pending. The owner reviews and merges.
+Status: merged in [PR #41](https://github.com/GiftedNovaHD/minsky/pull/41) at `7d19b00`. Local, hosted Supabase, and bounded hosted D1 checks pass. Protected authentication passes on the earlier merged `main` revision. T0019's protected Supabase job was not run.
 Summary: Extract the existing issue rules into one shared server service. Exercise all nine commands through a trusted Supabase path before expanding Cloudflare workflow persistence.
 
 The owner authorized work while [PR #40](https://github.com/GiftedNovaHD/minsky/pull/40) was open.
@@ -218,11 +232,12 @@ AWS adapters and Terraform remain deferred. Bounded subagent work is authorized.
 
 ### Verification
 
-Use [Run the D1 transaction proof](d1-transaction-proof.md) for exact commands and recovery.
-The [store reference](backend-contracts.md#bounded-d1-application-store) defines its bounded interface.
+The [historical D1 proof guide](https://github.com/GiftedNovaHD/minsky/blob/88ea5020a0f9dfc34a32ed7fbd84dfea07423297/docs/d1-transaction-proof.md) preserves the recorded commands and recovery procedure.
+Current D1 verification uses the complete workflow suite in [Run the provider tests](run-provider-tests.md).
+The [store reference](https://github.com/GiftedNovaHD/minsky/blob/88ea5020a0f9dfc34a32ed7fbd84dfea07423297/docs/backend-contracts.md#bounded-d1-application-store) defines its bounded interface.
 The [current-state record](current-state.md#t0017-d1-transaction-proof-2026-10-17) separates local and hosted evidence.
 All 42 focused cases pass locally and on hosted D1 at `edb4bd0`. Ordinary CI passes on that implementation revision.
-The complete Cloudflare connector remains unimplemented.
+That bounded proof did not implement the complete connector. [T0020](#t0020-complete-cloudflare-connector) supplies the later implementation.
 
 
 ## T0015 shared provider tests
@@ -701,7 +716,8 @@ The user accepted the design by merging PR #36. This did not authorize Cloudflar
 ### Verification
 
 The [design](cloudflare-backend-design.md) explains the decisions.
-The [implementation plan](cloudflare-implementation-plan.md) defines acceptance steps.
+The [historical implementation plan](https://github.com/GiftedNovaHD/minsky/blob/88ea5020a0f9dfc34a32ed7fbd84dfea07423297/docs/cloudflare-implementation-plan.md) records the accepted implementation phases.
+Remaining [migration gates](product-direction.md#migration-and-cutover-gates) stay deferred.
 The [verification record](current-state.md#t0016-cloudflare-backend-design-2026-10-17) identifies this documentation-only change.
 Supabase remains active. This ticket creates no credentials, provider resources, or data migration.
 
@@ -838,7 +854,7 @@ Deployment remains a separate step.
 
 Branch: `feature/t0009-jury-worklist`, from updated `main` at `1ed603a`.
 
-Status: parallel maintenance of [PR #23](https://github.com/GiftedNovaHD/minsky/pull/23), authorized on 2026-10-18. Verified and prepared for owner review.
+Status: merged in [PR #23](https://github.com/GiftedNovaHD/minsky/pull/23) at `c144a2a` on 2026-10-18 after parallel maintenance and verification.
 Current `main` at `7d19b00` is the integration baseline. Fast checks, 276 unit/database tests, 44 application browser cases, and authentication/documentation browser checks pass. Hosted jury acceptance, protected checks, and scoped cleanup pass on runtime source `f45d03f`. The final follow-up changes documentation only.
 Summary: Provide separate outstanding decision and external-application lists through the existing issue details and actions.
 

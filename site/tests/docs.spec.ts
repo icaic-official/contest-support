@@ -17,18 +17,45 @@ test('documentation navigation and direct page reload work', async ({page}, test
   expect(errors).toEqual([]);
 });
 
-test('search can be opened by keyboard and finds an indexed page', async ({page}) => {
-  await page.goto('/');
-  await page.getByRole('button', {name: 'Search', exact: true}).focus();
-  await page.keyboard.press('Enter');
-  const dialog = page.getByRole('dialog', {name: 'Search', exact: true});
-  await expect(dialog).toBeVisible();
-  await dialog.getByRole('textbox', {name: 'Search', exact: true}).fill('handoff');
-  const result = dialog.getByRole('link', {name: /Investigate and resolve issues/}).first();
-  await expect(result).toBeVisible();
-  await result.click();
-  await expect(page).toHaveURL(/\/guides\/staff\//);
-  await expect(page.getByRole('heading', {level: 1})).toHaveText('Investigate and resolve issues');
+test('keyboard search retains a query while its index loads', async ({page}) => {
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  let resumeIndex: (() => void) | undefined;
+  const indexGate = new Promise<void>((resolve) => { resumeIndex = resolve; });
+  await page.route('**/pagefind/index/*.pf_index', async (route) => {
+    await indexGate;
+    await route.continue();
+  });
+  try {
+    await page.goto('/');
+    await page.getByRole('button', {name: 'Search', exact: true}).focus();
+    await page.keyboard.press('Enter');
+    const dialog = page.getByRole('dialog', {name: 'Search', exact: true});
+    await expect(dialog).toBeVisible();
+    const input = dialog.getByRole('textbox', {name: 'Search', exact: true});
+    await input.fill('handoff');
+    await expect(dialog.getByText('Searching for handoff...', {exact: true})).toBeVisible();
+    await expect(input).toHaveValue('handoff');
+
+    // A visible input accepts queries before Pagefind finishes loading. Wait for
+    // the actual index response before checking the completed search result.
+    const indexResponse = page.waitForResponse((response) =>
+      /\/pagefind\/index\/[^/]+\.pf_index$/.test(new URL(response.url()).pathname));
+    resumeIndex?.();
+    const response = await indexResponse;
+    expect(response.ok()).toBe(true);
+    expect(await response.finished()).toBeNull();
+    const result = dialog.getByRole('link', {name: /Investigate and resolve issues/}).first();
+    await expect(result).toBeVisible();
+    await result.focus();
+    await expect(result).toBeFocused();
+    await page.keyboard.press('Enter');
+    await expect(page).toHaveURL(/\/guides\/staff\//);
+    await expect(page.getByRole('heading', {level: 1})).toHaveText('Investigate and resolve issues');
+    expect(errors).toEqual([]);
+  } finally {
+    resumeIndex?.();
+  }
 });
 
 test('phone navigation and a missing page remain usable', async ({page}, testInfo) => {
@@ -38,8 +65,8 @@ test('phone navigation and a missing page remain usable', async ({page}, testInf
   await expect(page.getByRole('link', {name: 'Skip to content'})).toBeFocused();
   await page.keyboard.press('Enter');
   await page.getByRole('button', {name: 'Menu', exact: true}).click();
-  await page.getByRole('link', {name: 'Installation options', exact: true}).click();
-  await expect(page.getByRole('heading', {level: 1})).toHaveText('Prepare an independent installation');
+  await page.getByRole('link', {name: 'Install Cloudflare', exact: true}).click();
+  await expect(page.getByRole('heading', {level: 1})).toHaveText('Install an isolated Cloudflare instance');
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   await page.screenshot({path: testInfo.outputPath('docs-phone.png')});
   const response = await page.goto('/this-page-does-not-exist/');

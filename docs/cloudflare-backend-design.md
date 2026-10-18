@@ -1,32 +1,25 @@
 # Cloudflare backend design
 
-This page explains the proposed Cloudflare backend and its provider boundaries.
-T0016 began while PR #32 was under review. The user merged PR #32 on 2026-10-17.
-T0017's bounded [D1 transaction proof](d1-transaction-proof.md) merged in PR #39.
-T0019 extracts the existing workflow into shared server code and verifies it through Supabase before further D1 workflow implementation.
-T0018 authentication merged in PR #40 at `68e8642`. T0019 now includes that updated `main`.
-The complete Cloudflare connector and migration tools remain later work.
-The owner authorizes isolated development and CI resources for this implementation.
-That authorization does not establish a hosted verification result.
-Supabase remains the active backend.
+This page explains the Cloudflare connector and its provider boundaries.
+The browser uses the same `Backend` contract for Supabase and Cloudflare.
+Issue decisions use one `WorkflowService`. Provider adapters supply persistence, authentication, images, and live delivery.
+Supabase remains the active development backend.
 
 The user selected Workers, D1 with a SQLite rewrite, private R2, and Durable Objects.
-The migration preserves accounts, IDs, permissions, issue history, timestamps, awards, and image contents.
-Possible AWS testing motivates portable interfaces. It does not add an AWS implementation to this change.
-
-The [implementation plan](cloudflare-implementation-plan.md) defines the acceptance steps and unresolved decisions.
-The [backend contracts](backend-contracts.md) describe the implemented browser interface.
+A later migration must preserve accounts, IDs, permissions, issue history, timestamps, awards, and image contents.
+See [migration gates](product-direction.md#migration-and-cutover-gates) for the deferred cutover requirements.
+See [backend contracts](backend-contracts.md) for the browser interface and [current state](current-state.md) for dated evidence.
 
 ## Two different adapter boundaries
 
 `Backend` describes what the browser needs from Minsky.
 The existing Supabase adapter translates those operations into Supabase calls.
-A future Cloudflare adapter translates the same operations into authenticated HTTP requests and live subscriptions.
+The Cloudflare adapter translates the same operations into authenticated HTTP requests and live subscriptions.
 
 The server needs a separate boundary.
 Moving browser calls behind `Backend` does not make PostgreSQL functions portable.
-T0019 supplies one [shared workflow service](server-workflow.md) for the existing issue commands.
-The Cloudflare server must reuse those decisions and enforce their commit conditions through its SQLite adapter.
+The [shared workflow service](server-workflow.md) applies the existing issue decisions.
+The Cloudflare server reuses those decisions and enforces their commit conditions through its SQLite adapter.
 A later AWS server can reuse the same service without importing Cloudflare bindings.
 
 ```mermaid
@@ -40,24 +33,25 @@ flowchart TD
     CF --> API[Worker HTTP handlers]
     API --> Identity[Identity and login sessions]
     API --> Domain[Minsky command and access rules]
-    Domain --> Store[Transactional application store]
-    API --> Images[Image operations]
-    Images --> Store
-    Images --> Blobs[Private blob store]
-    Store --> D1[D1 adapter]
-    Store --> SP[Supabase persistence adapter]
+    Domain --> Persistence[WorkflowPersistence]
+    Persistence --> D1[D1 adapter]
+    Persistence --> SP[Supabase persistence adapter]
     SP --> PG[Guarded PostgreSQL commit]
-    Blobs --> R2[R2 adapter]
+    API --> Application[D1 application service]
+    Application --> D1
+    API --> Images[R2 image service]
+    Images --> D1
+    Images --> R2[Private R2 bucket]
     D1 --> Pending[Committed notification records]
     Pending --> Live[Durable Object delivery adapter]
     Live --> CF
 ```
 
-The diagram includes the complete target and the separate Supabase verification path.
-T0019's Supabase function executes every issue command through the shared service.
-The bounded D1 adapter reuses that service for `claim` and `message` only.
-The merged authentication Worker has no workflow route.
-The complete connector must also guard current identity sessions and credential generations inside each workflow commit.
+The diagram includes the Cloudflare connector and the separate Supabase verification path.
+The opt-in Supabase function executes every issue command through the shared service.
+The D1 adapter persists all nine commands from that service.
+The complete [application Worker](../src/server/adapters/cloudflare/applicationWorker.ts) combines authenticated workflow, reads, administration, images, and live connections.
+It guards current identity sessions and credential generations inside workflow commits.
 The active Supabase browser workflow still calls the legacy RPC.
 The dotted connection identifies the opt-in executor used for replacement verification.
 
@@ -65,22 +59,25 @@ The dotted connection identifies the opt-in executor used for replacement verifi
 
 The table defines the boundaries.
 The [workflow reference](server-workflow.md) identifies implemented workflow modules and remaining provider-specific paths.
-Identity, image, and delivery entries still include proposed Cloudflare work.
+The Cloudflare implementations remain inside provider adapter modules.
 
 | Boundary | Responsibility | Provider details excluded from callers |
 | --- | --- | --- |
 | Browser `Backend` | Minsky operations and validated results. | SQL, SDK clients, bearer tokens, and subscription channels. |
 | HTTP handlers | Validate requests, authenticate callers, and map typed results to responses. | Business rules inside route handlers. |
 | Domain rules | Decide valid transitions and required changes from explicit account and workflow state. | Worker bindings, environment variables, SQL syntax, and network calls. |
-| Application store | Read authorized state and commit an entire command with its preconditions, receipt, history, and notification records. | Generic table CRUD and caller-controlled transactions. |
+| `WorkflowPersistence` | Read authorized workflow state and commit a decision with its preconditions, receipt, history, and notifications. | Generic table CRUD and caller-controlled transactions. |
 | Identity service | Verify credentials and login sessions, change passwords, and revoke access. | Provider token formats and password storage details. |
 | Blob store | Store immutable image objects, inspect content, read bytes, and retry deletion. | Bucket clients and provider URLs. |
 | Change delivery | Deliver authorized snapshot invalidations and recover pending notifications. | Durable Object classes and WebSocket lifecycle details. |
 
-A port is a typed interface at one of these server boundaries.
-Ports describe complete Minsky operations, such as committing a workflow command.
-They do not expose a generic `save(table, record)` API.
-The application store owns the transaction needed by each operation.
+The application Worker constructs [D1 application access](../src/server/adapters/cloudflare/application.ts), [R2 images](../src/server/adapters/cloudflare/images.ts), and [live delivery](../src/server/adapters/cloudflare/live.ts).
+The [browser adapter](../src/backend/cloudflare/backend.ts) implements every `Backend` group.
+Issue decisions remain shared. Other operations preserve their behavior in the corresponding provider server adapter.
+The [operator tooling](../src/server/adapters/cloudflare/tooling/install.mjs) owns Cloudflare configuration, target checks, bootstrap, and owner recovery.
+
+`WorkflowPersistence` defines complete workflow operations.
+Each persistence adapter owns the transaction needed by an operation.
 
 Workflow decisions use explicit authorized state.
 The persistence adapter supplies authoritative timestamps and generated IDs during commit.
@@ -106,31 +103,32 @@ Terraform can later provision selected resources. Terraform does not replace app
 
 ## D1 stores the authoritative application state
 
-The complete target uses one application database per environment.
-The existing bounded proof does not yet implement the complete schema or every workflow command.
+The connector uses one application database per environment.
+The complete schema includes workflow, account, administration, image, and notification records.
 The same database contains account access state and all memberships.
 This permits password-reset authorization across every session assigned to an account.
 Splitting databases by contest session would require a separate consistency design for that rule.
 
 The SQLite schema retains UUIDs as stable identifiers and retains current issue numbers.
-Migration initializes the issue-number allocator above the highest imported number.
+Submission allocates a number above the current session's existing issue numbers inside its commit.
 Foreign keys retain session boundaries between teams, issues, resolutions, awards, and images.
 Unique constraints retain one award per issue and one current resolution per issue.
-Roles use explicit related records or validated JSON with equivalent membership checks.
-The schema decision must not silently narrow the existing combination of staff roles.
+Roles use explicit membership-role records and retain combined staff capabilities.
 
-Imported timestamps retain their precision and order.
-The migration must test its timestamp encoding against PostgreSQL values before choosing the SQLite representation.
-JavaScript millisecond timestamps alone are insufficient evidence of a lossless conversion.
+New D1 commits obtain ISO 8601 timestamps from the database.
+Data import remains deferred.
+A later migration must preserve imported timestamp precision and order and verify its encoding against PostgreSQL values.
+The current timestamp format alone does not prove a lossless import.
 Saved resolution intervals remain the basis of elapsed-time calculations.
 
-The API is the only application route to D1.
+The browser accesses D1 through the authenticated Worker API.
+Trusted operator commands and isolated fixtures use provider bindings separately.
 Every read includes the authenticated account and its current access conditions.
 The store assembles snapshots in one consistent database operation.
 It excludes other teams' records and staff-only records before they leave the server.
 Account status, login revocation, and mandatory password changes also guard file reads and live connections.
 
-The initial design uses primary database reads for authorization and snapshots.
+The implementation uses primary database reads for authorization and snapshots.
 Cloudflare routes binding queries to the primary unless the application uses the Sessions API for replication.
 Replica reads require a tested consistency rule for revocation and reads after writes before adoption.
 See [D1 read replication](https://developers.cloudflare.com/d1/best-practices/read-replication/).
@@ -138,24 +136,23 @@ See [D1 read replication](https://developers.cloudflare.com/d1/best-practices/re
 ## One workflow command has one database commit
 
 The existing [workflow function](../supabase/migrations/202610020003_private_signals.sql) commits state, history, signals, and the request receipt together.
-The SQLite implementation must preserve that property.
+The SQLite implementation preserves that property.
 D1 `batch()` accepts prepared statements and rolls back the batch if a statement fails.
 It does not provide a JavaScript transaction callback around arbitrary asynchronous work.
 See [the D1 database API](https://developers.cloudflare.com/d1/worker-api/d1-database/).
 
-The proposed store first reads the state needed to evaluate a command.
+The store first reads the state needed to evaluate a command.
 Domain rules produce either a rejection or a complete change with expected versions.
 The store submits one bounded batch with these elements:
 
-1. An assertion checks the current login, account access version, membership versions, event state, session settings, and affected workflow versions.
-2. A receipt reserves the unique pair of authenticated actor and request ID.
-3. The batch writes the issue changes, history, resolution, or award.
-4. The batch writes audience-specific notification records and the receipt result.
+1. An assertion checks current access and the captured account, membership, event, session, and workflow dependencies.
+2. The batch obtains one database timestamp and writes the issue, resolution, reopening, or award effects.
+3. The batch records history, the unique actor/request receipt, and audience-specific notifications.
+4. A final access assertion rejects expiry or revocation before the batch completes.
 
 The assertions execute inside the batch.
 A failed assertion must raise a database error and roll back every write.
 A conditional update that affects zero rows must not allow the remaining writes to commit.
-The first D1 implementation task must prove this assertion pattern with real D1 tests before it becomes the command foundation.
 
 Every changed dependency increments its internal version in the same commit.
 Membership changes also increment the affected account's access version.
@@ -179,16 +176,10 @@ There is no transaction across D1, R2, and Durable Objects.
 The D1 commit records later work before any external side effect begins.
 A retry repeats that work safely without repeating the workflow command.
 Administration methods currently lack workflow-style request IDs.
-Their implementation must define retry semantics before adding automatic retries or claiming the same guarantee.
+The browser does not automatically retry those administration calls with a workflow-style guarantee.
+An uncertain credential result requires checking account state or issuing a later authorized reset.
 
 ## Authentication uses replacement temporary passwords
-
-T0018 implements bounded authentication in [PR #40](https://github.com/GiftedNovaHD/minsky/pull/40).
-The owner merged that PR at `68e8642` on 2026-10-17 at 17:16:41 UTC.
-T0019 preserves the merged authentication behavior.
-The initial protected hosted HTTP check reached a Workers Free resource limit.
-The owner activated Workers Paid during PR #41 review. The local hosted HTTP suite now passes.
-See [current state](current-state.md) for the separate protected GitHub result.
 
 Account preservation and password preservation are different requirements.
 The owner selected organizer-issued replacement temporary passwords on 2026-10-17.
@@ -196,28 +187,23 @@ Users must change these passwords before contest access.
 Preserve account IDs, memberships, permissions, and history.
 Existing passwords do not need to survive. Password-hash import is no longer required.
 
-T0018 selects maintained Better Auth behind the identity adapter.
+The Cloudflare identity adapter uses maintained Better Auth.
 See [the implementation reference](cloudflare-authentication.md) and [choice with costs](cloudflare-authentication-choice.md).
-The identity boundary does not activate Cloudflare authentication in the application.
+The isolated Cloudflare application uses this identity boundary.
+The active Supabase development application retains Supabase authentication.
 Minsky retains its username rules, organizer recovery, mandatory password changes, and cross-session authorization.
 
-T0018 implements authentication after the merged D1 proof.
-Use fictional accounts to verify password creation, mandatory changes, private credential distribution, recovery, and Worker execution limits.
-Full migration tooling follows connector verification.
-The owner decision authorizes no real-account reset, credential export, or backend switch in T0017.
-Supabase remains active during the proof and connector work.
-
-The replacement must verify current login state for each protected operation.
+The connector verifies current login state for each protected operation.
 A signed token alone does not prove that the login remains active.
 Supabase itself documents that issued tokens can outlive session deletion.
 See [Supabase session invalidation](https://supabase.com/docs/guides/auth/managing-user-data).
 
-The proposed Worker API uses a secure, HttpOnly session cookie and an opaque login identifier for same-origin application requests.
+The Worker API uses a secure, HttpOnly session cookie and an opaque login identifier for same-origin application requests.
 The identity adapter owns expiry, rotation, and revocation. The browser receives no database credentials.
 State-changing routes check the request origin and a cross-site request forgery token.
 The WebSocket upgrade checks the origin and current login too.
 Preview origins and cross-origin local development need an explicit allowlist and browser tests.
-T0018 uses host-only HttpOnly cookies, SameSite Strict, and a fixed eight-hour lifetime.
+The application uses host-only HttpOnly cookies, SameSite Strict, and a fixed eight-hour lifetime.
 Hosted cookies require Secure. The authentication reference defines exact origins and request protection.
 
 Password resets first place the account behind the mandatory-change gate and revoke earlier logins.
@@ -226,7 +212,7 @@ Only an administrator of every assigned session can reset the account or assign 
 An archived event in any assigned session prevents these account changes.
 The current behavior rejects replacement of an assigned username and directs self-resets to `changePassword()`.
 See [the account administration rules](../supabase/migrations/202610020004_usernames.sql).
-An external identity update uses a persisted operation record with a retryable completion state.
+A credential update uses a persisted operation record with a guarded completion state.
 Failure leaves the account restricted instead of restoring an earlier valid login.
 The [current credential migration](../supabase/migrations/202610140001_attachment_fixes.sql) provides the behavior to preserve.
 
@@ -235,7 +221,7 @@ The [current credential migration](../supabase/migrations/202610140001_attachmen
 The browser keeps the existing `ImageTransport` operations and logical image paths.
 The Worker authenticates every upload, completion, download, removal, and abandonment.
 The R2 bucket has no public route.
-The first implementation proxies downloads through the Worker with private, non-cacheable responses.
+The implementation proxies downloads through the Worker with private, non-cacheable responses.
 This avoids a reusable public link after membership revocation.
 
 `begin()` atomically reserves an attachment, its immutable visibility, declared bytes, quota allowance, and request receipt in D1.
@@ -262,8 +248,7 @@ File access rejects a tombstone immediately, even if object deletion needs anoth
 Expired or abandoned uploads also create deletion tasks for their exact keys.
 An upload that finishes after revocation or expiry cannot publish its object.
 The worker rechecks reservation state after upload. A recovery scan removes orphaned bytes after interrupted requests.
-The cleanup design retains tombstones long enough to handle late uploads instead of deleting the evidence after the first successful delete.
-Its tests must cover upload, expiry, deletion, and process interruption in every order.
+Recovery retains tombstones and repeats exact-key deletion to catch late transfers.
 
 R2 object consistency does not make a D1 metadata change and an R2 write atomic.
 Cache behavior can also differ from direct bucket reads.
@@ -276,7 +261,7 @@ This table is an outbox, a durable record of notifications still needing deliver
 It contains the session, permitted audience, sequence, and delivery status.
 It contains no issue text, image key, password, or private note body.
 
-The proposed connection coordinator is one Durable Object per contest session.
+The connection coordinator is one Durable Object per contest session.
 The Worker attempts delivery after the database commit.
 A scheduled recovery scan retries pending rows if the Worker stops before delivery.
 The coordinator accepts repeated deliveries and ignores older duplicate sequences for the same audience.
@@ -286,16 +271,17 @@ Team changes reach the affected team and staff.
 Staff-only changes reach staff only.
 Private changes use separate sequences, so contestant notifications and counters cannot reveal their existence.
 Membership changes and password resets produce targeted access invalidations.
-The coordinator rechecks current authorization before each delivery and closes invalid logins.
+The coordinator rechecks current authorization before each delivery, including duplicate hints, and closes invalid logins.
 An unavailable authorization service causes delivery to stop rather than reuse stale permissions.
 
 The coordinator stores each socket's account ID, login ID, session ID, and expiry.
 Those values identify a connection. They do not replace current permission checks.
-Hibernation can retain sockets while clearing ordinary memory, so connection metadata must survive through socket attachments.
+Connection metadata survives hibernation through socket attachments.
 See [Durable Objects WebSocket hibernation](https://developers.cloudflare.com/durable-objects/best-practices/websockets/).
 
-An expiry alarm closes expired connections. Access invalidations request earlier closure.
-Alarm handlers must tolerate repeat execution and explicitly reschedule unresolved work.
+An alarm checks current access and closes expired or revoked connections.
+Access invalidations request earlier checks.
+The handler reschedules checks for its remaining sockets.
 Cloudflare retries failed alarms a bounded number of times.
 See [Durable Objects alarms](https://developers.cloudflare.com/durable-objects/api/alarms/).
 
@@ -306,43 +292,19 @@ Closing a subscription stops callbacks immediately and releases the socket and t
 
 The healthy-connection target remains live updates within three seconds.
 Immediate delivery is the normal path. Recovery scans and polling handle missed messages but do not establish that latency target.
-Hosted latency, fan-out, revocation, and recovery tests must measure the implementation.
 
 ## Separate deployment and data migration
 
 The documentation Worker remains a static site with no application data bindings.
-The application Worker serves static assets and routes backend requests under the same origin in the proposed Cloudflare deployment.
+The application Worker serves static assets and backend requests under one origin.
+The generated configuration runs the Worker before static asset handling, so private-path checks also apply to application routes.
 Development, CI, and future production use separate databases, buckets, object namespaces, and identity credentials.
 Untrusted branch previews receive no shared database write access or privileged credentials.
 
-The first proof uses fictional fixtures in local emulation and isolated hosted D1 resources.
-The owner authorizes separate development and CI resources in the existing Cloudflare account.
-Check existing Wrangler access before requesting credentials. Keep tokens out of chat and logs.
+The installation procedure requires an empty isolated database and explicit provider targets.
+Use [Install an isolated Cloudflare instance](../site/src/content/docs/operators/installation.md) for configuration, bootstrap, and recovery.
+The [PR #21 component record](pr21-installation-disposition.md) preserves reuse decisions and the owner's closure decision.
 
-The existing OAuth login was checked against account `458ad6a930b0fb717796dfa19ca6a2b1`, which matches the repository configuration.
-Verify that account before provisioning. Document the concrete need and cost before any paid upgrade.
-Subagents may perform independent, bounded tasks.
-
-Record hosted evidence in [the proof guide](d1-transaction-proof.md) before claiming transaction verification.
-Passing that suite does not prove a fresh installation, a data migration, or capacity for 800 simultaneous users.
-Each claim needs its own evidence.
-
-T0018 adds bounded authentication after the D1 proof.
-Shared-rule verification through Supabase precedes further Cloudflare workflow persistence.
-Authentication verification and the remaining connector operations remain separate requirements.
-Full migration tooling follows connector verification. Real-data exports and the backend switch remain later phases.
-AWS adapters and Terraform remain deferred.
-
-Cutover uses one writable backend at a time.
-The migration rehearsal compares IDs, references, timestamps, receipts, image hashes, and authorized snapshots.
-It also checks login, mandatory password changes, recovery, and historical actor names.
-The proposal has no background dual writes.
-
-Before Cloudflare accepts new writes, rollback can restore the unchanged Supabase application after verification.
-After Cloudflare accepts writes, switching URLs alone loses changes.
-A post-write rollback must either import and verify those changes or keep writes paused while operators repair Cloudflare.
-The rehearsal must settle and test that procedure before cutover approval.
-
-Authentication selection, transaction proof, provider tests, and rollback rehearsal remain acceptance requirements.
-The design does not authorize a provider upgrade or claim that free-tier limits meet the contest target.
-Resource and query estimates must use the measured implementation and current [D1 limits](https://developers.cloudflare.com/d1/platform/limits/) before deployment.
+Data exports, migration tooling, and backend cutover remain deferred.
+The [migration gates](product-direction.md#migration-and-cutover-gates) require one writable backend, comparison of preserved data, and a tested rollback procedure.
+Each installation must establish its own capacity and latency evidence before live-contest use.

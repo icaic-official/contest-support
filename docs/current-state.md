@@ -549,7 +549,7 @@ The newest record appears first. Older sections describe their own revisions and
 
 ## T0015 frontend redesign integration (2026-10-18)
 
-Step 5 of T0015 is on `feature/t0015-frontend-redesign`. It is not merged or deployed.
+Step 5 of T0015 is on `feature/t0015-frontend-redesign` in [PR #44](https://github.com/GiftedNovaHD/minsky/pull/44), which is ready for review. It is not merged or deployed.
 The user reviews and merges the PR. Deployment is a separate explicit step.
 See [T0015](tickets.md#t0015--organiser-and-contestant-frontend-redesign) and [frontend architecture](frontend-architecture.md).
 
@@ -617,7 +617,9 @@ After these checks, `main` moved to `104d9d1` (PR #42, T0020 Cloudflare connecto
 - `npm test` passed 684 tests in 44 files.
 - `npm run test:e2e` passed 61 of 61 tests.
 - `npm run test:connector:runtime` passed.
-- `npm run test:connector:ui:local` failed. PR #42 added this check to the ordinary PR workflow. Its shared journey `tests/connector/ui-journey.ts` uses the selectors of the UI before T0015. It stopped after the temporary password change, at `ui-journey.ts:118`. A follow-up chat ports it to the T0015 UIs. Until then, the PR stays a draft.
+- `npm run test:connector:ui:local` failed. PR #42 added this check to the ordinary PR workflow. Its shared journey `tests/connector/ui-journey.ts` used the selectors of the UI before T0015.
+
+`1df20d8` ports the shared journey to the T0015 UIs. It uses the contestant UI, the organiser phone app for the volunteer and the jury member, and the desktop console for the specialist and the admin. It keeps all earlier checks, including admin intake, image limits, role changes, revocation and account recovery. At `1df20d8`, lint, type checking, the build, `npm run check:functions`, 684 unit and database tests, 61 of 61 browser tests and `npm run test:connector:runtime` passed. `npm run test:connector:ui:local` passed in three runs, with verified fixture cleanup. `npm run test:cloud` and the hosted connector UI check were not run, because no cloud credentials exist here.
 
 Visual checks used the browser tool, the Vite dev server and a temporary server that wrapped the PGlite jury fixture. That server is not committed. The checks covered the organiser phone app at 390 × 844 with touch, the organiser desktop console at 1280 × 800 and the contestant desktop app at 1280 × 800. Each UI was checked in light and dark themes. Keyboard checks covered Tab, the skip link, J, Ctrl+K, Escape and sheet **Cancel**. A reload kept the session, the internal note and the running timer. The contestant saw the public reply and not the internal note.
 The [T0015 ticket](tickets.md#verification-2026-10-18) has the details.
@@ -633,8 +635,8 @@ The [T0015 ticket](tickets.md#verification-2026-10-18) has the details.
 - The ticket number T0015 is also used by the earlier shared provider tests record.
 - The `main` landmark holds the desktop console sidebar, so the skip link moves focus to the start of the sidebar, not to the page content.
 - The updated cloud specs have not run against a cloud project.
-- `npm run test:connector:ui:local` fails until `tests/connector/ui-journey.ts` uses the T0015 selectors. The hosted connector UI check uses the same journey.
-- The final visual pass did not check the account dialogs or the image upload against a backend. The mocked browser specs cover the membership form (`workspace-refresh.spec.ts`) and the image requests (`images.spec.ts`).
+- The hosted connector UI check uses the ported journey. It has not run against the hosted Cloudflare CI application.
+- The final visual pass did not check the account dialogs or the image upload against a backend. The local connector UI journey operates them against emulated Cloudflare bindings, but that is an automated check, not a visual one.
 
 ## T0015 organiser desktop console (2026-10-18)
 

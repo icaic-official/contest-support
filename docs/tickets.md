@@ -2,7 +2,7 @@
 
 These tickets describe development work, not contestant issues.
 
-The frontend redesign [T0015 organiser and contestant frontend redesign](#t0015--organiser-and-contestant-frontend-redesign) is implemented on its own branch in draft [PR #44](https://github.com/GiftedNovaHD/minsky/pull/44). Step 5 merged current `main` on 2026-10-18.
+The frontend redesign [T0015 organiser and contestant frontend redesign](#t0015--organiser-and-contestant-frontend-redesign) is implemented on its own branch in [PR #44](https://github.com/GiftedNovaHD/minsky/pull/44), which is ready for review. Step 5 merged current `main` on 2026-10-18.
 The active ticket is [T0020 complete Cloudflare connector](#t0020-complete-cloudflare-connector).
 The owner merged T0019 in PR #41 at `7d19b00` before authorizing this ticket.
 T0020 completes Cloudflare persistence, the browser connector, and independent installation verification.
@@ -905,7 +905,7 @@ No schema, backend feature, provider implementation, or runtime dependency is pa
 ## T0015 — Organiser and contestant frontend redesign
 
 Branch: `feature/t0015-frontend-redesign`, from updated `main` at `aaa6bbc`.
-Status: steps 1 to 5 are implemented and verified locally. [PR #44](https://github.com/GiftedNovaHD/minsky/pull/44) is a draft until the connector UI journey uses the new selectors. The user reviews and merges the PR. Deployment is a separate step.
+Status: steps 1 to 5 are implemented and verified locally. [PR #44](https://github.com/GiftedNovaHD/minsky/pull/44) is ready for review. The user reviews and merges the PR. Deployment is a separate step.
 This ticket is different from [T0015 shared provider tests](#t0015-shared-provider-tests) from PR #37. The two records share the ticket number. Keep their anchors separate.
 
 ### Progress
@@ -921,6 +921,7 @@ This ticket is different from [T0015 shared provider tests](#t0015-shared-provid
   - [x] Organiser issue views close with "ISS-N is no longer in your lists." when the open issue leaves the person's lists. Phone sheets close when their action is no longer allowed. The desktop sheet returns focus to the control that opened it (`00119f3`).
   - [x] Playwright selector updates: the jury specs and a new local full journey (`7ec7f79`), the team search and refresh specs (`e160cf6`), and the cloud specs (`23ccfa7`, `0d304bd`). The cloud specs are updated but not run.
   - [x] Final review, visual pass and the PR (2026-10-18). A recorded command no longer opens its issue again after the person pressed **Back** during the refresh (`5507bc7`). The two-client jury spec uses the slow test timeout (`52f1ea1`). The visual pass fixed the skip link padding, a blank issue sheet during its close animation and a sign-out error that stayed after the next sign-in (`1c9d0c6`). The contestant heading now gets focus after the commit that shows it (`7996f9c`). Tailwind scans only `src/` (`13e6034`).
+  - [x] Connector UI journey port (2026-10-18). `tests/connector/ui-journey.ts` drives the T0015 UIs (`1df20d8`). The UI needed no change.
 
 The user requested a complete frontend redesign on 2026-10-17.
 They reviewed four mockup directions in [`design/redesign/`](../design/redesign/README.md).
@@ -965,7 +966,16 @@ After these checks, `main` moved to `104d9d1` (PR #42, T0020 Cloudflare connecto
 - `npm test` passed 684 tests in 44 files.
 - `npm run test:e2e` passed 61 of 61 tests.
 - `npm run test:connector:runtime` passed.
-- `npm run test:connector:ui:local` failed. PR #42 added this check to the ordinary PR workflow. Its shared journey `tests/connector/ui-journey.ts` uses the selectors of the UI before T0015. It stopped after the temporary password change, at `ui-journey.ts:118`. A follow-up chat ports it to the T0015 UIs. Until then, the PR stays a draft.
+- `npm run test:connector:ui:local` failed. PR #42 added this check to the ordinary PR workflow. Its shared journey `tests/connector/ui-journey.ts` used the selectors of the UI before T0015. It stopped after the temporary password change, at `ui-journey.ts:118`.
+
+`1df20d8` ports the shared journey to the T0015 UIs. Contestants use the desktop contestant UI. The volunteer and the jury member use the organiser phone app. The specialist and the admin use the desktop console. The journey keeps all earlier checks: the temporary password change, the session and **Live** status, intake close and open with its effect on **Report an issue**, image limits, role changes, keyboard focus, the report, claim, handoff, public and internal messages, team-visible and staff-only images, resolution, award, external application, reopening, refresh, revocation, account recovery and fixture cleanup. At `1df20d8`, in a 4 vCPU job VM:
+
+- `npm run lint`, `npm run typecheck`, `npm run build` and `npm run check:functions` passed.
+- `npm test` passed 684 tests in 44 files.
+- `npm run test:e2e` passed 61 of 61 tests in two full runs.
+- `npm run test:connector:runtime` passed.
+- `npm run test:connector:ui:local` passed in three runs: 1 passed, 0 failed, 0 skipped, 0 flaky. Fixture D1, R2 and Durable Object cleanup was verified each time.
+- `npm run test:cloud` and the hosted connector UI check were not run. The Lapiz environment has no cloud credentials.
 
 Before the fixes, two jury specs failed. The jury retry spec failed 3 of 8 runs because **Back** during the refresh after a command was undone. It then passed 10 of 10. The two-client jury spec timed out at 30 seconds on its last step during a full parallel run.
 
@@ -990,6 +1000,5 @@ If the T0006 and T0007 PRs are still open, they can change `src/connected/`. Whi
 
 - Remove the legacy rules in `src/styles.css` that the image preview page does not use, or restyle the preview page with Tailwind.
 - Split the main JavaScript chunk to remove the build warning.
-- Port `tests/connector/ui-journey.ts` to the T0015 UIs, so `npm run test:connector:ui:local` and the hosted connector UI check pass.
 - Move the console sidebar out of the `main` landmark, so the skip link skips it. The local and cloud specs expect focus on `#main`, so they change too.
 

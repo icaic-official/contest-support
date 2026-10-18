@@ -11,7 +11,7 @@ This page is a dated record, not a live deployment dashboard.
 | Work | What it provides |
 | --- | --- |
 | T0003 | Connected Supabase accounts, shared issues, access rules, and account administration. |
-| T0004 | Dark green workspace, sidebar, and phone layouts. |
+| T0004 | Dark green workspace, sidebar, and phone layouts. T0015 replaces this interface after its merge. |
 | [T0005](https://github.com/GiftedNovaHD/minsky/pull/19) | Staff image uploads, fixed visibility, removal, and session limits. |
 | [T0008](https://github.com/GiftedNovaHD/minsky/pull/22) | Team search in the queue and staff report form. |
 | [T0010](https://github.com/GiftedNovaHD/minsky/pull/24) | Refresh behavior and cloud fixture cleanup fixes. |
@@ -22,6 +22,7 @@ This page is a dated record, not a live deployment dashboard.
 | [T0016](https://github.com/GiftedNovaHD/minsky/pull/36) | Proposed Cloudflare architecture and implementation plan. |
 | [T0017](https://github.com/GiftedNovaHD/minsky/pull/39) | Verified bounded D1 transaction proof for claims and messages. The complete Cloudflare connector remains incomplete. |
 | [T0018 Cloudflare authentication](https://github.com/GiftedNovaHD/minsky/pull/40) | Experimental username authentication, cookie sessions, and organizer recovery. Hosted HTTP checks pass on Workers Paid with isolated fictional fixtures. The full connector and migration remain incomplete. |
+| [T0009 jury worklist](https://github.com/GiftedNovaHD/minsky/pull/23) | Merged at `c144a2a`. Lists award decisions and external confirmations that are still needed. T0015 moves these lists into the redesigned award screens. |
 | [T0019 shared server workflow](https://github.com/GiftedNovaHD/minsky/pull/41) | Merged at `7d19b00`. All nine command decisions use a shared service on the isolated Supabase verification path. D1 still supports only claims and messages. |
 
 ## Pending changes
@@ -30,7 +31,7 @@ This page is a dated record, not a live deployment dashboard.
 | --- | --- |
 | [T0006 announcements](https://github.com/GiftedNovaHD/minsky/pull/20) | Open pull request. |
 | [T0007 independent installations](https://github.com/GiftedNovaHD/minsky/pull/21) | Open pull request. Packaging exists on its branch. Container operation remains unverified. |
-| [T0009 jury worklist](https://github.com/GiftedNovaHD/minsky/pull/23) | Includes current main. Local checks, hosted acceptance, protected CI, and scoped cleanup pass on runtime source `f45d03f`. Prepared for owner review. |
+| T0015 organiser and contestant frontend redesign | In progress on `feature/t0015-frontend-redesign`. Separate contestant desktop app, organiser phone app and organiser desktop console. The guides describe this interface. |
 | T0020 complete Cloudflare connector | Active development. Supabase remains the active application backend. |
 
 Supabase remains the active backend.

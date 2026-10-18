@@ -5,8 +5,10 @@ description: Create accounts, assign access, control contestant intake, and set 
 
 ## Create an account
 
-Select **Administration** as a session admin.
+As a session admin, open the **Session** tab on a phone, or **Accounts** in the desktop console.
+Select **New account** on a phone, or **Create account** on the desktop.
 Create a username account for a roster team or an individual staff member.
+Minsky shows the username and temporary password once. Copy them before you select **Done**.
 Distribute the temporary password through your organization's approved private channel.
 The user must change it before contest access.
 
@@ -28,7 +30,7 @@ Minsky prevents removal of the last administrator.
 ## Reset a password
 
 1. Check the requester's identity through your organizer procedure.
-2. Reset the account password in administration.
+2. Reset the account password from the account sheet on a phone, or from **Manage** on the desktop. Confirm the reset.
 3. Give the replacement temporary password to the account holder privately.
 4. Ask the user to sign in again and change it.
 

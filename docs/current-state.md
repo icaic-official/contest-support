@@ -12,10 +12,9 @@ The [run report](t0020-run-report.md) lists changed files, commands, results, an
 Wrangler `whoami` confirmed account `458ad6a930b0fb717796dfa19ca6a2b1` before resource changes.
 The database list contains the existing, separate authentication and bounded-proof CI databases.
 No complete connector or installation database existed at that check.
-The supported `wrangler r2 bucket list` command failed with Cloudflare code `10042`.
-The response requires R2 activation through the Cloudflare dashboard.
-Hosted private-image and empty-installation checks require that activation.
-Local implementation and verification can continue without it.
+The initial `wrangler r2 bucket list` command failed with Cloudflare code `10042`.
+The owner then confirmed R2 activation. The repeated account check and bucket list pass.
+Hosted application and empty-installation verification can now proceed.
 
 ### Implementation and observed checks
 
@@ -29,20 +28,32 @@ The [installation guide](install-cloudflare.md) remains experimental until its h
 Observed results during implementation are separate from final PR verification:
 
 - All 70 workflow tests pass locally and on hosted D1. Hosted fixture cleanup passes.
+- All 82 hosted account tests pass on the new connector D1 schema, with zero skips and verified fixture cleanup.
+- All 553 local tests pass across 33 files. The local account suite includes 83 cases, including its separate execution-clock probe.
 - All eight unchanged shared provider scenarios pass against Minsky CI on Supabase, `ghtztmovdkhuketcbjmq`. Fixture cleanup passes.
 - The local complete HTTPS Worker journey passes with actual authentication, D1, R2, and Durable Object bindings.
+- The complete local React journey passes through actual HTTPS and emulated bindings, including phone keyboard checks and exact fixture cleanup.
 - All 34 ordinary application browser regressions and three local HTTPS authentication browser cases pass.
-- The application build, type checking, lint, Deno checks, and all 12 function tests pass before the final review corrections.
+- Both frontend builds, type checking, lint, Deno checks, and all 12 function tests pass after the review corrections.
 - Both locked dependency audits report zero vulnerabilities.
+- The implementation secret scan passes across 117 commits through `de1ecbd`.
 
 The hosted D1 run uses the new `minsky-connector-ci` database, `de43cf95-c024-4e44-860d-8ff179e4e08d`.
 All nine repository D1 migrations are applied there.
 The test executes production persistence through a remote D1 binding. It does not test the deployed application Worker.
+Both hosted D1 runners and the repeated Supabase shared run verify source `de1ecbd`.
+After both D1 runners finish, a separate read-only query confirms zero rows in all 27 application tables.
+The D1 migration records remain intact. No fixture recovery journals remain from these successful runs.
 The existing authentication and bounded-proof databases remain separate.
 The connector Worker has passed a deployment dry run, but has not been deployed.
-Its proposed image bucket does not exist because R2 is not enabled.
+Its new Standard bucket, `minsky-connector-ci-images`, exists in APAC. Its public `r2.dev` URL is disabled.
 Hosted Cloudflare shared scenarios, the hosted React journey, and the empty installation remain unverified.
-Protected T0020 GitHub Actions checks have not run.
+The implementation is in draft [PR #42](https://github.com/GiftedNovaHD/minsky/pull/42), at `de1ecbd`.
+Ordinary push CI passes `checks`, `secrets`, and `dependencies` in [run 39095244800](https://github.com/GiftedNovaHD/minsky/actions/runs/39095244800).
+Ordinary PR CI also passes in [run 39095267935](https://github.com/GiftedNovaHD/minsky/actions/runs/39095267935).
+Protected Supabase verification passes on that revision in [run 39095319959](https://github.com/GiftedNovaHD/minsky/actions/runs/39095319959).
+The protected Supabase run uses the existing CI backend without changing its configuration, migrations, or functions.
+The protected complete Cloudflare job remains unverified. Its resources are now being prepared after R2 activation.
 
 The `cloud-test` environment now permits `feature/t0020-cloudflare-connector`.
 The API showed five existing branch entries before this change. All five entries and their IDs remain unchanged.
@@ -69,7 +80,7 @@ Usage above those allowances costs US$0.015 per GB-month, US$4.50 per million Cl
 Internet egress is free. These are account-wide allowances, not separate allowances for each bucket.
 Small fictional fixtures should fit within them, but this estimate does not prove the account's remaining allowance.
 Workers Paid is already active. No further Workers plan upgrade is proposed.
-The owner must activate R2 through the provider dashboard before hosted bucket checks can pass.
+The owner confirmed R2 activation during this run. No further subscription upgrade was required.
 
 The newest record appears first. Older sections describe their own revisions and targets.
 

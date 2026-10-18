@@ -5,7 +5,7 @@ description: Prepare an isolated Cloudflare application with its own accounts, d
 
 :::caution[Experimental installation path]
 T0020 adds the complete Cloudflare connector and installation tooling.
-The complete hosted procedure remains unverified while R2 activation is pending.
+The complete hosted procedure remains unverified while its isolated trial is in progress.
 Use fictional accounts and new isolated resources for an installation trial.
 Supabase remains the project's active development backend.
 :::

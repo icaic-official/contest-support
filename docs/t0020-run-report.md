@@ -42,9 +42,11 @@ The implementation changes these files:
 - `playwright.auth.config.ts`
 - `playwright.cloud.config.ts`
 - `playwright.config.ts`
+- `playwright.connector-local.config.ts`
 - `playwright.connector.config.ts`
 - `playwright.providers.config.ts`
 - `scripts/connector-runtime-test.mjs`
+- `scripts/connector-local-ui-test.mjs`
 - `scripts/provider-test-cloudflare.test.mjs`
 - `scripts/provider-test-options.mjs`
 - `scripts/provider-test.mjs`
@@ -99,7 +101,10 @@ The implementation changes these files:
 - `src/server/adapters/d1/store.ts`
 - `src/server/adapters/d1/testFixture.ts`
 - `tests/connector/hosted-ui.spec.ts`
+- `tests/connector/local-ui-fixture.ts`
+- `tests/connector/local-ui.spec.ts`
 - `tests/connector/runtime.test.ts`
+- `tests/connector/ui-journey.ts`
 - `tests/providers/browser-backend.ts`
 - `tests/providers/cloudflare/browser.ts`
 - `tests/providers/cloudflare/fixture.ts`
@@ -114,16 +119,21 @@ The implementation changes these files:
 ## 3. Commands run
 
 Repository inspection used `git status`, `log`, `diff`, `fetch`, `switch`, `rg`, `cat`, and `sed`.
+Git `add`, `commit`, and `push` created and published implementation `de1ecbd` with the required co-author trailer.
+GitHub commands created draft [PR #42](https://github.com/GiftedNovaHD/minsky/pull/42) and started protected verification against the existing Supabase CI backend.
 Provider and review inspection used `gh api`, `gh pr view`, Wrangler `whoami`, D1 `list`, `info`, `create`, and `migrations apply`.
 The isolated connector D1 database received only repository migrations and fictional fixture records.
 The GitHub environment change added only this ticket branch.
 
 Local verification used `npm test -- --maxWorkers=2`, focused Vitest runs, `typecheck`, `lint`, and both frontend builds.
 It also used `check:functions`, `test:functions`, `test:e2e`, `test:auth:browser`, `test:connector:runtime`, `test:providers:list`, `docs:build`, and `docs:test`.
+`node scripts/connector-local-ui-test.mjs` runs the complete actual React journey on temporary local bindings.
 Both locked dependency audits ran with `--audit-level=high`.
 The complete Worker passed `wrangler deploy --dry-run` with the isolated connector configuration.
-Hosted CLI checks ran the full D1 workflow suite and `test:providers -- --provider=supabase`.
+Hosted CLI checks ran the full D1 workflow and account suites, and `test:providers -- --provider=supabase`.
+The provider-owned `cloudflare:install -- migrate` command applied the schema after exact account and database checks.
 Markdown link checks, YAML parsing, and `git diff --check` also ran.
+The checksum-pinned Gitleaks scanner checked staged changes and all fetched Git history with redacted output.
 
 Early integrated tests exposed fixture audit relationships and notification-count assumptions. Corrections passed their focused and complete reruns.
 An initial browser discovery error and the provider bridge's wrong asset origin were corrected. The 34-case browser rerun passed.
@@ -135,19 +145,28 @@ No automatic approval review rejected an authorized action.
 
 ## 4. Build and test results
 
-The complete local suite passes 543 tests across 32 files at this verification point.
+The complete local suite passes 553 tests across 33 files.
 The full local account suite also passes all 83 cases against the historical authentication schema.
 The final local HTTPS connector journey, including actual D1, R2, and live bindings, passes.
+The complete local React journey also passes with the same assertions as the hosted journey.
+It checks all nine commands, images, live connections, administration, persisted state, and 320 px keyboard behavior.
+All 59 image cases pass after the additional cleanup-fairness correction.
 Both frontend builds, types, lint, Deno checks, and all 12 function tests pass.
 All 34 ordinary application browser cases, three authentication browser cases, and three documentation browser cases pass.
 The documentation build checks 14 pages and 562 local links and assets.
 Both locked dependency audits report zero vulnerabilities.
 
 Hosted D1 passes all 70 production workflow cases, with scoped cleanup.
+Hosted D1 also passes all 82 account cases, with zero skips and scoped cleanup.
 Hosted Supabase passes all eight unchanged shared provider scenarios, with scoped cleanup.
+The final CLI reruns verify source `de1ecbd`.
+A separate read-only D1 query confirms zero rows in all 27 application tables after the runs.
+The first aggregate count command failed; its scalar-query retry passed. Neither command changed data.
 These CLI runs are separate from protected GitHub Actions evidence.
-Hosted account verification is in progress.
+Both staged and full-history secret scans pass. The implementation scan checks 117 commits through `de1ecbd`.
 Hosted Cloudflare shared scenarios, the complete hosted React journey, and the empty installation remain unverified.
+Ordinary push CI passes `checks`, `secrets`, and `dependencies` on `de1ecbd` in [run 39095244800](https://github.com/GiftedNovaHD/minsky/actions/runs/39095244800).
+Ordinary PR CI and protected Supabase verification also pass on that revision in [run 39095267935](https://github.com/GiftedNovaHD/minsky/actions/runs/39095267935) and [run 39095319959](https://github.com/GiftedNovaHD/minsky/actions/runs/39095319959).
 
 ## 5. Manual verification
 
@@ -159,10 +178,10 @@ The full hosted application and documented independent installation still requir
 
 ## 6. Risks
 
-R2 is not enabled in account `458ad6a930b0fb717796dfa19ca6a2b1`.
-The connector Worker and its bucket have not been deployed.
+The owner activated R2 in account `458ad6a930b0fb717796dfa19ca6a2b1`.
+The new private Standard CI bucket exists. Worker deployment and hosted verification are in progress.
 The empty-installation procedure remains experimental.
-Protected connector evidence and the final PR checks remain pending.
+Protected connector evidence and the final PR checks remain pending. PR #42 remains a draft.
 Contest capacity and real-data migration remain outside this evidence.
 
 ## 7. Follow-up tickets

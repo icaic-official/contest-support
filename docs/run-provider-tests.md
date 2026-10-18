@@ -6,7 +6,7 @@ For the suite's responsibilities and limits, see [the test contracts](provider-t
 
 The Supabase driver passes all eight shared scenarios with cleanup.
 The Cloudflare driver is implemented, but its hosted shared and UI results remain pending.
-R2 activation currently blocks those runs with provider error `10042`.
+The owner activated R2 after the initial provider error `10042`. Those hosted runs are now in progress.
 The full hosted D1 suite separately passes all 70 cases without skips and verifies scoped cleanup.
 See [current state](current-state.md) for the tested revisions and separate evidence categories.
 
@@ -117,6 +117,17 @@ This command accepts no provider target.
 It uses fictional accounts, Chromium, and temporary local D1, R2, and Durable Object resources.
 One complete runtime case passes locally.
 That result does not establish hosted deployment or a fresh installation.
+
+Run the complete React journey against a temporary local application:
+
+```sh
+npm run test:connector:ui:local
+```
+
+This command builds a separate Cloudflare frontend without replacing the default `dist` output.
+It uses the same UI assertions as the guarded hosted journey, with separate local fixture setup.
+It accepts no targets or filters and removes its temporary build, bindings, and browser artifacts afterward.
+Local emulation does not replace the required hosted Cloudflare evidence.
 
 Run the complete workflow directly against the explicit hosted D1 target:
 

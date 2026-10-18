@@ -58,7 +58,7 @@ T0008 fuzzy team search merged into `main` in [PR #22](https://github.com/notbow
 ## T0020 Complete Cloudflare connector
 
 Branch: `feature/t0020-cloudflare-connector`, from updated `main` at `7d19b00`.
-Status: implementation in progress. The owner reviews and merges.
+Status: implemented in draft [PR #42](https://github.com/GiftedNovaHD/minsky/pull/42). Hosted Cloudflare application and empty-installation verification remain pending. The owner reviews and merges.
 Summary: Complete every Cloudflare backend operation and verify the application with isolated resources. Verify installation into an empty Cloudflare environment.
 
 The owner authorized the complete connector after PR #41 merged.
@@ -90,12 +90,12 @@ Do not claim contest capacity without separate evidence.
 
 ### Acceptance criteria
 
-- [ ] Every workflow command uses shared decisions and atomic state, history, receipt, and notification commits.
-- [ ] Commits recheck permissions, credential generation, identity-session expiry, and revocation.
-- [ ] Every `Backend` capability has a working Cloudflare implementation with existing behavior preserved.
-- [ ] Authorized snapshots include complete permitted workflow, account, image, and timing data.
-- [ ] Private images preserve visibility, ownership, limits, archival rules, retries, and scoped cleanup.
-- [ ] Live updates preserve audience separation, revocation, reconnect refresh, duplicate handling, and failure recovery.
+- [x] Every workflow command uses shared decisions and atomic state, history, receipt, and notification commits.
+- [x] Commits recheck permissions, credential generation, identity-session expiry, and revocation.
+- [x] Every `Backend` capability has a working Cloudflare implementation with existing behavior preserved.
+- [x] Authorized snapshots include complete permitted workflow, account, image, and timing data.
+- [x] Private images preserve visibility, ownership, limits, archival rules, retries, and scoped cleanup.
+- [x] Live updates preserve audience separation, revocation, reconnect refresh, duplicate handling, and failure recovery.
 - [ ] The same required shared scenarios pass against Supabase and Cloudflare.
 - [ ] Complete hosted application journeys pass with fictional accounts and images.
 - [ ] The documented installation procedure succeeds in an empty isolated Cloudflare environment.
@@ -108,10 +108,12 @@ Do not claim contest capacity without separate evidence.
 ### Verification
 
 All 70 full-workflow cases pass locally and on the separate hosted connector D1 database.
+All 82 hosted account cases pass there, with zero skips and verified cleanup.
+All 553 local tests pass. Checked behavior criteria above include local emulation evidence.
 All eight shared provider scenarios pass against Supabase.
 The local complete HTTPS Worker journey and all 34 ordinary browser regressions pass.
 These results do not replace the required hosted Cloudflare browser and installation runs.
-R2 activation is pending. Cloudflare returns code `10042` until the owner enables R2 through the dashboard.
+The owner enabled R2 after the initial provider error `10042`. Hosted Cloudflare verification is now in progress.
 The [current-state record](current-state.md#t0020-connector-implementation-2026-10-18) separates observed results from pending acceptance work.
 
 ## T0019 Shared server workflow

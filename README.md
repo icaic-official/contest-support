@@ -63,6 +63,7 @@ See [cloud onboarding](docs/cloud-onboarding.md#contributor-setup) for provider 
 | `npm test` | Run unit, script, and embedded database tests without cloud credentials. |
 | `npm run test:d1` | Run every D1 workflow case with local emulation and current identity guards. |
 | `npm run test:connector:runtime` | Run the complete connector through a temporary local HTTPS Worker, D1, R2, and Durable Objects. |
+| `npm run test:connector:ui:local` | Build a temporary Cloudflare frontend and run the complete React journey on local HTTPS and real emulated bindings. |
 | `npm run test:connector:ui -- --config=… --account=… --database=… --origin=…` | Run the complete React journey against the confirmed hosted Cloudflare CI application. |
 | `npm run test:connector:workflow:hosted -- --config=… --account=… --database=…` | Run every workflow case on an explicitly confirmed isolated hosted D1 target. |
 | `npm run test:connector:accounts:hosted -- --config=… --account=… --database=…` | Check account guards on the separate hosted connector D1 schema, without a Worker deployment. |

@@ -9,7 +9,7 @@ T0020 implements the complete Cloudflare connector and isolated installation too
 All 70 production D1 cases pass locally and against the separate hosted connector CI database, with cleanup.
 Local HTTPS runtime, application, image, live-update, and installation checks also pass.
 Complete hosted shared scenarios, UI journeys, empty installation, and protected connector CI remain pending.
-The account's R2 service still requires activation after provider error `10042`.
+The owner activated R2 after the initial provider error `10042`. Hosted verification is in progress.
 Data migration tools remain later work.
 The owner authorizes isolated development and CI resources for this implementation.
 That authorization does not establish a hosted verification result.

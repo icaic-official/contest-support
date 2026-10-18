@@ -470,6 +470,33 @@ describe('Cloudflare private images with local D1 and R2 bindings', () => {
     expect(await fixture.rows('SELECT attachment_id FROM image_deletions WHERE attachment_id = ?', image.id)).toHaveLength(1);
   });
 
+  it('cleans a later image when the first 100 deletion tasks keep failing', async () => {
+    const failures = Array.from({ length: 100 }, (_, index) => `00000000-0000-4000-8000-${String(index).padStart(12, '0')}`);
+    await db.batch(failures.flatMap((id) => [
+      statement(`INSERT INTO issue_images (id, session_id, issue_id, uploader, uploader_name, request_id,
+        visibility, declared_bytes, original_name, original_path, thumbnail_path, state)
+        VALUES (?, ?, ?, ?, 'Fictional uploader', ?, 'internal', 1, 'fictional.png', ?, ?, 'expired')`,
+      id, fixture.sessionId, fixture.issueId, fixture.staff.accountId, randomUUID(),
+      `${fixture.sessionId}/${fixture.issueId}/${id}/original`, `${fixture.sessionId}/${fixture.issueId}/${id}/thumbnail`),
+      statement('INSERT INTO image_deletions (attachment_id) VALUES (?)', id),
+    ]));
+    const image = await reserve();
+    await transfer(image, 'original');
+    await statement('UPDATE issue_images SET expires_at = unixepoch() - 1 WHERE id = ?', image.id).run();
+    const recovering = new R2ImageService(db, wrappedBucket({ delete: async (keys) => {
+      if (keys.includes(image.original_path)) await bucket.delete(keys);
+      else throw new Error('Injected persistent deletion failure');
+    } }));
+    await expect(recovering.recover(fixture.sessionId)).rejects.toThrow('requires another attempt');
+    const waiting = await bucket.get(image.original_path);
+    expect(waiting).not.toBeNull();
+    await waiting?.body.cancel();
+    await expect(recovering.recover(fixture.sessionId)).rejects.toThrow('requires another attempt');
+    expect(await bucket.get(image.original_path)).toBeNull();
+    expect((await record(image.id))?.files_removed_at).not.toBeNull();
+    expect(await fixture.rows('SELECT attempts FROM image_deletions WHERE attachment_id = ?', image.id)).toEqual([{ attempts: 1 }]);
+  });
+
   it.each([false, true])('removes a late object after fixture metadata deletion, including response loss %s', async (lostResponse) => {
     const image = await reserve();
     ownedKeys.add(image.original_path);

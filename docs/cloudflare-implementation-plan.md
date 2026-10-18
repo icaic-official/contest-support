@@ -13,15 +13,15 @@ Supabase remains the active development backend.
 | Milestone | Implemented behavior | Observed verification and remaining gate |
 | --- | --- | --- |
 | Complete D1 workflow | All nine commands persist shared `WorkflowService` decisions with atomic effects and current identity guards. | All 70 local and hosted D1 cases pass with scoped cleanup. Hosted target: separate `minsky-connector-ci`, database `de43cf95-c024-4e44-860d-8ff179e4e08d`. |
-| Complete application boundary | Authenticated routes, session lists, authorized snapshots, administration, and every browser `Backend` group. | 37 local application cases and one local HTTPS runtime case pass. Complete hosted UI verification remains pending. |
-| Private R2 images | Reservations, immutable transfers, completion, authorized downloads, removal, abandonment, expiry, and exact-key recovery. | 34 cases pass against local D1 and R2 bindings. Hosted image journeys remain pending. |
-| Durable Object updates | Audience-specific delivery from the D1 outbox, current-access checks, duplicate handling, reconnect refresh, and retry recovery. | Nine local live-update cases and the local runtime case pass. Complete hosted delivery remains pending. |
+| Complete application boundary | Authenticated routes, session lists, authorized snapshots, administration, and every browser `Backend` group. | Application cases, the local HTTPS runtime, and the complete local React journey pass. Complete hosted UI verification remains pending. |
+| Private R2 images | Reservations, immutable transfers, completion, authorized downloads, removal, abandonment, expiry, and exact-key recovery. | All 59 image cases pass against local D1 and R2 bindings. Hosted image journeys remain pending. |
+| Durable Object updates | Audience-specific delivery from the D1 outbox, current-access checks, duplicate handling, reconnect refresh, and retry recovery. | Local live-update, runtime, complete React, and internal cleanup-binding checks pass. Complete hosted delivery remains pending. |
 | Shared provider assertions | Both fixture drivers use the same eight scenarios. | Supabase passes all eight with cleanup. The Cloudflare hosted shared run remains pending. |
 | Empty installation | Provider-owned configuration, explicit target checks, atomic bootstrap, and trusted owner recovery. | 15 local installation cases and 24 tooling cases pass at the recorded revision. The documented hosted empty installation remains pending. |
 
-R2 activation is the current hosted prerequisite.
-Cloudflare returned error `10042` for the isolated account.
-Workers Paid is active. That does not activate R2.
+The owner activated R2 after the initial provider error `10042`.
+The isolated Standard CI bucket exists with public access disabled. Hosted verification is in progress.
+Workers Paid is active.
 Do not count blocked image, shared-suite, UI, installation, or protected connector checks as passes.
 Record each later result with its actual revision and target in [current state](current-state.md).
 Earlier aggregate test counts describe those runs and do not replace checks of the final PR revision.
@@ -137,7 +137,7 @@ The [browser adapter](../src/backend/cloudflare/backend.ts) implements every `Ba
 The [Cloudflare fixture driver](../tests/providers/cloudflare/fixture.ts) supplies fictional setup, exact target checks, and scoped D1 and R2 cleanup.
 The remaining hosted sequence is:
 
-1. Complete R2 activation and prepare the new isolated bucket without changing existing resources.
+1. Verify the new isolated Standard bucket after the owner's R2 activation. Preserve existing resources.
 2. Deploy the reviewed complete Worker and its private secret to the selected CI target.
 3. Run every shared provider scenario through real hosted endpoints and browser cookies.
 4. Run the complete hosted product journey, including fictional accounts, images, and live updates.

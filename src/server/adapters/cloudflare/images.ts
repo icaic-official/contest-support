@@ -266,11 +266,11 @@ export class R2ImageService {
   }
 
   private async deleteObjects(row: Pick<Image, 'id' | 'original_path' | 'thumbnail_path'>): Promise<void> {
+    // Count an attempt before R2 can fail. Failed keys must not permanently
+    // occupy the first recovery batch and starve other cleanup tasks.
+    await this.statement('UPDATE image_deletions SET attempts = attempts + 1 WHERE attachment_id = ?', row.id).run();
     await this.bucket.delete([row.original_path, row.thumbnail_path]);
-    await this.db.batch([
-      this.statement(`UPDATE issue_images SET files_removed_at = ${now}, state = CASE WHEN state = 'deleting' THEN 'deleted' ELSE state END WHERE id = ?`, row.id),
-      this.statement('UPDATE image_deletions SET attempts = attempts + 1 WHERE attachment_id = ?', row.id),
-    ]);
+    await this.statement(`UPDATE issue_images SET files_removed_at = ${now}, state = CASE WHEN state = 'deleting' THEN 'deleted' ELSE state END WHERE id = ?`, row.id).run();
   }
 
   async download(caller: Caller, path: string): Promise<{ body: ReadableStream<Uint8Array>; contentType: string }> {
@@ -305,7 +305,7 @@ export class R2ImageService {
     ]);
     const pending = await this.statement(`SELECT x.id, x.original_path, x.thumbnail_path FROM issue_images x
       JOIN image_deletions d ON d.attachment_id = x.id WHERE x.state IN ('deleting', 'deleted', 'expired', 'abandoned')
-      ${sessionId ? 'AND x.session_id = ?' : ''} ORDER BY COALESCE(x.files_removed_at, ''), x.id LIMIT 100`, ...bindings).all<Image>();
+      ${sessionId ? 'AND x.session_id = ?' : ''} ORDER BY d.attempts, COALESCE(x.files_removed_at, ''), x.id LIMIT 100`, ...bindings).all<Image>();
     const results = await Promise.allSettled(pending.results.map((row) => this.deleteObjects(row)));
     if (results.some((result) => result.status === 'rejected')) throw new Error('Stored image cleanup requires another attempt.');
   }

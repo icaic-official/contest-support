@@ -55,6 +55,7 @@ jobs:
       - run: npm run test:e2e
       - run: npm run test:auth:browser
       - run: npm run test:connector:runtime
+      - run: npm run test:connector:ui:local
       - run: npm run docs:test
   secrets:
     runs-on: ubuntu-latest

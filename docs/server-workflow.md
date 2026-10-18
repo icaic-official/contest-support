@@ -160,6 +160,6 @@ The full hosted runner uses `MINSKY_CONNECTOR_D1_CONFIG`, modern fixtures, and t
 
 T0020 also implements application reads, administration, private images, live updates, and the Cloudflare browser adapter.
 Local runtime checks do not replace complete hosted application verification.
-Hosted Cloudflare shared scenarios, UI journeys, empty installation, and protected connector CI remain pending while R2 activation is incomplete.
+Hosted Cloudflare shared scenarios, UI journeys, empty installation, and protected connector CI remain pending after the owner's R2 activation.
 Record these results separately from hosted D1, hosted Supabase, and earlier protected authentication runs.
 Real-data migration, cutover, AWS, and Terraform remain deferred.

@@ -17,6 +17,7 @@
     "test:d1:hosted": "node scripts/d1-proof.mjs",
     "test:connector:runtime": "node scripts/connector-runtime-test.mjs",
     "test:connector:ui": "node src/server/adapters/cloudflare/tooling/test-ui.mjs",
+    "test:connector:ui:local": "node scripts/connector-local-ui-test.mjs",
     "test:connector:workflow:hosted": "node src/server/adapters/cloudflare/tooling/test-workflow.mjs",
     "test:connector:accounts:hosted": "node src/server/adapters/cloudflare/tooling/test-accounts.mjs",
     "cloudflare:install": "node src/server/adapters/cloudflare/tooling/install.mjs",

@@ -30,6 +30,7 @@
     "vitest.connector-runtime.config.ts",
     "playwright.auth.config.ts",
     "playwright.connector.config.ts",
+    "playwright.connector-local.config.ts",
     "playwright.config.ts",
     "playwright.cloud.config.ts",
     "playwright.providers.config.ts",

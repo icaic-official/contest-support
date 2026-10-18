@@ -1,5 +1,28 @@
 # Minsky planning record
 
+**Parallel T0009 maintenance, 2026-10-18.** The owner requested an update to [PR #23](https://github.com/GiftedNovaHD/minsky/pull/23).
+Use its existing `feature/t0009-jury-worklist` branch in a separate worktree.
+Merge current `main` at `7d19b00` and verify current behavior before owner review.
+Preserve the separate T0020 connector checkout and scope.
+Use the existing `Backend` contracts, authorized snapshots, and shared server workflow rules.
+Keep Supabase active. Add no schema, backend feature, provider implementation, or runtime dependency.
+Use only UUID-owned fictional fixtures in Minsky CI, `ghtztmovdkhuketcbjmq`, for hosted acceptance.
+The owner approved the exact T0009 `cloud-test` branch addition on 2026-10-18. Preserve all other entries and protection rules.
+Do not deploy the application, merge the PR, or migrate data.
+Required checks and hosted acceptance must pass before PR #23 is ready for owner review.
+
+**Complete Cloudflare connector, 2026-10-18.** T0020 starts from updated `main` at `7d19b00` after PR #41 merged.
+Use `feature/t0020-cloudflare-connector` for the complete connector and empty-installation verification.
+The [ticket](docs/tickets.md#t0020-complete-cloudflare-connector) records milestones and acceptance criteria before implementation.
+Reuse the shared workflow and merged authentication implementation.
+Inspect PR #21 before installation tooling. Reuse suitable parts without merging its branch wholesale.
+Keep provider configuration and bootstrap inside provider implementations.
+Document reuse decisions and recommend a PR #21 disposition. The owner decides whether to close it.
+Isolated Cloudflare development, CI, and installation resources are authorized in the confirmed account.
+Only T0020's branch may be added to the protected cloud-test allowlist. Preserve other entries and rules.
+Supabase remains active. Docker packaging, AWS, Terraform, real-data migration, and backend cutover remain deferred.
+The owner reviews and merges. Bounded subagent work is authorized.
+
 **PR #41 review follow-up, 2026-10-18.** The owner requested review fixes, code cleanup, and completion of authentication verification on the existing PR.
 Use `feature/t0019-shared-server-workflow`.
 Correct Supabase login expiry after lock waits with an additive migration. Preserve the installed migration source.

@@ -2,6 +2,206 @@
 
 The newest record appears first. Older sections describe their own revisions and targets.
 
+## T0009 parallel maintenance, 2026-10-18
+
+The owner requested current-main integration and verification of [PR #23](https://github.com/GiftedNovaHD/minsky/pull/23).
+Work uses the existing `feature/t0009-jury-worklist` branch in `/tmp/minsky-t0009`.
+The integration baseline is `main` at `7d19b00`, which includes PR #41.
+This T0009 run did not edit the separate connector checkout.
+T0020 retains its complete-connector and empty-installation scope.
+
+The worklist uses provider-neutral `Backend` contracts and authorized snapshots.
+Existing workflow operations enforce current permissions, transitions, stale revisions, and request receipts at the server.
+Supabase remains active. This maintenance adds no schema, backend feature, provider implementation, or runtime dependency.
+The owner reviews and merges. No application deployment or data migration is authorized.
+
+### Current local checks
+
+| Check | Observed result |
+| --- | --- |
+| `npm run typecheck`, `npm run lint`, `npm run build` | Passed. The final build emits a 308.24 kB JavaScript bundle without a size warning. |
+| `npm run check:functions`, `npm run test:functions` | Passed. All 12 function tests passed. |
+| `npm run docs:build` | Passed. Built 14 pages and checked 566 local links and assets. The existing `/404` route warning remains. |
+| `npm run test:providers:list` | Listed eight scenarios. This lists tests and does not verify a hosted provider. |
+| `npm test` | Passed all 276 tests in 22 files in 33.88 seconds after the resource-heavy browser suites ended. |
+| `npm test -- --no-file-parallelism` | Passed all 276 tests in 22 files in 73.30 seconds. No assertion or timeout changed. |
+| `npm run test:e2e -- --workers=2 --output=/tmp/minsky-t0009-e2e-results` | Passed all 44 cases in 42.5 seconds, including all ten jury cases. |
+| `npm run docs:test` | Passed all three cases in 4.9 seconds. |
+| Repository Markdown links | Checked 181 local links in eight affected root documents. Passed. |
+| `npm run test:auth:browser -- --output=/tmp/minsky-t0009-auth-results` | Passed all three cases in 9.6 seconds. The local HTTPS Worker logged expected self-signed TLS alerts. |
+
+Initial setup attempts hit sandbox `esbuild` `EPERM`, loopback restrictions, and missing or incomplete Chromium binaries.
+The checks passed after correcting permissions and installing the pinned browser.
+One default-parallel unit attempt timed out during resource-heavy concurrent checks and then hit a cleanup assertion.
+Both serial and default-parallel execution passed afterward. No timeout or assertion changed.
+
+The application suite covers eligibility, ordering, zero-minute decisions, reopening, two-client updates, and uncertain retries.
+It checks drafts, focus, queue independence, role and session changes, membership removal, archival, failed reads, and isolation.
+These browser cases use simulated transport with the current migration-owned PostgreSQL rules, snapshots, and workflow transactions.
+They do not establish hosted acceptance.
+Desktop and 320px and 390px screenshots were inspected without visible clipping.
+Keyboard navigation, return focus, CSS zoom, and reflow checks pass.
+
+Two new test assumptions required correction.
+The isolation precondition tried to reply to a resolved issue. The server correctly rejected that action.
+The test now reopens the issue before replying.
+The membership-removal test expected an exception, but the current snapshot intentionally returns null membership and empty protected data.
+The test now checks that exact authorized response.
+Concurrent browser suites also shared an output directory and hit an artifact `ENOENT` error.
+Separate `/tmp` output directories corrected the artifact collision without changing application assertions.
+
+### Hosted and protected checks
+
+The hosted-service CLI run targets only Minsky CI, `ghtztmovdkhuketcbjmq`.
+Prerequisite inspection found all nine local migrations and the account and attachment functions already present.
+An unrelated remote migration, `202610110002`, remains unchanged.
+The final full local CLI run against hosted services passed all 16 cases in 2.3 minutes.
+It started at `2026-10-18T03:06:52.639Z` and used runtime source revision `f45d03f`.
+Two real jury cases check Realtime updates and wait for the confirmed snapshot before checking draft and focus preservation.
+They also cover zero-minute decisions, reopening, re-resolution, and committed actions whose responses are deliberately dropped.
+Award and external-confirmation retries retain identical request IDs.
+The tests confirm one award, one confirmation, and one history entry for each action.
+
+The first full hosted attempt passed 15 of 16 cases.
+Its second new jury case failed at a status-selector locator before completing.
+The exact label included wrapped option text. The corrected locator uses the exact **Status** combobox role.
+This correction changes no application assertion.
+
+Cleanup checks found zero remaining run-owned records in all 16 categories, including Storage, Auth, and request receipts.
+Both the completed run and the failed attempt were checked.
+Audit records are `/tmp/t0009-cloud-audit-1792292812639-cleanup.json` and `/tmp/t0009-cloud-audit-1792292637288-cleanup.json`.
+Unrelated fixtures, migrations, and provider configuration remain unchanged.
+
+The owner approved adding only `feature/t0009-jury-worklist` to the protected `cloud-test` branch allowlist.
+The branch policy was added as ID `63431065`.
+The four existing entries and branch protection ID `69128862` remain unchanged.
+Ordinary [push checks](https://github.com/GiftedNovaHD/minsky/actions/runs/39092550990) and [PR checks](https://github.com/GiftedNovaHD/minsky/actions/runs/39092552506) passed on `f45d03f`.
+The protected `existing_backend=true` check passed on `f45d03f` in [run 39092567628](https://github.com/GiftedNovaHD/minsky/actions/runs/39092567628).
+Its results are separate from the local hosted-service CLI run:
+
+| Protected check | Observed result |
+| --- | --- |
+| Unit and database tests | All 276 passed. |
+| Function tests | All 12 passed. |
+| Application browser tests | All 44 passed. |
+| Authentication and documentation browser tests | All three cases in each suite passed. |
+| Hosted application journey | All 16 cases passed in 2.9 minutes. |
+| Supabase shared provider scenarios | All eight passed in 1.8 minutes. |
+| Hosted shared server workflow | All five passed. |
+
+No recovery journals remained after provider and workflow cleanup.
+The deployment job and all six backend preparation steps were skipped.
+Repository variable `CLOUDFLARE_DEPLOY_ENABLED=false` is confirmed. No application deployment was performed.
+
+### Integration boundaries and remaining checks
+
+The worklist changes overlap T0020 at `ConnectedApp.tsx` navigation, selection, and issue-detail return handling.
+Shared styles contain a separate jury-worklist block.
+Planning-document changes preserve T0020's connector scope. This T0009 run did not edit that checkout.
+
+Required verification and hosted acceptance pass for runtime source `f45d03f`.
+PR #23 is prepared for owner review.
+The final follow-up changes documentation only. It does not change that verified runtime source.
+Checks for the documentation follow-up must be reported against its own revision after the commit exists.
+No required runtime verification remains outstanding.
+The 2026-10-15 results below are historical and do not establish current-main compatibility.
+Record local browser simulations, hosted-service CLI runs, and protected GitHub Actions results separately.
+Physical devices, native browser zoom, screen readers, and other browser engines remain unverified.
+
+## T0009 jury worklist (2026-10-15)
+
+Historical record. These results apply to the stated revision only.
+Current-main integration and verification appear in the 2026-10-18 record above.
+
+Implemented on `feature/t0009-jury-worklist`, from updated `main` at `1ed603a`.
+Source revision: `2ce66bd`; [draft PR #23](https://github.com/notbowen/minsky/pull/23).
+The user authorized this work independently of the open T0005–T0008 branches.
+Those branches were not merged or copied into this implementation.
+The feature is not deployed. The user reviews and merges; merge does not deploy.
+
+Implemented:
+
+- Jury and combined-role members have a separate sidebar entry. Admin-only,
+  support-only, and contestant accounts gain no new capabilities.
+- **Needs decision** lists resolved issues without an award, oldest resolution
+  first. **Pending external application** lists every unapplied award, oldest
+  decision first, including zero-minute decisions and reopened issues. Counts,
+  resolution evidence, authenticated attribution, and timing use the existing snapshot.
+- Existing issue details and forms handle decisions and explicit external
+  confirmation. Jury-only members can reach a reopened issue's pending award.
+  Return focus goes to the originating row or section heading. Queue filters and
+  selection remain independent. Re-resolution does not create a second award.
+- Existing refresh, Realtime invalidations, revision checks, and request receipts
+  are reused. No schema, policy, backend function, provider resource, or runtime
+  dependency was added. The HTML title no longer refers to the retired local demo.
+
+Verification:
+
+| Check | Observed result |
+| --- | --- |
+| Type checking, lint, production build, Deno function check | Passed locally |
+| `npm test` | All 34 focused and database tests passed, including 12 new worklist cases |
+| `npm run test:e2e` | All 10 browser cases passed: seven jury cases and three existing public-page cases |
+| Local two-client updates | Passed with simulated Auth/HTTP/Realtime transport and actual migration-owned PostgreSQL RLS, snapshots, and workflow transactions |
+| Cloud integration | Could not start: the credential lookup for the isolated Minsky CI project failed before fixture creation |
+| Protected GitHub cloud job and hosted deployment | Not run; no deployment was performed |
+| Dependency audit | `npm audit --audit-level=high` reported zero vulnerabilities |
+| Documentation | All 63 local links/anchors and whitespace checks passed |
+
+Browser plugin not available; repository Playwright/Chromium was used at
+`http://127.0.0.1:4173`. Checks covered eligibility, ordering, zero-minute decisions,
+reopened confirmations, queue-filter independence, two-client updates, preserved
+drafts, lost-response retries without duplicate decisions, session/role changes,
+membership removal, archival, failed reads, refresh, empty states, and focus.
+The screenshot case checks page title, meaningful content, interactions, and
+absence of application errors or warnings. Desktop and 390/320px screenshots
+were reviewed; 720px reflow and 200% CSS zoom are also automated. Native browser
+zoom, physical phones, screen readers, and other browser engines remain unverified.
+Screenshots, traces, and browser output are outside the repository under `/tmp`.
+
+The build retains the main-bundle size warning. Deno synchronized workspace
+metadata with dependency versions already accepted on `main`; the function's
+resolved dependencies are unchanged. The Google TypeScript guide was read before
+source changes. Repository double quotes, React component capitalization, and
+inferred component returns are deliberate existing style/framework exceptions.
+
+Verification corrections: the first network commands lacked sandbox network
+access, then passed with that access. The first dependency install used an
+unwritable home cache, then passed with a `/tmp` cache. Fixture UUID defaults were
+typed explicitly, the Playwright fixture callback was renamed to avoid a React
+Hook lint false positive, and overly strict label locators were corrected.
+The simulated Realtime payload now includes PostgreSQL column metadata. Browser
+testing caught the return-focus case after a row moved sections; it was corrected
+before the passing run. None of those failed attempts count as passing checks.
+
+The [specification](jury-worklist.md) and [manual walkthrough](manual-verification.md#13-jury-worklist-t0009)
+record remaining acceptance. Cloud results must not be inferred from local
+transport simulations. The hosted test includes zero-minute award, reopening,
+external confirmation, re-resolution, and rejection of a second award, but is unverified.
+
+### PR23 review fixes (2026-10-15)
+
+The shared cloud journey now saves the volunteer's changed password in its
+private fixture file and restores the event's previous archive state in `finally`,
+including when an assertion fails. The later jury case can reuse that fixture
+without inheriting stale credentials or an archived event. All updates stay
+within the run's UUID-scoped fixture; no shared project state was changed.
+
+The two-client browser case now waits for the first client's completed snapshot
+response containing the other issue's award before checking the explanation
+draft and keyboard focus. An unchanged pre-refresh draft can no longer satisfy
+the check before that response arrives.
+
+After these fixes, type checking, lint, build, Deno checking, all 34 unit/database
+tests, and all 10 credential-free browser cases passed. Browser plugin not
+available; Playwright used system Chromium and a temporary configuration outside
+the repository. The cloud runner still cannot retrieve credentials for the
+isolated Minsky CI project `ghtztmovdkhuketcbjmq`; it stopped before fixture
+creation. Listing the cloud suite confirms 13 cases, but does not execute them.
+Hosted verification remains unverified, and PR23 remains a draft. The build
+retains its existing bundle-size warning. No deployment was performed.
+
+
 ## PR #41 review corrections and paid authentication, 2026-10-18
 
 The owner requested the PR #41 fixes, a second review, bounded code cleanup, and completion of hosted authentication verification.

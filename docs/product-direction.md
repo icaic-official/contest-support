@@ -4,6 +4,12 @@ This document preserves the agreed direction from [PLAN.md](../PLAN.md).
 Only requirements listed in [current-state.md](current-state.md) describe implemented behavior.
 The user selects later scope after demo feedback.
 
+Jury worklist maintenance (2026-10-18): [T0009](jury-worklist.md) remains on its existing PR #23 branch.
+It uses authorized `Backend` snapshots and existing workflow actions for decisions and external confirmations.
+The owner authorized current-main integration and verification in a separate worktree alongside T0020 connector work.
+The connector scope remains separate. Supabase remains active.
+Historical local results do not establish current compatibility or hosted acceptance.
+
 Team-search status (2026-10-15): [T0008](tickets.md#t0008--fuzzy-team-search) merged into `main` in PR #22.
 Staff search the current session's team names and locations from the issue queue.
 Volunteers and specialists use the same search to choose a team before they report an issue.

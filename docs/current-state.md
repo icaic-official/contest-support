@@ -43,9 +43,31 @@ The integration chat recorded these results at the merge revision:
 - `npm run test:e2e` passed 27 tests and failed 20 tests. The failures use selectors of the old UI. Parallel step 5 chats update them.
 - `npm run test:cloud` was not run. No cloud credentials exist in the Lapiz environment.
 
-### Verification
+### Selector updates and final step
 
-To be recorded by the final step: the Playwright results after the selector updates, the browser and visual checks at 390 × 844 and 1280 × 800 in both themes, and the PR checks.
+The parallel step 5 chats rewrote the jury specs and added a local full journey (`7ec7f79`). They updated the team search and refresh specs (`e160cf6`) and the cloud specs (`23ccfa7`, `0d304bd`).
+`00119f3` closes an organiser issue view when its issue leaves the person's lists, with the status message "ISS-N is no longer in your lists.". It also closes a phone sheet when its action is no longer allowed and returns desktop sheet focus to the control that opened it.
+
+The final step reviewed `git diff origin/main...HEAD` against the AGENTS.md "Behavior to preserve" rules. It compared the command runner, the issue abilities, the contestant filters and the image preview requests with the code on `main`. It made these fixes:
+
+- `5507bc7`: a recorded command selects its issue only when the selection did not change while the command ran. Before, **Back** during the refresh after a command was undone.
+- `52f1ea1`: the two-client jury spec uses `test.slow()`.
+- `1c9d0c6`: the skip link has padding when it gets focus. The desktop issue sheet keeps the last issue on screen while it slides out. A sign-in clears an earlier sign-out or session restore error.
+- `7996f9c`: the contestant app moves focus to the heading after the commit that shows it. Before, pending effects of an earlier refresh could focus the old heading with the same ID. The journey spec failed on this in 1 to 3 of 8 runs, also before this step.
+- `13e6034`: Tailwind scans only `src/` for class names. The CSS fell from 137.6 kB to 116.2 kB. An edit to a document no longer reloads the page in the dev server.
+
+### Verification (2026-10-18)
+
+Local checks at `13e6034`:
+
+- `npm run lint`, `npm run typecheck` and `npm run check:functions` passed.
+- `npm run build` passed with the chunk-size warning (about 511 kB).
+- `npm test` passed 348 tests in 26 files.
+- `npm run test:e2e` passed 60 of 60 tests in two full runs in a 4 vCPU job VM. The journey and UI selection specs then passed 32 of 32 runs with `--repeat-each=8`.
+- `npm run test:cloud` was not run. No cloud credentials exist in the Lapiz environment.
+
+Visual checks used the browser tool, the Vite dev server and a temporary server that wrapped the PGlite jury fixture. That server is not committed. The checks covered the organiser phone app at 390 × 844 with touch, the organiser desktop console at 1280 × 800 and the contestant desktop app at 1280 × 800. Each UI was checked in light and dark themes. Keyboard checks covered Tab, the skip link, J, Ctrl+K, Escape and sheet **Cancel**. A reload kept the session, the internal note and the running timer. The contestant saw the public reply and not the internal note.
+The [T0015 ticket](tickets.md#verification-2026-10-18) has the details.
 
 ### Limitations
 
@@ -56,6 +78,9 @@ To be recorded by the final step: the Playwright results after the selector upda
 - `src/styles.css` still holds all legacy styles (1,748 lines), with the Public Sans font. Only the image preview page uses them, inside `.legacy-ui`. Step 5 did not remove the unused rules. This is follow-up work.
 - The T0015 design differs from [the T0009 specification](jury-worklist.md) in two ways. The desktop award and confirmation forms stay on the Award review cards. There is no separate **Jury worklist** sidebar entry and no **Back to jury worklist** button.
 - The ticket number T0015 is also used by the earlier shared provider tests record.
+- The `main` landmark holds the desktop console sidebar, so the skip link moves focus to the start of the sidebar, not to the page content.
+- The updated cloud specs have not run against a cloud project.
+- The final visual pass did not check the account dialogs or the image upload against a backend. The mocked browser specs cover the membership form (`workspace-refresh.spec.ts`) and the image requests (`images.spec.ts`).
 
 ## T0015 organiser desktop console (2026-10-18)
 

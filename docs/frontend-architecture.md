@@ -10,7 +10,7 @@ See [T0015](tickets.md#t0015--organiser-and-contestant-frontend-redesign) for sc
 The frontend uses React 19, TypeScript and Vite.
 The redesigned screens use these parts:
 
-- **Tailwind CSS v4** through `@tailwindcss/vite`. The entry stylesheet is `src/index.css`.
+- **Tailwind CSS v4** through `@tailwindcss/vite`. The entry stylesheet is `src/index.css`. It scans only `src/` for class names (`source(".")`). Put class names only in files under `src/`.
 - **shadcn/ui** components, copied into `src/components/ui/`. They use Radix primitives from the `radix-ui` package.
 - **lucide-react** icons, `class-variance-authority`, `clsx` and `tailwind-merge`.
 - **cmdk** for command menus, **vaul** for phone drawers and **sonner** for toasts.
@@ -186,6 +186,10 @@ These rules apply:
 - Cards are sorted by unresolved time, longest first. The timer is neutral below 10 minutes, amber below 20 minutes and rose after that. A resolved issue stays neutral.
 - A recorded command selects its issue, so the issue view opens. An inline **Claim** or **Accept** on a card returns to the list. **Claim and go** opens the issue.
 - **Back** returns focus to the card of the issue. A tab change moves focus to the tab heading. Sheets trap focus and have a **Cancel** button, so no action needs a swipe. Buttons are at least 44 px high.
+- A recorded command selects its issue only when the person did not change the selection while the command ran. Thus **Back** during the refresh after a command is not undone.
+- When the open issue leaves the person's lists, for example after a live reopen, the issue view closes. The status message "ISS-N is no longer in your lists." appears and focus moves to the page heading (`useLeftIssueNotice`, `issueThatLeft()`).
+- An open sheet closes when its action is no longer allowed, for example after the person loses the jury role (`sheetAllowed()`).
+- The Find tab keeps its query when the person goes back from a team.
 - The Session tab keeps the behavior of the `AdminPanel` from before T0015: status counts, the intake switch, image limits (1–50 MB, 1–24 images, 1–120 MB), accounts, a username for accounts without one, membership changes, password reset (not for your own account), removal of session access, assignment by user ID and recent administration activity.
 - A new account and a password reset show the credentials once, in the same sheet. If the admin closes the sheet while the request runs, the sheet opens again for the credentials. Closing the sheet discards them.
 - A password reset and a removal need confirmation in a dialog. The text keeps the meaning of the earlier `window.confirm` text.
@@ -226,6 +230,9 @@ These rules apply:
 - Rows are sorted by unresolved time, longest first. The timer colors are the same as in the phone app.
 - The issue number in each row is a button. Tab reaches it and Enter opens the sheet. A click on the row also opens it. J and K move focus between rows when no field or dialog has focus.
 - **Claim** or **Accept** in a row stays on the page. **Claim** or **Accept handoff** in the sheet keeps the sheet open. A recorded report opens its issue in the sheet.
+- When the sheet closes, focus goes back to the control that opened it, then to the issue row, then to the page heading. Radix returns focus only to a `Dialog.Trigger`, so the console moves focus itself. The sheet keeps the last issue on screen while it slides out.
+- When the open issue leaves the person's lists, the sheet closes with the same status message as the phone app.
+- The queue team filter and the **Report for a team** dialog keep separate team choices. The UI before T0015 shared one choice.
 - The sheet shows one filled primary action from `primaryAction()`. Other allowed actions are outlined. **Decide award** and **Confirm applied** open the Outcome & award tab. Resolve, escalate and reopen open a dialog.
 - The composer has **Public reply** and **Internal note**. An internal note has the amber striped surface. The draft clears only when the server records the message, also after **Retry last request** (T0012).
 - The command palette finds issues by number (`31`, `#31`, `ISS-31`) or by report text from three characters, teams and tables with the T0008 search, pages and actions. A team opens the queue with that team filter. A jury-only member goes to Teams & tables instead.

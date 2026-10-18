@@ -382,4 +382,5 @@ Check all notification audiences, including `account:` records, and all associat
 Check remaining history, audit, operation, identity, login, membership, and authentication-limit rows.
 Delete the temporary assertion rows inside the same batch.
 Retain the migrations and schema. Preserve unrelated records and shared IP counters.
-Delete the journal and runtime configuration only after the batch and independent final checks pass.
+Delete the journal and its private temporary directory only after the batch and independent final checks pass.
+Retain the original repository configuration.

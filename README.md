@@ -14,7 +14,7 @@ Both providers use the same workflow decisions. The active Supabase browser path
 
 [Read the user and operator guides](https://minsky-docs.icaic-minsky.workers.dev).
 Use [the installation guide](site/src/content/docs/operators/installation.md) for an isolated Cloudflare instance.
-See [current state](docs/current-state.md#t0020-connector-implementation-2026-10-18) for source-specific checks and [migration gates](docs/product-direction.md#migration-and-cutover-gates) for deferred cutover work.
+See [current state](docs/current-state.md#pr-42-review-fixes-and-cleanup-2026-10-18) for source-specific checks and [migration gates](docs/product-direction.md#migration-and-cutover-gates) for deferred cutover work.
 These are development installations that require connectivity. Live-contest readiness and capacity for 800 simultaneous users remain unverified.
 
 ## Local development

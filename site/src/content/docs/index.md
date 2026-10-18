@@ -41,5 +41,6 @@ Ask your organizer for your competition's address.
 :::note[Development stage]
 Live-contest readiness and capacity for 800 simultaneous users remain unverified.
 Minsky currently requires a working network connection.
-Independent installation packaging is pending review in T0007.
+The [Cloudflare development installation](/operators/installation/) has a verified procedure.
+T0007 container packaging remains deferred.
 :::

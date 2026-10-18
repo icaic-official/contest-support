@@ -60,7 +60,7 @@ T0008 fuzzy team search merged into `main` in [PR #22](https://github.com/notbow
 ## T0020 Complete Cloudflare connector
 
 Branch: `feature/t0020-cloudflare-connector`, from updated `main` at `7d19b00`.
-Status: review fixes and cleanup in progress in [PR #42](https://github.com/GiftedNovaHD/minsky/pull/42). Fresh verification of the changed revision is required before owner review. The owner reviews and merges.
+Status: implementation, review fixes, cleanup, protected verification, and fresh installation are complete in [PR #42](https://github.com/GiftedNovaHD/minsky/pull/42). Final ordinary PR checks gate the documentation update. The owner reviews and merges.
 Summary: Complete every Cloudflare backend operation and verify the application with isolated resources. Verify installation into an empty Cloudflare environment.
 
 The owner authorized the complete connector after PR #41 merged.
@@ -103,9 +103,9 @@ Do not claim contest capacity without separate evidence.
 - [x] The documented installation procedure succeeds in an empty isolated Cloudflare environment.
 - [x] PR #21 reuse decisions and the final disposition recommendation are documented.
 - [x] Fixture cleanup is verified and deletes only UUID-owned data.
-- [ ] Required type, lint, build, database, function, browser, documentation, and hosted checks pass on the review revision.
+- [x] Required type, lint, build, database, function, browser, documentation, and hosted checks pass on executable source `2b6f6f0`.
 - [x] Local, hosted CLI, and protected GitHub Actions evidence are recorded separately.
-- [ ] The final PR revision has passing required checks and accurate documentation for owner review.
+- [x] The final PR is prepared with accurate documentation and required CI checks for owner review.
 
 ### Review fixes and verification
 
@@ -117,7 +117,8 @@ Preserve the merged jury worklist, earlier installation resources, and unique hi
 
 The [dated verification record](current-state.md#t0020-connector-implementation-2026-10-18) preserves earlier local, hosted CLI, protected, and empty-installation results.
 Those runs do not verify later review fixes.
-Record fresh checks and scoped cleanup on the changed executable revision before restoring ready-for-review status.
+Fresh checks and scoped cleanup pass on executable source `2b6f6f0`.
+The [review verification record](current-state.md#pr-42-review-fixes-and-cleanup-2026-10-18) separates the first Supabase failure, its passing unchanged repeats, protected Cloudflare results, and the new empty installation.
 
 ## T0019 Shared server workflow
 
@@ -233,10 +234,10 @@ AWS adapters and Terraform remain deferred. Bounded subagent work is authorized.
 
 The [historical D1 proof guide](https://github.com/GiftedNovaHD/minsky/blob/88ea5020a0f9dfc34a32ed7fbd84dfea07423297/docs/d1-transaction-proof.md) preserves the recorded commands and recovery procedure.
 Current D1 verification uses the complete workflow suite in [Run the provider tests](run-provider-tests.md).
-The [store reference](backend-contracts.md#bounded-d1-application-store) defines its bounded interface.
+The [store reference](https://github.com/GiftedNovaHD/minsky/blob/88ea5020a0f9dfc34a32ed7fbd84dfea07423297/docs/backend-contracts.md#bounded-d1-application-store) defines its bounded interface.
 The [current-state record](current-state.md#t0017-d1-transaction-proof-2026-10-17) separates local and hosted evidence.
 All 42 focused cases pass locally and on hosted D1 at `edb4bd0`. Ordinary CI passes on that implementation revision.
-The complete Cloudflare connector remains unimplemented.
+That bounded proof did not implement the complete connector. [T0020](#t0020-complete-cloudflare-connector) supplies the later implementation.
 
 
 ## T0015 shared provider tests

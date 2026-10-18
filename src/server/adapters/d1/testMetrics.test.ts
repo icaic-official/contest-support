@@ -10,7 +10,7 @@ import { passwordHasher, randomSecret } from '../cloudflare/password';
 
 it('measures the real D1 transport without exposing data or changing batch rollback', async () => {
   const platform = await getPlatformProxy<{ DB: D1Connection }>({
-    configPath: 'wrangler.d1-proof.jsonc', persist: false, remoteBindings: false, envFiles: [],
+    configPath: 'src/server/adapters/cloudflare/deploy/connector-store-ci.wrangler.jsonc', persist: false, remoteBindings: false, envFiles: [],
   });
   const lines: string[] = [];
   const metrics = measureD1(platform.env.DB, (line) => lines.push(line));
@@ -44,11 +44,11 @@ it('measures the real D1 transport without exposing data or changing batch rollb
 
 it('keeps native D1 capabilities used by the maintained identity adapter', async () => {
   const platform = await getPlatformProxy<{ DB: D1Connection }>({
-    configPath: 'wrangler.d1-proof.jsonc', persist: false, remoteBindings: false, envFiles: [],
+    configPath: 'src/server/adapters/cloudflare/deploy/connector-store-ci.wrangler.jsonc', persist: false, remoteBindings: false, envFiles: [],
   });
   const lines: string[] = [];
   const { db } = measureD1(platform.env.DB, (line) => lines.push(line));
-  const fixture = new D1Fixture(db);
+  const fixture = new D1Fixture(db, 'src/server/adapters/cloudflare/deploy/connector-store-ci.wrangler.jsonc');
   let created = false;
   const password = randomSecret();
   const username = `metrics_${fixture.eventId.replaceAll('-', '').slice(0, 20)}`;

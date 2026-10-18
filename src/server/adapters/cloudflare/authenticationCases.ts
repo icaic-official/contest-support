@@ -5,7 +5,7 @@ import { getPlatformProxy, unstable_splitSqlQuery as splitSqlQuery } from 'wrang
 import type { D1Connection, D1Statement } from '../d1/connection';
 import { D1Fixture } from '../d1/testFixture';
 import { measureD1 } from '../d1/testMetrics';
-import { D1ApplicationStore } from '../d1/store';
+import { D1ApplicationService, notificationStatements } from './application';
 import { D1AuthenticationService } from './authentication';
 import { createBetterAuthIdentity, type IdentityProvider } from './identity';
 import { passwordHasher, randomSecret, type PasswordHasher } from './password';
@@ -15,8 +15,7 @@ import { verifyTemporaryAuthentication } from '../../../../tests/providers/scena
 
 const connectorConfig = process.env.MINSKY_CONNECTOR_D1_CONFIG;
 const historicalRemote = process.env.MINSKY_AUTH_REMOTE === '1';
-const legacy = process.env.MINSKY_AUTH_LEGACY === '1';
-if (connectorConfig && (historicalRemote || legacy)) throw new Error('Select the full connector account target or historical authentication verification.');
+if (connectorConfig && historicalRemote) throw new Error('Select the full connector account target or isolated authentication verification.');
 const remote = historicalRemote || Boolean(connectorConfig);
 const configPath = connectorConfig ?? 'wrangler.auth-ci.jsonc';
 const origin = 'http://127.0.0.1:8788';
@@ -55,7 +54,7 @@ export function registerAuthenticationCases(group: AuthenticationCases) {
       dispose = async () => { metrics?.flush(); await platform.dispose(); };
       if (!remote) {
         const dir = 'src/server/adapters/d1/migrations';
-        for (const file of readdirSync(dir).filter((file) => file.endsWith('.sql') && (!legacy || Number(file.slice(0, 4)) <= 4)).sort()) {
+        for (const file of readdirSync(dir).filter((file) => file.endsWith('.sql')).sort()) {
           await db.batch(splitSqlQuery(readFileSync(`${dir}/${file}`, 'utf8')).map((sql) => db.prepare(sql)));
         }
       }
@@ -445,13 +444,18 @@ export function registerAuthenticationCases(group: AuthenticationCases) {
         await expectFailure(service.sessions(new Headers({ 'X-Account-Id': fixture.staff.accountId }))).toMatchObject({ status: 401 });
       });
 
-      it('blocks temporary passwords at both session reads and the application store', async () => {
+      it('blocks temporary passwords at session and application reads', async () => {
         await stmt('UPDATE accounts SET must_change = 1 WHERE id = ?', fixture.contestant.accountId).run();
         const headers = await signIn();
         const current = await service.current(headers);
         expect(current?.status.must_change).toBe(true);
         await expectFailure(service.sessions(headers)).toMatchObject({ status: 403 });
-        expect(await new D1ApplicationStore(db, fullApplication ? {} : { mode: 'transaction-proof' }).issue(current!.caller, fixture.sessionId, fixture.issueId)).toBeUndefined();
+        // An auth-only target can retain the earlier schema. Check application
+        // reads when the complete schema exists.
+        if (fullApplication) {
+          await expectFailure(new D1ApplicationService(db).snapshot(current!.caller, fixture.sessionId))
+            .toMatchObject({ status: 403 });
+        }
         await expectFailure(service.account(headers, fixture.sessionId, { action: 'reset_password', userId: fixture.staff.accountId })).toMatchObject({ status: 403 });
       });
 
@@ -552,11 +556,20 @@ export function registerAuthenticationCases(group: AuthenticationCases) {
 
       it('resets through the organizer and preserves IDs, membership, and issue history', async () => {
         const oldHeaders = await signIn();
-        const caller = (await service.current(oldHeaders))!.caller;
-        expect(await new D1ApplicationStore(db, fullApplication ? {} : { mode: 'transaction-proof' }).execute(caller, fixture.sessionId, randomUUID(), {
+        const command = {
           type: 'message', issue_id: fixture.issueId, revision: 1,
           text: 'Fictional history retained through password reset.', visibility: 'public',
-        })).toMatchObject({ outcome: 'committed' });
+        };
+        // Seed retained records directly. Password recovery must preserve data
+        // on both the auth-only target and the complete connector schema.
+        await db.batch([
+          stmt(`INSERT INTO history (id, issue_id, actor, at, text, visibility)
+            VALUES (?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), ?, 'public')`,
+          randomUUID(), fixture.issueId, fixture.contestant.accountId, command.text),
+          stmt('INSERT INTO command_receipts (actor, request_id, session_id, command, issue_id) VALUES (?, ?, ?, ?, ?)',
+            fixture.contestant.accountId, randomUUID(), fixture.sessionId, JSON.stringify(command), fixture.issueId),
+          ...notificationStatements(db, fixture.sessionId, ['staff', `team:${fixture.teamId}`]),
+        ]);
         const before = await fixture.durableState();
         expect(before.history.length).toBe(1);
         const reset = await service.account(adminHeaders, fixture.sessionId, { action: 'reset_password', userId: fixture.contestant.accountId });

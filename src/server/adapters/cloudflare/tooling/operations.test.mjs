@@ -94,12 +94,15 @@ test('Wrangler subprocesses force private logging despite inherited debug settin
   vi.stubEnv('WRANGLER_LOG_SANITIZE', 'false');
   vi.stubEnv('WRANGLER_WRITE_LOGS', 'true');
   vi.stubEnv('WRANGLER_SEND_METRICS', 'true');
-  const inherited = { WRANGLER_LOG_SANITIZE: 'false', WRANGLER_WRITE_LOGS: 'true', WRANGLER_SEND_METRICS: 'true', KEEP_SETTING: 'public' };
+  vi.stubEnv('CLOUDFLARE_ENV', 'staging');
+  const inherited = { WRANGLER_LOG_SANITIZE: 'false', WRANGLER_WRITE_LOGS: 'true', WRANGLER_SEND_METRICS: 'true', CLOUDFLARE_ENV: 'staging', KEEP_SETTING: 'public' };
   const safe = safeWranglerEnvironment(inherited);
   assert.equal(safe.WRANGLER_LOG_SANITIZE, 'true');
   assert.equal(safe.WRANGLER_WRITE_LOGS, 'false');
   assert.equal(safe.WRANGLER_SEND_METRICS, 'false');
   assert.equal(safe.KEEP_SETTING, 'public');
+  assert.equal(safe.CLOUDFLARE_ENV, undefined);
+  assert.equal(inherited.CLOUDFLARE_ENV, 'staging');
   assert.equal(inherited.WRANGLER_LOG_SANITIZE, 'false');
   let spawned = false;
   const run = wranglerRunner(settings, '/tmp/fictional-wrangler.jsonc', (_executable, _args, options) => {
@@ -108,6 +111,7 @@ test('Wrangler subprocesses force private logging despite inherited debug settin
     assert.equal(options.env.WRANGLER_WRITE_LOGS, 'false');
     assert.equal(options.env.WRANGLER_SEND_METRICS, 'false');
     assert.equal(options.env.CLOUDFLARE_ACCOUNT_ID, settings.accountId);
+    assert.equal(options.env.CLOUDFLARE_ENV, undefined);
     return { status: 0, stdout: 'safe response' };
   });
   assert.equal(run(['whoami']), 'safe response');
@@ -117,10 +121,12 @@ test('Wrangler subprocesses force private logging despite inherited debug settin
 test('trusted commands disable current-process logs before provider setup', async () => {
   vi.stubEnv('WRANGLER_LOG_SANITIZE', 'false');
   vi.stubEnv('WRANGLER_WRITE_LOGS', 'true');
+  vi.stubEnv('CLOUDFLARE_ENV', 'staging');
   const options = await fixture();
   const injected = dependencies();
   const original = injected.runWrangler;
   injected.runWrangler = async (...args) => {
+    assert.equal(process.env.CLOUDFLARE_ENV, undefined);
     assert.equal(process.env.WRANGLER_LOG_SANITIZE, 'true');
     assert.equal(process.env.WRANGLER_WRITE_LOGS, 'false');
     return original(...args);

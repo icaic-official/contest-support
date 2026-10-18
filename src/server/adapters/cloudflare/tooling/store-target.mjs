@@ -1,6 +1,7 @@
 import { dirname, relative, resolve } from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
+import { isDeepStrictEqual } from 'node:util';
 import { readPublicJson, repositoryRoot } from './configuration.mjs';
 import { assertCurrentMigrations, currentMigrationNames } from './migrations.mjs';
 import { confirmTarget, wranglerRunner } from './operations.mjs';
@@ -35,12 +36,6 @@ export function renderStoreConfiguration(configPath) {
   };
 }
 
-function canonical(value) {
-  if (Array.isArray(value)) return value.map(canonical);
-  if (value && typeof value === 'object') return Object.fromEntries(Object.keys(value).sort().map((key) => [key, canonical(value[key])]));
-  return value;
-}
-
 /** The store suites must never share a database with an active Worker cron. */
 export async function readStoreTarget(options) {
   if (options.account !== storeTarget.accountId || options.database !== storeTarget.databaseId ||
@@ -49,7 +44,7 @@ export async function readStoreTarget(options) {
   }
   const configPath = resolve(options.config);
   const config = await readPublicJson(configPath);
-  if (JSON.stringify(canonical(config)) !== JSON.stringify(canonical(renderStoreConfiguration(configPath)))) {
+  if (!isDeepStrictEqual(config, renderStoreConfiguration(configPath))) {
     throw new Error('The dedicated store CI configuration changed. Only its exact D1 binding and reviewed migration path are permitted.');
   }
   return { ...storeTarget, configPath };

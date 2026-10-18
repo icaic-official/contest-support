@@ -6,7 +6,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import { getPlatformProxy, unstable_splitSqlQuery as splitSqlQuery } from 'wrangler';
 import type { StartedImage } from '../../../backend/contracts';
 import { MIB, THUMBNAIL_BYTES } from '../../../connected/imageFile';
-import type { Caller } from '../../applicationStore';
+import type { Caller } from '../../authentication';
 import type { D1Connection, D1Statement } from '../d1/connection';
 import { D1Fixture } from '../d1/testFixture';
 import { D1ApplicationService } from './application';
@@ -445,6 +445,28 @@ describe('Cloudflare private images with local D1 and R2 bindings', () => {
     const untouched = await bucket.get(otherSession.original_path);
     expect(untouched).not.toBeNull();
     await untouched?.body.cancel();
+  });
+
+  it('recovers an upload whose deadline passes between recovery statements', async () => {
+    const image = await reserve();
+    await transfer(image, 'original');
+    const racing = new R2ImageService({
+      prepare: (sql) => db.prepare(sql),
+      batch: (statements) => db.batch([
+        statements[0],
+        // Advance this reservation's deadline between the two SQL statements.
+        // This models database time crossing expiry without a wall-clock delay.
+        statement('UPDATE issue_images SET expires_at = unixepoch() - 1 WHERE id = ?', image.id),
+        ...statements.slice(1),
+      ]),
+    }, bucket);
+    await racing.recover(fixture.sessionId);
+    const first = await record(image.id);
+    const tasks = await fixture.rows('SELECT attachment_id FROM image_deletions WHERE attachment_id = ?', image.id);
+    expect(first?.state === 'pending' || tasks.length === 1).toBe(true);
+    await service.recover(fixture.sessionId);
+    expect(await record(image.id)).toMatchObject({ state: 'expired', files_removed_at: expect.any(String) });
+    expect(await bucket.get(image.original_path)).toBeNull();
   });
 
   it('removes a late transfer after deletion and revocation commit during R2 transfer', async () => {

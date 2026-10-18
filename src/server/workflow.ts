@@ -1,5 +1,10 @@
 import type { Command, Role } from '../connected/model.ts';
-import type { Caller, CommandResult } from './applicationStore.ts';
+import type { Caller } from './authentication.ts';
+
+export type CommandResult =
+  | { outcome: 'committed'; issueId: string }
+  | { outcome: 'rejected'; reason: 'access' | 'state' | 'request_id' | 'input' }
+  | { outcome: 'unknown' };
 
 export interface WorkflowState {
   actor: { id: string; name: string };

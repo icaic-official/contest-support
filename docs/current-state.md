@@ -1,5 +1,33 @@
 # Current state
 
+## PR #42 review fixes and cleanup, 2026-10-18
+
+The owner requested the review fixes, removal of obsolete tests and code, and fresh verification before PR #42 is ready.
+Supabase remains active. The owner reviews and merges.
+
+The current code removes the historical D1 proof implementation, its command and configuration, and the test-only issue-view interface.
+D1 workflow tests now call the shared service and the real authorized application snapshots.
+Their 70 cases remain intact. Workflow decision reads no longer aggregate history or audience sequences.
+The isolated authentication target remains separate and retains its focused checks.
+One provider-owned hosted runner replaces two runners. Each child owns its recovery journals through a private temporary directory.
+
+Image expiry recovery now queues the persisted expired set, so a deadline crossing cannot strand a storage object without a deletion task.
+Wrangler operations clear inherited environment selection before using the reviewed target.
+Protected CI retains the hosted React recovery journal and the consolidated runner's scoped D1 journals.
+Authentication and application HTTP routes share the bounded JSON reader.
+Node.js supplies exact configuration comparison in place of duplicate sorting functions.
+
+The complete installation procedure now lives in [the public installation source](../site/src/content/docs/operators/installation.md).
+Completed proof and implementation instructions link to their frozen historical source.
+The [review run report](t0020-run-report.md) lists changes, commands, checks, and remaining verification.
+
+Local verification passes all 612 tests across 40 files without skips, all 45 ordinary browser cases, three authentication browser cases, the complete HTTPS runtime, and the complete local React journey.
+Type checks, lint, both builds, 12 function tests, three documentation browser cases, and locked dependency audits pass.
+The documentation build verifies 527 local links and assets across 13 pages.
+The new expiry and environment-isolation regressions fail before their fixes and pass afterward.
+New hosted, protected, and empty-installation results remain pending for the published executable revision.
+Earlier records below apply to their recorded source revisions.
+
 ## T0020 connector implementation, 2026-10-18
 
 T0020 starts from merged PR #41 at `7d19b00`.
@@ -28,7 +56,7 @@ The full Worker supplies maintained authentication, authorized snapshots, admini
 The browser can select this connector with `VITE_BACKEND=cloudflare` for an isolated build.
 The default remains Supabase.
 Provider-owned installation tooling validates public configuration, checks the exact target, and creates one initial owner only in an empty database.
-The [installation guide](install-cloudflare.md) passed its current hosted empty-installation trial on source `25b2033`.
+The [installation guide](https://github.com/GiftedNovaHD/minsky/blob/88ea5020a0f9dfc34a32ed7fbd84dfea07423297/docs/install-cloudflare.md) passed its current hosted empty-installation trial on source `25b2033`.
 This evidence supports isolated development installations. It does not establish production capacity or a migration path.
 
 Observed results during implementation are separate from final PR verification:
@@ -1084,7 +1112,7 @@ The cases prove these bounded behaviors on hosted D1:
 Ordinary [PR CI](https://github.com/GiftedNovaHD/minsky/actions/runs/39042256683) passed `checks`, `secrets`, and `dependencies` on `edb4bd0`.
 The protected cloud job and frontend deployment job were skipped. A skipped cloud job is not hosted evidence.
 [PR #39](https://github.com/GiftedNovaHD/minsky/pull/39) contains the implementation for owner review.
-The [proof guide](d1-transaction-proof.md) contains exact commands, target checks, and recovery steps.
+The [proof guide](https://github.com/GiftedNovaHD/minsky/blob/88ea5020a0f9dfc34a32ed7fbd84dfea07423297/docs/d1-transaction-proof.md) contains exact commands, target checks, and recovery steps.
 This local CLI run against hosted D1 is separate from protected GitHub Actions verification.
 
 ### Run report
@@ -1121,7 +1149,7 @@ The user then merged PR #32 at `ef6a029` on 2026-10-17 at 12:51:42 UTC.
 This branch now includes that merge commit.
 The user merged T0016 in [PR #36](https://github.com/GiftedNovaHD/minsky/pull/36) at `b68ef72` on 2026-10-17 at 13:50:36 UTC. The design review is complete.
 The [design](cloudflare-backend-design.md) separates existing contracts from proposed server components.
-The [implementation plan](cloudflare-implementation-plan.md) defines bounded phases and acceptance evidence.
+The [implementation plan](https://github.com/GiftedNovaHD/minsky/blob/88ea5020a0f9dfc34a32ed7fbd84dfea07423297/docs/cloudflare-implementation-plan.md) defines bounded phases and acceptance evidence.
 Supabase remains active. No Cloudflare backend, authentication replacement, or data migration is implemented here.
 
 1. Summary of changes. Prepared the Cloudflare architecture and implementation acceptance plan. Recorded the parallel branch exception and AWS portability motivation.

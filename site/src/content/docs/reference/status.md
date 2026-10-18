@@ -31,7 +31,7 @@ This page is a dated record, not a live deployment dashboard.
 | --- | --- |
 | [T0006 announcements](https://github.com/GiftedNovaHD/minsky/pull/20) | Open pull request. |
 | [T0007 independent installations](https://github.com/GiftedNovaHD/minsky/pull/21) | Open pull request. Packaging exists on its branch. Container operation remains unverified. |
-| [T0020 complete Cloudflare connector](https://github.com/GiftedNovaHD/minsky/pull/42) | Implements every backend group and provider-owned installation tooling. Both providers pass the same eight hosted scenarios. The complete hosted React journey and fresh isolated installation pass. Protected connector CI passes. Owner review and merge remain pending. |
+| [T0020 complete Cloudflare connector](https://github.com/GiftedNovaHD/minsky/pull/42) | Implements every backend group and provider-owned installation tooling. Review fixes and cleanup require fresh checks before owner review. Earlier results remain in the dated repository record. The owner reviews and merges. |
 
 Supabase remains the active backend.
 The active browser retains the existing SQL workflow during Cloudflare replacement verification.
@@ -55,7 +55,7 @@ There is no provisioned Minsky production project in the recorded setup.
 
 - Ordinary repository checks use embedded databases and fictional browser responses.
 - Protected Supabase checks use the separate **Minsky CI** project. Cloudflare checks use separate connector CI resources. A skipped job is not a passing check.
-- The fresh independent Cloudflare installation passed on `25b2033`. T0007 container startup remains unverified and deferred.
+- The recorded independent Cloudflare installation passed on `25b2033`. Later review fixes require fresh verification. T0007 container startup remains unverified and deferred.
 - Live-contest readiness and capacity for 800 simultaneous users remain unverified.
 - Offline capture, outage operation, and venue-local resilience remain deferred.
 - An application license remains a decision before an open-source release.

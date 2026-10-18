@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { Caller } from "../../applicationStore";
+import type { Caller } from '../../authentication';
 import type { D1Connection, D1Statement } from "./connection";
 
 type Row = Record<string, unknown>;
@@ -26,7 +26,7 @@ export class D1Fixture {
 
   constructor(
     readonly db: D1Connection,
-    private readonly configPath = 'wrangler.d1-proof.jsonc',
+    private readonly configPath: string,
     private readonly workflow = false,
   ) {}
 
@@ -50,7 +50,7 @@ export class D1Fixture {
   private recoveryDetails() {
     const config = JSON.parse(readFileSync(this.configPath, "utf8"));
     return {
-      config: this.configPath, workflow: this.workflow, remote: process.env.MINSKY_D1_REMOTE === "1" || process.env.MINSKY_AUTH_REMOTE === "1" || Boolean(process.env.MINSKY_CONNECTOR_D1_CONFIG),
+      config: this.configPath, workflow: this.workflow, remote: process.env.MINSKY_AUTH_REMOTE === "1" || Boolean(process.env.MINSKY_CONNECTOR_D1_CONFIG),
       accountId: config.account_id, databaseId: config.d1_databases[0].database_id,
       databaseName: config.d1_databases[0].database_name,
       eventId: this.eventId, sessionIds: [this.sessionId, this.secondSessionId],

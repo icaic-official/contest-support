@@ -1,13 +1,9 @@
 # Cloudflare authentication reference
 
-T0018 introduced bounded authentication and account sessions for Workers and D1.
-Supabase remains the active application backend.
-T0020 adds the complete connector and passes all 82 hosted D1 account cases.
-The complete hosted React journey verifies account gates and organizer recovery through the application.
-A separate empty-installation journey verifies owner bootstrap, password change, and trusted recovery.
-Scoped installation fixture cleanup and protected Cloudflare connector CI pass. See the [final hosted record](current-state.md#final-protected-connector-verification).
-Real-data migration remains later work.
-This reference describes the implemented API. Use the [installation guide](install-cloudflare.md) for the separate setup procedure.
+The Cloudflare application uses maintained Better Auth identity operations and guarded D1 account records.
+Supabase remains the active development backend.
+This reference describes the authentication API and its access rules.
+Use the [installation guide](../site/src/content/docs/operators/installation.md) for setup and [current state](current-state.md) for dated verification evidence.
 
 The [identity choice](cloudflare-authentication-choice.md) explains Better Auth, cryptographic components, limitations, and measured resource costs.
 The [verification guide](verify-cloudflare-authentication.md) gives exact test commands and fixture recovery steps.
@@ -21,7 +17,7 @@ The [verification guide](verify-cloudflare-authentication.md) gives exact test c
 The raw Better Auth router is not exposed.
 
 `createCloudflareAuthentication()` implements the existing browser `Authentication` contract.
-Its additional `account()` and `sessions()` methods support this bounded API.
+Its additional `account()` and `sessions()` methods support account administration and session reads.
 The complete `createCloudflareBackend()` factory wraps this authentication adapter and supplies the remaining operation groups.
 The application's backend entry point defaults to Supabase. Isolated Cloudflare builds explicitly select `VITE_BACKEND=cloudflare`.
 

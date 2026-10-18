@@ -125,9 +125,9 @@ Private conflicts cannot reveal the private version or advance contestant-visibl
 ## Complete D1 workflow persistence
 
 The [D1 adapter](../src/server/adapters/d1/store.ts) persists all nine decisions from the same `WorkflowService`.
-Its default mode requires current application and Better Auth sessions.
-The [application Worker](../src/server/adapters/cloudflare/applicationWorker.ts) constructs this production mode for authenticated HTTP commands.
-The browser cannot select a weaker mode or supply a trusted caller.
+The store requires current application and Better Auth sessions.
+The [application Worker](../src/server/adapters/cloudflare/applicationWorker.ts) constructs this adapter for authenticated HTTP commands.
+The browser cannot supply a trusted caller.
 
 Each new command uses one guarded D1 batch:
 
@@ -147,23 +147,13 @@ It also checks credential state, credential generation, login revocation and exp
 Receipt replay crosses an atomic access check too.
 A previously successful request cannot authorize replay after access expires or is revoked.
 
-The complete 70-case D1 suite passes locally and against isolated `minsky-connector-store-ci`, with scoped fixture cleanup.
-That direct-test database has no deployed Worker. Hosted application journeys use the separate complete connector resources.
-The [full hosted runner](../src/server/adapters/cloudflare/tooling/test-workflow.mjs) requires an explicit target and runs production guards without skips.
-See the [D1 guide](d1-transaction-proof.md) for the separate commands and recorded scope.
+The [full hosted runner](../src/server/adapters/cloudflare/tooling/test-store.mjs) requires an explicit D1-only CI target.
+It executes the same current identity guards as the application.
+Direct tests use a database without an application Worker or background delivery.
+Hosted application journeys use separate complete connector resources.
+Use [the provider verification guide](run-provider-tests.md) for commands, target checks, and fixture recovery.
 
-## Historical proof mode and complete connector verification
-
-The earlier `claim` and `message` proof remains available through the explicit `mode: 'transaction-proof'` constructor option.
-Only the historical proof runner selects that mode through `MINSKY_D1_REMOTE`.
-Its separate database retains the bounded schema.
-The full hosted runner uses `MINSKY_CONNECTOR_D1_CONFIG`, modern fixtures, and the production store instead.
-
-T0020 also implements application reads, administration, private images, live updates, and the Cloudflare browser adapter.
-Both providers pass the same eight shared scenarios with verified fixture cleanup.
-The Cloudflare CLI run verifies `25b2033`.
-The complete hosted React journey passes on `25b2033`.
-The separate documented empty-installation journey also passes on `25b2033`.
-Scoped fixture cleanup and protected Cloudflare connector CI pass. See the [final hosted record](current-state.md#final-protected-connector-verification).
-Record these results separately from hosted D1, hosted Supabase, and earlier protected authentication runs.
-Real-data migration, cutover, AWS, and Terraform remain deferred.
+The historical bounded proof is retired from current execution paths.
+Its [frozen guide](https://github.com/GiftedNovaHD/minsky/blob/88ea5020a0f9dfc34a32ed7fbd84dfea07423297/docs/d1-transaction-proof.md) and [dated evidence](current-state.md#t0017-d1-transaction-proof-2026-10-17) remain available.
+Current verification covers the complete workflow through `WorkflowPersistence`.
+Record results in [current state](current-state.md#t0020-connector-implementation-2026-10-18), with local, hosted CLI, and protected runs kept separate.

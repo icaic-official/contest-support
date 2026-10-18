@@ -7,7 +7,7 @@ import process from 'node:process';
 import { pathToFileURL } from 'node:url';
 import { readInstallationTarget, readPublicJson, repositoryRoot } from './configuration.mjs';
 import { assertCurrentMigrations } from './migrations.mjs';
-import { enforcePrivateWranglerLogging, safeWranglerEnvironment } from './safe-environment.mjs';
+import { enforceWranglerEnvironment, safeWranglerEnvironment } from './safe-environment.mjs';
 
 /** Capture all provider output. Errors must not disclose its body or arguments. */
 export function wranglerRunner(settings, configPath, spawn = spawnSync) {
@@ -101,7 +101,7 @@ export async function loadInstallationLibrary() {
 }
 
 async function openRemotePlatform(configPath) {
-  enforcePrivateWranglerLogging();
+  enforceWranglerEnvironment();
   const { getPlatformProxy } = await import('wrangler');
   return getPlatformProxy({ configPath, remoteBindings: true, persist: false, envFiles: [] });
 }
@@ -111,7 +111,7 @@ async function openRemotePlatform(configPath) {
  * Tests inject provider dependencies and never contact Cloudflare.
  */
 export async function runTrustedCommand(options, dependencies = {}) {
-  enforcePrivateWranglerLogging();
+  enforceWranglerEnvironment();
   const settings = await readInstallationTarget(options.config);
   const runWrangler = dependencies.runWrangler ?? wranglerRunner(settings, options.config);
   await confirmTarget(options, settings, runWrangler);

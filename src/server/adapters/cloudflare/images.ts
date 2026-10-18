@@ -2,7 +2,7 @@ import { z } from 'zod';
 import type { ImageTransport, StartedImage } from '../../../backend/contracts';
 import { ImageRequestError } from '../../../backend/errors';
 import { attachmentPath, imageKind, THUMBNAIL_BYTES } from '../../../connected/imageFile';
-import type { Caller } from '../../applicationStore';
+import type { Caller } from '../../authentication';
 import { equalWorkflowJson } from '../../workflow';
 import type { D1Connection, D1Statement } from '../d1/connection';
 import { currentAccessBindings, currentAccessSql, currentReadyLoginBindings, currentReadyLoginSql, notificationStatements } from './application';
@@ -299,9 +299,11 @@ export class R2ImageService {
     const scope = sessionId ? ' AND session_id = ?' : '';
     const bindings = sessionId ? [sessionId] : [];
     await this.db.batch([
-      this.statement(`INSERT INTO image_deletions (attachment_id) SELECT id FROM issue_images
-        WHERE state = 'pending' AND expires_at <= unixepoch()${scope} ON CONFLICT DO NOTHING`, ...bindings),
       this.statement(`UPDATE issue_images SET state = 'expired' WHERE state = 'pending' AND expires_at <= unixepoch()${scope}`, ...bindings),
+      // Queue the persisted expired set. A second clock check could otherwise
+      // expire a reservation without retaining the keys needed for cleanup.
+      this.statement(`INSERT INTO image_deletions (attachment_id) SELECT id FROM issue_images
+        WHERE state = 'expired'${scope} ON CONFLICT DO NOTHING`, ...bindings),
     ]);
     const pending = await this.statement(`SELECT x.id, x.original_path, x.thumbnail_path FROM issue_images x
       JOIN image_deletions d ON d.attachment_id = x.id WHERE x.state IN ('deleting', 'deleted', 'expired', 'abandoned')

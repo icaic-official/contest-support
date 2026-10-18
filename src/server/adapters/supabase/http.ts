@@ -1,4 +1,5 @@
-import type { Caller, CommandResult } from '../../applicationStore.ts';
+import type { Caller } from '../../authentication.ts';
+import type { CommandResult } from '../../workflow.ts';
 
 export interface WorkflowEndpoint {
   authenticate(token: string): Promise<Caller | undefined>;

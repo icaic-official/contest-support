@@ -315,8 +315,7 @@ jobs:
           name: connector-recovery-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
             ${{ runner.temp }}/minsky-provider-*/recovery.json
-            /tmp/minsky-d1-proof-*/fixture.json
-            /tmp/minsky-connector-workflow-*/wrangler.jsonc
-            /tmp/minsky-connector-accounts-*/wrangler.jsonc
+            ${{ runner.temp }}/minsky-connector-ui-*/recovery.json
+            ${{ runner.temp }}/minsky-connector-store-*/minsky-d1-proof-*/fixture.json
           if-no-files-found: ignore
           retention-days: 7

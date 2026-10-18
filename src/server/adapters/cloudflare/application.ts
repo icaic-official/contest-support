@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type { MembershipInput, SessionSummary } from '../../../backend/contracts';
 import { snapshotSchema, type Snapshot } from '../../../connected/model';
-import type { Caller } from '../../applicationStore';
+import type { Caller } from '../../authentication';
 import { AuthenticationError } from '../../authentication';
 import type { D1Connection, D1Statement } from '../d1/connection';
 

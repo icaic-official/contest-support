@@ -65,8 +65,8 @@ test('phone navigation and a missing page remain usable', async ({page}, testInf
   await expect(page.getByRole('link', {name: 'Skip to content'})).toBeFocused();
   await page.keyboard.press('Enter');
   await page.getByRole('button', {name: 'Menu', exact: true}).click();
-  await page.getByRole('link', {name: 'Installation options', exact: true}).click();
-  await expect(page.getByRole('heading', {level: 1})).toHaveText('Prepare an independent installation');
+  await page.getByRole('link', {name: 'Install Cloudflare', exact: true}).click();
+  await expect(page.getByRole('heading', {level: 1})).toHaveText('Install an isolated Cloudflare instance');
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   await page.screenshot({path: testInfo.outputPath('docs-phone.png')});
   const response = await page.goto('/this-page-does-not-exist/');

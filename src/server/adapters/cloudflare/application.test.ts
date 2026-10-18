@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { readFileSync, readdirSync } from 'node:fs';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getPlatformProxy, unstable_splitSqlQuery as splitSqlQuery } from 'wrangler';
-import type { Caller } from '../../applicationStore';
+import type { Caller } from '../../authentication';
 import type { D1Connection, D1Statement } from '../d1/connection';
 import { D1Fixture } from '../d1/testFixture';
 import { D1ApplicationService } from './application';

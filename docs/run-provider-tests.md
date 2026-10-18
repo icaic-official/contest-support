@@ -6,7 +6,6 @@ For the suite's responsibilities and limits, see [the test contracts](provider-t
 
 Both drivers use the same eight shared scenarios.
 Record local checks, CLI runs against hosted resources, and protected GitHub runs separately.
-The [protected Cloudflare connector check](current-state.md#final-protected-connector-verification) passes on `25b2033`.
 See [current state](current-state.md) for tested revisions, results, and cleanup evidence.
 
 ## List the scenarios without credentials
@@ -179,8 +178,8 @@ npm run test:connector:workflow:hosted -- \
   --database=341350ba-7c74-4c46-8b21-edfdcda475f5
 ```
 
-Expected output is `Hosted full D1 workflow: 70 passed, 0 failed, 0 skipped.`
-This runner uses production identity guards and a temporary D1-only proxy configuration.
+The runner must report every workflow case passed, with zero failures or skipped cases.
+This runner uses production identity guards and the reviewed D1-only configuration.
 It requires the checkout's exact applied migration list, but applies no migrations itself.
 Its result does not check Worker execution, images, the product UI, or live delivery.
 
@@ -193,9 +192,9 @@ npm run test:connector:accounts:hosted -- \
   --database=341350ba-7c74-4c46-8b21-edfdcda475f5
 ```
 
-Expected output is `Hosted connector accounts: 82 passed, 0 failed, 0 skipped.`
+The runner must report every account case passed, with zero failures or skipped cases.
 This command checks current permissions, identity expiry, credential generation, revocation, and rollback inside account batches.
-It uses maintained password hashing and a D1-only proxy.
+It uses maintained password hashing and the same reviewed D1-only configuration.
 The runner includes four fixed authentication files:
 
 - `src/server/adapters/cloudflare/authentication.test.ts`
@@ -209,7 +208,7 @@ Fixture setup, credential snapshots, and cleanup checks use D1 batches with the 
 The local `npm run test:auth` suite includes one additional execution-clock probe and must pass all 83 cases.
 Record that local result separately from the 82 hosted cases.
 Both connector runners reject test filters, count overrides, and configuration overrides beyond the required target options.
-Both direct D1 runners retain fixture journals and proxy configurations if cleanup fails.
+Both direct D1 runners retain their own fixture journals if cleanup fails. They use the original reviewed repository configuration.
 
 Both runners report numeric progress at least every 15 seconds while their test process runs.
 Progress includes completed and total cases, elapsed time, active cases, and the age of the oldest active case.
@@ -233,7 +232,7 @@ node src/server/adapters/cloudflare/tooling/test-ui.mjs \
 
 The required result is one hosted UI case with no failures, skips, or retries and verified fixture cleanup.
 The journey checks all nine commands, jury worklist transitions, images, live updates, and account administration.
-Follow [the installation guide](install-cloudflare.md) for the separate empty-installation procedure.
+Follow [the installation guide](../site/src/content/docs/operators/installation.md) for the separate empty-installation procedure.
 Record the tested source revision and installation result in the current-state record.
 
 ## Run protected GitHub checks
@@ -264,12 +263,12 @@ gh workflow run checks.yml --repo GiftedNovaHD/minsky --ref feature/t0020-cloudf
 Use only the connector mode for that dispatch.
 The reviewed revision and workflow definition must exist on that remote branch.
 The protected job waits for ordinary checks, secret scanning, and dependency checks.
-It checks and migrates the dedicated store CI database for the 70 workflow and 82 account cases.
+It checks and migrates the dedicated store CI database for the complete workflow and account suites.
 It prepares the separate full connector database before it builds and deploys the isolated application Worker.
 It runs the shared contracts and React journey against that full connector.
 The private bucket, service activation, and initial Worker secret must exist before this job can pass.
 The workflow does not activate a paid service or create the bucket.
-The protected connector job passes on `25b2033`. This result is separate from the passing hosted CLI scenarios.
+Record the protected result and tested revision in [current state](current-state.md#t0020-connector-implementation-2026-10-18), separately from hosted CLI results.
 The existing allowlist includes the T0020 branch. Preserve the other entries and protection rules.
 Earlier protected authentication runs do not check this complete connector job.
 Record protected Supabase verification separately from Cloudflare CLI runs and the protected connector job.
@@ -308,11 +307,15 @@ Recovery skips scenario execution and normal backend prerequisites, but retains 
 
 ### Recover direct D1 fixtures
 
-There is no automatic recovery command for the 70 workflow or 82 account cases.
+There is no automatic recovery command for the direct workflow or account suites.
 The historical transaction-proof DELETE commands omit modern identity and account records. Do not use those commands for these journals.
 
-1. Retain each `/tmp/minsky-d1-proof-*/fixture.json` journal.
-2. Retain the matching `/tmp/minsky-connector-workflow-*/wrangler.jsonc` or `/tmp/minsky-connector-accounts-*/wrangler.jsonc` runtime configuration.
+In GitHub Actions, journals are under `$RUNNER_TEMP/minsky-connector-store-*/minsky-d1-proof-*/fixture.json`.
+Local runs use the same nested directory names under the system temporary directory.
+Current runs use the original reviewed repository configuration. They create no temporary Wrangler configuration copy.
+
+1. Retain each `fixture.json` journal and its containing `minsky-connector-store-*` directory.
+2. Retain the original repository configuration from that run's source revision.
 3. Check the journal's account, database name, database UUID, and configuration against live metadata.
 4. Check that the original migrations and foreign-key constraints remain installed.
 5. Stop the interrupted test process before inspecting or deleting its records.

@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { dirname, relative, resolve } from 'node:path';
 import { fileURLToPath, URL } from 'node:url';
+import { isDeepStrictEqual } from 'node:util';
 
 export const repositoryRoot = fileURLToPath(new URL('../../../../..', import.meta.url));
 const fields = ['accountId', 'workerName', 'databaseName', 'databaseId', 'bucketName', 'origin'];
@@ -105,14 +106,6 @@ export async function readPublicJson(path) {
   }
 }
 
-function canonical(value) {
-  if (Array.isArray(value)) return value.map(canonical);
-  if (value && typeof value === 'object') {
-    return Object.fromEntries(Object.keys(value).sort().map((key) => [key, canonical(value[key])]));
-  }
-  return value;
-}
-
 /** Reject extra bindings, environment overrides, secret variables, or changed entries. */
 export async function readInstallationTarget(configPath) {
   const config = await readPublicJson(configPath);
@@ -129,7 +122,7 @@ export async function readInstallationTarget(configPath) {
     throw new Error('The installation configuration is invalid. Regenerate it from public settings.');
   }
   const expected = renderWranglerConfiguration(settings, configPath);
-  if (JSON.stringify(canonical(config)) !== JSON.stringify(canonical(expected))) {
+  if (!isDeepStrictEqual(config, expected)) {
     throw new Error('The installation configuration changed. Regenerate it before any hosted operation.');
   }
   return settings;

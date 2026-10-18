@@ -94,9 +94,11 @@ T0020 owns the independent Cloudflare installation evidence. Container packaging
 
 ### 5. Make first-administrator setup reproducible
 
-**Observed:** [backend setup](../site/src/content/docs/operators/backend.md) says to create and confirm an account through trusted administration.
+**Observed:** [the historical backend setup](https://github.com/GiftedNovaHD/minsky/blob/88ea5020a0f9dfc34a32ed7fbd84dfea07423297/site/src/content/docs/operators/backend.md) says to create and confirm an account through trusted administration.
 It then tells the reader to apply generated SQL through trusted database access.
-Neither task has a complete procedure or an expected result.
+Neither task had a complete procedure or an expected result in that earlier guide.
+The current [Cloudflare installation procedure](../site/src/content/docs/operators/installation.md) supplies bootstrap, expected results, target checks, and trusted recovery.
+Its dated trial is recorded separately from the review revision, which requires fresh verification.
 
 **Complete when:** specify the supported account-creation method, confirmation setting, UUID lookup, SQL execution method, and target check.
 Use fictional values and explain each replacement.

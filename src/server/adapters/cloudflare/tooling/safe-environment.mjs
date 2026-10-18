@@ -6,12 +6,15 @@ const privateLogging = {
   WRANGLER_SEND_METRICS: 'false',
 };
 
-/** Captured output does not stop Wrangler from writing its own debug files. */
+/** Keep reviewed targets and private logging independent of the operator's shell. */
 export function safeWranglerEnvironment(environment = process.env) {
-  return { ...environment, ...privateLogging };
+  const safe = { ...environment, ...privateLogging };
+  delete safe.CLOUDFLARE_ENV;
+  return safe;
 }
 
 /** Apply before importing Wrangler when its API runs in the current process. */
-export function enforcePrivateWranglerLogging() {
+export function enforceWranglerEnvironment() {
   Object.assign(process.env, privateLogging);
+  delete process.env.CLOUDFLARE_ENV;
 }

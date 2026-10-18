@@ -3,7 +3,8 @@ import { PGlite } from "@electric-sql/pglite";
 import { readdirSync, readFileSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 import { snapshotSchema, unresolvedTime, type Snapshot } from "../../../connected/model";
-import type { Caller, CommandResult } from "../../applicationStore";
+import type { Caller } from '../../authentication';
+import type { CommandResult } from '../../workflow';
 import { WorkflowService, type WorkflowPersistence } from "../../workflow";
 import { createSupabaseWorkflowPersistence } from "./store";
 

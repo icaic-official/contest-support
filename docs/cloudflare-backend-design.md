@@ -1,31 +1,14 @@
 # Cloudflare backend design
 
 This page explains the Cloudflare connector and its provider boundaries.
-T0016 began while PR #32 was under review. The user merged PR #32 on 2026-10-17.
-T0017's bounded [D1 transaction proof](d1-transaction-proof.md) merged in PR #39.
-T0019 extracted the shared workflow and verified its Supabase execution path before further D1 persistence.
-T0018 authentication merged in PR #40 at `68e8642`. T0019 merged in PR #41.
-T0020 implements the complete Cloudflare connector and isolated installation tooling.
-All 70 production D1 cases pass locally and against the separate hosted D1-only store database, with cleanup.
-Local HTTPS runtime, application, image, live-update, and installation checks also pass.
-Both providers pass the same eight shared scenarios with verified fixture cleanup.
-The Cloudflare CLI run verifies `25b2033`.
-The complete hosted React journey passes on `25b2033`.
-The documented empty-installation journey also passes on `25b2033`, including trusted owner recovery.
-Scoped fixture cleanup and protected Cloudflare connector CI pass. See the [final hosted record](current-state.md#final-protected-connector-verification).
-The owner activated R2 after the initial provider error `10042`. Hosted image and live-update journeys now pass.
-Direct persistence and account tests use a database without a deployed Worker.
-Application checks use the complete CI Worker, with R2, Durable Objects, and scheduled recovery enabled.
-Data migration tools remain later work.
-The owner authorizes isolated development and CI resources for this implementation.
-Supabase remains the active backend.
+The browser uses the same `Backend` contract for Supabase and Cloudflare.
+Issue decisions use one `WorkflowService`. Provider adapters supply persistence, authentication, images, and live delivery.
+Supabase remains the active development backend.
 
 The user selected Workers, D1 with a SQLite rewrite, private R2, and Durable Objects.
 A later migration must preserve accounts, IDs, permissions, issue history, timestamps, awards, and image contents.
-Possible AWS testing motivates portable interfaces. It does not add an AWS implementation to this change.
-
-The [implementation plan](cloudflare-implementation-plan.md) defines the acceptance steps and unresolved decisions.
-The [backend contracts](backend-contracts.md) describe the implemented browser interface.
+See [migration gates](product-direction.md#migration-and-cutover-gates) for the deferred cutover requirements.
+See [backend contracts](backend-contracts.md) for the browser interface and [current state](current-state.md) for dated evidence.
 
 ## Two different adapter boundaries
 
@@ -35,7 +18,7 @@ The Cloudflare adapter translates the same operations into authenticated HTTP re
 
 The server needs a separate boundary.
 Moving browser calls behind `Backend` does not make PostgreSQL functions portable.
-T0019 supplies one [shared workflow service](server-workflow.md) for the existing issue commands.
+The [shared workflow service](server-workflow.md) applies the existing issue decisions.
 The Cloudflare server reuses those decisions and enforces their commit conditions through its SQLite adapter.
 A later AWS server can reuse the same service without importing Cloudflare bindings.
 
@@ -50,25 +33,25 @@ flowchart TD
     CF --> API[Worker HTTP handlers]
     API --> Identity[Identity and login sessions]
     API --> Domain[Minsky command and access rules]
-    Domain --> Store[Transactional application store]
-    API --> Images[Image operations]
-    Images --> Store
-    Images --> Blobs[Private blob store]
-    Store --> D1[D1 adapter]
-    Store --> SP[Supabase persistence adapter]
+    Domain --> Persistence[WorkflowPersistence]
+    Persistence --> D1[D1 adapter]
+    Persistence --> SP[Supabase persistence adapter]
     SP --> PG[Guarded PostgreSQL commit]
-    Blobs --> R2[R2 adapter]
+    API --> Application[D1 application service]
+    Application --> D1
+    API --> Images[R2 image service]
+    Images --> D1
+    Images --> R2[Private R2 bucket]
     D1 --> Pending[Committed notification records]
     Pending --> Live[Durable Object delivery adapter]
     Live --> CF
 ```
 
 The diagram includes the Cloudflare connector and the separate Supabase verification path.
-T0019's Supabase function executes every issue command through the shared service.
-T0020's D1 adapter persists all nine commands from the same service.
+The opt-in Supabase function executes every issue command through the shared service.
+The D1 adapter persists all nine commands from that service.
 The complete [application Worker](../src/server/adapters/cloudflare/applicationWorker.ts) combines authenticated workflow, reads, administration, images, and live connections.
 It guards current identity sessions and credential generations inside workflow commits.
-The earlier authentication-only Worker remains a separate bounded verification entry.
 The active Supabase browser workflow still calls the legacy RPC.
 The dotted connection identifies the opt-in executor used for replacement verification.
 
@@ -83,7 +66,7 @@ The Cloudflare implementations remain inside provider adapter modules.
 | Browser `Backend` | Minsky operations and validated results. | SQL, SDK clients, bearer tokens, and subscription channels. |
 | HTTP handlers | Validate requests, authenticate callers, and map typed results to responses. | Business rules inside route handlers. |
 | Domain rules | Decide valid transitions and required changes from explicit account and workflow state. | Worker bindings, environment variables, SQL syntax, and network calls. |
-| Application store | Read authorized state and commit an entire command with its preconditions, receipt, history, and notification records. | Generic table CRUD and caller-controlled transactions. |
+| `WorkflowPersistence` | Read authorized workflow state and commit a decision with its preconditions, receipt, history, and notifications. | Generic table CRUD and caller-controlled transactions. |
 | Identity service | Verify credentials and login sessions, change passwords, and revoke access. | Provider token formats and password storage details. |
 | Blob store | Store immutable image objects, inspect content, read bytes, and retry deletion. | Bucket clients and provider URLs. |
 | Change delivery | Deliver authorized snapshot invalidations and recover pending notifications. | Durable Object classes and WebSocket lifecycle details. |
@@ -93,10 +76,8 @@ The [browser adapter](../src/backend/cloudflare/backend.ts) implements every `Ba
 Issue decisions remain shared. Other operations preserve their behavior in the corresponding provider server adapter.
 The [operator tooling](../src/server/adapters/cloudflare/tooling/install.mjs) owns Cloudflare configuration, target checks, bootstrap, and owner recovery.
 
-A port is a typed interface at one of these server boundaries.
-Ports describe complete Minsky operations, such as committing a workflow command.
-They do not expose a generic `save(table, record)` API.
-The application store owns the transaction needed by each operation.
+`WorkflowPersistence` defines complete workflow operations.
+Each persistence adapter owns the transaction needed by an operation.
 
 Workflow decisions use explicit authorized state.
 The persistence adapter supplies authoritative timestamps and generated IDs during commit.
@@ -172,8 +153,6 @@ The store submits one bounded batch with these elements:
 The assertions execute inside the batch.
 A failed assertion must raise a database error and roll back every write.
 A conditional update that affects zero rows must not allow the remaining writes to commit.
-The earlier bounded proof established this pattern on hosted D1.
-T0020's separate 70-case hosted suite now verifies the complete workflow with production identity guards.
 
 Every changed dependency increments its internal version in the same commit.
 Membership changes also increment the affected account's access version.
@@ -202,30 +181,17 @@ An uncertain credential result requires checking account state or issuing a late
 
 ## Authentication uses replacement temporary passwords
 
-T0018 implements bounded authentication in [PR #40](https://github.com/GiftedNovaHD/minsky/pull/40).
-The owner merged that PR at `68e8642` on 2026-10-17 at 17:16:41 UTC.
-T0019 and T0020 preserve that authentication behavior.
-The initial protected hosted HTTP check reached a Workers Free resource limit.
-The owner activated Workers Paid during PR #41 review. The local hosted HTTP suite now passes.
-See [current state](current-state.md) for the separate protected GitHub result.
-
 Account preservation and password preservation are different requirements.
 The owner selected organizer-issued replacement temporary passwords on 2026-10-17.
 Users must change these passwords before contest access.
 Preserve account IDs, memberships, permissions, and history.
 Existing passwords do not need to survive. Password-hash import is no longer required.
 
-T0018 selects maintained Better Auth behind the identity adapter.
+The Cloudflare identity adapter uses maintained Better Auth.
 See [the implementation reference](cloudflare-authentication.md) and [choice with costs](cloudflare-authentication-choice.md).
 The isolated Cloudflare application uses this identity boundary.
 The active Supabase development application retains Supabase authentication.
 Minsky retains its username rules, organizer recovery, mandatory password changes, and cross-session authorization.
-
-T0018 implements authentication after the merged D1 proof.
-Use fictional accounts to verify password creation, mandatory changes, private credential distribution, recovery, and Worker execution limits.
-Full migration tooling follows connector verification.
-The owner decision authorizes no real-account reset, credential export, or backend switch in T0017.
-Supabase remains active during the proof and connector work.
 
 The connector verifies current login state for each protected operation.
 A signed token alone does not prove that the login remains active.
@@ -237,7 +203,7 @@ The identity adapter owns expiry, rotation, and revocation. The browser receives
 State-changing routes check the request origin and a cross-site request forgery token.
 The WebSocket upgrade checks the origin and current login too.
 Preview origins and cross-origin local development need an explicit allowlist and browser tests.
-T0018 uses host-only HttpOnly cookies, SameSite Strict, and a fixed eight-hour lifetime.
+The application uses host-only HttpOnly cookies, SameSite Strict, and a fixed eight-hour lifetime.
 Hosted cookies require Secure. The authentication reference defines exact origins and request protection.
 
 Password resets first place the account behind the mandatory-change gate and revoke earlier logins.
@@ -283,9 +249,6 @@ Expired or abandoned uploads also create deletion tasks for their exact keys.
 An upload that finishes after revocation or expiry cannot publish its object.
 The worker rechecks reservation state after upload. A recovery scan removes orphaned bytes after interrupted requests.
 Recovery retains tombstones and repeats exact-key deletion to catch late transfers.
-The local D1 and R2 suite passes 59 cases, including concurrent limits, revocation, expiry, and partial failures.
-The hosted shared scenarios and complete React journey also verify image uploads, downloads, visibility, and removal against private R2.
-The shared run verifies scoped deletion of image objects and metadata.
 
 R2 object consistency does not make a D1 metadata change and an R2 write atomic.
 Cache behavior can also differ from direct bucket reads.
@@ -329,10 +292,6 @@ Closing a subscription stops callbacks immediately and releases the socket and t
 
 The healthy-connection target remains live updates within three seconds.
 Immediate delivery is the normal path. Recovery scans and polling handle missed messages but do not establish that latency target.
-Local live-update, runtime, and cleanup-binding cases pass.
-The hosted shared scenarios verify independent subscribers, audience separation, revocation, and callback cleanup.
-The complete hosted React journey verifies live changes and refreshed state after reconnection.
-These development checks do not establish the latency target or contest capacity.
 
 ## Separate deployment and data migration
 
@@ -342,40 +301,10 @@ The generated configuration runs the Worker before static asset handling, so pri
 Development, CI, and future production use separate databases, buckets, object namespaces, and identity credentials.
 Untrusted branch previews receive no shared database write access or privileged credentials.
 
-The first proof uses fictional fixtures in local emulation and isolated hosted D1 resources.
-The owner authorizes separate development and CI resources in the existing Cloudflare account.
-Check existing Wrangler access before requesting credentials. Keep tokens out of chat and logs.
+The installation procedure requires an empty isolated database and explicit provider targets.
+Use [Install an isolated Cloudflare instance](../site/src/content/docs/operators/installation.md) for configuration, bootstrap, and recovery.
+The [PR #21 component record](pr21-installation-disposition.md) preserves reuse decisions and the owner's closure decision.
 
-The existing OAuth login was checked against account `458ad6a930b0fb717796dfa19ca6a2b1`, which matches the repository configuration.
-Verify that account before provisioning. Document the concrete need and cost before any paid upgrade.
-Subagents may perform independent, bounded tasks.
-
-Record hosted evidence in [the proof guide](d1-transaction-proof.md) before claiming transaction verification.
-Passing that suite does not prove a fresh installation, a data migration, or capacity for 800 simultaneous users.
-Each claim needs its own evidence.
-
-T0018 supplied bounded authentication after the D1 proof.
-T0019 verified the shared rules through Supabase before T0020's complete D1 persistence.
-T0020's [installation tooling](install-cloudflare.md) requires an empty isolated database and explicit provider targets.
-Its local bootstrap and recovery checks pass.
-The documented hosted empty-installation journey passes on `25b2033`, including owner recovery, old-session rejection, and preserved application records.
-Scoped fixture cleanup passes, including empty test Durable Objects.
-The installed owner, event, session, roster, and administrator membership remain intact.
-The [PR #21 record](pr21-installation-disposition.md) identifies reused, replaced, and deferred components.
-It leaves the closure decision with the owner.
-Full migration tooling follows connector verification. Real-data exports and the backend switch remain later phases.
-AWS adapters and Terraform remain deferred.
-
-Cutover uses one writable backend at a time.
-The migration rehearsal compares IDs, references, timestamps, receipts, image hashes, and authorized snapshots.
-It also checks login, mandatory password changes, recovery, and historical actor names.
-The migration direction has no background dual writes.
-
-Before Cloudflare accepts new writes, rollback can restore the unchanged Supabase application after verification.
-After Cloudflare accepts writes, switching URLs alone loses changes.
-A post-write rollback must either import and verify those changes or keep writes paused while operators repair Cloudflare.
-The rehearsal must settle and test that procedure before cutover approval.
-
-Existing authentication and D1 proofs do not replace complete hosted connector tests or a later migration and rollback rehearsal.
-The design does not authorize a provider upgrade or claim that free-tier limits meet the contest target.
-Resource and query estimates must use the measured implementation and current [D1 limits](https://developers.cloudflare.com/d1/platform/limits/) before deployment.
+Data exports, migration tooling, and backend cutover remain deferred.
+The [migration gates](product-direction.md#migration-and-cutover-gates) require one writable backend, comparison of preserved data, and a tested rollback procedure.
+Each installation must establish its own capacity and latency evidence before live-contest use.

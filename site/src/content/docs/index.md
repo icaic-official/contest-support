@@ -25,7 +25,7 @@ Jury members record time awards, and staff record when someone applies them to t
 | Claim, investigate, or hand off an issue | [Staff guide](/guides/staff/) |
 | Review a resolved issue and record an award | [Jury guide](/guides/jury/) |
 | Create accounts and manage access | [Administration guide](/guides/administration/) |
-| Run Minsky for another competition | [Installation options](/operators/installation/) |
+| Run Minsky for another competition | [Install Cloudflare](/operators/installation/) |
 | Change these pages and publish them | [Documentation workflow](/contributing/documentation/) |
 
 ## Know which version you are using

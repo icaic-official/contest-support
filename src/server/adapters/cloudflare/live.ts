@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { Caller } from '../../applicationStore';
+import type { Caller } from '../../authentication';
 import type { D1Connection } from '../d1/connection';
 import { currentAccessBindings, currentAccessSql, type CurrentAccessRow } from './application';
 

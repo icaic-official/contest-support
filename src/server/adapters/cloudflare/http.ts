@@ -1,8 +1,8 @@
 import { z } from 'zod';
 import { ImageRequestError } from '../../../backend/errors';
 import { roleSchema } from '../../../connected/model';
-import type { Caller } from '../../applicationStore';
-import { AuthenticationError, type AuthenticationService } from '../../authentication';
+import { readJsonBody } from '../../http';
+import { AuthenticationError, type AuthenticationService, type Caller } from '../../authentication';
 import type { WorkflowService } from '../../workflow';
 import type { D1ApplicationService } from './application';
 import type { R2ImageService } from './images';
@@ -29,34 +29,6 @@ export const privateHeaders = {
 
 export function privateJson(body: unknown, status = 200): Response {
   return Response.json(body, { status, headers: privateHeaders });
-}
-
-async function boundedJson(request: Request): Promise<unknown> {
-  const reader = request.body?.getReader();
-  if (!reader) throw new AuthenticationError(400, 'A JSON request body is required.');
-  const chunks: Uint8Array[] = [];
-  let size = 0;
-  try {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      size += value.byteLength;
-      if (size > 16_384) {
-        await reader.cancel();
-        throw new AuthenticationError(400, 'The request body is too large.');
-      }
-      chunks.push(value);
-    }
-    const body = new Uint8Array(size);
-    let offset = 0;
-    for (const chunk of chunks) { body.set(chunk, offset); offset += chunk.byteLength; }
-    return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(body));
-  } catch (error) {
-    if (error instanceof AuthenticationError) throw error;
-    throw new AuthenticationError(400, 'The JSON request body is invalid.');
-  } finally {
-    reader.releaseLock();
-  }
 }
 
 export interface ApplicationHttpServices {
@@ -114,7 +86,7 @@ export function createApplicationHandler(services: ApplicationHttpServices, orig
       if (request.headers.get('Content-Type')?.split(';')[0].trim().toLowerCase() !== 'application/json') {
         throw new AuthenticationError(400, 'A JSON request body is required.');
       }
-      const body = await boundedJson(request);
+      const body = await readJsonBody(request);
       if (url.pathname === '/api/workflow') {
         const parsed = workflowSchema.safeParse(body);
         if (!parsed.success) return privateJson({ outcome: 'rejected', reason: 'input' }, 400);

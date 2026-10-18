@@ -611,6 +611,14 @@ Local checks at `13e6034`:
 - `npm run test:e2e` passed 60 of 60 tests in two full runs in a 4 vCPU job VM. The journey and UI selection specs then passed 32 of 32 runs with `--repeat-each=8`.
 - `npm run test:cloud` was not run. No cloud credentials exist in the Lapiz environment.
 
+After these checks, `main` moved to `104d9d1` (PR #42, T0020 Cloudflare connector). The merge commit is `002a7a2`. At `002a7a2`:
+
+- `npm run lint`, `npm run typecheck`, `npm run build` and `npm run check:functions` passed.
+- `npm test` passed 684 tests in 44 files.
+- `npm run test:e2e` passed 61 of 61 tests.
+- `npm run test:connector:runtime` passed.
+- `npm run test:connector:ui:local` failed. PR #42 added this check to the ordinary PR workflow. Its shared journey `tests/connector/ui-journey.ts` uses the selectors of the UI before T0015. It stopped after the temporary password change, at `ui-journey.ts:118`. A follow-up chat ports it to the T0015 UIs. Until then, the PR stays a draft.
+
 Visual checks used the browser tool, the Vite dev server and a temporary server that wrapped the PGlite jury fixture. That server is not committed. The checks covered the organiser phone app at 390 × 844 with touch, the organiser desktop console at 1280 × 800 and the contestant desktop app at 1280 × 800. Each UI was checked in light and dark themes. Keyboard checks covered Tab, the skip link, J, Ctrl+K, Escape and sheet **Cancel**. A reload kept the session, the internal note and the running timer. The contestant saw the public reply and not the internal note.
 The [T0015 ticket](tickets.md#verification-2026-10-18) has the details.
 
@@ -625,6 +633,7 @@ The [T0015 ticket](tickets.md#verification-2026-10-18) has the details.
 - The ticket number T0015 is also used by the earlier shared provider tests record.
 - The `main` landmark holds the desktop console sidebar, so the skip link moves focus to the start of the sidebar, not to the page content.
 - The updated cloud specs have not run against a cloud project.
+- `npm run test:connector:ui:local` fails until `tests/connector/ui-journey.ts` uses the T0015 selectors. The hosted connector UI check uses the same journey.
 - The final visual pass did not check the account dialogs or the image upload against a backend. The mocked browser specs cover the membership form (`workspace-refresh.spec.ts`) and the image requests (`images.spec.ts`).
 
 ## T0015 organiser desktop console (2026-10-18)

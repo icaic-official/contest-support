@@ -959,6 +959,14 @@ Local checks at `13e6034`, recorded separately from protected GitHub Actions run
 - `npm run test:e2e` passed 60 of 60 tests in two full runs in a 4 vCPU job VM. The journey and UI selection specs then passed 32 of 32 runs with `--repeat-each=8`.
 - `npm run test:cloud` was not run. The Lapiz environment has no cloud credentials. The protected `cloud-test` job is where the updated cloud specs first run.
 
+After these checks, `main` moved to `104d9d1` (PR #42, T0020 Cloudflare connector). The merge commit is `002a7a2`. At `002a7a2`:
+
+- `npm run lint`, `npm run typecheck`, `npm run build` and `npm run check:functions` passed.
+- `npm test` passed 684 tests in 44 files.
+- `npm run test:e2e` passed 61 of 61 tests.
+- `npm run test:connector:runtime` passed.
+- `npm run test:connector:ui:local` failed. PR #42 added this check to the ordinary PR workflow. Its shared journey `tests/connector/ui-journey.ts` uses the selectors of the UI before T0015. It stopped after the temporary password change, at `ui-journey.ts:118`. A follow-up chat ports it to the T0015 UIs. Until then, the PR stays a draft.
+
 Before the fixes, two jury specs failed. The jury retry spec failed 3 of 8 runs because **Back** during the refresh after a command was undone. It then passed 10 of 10. The two-client jury spec timed out at 30 seconds on its last step during a full parallel run.
 
 The journey spec failed in 1 to 3 of 8 runs on the step that expects focus on the **Report an issue** heading. It failed the same way at `e160cf6`, before this step. Pending effects of an earlier refresh focused the old heading with the same ID. `7996f9c` fixes this.
@@ -982,5 +990,6 @@ If the T0006 and T0007 PRs are still open, they can change `src/connected/`. Whi
 
 - Remove the legacy rules in `src/styles.css` that the image preview page does not use, or restyle the preview page with Tailwind.
 - Split the main JavaScript chunk to remove the build warning.
+- Port `tests/connector/ui-journey.ts` to the T0015 UIs, so `npm run test:connector:ui:local` and the hosted connector UI check pass.
 - Move the console sidebar out of the `main` landmark, so the skip link skips it. The local and cloud specs expect focus on `#main`, so they change too.
 

@@ -2,7 +2,10 @@
  * utilities, so redesigned screens always win over the older workflow styles. */
 @layer theme, base, legacy, components, utilities;
 
-@import "tailwindcss";
+/* Scan only src/ for class names. Without this, Tailwind scans the whole
+ * repository: words in docs/ and design/ add unused CSS, and an edit to a
+ * document reloads the page in the dev server. */
+@import "tailwindcss" source(".");
 @import "tw-animate-css";
 @import "@fontsource-variable/inter";
 @import "@fontsource-variable/jetbrains-mono";

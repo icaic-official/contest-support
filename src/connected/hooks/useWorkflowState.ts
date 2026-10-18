@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { type CommandRunner, useCommand } from "./useCommand";
 import type { SessionData } from "./useSessionSnapshot";
 
@@ -19,12 +19,25 @@ export interface WorkflowState {
  * issue survive a change of viewport.
  */
 export function useWorkflowState(data: SessionData): WorkflowState {
-  const [selectedIssueId, selectIssue] = useState("");
+  const [selectedIssueId, setSelectedIssueId] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  // Counts selection changes. A recorded command selects its issue only when
+  // the selection did not change while the command ran, so Back during the
+  // refresh after a command is not undone.
+  const selections = useRef(0);
+  const selectionsAtStart = useRef(0);
+  const selectIssue = useCallback((issueId: string) => {
+    selections.current++;
+    setSelectedIssueId(issueId);
+  }, []);
   const command = useCommand({
     sessionId: data.sessionId,
     refresh: data.refresh,
+    onStart: () => {
+      selectionsAtStart.current = selections.current;
+    },
     onRecorded: (issueId, recorded) => {
+      if (selections.current !== selectionsAtStart.current) return;
       selectIssue(issueId);
       // Show a reopened issue even when the filter was "resolved".
       if (recorded.type === "reopen") setStatusFilter("claimed");

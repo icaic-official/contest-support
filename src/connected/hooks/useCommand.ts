@@ -52,10 +52,13 @@ interface PendingRequest {
 export function useCommand({
   sessionId,
   refresh,
+  onStart,
   onRecorded,
 }: {
   sessionId: string;
   refresh: () => Promise<void>;
+  /** Runs when a command or a retry starts. */
+  onStart?: () => void;
   /** Runs after the refresh that follows a recorded command. */
   onRecorded?: (issueId: string, command: Command) => void;
 }): CommandRunner {
@@ -75,6 +78,7 @@ export function useCommand({
   ): Promise<boolean> {
     if (inFlight.current || (!retry && pendingRequest.current)) return false;
     inFlight.current = true;
+    onStart?.();
     setBusy(true);
     setNotice("");
     setError("");

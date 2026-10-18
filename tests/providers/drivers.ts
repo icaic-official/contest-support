@@ -1,6 +1,9 @@
 import { cleanupFixture, createFixture } from './supabase/fixture';
 import type { ScenarioData } from './contracts';
 import { cleanupFixture as cleanupCloudflareFixture, createFixture as createCloudflareFixture } from './cloudflare/fixture';
+import { createDiagnostics } from './cloudflare/diagnostics';
+import { inspectFixtureAuthentication } from './cloudflare/fixture';
+import type { BrowserDiagnostics } from './browser-backend';
 
 interface PreparedFixture {
   data: ScenarioData;
@@ -14,6 +17,7 @@ interface ProviderDriver {
   assetOrigin?: string;
   create(path: string): Promise<PreparedFixture>;
   cleanup(path: string): Promise<void>;
+  diagnostics?(path: string, accountId?: string): BrowserDiagnostics;
 }
 
 const drivers: Record<string, ProviderDriver> = {
@@ -34,6 +38,8 @@ const drivers: Record<string, ProviderDriver> = {
       return { data, browserConfiguration: { origin } };
     },
     cleanup: cleanupCloudflareFixture,
+    diagnostics: (path, accountId) => createDiagnostics(accountId,
+      accountId ? () => inspectFixtureAuthentication(path, accountId) : undefined),
   },
 };
 

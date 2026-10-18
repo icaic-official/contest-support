@@ -87,6 +87,7 @@ The implementation changes these files:
 - `src/server/adapters/cloudflare/installation.ts`
 - `src/server/adapters/cloudflare/live.test.ts`
 - `src/server/adapters/cloudflare/live.ts`
+- `src/server/adapters/cloudflare/providerDiagnostics.test.ts`
 - `src/server/adapters/cloudflare/runtime.d.ts`
 - `src/server/adapters/cloudflare/tooling/competition.example.json`
 - `src/server/adapters/cloudflare/tooling/configuration.mjs`
@@ -127,6 +128,7 @@ The implementation changes these files:
 - `tests/provider-bridge.spec.ts`
 - `tests/providers/browser-backend.ts`
 - `tests/providers/cloudflare/browser.ts`
+- `tests/providers/cloudflare/diagnostics.ts`
 - `tests/providers/cloudflare/fixture.ts`
 - `tests/providers/cloudflare/target.d.mts`
 - `tests/providers/cloudflare/target.mjs`
@@ -188,6 +190,10 @@ It completed fixture cleanup. A forwarding proxy and real Better Auth regression
 The repeated hosted account run passes all 82 cases in 148 seconds, without skips, and verifies cleanup.
 The original 35 account test definitions retain their complete bodies and parameter lists across four isolated files.
 New progress checks verify numeric redaction, concurrent counters, intermediate output, timeout handling, and timer cleanup.
+A temporary Chromium probe repeats the shared temporary-password and full lifecycle cases against the local Worker with maintenance before every HTTP request.
+That probe passes. All 19 lifecycle snapshots and 20 authentication-session reads return 200. It does not reproduce the protected rejection.
+Provider-owned browser diagnostics now record safe endpoint timings and fixture authentication flags before logout.
+Their local tests verify redaction, ownership, and teardown ordering. The first browser mock used the wrong `page.evaluate` signature and was corrected.
 No automatic approval review rejected an authorized action.
 
 ## 4. Build and test results

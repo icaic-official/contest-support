@@ -158,6 +158,13 @@ The corrected account CLI run passes all 82 cases with zero skips and verified c
 Its measured totals include 3,423 calls and 10,536 statements, including suite initialization and maintained schema checks.
 This result is separate from GitHub timing. A corrected protected comparison remains required.
 
+The remaining shared-scenario failures now have provider-owned HTTP diagnostics.
+Each client reports endpoint names, status counts, and request durations before logout.
+A resource authentication rejection also records cookie presence and reads only that fixture account's authentication flags.
+The flags describe its newest login wrapper. The wrapper count identifies ambiguity when several logins exist.
+Diagnostics omit URLs, query values, account IDs, cookies, password data, and provider error text.
+Local regression checks verify these boundaries and confirm that the state read finishes before browser logout.
+
 ### Empty hosted installation
 
 A separate clean checkout of `59121f7` followed the installation guide after `npm ci`.

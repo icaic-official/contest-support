@@ -9,7 +9,7 @@ import { getPlatformProxy, unstable_splitSqlQuery as splitSqlQuery } from 'wrang
 import { renderWranglerConfiguration } from '../src/server/adapters/cloudflare/tooling/configuration.mjs';
 import { maintainFixtureSessions, SessionLiveCoordinator } from '../src/server/adapters/cloudflare/live';
 import { passwordHasher } from '../src/server/adapters/cloudflare/password';
-import { checkFixtureSchema, cleanupFixture, createFixture } from '../tests/providers/cloudflare/fixture';
+import { checkFixtureSchema, cleanupFixture, createFixture, inspectFixtureAuthentication } from '../tests/providers/cloudflare/fixture';
 import { checkCloudflareBackend, connectorTarget, readFixtureTarget } from '../tests/providers/cloudflare/target.mjs';
 import { createBrowserBackend } from '../tests/providers/browser-backend';
 import { createBrowserProvider } from '../tests/providers/cloudflare/browser';
@@ -31,6 +31,54 @@ afterEach(async () => {
 });
 
 describe('hosted-origin browser bridge boundaries', () => {
+  test('records cookie presence without its value and finishes diagnostics before browser logout', async () => {
+    const handlers = new Map();
+    const order = [];
+    let release;
+    let observed;
+    const ready = new Promise((resolve) => { observed = resolve; });
+    const diagnostics = {
+      observe: vi.fn(async () => {
+        order.push('observe');
+        observed();
+        await new Promise((resolve) => { release = resolve; });
+      }),
+      flush: async () => { order.push('flush'); },
+      summary: () => ({ requests: [] }),
+    };
+    const page = {
+      on: (event, callback) => handlers.set(event, callback),
+      exposeBinding: async () => {}, goto: async () => {},
+      evaluate: async (_callback, request) => {
+        if (request?.type === 'close') order.push('logout');
+        return { ok: true, value: undefined };
+      },
+    };
+    const context = { newPage: async () => page, close: async () => { order.push('context-close'); } };
+    const output = vi.spyOn(globalThis.console, 'log').mockImplementation(() => {});
+    try {
+      const connection = await createBrowserBackend({ newContext: async () => context }, {
+        origin: connectorTarget.origin, module: '/tests/providers/cloudflare/browser.ts',
+        configuration: { origin: connectorTarget.origin }, diagnostics,
+      });
+      const request = { url: () => `${connectorTarget.origin}/api/snapshot?sessionId=${randomUUID()}`,
+        method: () => 'GET', headerValue: async () => '__Host-minsky-session=private-cookie-token' };
+      handlers.get('request')(request);
+      handlers.get('response')({ request: () => request, status: () => 401 });
+      const closing = connection.close();
+      await ready;
+      expect(order).toEqual(['observe']);
+      release();
+      await closing;
+      expect(order).toEqual(['observe', 'flush', 'logout', 'context-close']);
+      expect(diagnostics.observe.mock.calls[0][0]).toMatchObject({ status: 401, hasSessionCookie: true });
+      expect(JSON.stringify(diagnostics.observe.mock.calls)).not.toContain('private-cookie-token');
+      expect(JSON.stringify(output.mock.calls)).not.toContain('private-cookie-token');
+    } finally {
+      output.mockRestore();
+    }
+  });
+
   test('proxies only source assets to Vite and sends no cookies or credentials to the asset server', async () => {
     let predicate;
     let handler;
@@ -217,6 +265,20 @@ describe('Cloudflare fixture setup and exact cleanup with real local D1/R2', () 
     return path;
   }
   function statement(sql, ...values) { return platform.env.DB.prepare(sql).bind(...values); }
+
+  test('authentication diagnostics reject an unowned account and preserve the fixture', async () => {
+    environment();
+    const path = journalPath();
+    const fixture = await createFixture(path, dependencies());
+    try {
+      await expect(inspectFixtureAuthentication(path, randomUUID(), dependencies())).rejects.toThrow('does not belong');
+      const flags = await inspectFixtureAuthentication(path, fixture.accounts.admin.id, dependencies());
+      expect(flags).toMatchObject({ accountExists: true, accountReady: true, wrapperExists: false });
+      expect(await statement('SELECT id FROM accounts WHERE id = ?', fixture.accounts.admin.id).first()).not.toBeNull();
+    } finally {
+      await cleanupFixture(path, dependencies());
+    }
+  });
 
   test('removes exact fixture Durable Object cursors while preserving another session object', async () => {
     environment();

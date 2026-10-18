@@ -144,6 +144,11 @@ These suites require no R2 bucket or Durable Object namespace.
 Their target guards reject the full connector, authentication, historical proof, and development configurations.
 The shared browser and product UI suites continue to use `minsky-connector-ci` above.
 
+Shared Cloudflare clients report endpoint names, status counts, and request durations before logout.
+For a resource authentication rejection, diagnostics record cookie presence and read only the fixture account's authentication flags.
+These flags describe the newest login wrapper. Check the wrapper count before interpreting a client-specific failure.
+The output excludes URLs, account IDs, cookies, passwords, and provider error text.
+
 An active Worker can change notification delivery fields while a direct test compares database state.
 Those fields are `delivered`, `attempts`, and `last_attempt_at`.
 Notification delivery can also create coordinator cursors outside direct-fixture cleanup.

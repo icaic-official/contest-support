@@ -9,6 +9,7 @@ import { attachmentPath } from '../../../src/connected/imageFile';
 import { passwordHasher, randomSecret } from '../../../src/server/adapters/cloudflare/password';
 import type { Actor, ScenarioData, TestAccount } from '../contracts';
 import { confirmFixtureTarget, readFixtureTarget, type FixtureTarget } from './target.mjs';
+import { readD1AuthFlags } from './diagnostics';
 
 const actors = ['admin', 'otherAdmin', 'contestant', 'otherTeam', 'volunteer', 'specialist', 'jury', 'isolated', 'temporary', 'revoked'] as const satisfies readonly Actor[];
 const uuid = z.uuid();
@@ -198,6 +199,24 @@ async function readJournal(path: string, target: FixtureTarget): Promise<Journal
     throw new Error('Recovery target does not match the selected isolated Cloudflare configuration.');
   }
   return journal;
+}
+
+/** Read only the failed client's fixture account before browser logout or cleanup. */
+export async function inspectFixtureAuthentication(path: string, accountId: string, dependencies: Dependencies = {}) {
+  const target = await configuration();
+  const journal = await readJournal(path, target);
+  const actor = actors.find((candidate) => journal.accountIds[candidate] === accountId);
+  if (!actor) throw new Error('The diagnostic account does not belong to this fixture.');
+  const platform = await open(target, dependencies);
+  try {
+    const owned = await statement(platform.env.DB,
+      'SELECT 1 AS owned FROM accounts WHERE id = ? AND name = ? AND username = ?',
+      accountId, name(journal, actor), username(journal, actor)).first();
+    if (!owned) throw new Error('The diagnostic account marker does not match this fixture.');
+    return await readD1AuthFlags(platform.env.DB, accountId, new Set(Object.values(journal.accountIds)));
+  } finally {
+    await platform.dispose();
+  }
 }
 
 interface OwnedImage { id: string; session_id: string; issue_id: string; original_path: string; thumbnail_path: string }

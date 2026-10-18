@@ -9,6 +9,15 @@ The final follow-up changes documentation only.
 Historical results do not establish current compatibility.
 See [current state](current-state.md#t0009-parallel-maintenance-2026-10-18).
 
+T0015 note (2026-10-18): the T0015 frontend redesign moved this worklist into the organiser screens.
+The phone **Awards** tab and the desktop **Award review** page show To decide, To apply and Applied lists from `awardLists()`.
+These lists use the eligibility and order rules below.
+There is no separate **Jury worklist** sidebar entry and no **Back to jury worklist** button.
+The award and confirmation forms stay on the desktop Award review cards.
+The legacy `src/connected/JuryWorklist.tsx` was removed.
+The sections below record the T0009 specification as accepted.
+See [frontend architecture](frontend-architecture.md#jury-award-lists).
+
 The owner authorized T0009 maintenance in parallel with the separate T0020 connector goal.
 Use a separate worktree. Preserve the connector checkout, scope, and active ticket.
 Supabase remains active. The owner reviews and merges.

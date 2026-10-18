@@ -4,15 +4,15 @@ import { clockDuration } from "@/connected/ui";
 import { ApplyForm, AwardForm } from "../actions/IssueForms";
 import { AwardReceipt } from "../components/IssueDetails";
 import { AwardEvidence, UnresolvedTimer } from "../components/issueDisplay";
-import { type AwardList, awardLists, issueAbilities } from "../organiserModel";
+import {
+  type AwardList,
+  awardListLabels,
+  awardListOrder,
+  awardLists,
+  issueAbilities,
+} from "../organiserModel";
 import type { ConsolePageProps } from "./consoleProps";
 import { PageHeader } from "./QueuePages";
-
-const lists: readonly [AwardList, string][] = [
-  ["decide", "To decide"],
-  ["apply", "To apply"],
-  ["done", "Applied"],
-];
 
 /**
  * The jury award lists: resolved issues without an award, awards that wait
@@ -36,7 +36,7 @@ export function AwardReviewPage({ props }: { props: ConsolePageProps }) {
         aria-label="Award lists"
         className="inline-flex gap-1 rounded-lg bg-muted p-1"
       >
-        {lists.map(([value, label]) => (
+        {awardListOrder.map((value) => (
           <button
             key={value}
             type="button"
@@ -47,7 +47,7 @@ export function AwardReviewPage({ props }: { props: ConsolePageProps }) {
               list === value && "bg-background text-foreground shadow-sm",
             )}
           >
-            {label}{" "}
+            {awardListLabels[value]}{" "}
             <span className="text-xs tabular-nums opacity-70">
               {issuesOf[value].length}
             </span>
@@ -55,7 +55,7 @@ export function AwardReviewPage({ props }: { props: ConsolePageProps }) {
         ))}
       </div>
       {shown.length ? (
-        <ul className="grid gap-4">
+        <ul aria-label={awardListLabels[list]} className="grid gap-4">
           {shown.map((row) => {
             const { issue, team, award } = row;
             const can = issueAbilities(issue, state, member);

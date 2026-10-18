@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNow } from "@/connected/hooks/useNow";
@@ -17,6 +17,7 @@ import {
   type OrganiserTab,
   organiserTabs,
 } from "../organiserModel";
+import { useLeftIssueNotice } from "../useLeftIssueNotice";
 import { PhoneIssueView } from "./PhoneIssueView";
 import {
   type CardAction,
@@ -73,6 +74,22 @@ export function OrganiserPhoneApp({
     {},
   );
 
+  const openedIssue =
+    state && member
+      ? openableIssues(state, member).find(
+          (issue) => issue.id === workflow.selectedIssueId,
+        )
+      : undefined;
+  const leftNotice = useLeftIssueNotice(
+    workflow.selectedIssueId,
+    workflow.selectIssue,
+    openedIssue,
+    useCallback(() => {
+      setPushSheet(undefined);
+      focusLater(headingId);
+    }, []),
+  );
+
   if (!state || !member || !state.session) {
     return (
       <NoSessionAccess
@@ -87,9 +104,6 @@ export function OrganiserPhoneApp({
 
   const tabs = organiserTabs(member);
   const currentTab = tabs.includes(tab) ? tab : tabs[0];
-  const openedIssue = openableIssues(state, member).find(
-    (issue) => issue.id === workflow.selectedIssueId,
-  );
   const archived = Boolean(state.event?.archived);
   const canReport = isSupport(member);
 
@@ -174,6 +188,11 @@ export function OrganiserPhoneApp({
           />
           <div className="flex-1 space-y-4 overflow-y-auto px-4 pb-6">
             <PhoneStatus state={state} data={data} command={command} />
+            {leftNotice && (
+              <p role="status" className="text-sm text-muted-foreground">
+                {leftNotice}
+              </p>
+            )}
             {currentTab === "queue" && <QueueTab {...tabProps} />}
             {currentTab === "mine" && <MineTab {...tabProps} />}
             {currentTab === "awards" && <AwardsTab {...tabProps} />}

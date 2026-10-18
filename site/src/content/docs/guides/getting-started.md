@@ -20,7 +20,9 @@ Refreshing the page does not bypass this requirement.
 
 ## Select the session
 
-If you belong to several sessions, choose the correct contest session in the sidebar.
+If you belong to several sessions, choose the correct contest session.
+Contestants use the session menu in the top bar.
+Staff use the session switcher at the top of the desktop sidebar, or the **Me** tab on a phone.
 Each session has its own teams, issues, and awards.
 Your assigned roles determine which controls you can use.
 Staff with several roles receive the combined permissions of those roles.
@@ -28,15 +30,25 @@ Staff with several roles receive the combined permissions of those roles.
 An account without session membership cannot read contest data.
 Ask an organizer to check your membership if the workspace reports that you have no access.
 
-## Find your workspace
+## Find your screens
 
-- Contestants use **My team's issues** to report problems and read public replies.
-- Volunteers and specialists use **Issues** to investigate reports.
-- Jury-only accounts use **Award review** for resolved issues.
-- Session admins use **Administration** to manage accounts and session controls.
-- All users can change their password through **My account**.
+Minsky shows a different interface to contestants and to staff:
 
-On a phone, select **Menu** to open the navigation.
+- Contestants get a desktop layout. Use a computer with a window at least 1024 px wide. The left column shows **Report an issue** and your team's reports.
+- Staff on a phone, or in a window narrower than 1024 px, get tabs at the bottom of the screen.
+- Staff in a window 1024 px wide or wider get a console with a sidebar.
+
+Your roles select the staff tabs and pages:
+
+| Role | Phone tabs | Desktop pages |
+| --- | --- | --- |
+| Volunteer or specialist | **Queue**, **Mine**, **Find**, **Me** | **Queue**, **Assigned to me**, **Handoffs**, **Teams & tables** |
+| Jury member | **Awards**, **Find**, **Me** | **Award review**, **Teams & tables** |
+| Session admin | Also **Session** | Also **Overview**, **Accounts**, **Session settings** |
+
+Staff with several roles get all the tabs and pages of those roles.
+Contestants change their password and sign out through the account menu in the top bar.
+Staff use the **Me** tab on a phone, or the account menu at the bottom of the desktop sidebar.
 Use **Sign out** when you finish on a shared device.
 
 ## Recover access

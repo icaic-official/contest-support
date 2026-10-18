@@ -5,8 +5,8 @@ description: Record an award decision and track its separate application to an e
 
 ## Review the issue
 
-Jury-only members use **Award review**, which shows resolved issues.
-Team search can narrow that list.
+Jury members use the **Awards** tab on a phone, or **Award review** in the desktop console.
+Jury-only members see resolved issues only, and reopened issues with a pending award.
 Members with combined support and jury roles also receive the support controls.
 Jury-only access does not permit claiming, resolving, or reopening an issue.
 Ask support staff to reopen a resolved issue if it needs further discussion.
@@ -37,17 +37,16 @@ Contestants can see both the decision and its application status.
 If the issue is reopened, its award and external application status remain.
 Reopening does not authorize a second award for the same issue.
 
-## Pending jury worklist
+## Use the award lists
 
-[T0009 in PR #23](https://github.com/GiftedNovaHD/minsky/pull/23) adds a separate **Jury worklist**.
-The PR remains under review. Check [feature status](/reference/status/) before you expect it in an installation.
+The **Awards** tab and the **Award review** page have three lists:
 
-The worklist has two sections:
+- **To decide** lists resolved issues without an award, oldest resolution first.
+- **To apply** lists awards that are not applied yet, oldest decision first. It includes zero-minute awards and reopened issues.
+- **Applied** lists resolved issues with an applied award, latest confirmation first.
 
-- **Needs decision** lists resolved issues without an award, oldest resolution first.
-- **Pending external application** lists unapplied awards, oldest decision first, including zero-minute awards and reopened issues.
-
-Use **View issue** to open the existing details and forms.
-Use **Back to jury worklist** to return to the originating row or section.
-The worklist covers the authorized session independently of ordinary queue filters.
+On the desktop, each card has the award form or the confirmation form.
+On a phone, open the issue and use **Decide award** or **Confirm applied**.
+A pending award on a reopened issue shows a **Reopened** badge and the resolution that the award relates to.
+The lists cover the whole session. Queue filters do not change them.
 Jury-only membership permits review and external confirmation without support capabilities.

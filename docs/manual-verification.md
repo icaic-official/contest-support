@@ -1,4 +1,4 @@
-# Connected manual verification (T0003/T0004/T0005)
+# Connected manual verification (T0003 to T0015)
 
 ## Documentation site (T0011)
 
@@ -7,7 +7,7 @@ For the published site, run `MINSKY_DOCS_URL=https://minsky-docs.icaic-minsky.wo
 These checks only read documentation.
 Check a direct guide URL after refresh, search by keyboard, phone navigation, and a missing page.
 Review light and dark themes at desktop and 320px widths.
-The sign-in footer and sidebar links open the guides in a new tab to preserve the workspace.
+The sign-in footer, the **Documentation** item in the desktop console account menu and the documentation link in the phone **Me** tab open the guides in a new tab.
 Those links reach the development app only after its separate frontend deployment.
 
 ## Experimental Cloudflare authentication
@@ -25,6 +25,15 @@ Use a separate browser or profile for each account: contestant, volunteer, speci
 Work only in a clearly identified development or test session.
 See [onboarding](cloud-onboarding.md).
 
+T0015 replaced the earlier workspace with three UIs. The membership and the window width select the UI:
+
+- A contestant account gets the contestant desktop app. Use a window at least 1024 px wide, such as 1280 × 800.
+- A staff account below 1024 px gets the organiser phone app. Use 390 × 844, and 320 × 740 for the narrow check.
+- A staff account at 1024 px and wider gets the organiser desktop console. Use 1280 × 800.
+
+Unless a step names one UI, do the step in the organiser phone app and again in the organiser desktop console.
+Section 7 lists the checks for each UI.
+
 ## 1. Login and session access
 
 1. Sign in with a username that uses different letter case.
@@ -39,7 +48,7 @@ See [onboarding](cloud-onboarding.md).
 ## 2. Account administration
 
 1. Sign in as admin.
-2. Select **Administration** in the sidebar.
+2. Open the **Session** tab in the phone app, or **Accounts** in the desktop console sidebar.
 3. Create a contestant username account for a roster team.
 4. Give its temporary password to the account holder through a secure channel.
 5. Assign individual staff accounts.
@@ -55,6 +64,18 @@ See [onboarding](cloud-onboarding.md).
 
 Expected result: the app rejects removal of the last admin.
 
+Check the admin screens of T0015 in both organiser layouts:
+
+1. In the phone **Session** tab, check the status counts, the intake switch and the image limits with the − and + buttons.
+2. Select **New account**. Create a staff account. Check that the sheet shows the username and the temporary password once, with copy buttons and **Done**.
+3. Select **Done**. Open the account again. Check that the credentials do not show again.
+4. Reset the password of another account. Check that a confirmation dialog shows first. Check that the new credentials show once.
+5. Check that your own account has no password reset.
+6. Remove session access from an account. Check that a confirmation dialog shows first.
+7. In the desktop console, repeat steps 2 to 6 with **Create account** and **Manage** on **Accounts**.
+8. In **Session settings**, change the image limits. Check that the phone **Session** tab shows the same values.
+9. Archive the event. Check that every admin control is disabled.
+
 ## 3. Contestant intake
 
 1. Close contestant intake as admin.
@@ -67,34 +88,34 @@ Expected result: the app rejects removal of the last admin.
 
 ## 4. Submission, replies, and handoff
 
-1. Select **Report an issue** as a contestant, or **Report for team** as support.
+1. Select **Report an issue** as a contestant, or **Report for a team** as support.
 2. Complete the form.
 3. Submit the report.
 
 Expected result: successful submission closes the form and selects the new report.
 
 1. Open the report form again.
-2. Select **Cancel report**.
+2. Select **Cancel**.
 3. Check that focus returns to the report button.
 4. Claim the issue as a volunteer in another signed-in browser.
-5. Use **Audience** to add a public reply.
-6. Use **Audience** to add an internal note.
+5. Add a public reply. Choose **To the team** in the phone app, or **Public reply** in the desktop composer.
+6. Add an internal note. Choose **Staff only** in the phone app, or **Internal note** in the desktop composer. Check that the message field has the amber striped surface.
 7. Request a specialist handoff.
 8. Check that the volunteer remains the owner.
-9. Accept the handoff as another specialist in the amber panel.
+9. Accept the handoff as another specialist with **Accept handoff**.
 10. Check that the contestant cannot see the internal note.
 11. Repeat the privacy check through direct API and history queries.
 12. Leave the reply input blank.
-13. Check that **Send reply** remains disabled.
+13. Check that the send button remains disabled. It is **Send to team** or **Add internal note** in the phone app, and **Send** or **Add note** in the desktop composer.
 
 Check reply retries with isolated accounts and controlled request failures:
 
 1. Enter a public reply and cause its response to be lost after the server records it.
 2. Select **Retry last request**. Repeat a transport failure and check that the text remains.
-3. Let the next retry succeed. Check that the text clears and **Send reply** is disabled.
+3. Let the next retry succeed. Check that the text clears and the send button is disabled.
 4. Check that history contains one copy of the reply.
 5. Enter a fresh reply. Check that it sends and clears normally.
-6. Repeat with an internal note. Check that successful retry resets **Audience** to its default.
+6. Repeat with an internal note. Check that a successful retry clears the note.
 7. Reject a reply at the server. Check that its text remains editable and no history entry appears.
 
 The retry cases in `tests/workspace-refresh.spec.ts` automate these checks with mocked responses.
@@ -120,60 +141,83 @@ Expected result: Minsky records application status without changing an external 
 7. Refresh each browser.
 8. Compare the shared state.
 
-## 7. Interface and accessibility
+## 7. Interface and accessibility (T0015)
 
-Compare the dark green interface with the T0004 references at 1505×1045 and 1280×900.
-Check these elements:
+Do these checks in the light theme and again in the dark theme.
+Change the theme with the theme menu. Check that the choice stays after a page reload.
+Check that each status shows an icon or a label, not only a color.
+Check that the page has no horizontal overflow and that focus is always visible.
 
-- The compact sidebar.
-- The four queue columns.
-- The selected green row.
-- The issue details.
-- The owner and timing facts.
-- The amber handoff panel.
-- The chronological activity.
-- The lock marker and separate panel for staff notes.
+### Sign-in and session access
 
-Reference labels and example values must come from actual session data.
-
-Repeat support actions at 390×844 and 320×740.
-Check these results:
-
-- The page has no horizontal overflow.
-- Owner names and timers remain readable.
-- The keyboard skip link works.
-- Focus remains visible.
-- Native select and checkbox controls work.
-- Valid forms submit.
-- Queue rows become cards.
-- Issue details stack below the queue.
-
-1. Select a queue row on a narrow screen.
-2. Check that focus moves to the detail heading.
-3. Select **Back to queue**.
-4. Check that focus returns to the queue heading.
-5. Open **Menu** with the keyboard.
-6. Switch between issues and **My account**.
-7. Check that the menu closes and focus moves to the new page heading.
-8. Check that **Sign out** appears inside the expanded phone menu.
-9. Check that admins can see **Administration**.
-10. Check that other accounts cannot see that section.
-11. Change a password from **My account**.
-12. Sign out.
-13. Check that the sidebar disappears.
-14. Reload the authenticated workspace after signing in again.
-15. Check that the workspace returns to issues.
-
-Review the centered sign-in page at desktop, 800px, 390px, and 320px widths.
+Review the sign-in page at 1280 × 800, 390 × 844 and 320 × 740.
 
 1. Toggle **Show password** and **Hide password** with the keyboard.
 2. Check that organizer access and recovery guidance remain visible.
-3. Review contestant, jury, and admin views at desktop widths and 200% zoom.
-4. Use a real phone and screen reader when available.
-5. Check that the development label remains visible.
+3. Sign in with an account without membership. Check that the access screen shows **Refresh access** and **Sign out**.
+4. Press Tab once after sign-in. Check that **Skip to main content** appears and moves focus to the main content.
 
-**Live** indicates a subscribed Realtime connection.
-**Connecting** indicates a pending connection.
+### Organiser phone app (390 × 844)
+
+Sign in as a volunteer, a specialist, a jury member and an admin.
+
+1. Check the bottom tabs. Volunteers and specialists get **Queue**, **Mine**, **Find** and **Me**. Jury members get **Awards**. Admins also get **Session**.
+2. Check that a jury-only member sees resolved issues only, except a reopened issue with a pending award.
+3. In **Queue**, check the chips, the cards sorted by unresolved time and the timer colors. The timer is neutral below 10 minutes, amber below 20 minutes and rose after that.
+4. Claim an issue on its card. Check that the list stays. Use **Claim and go** on another issue. Check that the issue view opens.
+5. In the issue view, use the bottom action bar. Open each sheet: reply, resolve, escalate, image, award, confirmation and reopen.
+6. In each sheet, select **Cancel**. Check that the sheet closes without a swipe and that no action is recorded.
+7. Select **Back**. Check that focus returns to the card of the issue.
+8. Change the tab. Check that focus moves to the tab heading.
+9. Check that buttons are at least 44 px high.
+10. Repeat steps 3 to 8 at 320 × 740.
+
+### Organiser desktop console (1280 × 800)
+
+Sign in as the same accounts.
+
+1. Check the sidebar pages. Volunteers and specialists get **Queue**, **Assigned to me** and **Handoffs**. Jury members get **Award review**. Every person gets **Teams & tables**. Admins also get **Overview**, **Accounts** and **Session settings**.
+2. Collapse the sidebar. Reload the page. Check that it stays collapsed.
+3. On the queue, press J and K. Check that focus moves between rows. Press Enter on an issue number. Check that the side sheet opens.
+4. Check that J and K do nothing while a field or a dialog has focus.
+5. Press ⌘K or Ctrl+K. Search for `31`, `#31` and `ISS-31`, three letters of report text, a team name and a table number. Check that each result opens the correct issue, team filter or page.
+6. Claim an issue in a row. Check that the page stays. Claim another issue in the side sheet. Check that the sheet stays open.
+7. Open resolve, escalate and reopen from the sheet. Check that each opens a dialog and that **Cancel** closes it without an action.
+8. Check that the sheet shows one filled primary action. **Decide award** and **Confirm applied** open the **Outcome & award** tab.
+
+### Contestant desktop app (1280 × 800)
+
+Sign in as a contestant.
+
+1. Check the top bar: event, session, **Live** or **Reconnecting**, the theme menu and the account menu with **Change password** and **Sign out**.
+2. Open a report. Check the headline, the live unresolved timer, the four-step tracker, the resolution cards, the award card and the messages.
+3. Select **Report an issue**. Check the category tiles, the description limit of 2,000 characters and the team location.
+4. Send a reply with Enter. Add a line with Shift+Enter.
+5. Close contestant intake as admin. Check that **Report an issue** is disabled with a reason.
+
+### Refresh persistence
+
+1. Note the unresolved timer of an open issue. Reload the page. Check that the timer continues from the same value and does not reset.
+2. Resolve the issue. Check that the timer stops. Reopen it. Check that the timer continues and excludes the resolved interval.
+3. Type a reply draft. Do not send it. From a second browser, record a change on another issue. Check that the draft and the selected issue stay in the first browser.
+4. Disconnect the network until **Reconnecting** shows. Connect again. Check that **Live** returns and that the draft stays.
+
+A page reload discards an unsent draft. The drafts stay only during the automatic snapshot refresh.
+
+### Public replies and internal notes
+
+1. As staff, add a public reply and an internal note to the same issue.
+2. As the contestant, check that the public reply shows and the internal note does not show.
+3. Add a staff-only image and a team-visible image. As the contestant, check that only the team-visible image shows.
+4. Repeat the privacy check through direct API and history queries.
+
+### Real devices
+
+Use a real phone and a screen reader when available.
+Review the contestant, jury and admin views at 1280 × 800 and at 200% zoom.
+
+**Live** shows a subscribed Realtime connection.
+**Reconnecting** shows that the connection is down and the app tries again.
 
 ## 8. Temporary passwords and recovery
 
@@ -281,7 +325,7 @@ Use a contestant account to confirm that team search stays hidden.
 9. Clear the team.
 10. Check that the previous queue returns.
 11. Select the team again.
-12. Open **Report for team**.
+12. Open **Report for a team**.
 13. Check that the same team is already selected.
 14. Edit the team text.
 15. Check that **Submit issue** stays unavailable until you choose a suggestion.
@@ -291,7 +335,7 @@ Use a contestant account to confirm that team search stays hidden.
 19. Check that the intended team appears before weaker matches.
 20. Type a query that matches nothing.
 21. Check that the message says no team matches and that no team is selected for you.
-22. Repeat the queue search at 390px and 320px widths.
+22. Repeat the queue search in the phone app at 390px and 320px widths. In the desktop console, also search for the team with ⌘K or Ctrl+K.
 23. Sign in as a contestant.
 24. Check that **Report an issue** does not ask for a team.
 
@@ -317,7 +361,7 @@ Use isolated test accounts for these checks.
 3. Submit another issue from a second client.
 4. Check that the first client still shows the original issue and reply text.
 5. Send the reply. Check that it belongs to the original issue.
-6. Open a membership form as an administrator.
+6. Open a membership form as an administrator. Use **Manage** on **Accounts** in the desktop console, or an account in the **Session** tab.
 7. Change that member's roles or team from a second administrator account.
 8. Return focus to the first client so it receives the current membership.
 9. Check that both the summary and form show the current roles or team.
@@ -340,44 +384,44 @@ Delete only that run's fixtures. Verify cleanup after the run. Use jury-only, co
 admin-only, and contestant accounts. Do not use real contest reports as fixtures.
 This is a checklist, not evidence that hosted or physical-device checks have passed.
 
-1. As jury or a combined-role member, open **Jury worklist** in the sidebar.
-   On phones use **Menu** first. Other roles must not have this entry; admin alone
-   does not grant jury powers. The initial issue screen remains available.
+T0015 moved the worklist into the phone **Awards** tab and the desktop **Award review** page.
+The lists are **To decide**, **To apply** and **Applied**. There is no separate **Jury worklist** entry.
+See [frontend architecture](frontend-architecture.md#jury-award-lists).
+
+1. As jury or a combined-role member, open **Awards** on a phone or **Award review** in the desktop console.
+   Other roles must not have this entry. Admin alone does not grant jury powers.
 2. Prepare resolved issues without decisions, a zero-minute pending award, a
    pending award on a reopened issue, an applied award, and a reopened issue with
-   no award. Compare both sections and their counts with the specification's
+   no award. Compare **To decide** and **To apply** and their counts with the specification's
    eligibility table. Order decisions by resolution time and applications by award time.
-3. As a combined-role member, filter the ordinary queue, then open the worklist.
-   Its lists must still cover the entire authorized session. Also check independence from the chosen team search filter.
-   Returning to the ordinary queue retains its filter and selected issue.
-4. Check team/location, status, resolution summary/actor/time, unresolved duration,
-   and award explanation/actor/time. Pending awards on reopened issues identify
-   the earlier resolution. Compare duration with issue details; resolved intervals
-   are excluded and first-assignment delay is separate.
-5. Use **View issue**, record an explicit zero-minute decision with a public
-   explanation, and return. It must leave **Needs decision** and enter **Pending
-   external application**. Zero is not a missing award and is not automatically applied.
-6. As support, reopen an issue with a pending award. As jury-only, reach it from
-   the worklist and confirm external application with the existing required
-   checkbox. It leaves the pending list. Minsky does not change the external clock.
-   Resolve it again: its existing award and confirmation remain, with no second decision.
-7. Open two signed-in browser contexts. In one, edit an explanation draft; in
-   the other, award a different issue. Lists/counts update without clearing the
-   unrelated draft or stealing focus. Confirm an award in one context and check
-   removal in the other. Check refresh and reconnect. Use the automated retry
-   cases to verify lost award and confirmation responses reuse the request ID.
+   Check that **Applied** shows the applied award, latest confirmation first.
+3. As a combined-role member, filter the ordinary queue by team, then open the award lists.
+   The lists must still cover the entire authorized session.
+   Return to the queue. Check that its filter and selected issue remain.
+4. Check the team, location, status, resolution summary, resolver and time, and the unresolved duration.
+   A pending award on a reopened issue shows a **Reopened** badge with the current status.
+   When the award resolution was reopened, the row shows "This award relates to an earlier resolution."
+   Resolved intervals are excluded from the duration. The first-assignment delay is separate.
+5. Record an explicit zero-minute decision with a public explanation.
+   It must leave **To decide** and enter **To apply**. Zero is not a missing award and is not automatically applied.
+6. As support, reopen an issue with a pending award. As jury-only, open it from **To apply**.
+   Confirm external application with the required checkbox. It leaves **To apply**.
+   Minsky does not change the external clock.
+   Resolve it again. Its existing award and confirmation remain, with no second decision.
+7. Open two signed-in browser contexts. In one, edit an explanation draft. In
+   the other, award a different issue. The lists and counts update without clearing the
+   unrelated draft or moving focus. Confirm an award in one context and check that it
+   leaves **To apply** in the other. Check refresh and reconnect. Use the automated retry
+   cases to verify that lost award and confirmation responses reuse the request ID.
    Confirm one award, one confirmation, and one history entry for each action.
-8. Switch sessions while viewing details. Selection clears and records belong
-   only to the next session. Losing the jury role removes its entry and returns
-   to an available screen; losing membership clears protected records. Password
-   setup/reset must retain the existing account-readiness gate.
-9. Check keyboard opening and **Back to jury worklist**. Focus returns to the
-   originating row, or its section heading if the row moved or disappeared.
-   Check a reopened unawarded issue leaving the decision list. Archived records
-   remain readable while decisions and confirmations are unavailable.
-10. Check desktop, 390px/320px phones, native browser 200% zoom, and screen-reader
-    labels. No text/control should clip or cause horizontal overflow. Distinguish
-    loading/read errors from valid empty sections; failed reads must clear stale data.
+8. Switch sessions. Check that the records belong only to the next session.
+   Losing the jury role removes the award lists. Losing membership clears protected records.
+   Password setup and reset must keep the existing account-readiness gate.
+9. Check the award lists with the keyboard only. Check that a reopened issue without an award leaves **To decide**.
+   Archived records remain readable while decisions and confirmations are unavailable.
+10. Check the desktop console at 1280 × 800, the phone app at 390 px and 320 px, native browser 200% zoom, and screen-reader
+    labels. No text or control should clip or cause horizontal overflow. Distinguish
+    loading and read errors from valid empty lists. Failed reads must clear stale data.
 
 Record results and remaining limits in [current state](current-state.md#t0009-parallel-maintenance-2026-10-18).
 The credential-free browser harness exercises actual migrations and RLS with

@@ -1,6 +1,16 @@
-import { expect, test as base, type Page } from "@playwright/test";
+import {
+  expect,
+  test as base,
+  type Locator,
+  type Page,
+} from "@playwright/test";
 import { createJuryFixture } from "./jury-fixture";
 import { snapshotSchema } from "../src/connected/model";
+
+// T0009 jury worklist checks for the T0015 organiser UIs. The phone Awards
+// tab (390 × 844) and the desktop Award review page (1280 × 800) are the
+// worklist: "To decide" is the old "Needs decision" list and "To apply" is
+// the old "Pending external application" list.
 
 const test = base.extend<{
   local: Awaited<ReturnType<typeof createJuryFixture>>;
@@ -17,80 +27,231 @@ const test = base.extend<{
 });
 test.describe.configure({ mode: "default" });
 
-async function login(page: Page, name = "jury") {
+const phone = { width: 390, height: 844 };
+const desktop = { width: 1280, height: 800 };
+type Viewport = typeof phone;
+type ListName = "To decide" | "To apply" | "Applied";
+
+/** Signs in a fixture account and waits for its UI and Realtime. */
+async function login(page: Page, name = "jury", viewport: Viewport = phone) {
+  await page.setViewportSize(viewport);
   await page.goto("/");
   await page.getByLabel("Username", { exact: true }).fill(name);
   await page.getByLabel("Password", { exact: true }).fill(crypto.randomUUID());
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
-  await expect(
-    page.getByRole("navigation", { name: "Workspace navigation" }),
-  ).toBeVisible();
+  const ui =
+    name === "contestant"
+      ? "contestant"
+      : viewport.width < 1024
+        ? "organiser-phone"
+        : "organiser-desktop";
+  await expect(page.locator(`[data-ui="${ui}"]`)).toBeVisible();
   await expect(page.getByText("Live", { exact: true })).toBeVisible();
 }
-async function openWorklist(page: Page) {
-  await page
-    .getByRole("navigation")
-    .getByRole("button", { name: "Jury worklist", exact: true })
-    .click();
-  await expect(
-    page.getByRole("heading", { name: "Jury worklist", exact: true }),
-  ).toBeVisible();
-}
-function section(page: Page, name: string) {
-  return page.getByRole("region", { name: new RegExp(`^${name}`) });
+
+function phoneTabs(page: Page) {
+  return page.getByRole("navigation", { name: "Organiser sections" });
 }
 
-test("lists outstanding work across queue filters and returns keyboard focus to the selected row", async ({
+function consolePages(page: Page) {
+  return page.getByRole("navigation", { name: "Console pages" });
+}
+
+/** Opens the jury worklist: the Awards tab or the Award review page. */
+async function openAwards(page: Page) {
+  if ((page.viewportSize()?.width ?? 0) < 1024) {
+    await phoneTabs(page)
+      .getByRole("button", { name: "Awards", exact: true })
+      .click();
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Awards", exact: true }),
+    ).toBeFocused();
+  } else {
+    await consolePages(page)
+      .getByRole("button", { name: /^Award review/ })
+      .click();
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Award review" }),
+    ).toBeFocused();
+  }
+}
+
+/** The button of an award list, whose text ends with its count. */
+function listButton(page: Page, name: ListName) {
+  return page
+    .getByRole("group", { name: "Award lists" })
+    .getByRole("button", { name: new RegExp(`^${name}`) });
+}
+
+async function showList(page: Page, name: ListName) {
+  await listButton(page, name).click();
+  await expect(listButton(page, name)).toHaveAttribute("aria-pressed", "true");
+}
+
+/** Checks the count on every list button. */
+async function expectCounts(
+  page: Page,
+  counts: { decide: number; apply: number; done: number },
+) {
+  await expect(listButton(page, "To decide")).toHaveText(
+    new RegExp(`^To decide\\s*${counts.decide}$`),
+  );
+  await expect(listButton(page, "To apply")).toHaveText(
+    new RegExp(`^To apply\\s*${counts.apply}$`),
+  );
+  await expect(listButton(page, "Applied")).toHaveText(
+    new RegExp(`^Applied\\s*${counts.done}$`),
+  );
+}
+
+/** The rows of the shown award list. */
+function rows(page: Page, name: ListName) {
+  return page.getByRole("list", { name, exact: true }).getByRole("listitem");
+}
+
+/** One row of an award list, found by its issue number. */
+function row(page: Page, number: number) {
+  return page
+    .getByRole("listitem")
+    .filter({ has: page.getByText(`ISS-${number}`, { exact: true }) });
+}
+
+async function issueNumbers(page: Page, name: ListName) {
+  return (await rows(page, name).allInnerTexts()).map(
+    (text) => text.match(/ISS-\d+/)?.[0],
+  );
+}
+
+/** The phone issue view heading, which has focus when the view opens. */
+function phoneIssueHeading(page: Page, number: number) {
+  return page.getByRole("heading", {
+    level: 1,
+    name: new RegExp(`^ISS-${number},`),
+  });
+}
+
+/** Picks award minutes. The radio is visually hidden inside its label. */
+async function chooseMinutes(scope: Locator, minutes: number) {
+  await scope
+    .locator("label")
+    .filter({
+      has: scope.page().getByRole("radio", {
+        name: `${minutes} min`,
+        exact: true,
+      }),
+    })
+    .click();
+}
+
+function sheet(page: Page, name: string) {
+  return page.getByRole("dialog", { name });
+}
+
+test("lists outstanding work across queue filters and keeps the filters after review", async ({
   page,
   local,
 }) => {
-  await login(page, "combined");
-  await page.getByLabel("Status").selectOption("resolved");
+  await login(page, "combined", desktop);
+  const filters = page.getByRole("group", { name: "Filter by status" });
+  await filters.getByRole("button", { name: /^Resolved/ }).click();
   await page.getByRole("combobox", { name: "Find a team" }).fill("Aurora");
   await page.getByRole("option", { name: /Aurora/ }).click();
-  await page.locator(".issue-card").filter({ hasText: "ISS-3" }).click();
-  await expect(page.locator("#issue-heading")).toHaveText("Issue 3 verification");
-  const before = await page.locator(".issue-card").allTextContents();
-  await openWorklist(page);
-  const decisions = section(page, "Needs decision");
-  const applications = section(page, "Pending external application");
-  await expect(decisions.getByRole("article")).toHaveCount(2);
-  await expect(applications.getByRole("article")).toHaveCount(2);
-  expect(
-    await decisions
-      .getByRole("article")
-      .evaluateAll((rows) => rows.map((row) => row.getAttribute("aria-label"))),
-  ).toEqual(["Issue ISS-1", "Issue ISS-2"]);
+  const table = page.getByRole("table", { name: "Issue queue" });
+  const before = await table.getByRole("row").allInnerTexts();
+  await page.getByRole("button", { name: "Open ISS-3", exact: true }).click();
   await expect(
-    applications.getByRole("article", { name: "Issue ISS-3", exact: true }),
-  ).toContainText("0 minutes awarded");
+    page.getByRole("dialog", { name: "ISS-3: Issue 3 verification" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Close issue" }).click();
   await expect(
-    applications.getByRole("article", { name: "Issue ISS-4", exact: true }),
-  ).toContainText("Reopened");
-  await expect(
-    page.getByRole("article", { name: "Issue ISS-5", exact: true }),
-  ).toHaveCount(0);
-  await expect(
-    page.getByRole("article", { name: "Issue ISS-6", exact: true }),
-  ).toHaveCount(0);
+    page.getByRole("button", { name: "Open ISS-3", exact: true }),
+  ).toBeFocused();
+
+  await openAwards(page);
+  await expectCounts(page, { decide: 2, apply: 2, done: 1 });
+  // Oldest resolution first.
+  expect(await issueNumbers(page, "To decide")).toEqual(["ISS-1", "ISS-2"]);
+  await expect(row(page, 1)).toContainText("Resolution 1: service restored");
+  await expect(row(page, 6)).toHaveCount(0);
+  await showList(page, "To apply");
+  // Oldest decision first. A zero award and a reopened issue still wait.
+  expect(await issueNumbers(page, "To apply")).toEqual(["ISS-3", "ISS-4"]);
+  await expect(row(page, 3)).toContainText("+0 min");
+  await expect(row(page, 4)).toContainText("Reopened · In progress");
+  await expect(row(page, 4)).toContainText(
+    "This award relates to an earlier resolution.",
+  );
+  await expect(row(page, 4)).toContainText(
+    "Award resolution: Resolution 4: service restored",
+  );
+  await expect(row(page, 5)).toHaveCount(0);
+  await expect(row(page, 6)).toHaveCount(0);
+  await showList(page, "Applied");
+  expect(await issueNumbers(page, "Applied")).toEqual(["ISS-5"]);
+  await expect(row(page, 5)).toContainText("Applied externally");
+
+  // T0015 has no "Back to jury worklist" button. Closing the side sheet
+  // returns focus to the award card button that opened it.
+  await showList(page, "To apply");
   const target = page.getByRole("button", {
-    name: "View issue ISS-4",
+    name: "Issue 4 verification",
     exact: true,
   });
   await target.focus();
   await page.keyboard.press("Enter");
-  await expect(page.locator("#issue-heading")).toBeFocused();
-  await page.getByRole("button", { name: "Back to jury worklist" }).click();
+  const issueSheet = page.getByRole("dialog", {
+    name: "ISS-4: Issue 4 verification",
+  });
+  await expect(issueSheet).toBeVisible();
+  await expect(
+    issueSheet.getByRole("tab", { name: "Outcome & award" }),
+  ).toHaveAttribute("aria-selected", "true");
+  await page.keyboard.press("Escape");
+  await expect(issueSheet).toHaveCount(0);
   await expect(target).toBeFocused();
-  await page
-    .getByRole("navigation")
-    .getByRole("button", { name: "Issues", exact: true })
-    .click();
-  await expect(page.getByLabel("Status")).toHaveValue("resolved");
-  await expect(page.getByRole("combobox", { name: "Find a team" })).toHaveValue("Aurora");
-  await expect(page.locator("#issue-heading")).toHaveText("Issue 3 verification");
-  expect(await page.locator(".issue-card").allTextContents()).toEqual(before);
+
+  await consolePages(page).getByRole("button", { name: /^Queue/ }).click();
+  await expect(filters.getByRole("button", { name: /^Resolved/ })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await expect(page.getByRole("combobox", { name: "Find a team" })).toHaveValue(
+    /Aurora/,
+  );
+  expect(await table.getByRole("row").allInnerTexts()).toEqual(before);
   expect((await local.snapshot()).awards).toHaveLength(3);
+});
+
+test("phone Awards tab keeps the queue filter and Back returns focus to the card", async ({
+  page,
+  local,
+}) => {
+  await login(page, "combined");
+  const chips = page.getByRole("group", { name: "Filter the queue" });
+  await chips.getByRole("button", { name: /^Resolved/ }).click();
+  await openAwards(page);
+  await expectCounts(page, { decide: 2, apply: 2, done: 1 });
+  expect(await issueNumbers(page, "To decide")).toEqual(["ISS-1", "ISS-2"]);
+  await showList(page, "To apply");
+  expect(await issueNumbers(page, "To apply")).toEqual(["ISS-3", "ISS-4"]);
+  const card = page.locator(`#issue-card-${local.issues[3]}`);
+  await card.click();
+  await expect(phoneIssueHeading(page, 4)).toBeFocused();
+  await page.getByRole("button", { name: "Back", exact: true }).click();
+  // The Awards tab opens on "To decide" again, so focus goes to the heading
+  // when the card is in another list.
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Awards", exact: true }),
+  ).toBeFocused();
+  await page.locator(`#issue-card-${local.issues[0]}`).click();
+  await expect(phoneIssueHeading(page, 1)).toBeFocused();
+  await page.getByRole("button", { name: "Back", exact: true }).click();
+  await expect(page.locator(`#issue-card-${local.issues[0]}`)).toBeFocused();
+  await phoneTabs(page).getByRole("button", { name: "Queue", exact: true }).click();
+  await expect(chips.getByRole("button", { name: /^Resolved/ })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
 });
 
 test("jury-only members record an explicit zero and can confirm a reopened issue's earlier award", async ({
@@ -98,70 +259,77 @@ test("jury-only members record an explicit zero and can confirm a reopened issue
   local,
 }) => {
   await login(page);
+  // Jury-only members see resolved issues only in the ordinary lists.
   await expect(
-    page.locator(".issue-card").filter({ hasText: "ISS-4" }),
+    phoneTabs(page).getByRole("button", { name: "Queue", exact: true }),
   ).toHaveCount(0);
-  await openWorklist(page);
-  await page
-    .getByRole("button", { name: "View issue ISS-1", exact: true })
-    .click();
-  const time = await page.locator(".elapsed-time").innerText();
-  await page.getByLabel("Award minutes").selectOption("0");
-  await page
+  await phoneTabs(page).getByRole("button", { name: "Find", exact: true }).click();
+  await page.getByRole("button", { name: /^Cedar/ }).click();
+  await expect(page.getByText("ISS-2", { exact: true })).toBeVisible();
+  await expect(page.getByText("ISS-4", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("ISS-6", { exact: true })).toHaveCount(0);
+
+  await openAwards(page);
+  const time = (await row(page, 1).innerText()).match(/\d+:\d\d(:\d\d)?/)?.[0];
+  expect(time).toBeTruthy();
+  await row(page, 1).getByRole("button", { name: "Decide award" }).click();
+  const award = sheet(page, "Decide award");
+  await chooseMinutes(award, 0);
+  await award
     .getByLabel("Public award explanation")
     .fill("Reviewed: no adjustment required.");
-  await page.getByRole("button", { name: "Record award", exact: true }).click();
+  await award.getByRole("button", { name: "Record 0 minutes" }).click();
+  await expect(award).toHaveCount(0);
+  await expect(page.getByRole("region", { name: "Time award" })).toContainText(
+    "+0 min",
+  );
+  await expect(page.getByRole("region", { name: "Time award" })).toContainText(
+    "Pending external application",
+  );
+  await page.getByRole("button", { name: "Back", exact: true }).click();
   await expect(
-    page.getByText("0 minutes awarded", { exact: true }),
-  ).toBeVisible();
-  await page.getByRole("button", { name: "Back to jury worklist" }).click();
-  await expect(
-    section(page, "Needs decision").getByRole("heading"),
+    page.getByRole("heading", { level: 1, name: "Awards", exact: true }),
   ).toBeFocused();
-  await expect(
-    section(page, "Needs decision").getByRole("article"),
-  ).toHaveCount(1);
-  await expect(
-    section(page, "Pending external application").getByRole("article"),
-  ).toHaveCount(3);
-  await expect(
-    page.getByRole("article", { name: "Issue ISS-1", exact: true }),
-  ).toContainText(time);
+  await expectCounts(page, { decide: 1, apply: 3, done: 1 });
+  await showList(page, "To apply");
+  await expect(row(page, 1)).toContainText(time!);
+  await expect(row(page, 1)).toContainText("+0 min");
   expect(
     (await local.snapshot()).awards.find(
-      (award) => award.issue_id === local.issues[0],
+      (item) => item.issue_id === local.issues[0],
     )?.applied_at,
   ).toBeNull();
-  await page
-    .getByRole("button", { name: "View issue ISS-4", exact: true })
-    .click();
-  await expect(
-    page.getByText(
-      "This decision relates to an earlier resolution. One award is allowed per issue.",
-    ),
-  ).toBeVisible();
+
+  await row(page, 4).locator(`#issue-card-${local.issues[3]}`).click();
+  await expect(phoneIssueHeading(page, 4)).toBeFocused();
+  await expect(page.getByRole("region", { name: "Time award" })).toContainText(
+    "This decision relates to an earlier resolution. One award is allowed per issue.",
+  );
   await expect(
     page.getByRole("button", {
-      name: /Record award|Reopen issue|Claim issue|Resolve issue/,
+      name: /^(Decide award|Reopen|Claim|Resolve)$/,
     }),
   ).toHaveCount(0);
-  await page.getByRole("checkbox").check();
-  await page
-    .getByRole("button", { name: "Confirm applied externally" })
-    .click();
+  await page.getByRole("button", { name: "Confirm applied", exact: true }).click();
+  const apply = sheet(page, "Confirm external application");
+  await apply.getByRole("checkbox").check();
+  await apply.getByRole("button", { name: "Confirm applied externally" }).click();
+  // The reopened issue leaves the jury-only member's lists, so the view
+  // closes with a status message and focus moves to the tab heading.
+  await expect(page.getByRole("status").filter({ hasText: "ISS-4 is no longer in your lists." })).toBeVisible();
   await expect(
-    section(page, "Pending external application").getByRole("heading"),
+    page.getByRole("heading", { level: 1, name: "Awards", exact: true }),
   ).toBeFocused();
-  await expect(
-    page.getByRole("button", { name: "View issue ISS-4", exact: true }),
-  ).toHaveCount(0);
+  await expectCounts(page, { decide: 1, apply: 2, done: 1 });
+  await showList(page, "To apply");
+  await expect(row(page, 4)).toHaveCount(0);
   const current = await local.snapshot();
   expect(
-    current.awards.find((award) => award.issue_id === local.issues[3])
+    current.awards.find((item) => item.issue_id === local.issues[3])
       ?.applied_at,
   ).not.toBeNull();
   expect(
-    current.issues.find((issue) => issue.id === local.issues[3])?.status,
+    current.issues.find((item) => item.id === local.issues[3])?.status,
   ).toBe("claimed");
 });
 
@@ -175,20 +343,18 @@ test("two simulated Realtime clients refresh decisions and confirmations without
   const second = await other.newPage();
   try {
     await login(page);
-    await login(second, "combined");
-    await openWorklist(page);
-    await openWorklist(second);
-    await page
-      .getByRole("button", { name: "View issue ISS-1", exact: true })
-      .click();
-    const draft = page.getByLabel("Public award explanation");
+    await login(second, "combined", desktop);
+    await openAwards(page);
+    await openAwards(second);
+    await row(page, 1).getByRole("button", { name: "Decide award" }).click();
+    const draft = sheet(page, "Decide award").getByLabel(
+      "Public award explanation",
+    );
     await draft.fill("Draft under review");
     await draft.focus();
-    await second
-      .getByRole("button", { name: "View issue ISS-2", exact: true })
-      .click();
-    await second.getByLabel("Award minutes").selectOption("5");
-    await second
+    const card = row(second, 2);
+    await chooseMinutes(card, 5);
+    await card
       .getByLabel("Public award explanation")
       .fill("Five minutes approved");
     // Match the other issue's award so an earlier or in-flight read cannot pass.
@@ -201,35 +367,40 @@ test("two simulated Realtime clients refresh decisions and confirmations without
       const state = snapshotSchema.parse(await response.json());
       return state.awards.some((award) => award.issue_id === local.issues[1]);
     });
-    await second
-      .getByRole("button", { name: "Record award", exact: true })
-      .click();
-    await expect(
-      second.getByText("5 minutes awarded", { exact: true }),
-    ).toBeVisible();
+    await card.getByRole("button", { name: "Record 5 minutes" }).click();
+    // A recorded command opens its issue in the side sheet.
+    const recorded = second.getByRole("dialog", {
+      name: "ISS-2: Issue 2 verification",
+    });
+    await expect(recorded).toContainText("5 minutes awarded");
+    await recorded.getByRole("button", { name: "Close issue" }).click();
+    await expect(recorded).toHaveCount(0);
+    await expect(row(second, 2)).toHaveCount(0);
+    await expectCounts(second, { decide: 1, apply: 3, done: 1 });
     await (await updatedSnapshot).finished();
     await expect(draft).toHaveValue("Draft under review");
     await expect(draft).toBeFocused();
-    await page.getByRole("button", { name: "Back to jury worklist" }).click();
-    await expect(
-      section(page, "Needs decision").getByRole("article"),
-    ).toHaveCount(1);
-    await expect(
-      section(page, "Pending external application").getByRole("article"),
-    ).toHaveCount(3);
-    await page
-      .getByRole("button", { name: "View issue ISS-2", exact: true })
+    await sheet(page, "Decide award")
+      .getByRole("button", { name: "Cancel" })
       .click();
-    await page.getByRole("checkbox").check();
-    await page
+    await page.getByRole("button", { name: "Back", exact: true }).click();
+    await expectCounts(page, { decide: 1, apply: 3, done: 1 });
+    await showList(page, "To apply");
+    await expect(row(page, 2)).toContainText("+5 min");
+    await row(page, 2)
       .getByRole("button", { name: "Confirm applied externally" })
       .click();
-    await expect(
-      second.getByRole("button", { name: "View issue ISS-2", exact: true }),
-    ).toHaveCount(0);
-    await expect(
-      section(second, "Pending external application").getByRole("article"),
-    ).toHaveCount(2);
+    const apply = sheet(page, "Confirm external application");
+    await apply.getByRole("checkbox").check();
+    await apply
+      .getByRole("button", { name: "Confirm applied externally" })
+      .click();
+    await expect(apply).toHaveCount(0);
+    await showList(second, "To apply");
+    await expect(row(second, 2)).toHaveCount(0);
+    await expectCounts(second, { decide: 1, apply: 2, done: 2 });
+    await showList(second, "Applied");
+    await expect(row(second, 2)).toContainText("Applied externally");
   } finally {
     await other.close();
   }
@@ -240,23 +411,20 @@ test("retry after a lost response uses the original transaction without duplicat
   local,
 }) => {
   await login(page);
-  await openWorklist(page);
-  await page
-    .getByRole("button", { name: "View issue ISS-1", exact: true })
-    .click();
-  await page.getByLabel("Award minutes").selectOption("10");
-  await page
-    .getByLabel("Public award explanation")
-    .fill("Ten minutes reviewed");
+  await openAwards(page);
+  await row(page, 1).getByRole("button", { name: "Decide award" }).click();
+  const award = sheet(page, "Decide award");
+  await chooseMinutes(award, 10);
+  await award.getByLabel("Public award explanation").fill("Ten minutes reviewed");
   local.loseNextResponse();
-  await page.getByRole("button", { name: "Record award", exact: true }).click();
-  await page.getByRole("button", { name: "Retry last request" }).click();
-  await expect(
-    page.getByRole("button", { name: "Retry last request" }),
-  ).toHaveCount(0);
+  await award.getByRole("button", { name: "Record 10 minutes" }).click();
+  const retry = page.getByRole("button", { name: "Retry last request" });
+  await expect(retry).toBeEnabled();
+  await retry.click();
+  await expect(retry).toHaveCount(0);
   const state = await local.snapshot();
   expect(
-    state.awards.filter((award) => award.issue_id === local.issues[0]),
+    state.awards.filter((item) => item.issue_id === local.issues[0]),
   ).toHaveLength(1);
   expect(
     state.history.filter(
@@ -267,10 +435,8 @@ test("retry after a lost response uses the original transaction without duplicat
   ).toHaveLength(1);
   expect(local.workflowRequests).toHaveLength(2);
   expect(local.workflowRequests[1]).toEqual(local.workflowRequests[0]);
-  await page.getByRole("button", { name: "Back to jury worklist" }).click();
-  await expect(
-    section(page, "Pending external application").getByRole("article"),
-  ).toHaveCount(3);
+  await page.getByRole("button", { name: "Back", exact: true }).click();
+  await expectCounts(page, { decide: 1, apply: 3, done: 1 });
 });
 
 test("retry after a lost confirmation response preserves one application and history record", async ({
@@ -278,25 +444,35 @@ test("retry after a lost confirmation response preserves one application and his
   local,
 }) => {
   await login(page);
-  await openWorklist(page);
-  await page.getByRole("button", { name: "View issue ISS-4", exact: true }).click();
-  await page.getByRole("checkbox").check();
+  await openAwards(page);
+  await showList(page, "To apply");
+  await row(page, 4)
+    .getByRole("button", { name: "Confirm applied externally" })
+    .click();
+  const apply = sheet(page, "Confirm external application");
+  await apply.getByRole("checkbox").check();
   local.loseNextResponse();
-  await page.getByRole("button", { name: "Confirm applied externally" }).click();
-  await expect(page.getByRole("button", { name: "Retry last request" })).toBeEnabled();
+  await apply.getByRole("button", { name: "Confirm applied externally" }).click();
+  const retry = page.getByRole("button", { name: "Retry last request" });
+  await expect(retry).toBeEnabled();
   const committed = await local.snapshot();
-  const applied = committed.awards.find((award) => award.issue_id === local.issues[3]);
-  expect(applied?.applied_at).not.toBeNull();
-  await page.getByRole("button", { name: "Retry last request" }).click();
-  await expect(page.getByRole("button", { name: "Retry last request" })).toHaveCount(0);
-  const retried = await local.snapshot();
-  expect(retried.awards.find((award) => award.issue_id === local.issues[3])).toEqual(applied);
-  expect(retried.history.filter((item) => item.issue_id === local.issues[3])).toEqual(
-    committed.history.filter((item) => item.issue_id === local.issues[3]),
+  const applied = committed.awards.find(
+    (item) => item.issue_id === local.issues[3],
   );
-  expect(retried.history.filter((item) => item.issue_id === local.issues[3])).toHaveLength(1);
+  expect(applied?.applied_at).not.toBeNull();
+  await retry.click();
+  await expect(retry).toHaveCount(0);
+  const retried = await local.snapshot();
+  expect(
+    retried.awards.find((item) => item.issue_id === local.issues[3]),
+  ).toEqual(applied);
+  const history = (state: typeof committed) =>
+    state.history.filter((item) => item.issue_id === local.issues[3]);
+  expect(history(retried)).toEqual(history(committed));
+  expect(history(retried)).toHaveLength(1);
   expect(local.workflowRequests).toHaveLength(2);
   expect(local.workflowRequests[1]).toEqual(local.workflowRequests[0]);
+  await expectCounts(page, { decide: 2, apply: 1, done: 1 });
 });
 
 test("live reopening removes a decision and re-resolution uses the current evidence", async ({
@@ -304,38 +480,58 @@ test("live reopening removes a decision and re-resolution uses the current evide
   local,
 }) => {
   await login(page);
-  await openWorklist(page);
-  await page.getByRole("button", { name: "View issue ISS-1", exact: true }).click();
-  await page.getByLabel("Public award explanation").fill("Do not carry this draft.");
-  const issue = (await local.snapshot()).issues.find((item) => item.id === local.issues[0])!;
+  await openAwards(page);
+  await row(page, 1).getByRole("button", { name: "Decide award" }).click();
+  await sheet(page, "Decide award")
+    .getByLabel("Public award explanation")
+    .fill("Do not carry this draft.");
+  const issue = (await local.snapshot()).issues.find(
+    (item) => item.id === local.issues[0],
+  )!;
   await local.act(local.users.volunteer, {
     type: "reopen",
     issue_id: issue.id,
     revision: issue.revision,
     reason: "Failure returned",
   });
-  await expect(section(page, "Needs decision").getByRole("heading")).toBeFocused();
-  await expect(page.getByRole("button", { name: "View issue ISS-1", exact: true })).toHaveCount(0);
-  await page.getByRole("button", { name: "View issue ISS-2", exact: true }).click();
-  await expect(page.getByLabel("Public award explanation")).toHaveValue("");
-  await page.getByRole("button", { name: "Back to jury worklist" }).click();
-  const reopened = (await local.snapshot()).issues.find((item) => item.id === issue.id)!;
+  await expect(sheet(page, "Decide award")).toHaveCount(0);
+  await expect(
+    page.getByRole("status").filter({ hasText: "ISS-1 is no longer in your lists." }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Awards", exact: true }),
+  ).toBeFocused();
+  await expect(row(page, 1)).toHaveCount(0);
+  await expectCounts(page, { decide: 1, apply: 2, done: 1 });
+  await row(page, 2).getByRole("button", { name: "Decide award" }).click();
+  await expect(
+    sheet(page, "Decide award").getByLabel("Public award explanation"),
+  ).toHaveValue("");
+  await sheet(page, "Decide award").getByRole("button", { name: "Cancel" }).click();
+  await page.getByRole("button", { name: "Back", exact: true }).click();
+  const reopened = (await local.snapshot()).issues.find(
+    (item) => item.id === issue.id,
+  )!;
   await local.act(local.users.volunteer, {
     type: "resolve",
     issue_id: issue.id,
     revision: reopened.revision,
     summary: "Replacement service verified",
   });
-  await expect(section(page, "Needs decision").getByRole("article")).toHaveCount(2);
-  await expect(section(page, "Needs decision").getByRole("article").last()).toHaveAttribute("aria-label", "Issue ISS-1");
-  await expect(page.getByRole("article", { name: "Issue ISS-1", exact: true })).toContainText("Replacement service verified");
+  await expectCounts(page, { decide: 2, apply: 2, done: 1 });
+  expect(await issueNumbers(page, "To decide")).toEqual(["ISS-2", "ISS-1"]);
+  await expect(row(page, 1)).toContainText(
+    "Resolution: Replacement service verified",
+  );
 });
 
 test("existing details retain public and internal separation and team/session isolation", async ({
   page,
   local,
 }) => {
-  const resolved = (await local.snapshot()).issues.find((item) => item.id === local.issues[0])!;
+  const resolved = (await local.snapshot()).issues.find(
+    (item) => item.id === local.issues[0],
+  )!;
   await local.act(local.users.volunteer, {
     type: "reopen",
     issue_id: resolved.id,
@@ -343,21 +539,39 @@ test("existing details retain public and internal separation and team/session is
     reason: "Check conversation visibility while support is active",
   });
   for (const visibility of ["public", "internal"] as const) {
-    const issue = (await local.snapshot()).issues.find((item) => item.id === local.issues[0])!;
+    const issue = (await local.snapshot()).issues.find(
+      (item) => item.id === local.issues[0],
+    )!;
     await local.act(local.users.volunteer, {
       type: "message",
       issue_id: issue.id,
       revision: issue.revision,
       visibility,
-      text: visibility === "public" ? "Public service update" : "Private staff investigation",
+      text:
+        visibility === "public"
+          ? "Public service update"
+          : "Private staff investigation",
     });
   }
   const contestant = await local.snapshot(local.users.contestant);
-  expect(contestant.issues.every((issue) => issue.team_id === local.teams[0])).toBe(true);
-  expect(contestant.history.some((entry) => entry.text === "Public service update")).toBe(true);
-  expect(contestant.history.some((entry) => entry.text === "Private staff investigation")).toBe(false);
-  expect((await local.snapshot(local.users.jury, local.sessions[1])).issues).toEqual([]);
-  const denied = await local.snapshot(local.users.contestant, local.sessions[1]);
+  expect(
+    contestant.issues.every((issue) => issue.team_id === local.teams[0]),
+  ).toBe(true);
+  expect(
+    contestant.history.some((entry) => entry.text === "Public service update"),
+  ).toBe(true);
+  expect(
+    contestant.history.some(
+      (entry) => entry.text === "Private staff investigation",
+    ),
+  ).toBe(false);
+  expect(
+    (await local.snapshot(local.users.jury, local.sessions[1])).issues,
+  ).toEqual([]);
+  const denied = await local.snapshot(
+    local.users.contestant,
+    local.sessions[1],
+  );
   expect(denied).toMatchObject({
     session: null,
     event: null,
@@ -371,12 +585,17 @@ test("existing details retain public and internal separation and team/session is
     members: [],
   });
 
-  await login(page, "contestant");
-  await page.locator(".issue-card").filter({ hasText: "ISS-1" }).click();
-  await expect(page.getByText("Public service update", { exact: true })).toBeVisible();
-  await expect(page.getByText("Private staff investigation", { exact: true })).toHaveCount(0);
-  await expect(page.locator(".issue-card").filter({ hasText: "ISS-2" })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Jury worklist", exact: true })).toHaveCount(0);
+  await login(page, "contestant", desktop);
+  const reports = page.getByRole("navigation", { name: "Reports" });
+  await reports.getByRole("button", { name: /ISS-1 ·/ }).click();
+  await expect(
+    page.getByText("Public service update", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("Private staff investigation", { exact: true }),
+  ).toHaveCount(0);
+  await expect(reports.getByRole("button", { name: /ISS-2 ·/ })).toHaveCount(0);
+  await expect(page.getByText(/Award review|Awards/)).toHaveCount(0);
 });
 
 test("session and role changes clear selection and do not grant other roles a jury entry", async ({
@@ -389,40 +608,55 @@ test("session and role changes clear selection and do not grant other roles a ju
     await local.attach(context);
     const member = await context.newPage();
     await login(member, name);
-    await expect(
-      member.getByRole("button", { name: "Jury worklist", exact: true }),
-    ).toHaveCount(0);
+    if (name === "contestant") {
+      await expect(member.getByText(/Award review|Awards/)).toHaveCount(0);
+    } else {
+      await expect(
+        phoneTabs(member).getByRole("button", { name: "Awards" }),
+      ).toHaveCount(0);
+      await member.setViewportSize(desktop);
+      await expect(
+        member.locator('[data-ui="organiser-desktop"]'),
+      ).toBeVisible();
+      await expect(
+        consolePages(member).getByRole("button", { name: /^Award review/ }),
+      ).toHaveCount(0);
+    }
     await context.close();
   }
+
   await login(page);
-  await openWorklist(page);
-  await page
-    .getByRole("button", { name: "View issue ISS-1", exact: true })
-    .click();
-  await page.getByLabel("Contest session").selectOption(local.sessions[1]);
+  await openAwards(page);
+  await page.locator(`#issue-card-${local.issues[0]}`).click();
+  await expect(phoneIssueHeading(page, 1)).toBeFocused();
+  await page.getByRole("button", { name: "Back", exact: true }).click();
+  await phoneTabs(page).getByRole("button", { name: "Me", exact: true }).click();
+  await page.getByRole("radio", { name: "Secondary" }).check();
+  // The jury member is a volunteer in the second session.
   await expect(
-    page.getByRole("button", { name: "Jury worklist", exact: true }),
+    phoneTabs(page).getByRole("button", { name: "Awards" }),
   ).toHaveCount(0);
-  await expect(
-    page.getByRole("heading", { name: "Issue Queue", exact: true }),
-  ).toBeVisible();
-  await expect(page.locator("#issue-heading")).toHaveCount(0);
-  await page.getByLabel("Contest session").selectOption(local.sessions[0]);
-  await openWorklist(page);
-  await expect(
-    page.getByRole("button", { name: "Back to jury worklist" }),
-  ).toHaveCount(0);
-  await page.getByRole("button", { name: "View issue ISS-1", exact: true }).click();
-  await page.getByLabel("Public award explanation").fill("Role change draft");
+  await phoneTabs(page).getByRole("button", { name: "Queue", exact: true }).click();
+  await expect(page.getByText("Reports will appear here when they are submitted.")).toBeVisible();
+  await phoneTabs(page).getByRole("button", { name: "Me", exact: true }).click();
+  await page.getByRole("radio", { name: "Primary" }).check();
+  await openAwards(page);
+  await row(page, 1).getByRole("button", { name: "Decide award" }).click();
+  await sheet(page, "Decide award")
+    .getByLabel("Public award explanation")
+    .fill("Role change draft");
   await local.db.query(
     "update public.memberships set roles=array['volunteer'] where user_id=$1 and session_id=$2",
     [local.users.jury, local.sessions[0]],
   );
   local.broadcast();
-  await expect(
-    page.getByRole("button", { name: "Jury worklist", exact: true }),
-  ).toHaveCount(0);
+  // The award form closes because the person can no longer decide awards.
+  await expect(sheet(page, "Decide award")).toHaveCount(0);
   await expect(page.getByLabel("Public award explanation")).toHaveCount(0);
+  await page.getByRole("button", { name: "Back", exact: true }).click();
+  await expect(
+    phoneTabs(page).getByRole("button", { name: "Awards" }),
+  ).toHaveCount(0);
   await local.db.query("delete from public.memberships where user_id=$1", [
     local.users.jury,
   ]);
@@ -430,35 +664,49 @@ test("session and role changes clear selection and do not grant other roles a ju
   await expect(
     page.getByRole("heading", { name: "Session access" }),
   ).toBeVisible();
-  await expect(page.getByRole("article")).toHaveCount(0);
+  await expect(page.getByRole("listitem")).toHaveCount(0);
 });
 
 test("archived details remain readable, while failed reads cannot masquerade as empty lists", async ({
   page,
   local,
 }) => {
-  await login(page);
-  await openWorklist(page);
-  await page.getByRole("button", { name: "View issue ISS-1", exact: true }).click();
-  await expect(page.getByRole("button", { name: "Record award", exact: true })).toBeEnabled();
+  await login(page, "jury", desktop);
+  await openAwards(page);
+  await expect(
+    row(page, 1).getByRole("button", { name: "Record award" }),
+  ).toBeVisible();
   await local.db.query("update public.events set archived=true where id=$1", [
     local.event,
   ]);
   local.broadcast();
   await expect(
-    page.getByText("This event is archived. Records are read only."),
+    page.getByText("This event is archived. Records are read only.").first(),
   ).toBeVisible();
-  await expect(
-    page.getByRole("button", { name: "Record award", exact: true }),
-  ).toBeDisabled();
-  await page.getByRole("button", { name: "Back to jury worklist" }).click();
-  await page
-    .getByRole("button", { name: "View issue ISS-4", exact: true })
-    .click();
+  await expect(page.getByRole("button", { name: /^Record/ })).toHaveCount(0);
+  await expect(row(page, 1)).toContainText("Resolution 1: service restored");
+  await showList(page, "To apply");
+  await expect(row(page, 4)).toContainText("+5 min");
   await expect(
     page.getByRole("button", { name: "Confirm applied externally" }),
-  ).toBeDisabled();
-  await page.getByRole("button", { name: "Back to jury worklist" }).click();
+  ).toHaveCount(0);
+  await page.getByRole("button", { name: "Issue 4 verification" }).click();
+  const issueSheet = page.getByRole("dialog", {
+    name: "ISS-4: Issue 4 verification",
+  });
+  await expect(issueSheet).toContainText("Decision 4 explanation");
+  await expect(issueSheet.getByRole("button", { name: "Confirm applied" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Close issue" }).click();
+
+  await page.setViewportSize(phone);
+  await expect(page.locator('[data-ui="organiser-phone"]')).toBeVisible();
+  await openAwards(page);
+  await expect(row(page, 1)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Decide award" })).toHaveCount(0);
+  await page.locator(`#issue-card-${local.issues[0]}`).click();
+  await expect(page.getByText("This event is archived.", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Back", exact: true }).click();
+
   await page.route("**/rpc/session_snapshot", (route) =>
     route.fulfill({
       status: 503,
@@ -466,13 +714,11 @@ test("archived details remain readable, while failed reads cannot masquerade as 
     }),
   );
   await page.evaluate(() => window.dispatchEvent(new Event("focus")));
-  await expect(page.getByRole("alert")).toContainText(
+  await expect(page.getByRole("alert").first()).toContainText(
     "Verification read unavailable",
   );
-  await expect(
-    page.getByText("No resolved issues need a decision."),
-  ).toHaveCount(0);
-  await expect(page.getByRole("article")).toHaveCount(0);
+  await expect(page.getByText("Nothing in this list.")).toHaveCount(0);
+  await expect(page.getByText(/ISS-\d/)).toHaveCount(0);
 });
 
 test("refresh, empty states, desktop, phone layouts and zoom reflow remain usable without app errors", async ({
@@ -485,30 +731,41 @@ test("refresh, empty states, desktop, phone layouts and zoom reflow remain usabl
     if (message.type() === "error" || message.type() === "warning")
       errors.push(message.text());
   });
-  await login(page);
-  await openWorklist(page);
+  await login(page, "jury", desktop);
+  await openAwards(page);
   await expect(page).toHaveTitle("Minsky");
-  await expect(
-    page.getByRole("heading", { name: "Jury worklist", exact: true }),
-  ).toBeVisible();
   await page.screenshot({
     path: testInfo.outputPath("jury-desktop.png"),
     fullPage: true,
   });
+  await showList(page, "To apply");
+  const award = page.getByRole("button", {
+    name: "Issue 4 verification",
+    exact: true,
+  });
+  await award.click();
+  await expect(
+    page.getByRole("dialog", { name: "ISS-4: Issue 4 verification" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Close issue" }).click();
+  await expect(award).toBeFocused();
+
   for (const width of [390, 320, 720]) {
     await page.setViewportSize({ width, height: 844 });
+    await expect(page.locator('[data-ui="organiser-phone"]')).toBeVisible();
+    if (width === 390) await openAwards(page);
+    await showList(page, "To apply");
     expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth <= window.innerWidth,
       ),
     ).toBe(true);
-    await page
-      .getByRole("button", { name: "View issue ISS-4", exact: true })
-      .click();
-    await expect(page.locator("#issue-heading")).toBeFocused();
-    await page.getByRole("button", { name: "Back to jury worklist" }).click();
+    const card = page.locator(`#issue-card-${local.issues[3]}`);
+    await card.click();
+    await expect(phoneIssueHeading(page, 4)).toBeFocused();
+    await page.getByRole("button", { name: "Back", exact: true }).click();
     await expect(
-      page.getByRole("button", { name: "View issue ISS-4", exact: true }),
+      page.getByRole("heading", { level: 1, name: "Awards", exact: true }),
     ).toBeFocused();
     await page.screenshot({
       path: testInfo.outputPath(`jury-${width}.png`),
@@ -516,6 +773,7 @@ test("refresh, empty states, desktop, phone layouts and zoom reflow remain usabl
     });
   }
   await page.setViewportSize({ width: 1440, height: 900 });
+  await expect(page.locator('[data-ui="organiser-desktop"]')).toBeVisible();
   await page.evaluate(() => {
     document.documentElement.style.zoom = "2";
   });
@@ -531,14 +789,14 @@ test("refresh, empty states, desktop, phone layouts and zoom reflow remain usabl
   await page.evaluate(() => {
     document.documentElement.style.zoom = "";
   });
+  await page.setViewportSize(phone);
   await page.reload();
-  await openWorklist(page);
-  await expect(
-    section(page, "Needs decision").getByRole("article"),
-  ).toHaveCount(2);
+  await expect(page.locator('[data-ui="organiser-phone"]')).toBeVisible();
+  await openAwards(page);
+  await expectCounts(page, { decide: 2, apply: 2, done: 1 });
   for (const id of local.issues.slice(0, 2)) {
     const issue = (await local.snapshot()).issues.find(
-      (issue) => issue.id === id,
+      (item) => item.id === id,
     )!;
     await local.act(local.users.jury, {
       type: "award",
@@ -548,11 +806,11 @@ test("refresh, empty states, desktop, phone layouts and zoom reflow remain usabl
       explanation: "No adjustment required",
     });
   }
-  for (const award of (await local.snapshot()).awards.filter(
-    (award) => !award.applied_at,
+  for (const item of (await local.snapshot()).awards.filter(
+    (entry) => !entry.applied_at,
   )) {
     const issue = (await local.snapshot()).issues.find(
-      (issue) => issue.id === award.issue_id,
+      (entry) => entry.id === item.issue_id,
     )!;
     await local.act(local.users.jury, {
       type: "apply",
@@ -560,11 +818,9 @@ test("refresh, empty states, desktop, phone layouts and zoom reflow remain usabl
       revision: issue.revision,
     });
   }
-  await expect(
-    page.getByText("No resolved issues need a decision."),
-  ).toBeVisible();
-  await expect(
-    page.getByText("No awards are awaiting external application."),
-  ).toBeVisible();
+  await expectCounts(page, { decide: 0, apply: 0, done: 4 });
+  await expect(page.getByText("Nothing in this list.")).toBeVisible();
+  await showList(page, "To apply");
+  await expect(page.getByText("Nothing in this list.")).toBeVisible();
   expect(errors).toEqual([]);
 });

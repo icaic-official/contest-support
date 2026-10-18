@@ -9,8 +9,9 @@ The SQL strings, statement order, bound values, assertions, and atomic batch rem
 UI lint rules now reject provider SDKs and implementation imports. The contributor guide documents the existing boundaries and reuse.
 The shared registry retains its original eight cases and adds account creation, image-limit boundaries, and reconnect recovery.
 The duplicate committed-response fault handlers now share one implementation. The progress reporter derives duration from its existing active-case map.
+A cleanup collision regression also preserves an unrelated account and its authentication counter when a planned account was never created. Cleanup requires a proved, retained ID before deleting that created-account username counter.
 
-The follow-up passes 656 local unit/database/tooling tests, 46 ordinary browser cases, 70 local D1 cases, 12 function cases, three authentication browser cases, three docs browser cases, and both complete local runtime journeys. Types, lint, app build, and docs build pass.
+The follow-up passes 657 local unit/database/tooling tests, 46 ordinary browser cases, 70 local D1 cases, 12 function cases, three authentication browser cases, three docs browser cases, and both complete local runtime journeys. Types, lint, app build, and docs build pass.
 The earlier source `0254f60` passed 646 local tests, both API store suites, ordinary CI, and [protected native verification](https://github.com/GiftedNovaHD/minsky/actions/runs/39143728239).
 Those results do not verify this follow-up. Fresh results belong in the [run report](t0021-run-report.md#maintainability-review-follow-up-2026-10-19) and PR checks.
 The owner reports no extra Cloudflare charges on 2026-10-19. Required verification stays bounded; no optional stress test or paid upgrade is planned.

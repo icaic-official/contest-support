@@ -267,3 +267,19 @@ PR #43 returned to draft for this work. The stable development URL still uses Su
 6. **Risks** — Fresh hosted verification of the expanded registry remains pending. The earlier protected pass on `0254f60` does not verify this change. Billing API reads return `403`; the owner reports no extra charges so far. Use only bounded required checks within the existing $5 plan. No optional stress test, resource creation, or upgrade is part of this follow-up. The underlying Wrangler preview-proxy fault remains unresolved; the existing API verification option remains a workaround.
 7. **Follow-up tickets** — Continue T0021 through review, owner merge, explicit activation approval, and subsequent-deployment verification. No new ticket is created. Future provider implementations remain contributor work.
 8. **Docs that need updating** — Local results are recorded above. PR #43 owns the post-commit protected results and exact tested revision. After approved activation, record the stable revision and subsequent automated deployment. Current procedures keep those gates explicit.
+
+### Cleanup ownership correction
+
+A later review finds that a planned created-account username is not proof that the account exists.
+A foreign account with that username and a different full name is correctly excluded from account discovery.
+The new cleanup code nevertheless included its username authentication-counter key.
+An in-memory SQLite probe confirms zero discovered accounts, a preserved foreign account, and one incorrectly deleted foreign counter.
+Cleanup now includes a planned username key only after its account ID is proved and retained.
+A real local D1 regression preserves the foreign account and every field of its counter.
+The existing lost-create-response test still proves cleanup of a discovered account.
+Focused fixture checks pass 18/18. The complete local suite then passes 657/657 across 42 files. Type checking, full lint, app build, and whitespace checks pass.
+This correction changes verification cleanup only. Application code, shared scenarios, database rules, and deployment settings remain unchanged from `da75d72`.
+
+Protected [Cloudflare run 39147864416](https://github.com/GiftedNovaHD/minsky/actions/runs/39147864416) on `da75d72` passes 70 workflow, 82 account, 11 shared, and one UI case.
+It has zero failures, skips, flaky results, or recovery artifacts. Its CI Worker version is `cacf2b33-25ad-4877-8141-f91618a18ebd`.
+Those results precede this fixture correction. PR #43 records fresh final-revision checks separately.

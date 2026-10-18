@@ -355,7 +355,7 @@ async function cleanupOnPlatform(path: string, platform: Platform, target: Fixtu
   for (let index = 0; index < keys.length; index += 1000) await platform.env.IMAGES.delete(keys.slice(index, index + 1000));
   for (const key of keys) if (await platform.env.IMAGES.head(key)) throw new Error('Fixture image cleanup is incomplete.');
   const rateKeys = [...actors.map((actor) => `username:${username(journal, actor)}`),
-    ...journal.createdAccounts.map((account) => `username:${account.username}`), ...ids.map((id) => `change:${id}`)];
+    ...journal.createdAccounts.filter((account) => account.id).map((account) => `username:${account.username}`), ...ids.map((id) => `change:${id}`)];
   await db.batch([
     statement(db, 'DELETE FROM events WHERE id = ?', journal.eventId),
     statement(db, `DELETE FROM account_operations WHERE account_id IN (${marks(ids.length)}) OR actor IN (${marks(ids.length)})`, ...ids, ...ids),

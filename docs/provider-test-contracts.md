@@ -110,6 +110,7 @@ Each run generates UUID identifiers for its event, sessions, and teams.
 Initial accounts carry the exact run UUID in their fixture metadata.
 Accounts created through the application use exact name and username markers saved before the create request.
 The name includes the full run UUID. Cleanup discovers their IDs after a lost create response and checks their memberships before deletion.
+Cloudflare removes a created-account username counter only after that account ID is proved and retained. A planned username alone is not ownership evidence.
 Cleanup checks those ownership records before deletion.
 The Supabase account scan also finds a creation whose response was lost before the runner saved its account ID.
 Cloudflare records its generated account IDs before its first fixture write.

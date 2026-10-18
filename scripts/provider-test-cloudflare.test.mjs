@@ -333,6 +333,33 @@ describe('Cloudflare fixture setup and exact cleanup with real local D1/R2', () 
     }
   });
 
+  test('preserves a foreign account and authentication counter that share an uncreated planned username', async () => {
+    environment();
+    const path = journalPath();
+    const fixture = await createFixture(path, dependencies());
+    const marker = fixture.createdAccounts.staff;
+    const foreign = randomUUID();
+    const counterKey = `username:${marker.username}`;
+    await platform.env.DB.batch([
+      statement('INSERT INTO accounts(id,name,username) VALUES (?,?,?)', foreign, 'Unrelated control account', marker.username),
+      statement('INSERT INTO authentication_limits(key,window_start,attempts) VALUES (?,123,7)', counterKey),
+    ]);
+    try {
+      expect(JSON.parse(await readFile(path, 'utf8')).createdAccounts.every((account) => !account.id)).toBe(true);
+      await cleanupFixture(path, dependencies());
+      expect(await statement('SELECT id,name,username FROM accounts WHERE id=?', foreign).first())
+        .toEqual({ id: foreign, name: 'Unrelated control account', username: marker.username });
+      expect(await statement('SELECT key,window_start,attempts FROM authentication_limits WHERE key=?', counterKey).first())
+        .toEqual({ key: counterKey, window_start: 123, attempts: 7 });
+    } finally {
+      if (existsSync(path)) await cleanupFixture(path, dependencies());
+      await platform.env.DB.batch([
+        statement('DELETE FROM authentication_limits WHERE key=?', counterKey),
+        statement('DELETE FROM accounts WHERE id=?', foreign),
+      ]);
+    }
+  });
+
   test('discovers an application-created account from its pre-recorded marker and cleans its exact UUID', async () => {
     environment();
     const path = journalPath();

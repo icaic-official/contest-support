@@ -15,7 +15,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { WorkflowState } from "@/connected/hooks/useWorkflowState";
-import { AdminPanel } from "@/connected/legacy/AdminPanel";
 import type { Issue, Membership, Snapshot } from "@/connected/model";
 import type { ShellProps } from "@/connected/shell";
 import { searchTeams, unresolvedCount } from "@/connected/teamSearch";
@@ -640,21 +639,6 @@ export function MeTab(props: PhoneTabProps & { onSessionChange: () => void }) {
         Ask an organiser if your roles or team assignment need to change.
         Development deployment.
       </p>
-    </div>
-  );
-}
-
-/**
- * Session administration. It shows the administration page from before
- * T0015 until the redesigned Session tab replaces it.
- */
-export function SessionTab({ state, shell }: PhoneTabProps) {
-  return (
-    <div className="legacy-ui -mx-4">
-      <fieldset className="workspace">
-        <legend className="sr-only">Session administration</legend>
-        <AdminPanel state={state} refresh={shell.data.refresh} />
-      </fieldset>
     </div>
   );
 }

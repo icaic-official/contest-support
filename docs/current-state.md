@@ -1,10 +1,24 @@
 # Current state
 
+## T0015 Session tab (2026-10-18)
+
+The step 2a follow-up of T0015 is on `feature/t0015-frontend-redesign`. It is not merged or deployed.
+The admin Session tab of the phone app now uses shadcn/ui instead of the administration page from before T0015.
+It keeps every admin action of that page. New accounts and password resets show the credentials once.
+The request logic and the forms are in `src/organiser/admin/`, so the desktop console can use them.
+See [frontend architecture](frontend-architecture.md#organiser-phone-app).
+
+Local type checking, lint, build and 118 unit and database tests passed.
+26 of 28 mocked browser tests passed. The two failures are the same two tests as in step 2a. Step 5 updates their selectors.
+A manual check at 390 × 844 used a local mock of the Supabase endpoints with fictional data.
+It covered the intake switch, image limits, a new staff account with the credential screen, the copy fallback, a username for an account without one, a membership change, a password reset with confirmation, access removal with confirmation, the collapsible sections, an error from an unknown user ID, the Team account form and an archived event.
+No development account was available. Protected cloud tests and hosted checks were not run.
+
 ## T0015 organiser phone app (2026-10-17)
 
 Step 2a of T0015 is on `feature/t0015-frontend-redesign`. It is not merged or deployed.
 Below 1024 px, organisers get the phone app from `e-organiser-phone.html` instead of the legacy workspace.
-The Session tab still shows the administration page from before T0015.
+The Session tab showed the administration page from before T0015. The follow-up above replaces it.
 See [frontend architecture](frontend-architecture.md#organiser-phone-app).
 
 Local type checking, lint, build and 100 unit and database tests passed.

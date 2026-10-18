@@ -140,7 +140,8 @@ These rules apply:
 | --- | --- |
 | `OrganiserPhoneApp.tsx` | The shell. It holds the tab, the open issue, the report sheet and the reply drafts. The drafts stay in memory while the snapshot is missing. |
 | `PhoneParts.tsx` | Tab bar, tab header with **Live** or **Reconnecting** and the intake state, the status banners and the queue card. |
-| `PhoneTabs.tsx` | The Queue, Mine, Find, Awards, Me and Session tabs. |
+| `PhoneTabs.tsx` | The Queue, Mine, Find, Awards and Me tabs. |
+| `PhoneSessionTab.tsx` | The Session tab for admins. It puts the admin parts from `src/organiser/admin/` on one page, with one sheet for a new account or one account. |
 | `PhoneIssueView.tsx` | The full-screen issue view with the bottom action bar and its sheets. |
 
 Shared organiser parts are one level up, so the desktop console can use them:
@@ -153,9 +154,16 @@ Shared organiser parts are one level up, so the desktop console can use them:
 | `actions/IssueForms.tsx` | `ReplyForm`, `ResolveForm`, `EscalateForm`, `ReopenForm`, `AwardForm` and `ApplyForm`. Each form takes the issue, the `CommandRunner` and `onDone`. |
 | `actions/ReportForm.tsx` | Report for a team, with `TeamSearch`. |
 | `actions/OrganiserImages.tsx` | `ImageGallery`, `ImageUploadForm`, `ImagePreviewDialog` and `OrganiserImages`. They use `useIssueImages`. |
-| `actions/ActionSheet.tsx` | `ActionSheet` (a vaul bottom sheet with a **Cancel** button) and `CommandFeedback` (the command error and **Retry last request**). |
+| `actions/ActionSheet.tsx` | `ActionSheet` (a vaul bottom sheet with a **Cancel** button) and `CommandFeedback` (the command error and **Retry last request**). `showCancel` hides **Cancel** when the content has its own **Done** button. `onClosed` runs after the closing animation. |
+| `admin/adminModel.ts` | Pure admin rules: the username pattern, image limit bounds and steps, the membership draft (Staff or Team, roles, Admin), and the request bodies of `set_image_limits`, `manage_member` and the `admin` Edge Function. `adminModel.test.ts` tests them. |
+| `admin/useSessionAdmin.ts` | The admin requests: intake, image limits, create account, set username, membership, password reset and removal. One request runs at a time (a ref guard). It holds the error, the notice and the one-time credentials. A recorded request refreshes the snapshot. |
+| `admin/SessionSettings.tsx` | `StatusCounts` (icon and label per status), `IntakeSwitch` and `ImageLimitsForm` (number fields with labelled − and + buttons). |
+| `admin/AccountForms.tsx` | `MembershipFields`, `CreateAccountForm`, `UsernameForm`, `MembershipForm` and `AssignByIdForm`. |
+| `admin/CredentialReveal.tsx` | The one-time username and temporary password, with copy buttons and **Done**. |
+| `admin/AccountAccess.tsx` | `AccountList`, `MemberActions` (username, membership, password reset and removal, with `ConfirmDialog`), `AdminFeedback`, `Collapsible` and `AdminActivity`. |
 
 The forms do not depend on the sheet. The desktop console can put them in a dialog or a side sheet.
+The admin parts take a `SessionAdmin` from `useSessionAdmin` or plain callbacks. The desktop console can use them on its admin pages.
 
 These rules apply:
 
@@ -164,7 +172,12 @@ These rules apply:
 - Cards are sorted by unresolved time, longest first. The timer is neutral below 10 minutes, amber below 20 minutes and rose after that. A resolved issue stays neutral.
 - A recorded command selects its issue, so the issue view opens. An inline **Claim** or **Accept** on a card returns to the list. **Claim and go** opens the issue.
 - **Back** returns focus to the card of the issue. A tab change moves focus to the tab heading. Sheets trap focus and have a **Cancel** button, so no action needs a swipe. Buttons are at least 44 px high.
-- The Session tab still shows the `AdminPanel` from before T0015 inside a `.legacy-ui` element. A later step replaces it.
+- The Session tab keeps the behavior of the `AdminPanel` from before T0015: status counts, the intake switch, image limits (1–50 MB, 1–24 images, 1–120 MB), accounts, a username for accounts without one, membership changes, password reset (not for your own account), removal of session access, assignment by user ID and recent administration activity.
+- A new account and a password reset show the credentials once, in the same sheet. If the admin closes the sheet while the request runs, the sheet opens again for the credentials. Closing the sheet discards them.
+- A password reset and a removal need confirmation in a dialog. The text keeps the meaning of the earlier `window.confirm` text.
+- A Team account needs a team. The form sends no staff roles and no Admin for it, as before.
+- An error from a page control stays at the top of the scroll area, so it is visible near the form that failed. An error inside the sheet shows in the sheet.
+- In an archived event, every admin control is disabled. `PhoneStatus` shows the archived banner.
 
 `useIssueImages` (`src/connected/hooks/`) holds the upload, retry, preview and removal logic of `IssueImages`. `IssueImages` uses it with its existing markup.
 
@@ -176,13 +189,14 @@ Its root element has `data-ui="contestant"`, `data-ui="organiser-phone"` or `dat
 
 | Step | Replace | Mockup |
 | --- | --- | --- |
-| Organiser phone app (done, except the Session tab) | `src/organiser/phone/OrganiserPhoneApp.tsx` | `design/redesign/e-organiser-phone.html` |
+| Organiser phone app (done) | `src/organiser/phone/OrganiserPhoneApp.tsx` | `design/redesign/e-organiser-phone.html` |
 | Contestant desktop app (done) | `src/contestant/ContestantApp.tsx` | `design/redesign/f-contestant-desktop.html` |
 | Organiser desktop console | `src/organiser/desktop/OrganiserDesktopConsole.tsx` | `design/redesign/a-console.html` |
 | Integration | Playwright selectors, `docs/manual-verification.md`, README | — |
 
 Put components that both organiser layouts use in `src/organiser/` (for example, the sheets for reply, resolve and award).
 When no shell uses `src/connected/legacy/` any more, delete that directory and `src/styles.css`.
+Only `LegacyWorkspace` in the desktop console still uses `src/connected/legacy/AdminPanel.tsx`. Delete it when the desktop console (step 2b) lands. Use the parts in `src/organiser/admin/` there.
 Keep `IssueImages`, `TeamSearch`, `teamSearch.ts`, `model.ts`, `client.ts` and the image modules. Restyle them only.
 
 ## Local checks

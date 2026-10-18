@@ -14,23 +14,36 @@ import type { CommandRunner } from "@/connected/hooks/useCommand";
 /**
  * A bottom sheet for one task on a phone. The sheet traps focus while it is
  * open and returns focus to the control that opened it. Swipe down, Escape
- * and the Cancel button all close it.
+ * and the Cancel button all close it. Content with its own closing button,
+ * such as **Done**, can hide Cancel. `onClosed` runs after the closing
+ * animation, so the content can stay the same until the sheet is gone.
  */
 export function ActionSheet({
   open,
   onOpenChange,
   title,
   description,
+  showCancel = true,
+  onClosed,
   children,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   title: string;
   description?: string;
+  showCancel?: boolean;
+  onClosed?: () => void;
   children: ReactNode;
 }) {
   return (
-    <Drawer open={open} onOpenChange={onOpenChange} repositionInputs={false}>
+    <Drawer
+      open={open}
+      onOpenChange={onOpenChange}
+      onAnimationEnd={(opened) => {
+        if (!opened) onClosed?.();
+      }}
+      repositionInputs={false}
+    >
       <DrawerContent className="max-h-[92dvh]">
         <DrawerHeader className="text-left">
           <DrawerTitle className="text-lg">{title}</DrawerTitle>
@@ -42,14 +55,16 @@ export function ActionSheet({
         </DrawerHeader>
         <div className="overflow-y-auto px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
           {children}
-          <Button
-            type="button"
-            variant="ghost"
-            className="mt-2 h-11 w-full"
-            onClick={() => onOpenChange(false)}
-          >
-            Cancel
-          </Button>
+          {showCancel && (
+            <Button
+              type="button"
+              variant="ghost"
+              className="mt-2 h-11 w-full"
+              onClick={() => onOpenChange(false)}
+            >
+              Cancel
+            </Button>
+          )}
         </div>
       </DrawerContent>
     </Drawer>

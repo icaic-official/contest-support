@@ -33,8 +33,8 @@ import {
   MineTab,
   type PhoneTabProps,
   QueueTab,
-  SessionTab,
 } from "./PhoneTabs";
+import { SessionTab } from "./PhoneSessionTab";
 
 const headingId = "organiser-tab-heading";
 

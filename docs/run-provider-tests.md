@@ -4,10 +4,12 @@ Use this guide to check an implemented provider against Minsky's shared behavior
 Use an isolated test backend. Never use development or production accounts.
 For the suite's responsibilities and limits, see [the test contracts](provider-test-contracts.md).
 
-The Supabase driver passes all eight shared scenarios with cleanup.
-The Cloudflare driver is implemented, but its hosted shared and UI results remain pending.
-The owner activated R2 after the initial provider error `10042`. Those hosted runs are now in progress.
+Both drivers pass the same eight shared scenarios with verified fixture cleanup.
+The Cloudflare CLI run verifies `1ee8cbf` against real hosted endpoints.
+The complete hosted React journey passes on `59121f7`, which has the same application Worker source.
+The owner activated R2 after the initial provider error `10042`. Private image and live-update journeys now pass.
 The full hosted D1 suite separately passes all 70 cases without skips and verifies scoped cleanup.
+Protected Cloudflare connector CI remains pending.
 See [current state](current-state.md) for the tested revisions and separate evidence categories.
 
 ## List the scenarios without credentials
@@ -141,7 +143,7 @@ npm run test:connector:workflow:hosted -- \
 Expected output is `Hosted full D1 workflow: 70 passed, 0 failed, 0 skipped.`
 This runner uses production identity guards and a temporary D1-only proxy configuration.
 It requires the checkout's exact applied migration list, but applies no migrations itself.
-It can run while the complete hosted R2 prerequisite remains blocked.
+It requires no R2 binding or deployed Worker.
 Its result does not verify images, hosted product UI, or Durable Object delivery.
 
 Check account permissions and credential races on the same isolated D1 schema:
@@ -170,8 +172,9 @@ node src/server/adapters/cloudflare/tooling/test-ui.mjs \
 ```
 
 The required result is one hosted UI case with no failures, skips, or retries and verified fixture cleanup.
-That result remains pending.
+That result passes on `59121f7` through the actual deployed React application.
 Follow [the installation guide](install-cloudflare.md) for the separate empty-installation procedure.
+Its hosted journey also passes on `59121f7`, with verified scoped fixture cleanup and the installed baseline intact.
 
 ## Run protected GitHub checks
 
@@ -206,8 +209,11 @@ It runs the shared contracts through the Cloudflare browser driver.
 The private bucket, service activation, and initial Worker secret must exist before this job can pass.
 The workflow does not activate a paid service or create the bucket.
 Its job definition and branch allowlist entry are implemented, but its passing protected result remains pending.
+The current protected connector run targets `1ee8cbf`. The passing CLI runs do not establish that protected result.
 The T0020 branch was added to the existing allowlist while preserving the other entries and protection rules.
 Earlier protected authentication runs do not verify this complete connector job.
+Protected Supabase verification passes on `de1ecbd` in [run 39095319959](https://github.com/GiftedNovaHD/minsky/actions/runs/39095319959).
+Keep that result separate from the Cloudflare CLI runs and the pending protected connector job.
 
 ## Recover an incomplete fixture
 

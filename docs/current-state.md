@@ -4,7 +4,8 @@
 
 T0020 starts from merged PR #41 at `7d19b00`.
 The active branch is `feature/t0020-cloudflare-connector`.
-Implementation and verification continue. Supabase remains active.
+The complete hosted connector and fresh installation pass. Protected connector CI is running.
+Supabase remains active.
 The [ticket](tickets.md#t0020-complete-cloudflare-connector) records the complete acceptance criteria.
 The [PR #21 component record](pr21-installation-disposition.md) explains installation reuse decisions.
 The [run report](t0020-run-report.md) lists changed files, commands, results, and remaining work.
@@ -14,7 +15,7 @@ The database list contains the existing, separate authentication and bounded-pro
 No complete connector or installation database existed at that check.
 The initial `wrangler r2 bucket list` command failed with Cloudflare code `10042`.
 The owner then confirmed R2 activation. The repeated account check and bucket list pass.
-Hosted application and empty-installation verification can now proceed.
+The isolated hosted checks then passed as recorded below.
 
 ### Implementation and observed checks
 
@@ -23,20 +24,24 @@ The full Worker supplies maintained authentication, authorized snapshots, admini
 The browser can select this connector with `VITE_BACKEND=cloudflare` for an isolated build.
 The default remains Supabase.
 Provider-owned installation tooling validates public configuration, checks the exact target, and creates one initial owner only in an empty database.
-The [installation guide](install-cloudflare.md) remains experimental until its hosted empty-installation procedure passes.
+The [installation guide](install-cloudflare.md) passed its hosted empty-installation trial on source `59121f7`.
+This evidence supports isolated development installations. It does not establish production capacity or a migration path.
 
 Observed results during implementation are separate from final PR verification:
 
 - All 70 workflow tests pass locally and on hosted D1. Hosted fixture cleanup passes.
 - All 82 hosted account tests pass on the new connector D1 schema, with zero skips and verified fixture cleanup.
-- All 553 local tests pass across 33 files. The local account suite includes 83 cases, including its separate execution-clock probe.
+- All 554 local tests pass across 33 files on `59121f7`. The local account suite includes 83 cases, including its separate execution-clock probe.
 - All eight unchanged shared provider scenarios pass against Minsky CI on Supabase, `ghtztmovdkhuketcbjmq`. Fixture cleanup passes.
+- The same eight scenarios pass against the deployed Cloudflare connector on `1ee8cbf`, with scoped D1, R2, and Durable Object cleanup.
+- The complete hosted React journey passes on `59121f7`, with zero failures, skips, or flaky results.
+- A separate empty hosted installation passes the documented procedure and complete React journey on `59121f7`.
 - The local complete HTTPS Worker journey passes with actual authentication, D1, R2, and Durable Object bindings.
 - The complete local React journey passes through actual HTTPS and emulated bindings, including phone keyboard checks and exact fixture cleanup.
 - All 34 ordinary application browser regressions and three local HTTPS authentication browser cases pass.
 - Both frontend builds, type checking, lint, Deno checks, and all 12 function tests pass after the review corrections.
 - Both locked dependency audits report zero vulnerabilities.
-- The implementation secret scan passes across 117 commits through `de1ecbd`.
+- The latest local secret scan passes across 119 commits through `1ee8cbf`.
 
 The hosted D1 run uses the new `minsky-connector-ci` database, `de43cf95-c024-4e44-860d-8ff179e4e08d`.
 All nine repository D1 migrations are applied there.
@@ -45,15 +50,19 @@ Both hosted D1 runners and the repeated Supabase shared run verify source `de1ec
 After both D1 runners finish, a separate read-only query confirms zero rows in all 27 application tables.
 The D1 migration records remain intact. No fixture recovery journals remain from these successful runs.
 The existing authentication and bounded-proof databases remain separate.
-The connector Worker has passed a deployment dry run, but has not been deployed.
+The isolated connector Worker is deployed at `https://minsky-connector-ci.icaic-minsky.workers.dev`.
+Its initial version is `2a3fe2f1-7b4e-4017-bd45-43c3fdf8cbeb`.
+Initial secret creation produced active version `6133f70f-5762-479b-88d6-dfa3f2b376e7`.
+The production source is `59121f7`. The later `1ee8cbf` changes only the provider test bridge and its regression test.
 Its new Standard bucket, `minsky-connector-ci-images`, exists in APAC. Its public `r2.dev` URL is disabled.
-Hosted Cloudflare shared scenarios, the hosted React journey, and the empty installation remain unverified.
-The implementation is in draft [PR #42](https://github.com/GiftedNovaHD/minsky/pull/42), at `de1ecbd`.
+Anonymous checks return 200 for the landing page and 401 for protected session routes.
+Both `/.env` and `/src/main.tsx` return 404.
+The implementation is in [PR #42](https://github.com/GiftedNovaHD/minsky/pull/42).
 Ordinary push CI passes `checks`, `secrets`, and `dependencies` in [run 39095244800](https://github.com/GiftedNovaHD/minsky/actions/runs/39095244800).
 Ordinary PR CI also passes in [run 39095267935](https://github.com/GiftedNovaHD/minsky/actions/runs/39095267935).
 Protected Supabase verification passes on that revision in [run 39095319959](https://github.com/GiftedNovaHD/minsky/actions/runs/39095319959).
 The protected Supabase run uses the existing CI backend without changing its configuration, migrations, or functions.
-The protected complete Cloudflare job remains unverified. Its resources are now being prepared after R2 activation.
+The protected complete Cloudflare job is running on `1ee8cbf`.
 
 The `cloud-test` environment now permits `feature/t0020-cloudflare-connector`.
 The API showed five existing branch entries before this change. All five entries and their IDs remain unchanged.
@@ -66,8 +75,51 @@ Self-password changes retain both original deadlines while deliberately revoking
 Review also added fair notification retries, late-upload cleanup, and complete Durable Object fixture cursor cleanup through a trusted service binding.
 The internal cleanup binding has passed a local runtime test. The public application has no cleanup route.
 Installation commands reject missing or foreign migrations and override inherited Wrangler settings that could log credentials.
-Final verification is in progress.
+An initial shared Cloudflare browser run stopped before login because its test bridge omitted a Vite runtime asset.
+The narrow asset correction and a real module-loading regression pass. The repeated hosted suite passes all eight scenarios.
+No application route or deployed source changed for that correction.
 No development backend deployment, real-account reset, data export, migration, or active backend switch occurred.
+
+### Empty hosted installation
+
+A separate clean checkout of `59121f7` followed the installation guide after `npm ci`.
+The operator confirmed the account and the absence of each new resource before creation.
+All nine migrations, build, deployment dry run, deployment, bootstrap, and initial secret creation passed in the documented order.
+
+| Resource | Trial value |
+| --- | --- |
+| Worker and D1 name | `minsky-install-t0020-b4b578a2` |
+| Origin | `https://minsky-install-t0020-b4b578a2.icaic-minsky.workers.dev` |
+| D1 UUID | `c3fcd906-3d4e-428f-b174-eb9ac1794aa1` |
+| Private Standard R2 bucket | `minsky-install-t0020-b4b578a2-images` |
+| Initial Worker version | `4eb3492e-37e3-464e-8e9a-a9c706678272` |
+| Active version after secret creation | `5ca7b4b2-9159-4a10-8041-f888f0103a4a` |
+| Installation UUID | `cb2ae35b-fcb7-4dc0-8293-9411194ed707` |
+| Initial owner UUID | `3bb1beb8-b6dd-4ed3-83f5-90353b17a262` |
+
+Before bootstrap, the landing page returned 200, `/.env` returned 404, and sign-in returned 503 without creating authentication-limit rows.
+The first owner changed the temporary password through the deployed React page before gaining session access.
+The configured event, session, categories, two-team roster, and closed intake matched the input file.
+Repeated bootstrap and initial-secret commands refused to replace existing state.
+
+The complete React assertions then passed with fictional accounts prepared through a private fixture copy guarded to this exact installation target.
+The committed CI fixture guards were unchanged. No browser request used Supabase.
+Trusted owner recovery through the actual operator command invalidated the old session with HTTP 401.
+The replacement password required another change before access.
+Account IDs, installation IDs, membership, and a fictional issue and its history stayed identical across recovery.
+
+UUID-scoped cleanup removed the journey accounts, sessions, workflow rows, and exact R2 objects.
+Both journey coordinators confirmed empty storage, no alarms, no sockets, and no socket attachments before journal deletion.
+Exact guarded deletion then removed the separate recovery-proof issue, history, receipt, and delivered notifications.
+Final counts retain one installation, owner, event, session, administrator membership, and two teams.
+There are zero staff roles, issues, history rows, receipts, issue-number counters, images, image deletions, or pending notifications.
+The bucket is empty. Intake stays closed, and installation and recovery audits remain intact.
+Baseline audience counters and their matching coordinator cursors remain monotonic to prevent sequence reuse.
+No fixture recovery journal remains.
+
+This trial passed at 04:21 UTC on 2026-10-18. Its final proof cleanup passed at 04:25 UTC.
+It is separate from the connector CI Worker and protected GitHub Actions runs.
+The fictional initialized installation remains available for owner review.
 
 ### R2 need and cost
 

@@ -1,10 +1,13 @@
 # Cloudflare authentication reference
 
-T0018 implements experimental authentication and account sessions for Workers and D1.
+T0018 introduced bounded authentication and account sessions for Workers and D1.
 Supabase remains the active application backend.
-T0020 adds the complete connector. Local HTTPS and hosted D1 checks pass; complete hosted verification remains pending.
+T0020 adds the complete connector and passes all 82 hosted D1 account cases.
+The complete hosted React journey verifies account gates and organizer recovery through the application.
+A separate empty-installation journey verifies owner bootstrap, password change, and trusted recovery.
+Scoped installation fixture cleanup passes. Protected Cloudflare connector CI remains pending.
 Real-data migration remains later work.
-This reference describes the implemented API. It does not describe a supported independent installation.
+This reference describes the implemented API. Use the [installation guide](install-cloudflare.md) for the separate setup procedure.
 
 The [identity choice](cloudflare-authentication-choice.md) explains Better Auth, cryptographic components, limitations, and measured resource costs.
 The [verification guide](verify-cloudflare-authentication.md) gives exact test commands and fixture recovery steps.
@@ -133,6 +136,8 @@ A lost database response can leave the commit outcome unknown and earlier logins
 This lets a sole organizer retry an interrupted temporary-password change.
 A committed change with a lost response allows login with the new password. Try that password before requesting recovery.
 The browser receives a fresh session only after the credential commit.
+The final self-change guard retains both original session deadlines while the batch deliberately revokes and deletes the old sessions.
+Login creation also rechecks the captured credential generation and both current session expiries before completion.
 
 Daily maintenance removes password-attempt counters and expired login records after a one-day retention period.
 Login attempts allow ten attempts per normalized username per 15-minute window.

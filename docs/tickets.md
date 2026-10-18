@@ -58,7 +58,7 @@ T0008 fuzzy team search merged into `main` in [PR #22](https://github.com/notbow
 ## T0020 Complete Cloudflare connector
 
 Branch: `feature/t0020-cloudflare-connector`, from updated `main` at `7d19b00`.
-Status: implemented in draft [PR #42](https://github.com/GiftedNovaHD/minsky/pull/42). Hosted Cloudflare application and empty-installation verification remain pending. The owner reviews and merges.
+Status: implemented in draft [PR #42](https://github.com/GiftedNovaHD/minsky/pull/42). Hosted provider, complete React, and empty-installation checks pass. Protected connector CI is running. The owner reviews and merges.
 Summary: Complete every Cloudflare backend operation and verify the application with isolated resources. Verify installation into an empty Cloudflare environment.
 
 The owner authorized the complete connector after PR #41 merged.
@@ -96,11 +96,11 @@ Do not claim contest capacity without separate evidence.
 - [x] Authorized snapshots include complete permitted workflow, account, image, and timing data.
 - [x] Private images preserve visibility, ownership, limits, archival rules, retries, and scoped cleanup.
 - [x] Live updates preserve audience separation, revocation, reconnect refresh, duplicate handling, and failure recovery.
-- [ ] The same required shared scenarios pass against Supabase and Cloudflare.
-- [ ] Complete hosted application journeys pass with fictional accounts and images.
-- [ ] The documented installation procedure succeeds in an empty isolated Cloudflare environment.
+- [x] The same required shared scenarios pass against Supabase and Cloudflare.
+- [x] Complete hosted application journeys pass with fictional accounts and images.
+- [x] The documented installation procedure succeeds in an empty isolated Cloudflare environment.
 - [ ] PR #21 reuse decisions and the final disposition recommendation are documented.
-- [ ] Fixture cleanup is verified and deletes only UUID-owned data.
+- [x] Fixture cleanup is verified and deletes only UUID-owned data.
 - [ ] Required type, lint, build, database, function, browser, documentation, and hosted checks pass.
 - [ ] Local, hosted CLI, and protected GitHub Actions evidence are recorded separately.
 - [ ] The final PR revision has passing required checks and accurate documentation for owner review.
@@ -109,11 +109,14 @@ Do not claim contest capacity without separate evidence.
 
 All 70 full-workflow cases pass locally and on the separate hosted connector D1 database.
 All 82 hosted account cases pass there, with zero skips and verified cleanup.
-All 553 local tests pass. Checked behavior criteria above include local emulation evidence.
-All eight shared provider scenarios pass against Supabase.
+All 554 local tests pass on `59121f7`. Checked behavior criteria above include local and hosted evidence.
+The same eight shared provider scenarios pass against Supabase and Cloudflare.
 The local complete HTTPS Worker journey and all 34 ordinary browser regressions pass.
-These results do not replace the required hosted Cloudflare browser and installation runs.
-The owner enabled R2 after the initial provider error `10042`. Hosted Cloudflare verification is now in progress.
+The complete hosted React journey passes on `59121f7`.
+A separate clean checkout passes the documented empty installation, complete React assertions, and trusted owner recovery on that source.
+Scoped D1, R2, and coordinator cleanup passes for both hosted targets.
+The owner enabled R2 after the initial provider error `10042`.
+Protected Supabase verification passes on `de1ecbd`. Protected connector verification is running on `1ee8cbf`.
 The [current-state record](current-state.md#t0020-connector-implementation-2026-10-18) separates observed results from pending acceptance work.
 
 ## T0019 Shared server workflow

@@ -3,8 +3,11 @@
 The browser uses `Backend` in [contracts.ts](../src/backend/contracts.ts) for accounts, workflows, administration, images, and live updates.
 An adapter implements those operations for a provider.
 Supabase remains the active implementation.
-T0020 adds every Cloudflare operation. Local integration and hosted D1 checks pass.
-Complete hosted browser and empty-installation checks remain pending. Cloudflare remains experimental.
+T0020 implements every Cloudflare operation.
+The same eight shared scenarios pass against Supabase and Cloudflare through their real browser adapters.
+The complete hosted Cloudflare React journey and a separate empty-installation journey also pass.
+Scoped fixture cleanup passes for both hosted journeys. Protected Cloudflare CI remains pending.
+These results verify isolated development resources.
 
 The contracts describe Minsky operations.
 They do not expose database queries, access tokens, provider clients, or channel objects.
@@ -138,8 +141,9 @@ Its hosted D1 suite checks every workflow case against the separate connector da
 
 The UI imports the contracts and `requireBackend()`.
 `npm run lint` rejects provider imports outside provider adapter modules and the backend entry point.
-The active application server functions and browser fixture driver remain specific to Supabase.
-The D1 proof has its own persistence adapter and isolated fixtures, with shared workflow decisions.
+The active application server functions remain specific to Supabase.
+Both complete browser adapters have provider-owned fixture drivers.
+The historical D1 proof retains its separate persistence mode and isolated fixtures, with shared workflow decisions.
 
 `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` remain the browser configuration.
 For a Supabase build, `backend` is `undefined` when either value is missing.
@@ -168,7 +172,7 @@ Authentication subscriptions invoke callbacks synchronously.
 Their cleanup function can run more than once.
 No callback runs after cleanup returns.
 
-The experimental Cloudflare adapter implements this same authentication contract through same-origin HTTP and HttpOnly cookies.
+The Cloudflare adapter implements this same authentication contract through same-origin HTTP and HttpOnly cookies.
 Password changes return a fresh session after the atomic credential commit. All earlier sessions are revoked.
 Its extra `account()` and `sessions()` methods retain the bounded authentication API.
 The complete browser factory supplies the other `Backend` groups.
@@ -272,7 +276,7 @@ The existing embedded PostgreSQL tests continue to check database rules.
 It covers request-ID reuse after an uncertain write and a new request after a definitive rejection.
 The suite also covers the existing account, team-search, image, and refresh behavior.
 
-These checks do not verify a hosted provider or a second complete browser adapter.
+Those mocked checks establish request and UI behavior. Hosted provider checks run separately.
 `npm test` also includes the local D1 application-store proof described above.
 It includes shared-service rules and Supabase persistence tests with embedded PostgreSQL.
 `npm run test:workflow:hosted` exercises the deployed opt-in Supabase function with the shared workflow scenarios and additional boundary checks.
@@ -280,6 +284,9 @@ That runner permits only the approved Minsky CI project. It does not activate th
 Hosted checks use isolated accounts and records through [protected cloud CI](cloud-onboarding.md#verification-and-protected-cloud-ci).
 The [shared provider suite](provider-test-contracts.md) checks these contracts through real browser adapters.
 Supabase and Cloudflare have separate fixture implementations with the same scenario assertions.
-Cloudflare hosted results remain pending until its isolated resources and deployment pass the suite.
+The Cloudflare CLI run passes all eight unchanged shared scenarios on `1ee8cbf` with verified fixture cleanup.
+The complete hosted React journey passes on `59121f7`, which has the same application Worker source.
+The separate documented empty-installation journey also passes on `59121f7`, with verified fixture cleanup.
+Protected Cloudflare CI on `1ee8cbf` remains pending.
 [Run the shared checks](run-provider-tests.md) separately from the provider-specific hosted UI suite.
 The latest observed results are in [current state](current-state.md).

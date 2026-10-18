@@ -151,7 +151,7 @@ The complete 70-case D1 suite passes locally and against isolated `minsky-connec
 The [full hosted runner](../src/server/adapters/cloudflare/tooling/test-workflow.mjs) requires an explicit target and runs production guards without skips.
 See the [D1 guide](d1-transaction-proof.md) for the separate commands and recorded scope.
 
-## Historical proof mode and remaining verification
+## Historical proof mode and complete connector verification
 
 The earlier `claim` and `message` proof remains available through the explicit `mode: 'transaction-proof'` constructor option.
 Only the historical proof runner selects that mode through `MINSKY_D1_REMOTE`.
@@ -159,7 +159,10 @@ Its separate database retains the bounded schema.
 The full hosted runner uses `MINSKY_CONNECTOR_D1_CONFIG`, modern fixtures, and the production store instead.
 
 T0020 also implements application reads, administration, private images, live updates, and the Cloudflare browser adapter.
-Local runtime checks do not replace complete hosted application verification.
-Hosted Cloudflare shared scenarios, UI journeys, empty installation, and protected connector CI remain pending after the owner's R2 activation.
+Both providers pass the same eight shared scenarios with verified fixture cleanup.
+The Cloudflare CLI run verifies `1ee8cbf`.
+The complete hosted React journey passes on `59121f7`, with the same application Worker source.
+The separate documented empty-installation journey also passes on `59121f7`.
+Scoped fixture cleanup passes for both hosted journeys. Protected Cloudflare connector CI remains pending.
 Record these results separately from hosted D1, hosted Supabase, and earlier protected authentication runs.
 Real-data migration, cutover, AWS, and Terraform remain deferred.

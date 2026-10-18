@@ -1,9 +1,9 @@
 # Install an isolated Cloudflare instance
 
-**Experimental. The complete hosted installation procedure is pending verification.**
-Use this guide with fictional accounts and a new, isolated database and bucket.
-Do not treat this draft as a supported production installation procedure.
-The [current-state record](current-state.md) contains the observed checks for the active revision.
+**Verified for an isolated development installation on 2026-10-18, source `59121f7`.**
+The empty hosted trial passed this procedure, the complete React journey, and trusted owner recovery.
+The [trial record](current-state.md#empty-hosted-installation) lists resources, versions, results, and scoped cleanup.
+Use new, isolated resources. This procedure does not establish production capacity or real-data migration.
 Supabase remains the project's active development backend.
 
 This guide installs the complete Cloudflare application from a reviewed checkout.

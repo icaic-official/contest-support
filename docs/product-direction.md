@@ -65,7 +65,9 @@ T0019 extracts the existing issue decisions into a [shared server service](serve
 An opt-in Supabase function executes that service for replacement verification.
 The active application retains the legacy PostgreSQL workflow during this transition.
 T0020 implements the complete Cloudflare connector and provider-owned installation tooling.
-Its local checks and hosted D1 tests pass. Complete hosted application and empty-installation checks remain pending.
+Its local checks, hosted D1 tests, and all eight shared scenarios pass.
+The complete hosted React journey and a separate documented empty-installation journey also pass.
+Scoped fixture cleanup passes. Protected Cloudflare connector CI remains pending.
 
 Supabase manages the services.
 Minsky still requires repository-owned migrations and functions that implement its schema, authorization policies, and business rules.
@@ -74,7 +76,8 @@ Those rules require tests.
 [T0003](tickets.md#t0003--cloud-onboarding-and-authenticated-shared-product) merged in PR #2.
 It includes cloud onboarding, Supabase authentication behind username and password login, shared Postgres workflows, role dashboards, and minimal account administration.
 It also includes reproducible local contribution.
-Protected cloud CI setup remains unverified.
+Protected Supabase CI passes at its recorded revision.
+The complete protected Cloudflare connector job remains pending.
 
 T0004 implements the selected UI makeover.
 T0005 implements issue images.
@@ -92,7 +95,7 @@ Actual authorization, synchronization, deployment, capacity, and recovery behavi
 
 ## Unresolved decisions
 
-T0018 selects maintained Better Auth for experimental Cloudflare authentication.
+T0018 selected maintained Better Auth for bounded Cloudflare authentication. T0020 retains it in the complete connector.
 See [the identity choice](cloudflare-authentication-choice.md) and [API reference](cloudflare-authentication.md).
 The owner selected organizer-issued replacement temporary passwords for migration on 2026-10-17.
 Users must change these passwords before contest access.
@@ -145,7 +148,8 @@ D1 remains the source of saved workflow state.
 Live messages do not grant access and do not carry private issue data.
 T0020 implements a D1 notification outbox and authenticated Durable Object connections.
 Clients refresh their authorized snapshots after connection or reconnection.
-Hosted live-delivery verification remains pending.
+Hosted shared scenarios verify audience separation and independent subscribers.
+The complete hosted React journey verifies delivery, revocation, and refreshed state after reconnection.
 The SQLite adapter must preserve the existing decisions through the same shared service and guarded commits.
 
 The shared Minsky interfaces, Supabase adapter, provider tests, and Cloudflare design merged before T0017.
@@ -160,7 +164,7 @@ T0020 implements the remaining connector operations and verifies an independent 
 Real-data migration tooling follows connector verification. Real-data exports and the backend switch remain later phases.
 See [the proof guide](d1-transaction-proof.md) and [implementation plan](cloudflare-implementation-plan.md).
 
-The migration preserves account IDs, relationships, historical actors, timestamps, resolution cycles, awards, external application status, image visibility, and file contents.
+A later migration must preserve account IDs, relationships, historical actors, timestamps, resolution cycles, awards, external application status, image visibility, and file contents.
 T0014 implemented only the interfaces and Supabase extraction.
 The owner now authorizes isolated Cloudflare development and CI resources in the existing account for connector work.
 Keep those resources separate and verify the account before provisioning.
@@ -176,5 +180,6 @@ T0016 records the [proposed architecture](cloudflare-backend-design.md) and [imp
 Neither design work nor provider tests migrate existing data.
 Possible AWS testing motivates separate domain rules, transactional persistence, identity, image storage, and live-delivery interfaces.
 T0017 verified the bounded D1 transaction pattern. T0018 selected and verified maintained Better Auth identity operations.
-T0020 must still verify the complete hosted application and independent installation before the connector is accepted.
+T0020's hosted application and independent installation journeys pass on isolated resources.
+Scoped installation fixture cleanup passes. Protected Cloudflare connector CI and checks of the final PR revision remain acceptance gates.
 The owner selected replacement temporary passwords rather than password-hash import for the later migration.

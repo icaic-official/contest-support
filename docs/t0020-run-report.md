@@ -3,7 +3,8 @@
 This record describes the complete connector implementation on `feature/t0020-cloudflare-connector`.
 The branch starts at merged PR #41, `7d19b00`.
 The [current-state record](current-state.md#t0020-connector-implementation-2026-10-18) lists resource targets and observed evidence.
-The goal remains incomplete until the required hosted application and empty-installation checks pass.
+The complete hosted application and empty-installation checks pass.
+Protected connector CI and final PR checks remain in progress.
 
 ## 1. Summary of changes
 
@@ -11,6 +12,8 @@ Implemented all nine D1 commands through the shared service, the complete Cloudf
 Added provider-owned installation, owner recovery, target checks, and isolated verification tooling.
 Reviewed PR #21 before installation changes and recorded [component decisions](pr21-installation-disposition.md).
 Supabase remains active.
+Runtime imports retain extensions required by Deno and the provider tools.
+Existing D1 tests retain their local quote style. These deliberate style exceptions avoid unrelated edits and preserve tool compatibility.
 
 ## 2. Files changed
 
@@ -105,6 +108,7 @@ The implementation changes these files:
 - `tests/connector/local-ui.spec.ts`
 - `tests/connector/runtime.test.ts`
 - `tests/connector/ui-journey.ts`
+- `tests/provider-bridge.spec.ts`
 - `tests/providers/browser-backend.ts`
 - `tests/providers/cloudflare/browser.ts`
 - `tests/providers/cloudflare/fixture.ts`
@@ -119,9 +123,11 @@ The implementation changes these files:
 ## 3. Commands run
 
 Repository inspection used `git status`, `log`, `diff`, `fetch`, `switch`, `rg`, `cat`, and `sed`.
-Git `add`, `commit`, and `push` created and published implementation `de1ecbd` with the required co-author trailer.
+Git `add`, `commit`, and `push` published `de1ecbd`, `59121f7`, and `1ee8cbf` with the required co-author trailer exactly once each.
 GitHub commands created draft [PR #42](https://github.com/GiftedNovaHD/minsky/pull/42) and started protected verification against the existing Supabase CI backend.
 Provider and review inspection used `gh api`, `gh pr view`, Wrangler `whoami`, D1 `list`, `info`, `create`, and `migrations apply`.
+R2 `bucket list`, `create`, and `dev-url get` confirmed new private Standard buckets.
+Worker `deployments list` confirmed name absence before initial deployment.
 The isolated connector D1 database received only repository migrations and fictional fixture records.
 The GitHub environment change added only this ticket branch.
 
@@ -129,9 +135,14 @@ Local verification used `npm test -- --maxWorkers=2`, focused Vitest runs, `type
 It also used `check:functions`, `test:functions`, `test:e2e`, `test:auth:browser`, `test:connector:runtime`, `test:providers:list`, `docs:build`, and `docs:test`.
 `node scripts/connector-local-ui-test.mjs` runs the complete actual React journey on temporary local bindings.
 Both locked dependency audits ran with `--audit-level=high`.
-The complete Worker passed `wrangler deploy --dry-run` with the isolated connector configuration.
+The complete Worker passed `wrangler deploy --dry-run` and deployed only to the new isolated connector CI target.
 Hosted CLI checks ran the full D1 workflow and account suites, and `test:providers -- --provider=supabase`.
+`test:providers -- --provider=cloudflare` ran the unchanged eight scenarios through the deployed HTTP application.
+`test:connector:ui` ran the full React journey through the deployed application.
 The provider-owned `cloudflare:install -- migrate` command applied the schema after exact account and database checks.
+The independent trial used a separate clean checkout, `npm ci`, and the documented configuration, provisioning, migration, build, deployment, bootstrap, and secret commands.
+It also exercised trusted `recover` through the actual CLI and ran the complete React assertions.
+Private temporary scripts checked preservation and deleted only the exact additional recovery-proof rows.
 Markdown link checks, YAML parsing, and `git diff --check` also ran.
 The checksum-pinned Gitleaks scanner checked staged changes and all fetched Git history with redacted output.
 
@@ -139,13 +150,16 @@ Early integrated tests exposed fixture audit relationships and notification-coun
 An initial browser discovery error and the provider bridge's wrong asset origin were corrected. The 34-case browser rerun passed.
 A later lint error in new request mocks was corrected; global lint passed.
 The unsupported R2 `list --json` form was replaced with `r2 bucket list`.
-The supported command still fails with Cloudflare code `10042`, which requires dashboard activation.
+The supported command initially failed with Cloudflare code `10042`. It passed after the owner activated R2.
+The initial hosted shared Cloudflare run stopped before login because the bridge omitted Vite's runtime asset.
+The narrow asset correction, its new ordinary browser regression, and the repeated hosted eight-case suite pass.
+The earlier protected connector dispatch on `59121f7` was canceled before its cloud job. It supplies no passing hosted evidence.
 Initial local socket and Git metadata operations needed sandbox escalation.
 No automatic approval review rejected an authorized action.
 
 ## 4. Build and test results
 
-The complete local suite passes 553 tests across 33 files.
+The complete local suite passes 554 tests across 33 files on `59121f7`, including the image cleanup-fairness regression.
 The full local account suite also passes all 83 cases against the historical authentication schema.
 The final local HTTPS connector journey, including actual D1, R2, and live bindings, passes.
 The complete local React journey also passes with the same assertions as the hosted journey.
@@ -163,34 +177,48 @@ The final CLI reruns verify source `de1ecbd`.
 A separate read-only D1 query confirms zero rows in all 27 application tables after the runs.
 The first aggregate count command failed; its scalar-query retry passed. Neither command changed data.
 These CLI runs are separate from protected GitHub Actions evidence.
-Both staged and full-history secret scans pass. The implementation scan checks 117 commits through `de1ecbd`.
-Hosted Cloudflare shared scenarios, the complete hosted React journey, and the empty installation remain unverified.
+Both staged and full-history secret scans pass. The latest local history scan checks 119 commits through `1ee8cbf`.
+Hosted Cloudflare passes all eight unchanged shared scenarios on `1ee8cbf`.
+The full hosted React journey passes on `59121f7`, with zero failures, skips, or flaky results.
+Their cleanup verifies only UUID-owned D1 data, exact R2 keys, and empty fixture coordinator state before journal removal.
+The [independent hosted installation](current-state.md#empty-hosted-installation) passes on a separate clean checkout of `59121f7`.
+Its one complete browser trial has zero failures, skips, retries, or flaky results.
+Bootstrap, mandatory password changes, closed intake, repeated-operation refusal, owner recovery, old-session rejection, and identity/history preservation pass.
+After scoped cleanup, the trial retains only its initialized baseline, audits, and monotonic transport state.
+Its bucket is empty, and no fixture recovery journal remains.
 Ordinary push CI passes `checks`, `secrets`, and `dependencies` on `de1ecbd` in [run 39095244800](https://github.com/GiftedNovaHD/minsky/actions/runs/39095244800).
 Ordinary PR CI and protected Supabase verification also pass on that revision in [run 39095267935](https://github.com/GiftedNovaHD/minsky/actions/runs/39095267935) and [run 39095319959](https://github.com/GiftedNovaHD/minsky/actions/runs/39095319959).
+The protected Supabase run passes 14 cloud browser cases, eight shared provider scenarios, and five shared server workflow cases.
+Both ordinary runs on `59121f7` pass in [run 39096348143](https://github.com/GiftedNovaHD/minsky/actions/runs/39096348143) and [run 39096350260](https://github.com/GiftedNovaHD/minsky/actions/runs/39096350260).
+Protected connector [run 39097062812](https://github.com/GiftedNovaHD/minsky/actions/runs/39097062812) is running on `1ee8cbf`.
 
 ## 5. Manual verification
 
 Reviewed authorization boundaries, atomic batches, original login deadlines, retry outcomes, image visibility and cleanup, notification fairness, and fixture ownership.
 Reviewed generated provider configuration, subscription requirements, bootstrap ordering, and PR #21 reuse.
-Interactive product screens were not checked manually.
-Automated browser tests cover phone layouts, keyboard behavior, persistence, and public/private separation.
-The full hosted application and documented independent installation still require verification.
+Visually inspected the actual local volunteer queue, issue detail, and image controls at 320 × 740 pixels.
+Text and controls fit the phone width. Keyboard focus remains visible, and the timer and owner fields remain readable.
+The private screenshot run also passes the complete React journey and scoped cleanup.
+Automated browser tests check keyboard behavior, persistence, and public/private separation.
+The hosted application and independent installation checks use automated real-browser assertions.
+The initialized fictional installation remains available for the owner's review.
+Its current owner password is in `/tmp/minsky-empty-install-b4b578a2/private/owner-recovered-current.json`, with mode `0600`.
+Open that file privately. Earlier generated temporary passwords are stale after the tested changes.
+If the private file is lost, use the documented trusted owner recovery command.
 
 ## 6. Risks
 
 The owner activated R2 in account `458ad6a930b0fb717796dfa19ca6a2b1`.
-The new private Standard CI bucket exists. Worker deployment and hosted verification are in progress.
-The empty-installation procedure remains experimental.
+The private CI and installation buckets exist, and the corresponding hosted checks pass.
 Protected connector evidence and the final PR checks remain pending. PR #42 remains a draft.
 Contest capacity and real-data migration remain outside this evidence.
 
 ## 7. Follow-up tickets
 
-Continue T0020's hosted verification and owner review.
-The conditional PR #21 disposition remains for the owner to decide after the complete goal passes.
+Finish protected T0020 verification, then prepare owner review.
+The PR #21 disposition remains for the owner to decide after the complete goal passes.
 No new follow-up ticket was created.
 
 ## 8. Docs that need updating
 
-Update this record, current state, ticket acceptance, and the PR after remaining checks finish.
-Keep the installation procedure experimental until the empty hosted trial succeeds.
+Update this record, current state, ticket acceptance, and the PR after protected checks finish.

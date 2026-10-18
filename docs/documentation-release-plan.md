@@ -82,8 +82,9 @@ Keep isolated fixtures and preserve the decision to retire the local demo.
 **Observed:** [installation](../site/src/content/docs/operators/installation.md) requires the unmerged T0007 branch.
 The guide correctly labels container startup and a fresh independent backend as unverified.
 Its three hosting options do not have equivalent verification evidence.
-This was the 2026-10-17 observation. The current guide links to T0020's experimental Cloudflare procedure.
-The hosted empty-installation trial is pending. Container packaging remains deferred.
+This was the 2026-10-17 observation. The current guide links to T0020's verified Cloudflare development procedure.
+The hosted empty-installation trial passed on `59121f7`, including the complete application and owner recovery.
+See its [evidence record](current-state.md#empty-hosted-installation). Container packaging remains deferred.
 
 **Complete when:** select a release revision and test a clean installation using only the published instructions.
 Record prerequisites, exact tool versions, account requirements, commands, expected results, and the tested revision.
@@ -315,7 +316,7 @@ The broader permission table and account-guide work in findings 7 and 8 remain i
 ## Recommended order
 
 1. Complete factual corrections, audience separation, and the contributor path within T0011.
-2. Finish T0020's independent Cloudflare installation, configuration, and owner-recovery verification before calling that installation path supported.
+2. Preserve T0020's verified independent Cloudflare development procedure and its recorded configuration, workflow, and owner-recovery evidence.
 3. Resolve owner decisions about licensing, publication, support, and the canonical address before announcing a public release.
 4. Review the complete reader journey, run applicable checks, and publish through the selected deployment workflow.
 

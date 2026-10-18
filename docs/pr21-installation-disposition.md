@@ -19,8 +19,8 @@ This record does not authorize its merge or closure.
 | `scripts/installation.test.mjs` PostgreSQL fixture | Replace the fixture with local D1 emulation that loads all current migrations. Verify rollback, concurrent initialization, lost responses, temporary-password enforcement, and owner recovery. Local checks do not prove hosted installation. |
 | `validateFrontendEnvironment()` | Retain its principle that errors must omit credentials. Replace Supabase URL and key assumptions for Cloudflare. Supabase-specific public-key validation remains provider-specific. |
 | `deploy/wrangler.example.jsonc` | Replace the frontend-only template for a complete installation. The new configuration must identify independent D1, R2, Durable Object, Worker, origin, and secret settings. Do not copy the original deployment IDs. |
-| `scripts/container-smoke.mjs` | Replace the Nginx and Supabase smoke command. The Cloudflare guide includes a private-path check and a complete browser checklist. The hosted UI test exercises the deployed application and its assets, but that run remains pending. The old script's cache-header assertions have not been ported. |
-| `docs/self-hosting.md` | Reuse explicit target selection, separate credentials, operator prerequisites, reviewed configuration, and clear verification limits. Replace its procedure with the experimental [Cloudflare installation guide](install-cloudflare.md). Complete hosted installation remains pending. |
+| `scripts/container-smoke.mjs` | Replace the Nginx and Supabase smoke command. The Cloudflare guide includes a private-path check and a complete browser checklist. The hosted UI test passes through the deployed application and its assets. The old script's cache-header assertions have not been ported. |
+| `docs/self-hosting.md` | Reuse explicit target selection, separate credentials, operator prerequisites, reviewed configuration, and clear verification limits. Replace its procedure with the [Cloudflare development installation guide](install-cloudflare.md). The separate empty hosted trial passes on `59121f7`. |
 | `Dockerfile`, `compose.yaml`, `deploy/nginx.conf`, `.dockerignore`, and Docker update settings | Defer. Docker packaging is outside this goal. |
 | Branch-wide guidance, workflow, and dependency edits | Do not merge the old branch wholesale. Apply only changes required by the current architecture and ticket. |
 
@@ -62,7 +62,9 @@ It does not authorize deletion or another bootstrap.
 
 [installation.test.ts](../src/server/adapters/cloudflare/installation.test.ts) covers local validation, bootstrap, and owner recovery.
 The tooling tests cover exact target and migration checks, private output, inherited logging settings, and refusal to rotate an existing secret.
-The active ticket must separately record the complete hosted installation and protected CI results.
+The [empty hosted installation](current-state.md#empty-hosted-installation) passes the full React journey and trusted owner recovery on `59121f7`.
+It verifies mandatory password changes, rejected repeated bootstrap and secret creation, original IDs and history, and scoped cleanup.
+The active ticket records protected CI separately.
 PR #21's older PostgreSQL and frontend checks do not establish those results.
 
 After the complete connector goal passes, recommend that the owner close PR #21 as superseded for Cloudflare installation.

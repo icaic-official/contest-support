@@ -8,15 +8,18 @@ T0018 authentication merged in PR #40 at `68e8642`. T0019 merged in PR #41.
 T0020 implements the complete Cloudflare connector and isolated installation tooling.
 All 70 production D1 cases pass locally and against the separate hosted connector CI database, with cleanup.
 Local HTTPS runtime, application, image, live-update, and installation checks also pass.
-Complete hosted shared scenarios, UI journeys, empty installation, and protected connector CI remain pending.
-The owner activated R2 after the initial provider error `10042`. Hosted verification is in progress.
+Both providers pass the same eight shared scenarios with verified fixture cleanup.
+The Cloudflare CLI run verifies `1ee8cbf`.
+The complete hosted React journey passes on `59121f7`, with the same application Worker source.
+The documented empty-installation journey also passes on `59121f7`, including trusted owner recovery.
+Scoped fixture cleanup passes for both hosted journeys. Protected Cloudflare connector CI remains pending.
+The owner activated R2 after the initial provider error `10042`. Hosted image and live-update journeys now pass.
 Data migration tools remain later work.
 The owner authorizes isolated development and CI resources for this implementation.
-That authorization does not establish a hosted verification result.
 Supabase remains the active backend.
 
 The user selected Workers, D1 with a SQLite rewrite, private R2, and Durable Objects.
-The migration preserves accounts, IDs, permissions, issue history, timestamps, awards, and image contents.
+A later migration must preserve accounts, IDs, permissions, issue history, timestamps, awards, and image contents.
 Possible AWS testing motivates portable interfaces. It does not add an AWS implementation to this change.
 
 The [implementation plan](cloudflare-implementation-plan.md) defines the acceptance steps and unresolved decisions.
@@ -278,8 +281,9 @@ Expired or abandoned uploads also create deletion tasks for their exact keys.
 An upload that finishes after revocation or expiry cannot publish its object.
 The worker rechecks reservation state after upload. A recovery scan removes orphaned bytes after interrupted requests.
 Recovery retains tombstones and repeats exact-key deletion to catch late transfers.
-The local D1 and R2 suite passes 34 cases, including concurrent limits, revocation, expiry, and partial failures.
-These emulated results do not verify the hosted bucket or complete image journey.
+The local D1 and R2 suite passes 59 cases, including concurrent limits, revocation, expiry, and partial failures.
+The hosted shared scenarios and complete React journey also verify image uploads, downloads, visibility, and removal against private R2.
+The shared run verifies scoped deletion of image objects and metadata.
 
 R2 object consistency does not make a D1 metadata change and an R2 write atomic.
 Cache behavior can also differ from direct bucket reads.
@@ -323,9 +327,10 @@ Closing a subscription stops callbacks immediately and releases the socket and t
 
 The healthy-connection target remains live updates within three seconds.
 Immediate delivery is the normal path. Recovery scans and polling handle missed messages but do not establish that latency target.
-Hosted latency, fan-out, revocation, and recovery tests must measure the implementation.
-Nine local live-update cases and the local HTTPS runtime case pass.
-Complete hosted delivery evidence remains pending.
+Local live-update, runtime, and cleanup-binding cases pass.
+The hosted shared scenarios verify independent subscribers, audience separation, revocation, and callback cleanup.
+The complete hosted React journey verifies live changes and refreshed state after reconnection.
+These development checks do not establish the latency target or contest capacity.
 
 ## Separate deployment and data migration
 
@@ -350,7 +355,10 @@ Each claim needs its own evidence.
 T0018 supplied bounded authentication after the D1 proof.
 T0019 verified the shared rules through Supabase before T0020's complete D1 persistence.
 T0020's [installation tooling](install-cloudflare.md) requires an empty isolated database and explicit provider targets.
-Its local bootstrap and recovery checks pass, but the documented hosted empty installation remains pending.
+Its local bootstrap and recovery checks pass.
+The documented hosted empty-installation journey passes on `59121f7`, including owner recovery, old-session rejection, and preserved application records.
+Scoped fixture cleanup passes, including empty test Durable Objects.
+The installed owner, event, session, roster, and administrator membership remain intact.
 The [PR #21 record](pr21-installation-disposition.md) identifies reused, replaced, and deferred components.
 It leaves the closure decision with the owner.
 Full migration tooling follows connector verification. Real-data exports and the backend switch remain later phases.

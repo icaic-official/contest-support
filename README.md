@@ -13,13 +13,15 @@ The [shared server workflow](docs/server-workflow.md) now supplies all nine issu
 The active browser path retains its guarded SQL workflow during the transition.
 T0020 adds a separate Cloudflare implementation with Workers, D1, private R2 images, and Durable Object live updates.
 All nine workflow commands use the same server service.
-Supabase remains active. Complete hosted Cloudflare and empty-installation verification remain pending.
+Supabase remains active. Both providers pass the same eight hosted scenarios.
+The complete Cloudflare React journey and a fresh isolated installation also pass.
+See the [verification record](docs/current-state.md#t0020-connector-implementation-2026-10-18) for exact revisions and CI results.
 See [the migration direction](docs/product-direction.md#backend-migration-direction) for the agreed scope and pending decisions.
 This is a **development deployment** that requires connectivity.
 Live-contest readiness and capacity for 800 simultaneous users remain unverified.
 
 [Read the user and operator guides](https://minsky-docs.icaic-minsky.workers.dev).
-The documentation site describes merged features and labels T0020's pending installation verification.
+The documentation site distinguishes merged features from T0020's verified development installation and pending owner review.
 Its deployment is separate from the application.
 
 ## Local development
@@ -142,7 +144,7 @@ The workflow requires account setup. The first automatic deployments remain unve
 - [Authentication choice](docs/cloudflare-authentication-choice.md) records Better Auth, maintained crypto, resource measurements, and costs.
 - [Verify Cloudflare authentication](docs/verify-cloudflare-authentication.md) gives local, hosted, and protected CI procedures.
 - [D1 transaction proof](docs/d1-transaction-proof.md) gives the local and isolated hosted verification commands.
-- [Cloudflare installation](docs/install-cloudflare.md) gives the experimental empty-installation procedure and owner recovery.
+- [Cloudflare installation](docs/install-cloudflare.md) gives the verified development installation procedure and owner recovery.
 - [PR #21 component record](docs/pr21-installation-disposition.md) records reused safeguards and replaced or deferred scaffolding.
 - [Shared provider test contracts](docs/provider-test-contracts.md) describe reusable assertions, fixture ownership, and provider requirements.
 - [Product direction](docs/product-direction.md) — agreed requirements and open decisions.

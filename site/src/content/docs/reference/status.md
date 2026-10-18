@@ -31,7 +31,7 @@ This page is a dated record, not a live deployment dashboard.
 | [T0006 announcements](https://github.com/GiftedNovaHD/minsky/pull/20) | Open pull request. |
 | [T0007 independent installations](https://github.com/GiftedNovaHD/minsky/pull/21) | Open pull request. Packaging exists on its branch. Container operation remains unverified. |
 | [T0009 jury worklist](https://github.com/GiftedNovaHD/minsky/pull/23) | Draft pull request. |
-| T0020 complete Cloudflare connector | Implements every backend group and provider-owned installation tooling. Local HTTPS and all 70 hosted D1 workflow cases pass. Complete hosted browser and empty-installation verification remain pending. |
+| [T0020 complete Cloudflare connector](https://github.com/GiftedNovaHD/minsky/pull/42) | Implements every backend group and provider-owned installation tooling. Both providers pass the same eight hosted scenarios. The complete hosted React journey and fresh isolated installation pass. Protected connector CI and owner review remain pending. |
 
 Supabase remains the active backend.
 The active browser retains the existing SQL workflow during Cloudflare replacement verification.
@@ -54,8 +54,8 @@ There is no provisioned Minsky production project in the recorded setup.
 ## Verification limits
 
 - Ordinary repository checks use embedded databases and fictional browser responses.
-- Protected cloud checks use the separate **Minsky CI** project. A skipped cloud job is not a passing cloud test.
-- T0007 container startup and a fresh independent backend's complete workflow still need operator verification.
+- Protected Supabase checks use the separate **Minsky CI** project. Cloudflare checks use separate connector CI resources. A skipped job is not a passing check.
+- The fresh independent Cloudflare installation passed on `59121f7`. T0007 container startup remains unverified and deferred.
 - Live-contest readiness and capacity for 800 simultaneous users remain unverified.
 - Offline capture, outage operation, and venue-local resilience remain deferred.
 - An application license remains a decision before an open-source release.

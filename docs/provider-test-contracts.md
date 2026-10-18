@@ -8,9 +8,10 @@ AWS has no implementation.
 T0017's separate [D1 transaction proof](d1-transaction-proof.md) checks the application store directly.
 T0020 extends that store to every workflow command and adds the complete Cloudflare fixture driver.
 The full D1 suite passes all 70 cases on local and isolated hosted D1, with cleanup.
-The Supabase shared suite passes all eight scenarios with cleanup.
-The Cloudflare shared run remains pending because R2 is not activated in the isolated account.
-Error `10042` is a blocked prerequisite, not a passing image or connector result.
+Both providers pass the same eight shared scenarios with verified fixture cleanup.
+The Cloudflare CLI run verifies `1ee8cbf` through the hosted Worker, D1, private R2, and Durable Objects.
+The owner enabled R2 after the earlier provider error `10042`.
+Protected Cloudflare CI remains pending. Keep its result separate from the passing CLI run.
 
 T0019 reuses the workflow scenarios against the [shared server service](server-workflow.md).
 The focused [hosted Supabase suite](../tests/workflow/supabase.test.ts) replaces only the workflow executor in a real Supabase connection.
@@ -60,7 +61,7 @@ It creates fictional application and Better Auth records in its dedicated D1 dat
 Its browser contexts use the hosted application origin for API calls, cookies, request protection, and WebSockets.
 Playwright supplies only bridge and source assets from the local Vite server under that browser origin.
 Those intercepted assets do not replace application HTTP operations or become public deployment routes.
-The hosted product UI still requires its separate journey check.
+The separate hosted product UI journey passes on `59121f7`, which has the same application Worker source as `1ee8cbf`.
 
 ESLint rejects provider imports in shared scenarios, fixture contracts, and the browser bridge.
 Provider implementations register outside those files.
@@ -86,9 +87,11 @@ The private-note notification check observes a bounded interval after a positive
 It does not prove delivery latency or the absence of arbitrarily delayed messages.
 
 The Cloudflare-specific suites additionally test current credential guards, atomic administration, concurrent image limits, partial storage failures, and live reconnect recovery.
-Local checks passed 37 application cases, 34 image cases, nine live-update cases, and one complete HTTPS runtime case.
-Installation passed 15 local cases, and its provider tooling passed 24 cases at the recorded revision.
-These results do not establish hosted Cloudflare shared-suite or empty-installation success.
+Local checks cover application reads, image limits and recovery, live updates, and the complete HTTPS runtime.
+Installation and tooling tests cover bootstrap, owner recovery, exact target selection, and credential handling.
+The separate documented hosted empty-installation journey passes on `59121f7`.
+Its scoped fixture cleanup also passes. The installed baseline remains intact, and both test Durable Objects are empty.
+See [current state](current-state.md) for exact case counts and revisions.
 
 The existing SQL and function suites retain lower-level permission and failure cases.
 The hosted UI suite still checks the app's account journey and provider-specific integration.
@@ -131,7 +134,7 @@ Its browser factory returns the real application adapter.
 Its cleanup owns provider-specific tables, accounts, objects, and test resources.
 The lost-response control must discard a committed response, not fake a successful write.
 
-Cloudflare must pass the complete scenario registry before it claims conformance.
+Cloudflare passes the current complete scenario registry through its guarded hosted CLI runner.
 A future AWS driver must pass the same registry.
 A driver cannot skip a failing behavior because its database or identity provider differs.
 A missing operation means that the provider implementation is incomplete.
@@ -147,4 +150,5 @@ T0018 extracts `verifyTemporaryAuthentication()` from the existing authenticatio
 The Supabase scenario retains its workflow hooks. Cloudflare supplies its real authentication adapter and protected session-list hooks.
 Both providers use the same identity, temporary-password, password-change, logout, stale-password, and subscription-cleanup assertions.
 That earlier bounded reuse did not establish complete Cloudflare `Backend` conformance.
-T0020 now provides the complete driver, but its hosted shared-suite result remains pending.
+T0020's complete driver now passes all eight unchanged scenarios against the hosted Cloudflare application.
+The protected connector job remains a separate pending verification gate.

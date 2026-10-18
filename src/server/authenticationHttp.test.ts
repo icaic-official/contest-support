@@ -1,0 +1,163 @@
+import { describe, expect, it, vi } from 'vitest';
+import { AuthenticationError, type AuthenticationService, type AuthenticationSession } from './authentication';
+import { createAuthenticationHandler } from './authenticationHttp';
+
+const ORIGIN = 'https://auth.minsky.test';
+const ACCOUNT_ID = '00000000-0000-4000-8000-000000000001';
+const SESSION_ID = '00000000-0000-4000-8000-000000000002';
+const current: AuthenticationSession = {
+  caller: { accountId: ACCOUNT_ID, loginId: 'private-login-id' },
+  user: { id: ACCOUNT_ID, name: 'Fictional helper' },
+  status: { username: 'helper', must_change: true, session_valid: true },
+  csrf: 'fixture-csrf',
+};
+
+function setup() {
+  const service = {
+    current: vi.fn<AuthenticationService['current']>().mockResolvedValue(current),
+    signIn: vi.fn<AuthenticationService['signIn']>().mockResolvedValue({ cookie: 'opaque=fixture; Secure; HttpOnly; SameSite=Strict; Path=/' }),
+    signOut: vi.fn<AuthenticationService['signOut']>().mockResolvedValue({ cookie: 'opaque=; Max-Age=0; Path=/' }),
+    changePassword: vi.fn<AuthenticationService['changePassword']>().mockResolvedValue({ cookie: 'opaque=changed; Secure; HttpOnly; SameSite=Strict; Path=/' }),
+    account: vi.fn<AuthenticationService['account']>().mockResolvedValue({ temporaryPassword: 'fictional-temporary-password' }),
+    sessions: vi.fn<AuthenticationService['sessions']>().mockResolvedValue([{ id: SESSION_ID, name: 'Fictional session' }]),
+  };
+  return { service, handle: createAuthenticationHandler(service, { origins: [ORIGIN] }) };
+}
+
+function post(path: string, body: unknown = {}, headers: Record<string, string> = {}) {
+  return new Request(`${ORIGIN}${path}`, {
+    method: 'POST',
+    headers: { Origin: ORIGIN, 'Content-Type': 'application/json', 'X-Minsky-Request': '1', 'X-CSRF-Token': current.csrf, ...headers },
+    body: JSON.stringify(body),
+  });
+}
+
+describe('authentication HTTP boundary', () => {
+  it('returns the public account status with no-store and omits the trusted caller', async () => {
+    const { handle } = setup();
+    const response = await handle(new Request(`${ORIGIN}/api/auth/session`));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ user: current.user, status: current.status, csrf: current.csrf });
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
+    expect(response.headers.get('Access-Control-Allow-Origin')).toBeNull();
+    expect(response.headers.get('X-Content-Type-Options')).toBe('nosniff');
+  });
+
+  it('rejects disallowed request hosts, cross-origin reads and CORS preflight', async () => {
+    const { handle, service } = setup();
+    for (const request of [
+      new Request('https://preview.minsky.test/api/auth/session'),
+      new Request(`${ORIGIN}/api/auth/session`, { headers: { Origin: 'https://attacker.test' } }),
+      new Request(`${ORIGIN}/api/auth/sign-in`, { method: 'OPTIONS', headers: { Origin: 'https://attacker.test' } }),
+    ]) {
+      const response = await handle(request);
+      expect(response.status).toBe(403);
+      expect(response.headers.get('Access-Control-Allow-Origin')).toBeNull();
+    }
+    expect(service.current).not.toHaveBeenCalled();
+  });
+
+  it('rejects unsafe origin configuration and allows only explicit local HTTP', () => {
+    const { service } = setup();
+    for (const origin of ['*', 'null', 'http://shared.test', `${ORIGIN}/`, `${ORIGIN}/path`, 'https://name:password@auth.test']) {
+      expect(() => createAuthenticationHandler(service, { origins: [origin] })).toThrow();
+    }
+    expect(() => createAuthenticationHandler(service, { origins: [] })).toThrow();
+    expect(() => createAuthenticationHandler(service, { origins: ['http://127.0.0.1:8787'] })).not.toThrow();
+  });
+
+  it('protects login without a prior session and never echoes submitted credentials', async () => {
+    const { handle, service } = setup();
+    const response = await handle(post('/api/auth/sign-in', { username: 'helper', password: 'fictional-password' }, { 'X-CSRF-Token': '' }));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({});
+    expect(response.headers.get('Set-Cookie')).toContain('HttpOnly');
+    expect(service.signIn).toHaveBeenCalledExactlyOnceWith('helper', 'fictional-password');
+    expect(service.current).not.toHaveBeenCalled();
+  });
+
+  it('rejects originless, foreign-origin, form and missing custom-header writes before identity work', async () => {
+    const { handle, service } = setup();
+    const body = { username: 'helper', password: 'fictional-password' };
+    const originless = post('/api/auth/sign-in', body);
+    originless.headers.delete('Origin');
+    for (const request of [
+      originless,
+      post('/api/auth/sign-in', body, { Origin: 'null' }),
+      post('/api/auth/sign-in', body, { Origin: 'https://attacker.test' }),
+      post('/api/auth/sign-in', body, { 'Content-Type': 'text/plain' }),
+      post('/api/auth/sign-in', body, { 'Content-Type': 'application/x-www-form-urlencoded' }),
+      post('/api/auth/sign-in', body, { 'X-Minsky-Request': '' }),
+      post('/api/auth/sign-in', body, { 'Sec-Fetch-Site': 'cross-site' }),
+    ]) expect((await handle(request)).status).toBe(403);
+    expect(service.signIn).not.toHaveBeenCalled();
+  });
+
+  it('requires the current session CSRF token for every authenticated write', async () => {
+    const { handle, service } = setup();
+    for (const path of ['/api/auth/sign-out', '/api/auth/change-password', '/api/accounts']) {
+      expect((await handle(post(path, {}, { 'X-CSRF-Token': 'stale-csrf' }))).status).toBe(403);
+    }
+    expect(service.signOut).not.toHaveBeenCalled();
+    expect(service.changePassword).not.toHaveBeenCalled();
+    expect(service.account).not.toHaveBeenCalled();
+    service.current.mockResolvedValue(undefined);
+    expect((await handle(post('/api/auth/sign-out'))).status).toBe(401);
+  });
+
+  it('passes cookie credentials to the service and permits password change behind the temporary gate', async () => {
+    const { handle, service } = setup();
+    const request = post('/api/auth/change-password', { currentPassword: 'fictional-old', newPassword: 'fictional-new' }, { Cookie: 'opaque=fixture' });
+    const response = await handle(request);
+    expect(response.status).toBe(200);
+    expect(response.headers.get('Set-Cookie')).toContain('changed');
+    expect(service.changePassword).toHaveBeenCalledExactlyOnceWith(request.headers, 'fictional-old', 'fictional-new');
+    const signedOut = await handle(post('/api/auth/sign-out'));
+    expect(signedOut.headers.get('Set-Cookie')).toContain('Max-Age=0');
+  });
+
+  it('returns temporary credentials only from the authorized account command', async () => {
+    const { handle, service } = setup();
+    const command = { action: 'reset_password', userId: ACCOUNT_ID } as const;
+    const request = post('/api/accounts', { sessionId: SESSION_ID, command });
+    const response = await handle(request);
+    expect(await response.json()).toEqual({ temporaryPassword: 'fictional-temporary-password' });
+    expect(service.account).toHaveBeenCalledExactlyOnceWith(request.headers, SESSION_ID, command);
+    service.account.mockRejectedValue(new AuthenticationError(403, 'Admin access to every assigned session is required.'));
+    const rejected = await handle(post('/api/accounts', { sessionId: SESSION_ID, command }));
+    expect(rejected.status).toBe(403);
+    expect(await rejected.text()).not.toContain('fictional-temporary-password');
+  });
+
+  it('rejects invalid, unknown-field and oversized bodies without identity writes', async () => {
+    const { handle, service } = setup();
+    const malformed = post('/api/auth/sign-in');
+    const invalidJSON = new Request(malformed, { body: '{' });
+    for (const request of [
+      invalidJSON,
+      post('/api/auth/sign-in', { username: 'helper', password: 'test', isAdmin: true }),
+      post('/api/auth/sign-in', { username: 'helper', password: 'x'.repeat(17_000) }),
+      post('/api/accounts', { sessionId: SESSION_ID, command: { action: 'reset_password', userId: ACCOUNT_ID, user: 'forged' } }),
+    ]) expect((await handle(request)).status).toBe(400);
+    expect(service.signIn).not.toHaveBeenCalled();
+    expect(service.account).not.toHaveBeenCalled();
+  });
+
+  it('does not expose internal errors or credentials and preserves controlled rejections', async () => {
+    const { handle, service } = setup();
+    service.signIn.mockRejectedValue(new Error('database password=fictional-private-value'));
+    const failure = await handle(post('/api/auth/sign-in', { username: 'helper', password: 'fictional-password' }));
+    expect(failure.status).toBe(503);
+    expect(await failure.text()).not.toContain('fictional');
+    service.signIn.mockRejectedValue(new AuthenticationError(401, 'The username or password is incorrect.'));
+    expect((await handle(post('/api/auth/sign-in', { username: 'helper', password: 'wrong' }))).status).toBe(401);
+  });
+
+  it('passes session-list gating to the service and rejects unsupported routes and methods', async () => {
+    const { handle, service } = setup();
+    service.sessions.mockRejectedValue(new AuthenticationError(403, 'Change your password first.'));
+    expect((await handle(new Request(`${ORIGIN}/api/auth/sessions`))).status).toBe(403);
+    expect((await handle(new Request(`${ORIGIN}/api/unknown`))).status).toBe(404);
+    expect((await handle(new Request(`${ORIGIN}/api/auth/session`, { method: 'DELETE' }))).status).toBe(405);
+  });
+});

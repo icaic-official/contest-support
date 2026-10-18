@@ -2,15 +2,28 @@ name: Checks
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: ["**"]
+  schedule:
+    - cron: "23 3 * * 1"
   workflow_dispatch:
+    inputs:
+      existing_backend:
+        description: Test the existing CI backend without applying configuration, migrations, or functions
+        type: boolean
+        default: false
+      cloudflare_auth:
+        description: Run authentication checks on the isolated Cloudflare CI target
+        type: boolean
+        default: false
 permissions:
   contents: read
 concurrency:
   group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: ${{ github.event_name != 'workflow_dispatch' }}
+  # Finish a running push deployment before another run can publish that branch.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   checks:
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -21,17 +34,104 @@ jobs:
         with:
           node-version: 22
           cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            site/package-lock.json
       - run: npm ci
+      - run: npm ci --prefix site
       - run: npm run typecheck
       - run: npm run lint
       - run: npm run check:functions
+      - run: npm run test:functions
       - run: npm test
+      - run: npm run test:providers:list
       - run: npm run build
+      - run: npm run docs:build
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e
+      - run: npm run test:auth:browser
+      - run: npm run docs:test
+  secrets:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v4.3.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install checksum-verified Gitleaks
+        env:
+          GITLEAKS_VERSION: "8.30.1"
+          GITLEAKS_SHA256: "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb"
+        run: |
+          curl --fail --silent --show-error --location \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
+            --output "$RUNNER_TEMP/gitleaks.tar.gz"
+          printf '%s  %s\n' "$GITLEAKS_SHA256" "$RUNNER_TEMP/gitleaks.tar.gz" | sha256sum --check
+          tar -xzf "$RUNNER_TEMP/gitleaks.tar.gz" -C "$RUNNER_TEMP" gitleaks
+      - name: Scan fetched Git history with redacted output
+        run: '"$RUNNER_TEMP/gitleaks" git --redact --verbose --log-opts=--all .'
+  dependencies:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v4.3.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      - name: Audit locked runtime and development dependencies
+        run: npm audit --package-lock-only --audit-level=high
+      - name: Audit documentation dependencies
+        run: npm audit --prefix site --package-lock-only --audit-level=high
+  deploy:
+    needs: [checks, secrets, dependencies]
+    if: >-
+      github.event_name == 'push' &&
+      github.repository == 'GiftedNovaHD/minsky' &&
+      github.actor != 'dependabot[bot]' &&
+      github.event.deleted == false &&
+      vars.CLOUDFLARE_DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+      VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}
+      VITE_ENVIRONMENT: development
+      CLOUDFLARE_ACCOUNT_ID: 458ad6a930b0fb717796dfa19ca6a2b1
+      WRANGLER_SEND_METRICS: "false"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v4.3.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            site/package-lock.json
+      - name: Check deployment settings
+        env:
+          HAS_CLOUDFLARE_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN != '' }}
+        run: |
+          test "$HAS_CLOUDFLARE_TOKEN" = true
+          node scripts/deploy-workers.mjs --check
+      - run: npm ci
+      - run: npm ci --prefix site
+      - run: npm run build
+      - run: npm run docs:build
+      - name: Publish both Workers and verify the source revision
+        # Only this step receives provider credentials. PR jobs never receive them.
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: node scripts/deploy-workers.mjs
   cloud:
-    if: github.event_name == 'workflow_dispatch'
-    needs: checks
+    if: github.event_name == 'workflow_dispatch' && !inputs.cloudflare_auth
+    needs: [checks, secrets, dependencies]
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment: cloud-test
@@ -55,9 +155,84 @@ jobs:
           test -n "$MINSKY_TEST_PROJECT_REF"
           test "$MINSKY_TEST_PROJECT_REF" != ovymmobupzowotvrywek
       - run: npx supabase link --project-ref "$MINSKY_TEST_PROJECT_REF"
-      - run: npx supabase config push --project-ref "$MINSKY_TEST_PROJECT_REF" --yes
-      - run: npx supabase db push --linked
-      - run: npx supabase functions deploy admin --project-ref "$MINSKY_TEST_PROJECT_REF" --use-api
-      - run: npx supabase secrets set ALLOWED_ORIGINS=http://127.0.0.1:4174 --project-ref "$MINSKY_TEST_PROJECT_REF"
+      - name: Record existing CI backend
+        run: |
+          npx supabase migration list --linked
+          npx supabase functions list --project-ref "$MINSKY_TEST_PROJECT_REF"
+      - name: Record test mode
+        env:
+          EXISTING_BACKEND: ${{ inputs.existing_backend }}
+        run: |
+          if [ "$EXISTING_BACKEND" = true ]; then
+            echo "Testing the existing CI backend. Backend preparation is disabled."
+            echo "This run does not verify migration installation or function deployment."
+          else
+            echo "Preparing the CI backend from this revision before testing."
+          fi
+      - if: ${{ !inputs.existing_backend }}
+        run: npx supabase config push --project-ref "$MINSKY_TEST_PROJECT_REF" --yes
+      - if: ${{ !inputs.existing_backend }}
+        run: npx supabase db push --linked
+      - if: ${{ !inputs.existing_backend }}
+        run: npx supabase functions deploy admin --project-ref "$MINSKY_TEST_PROJECT_REF" --use-api
+      - if: ${{ !inputs.existing_backend }}
+        run: npx supabase functions deploy attachments --project-ref "$MINSKY_TEST_PROJECT_REF" --use-api
+      - if: ${{ !inputs.existing_backend }}
+        run: npx supabase functions deploy workflow --project-ref "$MINSKY_TEST_PROJECT_REF" --use-api
+      - if: ${{ !inputs.existing_backend }}
+        run: npx supabase secrets set ALLOWED_ORIGINS=http://127.0.0.1:4174 --project-ref "$MINSKY_TEST_PROJECT_REF"
+      - name: Check backend prerequisites before fixture creation
+        run: node scripts/check-cloud-backend.mjs
       - run: npx playwright install --with-deps chromium
       - run: npm run test:cloud
+      - name: Test shared provider contracts against Supabase
+        run: npm run test:providers -- --provider=supabase
+      - name: Test shared server workflow through Supabase
+        run: npm run test:workflow:hosted
+      - name: Retain fixture recovery IDs after incomplete cleanup
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: provider-recovery-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/minsky-provider-*/recovery.json
+            ${{ runner.temp }}/minsky-workflow-proof-*/fixture.json
+          if-no-files-found: ignore
+          retention-days: 7
+  cloudflare-auth:
+    if: github.event_name == 'workflow_dispatch' && inputs.cloudflare_auth
+    needs: [checks, secrets, dependencies]
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    environment: cloud-test
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: 458ad6a930b0fb717796dfa19ca6a2b1
+      WRANGLER_SEND_METRICS: 'false'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v4.3.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Check existing CI access and exact isolated target
+        run: node scripts/auth-target.mjs
+      - name: Apply CI schema and deploy only the authentication CI Worker
+        run: |
+          npx wrangler d1 migrations apply minsky-auth-ci --remote --config wrangler.auth-ci.jsonc
+          npx wrangler deploy --config wrangler.auth-ci.jsonc
+      - name: Check account rules on hosted D1
+        run: npm run test:auth:hosted -- --account=458ad6a930b0fb717796dfa19ca6a2b1 --database=5d746d29-0a66-4346-96a6-4974126685d7
+      - name: Check hosted HTTP authentication
+        run: npm run test:auth:http -- --account=458ad6a930b0fb717796dfa19ca6a2b1 --database=5d746d29-0a66-4346-96a6-4974126685d7 --origin=https://minsky-auth-ci.icaic-minsky.workers.dev
+      - name: Retain credential-free recovery IDs after incomplete cleanup
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: auth-recovery-${{ github.run_id }}-${{ github.run_attempt }}
+          path: /tmp/minsky-d1-proof-*/fixture.json
+          if-no-files-found: ignore
+          retention-days: 7

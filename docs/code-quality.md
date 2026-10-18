@@ -3,20 +3,22 @@
 On 2026-10-02, the user selected mandatory CI, a short PR review checklist, and scans for secrets and dependencies.
 These changes extend T0003.
 The user reviews and merges.
-Cloud deployment and automated branch previews remain separate setup work.
+The frontend deployment job waits for all three required checks.
+[Deployment activation](cloudflare-builds.md) requires separate account setup.
 
 ## Automated checks
 
-Pull requests and pushes to `main` run these checks:
+Pull requests and all branch pushes run these checks:
 
 | Check | Required behavior |
 | --- | --- |
-| `checks` | Type checking, ESLint, Deno function checks, focused and database tests, builds, and public landing and login browser tests must pass. |
+| `checks` | Type checking, ESLint, Deno function checks, unit and database tests, both site builds, docs links, and both browser suites must pass. |
 | `secrets` | Gitleaks scans fetched Git history, including secrets that later commits removed. It redacts findings. Any finding fails the check. |
 | `dependencies` | `npm audit --package-lock-only --audit-level=high` checks locked runtime and development dependencies. High and critical advisories fail the check. Lower severities remain visible for review. Registry failures also fail the check. |
 
+The security jobs now run in `Checks`, alongside `checks`. Their required status names stay the same.
 Security checks also run weekly on the default branch.
-You can dispatch them manually.
+Manual dispatch runs all checks and the separate protected cloud job. It does not publish either frontend.
 The weekly schedule and Dependabot updates take effect after their configuration reaches `main`.
 Dependabot proposes weekly npm and GitHub Actions updates.
 It permits at most three open update PRs per ecosystem.
@@ -32,6 +34,10 @@ Gitleaks uses a pinned binary with a verified checksum.
 PR security jobs do not use cloud credentials or execute package install scripts.
 The privileged cloud integration job requires manual dispatch against the separate, protected `cloud-test` project.
 It is not a routine required PR check.
+On trusted branch pushes, `deploy` waits for `checks`, `secrets`, and `dependencies` to pass.
+The workflow publishes previews for feature branches and stable sites for `main`.
+Pull requests, forks, and Dependabot do not receive deployment credentials.
+Disabling independent Cloudflare Git builds prevents a second deployment path that skips these CI prerequisites.
 
 Run the usual README checks locally.
 With Gitleaks 8.30.1 installed, scan history with this command:
@@ -71,7 +77,9 @@ The Google TypeScript style policy and manual interface checks in AGENTS.md stil
 ## Owner setup for mandatory merges
 
 On 2026-10-02, the user deferred remote merge enforcement and setup of vulnerability alerts.
-On 2026-10-03, the user moved these scope notes from T0004 to T0005.
+On 2026-10-03, the user moved these scope notes from T0004.
+They stay deferred.
+They are not part of the T0005 issue-image ticket.
 Existing checks and prepared configuration remain in T0003.
 The owner steps below remain incomplete.
 Setup of the protected cloud integration CI environment remains a separate T0003 requirement.
@@ -98,10 +106,10 @@ An authenticated repository administrator can also use the prepared payload.
 Before you use it, reconcile it with existing rules.
 
 ```sh
-gh api --method PUT repos/notbowen/minsky/branches/main/protection \
+gh api --method PUT repos/GiftedNovaHD/minsky/branches/main/protection \
   --input .github/main-protection.json
-gh api --method GET repos/notbowen/minsky/branches/main/protection
-gh api --method PUT repos/notbowen/minsky/vulnerability-alerts
+gh api --method GET repos/GiftedNovaHD/minsky/branches/main/protection
+gh api --method PUT repos/GiftedNovaHD/minsky/vulnerability-alerts
 ```
 
 The payload replaces branch protection.

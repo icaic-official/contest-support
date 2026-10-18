@@ -5,28 +5,31 @@ import {
   useRef,
   useState,
 } from "react";
-import type { User } from "@supabase/supabase-js";
-import {
-  type AccountStatus,
-  accountStatus,
-  client,
-  errorMessage,
-  execute,
-  loginIdentifier,
-  requireClient,
-  snapshot,
-} from "./client";
+import { backend, backendSetupMessage, requireBackend } from "../backend";
+import type {
+  AccountCommand,
+  AccountIdentity,
+  AccountStatus,
+  MembershipInput,
+} from "../backend/contracts";
+import { errorMessage, WorkflowRejectedError } from "../backend/errors";
 import {
   type Command,
   isStaff,
   type Issue,
   isSupport,
   type Membership,
-  membershipSchema,
+  roleSchema,
   type Snapshot,
   unresolvedTime,
 } from "./model";
-import { z } from "zod";
+import { IssueImages } from "./IssueImages";
+import { TeamSearch } from "./TeamSearch";
+import {
+  initialTeamSelection,
+  issueVisibleForTeam,
+  submitTeamId,
+} from "./teamSearch";
 import { Brand, clockDuration, Icon } from "./ui";
 import { JuryWorklist } from "./JuryWorklist";
 
@@ -43,6 +46,12 @@ const resolutions = [
   "Problem statement clarified",
 ];
 const formatDate = (value: string) => new Date(value).toLocaleString();
+
+interface ActionOptions {
+  retry?: boolean;
+  onSuccess?: () => void;
+}
+
 function formData(event: FormEvent<HTMLFormElement>): FormData {
   event.preventDefault();
   return new FormData(event.currentTarget);
@@ -51,8 +60,16 @@ function text(data: FormData, name: string): string {
   return String(data.get(name) ?? "");
 }
 
+function memberInput(data: FormData): MembershipInput {
+  return {
+    teamId: text(data, "team") || null,
+    roles: data.getAll("role").map((role) => roleSchema.parse(role)),
+    isAdmin: data.has("admin"),
+  };
+}
+
 export function ConnectedApp() {
-  const [user, setUser] = useState<User>();
+  const [user, setUser] = useState<AccountIdentity>();
   const [loading, setLoading] = useState(true);
   const [passwordSetup, setPasswordSetup] = useState(false);
   const [error, setError] = useState("");
@@ -61,28 +78,30 @@ export function ConnectedApp() {
   const [accountRetry, setAccountRetry] = useState(0);
   const userId = user?.id;
   useEffect(() => {
-    if (!client) {
+    if (!backend) {
       setLoading(false);
       return;
     }
     let active = true;
-    const { data: subscription } = client.auth.onAuthStateChange(
-      (event, session) => {
-        if (!active) return;
-        setUser(session?.user);
-        setLoading(false);
-        if (event === "SIGNED_OUT") setPasswordSetup(false);
-      },
-    );
-    void client.auth.getSession().then(({ data, error: cause }) => {
+    const unsubscribe = backend.auth.subscribe((nextUser) => {
       if (!active) return;
-      setUser(data.session?.user);
-      if (cause) setError(cause.message);
+      setUser(nextUser);
       setLoading(false);
+      if (!nextUser) setPasswordSetup(false);
     });
+    void backend.auth.currentUser()
+      .then((nextUser) => {
+        if (!active) return;
+        setUser(nextUser);
+        setLoading(false);
+      }).catch((cause: unknown) => {
+        if (!active) return;
+        setError(errorMessage(cause));
+        setLoading(false);
+      });
     return () => {
       active = false;
-      subscription.subscription.unsubscribe();
+      unsubscribe();
     };
   }, []);
   useEffect(() => {
@@ -91,7 +110,7 @@ export function ConnectedApp() {
     setAccount(undefined);
     async function refreshAccount() {
       try {
-        const next = await accountStatus();
+        const next = await requireBackend().auth.accountStatus();
         if (!active) return;
         setAccount(next);
         setAccountError("");
@@ -111,11 +130,9 @@ export function ConnectedApp() {
     };
   }, [userId, accountRetry]);
   function signOut() {
-    void requireClient()
-      .auth.signOut()
-      .then(({ error: cause }) => {
-        if (cause) setError(cause.message);
-      });
+    void requireBackend().auth.signOut().catch((cause: unknown) => {
+      setError(errorMessage(cause));
+    });
   }
   const dashboardReady =
     !!user &&
@@ -146,10 +163,9 @@ export function ConnectedApp() {
         )}
         {loading ? (
           <p role="status">Restoring your session…</p>
-        ) : !client ? (
+        ) : !backend ? (
           <p role="alert">
-            Set VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY in
-            .env.local. See docs/cloud-onboarding.md.
+            {backendSetupMessage}
           </p>
         ) : !user ? (
           <SignIn />
@@ -190,7 +206,16 @@ export function ConnectedApp() {
         )}
       </main>
       {!dashboardReady && (
-        <footer className="auth-footer">Minsky · Development deployment</footer>
+        <footer className="auth-footer">
+          Minsky · Development deployment ·{" "}
+          <a
+            href="https://minsky-docs.icaic-minsky.workers.dev"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Documentation <span className="sr-only">(opens in a new tab)</span>↗
+          </a>
+        </footer>
       )}
     </div>
   );
@@ -216,11 +241,10 @@ function SignIn() {
           setError("");
           void (async () => {
             try {
-              const result = await requireClient().auth.signInWithPassword({
-                email: loginIdentifier(text(data, "username")),
-                password: text(data, "password"),
-              });
-              if (result.error) throw result.error;
+              await requireBackend().auth.signIn(
+                text(data, "username"),
+                text(data, "password"),
+              );
             } catch (cause) {
               setError(errorMessage(cause));
             } finally {
@@ -320,15 +344,10 @@ function PasswordForm({
           setError("");
           void (async () => {
             try {
-              const updated = await requireClient().auth.updateUser({
-                password: text(data, "password"),
-                current_password: text(data, "current"),
-              });
-              if (updated.error) throw updated.error;
-              const completed = await requireClient().rpc(
-                "complete_password_change",
+              await requireBackend().auth.changePassword(
+                text(data, "current"),
+                text(data, "password"),
               );
-              if (completed.error) throw completed.error;
               done();
             } catch (cause) {
               setError(errorMessage(cause));
@@ -392,7 +411,7 @@ function Dashboard({
   changePassword,
   signOut,
 }: {
-  user: User;
+  user: AccountIdentity;
   username: string | null;
   changePassword: () => void;
   signOut: () => void;
@@ -408,6 +427,7 @@ function Dashboard({
   const [busy, setBusy] = useState(false);
   const [selected, setSelected] = useState("");
   const [filter, setFilter] = useState("all");
+  const [teamSelection, setTeamSelection] = useState(initialTeamSelection);
   const [view, setView] = useState<"issues" | "admin" | "account" | "jury">(
     "issues",
   );
@@ -417,9 +437,11 @@ function Dashboard({
   const [now, setNow] = useState(Date.now());
   const clockOffset = useRef(0);
   const inFlight = useRef(false);
-  const pending = useRef<{ request: string; command: Command } | undefined>(
-    undefined,
-  );
+  const pending = useRef<{
+    request: string;
+    command: Command;
+    onSuccess?: () => void;
+  } | undefined>(undefined);
   const generation = useRef(0);
   const refreshQueue = useRef<Promise<void>>(Promise.resolve());
   const refresh = useCallback(() => {
@@ -428,27 +450,13 @@ function Dashboard({
     // revision. A write waits for its own refresh before enabling controls.
     const task = refreshQueue.current.then(async () => {
       try {
-        const membershipsResult = await requireClient()
-          .from("memberships")
-          .select("*")
-          .eq("user_id", user.id);
-        if (membershipsResult.error) throw membershipsResult.error;
-        const members = z.array(membershipSchema).parse(membershipsResult.data);
-        const sessionResult = await requireClient()
-          .from("sessions")
-          .select("id,name")
-          .in(
-            "id",
-            members.map((m) => m.session_id),
-          );
-        if (sessionResult.error) throw sessionResult.error;
-        const list = z
-          .array(z.object({ id: z.string().uuid(), name: z.string() }))
-          .parse(sessionResult.data);
+        const list = await requireBackend().workflows.sessions(user.id);
         const nextSession = list.some((s) => s.id === session)
           ? session
           : (list[0]?.id ?? "");
-        const next = nextSession ? await snapshot(nextSession) : undefined;
+        const next = nextSession
+          ? await requireBackend().workflows.snapshot(nextSession)
+          : undefined;
         if (run !== generation.current) return;
         setSessions(list);
         setSession(nextSession);
@@ -458,6 +466,21 @@ function Dashboard({
             ? "issues"
             : current,
         );
+        // Keep a choice only while its session, staff access, and team remain valid.
+        setTeamSelection((selection) => {
+          const member = next?.membership;
+          if (
+            nextSession !== session ||
+            !member ||
+            member.team_id ||
+            !isStaff(member) ||
+            (selection.teamId &&
+              !next?.teams.some((team) => team.id === selection.teamId))
+          ) {
+            return initialTeamSelection();
+          }
+          return selection;
+        });
         if (next) {
           clockOffset.current = Date.parse(next.server_time) - Date.now();
         }
@@ -475,48 +498,20 @@ function Dashboard({
   useEffect(() => {
     void refresh();
     setConnected(false);
-    const channel = requireClient()
-      .channel(`session-${session}-${user.id}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "changes",
-          filter: `session_id=eq.${session}`,
-        },
-        () => {
+    // The first refresh selects a session. Empty IDs produce invalid live filters.
+    const unsubscribe = session
+      ? requireBackend().updates.subscribe({
+        sessionId: session,
+        userId: user.id,
+        onChange: () => {
           void refresh();
         },
-      )
-      .on(
-        "postgres_changes",
-        {
-          event: "UPDATE",
-          schema: "public",
-          table: "sessions",
-          filter: `id=eq.${session}`,
+        onConnection: (isConnected) => {
+          setConnected(isConnected);
+          if (isConnected) void refresh();
         },
-        () => {
-          void refresh();
-        },
-      )
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "staff_changes",
-          filter: `session_id=eq.${session}`,
-        },
-        () => {
-          void refresh();
-        },
-      )
-      .subscribe((status) => {
-        setConnected(status === "SUBSCRIBED");
-        if (status === "SUBSCRIBED") void refresh();
-      });
+      })
+      : undefined;
     // Poll current membership as a backstop: a revoked subscriber receives no further data.
     const interval = window.setInterval(() => {
       void refresh();
@@ -533,7 +528,7 @@ function Dashboard({
       window.clearInterval(interval);
       window.removeEventListener("focus", focus);
       window.removeEventListener("online", focus);
-      void requireClient().removeChannel(channel);
+      unsubscribe?.();
     };
   }, [refresh, session, user.id]);
   useEffect(() => {
@@ -543,7 +538,10 @@ function Dashboard({
     );
     return () => window.clearInterval(interval);
   }, []);
-  async function act(command: Command, retry = false): Promise<boolean> {
+  async function act(
+    command: Command,
+    { retry = false, onSuccess }: ActionOptions = {},
+  ): Promise<boolean> {
     if (inFlight.current || (!retry && pending.current)) return false;
     inFlight.current = true;
     setBusy(true);
@@ -552,11 +550,17 @@ function Dashboard({
     const request =
       retry && pending.current
         ? pending.current
-        : { request: crypto.randomUUID(), command };
+        : { request: crypto.randomUUID(), command, onSuccess };
     pending.current = request;
     try {
-      const id = await execute(session, request.request, request.command);
+      const id = await requireBackend().workflows.execute(
+        session,
+        request.request,
+        request.command,
+      );
       pending.current = undefined;
+      // A retry must complete the original form's cleanup before enabling edits.
+      request.onSuccess?.();
       await refresh();
       if (view !== "jury") {
         setSelected(id);
@@ -567,13 +571,7 @@ function Dashboard({
     } catch (cause) {
       // Known server rejections are definitive. Transport failures retain the same
       // request UUID for an explicit retry, including submissions and messages.
-      if (
-        cause &&
-        typeof cause === "object" &&
-        "code" in cause &&
-        typeof cause.code === "string" &&
-        cause.code
-      ) {
+      if (cause instanceof WorkflowRejectedError) {
         pending.current = undefined;
       }
       await refresh();
@@ -587,12 +585,25 @@ function Dashboard({
   const m = state?.membership;
   const juryOnly =
     m && m.roles.includes("jury") && !isSupport(m) && !m.is_admin;
+  const canSearchTeams = Boolean(m && !m.team_id && isStaff(m));
   const visible =
-    state?.issues.filter((i) => !juryOnly || i.status === "resolved") ?? [];
-  const filtered = visible.filter(
-    (i) => filter === "all" || i.status === filter,
-  );
+    state?.issues.filter((issue) =>
+      issueVisibleForTeam(issue, null, "all", Boolean(juryOnly)),
+    ) ?? [];
+  const filtered =
+    state?.issues.filter((issue) =>
+      issueVisibleForTeam(
+        issue,
+        teamSelection.teamId,
+        filter,
+        Boolean(juryOnly),
+      ),
+    ) ?? [];
   const issue = filtered.find((i) => i.id === selected) ?? filtered[0];
+  // Keep the displayed issue selected when a new report arrives.
+  if (issue && issue.id !== selected) {
+    setSelected(issue.id);
+  }
   const activeView =
     (view === "admin" && !m?.is_admin) ||
     (view === "jury" && !m?.roles.includes("jury"))
@@ -611,9 +622,7 @@ function Dashboard({
     (m?.team_id
       ? state?.teams.find((team) => team.id === m.team_id)?.name
       : undefined) ??
-    (typeof user.user_metadata.name === "string"
-      ? user.user_metadata.name
-      : undefined) ??
+    user.name ??
     username ??
     user.email ??
     "Your account";
@@ -657,6 +666,7 @@ function Dashboard({
                   setSession(event.target.value);
                   setSelected("");
                   setFilter("all");
+                  setTeamSelection(initialTeamSelection());
                   setReportOpen(false);
                 }}
               >
@@ -727,6 +737,13 @@ function Dashboard({
             <Icon name="account" />
             My account
           </button>
+          <a
+            href="https://minsky-docs.icaic-minsky.workers.dev"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Documentation <span className="sr-only">(opens in a new tab)</span>↗
+          </a>
         </nav>
         <div className="sidebar-bottom">
           <div className="sidebar-person">
@@ -768,7 +785,7 @@ function Dashboard({
           <button
             onClick={() => {
               const command = pending.current?.command;
-              if (command) void act(command, true);
+              if (command) void act(command, { retry: true });
             }}
           >
             Retry last request
@@ -837,6 +854,7 @@ function Dashboard({
                       member={m}
                       now={now}
                       act={act}
+                      refresh={refresh}
                       onBack={back}
                     />
                   )}
@@ -904,6 +922,17 @@ function Dashboard({
                       </div>
                     </div>
                     <div className="queue-toolbar">
+                      {canSearchTeams && (
+                        <TeamSearch
+                          id="queue-team-search"
+                          label="Find a team"
+                          teams={state.teams}
+                          issues={state.issues}
+                          selection={teamSelection}
+                          onSelection={setTeamSelection}
+                          variant="inline"
+                        />
+                      )}
                       {!juryOnly && (
                         <label className="filter-label">
                           Status
@@ -989,13 +1018,15 @@ function Dashboard({
                           onSubmit={(event) => {
                             const form = event.currentTarget;
                             const data = formData(event);
+                            const teamId = submitTeamId(teamSelection);
+                            if (!m.team_id && !teamId) return;
                             void act({
                               type: "submit",
                               category: text(data, "category"),
                               description: text(data, "description"),
                               ...(m.team_id
                                 ? {}
-                                : { team_id: text(data, "team") }),
+                                : { team_id: teamId ?? undefined }),
                             }).then((ok) => {
                               if (ok) {
                                 form.reset();
@@ -1017,16 +1048,15 @@ function Dashboard({
                               Issue submission
                             </legend>
                             {!m.team_id && (
-                              <label>
-                                Affected team
-                                <select name="team" required>
-                                  {state.teams.map((t) => (
-                                    <option key={t.id} value={t.id}>
-                                      {t.name} · {t.location}
-                                    </option>
-                                  ))}
-                                </select>
-                              </label>
+                              <TeamSearch
+                                id="report-team-search"
+                                label="Affected team"
+                                teams={state.teams}
+                                issues={state.issues}
+                                selection={teamSelection}
+                                onSelection={setTeamSelection}
+                                variant="field"
+                              />
                             )}
                             <label>
                               Category
@@ -1044,7 +1074,12 @@ function Dashboard({
                                 maxLength={2000}
                               />
                             </label>
-                            <button type="submit">Submit issue</button>
+                            <button
+                              type="submit"
+                              disabled={!m.team_id && !teamSelection.teamId}
+                            >
+                              Submit issue
+                            </button>
                           </fieldset>
                         </form>
                       </section>
@@ -1117,9 +1152,11 @@ function Dashboard({
                         <Icon name="issues" />
                         <h3>No issues in this view.</h3>
                         <p>
-                          {visible.length
-                            ? "Choose another status to see more reports."
-                            : "Reports will appear here when they are submitted."}
+                          {teamSelection.teamId
+                            ? "This team has no issues in the current view."
+                            : visible.length
+                              ? "Choose another status to see more reports."
+                              : "Reports will appear here when they are submitted."}
                         </p>
                       </div>
                     )}
@@ -1135,6 +1172,7 @@ function Dashboard({
                       member={m}
                       now={now}
                       act={act}
+                      refresh={refresh}
                     />
                   ) : (
                     <section className="detail detail-empty">
@@ -1163,12 +1201,14 @@ function IssueDetail({
   now,
   act,
   onBack,
+  refresh,
 }: {
   issue: Issue;
   state: Snapshot;
   member: Membership;
   now: number;
-  act: (command: Command) => Promise<boolean>;
+  act: (command: Command, options?: ActionOptions) => Promise<boolean>;
+  refresh: () => Promise<void>;
   onBack?: () => void;
 }) {
   const [resolution, setResolution] = useState("");
@@ -1232,7 +1272,7 @@ function IssueDetail({
         {onBack ? "Back to jury worklist" : "Back to queue"}
       </button>
       <fieldset className="detail-actions" disabled={state.event?.archived}>
-        <legend className="sr-only">Issue actions and history</legend>
+        <legend className="sr-only">Issue actions</legend>
         <p className="detail-breadcrumb">Issues / ISS-{issue.number}</p>
         <div className="detail-heading">
           <strong>ISS-{issue.number}</strong>
@@ -1326,9 +1366,30 @@ function IssueDetail({
               }}
             >
               Escalate to specialist
-            </button>
-          )}
+          </button>
+        )}
         </div>
+      </fieldset>
+      {state.session && (
+        <IssueImages
+          sessionId={state.session.id}
+          issueId={issue.id}
+          archived={Boolean(state.event?.archived)}
+          canUpload={staff && !state.event?.archived}
+          staff={staff}
+          userId={m.user_id}
+          limits={{
+            maxImageBytes: state.session.max_image_bytes,
+            maxImages: state.session.max_images_per_issue,
+            maxTotalBytes: state.session.max_image_bytes_per_issue,
+          }}
+          attachments={state.attachments.filter((item) => item.issue_id === issue.id)}
+          pendingRemovals={state.pending_removals.filter((item) => item.issue_id === issue.id)}
+          onChanged={refresh}
+        />
+      )}
+      <fieldset className="detail-actions" disabled={state.event?.archived}>
+        <legend className="sr-only">Issue conversation and resolution</legend>
         {active && activity}
         {active && (m.team_id || support || m.roles.includes("jury")) && (
           <form
@@ -1336,20 +1397,23 @@ function IssueDetail({
             onSubmit={(event) => {
               const form = event.currentTarget;
               const data = formData(event);
-              void act({
-                type: "message",
-                ...base,
-                text: text(data, "message"),
-                visibility:
-                  text(data, "visibility") === "internal"
-                    ? "internal"
-                    : "public",
-              }).then((ok) => {
-                if (ok) {
-                  form.reset();
-                  setMessage("");
-                }
-              });
+              void act(
+                {
+                  type: "message",
+                  ...base,
+                  text: text(data, "message"),
+                  visibility:
+                    text(data, "visibility") === "internal"
+                      ? "internal"
+                      : "public",
+                },
+                {
+                  onSuccess: () => {
+                    form.reset();
+                    setMessage("");
+                  },
+                },
+              );
             }}
           >
             {staff && (
@@ -1588,7 +1652,7 @@ function AdminPanel({
   const guard = useRef(false);
   const session = state.session;
   if (!session) return null;
-  async function run(work: () => Promise<{ error: unknown }>) {
+  async function run(work: () => Promise<void>) {
     if (guard.current) return;
     guard.current = true;
     setBusy(true);
@@ -1596,8 +1660,7 @@ function AdminPanel({
     setNotice("");
     setCredentials(undefined);
     try {
-      const result = await work();
-      if (result.error) throw result.error;
+      await work();
       await refresh();
       setNotice("Administration action completed.");
     } catch (cause) {
@@ -1607,45 +1670,33 @@ function AdminPanel({
       guard.current = false;
     }
   }
-  async function account(action: string, data: FormData) {
-    const result = await requireClient().functions.invoke("admin", {
-      body: {
-        action,
-        session_id: session?.id,
-        username: text(data, "username"),
-        user_id: text(data, "user"),
-        name: text(data, "name"),
-        team_id: text(data, "team") || null,
-        roles: data.getAll("role"),
-        is_admin: data.has("admin"),
-      },
-    });
-    if (
-      result.error &&
-      "context" in result.error &&
-      result.error.context instanceof Response
-    ) {
-      const body: unknown = await result.error.context.json();
-      if (body && typeof body === "object" && "error" in body) {
-        return { error: { message: String(body.error) } };
-      }
-    }
-    if (!result.error && result.data?.temporary_password) {
-      const parsed = z
-        .object({ temporary_password: z.string() })
-        .parse(result.data);
-      const target = state.members.find(
-        (m) => m.person.id === text(data, "user"),
-      );
+  async function account(action: AccountCommand["action"], data: FormData) {
+    if (!session) return;
+    const command: AccountCommand = action === "create_account"
+      ? {
+          action,
+          username: text(data, "username"),
+          name: text(data, "name"),
+          ...memberInput(data),
+        }
+      : action === "set_username"
+        ? {
+            action,
+            userId: text(data, "user"),
+            username: text(data, "username"),
+          }
+        : { action, userId: text(data, "user") };
+    const result = await requireBackend().admin.account(session.id, command);
+    if (result.temporaryPassword) {
+      const target = state.members.find((m) => m.person.id === text(data, "user"));
       setCredentials({
         username:
           text(data, "username") ||
           target?.person.username ||
           "Existing email login",
-        password: parsed.temporary_password,
+        password: result.temporaryPassword,
       });
     }
-    return result;
   }
   return (
     <section className="panel admin-panel">
@@ -1712,10 +1763,9 @@ function AdminPanel({
           <button
             onClick={() => {
               void run(async () =>
-                requireClient().rpc("set_intake", {
-                  p_session: session.id,
-                  p_open: !session.intake_open,
-                }),
+                requireBackend().admin.setIntake(
+                  session.id, !session.intake_open,
+                ),
               );
             }}
           >
@@ -1724,6 +1774,65 @@ function AdminPanel({
               : "Open contestant intake"}
           </button>
         </div>
+        <form
+          className="image-limits"
+          key={`${session.max_image_bytes}-${session.max_images_per_issue}-${session.max_image_bytes_per_issue}`}
+          onSubmit={(event) => {
+            const data = formData(event);
+            void run(async () =>
+              requireBackend().admin.setImageLimits(session.id, {
+                fileMegabytes: Number(text(data, "file_mb")),
+                count: Number(text(data, "count")),
+                totalMegabytes: Number(text(data, "total_mb")),
+              })
+            );
+          }}
+        >
+          <div>
+            <h3>Image limits</h3>
+            <p>
+              JPEG, PNG, and WebP images. Lowering a limit leaves images that
+              are already attached.
+            </p>
+          </div>
+          <label>
+            Maximum size of one image (MB)
+            <input
+              name="file_mb"
+              type="number"
+              min={1}
+              max={50}
+              step={1}
+              required
+              defaultValue={session.max_image_bytes / 1048576}
+            />
+          </label>
+          <label>
+            Maximum images on one issue
+            <input
+              name="count"
+              type="number"
+              min={1}
+              max={24}
+              step={1}
+              required
+              defaultValue={session.max_images_per_issue}
+            />
+          </label>
+          <label>
+            Maximum combined size on one issue (MB)
+            <input
+              name="total_mb"
+              type="number"
+              min={1}
+              max={120}
+              step={1}
+              required
+              defaultValue={session.max_image_bytes_per_issue / 1048576}
+            />
+          </label>
+          <button type="submit">Save image limits</button>
+        </form>
         <div className="admin-workspace">
           <section className="admin-section">
             <div className="admin-section-heading">
@@ -1830,18 +1939,17 @@ function AdminPanel({
                     onSubmit={(event) => {
                       const data = formData(event);
                       void run(async () =>
-                        requireClient().rpc("manage_member", {
-                          p_session: session.id,
-                          p_user: person.id,
-                          p_team: text(data, "team") || null,
-                          p_roles: data.getAll("role"),
-                          p_admin: data.has("admin"),
-                          p_remove: false,
-                        }),
+                        requireBackend().admin.saveMember(
+                          session.id, person.id, memberInput(data),
+                        ),
                       );
                     }}
                   >
-                    <MembershipFields state={state} member={m} />
+                    <MembershipFields
+                      key={JSON.stringify(m)}
+                      state={state}
+                      member={m}
+                    />
                     <button type="submit">Save membership</button>
                   </form>
                   <div className="account-actions">
@@ -1872,11 +1980,9 @@ function AdminPanel({
                           )
                         ) {
                           void run(async () =>
-                            requireClient().rpc("manage_member", {
-                              p_session: session.id,
-                              p_user: person.id,
-                              p_remove: true,
-                            }),
+                            requireBackend().admin.removeMember(
+                              session.id, person.id,
+                            ),
                           );
                         }
                       }}
@@ -1892,20 +1998,15 @@ function AdminPanel({
         <details className="admin-advanced">
           <summary>Assign an existing account by ID</summary>
           <p>
-            For trusted provisioning and accounts already created in Supabase.
+            For trusted provisioning and accounts that already exist.
           </p>
           <form
             onSubmit={(event) => {
               const data = formData(event);
               void run(async () =>
-                requireClient().rpc("manage_member", {
-                  p_session: session.id,
-                  p_user: text(data, "user"),
-                  p_team: text(data, "team") || null,
-                  p_roles: data.getAll("role"),
-                  p_admin: data.has("admin"),
-                  p_remove: false,
-                }),
+                requireBackend().admin.saveMember(
+                  session.id, text(data, "user"), memberInput(data),
+                ),
               );
             }}
           >

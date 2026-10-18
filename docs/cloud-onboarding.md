@@ -1,12 +1,30 @@
 # Cloud onboarding for T0003
 
+Supabase remains the active backend during [T0014 backend adapters](tickets.md#t0014-backend-adapters).
+The adapter extraction keeps the public environment variables and provider commands below unchanged.
+The selected future migration to Workers, D1, R2, and Durable Objects is recorded in [product direction](product-direction.md#backend-migration-direction).
+
+**Workflow update (2026-10-17):** the user selected automatic frontend previews and deployment from `main` for both Workers.
+GitHub Actions publishes both sites only after all required CI jobs pass.
+Follow [deployment setup](cloudflare-builds.md). Credentials, activation, and the first automatic deployments remain unverified.
+Backend migrations, functions, and provider settings retain their explicit deployment steps.
+
 The connected development app runs at https://minsky-dev.icaic-minsky.workers.dev.
 Supabase hosts authentication, Postgres, and Realtime.
 Cloudflare Workers Static Assets serves the frontend.
 Docker is optional.
 The user permits full authorized cloud credential access for contributors.
 
+## Experimental Cloudflare authentication
+
+T0018 uses separate local development databases and the isolated hosted `minsky-auth-ci` database and Worker.
+Follow [the authentication verification guide](verify-cloudflare-authentication.md) for explicit targets, credentials, checks, and recovery.
+The [identity choice](cloudflare-authentication-choice.md) records measured Worker CPU and the Standard plan need and cost.
+These resources contain fictional fixtures. They do not replace the Supabase projects described below.
+
 ## Authentication decision (2026-10-02)
+
+The public documentation has separate hosting. See [documentation hosting](#documentation-hosting-t0011).
 
 The user replaced email invitations and email recovery with organizer-created **usernames and passwords**.
 SMTP and personal email addresses are not prerequisites.
@@ -88,8 +106,40 @@ T0003 does not require a sender, domain, or SMTP setup.
 
 ## Ownership and costs
 
+### Documentation hosting (T0011)
+
+The documentation site uses a separate static Worker named `minsky-docs`.
+Its address is `https://minsky-docs.icaic-minsky.workers.dev`.
+Its configuration is `wrangler.docs.jsonc`, with `site/dist` as its only asset directory.
+The account is the existing Minsky development account, `458ad6a930b0fb717796dfa19ca6a2b1`.
+It has no backend binding, Supabase credential, or Worker request handler.
+No paid upgrade or purchased domain is required for this setup.
+
+Use Node.js 22.22 or later. From the repository root:
+
+```sh
+npm ci
+npm ci --prefix site
+npm run docs:build
+npm run docs:test
+npx wrangler whoami
+npx wrangler deploy --config wrangler.docs.jsonc --dry-run
+npm run docs:deploy
+```
+
+Confirm the account and Worker name before the final command.
+The user authorized the initial documentation deployment before merge on 2026-10-17.
+This is a T0011 exception for the docs Worker only.
+After automation setup, later stable updates use review, merge, passing CI, and automatic frontend deployment.
+The app's `npm run deploy` command is separate.
+See [the complete guide](../site/src/content/docs/contributing/documentation.md).
+
+### Existing provider records
+
 On 2026-10-02, the user deferred records of provider ownership and billing details.
-On 2026-10-03, the user moved these scope notes from T0004 to T0005.
+On 2026-10-03, the user moved these scope notes from T0004.
+They stay deferred.
+They are not part of the T0005 issue-image ticket.
 The guidance below still applies before any paid upgrade.
 No paid upgrade is selected.
 
@@ -115,6 +165,60 @@ Before any paid upgrade, record the concrete blocker, current cost, and expected
 
 Free tiers do not establish capacity for 800 users.
 See [Workers pricing](https://developers.cloudflare.com/workers/platform/pricing/) and [Supabase pricing](https://supabase.com/pricing).
+
+## Issue image storage (T0005)
+
+T0005 adds a private Storage bucket named `issue-attachments`.
+The bucket accepts JPEG, PNG, and WebP objects up to 50 MB.
+Each image uses two paths: `{session}/{issue}/{attachment}/original` and `{session}/{issue}/{attachment}/thumbnail`.
+The browser creates the JPEG thumbnail.
+Its longest edge is 480 pixels, and its maximum size is 512 KB.
+Thumbnails do not count toward the image count or the issue total.
+Supabase Free includes 1 GB of file storage.
+It does not include image transformations.
+This ticket does not enable transformations or a paid plan.
+At the default 120 MB issue total, about eight full issues use 1 GB.
+
+The user authorized the T0005 preview and use of the existing development backend on 2026-10-11.
+The migration and `admin`/`attachments` functions are applied to `Minsky` development.
+`Minsky CI` remains unchanged.
+Apply the migration before you deploy functions.
+Then deploy `admin` and `attachments`.
+Then deploy the frontend.
+`npm run cloud:functions` deploys both functions to development.
+Prepare these backend changes before a dependent frontend merges. Automatic frontend deployment does not apply backend changes.
+
+The review fixes use `202610140001_attachment_fixes.sql`.
+Keep the first attachment migration unchanged.
+Apply the new migration, then deploy the updated `attachments` function, then deploy the frontend.
+The migration removes the old upload-completion function.
+The new function requires the verified login-session ID from `account_status`.
+The older deployed attachment function cannot complete uploads after this migration.
+Complete the function update in the same release before testing uploads.
+
+Failed file deletion keeps a cleanup record for the uploader.
+The record remains available after refresh.
+**Retry removal** repeats file deletion and confirms completion in the database.
+Other members cannot see the uploader's cleanup record.
+This does not add a deletion job.
+New removal requests stop after archival.
+File cleanup for a removal already approved before archival can still finish.
+
+### Manual Worker previews
+
+From the reviewed ticket branch, run `npm run deploy:preview -- --preview-alias t0005`.
+This builds the frontend and runs `wrangler versions upload`.
+It updates `https://t0005-minsky-dev.icaic-minsky.workers.dev` and leaves the main Worker deployment unchanged.
+No permanent `preview` Git branch is needed.
+This command is the older manual preview path. After setup, repository branch pushes publish through [the CI workflow](cloudflare-builds.md).
+See [Cloudflare version URLs](https://developers.cloudflare.com/workers/versions-and-deployments/version-urls/).
+
+The frontend uses its build-time Supabase settings.
+The approved T0005 preview shares `Minsky` accounts, database, and Storage.
+The functions' `ALLOWED_ORIGINS` includes the exact preview origin alongside the existing main and local origins.
+A frontend preview does not isolate backend changes or data.
+Confirm the backend target before applying migrations or functions.
+The attachment migration checks that Supabase already enabled Storage RLS rather than altering its managed table.
 
 ## Contributor setup
 
@@ -180,9 +284,11 @@ For each ticket, use this sequence:
 5. Prepare the PR.
 6. Run cloud integration checks against the reviewed revision.
 7. Let the user review and merge.
-8. Explicitly deploy the approved revision afterward.
+8. After automation setup, let GitHub Actions deploy both static frontends when the `main` CI checks pass. Coordinate backend deployment separately.
 
-Merge does not automatically deploy the app.
+Automatic frontend deployment requires GitHub deployment settings and passing `checks`, `secrets`, and `dependencies` jobs.
+Until setup is verified, record merge and deployment separately.
+Prepare compatible backend changes before a dependent frontend merges, or pause frontend deployment for that release.
 When production exists, validate changes on development and CI before you apply them to production.
 See [AGENTS.md](../AGENTS.md#cloud-development-and-deployment-workflow).
 
@@ -204,12 +310,17 @@ npx supabase config push --project-ref ghtztmovdkhuketcbjmq
 npx supabase db push --linked --dry-run
 npx supabase db push --linked
 npx supabase functions deploy admin --project-ref ghtztmovdkhuketcbjmq --use-api
+npx supabase functions deploy attachments --project-ref ghtztmovdkhuketcbjmq --use-api
 npx supabase secrets set ALLOWED_ORIGINS=http://127.0.0.1:4174 --project-ref ghtztmovdkhuketcbjmq
 npm run test:cloud
 ```
 
 Review the configuration diff before you apply it.
 Review the migration target before you apply migrations.
+Deploy `attachments` only from a checkout that contains that function.
+The merged T0005 image migrations and both functions are installed in `Minsky CI` as of 2026-10-17.
+The CI preparation retained the already applied announcement migration from open PR #20.
+See the [T0014 verification record](current-state.md#t0014-existing-backend-verification-2026-10-17) for the setup and recovery evidence.
 The `cloud:link` and `cloud:functions` npm shortcuts target development.
 Use the explicit CI commands above in the separate checkout.
 
@@ -228,16 +339,21 @@ Run these checks:
 npm run typecheck
 npm run lint
 npm run check:functions
+npm run test:functions
 npm test
 npm run build
 ```
 
 Embedded PostgreSQL executes the actual migrations and policies with stubs for Auth context, sessions, and password hashes.
 It does not establish managed Auth behavior.
-`npm run test:e2e` checks the public connected landing and login pages without cloud credentials.
+`npm run test:functions` checks the attachment HTTP handler with fake Auth, database, and Storage clients.
+It tests revoked access, invalid login sessions, failed file deletion, and retries.
+`npm run test:e2e` checks login, team search, workspace refresh, and image previews with fictional API responses and no cloud credentials.
 The old demo and its tests are removed.
 `npm run test:cloud` tests managed Auth, database, and Realtime behavior against a local frontend.
 `npm run test:hosted` repeats the suite with real accounts against the deployed app.
+The protected cloud job also runs the [shared provider suite](provider-test-contracts.md) through the Supabase adapter.
+See [Run the shared provider tests](run-provider-tests.md) for its explicit target settings and separate recovery journal.
 
 Install Chromium with `npx playwright install chromium`.
 Cloud tests create unique temporary sessions and accounts.
@@ -267,7 +383,31 @@ Configure required reviewers where the repository's GitHub plan supports them.
 Verify plan availability before you treat protection as enabled.
 Then manually dispatch **Checks** for the reviewed branch.
 Record the cloud job result.
-No automatic deployment or preview writes to shared data are configured.
+By default, the cloud job applies configuration and migrations, deploys both `admin` and `attachments`, and sets the test origin before the tests.
+The job records the remote migration versions and function versions in its log.
+
+To test a frontend change against the existing CI backend, select `existing_backend` when you dispatch the workflow.
+Use this mode only when the change needs no new backend migration, function, or configuration.
+The existing backend must already allow the test origin `http://127.0.0.1:4174`.
+For T0014, the command is:
+
+```sh
+gh workflow run checks.yml --repo GiftedNovaHD/minsky \
+	--ref feature/t0014-backend-adapters -f existing_backend=true
+```
+
+This mode skips backend preparation. The tests still create and delete isolated fixtures.
+Before fixture creation, `scripts/check-cloud-backend.mjs` requires every local migration version and active `admin` and `attachments` functions.
+The check reads provider metadata and reports additional remote migration versions.
+It stops when prerequisites are missing. It does not compare deployed function source or prove that database objects match migration history.
+A passing result verifies the frontend against the recorded backend. It does not verify installation of that revision's backend.
+Keep the default mode for changes to migrations, functions, or backend configuration.
+If the migration history differs, resolve that difference before an installation check.
+Do not remove a migration record while its database objects remain.
+
+Automatic frontend deployment is selected but its setup remains unverified.
+An app preview can write to its configured development backend through the authenticated app.
+It does not isolate data. See [preview backend limits](cloudflare-preview-behavior.md).
 
 See [GitHub environment documentation](https://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/manage-environments).
 Initial inspection on 2026-10-02 found no GitHub environments and no separate Supabase test project.
@@ -285,6 +425,19 @@ The user must review and merge the workflow before the first dispatch.
 The agent must not merge it to bypass that step.
 See [manual workflow requirements](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/manually-run-a-workflow).
 
+## Fixture recovery
+
+Successful teardown deletes the fixture file after all fixture records and accounts are removed.
+The wrapper then removes its temporary directory, including when a test assertion failed.
+If cleanup fails, the wrapper keeps the file and prints its path.
+The file retains the recorded account and session IDs and its existing access restrictions.
+It can contain temporary test passwords. Do not copy its contents into logs, chat, or a pull request.
+
+Use the recorded IDs to identify the remaining fixtures in the selected test project.
+Delete only records and accounts from that test run.
+Remove the recovery file and its directory after cleanup succeeds.
+The file is local to the machine that ran the tests.
+
 ## Completion record
 
 - Supabase project: `Minsky`, URL `https://ovymmobupzowotvrywek.supabase.co`, reference `ovymmobupzowotvrywek`, organization `gayymsuhfqsboksikzwx`, Singapore region `ap-southeast-1`, PostgreSQL 17. Provider access and CLI login/link were independently verified in the initial implementation.
@@ -295,5 +448,5 @@ See [manual workflow requirements](https://docs.github.com/en/actions/how-tos/ma
 - Authentication settings: user reported Email enabled, public signup and anonymous sign-in disabled, email confirmation enabled and exact local/hosted redirects saved. Keep these settings; the trusted function confirms organizer-created internal identities.
 - Historical migrations `202610020001_cloud.sql` through `202610020003_private_signals.sql` and the first bootstrap were applied without seeds. Both username/password migrations were applied without seeds, the account function was deployed, and all eight final hosted cases passed. Current deployment/version and detailed verification are recorded in current-state.md.
 - SMTP: deliberately removed from T0003 requirements by the user. No sender domain or paid mail service was configured; prior SMTP blockers are historical.
-- Ownership/billing: selected plans, organization owner, billing contact, recurring charges and receipt handling remain unverified and are deferred to T0005 by the user's 2026-10-03 ticket decision. No paid upgrade was selected or payment action performed by the agent.
+- Ownership/billing: selected plans, organization owner, billing contact, recurring charges and receipt handling remain unverified. They stay deferred and are not part of the T0005 issue-image ticket. No paid upgrade was selected or payment action performed by the agent.
 - Protected cloud CI: remains in T0003. The separate test project is prepared; protected GitHub environment setup and the first protected cloud run remain pending, including owner access and default-branch workflow availability. Local runs against isolated fixtures are separate evidence.

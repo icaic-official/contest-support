@@ -1,209 +1,142 @@
 # Minsky
 
 Minsky helps contest teams and staff report, triage, resolve, and review technical problems.
-T0003 connects this workflow to Supabase Auth, Postgres, and Realtime.
-Cloudflare Workers serves the static React frontend.
+Contestants report issues; volunteers and specialists handle them through a shared queue.
+Jury members record time awards, and staff confirm their application to the external contest clock.
+Administrators manage accounts, roles, and contestant intake.
+Staff can attach images to issues and choose staff-only or team visibility.
 
-The connected app is a **development deployment**.
-Development assumes connectivity.
-Organizers provide usernames and passwords.
-Users must change temporary passwords before they can access contest data.
-Organizers handle password recovery without SMTP.
-The app is not yet certified for a live contest or the 800-user target.
+The app uses React, TypeScript, and Vite, with Supabase Auth, Postgres, and Realtime.
+Cloudflare Workers hosts the frontend.
+The browser uses shared [backend contracts](docs/backend-contracts.md), with Supabase as the current implementation.
+The [shared server workflow](docs/server-workflow.md) now supplies all nine issue decisions for a separate Supabase verification path.
+The active browser path retains its guarded SQL workflow during the transition.
+The selected future backend uses Workers, D1, R2, and Durable Objects.
+See [the migration direction](docs/product-direction.md#backend-migration-direction) for the agreed scope and pending decisions.
+This is a **development deployment** that requires connectivity.
+Live-contest readiness and capacity for 800 simultaneous users remain unverified.
 
-T0004 gives the app a dark green interface based on the user's references.
-On desktop screens, a compact sidebar sits beside the issue queue and the panel for issue details and activity.
-On phones, queue rows become cards.
-**Menu** opens navigation.
-When you select a report, focus moves to its details.
-**Back to queue** returns focus to the queue heading.
+[Read the user and operator guides](https://minsky-docs.icaic-minsky.workers.dev).
+The documentation site describes merged features and labels pending T0007 installation work.
+Its deployment is separate from the application.
 
-**Report an issue** and **Report for team** open the submission form.
-The centered public sign-in page includes organizer recovery guidance and a control that shows or hides the password.
-The sign-in button is amber.
-Account settings and administration use the same theme.
-The app serves Public Sans locally.
-Its license is in `public/fonts/OFL-Public-Sans.txt`.
+T0009 adds a separate **Jury worklist** in [PR #23](https://github.com/GiftedNovaHD/minsky/pull/23).
+It lists outstanding award decisions and external confirmations, including zero-minute awards and reopened issues.
+The PR is under parallel maintenance against current `main`. Local checks pass. Hosted and protected verification remain pending.
+See [the worklist specification](docs/jury-worklist.md).
 
-The app uses actual authenticated accounts and shared data.
-It preserves the workflow and account permissions.
-The reference values are not product seed data.
-The old local demo and its commands are removed.
+## Local development
 
-T0009 adds **Jury worklist** for jury members, including combined staff roles.
-It separates resolved issues needing a decision from awards awaiting external
-application, including zero-minute awards and awards on reopened issues.
-**View issue** uses the existing details and forms; **Back to jury worklist**
-returns to the relevant row or heading. Queue filters do not limit these lists.
-This feature is implemented on `feature/t0009-jury-worklist` and is not deployed.
-[Verification](docs/current-state.md#t0009-jury-worklist-2026-10-15) distinguishes
-passing local checks from the outstanding hosted and manual checks.
-
-## Connected development — no Docker required
-
-Use Node.js 22.13 or later within 22.x, or Node.js 24 or later.
-Use npm.
-The user's 2026-10-02 decision permits full cloud credential access for contributors.
-Provider-console permissions and Minsky session membership are separate.
-
-Run these commands in sequence:
+Use npm with Node.js 22.13 or later within 22.x, or Node.js 24 or later. Docker is not required.
 
 ```sh
 npm ci
 cp .env.example .env.local
+```
+
+Set `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` in `.env.local` using the development project's public credentials.
+Never put service credentials in a `VITE_` variable.
+
+Then connect to the development project and start the frontend.
+Enter the database password privately when prompted by the link command.
+
+```sh
 npm run cloud:login
 npm run cloud:link
 npm run dev
 ```
 
-Enter the Supabase URL in `.env.local`.
-Enter the publishable key in `.env.local`.
-Enter the database password privately at the CLI prompt.
-Never put service credentials in a `VITE_` variable.
-The app does not import old local demo data.
+Open [http://127.0.0.1:5173](http://127.0.0.1:5173).
+Provider access and app membership are separate: an administrator must grant your account session access.
+Sign in with your organizer-provided username and password, then change any temporary password.
 
-The project maintainer explicitly applies schema changes and creates the first admin through the bootstrap command.
-For first setup, the commands are:
+See [cloud onboarding](docs/cloud-onboarding.md#contributor-setup) for provider access, first setup, migrations, account recovery, and deployment.
 
-```sh
-npm run cloud:plan
-npm run cloud:migrate
-npm run cloud:bootstrap -- --admin-user EXISTING_AUTH_UUID
-npm run cloud:functions
-npm run cloud:hosting-login
-npm run deploy
-```
-
-`cloud:functions` uses server-side bundling with `--use-api`.
-Docker is not required.
-The bootstrap refuses to run if an admin already exists.
-Before first setup, review `scripts/bootstrap.sql` for the initial event, session, and roster.
-Edit it if necessary.
-
-After bootstrap, select **Administration** in the sidebar.
-Use this section to manage account membership, roles, and contestant intake.
-See [cloud onboarding](docs/cloud-onboarding.md) for function configuration, username creation, password resets, and observed setup results.
+## Checks and common commands
 
 | Command | Purpose |
 | --- | --- |
-| `npm run dev` | Serve the connected frontend at `http://127.0.0.1:5173`. |
-| `npm run build` | Check types and create production static assets in `dist/`. |
+| `npm run dev` | Start the local frontend. |
+| `npm run build` | Check types and create static assets in `dist/`. |
 | `npm run preview` | Serve built assets locally. |
-| `npm run typecheck` | Check TypeScript in the frontend, scripts, and browser tests. |
-| `npm run lint` | Run ESLint for TypeScript and Node scripts. |
-| `npm run check:functions` | Run the Deno type check for the privileged Supabase function. |
-| `npm test` | Test connected timing, account identifiers, and migrations and RLS with embedded PostgreSQL. Cloud credentials and Docker are not required. |
-| `npm run test:e2e` | Run public landing and login browser checks without cloud credentials. |
-| `npm run test:hosted` | Run the smoke suite with real accounts against the deployed development frontend. |
-| `npm run test:cloud` | Test real Auth, database, and Realtime behavior against the linked project. The suite creates temporary accounts and isolated sessions, then deletes its fixtures. |
-| `npm run cloud:plan` / `cloud:migrate` | Preview or apply migrations to the linked cloud project. |
-| `npm run cloud:bootstrap -- --admin-user UUID` | Create the first admin and session through a trusted bootstrap. |
-| `npm run cloud:recover-admin -- --user UUID` | Recover an existing admin through trusted provider access. Print a new temporary password in the private terminal. |
-| `npm run cloud:functions` | Deploy account administration with cloud bundling. |
-| `npm run deploy` | Build and explicitly deploy Workers Static Assets. |
+| `npm run typecheck` | Check TypeScript. |
+| `npm run lint` | Run ESLint. |
+| `npm run check:functions` | Check the account, attachment, and workflow functions with Deno. |
+| `npm run test:functions` | Test attachment authorization and file removal with fake clients. |
+| `npm test` | Run unit, script, and embedded database tests without cloud credentials. |
+| `npm run test:d1` | Run the experimental D1 transaction proof with local emulation. |
+| `npm run test:d1:hosted -- --account=… --database=…` | Run the proof against its explicit isolated hosted D1 target. See the proof guide for exact values. |
+| `npm run test:workflow:hosted` | Verify the shared server through the deployed Supabase function on approved Minsky CI. See the [verification guide](docs/verify-server-workflow.md). |
+| `npm run test:auth` | Run experimental Cloudflare account and permission tests on local D1. |
+| `npm run test:auth:browser` | Check cookies, origins, and request protection with a local HTTPS Worker and Chromium. |
+| `npm run test:auth:hosted -- --account=… --database=…` | Run account cases on the explicit isolated hosted authentication D1 target. |
+| `npm run test:auth:http -- --account=… --database=… --origin=…` | Check the isolated deployed authentication Worker. |
+| `npm run test:auth:hash` | Measure password cost in a temporary local Worker. |
+| `npm run test:e2e` | Run browser tests with mocked cloud responses. |
+| `npm run test:providers:list` | List the shared provider scenarios without hosted credentials. |
+| `npm run test:providers -- --provider=supabase` | Run the shared contracts against an explicitly configured isolated Supabase project. |
 
-Install Chromium once:
+Install Chromium once before browser tests:
 
 ```sh
 npx playwright install chromium
 ```
 
 Deno and the provider CLIs are pinned npm dependencies.
-Cloud tests hold test credentials in memory and a temporary file.
-Privileged credentials never enter the browser.
-Do not interrupt cloud tests during fixture deletion.
-If fixture deletion fails, investigate the reported test sessions before you delete them.
-There is no command to reset shared data.
-
-PR CI checks builds, lint, types, functions, database behavior, and the public landing and login pages without hosted secrets.
-The protected `cloud-test` environment supports manually dispatched cloud tests.
-It requires a separate Supabase test project and credentials.
-It refuses the shared development project.
-Preview deployments do not automatically use or change the shared database.
-See [contributor setup](docs/cloud-onboarding.md#contributor-setup) and [protected cloud CI](docs/cloud-onboarding.md#verification-and-protected-cloud-ci).
-
-Use this development sequence:
-
-1. Create the ticket branch from updated `main`.
-2. Develop the change and add migrations.
-3. Run fast checks.
-4. Prepare the PR.
-5. Review the PR and run isolated cloud integration checks on the reviewed revision.
-6. Let the user review and merge.
-7. Explicitly deploy the approved changes.
-
-`Minsky` serves development and trial accounts.
-`Minsky CI` contains temporary automated fixtures.
-Production is not provisioned.
-When production exists, validate changes on development and CI before deployment to its separate database and frontend.
-See [AGENTS.md](AGENTS.md#cloud-development-and-deployment-workflow) and the [release process](docs/cloud-onboarding.md#development-and-release-process).
-
-PR security checks scan Git history for secrets with redacted Gitleaks output.
-They also audit locked npm dependencies.
-High and critical vulnerabilities block the dependency check.
-Dependabot proposes weekly dependency and action updates.
-TypeScript major updates are ignored until the installed lint toolchain accepts them.
-The [code-quality guide](docs/code-quality.md) describes the review checklist and prepared mandatory merge rules.
-The repository owner must enable the remote rules and vulnerability alerts.
-
-## Connected workflow
-
-Sign in with the username and password from your organizer.
-Existing development accounts can use their original email until an admin assigns a username.
-Team accounts see their own issues and public activity.
-Staff receive the combined capabilities of their volunteer, specialist, and jury roles.
-Admin is a separate capability.
-
-The complete workflow is:
-
-1. The contestant submits an issue.
-2. A support staff member claims the issue.
-3. The owner requests a specialist handoff.
-4. A specialist accepts the handoff.
-5. The owner resolves the issue.
-6. The jury records an award.
-7. Staff confirm external application of the award.
-
-Support staff can report an issue for a roster team.
-Reopening retains the owner, every previous resolution, and any existing award.
-Unresolved time excludes resolved intervals.
-Server timestamps, issue revisions, transactional locks, and persisted request IDs protect writes.
-Minsky records awards separately from the external contest clock.
-
-The admin view supports these actions:
-
-- Create username accounts.
-- Issue new temporary passwords.
-- Assign existing Auth users to teams or staff roles.
-- Revoke membership.
-- Open or close contestant intake.
-
-The app shows temporary credentials only for the account creation or reset action.
-It does not store passwords in recoverable form.
-Users must change temporary passwords before they can read or change contest data.
-Resets invalidate previous sessions.
-
-Account-wide changes require admin access to every session of that identity.
-They reject archived memberships.
-The app prevents removal of the last admin.
-
-When an admin removes membership, an existing login immediately loses database access.
-The UI retrieves current membership on focus, on reconnect, and at ten-second intervals.
-Realtime sends public invalidations scoped to teams and private invalidations restricted to staff.
-The app then reads the data that the account can access.
-Private notes do not advance public counters.
-Invalidation payloads contain no notes or issue content.
-
-Uploads, broader event, roster, and category editors, CSV, notifications, shared incidents, offline operation, and award adjustments remain deferred.
-This implementation supports group events and one award per issue.
+For `npm run test:cloud` and `npm run test:hosted`, follow [cloud verification](docs/cloud-onboarding.md#verification-and-protected-cloud-ci).
+For shared adapter checks, follow [Run the shared provider tests](docs/run-provider-tests.md).
+If an existing cloud fixture cleanup fails, follow [fixture recovery](docs/cloud-onboarding.md#fixture-recovery).
 
 ## Documentation
 
-- [Working rules](AGENTS.md) and [original plan](PLAN.md)
-- [Development tickets](docs/tickets.md)
-- [T0009 jury worklist specification](docs/jury-worklist.md)
-- [Cloud onboarding and costs](docs/cloud-onboarding.md)
-- [Current implementation and verification](docs/current-state.md)
-- [Manual walkthrough](docs/manual-verification.md)
-- [Code quality and review](docs/code-quality.md)
-- [Product direction](docs/product-direction.md)
+### Write and publish the site
+
+Use Node.js 22.22 or later for the documentation tools.
+The public guides are Markdown files in `site/src/content/docs/`.
+
+```sh
+npm ci
+npm ci --prefix site
+npm run docs:dev
+```
+
+| Command | Purpose |
+| --- | --- |
+| `npm run docs:dev` | Start the documentation server locally. |
+| `npm run docs:build` | Build the static site and check local links and anchors. |
+| `npm run docs:preview` | Serve the built site, including search. |
+| `npm run docs:test` | Check navigation, search, and phone layouts with Chromium. Build the docs first. |
+| `npm run docs:deploy` | Build and publish only the `minsky-docs` Worker during an approved manual recovery. |
+
+The deployment configuration is `wrangler.docs.jsonc`.
+See [the writing and deployment guide](site/src/content/docs/contributing/documentation.md).
+The initial docs deployment is explicitly authorized in T0011 before merge.
+The user selected automatic branch previews and deployment from `main` for both sites.
+GitHub Actions runs CI for pull requests and all branch pushes.
+The deployment job waits for `checks`, `secrets`, and `dependencies` before publishing either Worker.
+See [deployment setup](docs/cloudflare-builds.md) for credentials, activation, and backend limits.
+The workflow requires account setup. The first automatic deployments remain unverified.
+
+### Repository records
+
+- [Writing guide](docs/writing-guide.md) gives the documentation structure and sentence rules.
+- [Deployment setup](docs/cloudflare-builds.md) explains branch previews, deployment after CI passes, and first-run verification.
+- [Documentation release plan](docs/documentation-release-plan.md) — public-reader requirements, specific gaps, and completion criteria.
+- [Development tickets](docs/tickets.md) — ticket scope, status, and acceptance criteria.
+- [Current state](docs/current-state.md) — implementation details, verification records, and limitations.
+- [Cloud onboarding](docs/cloud-onboarding.md) — provider setup, costs, accounts, and deployment.
+- [Jury worklist specification](docs/jury-worklist.md) records pending T0009 behavior and acceptance.
+- [Manual verification](docs/manual-verification.md) — workflow and interface checks.
+- [Code quality](docs/code-quality.md) — CI checks and review requirements.
+- [Server workflow reference](docs/server-workflow.md) inventories existing rules and the shared service and persistence boundaries.
+- [Verify the shared server workflow](docs/verify-server-workflow.md) gives local, CI-only hosted, and recovery commands.
+- [Backend contracts](docs/backend-contracts.md) describe the provider interfaces and their behavior.
+- [Cloudflare backend design](docs/cloudflare-backend-design.md) explains the proposed server boundaries and migration decisions.
+- [Cloudflare implementation plan](docs/cloudflare-implementation-plan.md) defines the work and verification required before cutover.
+- [Cloudflare authentication reference](docs/cloudflare-authentication.md) defines the experimental API, browser sessions, and account rules.
+- [Authentication choice](docs/cloudflare-authentication-choice.md) records Better Auth, maintained crypto, resource measurements, and costs.
+- [Verify Cloudflare authentication](docs/verify-cloudflare-authentication.md) gives local, hosted, and protected CI procedures.
+- [D1 transaction proof](docs/d1-transaction-proof.md) gives the local and isolated hosted verification commands.
+- [Shared provider test contracts](docs/provider-test-contracts.md) describe reusable assertions, fixture ownership, and provider requirements.
+- [Product direction](docs/product-direction.md) — agreed requirements and open decisions.
+- [Contributor rules](AGENTS.md) and [planning record](PLAN.md).

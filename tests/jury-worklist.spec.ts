@@ -1,5 +1,4 @@
 import { expect, test as base, type Page } from "@playwright/test";
-import { mkdir } from "node:fs/promises";
 import { createJuryFixture } from "./jury-fixture";
 import { snapshotSchema } from "../src/connected/model";
 
@@ -47,6 +46,10 @@ test("lists outstanding work across queue filters and returns keyboard focus to 
 }) => {
   await login(page, "combined");
   await page.getByLabel("Status").selectOption("resolved");
+  await page.getByRole("combobox", { name: "Find a team" }).fill("Aurora");
+  await page.getByRole("option", { name: /Aurora/ }).click();
+  await page.locator(".issue-card").filter({ hasText: "ISS-3" }).click();
+  await expect(page.locator("#issue-heading")).toHaveText("Issue 3 verification");
   const before = await page.locator(".issue-card").allTextContents();
   await openWorklist(page);
   const decisions = section(page, "Needs decision");
@@ -84,6 +87,8 @@ test("lists outstanding work across queue filters and returns keyboard focus to 
     .getByRole("button", { name: "Issues", exact: true })
     .click();
   await expect(page.getByLabel("Status")).toHaveValue("resolved");
+  await expect(page.getByRole("combobox", { name: "Find a team" })).toHaveValue("Aurora");
+  await expect(page.locator("#issue-heading")).toHaveText("Issue 3 verification");
   expect(await page.locator(".issue-card").allTextContents()).toEqual(before);
   expect((await local.snapshot()).awards).toHaveLength(3);
 });
@@ -260,10 +265,118 @@ test("retry after a lost response uses the original transaction without duplicat
         item.text.startsWith("10 minutes awarded"),
     ),
   ).toHaveLength(1);
+  expect(local.workflowRequests).toHaveLength(2);
+  expect(local.workflowRequests[1]).toEqual(local.workflowRequests[0]);
   await page.getByRole("button", { name: "Back to jury worklist" }).click();
   await expect(
     section(page, "Pending external application").getByRole("article"),
   ).toHaveCount(3);
+});
+
+test("retry after a lost confirmation response preserves one application and history record", async ({
+  page,
+  local,
+}) => {
+  await login(page);
+  await openWorklist(page);
+  await page.getByRole("button", { name: "View issue ISS-4", exact: true }).click();
+  await page.getByRole("checkbox").check();
+  local.loseNextResponse();
+  await page.getByRole("button", { name: "Confirm applied externally" }).click();
+  await expect(page.getByRole("button", { name: "Retry last request" })).toBeEnabled();
+  const committed = await local.snapshot();
+  const applied = committed.awards.find((award) => award.issue_id === local.issues[3]);
+  expect(applied?.applied_at).not.toBeNull();
+  await page.getByRole("button", { name: "Retry last request" }).click();
+  await expect(page.getByRole("button", { name: "Retry last request" })).toHaveCount(0);
+  const retried = await local.snapshot();
+  expect(retried.awards.find((award) => award.issue_id === local.issues[3])).toEqual(applied);
+  expect(retried.history.filter((item) => item.issue_id === local.issues[3])).toEqual(
+    committed.history.filter((item) => item.issue_id === local.issues[3]),
+  );
+  expect(retried.history.filter((item) => item.issue_id === local.issues[3])).toHaveLength(1);
+  expect(local.workflowRequests).toHaveLength(2);
+  expect(local.workflowRequests[1]).toEqual(local.workflowRequests[0]);
+});
+
+test("live reopening removes a decision and re-resolution uses the current evidence", async ({
+  page,
+  local,
+}) => {
+  await login(page);
+  await openWorklist(page);
+  await page.getByRole("button", { name: "View issue ISS-1", exact: true }).click();
+  await page.getByLabel("Public award explanation").fill("Do not carry this draft.");
+  const issue = (await local.snapshot()).issues.find((item) => item.id === local.issues[0])!;
+  await local.act(local.users.volunteer, {
+    type: "reopen",
+    issue_id: issue.id,
+    revision: issue.revision,
+    reason: "Failure returned",
+  });
+  await expect(section(page, "Needs decision").getByRole("heading")).toBeFocused();
+  await expect(page.getByRole("button", { name: "View issue ISS-1", exact: true })).toHaveCount(0);
+  await page.getByRole("button", { name: "View issue ISS-2", exact: true }).click();
+  await expect(page.getByLabel("Public award explanation")).toHaveValue("");
+  await page.getByRole("button", { name: "Back to jury worklist" }).click();
+  const reopened = (await local.snapshot()).issues.find((item) => item.id === issue.id)!;
+  await local.act(local.users.volunteer, {
+    type: "resolve",
+    issue_id: issue.id,
+    revision: reopened.revision,
+    summary: "Replacement service verified",
+  });
+  await expect(section(page, "Needs decision").getByRole("article")).toHaveCount(2);
+  await expect(section(page, "Needs decision").getByRole("article").last()).toHaveAttribute("aria-label", "Issue ISS-1");
+  await expect(page.getByRole("article", { name: "Issue ISS-1", exact: true })).toContainText("Replacement service verified");
+});
+
+test("existing details retain public and internal separation and team/session isolation", async ({
+  page,
+  local,
+}) => {
+  const resolved = (await local.snapshot()).issues.find((item) => item.id === local.issues[0])!;
+  await local.act(local.users.volunteer, {
+    type: "reopen",
+    issue_id: resolved.id,
+    revision: resolved.revision,
+    reason: "Check conversation visibility while support is active",
+  });
+  for (const visibility of ["public", "internal"] as const) {
+    const issue = (await local.snapshot()).issues.find((item) => item.id === local.issues[0])!;
+    await local.act(local.users.volunteer, {
+      type: "message",
+      issue_id: issue.id,
+      revision: issue.revision,
+      visibility,
+      text: visibility === "public" ? "Public service update" : "Private staff investigation",
+    });
+  }
+  const contestant = await local.snapshot(local.users.contestant);
+  expect(contestant.issues.every((issue) => issue.team_id === local.teams[0])).toBe(true);
+  expect(contestant.history.some((entry) => entry.text === "Public service update")).toBe(true);
+  expect(contestant.history.some((entry) => entry.text === "Private staff investigation")).toBe(false);
+  expect((await local.snapshot(local.users.jury, local.sessions[1])).issues).toEqual([]);
+  const denied = await local.snapshot(local.users.contestant, local.sessions[1]);
+  expect(denied).toMatchObject({
+    session: null,
+    event: null,
+    membership: null,
+    teams: [],
+    issues: [],
+    resolutions: [],
+    history: [],
+    awards: [],
+    attachments: [],
+    members: [],
+  });
+
+  await login(page, "contestant");
+  await page.locator(".issue-card").filter({ hasText: "ISS-1" }).click();
+  await expect(page.getByText("Public service update", { exact: true })).toBeVisible();
+  await expect(page.getByText("Private staff investigation", { exact: true })).toHaveCount(0);
+  await expect(page.locator(".issue-card").filter({ hasText: "ISS-2" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Jury worklist", exact: true })).toHaveCount(0);
 });
 
 test("session and role changes clear selection and do not grant other roles a jury entry", async ({
@@ -299,6 +412,8 @@ test("session and role changes clear selection and do not grant other roles a ju
   await expect(
     page.getByRole("button", { name: "Back to jury worklist" }),
   ).toHaveCount(0);
+  await page.getByRole("button", { name: "View issue ISS-1", exact: true }).click();
+  await page.getByLabel("Public award explanation").fill("Role change draft");
   await local.db.query(
     "update public.memberships set roles=array['volunteer'] where user_id=$1 and session_id=$2",
     [local.users.jury, local.sessions[0]],
@@ -307,6 +422,7 @@ test("session and role changes clear selection and do not grant other roles a ju
   await expect(
     page.getByRole("button", { name: "Jury worklist", exact: true }),
   ).toHaveCount(0);
+  await expect(page.getByLabel("Public award explanation")).toHaveCount(0);
   await local.db.query("delete from public.memberships where user_id=$1", [
     local.users.jury,
   ]);
@@ -321,17 +437,17 @@ test("archived details remain readable, while failed reads cannot masquerade as 
   page,
   local,
 }) => {
+  await login(page);
+  await openWorklist(page);
+  await page.getByRole("button", { name: "View issue ISS-1", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Record award", exact: true })).toBeEnabled();
   await local.db.query("update public.events set archived=true where id=$1", [
     local.event,
   ]);
-  await login(page);
-  await openWorklist(page);
+  local.broadcast();
   await expect(
     page.getByText("This event is archived. Records are read only."),
   ).toBeVisible();
-  await page
-    .getByRole("button", { name: "View issue ISS-1", exact: true })
-    .click();
   await expect(
     page.getByRole("button", { name: "Record award", exact: true }),
   ).toBeDisabled();
@@ -362,7 +478,7 @@ test("archived details remain readable, while failed reads cannot masquerade as 
 test("refresh, empty states, desktop, phone layouts and zoom reflow remain usable without app errors", async ({
   page,
   local,
-}) => {
+}, testInfo) => {
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   page.on("console", (message) => {
@@ -375,9 +491,8 @@ test("refresh, empty states, desktop, phone layouts and zoom reflow remain usabl
   await expect(
     page.getByRole("heading", { name: "Jury worklist", exact: true }),
   ).toBeVisible();
-  await mkdir("/tmp/minsky-t0009", { recursive: true });
   await page.screenshot({
-    path: "/tmp/minsky-t0009/jury-desktop.png",
+    path: testInfo.outputPath("jury-desktop.png"),
     fullPage: true,
   });
   for (const width of [390, 320, 720]) {
@@ -396,7 +511,7 @@ test("refresh, empty states, desktop, phone layouts and zoom reflow remain usabl
       page.getByRole("button", { name: "View issue ISS-4", exact: true }),
     ).toBeFocused();
     await page.screenshot({
-      path: `/tmp/minsky-t0009/jury-${width}.png`,
+      path: testInfo.outputPath(`jury-${width}.png`),
       fullPage: true,
     });
   }
@@ -410,7 +525,7 @@ test("refresh, empty states, desktop, phone layouts and zoom reflow remain usabl
     ),
   ).toBe(true);
   await page.screenshot({
-    path: "/tmp/minsky-t0009/jury-css-zoom.png",
+    path: testInfo.outputPath("jury-css-zoom.png"),
     fullPage: true,
   });
   await page.evaluate(() => {

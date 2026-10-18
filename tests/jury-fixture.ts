@@ -21,6 +21,13 @@ export async function createJuryFixture() {
     names.map((name) => [name, crypto.randomUUID()]),
   );
   const tokens = new Map<string, string>();
+  const logins = new Map<string, string>();
+  const workflowRequests: Array<{
+    actor: string;
+    request: string;
+    session: string;
+    command: Command;
+  }> = [];
   const channels = new Map<WebSocketRoute, Map<string, boolean>>();
   let loseResponse = false;
   await db.exec(`
@@ -32,6 +39,14 @@ export async function createJuryFixture() {
     create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$;
     grant usage on schema auth to authenticated; grant execute on function auth.uid() to authenticated;
     create publication supabase_realtime;
+    create schema storage;
+    create table storage.buckets(id text primary key,name text not null,public boolean default false,file_size_limit bigint,allowed_mime_types text[]);
+    create table storage.objects(id uuid primary key default gen_random_uuid(),bucket_id text,name text,metadata jsonb);
+    alter table storage.objects enable row level security;
+    create function storage.foldername(name text) returns text[] language sql immutable as $$ select (string_to_array(name,'/'))[1:array_length(string_to_array(name,'/'),1)-1] $$;
+    create function storage.filename(name text) returns text language sql immutable as $$ select (string_to_array(name,'/'))[array_length(string_to_array(name,'/'),1)] $$;
+    grant usage on schema storage to authenticated,service_role;
+    grant all on storage.buckets,storage.objects to authenticated,service_role;
   `);
   for (const file of readdirSync("supabase/migrations")
     .filter((file) => file.endsWith(".sql"))
@@ -39,10 +54,15 @@ export async function createJuryFixture() {
     await db.exec(readFileSync(`supabase/migrations/${file}`, "utf8"));
   }
   for (const name of names) {
+    logins.set(users[name], crypto.randomUUID());
     await db.query(
       "insert into auth.users(id,raw_user_meta_data) values($1,$2::jsonb)",
       [users[name], JSON.stringify({ name: `Test ${name}` })],
     );
+    await db.query("insert into auth.sessions(id,user_id) values($1,$2)", [
+      logins.get(users[name]),
+      users[name],
+    ]);
   }
   await db.query(
     "insert into public.events(id,name) values($1,'Jury verification')",
@@ -147,6 +167,9 @@ export async function createJuryFixture() {
       await tx.query("select set_config('request.jwt.claim.sub',$1,true)", [
         user,
       ]);
+      await tx.query("select set_config('request.jwt.claims',$1,true)", [
+        JSON.stringify({ sub: user, session_id: logins.get(user), role: "authenticated" }),
+      ]);
       await tx.exec("set local role authenticated");
       return operation(tx);
     });
@@ -198,6 +221,7 @@ export async function createJuryFixture() {
     request: string = crypto.randomUUID(),
     session: string = sessions[0],
   ) {
+    workflowRequests.push({ actor: user, request, session, command });
     const result = await run(
       user,
       async (tx) =>
@@ -277,7 +301,7 @@ export async function createJuryFixture() {
           const encode = (value: object) =>
             Buffer.from(JSON.stringify(value)).toString("base64url");
           const expires = Math.floor(Date.now() / 1000) + 3600;
-          const access = `${encode({ alg: "HS256", typ: "JWT" })}.${encode({ sub: user, aud: "authenticated", role: "authenticated", exp: expires })}.${Buffer.from(crypto.randomUUID()).toString("base64url")}`;
+          const access = `${encode({ alg: "HS256", typ: "JWT" })}.${encode({ sub: user, session_id: logins.get(user), aud: "authenticated", role: "authenticated", exp: expires })}.${Buffer.from(crypto.randomUUID()).toString("base64url")}`;
           tokens.set(access, user);
           result = {
             access_token: access,
@@ -362,7 +386,9 @@ export async function createJuryFixture() {
     event,
     sessions,
     users,
+    teams,
     issues,
+    workflowRequests,
     attach,
     snapshot,
     act,

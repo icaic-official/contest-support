@@ -1,4 +1,22 @@
-# Connected manual verification (T0003/T0004)
+# Connected manual verification (T0003/T0004/T0005)
+
+## Documentation site (T0011)
+
+Run `npm run docs:build` and `npm run docs:test` after installing the separate `site/` dependencies.
+For the published site, run `MINSKY_DOCS_URL=https://minsky-docs.icaic-minsky.workers.dev npm run docs:test`.
+These checks only read documentation.
+Check a direct guide URL after refresh, search by keyboard, phone navigation, and a missing page.
+Review light and dark themes at desktop and 320px widths.
+The sign-in footer and sidebar links open the guides in a new tab to preserve the workspace.
+Those links reach the development app only after its separate frontend deployment.
+
+## Experimental Cloudflare authentication
+
+Follow [Verify Cloudflare authentication](verify-cloudflare-authentication.md) for isolated HTTPS browser checks.
+These checks use fictional local accounts. They do not switch the connected application from Supabase.
+The account reference records current cookie, origin, recovery, and session restrictions.
+
+## Connected application
 
 Use the linked development project and organizer-provided username and password accounts.
 Create the first admin through the explicit bootstrap process.
@@ -68,6 +86,18 @@ Expected result: successful submission closes the form and selects the new repor
 11. Repeat the privacy check through direct API and history queries.
 12. Leave the reply input blank.
 13. Check that **Send reply** remains disabled.
+
+Check reply retries with isolated accounts and controlled request failures:
+
+1. Enter a public reply and cause its response to be lost after the server records it.
+2. Select **Retry last request**. Repeat a transport failure and check that the text remains.
+3. Let the next retry succeed. Check that the text clears and **Send reply** is disabled.
+4. Check that history contains one copy of the reply.
+5. Enter a fresh reply. Check that it sends and clears normally.
+6. Repeat with an internal note. Check that successful retry resets **Audience** to its default.
+7. Reject a reply at the server. Check that its text remains editable and no history entry appears.
+
+The retry cases in `tests/workspace-refresh.spec.ts` automate these checks with mocked responses.
 
 ## 5. Resolution and award
 
@@ -181,14 +211,132 @@ Review the centered sign-in page at desktop, 800px, 390px, and 320px widths.
 The suite creates isolated test fixtures and deletes only those fixtures.
 It does not reset the shared project.
 
+## 10. Issue images
+
+Use an active event unless a step says the event is archived.
+
+1. As a volunteer, specialist, jury member, and admin, add a JPEG, PNG, or WebP image from the issue detail.
+2. Check the progress text, thumbnail, uploader, and time.
+3. Open the full-size preview with the keyboard.
+4. Download the image.
+5. Close the preview and check that focus returns to the thumbnail.
+6. Keep the default **Staff only** choice for one image.
+7. Choose **Visible to the team** for another image.
+8. As a contestant on that team, check that only the team-visible image appears.
+9. Check that the contestant has no image file control.
+10. As a contestant on another team, check that neither image appears.
+11. As a staff member who did not upload the image, check that removal is refused.
+12. As the uploader, remove the image.
+13. Check that activity records the removal at the same visibility.
+14. Retry a failed transfer with **Try the upload again**.
+15. Reject a file that is not a JPEG, PNG, or WebP image.
+16. Reject an image above the current size limit.
+17. As admin, save lower image limits.
+18. Check that existing images remain and that the next upload must fit.
+19. Resolve the issue.
+20. Check that the images remain and that an authorized upload still works.
+21. Archive the event.
+22. Check that preview and download still work.
+23. Check that upload, removal, and limit changes are refused.
+24. Repeat the image controls at 390×844 and 320×740.
+25. Check that the page does not scroll horizontally.
+26. Start a team-visible upload and cause a transfer failure in an isolated test.
+27. Check that **Who can see this image** remains locked to **Visible to the team**.
+28. Select **Cancel upload**. Check that the unfinished files are deleted before the choice becomes available.
+29. Select **Staff only** and start a new upload. Check that contestants cannot see it.
+30. Cause file deletion to fail. Check that the app reports the failure and shows **Retry removal**.
+31. Refresh the page. Check that the uploader still has **Retry removal**, even though the image is no longer listed.
+32. Retry removal. Check that both stored files are gone and the retry control disappears.
+33. Start an upload, then remove that member's session access before completion. Check that unfinished-file access and completion fail.
+34. Repeat with a password reset and with event archival.
+35. Start two uploads, then lower the count limit to one. Check that only one can become attached.
+36. Try a file path with an extra folder. Check that Storage refuses it.
+
+Check delayed previews with two different images, A and B, in an isolated test:
+
+1. Delay the original-file response for A, then open A.
+2. Close its preview and open B. Let B finish first.
+3. Release A's delayed response. Check that B's image, uploader, time, and download file still match B.
+4. Repeat with a failed response for A. Check that it does not report an error for the closed preview.
+5. Repeat with Escape to close A. Check that focus returns to A's thumbnail before opening B.
+6. Fail the response for the current preview. Check that the error still appears.
+
+`tests/images.spec.ts` automates these response-order checks with the development image harness.
+It also checks that closing the preview releases its temporary browser URL.
+These tests do not access hosted data.
+
+## 11. Team search
+
+Use a volunteer or specialist account, then repeat the queue search as jury and as a session admin.
+Use a contestant account to confirm that team search stays hidden.
+
+1. Open the issue queue.
+2. Type part of a team name.
+3. Check that suggestions update and that none is selected by itself.
+4. Check that each suggestion shows the team name, location, and unresolved-issue count.
+5. Choose a suggestion with the keyboard and again with a pointer.
+6. Check that the queue shows that team's issues.
+7. Change the status filter to **Resolved**.
+8. Check that the same team's resolved issues remain available.
+9. Clear the team.
+10. Check that the previous queue returns.
+11. Select the team again.
+12. Open **Report for team**.
+13. Check that the same team is already selected.
+14. Edit the team text.
+15. Check that **Submit issue** stays unavailable until you choose a suggestion.
+16. Submit the issue.
+17. Check that the new issue belongs to that team.
+18. Type a table number, a reordered name, and a small spelling mistake.
+19. Check that the intended team appears before weaker matches.
+20. Type a query that matches nothing.
+21. Check that the message says no team matches and that no team is selected for you.
+22. Repeat the queue search at 390px and 320px widths.
+23. Sign in as a contestant.
+24. Check that **Report an issue** does not ask for a team.
+
+Expected result: the submission stores the chosen team's database id. Contestants remain limited to their own team. Jury members can filter the resolved queue and do not gain the other status filters.
+
+Also check these regressions with isolated fixtures:
+
+- With locations `Desk 1234` and `Desk 1235`, `123` matches neither. `1234` and `001234` match only the first number. A spelling mistake in a word can still match beside an exact number.
+- Type a query with suggestions, then press Tab. Queue focus moves to **Status**; report-form focus moves to **Category**. The popup closes and no team is chosen. Arrow keys and Enter still choose a team; pointer selection still works.
+- Choose a team, Tab from the input to **Clear team**, and activate it with Enter, then repeat with Space in both controls. Both team fields clear, focus returns to the initiating input, and the queue shows all teams under the existing status filter. The report draft and category stay intact; **Submit issue** stays disabled until another team is chosen. Repeat clearing with a pointer.
+- Select a team as staff, then assign that account to a different contestant team. Trigger the normal refresh by focusing the window. The search disappears and the contestant's own issues remain visible without reloading.
+- Revoke access to the selected session while another session remains accessible. The automatic fallback clears the query and chosen team. Removing the chosen team from the next snapshot also clears it and disables staff submission until another team is chosen.
+
+`tests/team-search.spec.ts` runs the focus and refreshed-snapshot checks using mocked Auth and session responses.
+These fixtures do not connect to a hosted backend or verify database authorization.
+
+## 12. Workspace refresh and cloud fixture recovery
+
+Use isolated test accounts for these checks.
+
+1. Open the issue queue as support staff without selecting a row.
+2. Enter a reply on the displayed issue.
+3. Submit another issue from a second client.
+4. Check that the first client still shows the original issue and reply text.
+5. Send the reply. Check that it belongs to the original issue.
+6. Open a membership form as an administrator.
+7. Change that member's roles or team from a second administrator account.
+8. Return focus to the first client so it receives the current membership.
+9. Check that both the summary and form show the current roles or team.
+10. Save the form. Check that it preserves the second administrator's change.
+
+The credential-free tests in `tests/workspace-refresh.spec.ts` cover these UI effects and exact write requests.
+The cleanup tests in `scripts/cloud-test.test.mjs` check a failed deletion, a successful retry, and the retained recovery file.
+They use mocked cloud responses and a local child process. They do not access hosted data.
+See [fixture recovery](cloud-onboarding.md#fixture-recovery) for failed cloud cleanup.
+
 Record observed results in [current-state.md](current-state.md).
 Suggested manual checks are not completed checks.
 Browser automation does not establish results for real devices, assistive technology, or capacity.
 
-## 10. Jury worklist (T0009)
+## 13. Jury worklist (T0009)
 
-Run these checks on the T0009 revision with disposable accounts and a session
-reserved for verification. Use jury-only, combined jury/support, support-only,
+Run these checks on the current T0009 revision after merging current `main`.
+For hosted acceptance, confirm Minsky CI project `ghtztmovdkhuketcbjmq` before creating UUID-owned fictional accounts and records.
+Delete only that run's fixtures. Verify cleanup after the run. Use jury-only, combined jury/support, support-only,
 admin-only, and contestant accounts. Do not use real contest reports as fixtures.
 This is a checklist, not evidence that hosted or physical-device checks have passed.
 
@@ -200,8 +348,7 @@ This is a checklist, not evidence that hosted or physical-device checks have pas
    no award. Compare both sections and their counts with the specification's
    eligibility table. Order decisions by resolution time and applications by award time.
 3. As a combined-role member, filter the ordinary queue, then open the worklist.
-   Its lists must still cover the entire authorized session. If team search is
-   available in the tested revision, also check independence from the chosen team.
+   Its lists must still cover the entire authorized session. Also check independence from the chosen team search filter.
    Returning to the ordinary queue retains its filter and selected issue.
 4. Check team/location, status, resolution summary/actor/time, unresolved duration,
    and award explanation/actor/time. Pending awards on reopened issues identify
@@ -218,7 +365,8 @@ This is a checklist, not evidence that hosted or physical-device checks have pas
    the other, award a different issue. Lists/counts update without clearing the
    unrelated draft or stealing focus. Confirm an award in one context and check
    removal in the other. Check refresh and reconnect. Use the automated retry
-   case to verify a lost response does not duplicate an award or history.
+   cases to verify lost award and confirmation responses reuse the request ID.
+   Confirm one award, one confirmation, and one history entry for each action.
 8. Switch sessions while viewing details. Selection clears and records belong
    only to the next session. Losing the jury role removes its entry and returns
    to an available screen; losing membership clears protected records. Password
@@ -231,7 +379,19 @@ This is a checklist, not evidence that hosted or physical-device checks have pas
     labels. No text/control should clip or cause horizontal overflow. Distinguish
     loading/read errors from valid empty sections; failed reads must clear stale data.
 
-Record results and remaining limits in [current state](current-state.md#t0009-jury-worklist-2026-10-15).
+Record results and remaining limits in [current state](current-state.md#t0009-parallel-maintenance-2026-10-18).
 The credential-free browser harness exercises actual migrations and RLS with
 simulated hosted transport. It does not establish real Auth, Storage, Realtime,
 deployment, offline operation, or capacity results.
+
+For isolated hosted acceptance from a local CLI, follow the credential prerequisites in [cloud onboarding](cloud-onboarding.md#verification-and-protected-cloud-ci).
+Then run the current cloud suite against the explicit CI target:
+
+```sh
+MINSKY_TEST_PROJECT_REF=ghtztmovdkhuketcbjmq npm run test:cloud
+```
+
+Do not apply unrelated remote migrations or change provider configuration for this test.
+If cleanup retains a recovery file, follow [fixture recovery](cloud-onboarding.md#fixture-recovery).
+Record local simulations, hosted-service CLI results, and protected GitHub Actions results separately.
+A skipped protected job is not a pass. The owner approved the exact T0009 branch-only environment policy addition on 2026-10-18.

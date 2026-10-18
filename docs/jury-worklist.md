@@ -1,16 +1,17 @@
 # T0009 — Jury worklist
 
-Status: specified on 2026-10-14 and implemented on 2026-10-15 at the user's request.
-Branch: `feature/t0009-jury-worklist`, from updated `main` at `1ed603a`.
-Review: [draft PR #23](https://github.com/notbowen/minsky/pull/23).
-Local verification passes; hosted cloud and remaining manual acceptance are unverified.
-See [current state](current-state.md#t0009-jury-worklist-2026-10-15).
+Status: implemented on 2026-10-15. Current-main maintenance started on 2026-10-18.
+Branch: `feature/t0009-jury-worklist`, originally from `main` at `1ed603a`.
+Integration baseline: current `main` at `7d19b00`, including PR #41.
+Review: [draft PR #23](https://github.com/GiftedNovaHD/minsky/pull/23).
+Current local checks pass. Hosted jury acceptance and protected CI remain pending.
+Historical results do not establish current compatibility.
+See [current state](current-state.md#t0009-parallel-maintenance-2026-10-18).
 
-The user requested this specification after selecting the jury worklist as an
-independent feature. T0005's issue images, T0006's session announcements,
-T0007's installation scaffolding, and T0008's team search are not prerequisites.
-The user authorized independent implementation on 2026-10-15.
-The user reviews and merges; deployment remains a separate explicit step.
+The owner authorized T0009 maintenance in parallel with the separate T0020 connector goal.
+Use a separate worktree. Preserve the connector checkout, scope, and active ticket.
+Supabase remains active. The owner reviews and merges.
+This task does not authorize application deployment, backend changes, or data migration.
 
 ## Outcome and scope
 
@@ -120,16 +121,18 @@ does not erase an award, undo its application, or create another award decision.
 - Implement the lists in a separate component and keep their eligibility and
   ordering logic independently testable. Limit shared changes to navigation,
   selection, and the existing details' return destination.
-- Read the existing `Snapshot` through `session_snapshot`. Reuse the existing
-  refresh, Realtime invalidations, reconnect handling, errors, and request retry
-  behavior. Do not add another subscription, polling loop, or persisted worklist.
-- Keep current database policies, transactional `workflow` operations, revision
-  checks, request IDs, and duplicate-award protection. No schema migration,
-  backend function, API, provider resource, or new dependency is expected.
-- Start from updated `main`; do not merge or copy the open feature branches to
-  obtain images, announcements, installation settings, or fuzzy search. A small
-  navigation integration may still need conflict resolution when branches merge.
-  Preserve those features if they reach `main` before implementation starts.
+- Read the authorized `Snapshot` through `Backend.workflows.snapshot()`.
+  Keep the UI independent of Supabase and Cloudflare SDKs.
+  Reuse existing refresh, invalidations, reconnect handling, errors, and request retries.
+  Add no subscription, polling loop, or persisted worklist.
+- Use `Backend.workflows.execute()` for existing issue commands.
+  Keep permission and transition decisions at the server.
+  Preserve current database constraints, atomic commits, revision checks, request IDs, and duplicate-award protection.
+  Add no schema, backend feature, provider implementation, or runtime dependency.
+  The active Supabase adapter retains its guarded SQL path during shared-service replacement verification.
+- Merge current `main` into the existing PR branch without rewriting commits.
+  Preserve current authentication, backend contracts, shared workflow integration, images, and refresh handling.
+  Keep changes to `ConnectedApp.tsx` and shared styles focused on worklist integration.
 - Follow the existing dark green theme. Use readable desktop lists and stacked
   phone rows, named controls, keyboard navigation, visible focus, and text labels
   for statuses. Check 320/390px widths and 200% zoom without horizontal overflow.
@@ -149,7 +152,7 @@ the other's worklist. Check an open draft during unrelated live updates and the
 existing stale-write, retry, and duplicate-decision protections.
 
 Run `npm run typecheck`, `npm run lint`, `npm run build`, `npm run check:functions`,
-`npm test`, and `npm run test:e2e`. Run the existing issue-workflow regression and
+`npm run test:functions`, `npm test`, and `npm run test:e2e`. Run the existing issue-workflow regression and
 isolated Minsky CI cloud integration checks on the reviewed revision. Use only
 UUID-scoped fixtures and remove only their records. Record local simulation,
 embedded database, hosted cloud, protected CI, and manual results separately;
@@ -158,8 +161,8 @@ leave unavailable checks explicitly unverified.
 Update README, tickets, current state, and manual verification with implemented
 behavior and observed results. Update product direction and this specification
 when implementation changes an agreed detail. Prepare the PR after fast checks;
-the user reviews and merges. Deploy the approved frontend explicitly afterward.
-No backend release is expected for this scope. Merging does not deploy the app.
+the owner reviews and merges. Keep PR #23 a draft until required verification passes.
+This maintenance does not authorize deployment. Existing automatic frontend deployment rules remain separate.
 
 ### Acceptance criteria
 
@@ -175,10 +178,10 @@ No backend release is expected for this scope. Merging does not deploy the app.
   changes pass locally, including two-client changes and an open explanation draft.
 - [x] Desktop, 320/390px phone, keyboard, return-focus, and CSS zoom/reflow checks
   are recorded. Physical devices and native browser zoom remain unverified.
-- [x] Required checks and the existing workflow regressions pass, or unavailable
-  checks are clearly identified without claiming readiness.
-- [x] Documentation describes the actual implementation and verification.
-  Draft PR #23 is prepared for user review; deployment remains separate.
+- [ ] Required checks, current workflow regressions, and hosted jury acceptance pass.
+  Fixture cleanup is verified. Evidence distinguishes simulations, hosted CLI, and protected GitHub runs.
+- [ ] Documentation and PR #23 describe current results.
+  The PR becomes ready only after required verification passes.
 
 ## Exclusions
 

@@ -57,6 +57,9 @@ function snapshot(overrides: Partial<Snapshot> = {}): Snapshot {
       intake_open: true,
       categories: ["Backend"],
       revision: 1,
+      max_image_bytes: 5 * 1024 * 1024,
+      max_images_per_issue: 5,
+      max_image_bytes_per_issue: 20 * 1024 * 1024,
     },
     event: { id: "event", name: "Contest", archived: false },
     membership: {
@@ -73,6 +76,8 @@ function snapshot(overrides: Partial<Snapshot> = {}): Snapshot {
     resolutions: [resolution],
     awards: [],
     history: [],
+    attachments: [],
+    pending_removals: [],
     members: [],
     audit: [],
     server_time: "2026-10-02T10:10:00Z",

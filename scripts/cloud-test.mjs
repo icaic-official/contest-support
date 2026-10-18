@@ -1,5 +1,7 @@
 import process from "node:process";
+import console from "node:console";
 import { execFileSync, spawnSync } from "node:child_process";
+import { existsSync } from "node:fs";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -48,6 +50,7 @@ if (process.env.CI && project === "ovymmobupzowotvrywek")
     "CI must use an isolated test project, not the shared development project.",
   );
 const directory = await mkdtemp(join(tmpdir(), "minsky-cloud-test-"));
+const fixturePath = join(directory, "fixture.json");
 try {
   const result = spawnSync(
     "node_modules/.bin/playwright",
@@ -56,7 +59,7 @@ try {
       stdio: "inherit",
       env: {
         ...process.env,
-        MINSKY_CLOUD_FIXTURE: join(directory, "fixture.json"),
+        MINSKY_CLOUD_FIXTURE: fixturePath,
         MINSKY_TEST_PROJECT_REF: project,
         SUPABASE_URL: `https://${project}.supabase.co`,
         SUPABASE_ANON_KEY: anon,
@@ -68,5 +71,11 @@ try {
   );
   process.exitCode = result.status ?? 1;
 } finally {
-  await rm(directory, { recursive: true, force: true });
+  if (existsSync(fixturePath)) {
+    console.error(
+      `Fixture cleanup did not complete. Recovery file retained at ${fixturePath}`,
+    );
+  } else {
+    await rm(directory, { recursive: true, force: true });
+  }
 }

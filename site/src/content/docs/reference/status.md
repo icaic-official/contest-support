@@ -20,8 +20,8 @@ This page is a dated record, not a live deployment dashboard.
 | [T0014](https://github.com/GiftedNovaHD/minsky/pull/32) | Shared backend interfaces and the active Supabase adapter. |
 | [T0015](https://github.com/GiftedNovaHD/minsky/pull/37) | Shared provider behavior tests, verified against isolated Supabase fixtures. |
 | [T0016](https://github.com/GiftedNovaHD/minsky/pull/36) | Proposed Cloudflare architecture and implementation plan. |
-| [T0017](https://github.com/GiftedNovaHD/minsky/pull/39) | Verified bounded D1 transaction proof for claims and messages. The complete Cloudflare connector remains incomplete. |
-| [T0018 Cloudflare authentication](https://github.com/GiftedNovaHD/minsky/pull/40) | Experimental username authentication, cookie sessions, and organizer recovery. Hosted HTTP checks pass on Workers Paid with isolated fictional fixtures. The full connector and migration remain incomplete. |
+| [T0017](https://github.com/GiftedNovaHD/minsky/pull/39) | Verified bounded D1 transaction proof for claims and messages. T0020 implements the complete connector separately. |
+| [T0018 Cloudflare authentication](https://github.com/GiftedNovaHD/minsky/pull/40) | Experimental username authentication, cookie sessions, and organizer recovery. Hosted HTTP checks pass on Workers Paid with isolated fictional fixtures. T0020 implements the complete connector separately. Real-data migration remains future work. |
 | [T0019 shared server workflow](https://github.com/GiftedNovaHD/minsky/pull/41) | All nine issue decisions use one shared service, verified through isolated Supabase execution. |
 | [T0009 jury worklist](https://github.com/GiftedNovaHD/minsky/pull/23) | Merged at `c144a2a`. Separate lists show outstanding award decisions and external confirmations through the existing issue actions. |
 

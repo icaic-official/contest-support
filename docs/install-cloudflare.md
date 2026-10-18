@@ -126,9 +126,14 @@ node src/server/adapters/cloudflare/tooling/install.mjs configure --settings=.wr
 Expected output is `Created the public Cloudflare configuration. No provider resources changed.`
 The command refuses an existing destination file.
 It configures D1, private R2 access, the live-update coordinator, static assets, and a recovery cron each minute.
+It enables Smart Placement for application requests. Cloudflare can then run database-heavy handlers closer to their backend services.
+Placement analysis can take 15 minutes and requires traffic from multiple locations.
+See [Cloudflare placement](https://developers.cloudflare.com/workers/configuration/placement/).
 It disables preview URLs and includes no authentication secret.
 Do not hand-edit bindings or add environment overrides.
 If public settings need correction, generate a new configuration path and review that result.
+After updating this checkout, regenerate older configuration files from the same public settings at a new path.
+Review the account and resource IDs before using the new file. Current operator commands require this checkout's complete generated configuration.
 
 Create the new R2 bucket through this explicit target:
 

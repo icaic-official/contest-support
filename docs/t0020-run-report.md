@@ -60,6 +60,7 @@ The implementation changes these files:
 - `site/src/content/docs/operators/installation.md`
 - `site/src/content/docs/operators/verification.md`
 - `site/src/content/docs/reference/status.md`
+- `site/tests/docs.spec.ts`
 - `src/backend/cloudflare/authentication.test.ts`
 - `src/backend/cloudflare/authentication.ts`
 - `src/backend/cloudflare/backend.test.ts`
@@ -194,6 +195,23 @@ A temporary Chromium probe repeats the shared temporary-password and full lifecy
 That probe passes. All 19 lifecycle snapshots and 20 authentication-session reads return 200. It does not reproduce the protected rejection.
 Provider-owned browser diagnostics now record safe endpoint timings and fixture authentication flags before logout.
 Their local tests verify redaction, ownership, and teardown ordering. The first browser mock used the wrong `page.evaluate` signature and was corrected.
+The repeated hosted CLI suite passes all eight shared scenarios with those diagnostics on the changes committed as `ab4a8ff`.
+The complete hosted React journey also passes on that source, with verified scoped cleanup.
+A final read-only audit checks the retained independent installation, migration names, baseline counts, private bucket, and active Worker version.
+A controlled 5,500-millisecond Pagefind module delay reproduces the docs search assertion failure.
+The unchanged query returns the expected result at 5,889 milliseconds. Query retention already works.
+The corrected browser test checks loading and waits for the actual index response before checking the completed result.
+It passes under the same injected delay. The test adds no sleep, retry, or timeout increase.
+The historical CI delay itself remains unconfirmed because that run retained no trace.
+A separate preflight reproduction confirms that HTTP 503 is incorrectly reported as a sign-in failure.
+The browser adapter now reserves the sign-in prompt for HTTP 401 and retains other server errors or a fixed fallback.
+Twelve boundary cases verify all four mutation preflights and confirm that no mutation follows a failed preflight.
+All 40 focused browser transport and authentication tests, types, lint, and the default build pass.
+Snapshots bypass this helper, so this correction does not explain the earlier snapshot error after timeout.
+An isolated progress-reporter check initially produces no child output under the restricted local execution context.
+A minimal nested Node command reports `EPERM` there. The same unchanged command and progress test pass with the required execution permission.
+The complete permitted run then passes all 611 tests across 41 files, without failures, skips, or pending cases.
+No progress test, reporter, or runner change is needed for that local permission limit.
 No automatic approval review rejected an authorized action.
 
 ## 4. Build and test results
@@ -201,6 +219,11 @@ No automatic approval review rejected an authorized action.
 After current-main integration, the complete local suite passes 566 tests across 34 files.
 Corrected ordinary CI passes 579 tests across 35 files on `9b0ef6b`.
 The duration correction passes all 591 local tests across 40 files in 51.34 seconds.
+Ordinary PR CI passes all 598 tests across 41 files on `ab4a8ff`, including the new diagnostic tests.
+That run also passes 45 ordinary browser cases, three authentication browser cases, the local runtime case, three docs cases, and the complete local React journey.
+The same revision's push run fails the docs search assertion after passing the other two docs cases.
+The corrected search test passes the controlled-delay comparison and all three docs cases locally.
+The docs build, type checking, and focused lint also pass after that correction.
 Types, lint, and the default Supabase frontend build also pass after that correction.
 The new hosted-runner and store-target checks pass all 28 focused cases locally.
 The earlier `59121f7` run passes 554 tests, including the image cleanup-fairness regression.
@@ -223,7 +246,7 @@ The final CLI reruns verify source `de1ecbd`.
 A separate read-only D1 query confirms zero rows in all 27 application tables after the runs.
 The first aggregate count command failed; its scalar-query retry passed. Neither command changed data.
 These CLI runs are separate from protected GitHub Actions evidence.
-Both staged and full-history secret scans pass. The latest local history scan checks 119 commits through `1ee8cbf`.
+Both staged and full-history secret scans pass. The history scan checks 124 commits through `ab4a8ff`.
 Hosted Cloudflare passes all eight unchanged shared scenarios on `1ee8cbf`.
 The full hosted React journey passes on `59121f7`, with zero failures, skips, or flaky results.
 Their cleanup verifies only UUID-owned D1 data, exact R2 keys, and empty fixture coordinator state before journal removal.
@@ -238,12 +261,43 @@ The protected Supabase run passes 14 cloud browser cases, eight shared provider 
 Both ordinary runs on `59121f7` pass in [run 39096348143](https://github.com/GiftedNovaHD/minsky/actions/runs/39096348143) and [run 39096350260](https://github.com/GiftedNovaHD/minsky/actions/runs/39096350260).
 Protected connector [run 39098783172](https://github.com/GiftedNovaHD/minsky/actions/runs/39098783172) fails on `9b0ef6b` after passing all 70 workflow and 82 account cases.
 Its account phase takes 20 minutes 6 seconds. Its shared browser phase passes six cases and fails two in 10 minutes 56 seconds.
-The lifecycle case receives an unexpected authentication rejection. The image case times out during uploader removal.
+Both cases report the 90-second scenario timeout. The later lifecycle sign-in message does not establish HTTP 401.
 The hosted React step is not reached. No cleanup marker or recovery artifact remains.
 The [duration investigation](current-state.md#hosted-check-duration) records measured transport costs and the correction.
+Protected run `39102298675` passes all 82 corrected account cases in 5 minutes 21 seconds.
+The earlier protected account phase takes 20 minutes 6 seconds. The observed reduction is 73.4%.
+The corrected workflow phase passes all 70 cases in 4 minutes 36 seconds.
 Ordinary push [run 39098769818](https://github.com/GiftedNovaHD/minsky/actions/runs/39098769818) passes on that revision.
 The direct CLI workflow suite passes all 70 cases on the dedicated store database with verified scoped cleanup.
 The direct account CLI suite also passes all 82 cases there on `9b0ef6b`, with zero skips and verified scoped cleanup.
+The repeated Cloudflare CLI shared suite passes all eight cases on `ab4a8ff` in about three minutes.
+Its safe summaries cover 290 HTTP requests and no resource authentication rejection. The longest observed request takes 1,947 milliseconds.
+The hosted React journey passes again on that source with zero failures, skips, or flaky results.
+Both checks use deployed Worker version `33977804-a8c2-475d-ad52-27906df0a136` and verify scoped cleanup.
+They do not reproduce the earlier protected timeouts.
+Protected run `39102298675` repeats the two 90-second shared-scenario failures on `ab4a8ff` after both direct suites pass.
+Its shared step takes 11 minutes 5 seconds. The hosted React step is skipped.
+It deploys Worker version `0c0c7675-9486-44d3-a8f9-7b356914127f` and retains no recovery artifact.
+The lifecycle's 45 completed requests consume 87,863 milliseconds. All 13 snapshots and 16 authentication-session reads return 200.
+The image scenario's 45 completed requests consume 88,547 milliseconds. All 20 authentication-session reads return 200.
+No resource HTTP 401 appears before logout. The earlier run also shows timeout before the lifecycle sign-in message.
+Read-only adaptive analytics estimate median successful CPU time of 9.663 milliseconds and request duration of 1,541.840 milliseconds.
+Execution estimates are IAD 405, ARN 11, and SJC one. The database is in APAC.
+Waiting dominates CPU. Smart Placement is a candidate for a measured comparison, not a verified cause or correction.
+The isolated candidate deployment passes target checks, the Cloudflare build, and a deployment dry run.
+It deploys version `f34b1519-525d-4dde-85bc-4b63c0dc1f02`. The default local build is then restored to Supabase.
+Placement metadata reports `smart` and `SUCCESS`, analyzed at 06:37:32 UTC.
+Both the CI configuration and provider generator use the candidate setting. The separate direct-store and bounded authentication configurations are unchanged.
+Older generated application configurations must be regenerated from the same public settings for current operator commands.
+The candidate CLI suite passes all eight unchanged scenarios in 3.5 minutes, with verified scoped cleanup.
+Its 29 clients record 290 requests totaling 135,640 milliseconds, with a maximum of 2,837 milliseconds and no resource authentication rejection.
+That Singapore-origin run does not establish a protected GitHub latency improvement.
+After the preflight error correction, the complete local suite passes all 610 tests across 41 files, without skips, in 104.54 seconds.
+Global lint passes again.
+The independent installation's final read-only audit passes at 06:06:54 UTC.
+It confirms the initial IDs, two teams, closed intake, all nine migration names, and an empty private bucket.
+Baseline records include 20 delivered notifications, three audience counters, seven audits, and four completed account operations.
+No pending notifications or account operations remain. Journey workflow and image rows remain absent.
 
 ## 5. Manual verification
 

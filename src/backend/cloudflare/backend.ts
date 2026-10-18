@@ -36,8 +36,8 @@ export function createCloudflareBackend(options: {
 
   async function csrfHeaders(contentType: string): Promise<Headers> {
     const response = await send('/api/auth/session');
-    if (!response.ok) throw new Error('Sign in to continue.');
-    const current = sessionSchema.parse(await response.json());
+    if (response.status === 401) throw new Error('Sign in to continue.');
+    const current = sessionSchema.parse(await readJson(response));
     return new Headers({
       'Content-Type': contentType, 'X-Minsky-Request': '1', 'X-CSRF-Token': current.csrf,
     });

@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createCloudflareBackend } from './backend';
+import type { Backend } from '../contracts';
 import { ImageRequestError, WorkflowRejectedError } from '../errors';
 
 const origin = 'https://connector.example';
@@ -28,6 +29,52 @@ class Socket {
 afterEach(() => vi.useRealTimers());
 
 describe('Cloudflare Backend transport', () => {
+  describe.each([
+    ['workflow', (backend: Backend) =>
+      backend.workflows.execute(sessionId, requestId, command)],
+    ['admin', (backend: Backend) =>
+      backend.admin.setIntake(sessionId, true)],
+    ['image finish', (backend: Backend) =>
+      backend.images.finish(sessionId, issueId)],
+    ['image upload', (backend: Backend) => backend.images.upload(
+      'fixture-path', new Blob(['fixture']), 'image/png', () => undefined,
+    )],
+  ] as const)('%s session preflight', (_name, mutate) => {
+    it.each([
+      {
+        status: 401, format: 'JSON',
+        reply: () => Response.json(
+          { error: 'Session expired.' }, { status: 401 },
+        ),
+        message: 'Sign in to continue.',
+      },
+      {
+        status: 503, format: 'JSON',
+        reply: () => Response.json(
+          { error: 'Service temporarily unavailable.' }, { status: 503 },
+        ),
+        message: 'Service temporarily unavailable.',
+      },
+      {
+        status: 503, format: 'non-JSON',
+        reply: () => new Response(
+          '<html>Unavailable</html>', { status: 503 },
+        ),
+        message: 'The request could not be completed.',
+      },
+    ])('reports a $status $format failure without sending a mutation', async ({ reply, message }) => {
+      const fetcher = vi.fn<typeof fetch>(async () => reply());
+      const backend = createCloudflareBackend({ origin, fetch: fetcher });
+      await expect(mutate(backend)).rejects.toThrow(message);
+      expect(fetcher).toHaveBeenCalledTimes(1);
+      const [input, init] = fetcher.mock.calls[0];
+      const preflight = new Request(input, init);
+      expect(new URL(preflight.url).pathname).toBe('/api/auth/session');
+      expect(preflight.method).toBe('GET');
+      expect(preflight.body).toBeNull();
+    });
+  });
+
   it('preserves request identity and uses a fresh request-protection token', async () => {
     const fetcher = transport(() => Response.json({ outcome: 'committed', issueId }));
     const backend = createCloudflareBackend({ origin, fetch: fetcher });

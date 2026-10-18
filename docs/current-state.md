@@ -8,7 +8,7 @@ Earlier hosted CLI connector and fresh-installation checks pass. The latest prot
 Supabase remains active.
 During final verification, the owner merged PR #23 at `c144a2a`.
 T0020 includes that main revision and preserves the jury worklist.
-The combined source passes 566 unit and database tests across 34 files and all 45 ordinary browser cases.
+The combined source passes 611 unit and database tests across 41 files and all 45 ordinary browser cases.
 The complete local React journey also passes through the merged jury worklist.
 The [ticket](tickets.md#t0020-complete-cloudflare-connector) records the complete acceptance criteria.
 The [PR #21 component record](pr21-installation-disposition.md) explains installation reuse decisions.
@@ -46,7 +46,7 @@ Observed results during implementation are separate from final PR verification:
 - All 45 ordinary application browser regressions pass after main integration. Three local HTTPS authentication browser cases pass at the earlier revision.
 - Both frontend builds, type checking, lint, Deno checks, and all 12 function tests pass after the review corrections.
 - Both locked dependency audits report zero vulnerabilities.
-- The latest local secret scan passes across 119 commits through `1ee8cbf`.
+- The full-history secret scan passes across 124 commits through `ab4a8ff`.
 
 The hosted D1 run uses the new `minsky-connector-ci` database, `de43cf95-c024-4e44-860d-8ff179e4e08d`.
 All nine repository D1 migrations are applied there.
@@ -60,7 +60,7 @@ The direct D1 suites now require a separate store CI target, described below.
 The isolated connector Worker is deployed at `https://minsky-connector-ci.icaic-minsky.workers.dev`.
 Its initial version is `2a3fe2f1-7b4e-4017-bd45-43c3fdf8cbeb`.
 Initial secret creation produced active version `6133f70f-5762-479b-88d6-dfa3f2b376e7`.
-The production source is `59121f7`. The later `1ee8cbf` changes only the provider test bridge and its regression test.
+That initial application deployment uses source `59121f7`. The later `1ee8cbf` changes only the provider test bridge and its regression test.
 Its new Standard bucket, `minsky-connector-ci-images`, exists in APAC. Its public `r2.dev` URL is disabled.
 Anonymous checks return 200 for the landing page and 401 for protected session routes.
 Both `/.env` and `/src/main.tsx` return 404.
@@ -71,9 +71,9 @@ Protected Supabase verification passes on that revision in [run 39095319959](htt
 The protected Supabase run uses the existing CI backend without changing its configuration, migrations, or functions.
 Protected [run 39098783172](https://github.com/GiftedNovaHD/minsky/actions/runs/39098783172) on `9b0ef6b` passes all 70 workflow and 82 account cases.
 It deploys CI Worker version `33977804-a8c2-475d-ad52-27906df0a136`, then passes six of eight shared scenarios.
-The lifecycle scenario receives an unexpected authentication rejection before its contestant snapshot.
-The image scenario exceeds its 90-second limit during uploader removal. The hosted React step is not reached.
-Fixture cleanup reports no retained recovery marker or artifact. Both failures require correction before owner review.
+Both failing scenarios exceed their 90-second limit. The lifecycle then reports a sign-in message, and the image case reports a closed page.
+The static sign-in message does not establish HTTP 401. The hosted React step is not reached.
+Fixture cleanup reports no retained recovery marker or artifact. The timeout cause requires correction before owner review.
 Ordinary push CI passes on that corrected revision in [run 39098769818](https://github.com/GiftedNovaHD/minsky/actions/runs/39098769818).
 
 The `cloud-test` environment now permits `feature/t0020-cloudflare-connector`.
@@ -156,7 +156,11 @@ Reported SQL time covers provider metadata from `all`, `run`, and `batch`. It ex
 Summed call wall time can exceed elapsed time when files run concurrently.
 The corrected account CLI run passes all 82 cases with zero skips and verified cleanup in 148 seconds from this machine.
 Its measured totals include 3,423 calls and 10,536 statements, including suite initialization and maintained schema checks.
-This result is separate from GitHub timing. A corrected protected comparison remains required.
+This result is separate from GitHub timing.
+Protected run `39102298675` passes all 82 cases in 5 minutes 21 seconds, from 06:10:22 to 06:15:43 UTC.
+That is 14 minutes 45 seconds, or 73.4%, shorter than the earlier protected phase.
+Its workflow phase passes all 70 cases in 4 minutes 36 seconds.
+The elapsed comparison combines batching and concurrency changes. It does not isolate their individual effects.
 
 The remaining shared-scenario failures now have provider-owned HTTP diagnostics.
 Each client reports endpoint names, status counts, and request durations before logout.
@@ -164,6 +168,76 @@ A resource authentication rejection also records cookie presence and reads only 
 The flags describe its newest login wrapper. The wrapper count identifies ambiguity when several logins exist.
 Diagnostics omit URLs, query values, account IDs, cookies, password data, and provider error text.
 Local regression checks verify these boundaries and confirm that the state read finishes before browser logout.
+The repeated hosted CLI suite passes all eight shared scenarios on the changes committed as `ab4a8ff`.
+Its 29 client summaries cover 290 HTTP requests before teardown logout. The longest observed request takes 1,947 milliseconds.
+No resource authentication rejection occurs, so no fixture authentication-state read is needed.
+Scoped D1, R2, and coordinator cleanup passes without a retained recovery journal.
+The complete hosted React journey also passes on that source, with zero failures, skips, or flaky results.
+These CLI checks use deployed Worker version `33977804-a8c2-475d-ad52-27906df0a136`.
+These CLI checks do not reproduce the earlier protected timeouts.
+
+### Hosted browser duration
+
+Protected [run 39102298675](https://github.com/GiftedNovaHD/minsky/actions/runs/39102298675) on `ab4a8ff` passes both direct suites, then passes six of eight shared scenarios.
+It deploys Worker version `0c0c7675-9486-44d3-a8f9-7b356914127f`.
+Both failed scenarios reach the unchanged 90-second limit. The hosted React step is skipped.
+Cleanup reports no retained marker, recovery paths, or artifact.
+
+The lifecycle records 45 completed requests totaling 87,863 milliseconds before teardown, with a maximum of 3,178 milliseconds.
+All 13 observed snapshots and all 16 authentication-session reads return 200.
+The image scenario records 45 requests totaling 88,547 milliseconds, with a maximum of 3,160 milliseconds.
+All 20 observed authentication-session reads return 200.
+The scenarios await these requests sequentially. Successful HTTP time consumes almost their entire budget.
+No resource HTTP 401 appears in the summaries before logout.
+
+The earlier `39098783172` lifecycle log also contains a 90-second timeout before its sign-in error.
+The earlier interpretation as an authentication rejection was too strong.
+Teardown can revoke a session while a timed-out browser operation remains in flight.
+The observed order supports that explanation for the later message. It does not prove the pending request's response status.
+
+Read-only adaptive analytics cover 06:16:32 to 06:28:00 UTC.
+Successful invocations report median CPU time of 9.663 milliseconds and median request duration of 1,541.840 milliseconds.
+The estimates include 405 invocations in IAD, 11 in ARN, and one in SJC, with zero runtime errors.
+The database is in APAC. Waiting dominates CPU, but these aggregates do not identify the slow binding or queue.
+Smart Placement is a configuration candidate for a controlled comparison. Its effect remains unverified.
+The isolated CI candidate deploys as `f34b1519-525d-4dde-85bc-4b63c0dc1f02` after account, database, configuration, build, and dry-run checks.
+Its placement metadata reports `smart` and `SUCCESS`, with analysis at 06:37:32 UTC.
+This status does not establish a latency improvement. The same hosted assertions must pass from the GitHub runner.
+The generated full-application configuration includes the same candidate setting. Direct store and bounded authentication configurations remain unchanged.
+Older generated application files require regeneration from their original public settings before current operator commands will accept them.
+The default local frontend build is restored to Supabase after the isolated deployment.
+The candidate's complete hosted CLI suite passes all eight scenarios in 3.5 minutes, with scoped cleanup.
+Its 29 clients record 290 requests totaling 135,640 milliseconds, with a maximum of 2,837 milliseconds.
+No resource authentication rejection occurs. This Singapore-origin run does not prove improvement from the GitHub runner.
+
+### Documentation search verification
+
+Ordinary push run `39102274608` fails its search-result assertion after five seconds on `ab4a8ff`.
+The same revision passes all three docs cases in its PR and protected runs.
+A controlled 5,500-millisecond search-module delay reproduces the assertion failure.
+The unchanged query then returns the expected result at 5,889 milliseconds, without JavaScript errors.
+The visible input correctly retains the query while the index loads.
+The test incorrectly includes network initialization in its five-second result assertion.
+The historical CI log does not establish which initialization step took longer in that run.
+
+The corrected test holds the real index request and checks the visible loading message and retained query.
+It releases that request, waits for the completed response, then checks the result and keyboard activation.
+It passes under the same controlled delay. All three docs cases and the site build pass locally.
+The application, overall timeout, and retry settings are unchanged.
+The loading message and completed response are explicit failure signals for later runs.
+
+### Session preflight errors
+
+A separate browser-adapter check reproduces misleading errors for legitimate service failures.
+The session preflight maps every unsuccessful response, including HTTP 503, to a sign-in prompt.
+Only HTTP 401 now produces that prompt. Other failures retain the server message or a fixed request-error fallback.
+Twelve boundary cases cover workflow, administration, image completion, and image upload preflights.
+Each case verifies that the failed preflight sends no mutation.
+The focused browser transport and authentication suites pass all 40 cases. Types, lint, and the default frontend build also pass.
+Snapshots do not use this helper. This correction does not explain the earlier snapshot error after timeout.
+The complete local suite then passes all 610 tests across 41 files, with zero skips, in 104.54 seconds.
+Global lint also passes.
+After the placement configuration checks are added, the full local suite passes all 611 tests across 41 files without skips.
 
 ### Empty hosted installation
 
@@ -205,6 +279,12 @@ No fixture recovery journal remains.
 This trial passed at 04:21 UTC on 2026-10-18. Its final proof cleanup passed at 04:25 UTC.
 It is separate from the connector CI Worker and protected GitHub Actions runs.
 The fictional initialized installation remains available for owner review.
+
+A final read-only audit at 06:06:54 UTC confirms the same initial IDs, owner membership, two teams, and closed intake.
+All nine migration names match the trial checkout. The private bucket contains zero objects.
+The retained baseline includes 20 delivered notifications, three audience counters, seven audit records, and four completed account operations.
+There are zero pending notifications or account operations. Journey workflow and image rows remain absent.
+The audit reads no private credentials and makes no provider changes.
 
 ### R2 need and cost
 

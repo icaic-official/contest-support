@@ -43,10 +43,18 @@ test('configuration contains only public independent settings and complete Cloud
   assert.deepEqual(config.migrations, [{ tag: 'v1', new_sqlite_classes: ['SessionLiveCoordinator'] }]);
   assert.equal(config.assets.run_worker_first, true);
   assert.equal(config.preview_urls, false);
+  assert.deepEqual(config.placement, { mode: 'smart' });
   assert.equal(config.limits.cpu_ms, 1000);
   assert.deepEqual(config.triggers.crons, ['* * * * *']);
   assert.equal(JSON.stringify(config).includes('AUTH_SECRET'), false);
   assert.equal(validateProviderConfiguration({ ...settings, databaseName: settings.workerName }).databaseName, settings.workerName);
+});
+
+test('committed connector CI configuration matches the full configuration generator', async () => {
+  const path = resolve(repositoryRoot, 'src/server/adapters/cloudflare/deploy/connector-ci.wrangler.jsonc');
+  const settings = await readInstallationTarget(path);
+  const config = JSON.parse(await readFile(path, 'utf8'));
+  assert.deepEqual(config, renderWranglerConfiguration(settings, path));
 });
 
 test('configuration rejects credentials, placeholders, and malformed resource names and identifiers', () => {
@@ -117,7 +125,7 @@ test('plan is read-only and configure creates an exclusive configuration with no
   assert.equal(await readFile(configPath, 'utf8'), before);
 });
 
-test('hosted operations reject modified entry points, extra bindings, origins, or secret values', async () => {
+test('hosted operations reject modified entry points, placement, bindings, origins, or secret values', async () => {
   const path = await directory();
   const configPath = join(path, 'wrangler.jsonc');
   const original = renderWranglerConfiguration(settings, configPath);
@@ -127,6 +135,9 @@ test('hosted operations reject modified entry points, extra bindings, origins, o
     (value) => { value.vars.AUTH_SECRET = 'private-placeholder'; },
     (value) => { value.vars.AUTH_ORIGIN = 'http://localhost:8788'; },
     (value) => { value.env = { other: { account_id: settings.accountId } }; },
+    (value) => { delete value.placement; },
+    (value) => { value.placement.mode = 'off'; },
+    (value) => { value.placement.region = 'aws:us-east-1'; },
   ]) {
     const modified = globalThis.structuredClone(original);
     change(modified);

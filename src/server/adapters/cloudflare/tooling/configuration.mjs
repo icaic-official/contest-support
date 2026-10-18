@@ -65,6 +65,7 @@ export function renderWranglerConfiguration(input, configPath, { allowLocal = fa
     compatibility_flags: ['nodejs_compat'],
     workers_dev: true,
     preview_urls: false,
+    placement: { mode: 'smart' },
     limits: { cpu_ms: 1000 },
     observability: { enabled: false },
     triggers: { crons: ['* * * * *'] },

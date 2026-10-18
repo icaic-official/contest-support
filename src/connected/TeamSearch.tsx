@@ -145,42 +145,47 @@ export function TeamSearch({
             {unresolvedLabel(unresolvedCount(issues, selected.id))}
           </p>
         )}
-        {listOpen && (
-          <div
-            className="team-suggestions absolute inset-x-0 top-full z-50 mt-1 max-h-72 overflow-y-auto rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
-            id={listId}
-            role="listbox"
-          >
-            {result.suggestions.map((team, index) => (
-              <button
-                key={team.id}
-                id={`${id}-option-${index}`}
-                type="button"
-                role="option"
-                tabIndex={-1}
-                aria-selected={index === activeIndex}
-                onMouseDown={(event) => event.preventDefault()}
-                onClick={() => onSelection(chooseTeam(team.id))}
-                className="flex min-h-11 w-full flex-col items-start justify-center rounded-sm px-2 py-1.5 text-left text-sm aria-selected:bg-accent aria-selected:text-accent-foreground hover:bg-accent"
-              >
-                <strong>{team.name}</strong>
-                <span className="text-xs text-muted-foreground">
-                  {team.location} · {unresolvedLabel(team.unresolved)}
-                </span>
-              </button>
-            ))}
-            {result.suggestions.length === 0 && (
-              <p className="team-search-note px-2 py-1.5 text-xs text-muted-foreground" role="status">
-                No matching teams.
-              </p>
-            )}
-            {result.overflow && (
-              <p className="team-search-note px-2 py-1.5 text-xs text-muted-foreground" role="status">
-                Keep typing to narrow the list.
-              </p>
-            )}
-          </div>
-        )}
+        {/*
+          The list stays mounted and is hidden when it closes. If blur
+          removed it, a Radix dialog or sheet would see the removal while
+          focus moves and pull focus back to the dialog, so Tab would not
+          reach the next control.
+        */}
+        <div
+          className="team-suggestions absolute inset-x-0 top-full z-50 mt-1 max-h-72 overflow-y-auto rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
+          id={listId}
+          role="listbox"
+          hidden={!listOpen}
+        >
+          {result.suggestions.map((team, index) => (
+            <button
+              key={team.id}
+              id={`${id}-option-${index}`}
+              type="button"
+              role="option"
+              tabIndex={-1}
+              aria-selected={index === activeIndex}
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => onSelection(chooseTeam(team.id))}
+              className="flex min-h-11 w-full flex-col items-start justify-center rounded-sm px-2 py-1.5 text-left text-sm aria-selected:bg-accent aria-selected:text-accent-foreground hover:bg-accent"
+            >
+              <strong>{team.name}</strong>
+              <span className="text-xs text-muted-foreground">
+                {team.location} · {unresolvedLabel(team.unresolved)}
+              </span>
+            </button>
+          ))}
+          {result.suggestions.length === 0 && (
+            <p className="team-search-note px-2 py-1.5 text-xs text-muted-foreground" role="status">
+              No matching teams.
+            </p>
+          )}
+          {result.overflow && (
+            <p className="team-search-note px-2 py-1.5 text-xs text-muted-foreground" role="status">
+              Keep typing to narrow the list.
+            </p>
+          )}
+        </div>
       </div>
     </label>
   );

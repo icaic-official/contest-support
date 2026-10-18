@@ -59,8 +59,9 @@ The full Git-history secret scan passes for all 132 commits present at that chec
 
 Ordinary [push CI](https://github.com/GiftedNovaHD/minsky/actions/runs/39124689827) and [PR CI](https://github.com/GiftedNovaHD/minsky/actions/runs/39124726035) pass on `f6864f6`.
 Both publication jobs skip because `CLOUDFLARE_DEPLOY_ENABLED=false`.
-Protected T0021 checks remain pending authorization for its exact branch entry, or later execution on approved `main`.
-The six existing branch entries and protection rule `69128862` remain unchanged.
+The owner later approved only the T0021 branch entry. Entry `63467138` adds `feature/t0021-cloudflare-development-install`.
+All six earlier branch entries and protection rule `69128862` remain unchanged.
+Protected T0021 verification follows this approval. Its current run result is recorded in PR #43.
 The five Cloudflare selection variables remain absent. The stable Worker has no application bindings.
 Independent Cloudflare Git builds were disabled by the owner's earlier confirmation.
 Current read-only Builds API checks return `403` for both Workers, so that setting requires dashboard confirmation before activation.
@@ -73,6 +74,25 @@ The final source adds this configuration test, public configuration, and operati
 Its ordinary CI results are available in [PR #43 checks](https://github.com/GiftedNovaHD/minsky/pull/43/checks).
 The [run report](t0021-run-report.md) owns the full command and file lists.
 Activation, protected final verification, and a subsequent automated stable deployment remain incomplete.
+
+### Final executable verification and protected access
+
+Ordinary [push CI](https://github.com/GiftedNovaHD/minsky/actions/runs/39126910216) and [PR CI](https://github.com/GiftedNovaHD/minsky/actions/runs/39126913307) pass on `33e76b2e5d75e5650c2397829460cd6bd78643b0`.
+This revision deploys only to the existing full connector CI target for final CLI verification.
+Its Worker version is `1e41f5ce-230e-4f4b-b270-659ecea85a73`.
+Revision metadata, actual bindings, and anonymous API rejection pass.
+All eight official shared provider scenarios and the complete hosted UI case pass without skips or flaky results. Scoped cleanup passes.
+
+The final direct workflow attempt passes 69 cases and fails at position 8, retaining one fixture journal.
+Its private child output was not retained, so the failure cause is unconfirmed.
+Atomic recovery checks 17 ownership conditions and 18 independent absence conditions before journal removal at 12:29:30 UTC.
+The complete unchanged workflow repeat then passes all 70 cases without skips.
+The following account run passes 75 cases and fails seven, retaining three fixture journals.
+The failures include network and cleanup errors. That account run is not a pass.
+The existing earlier 82-case pass remains evidence only for its recorded run.
+The follow-up recovery, any repeat, and protected final result are recorded in [PR #43](https://github.com/GiftedNovaHD/minsky/pull/43).
+Protected verification uses the separately approved exact branch entry. It does not replace a local hosted result.
+The authorization and evidence update changes documentation only. Application code and final deployment configuration remain those tested on `33e76b2`.
 
 ## PR #42 review fixes and cleanup, 2026-10-18
 

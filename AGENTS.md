@@ -38,7 +38,7 @@ Record PR #21 reuse and recommend its disposition. The owner decides whether to 
 Isolated Cloudflare development, CI, and installation resources are authorized in account `458ad6a930b0fb717796dfa19ca6a2b1`.
 Confirm that account and the exact target before provider changes.
 Keep development, CI, and installation resources separate.
-T0020's earlier allowlist authorization does not extend to T0021. Do not change protected environment rules or branch allowlists without authorization.
+On 2026-10-18, the owner approved only `feature/t0021-cloudflare-development-install` as one additional `cloud-test` branch entry. Preserve all six earlier entries and protection rule `69128862`. This approval does not authorize another branch, protection changes, or activation.
 Workers Paid and R2 are active. Document the concrete need and cost before any further paid upgrade.
 Bounded subagent work is authorized.
 

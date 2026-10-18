@@ -5,7 +5,7 @@ The separate T0021 worktree now includes that main revision and the final T0020 
 The accepted executable connector remains `2b6f6f0`; PR #42's final `b984e67` adds documentation and evidence.
 The pre-merge local-only limit ended. Dedicated development and separate installation-verification resources are now authorized.
 Supabase remains active and intact. The development URL switch still requires approval of exact resources, revision, commands, checks, and recovery.
-T0021 has no authorization to change protected environment rules or branch entries without a separate owner decision.
+The owner later approved adding only `feature/t0021-cloudflare-development-install` to `cloud-test`. Entry `63467138` preserves all six earlier entries and protection rule `69128862`. No other branch, protection change, or backend activation is authorized.
 Earlier preparation and pause records retain their original scope.
 
 **Fresh Cloudflare development installation, 2026-10-18.** The owner authorized T0021 before PR #42 merges.
@@ -28,7 +28,7 @@ Implement no speculative provider abstractions. AWS, GCP, Azure, Terraform, Dock
 After PR #42 merges, dedicated development resources are authorized in account `458ad6a930b0fb717796dfa19ca6a2b1`.
 Confirm existing Wrangler access and each exact target before mutation. Keep development, CI, and installation-verification resources separate.
 Workers Paid and R2 are active. Identify need and cost before proposing another paid upgrade.
-Do not extend T0020's protected-environment allowlist authorization to this ticket.
+The separate T0021 allowlist approval covers only its exact branch. Preserve the earlier entries and protection rules.
 Before changing the development URL, present exact resources, approved revision, configuration and secret names, commands, checks, and recovery.
 Obtain owner approval for that concrete switch. Preparation PR merge is not activation approval.
 See [T0021](docs/tickets.md#t0021-fresh-cloudflare-development-installation) and [activation](docs/activate-cloudflare-development.md).

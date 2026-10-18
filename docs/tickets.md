@@ -58,7 +58,7 @@ T0008 fuzzy team search merged into `main` in [PR #22](https://github.com/notbow
 ## T0021 Fresh Cloudflare development installation
 
 Branch: `feature/t0021-cloudflare-development-install`, from PR #42 head `2b6f6f0` in a separate worktree.
-Status: [Draft PR #43](https://github.com/GiftedNovaHD/minsky/pull/43) includes merged main at `104d9d1`. Fresh development and separate installation verification pass. Protected final checks and activation remain pending authorization.
+Status: [Draft PR #43](https://github.com/GiftedNovaHD/minsky/pull/43) includes merged main at `104d9d1`. Fresh development and separate installation verification pass. The owner approved its exact protected branch entry. Protected final checks remain to run; activation still requires separate approval.
 Summary: Prepare a fresh Cloudflare development installation and guarded deployment automation. Keep Supabase intact and active until the owner approves the concrete URL switch.
 
 The owner authorizes this ticket before PR #42 merges.
@@ -69,7 +69,7 @@ Bootstrap a new administrator through the existing provider tool.
 Preserve the shared contracts, workflow decisions, database rules, and jury worklist.
 Keep development, CI, and installation-verification resources separate.
 Use account `458ad6a930b0fb717796dfa19ca6a2b1` and confirm each exact target before mutation.
-The earlier T0020 branch allowlist authorization does not cover this branch.
+The owner separately approved this exact branch entry on 2026-10-18. Entry `63467138` preserves all six earlier entries and protection rule `69128862`.
 Do not merge either PR or activate the development URL without owner approval.
 
 ### Acceptance criteria

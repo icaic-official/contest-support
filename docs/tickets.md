@@ -2,7 +2,7 @@
 
 These tickets describe development work, not contestant issues.
 
-The frontend redesign [T0015 organiser and contestant frontend redesign](#t0015--organiser-and-contestant-frontend-redesign) is implemented on its own branch. Step 5 merged current `main` on 2026-10-18, and the PR waits for the user's review.
+The frontend redesign [T0015 organiser and contestant frontend redesign](#t0015--organiser-and-contestant-frontend-redesign) is implemented on its own branch in draft [PR #44](https://github.com/GiftedNovaHD/minsky/pull/44). Step 5 merged current `main` on 2026-10-18.
 The active ticket is [T0020 complete Cloudflare connector](#t0020-complete-cloudflare-connector).
 The owner merged T0019 in PR #41 at `7d19b00` before authorizing this ticket.
 T0020 completes Cloudflare persistence, the browser connector, and independent installation verification.
@@ -905,7 +905,7 @@ No schema, backend feature, provider implementation, or runtime dependency is pa
 ## T0015 — Organiser and contestant frontend redesign
 
 Branch: `feature/t0015-frontend-redesign`, from updated `main` at `aaa6bbc`.
-Status: steps 1 to 5 are implemented and verified locally. The PR is open for the user's review. The user reviews and merges the PR. Deployment is a separate step.
+Status: steps 1 to 5 are implemented and verified locally. [PR #44](https://github.com/GiftedNovaHD/minsky/pull/44) is a draft until the connector UI journey uses the new selectors. The user reviews and merges the PR. Deployment is a separate step.
 This ticket is different from [T0015 shared provider tests](#t0015-shared-provider-tests) from PR #37. The two records share the ticket number. Keep their anchors separate.
 
 ### Progress

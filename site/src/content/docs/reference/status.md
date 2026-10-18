@@ -31,7 +31,7 @@ This page is a dated record, not a live deployment dashboard.
 | --- | --- |
 | [T0006 announcements](https://github.com/GiftedNovaHD/minsky/pull/20) | Open pull request. |
 | [T0007 independent installations](https://github.com/GiftedNovaHD/minsky/pull/21) | Open pull request. Packaging exists on its branch. Container operation remains unverified. |
-| T0015 organiser and contestant frontend redesign | Pull request open for review from `feature/t0015-frontend-redesign`. Separate contestant desktop app, organiser phone app and organiser desktop console. The guides describe this interface. |
+| [T0015 organiser and contestant frontend redesign](https://github.com/GiftedNovaHD/minsky/pull/44) | Draft pull request from `feature/t0015-frontend-redesign`. Separate contestant desktop app, organiser phone app and organiser desktop console. The guides describe this interface. |
 | [T0020 complete Cloudflare connector](https://github.com/GiftedNovaHD/minsky/pull/42) | Implements every backend group and provider-owned installation tooling. Review fixes pass local checks, protected Cloudflare verification, and empty-installation verification on `2b6f6f0`. The repository records each run separately. The owner reviews and merges. |
 
 Supabase remains the active backend.

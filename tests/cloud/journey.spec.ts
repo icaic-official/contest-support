@@ -774,6 +774,10 @@ test("admin UI assigns combined roles; password change, refresh and logout work"
   await expect(
     page.getByRole("heading", { name: "Issue Queue" }),
   ).toBeVisible();
+  // Later cloud tests sign in through the same UUID-scoped fixture accounts.
+  const state = fixture();
+  state.accounts.volunteer.password = password;
+  save(state);
   await page.reload();
   await expect(
     page.getByRole("heading", { name: "Issue Queue" }),
@@ -1045,37 +1049,54 @@ test("trusted provider recovery restores a locked-out sole admin without email",
 test("archived records allow queue navigation and disable writes", async ({
   page,
 }) => {
-  const { error } = await service()
+  const event = fixture().event;
+  const admin = service();
+  const { data: original, error: readError } = await admin
     .from("events")
-    .update({ archived: true })
-    .eq("id", fixture().event);
-  expect(error).toBeNull();
-  await login(page, "specialist");
-  await expect(
-    page.getByText("This event is archived. Records are read only."),
-  ).toBeVisible();
-  const filter = page.getByRole("combobox", {
-    name: "Status",
-    exact: true,
-  });
-  await expect(filter).toBeEnabled();
-  await filter.selectOption("open");
-  await page
-    .getByRole("button")
-    .filter({ hasText: "Staff bypass intake" })
-    .click();
-  await expect(
-    page.getByRole("heading", { name: "Staff bypass intake", exact: true }),
-  ).toBeVisible();
-  await expect(
-    page.getByRole("button", { name: "Claim issue", exact: true }),
-  ).toBeDisabled();
-  await expect(
-    page.getByRole("button", { name: "Report for team", exact: true }),
-  ).toBeDisabled();
-  await page.setViewportSize({width: 320, height: 740});
-  const back = page.getByRole("button", {name: "Back to queue", exact: true});
-  await expect(back).toBeEnabled();
-  await back.click();
-  await expect(page.locator("#workspace-heading")).toBeFocused();
+    .select("archived")
+    .eq("id", event)
+    .single();
+  if (readError) throw readError;
+  try {
+    const { error } = await admin
+      .from("events")
+      .update({ archived: true })
+      .eq("id", event);
+    if (error) throw error;
+    await login(page, "specialist");
+    await expect(
+      page.getByText("This event is archived. Records are read only."),
+    ).toBeVisible();
+    const filter = page.getByRole("combobox", {
+      name: "Status",
+      exact: true,
+    });
+    await expect(filter).toBeEnabled();
+    await filter.selectOption("open");
+    await page
+      .getByRole("button")
+      .filter({ hasText: "Staff bypass intake" })
+      .click();
+    await expect(
+      page.getByRole("heading", { name: "Staff bypass intake", exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Claim issue", exact: true }),
+    ).toBeDisabled();
+    await expect(
+      page.getByRole("button", { name: "Report for team", exact: true }),
+    ).toBeDisabled();
+    await page.setViewportSize({width: 320, height: 740});
+    const back = page.getByRole("button", {name: "Back to queue", exact: true});
+    await expect(back).toBeEnabled();
+    await back.click();
+    await expect(page.locator("#workspace-heading")).toBeFocused();
+  } finally {
+    // Do not leave later tests with a read-only fixture, even on assertion failure.
+    const { error } = await admin
+      .from("events")
+      .update({ archived: original.archived })
+      .eq("id", event);
+    expect(error, "Restore the fixture event's archive state").toBeNull();
+  }
 });

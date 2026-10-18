@@ -21,11 +21,14 @@ import { searchTeams, unresolvedCount } from "@/connected/teamSearch";
 import { type ThemePreference, useTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 import {
+  AwardEvidence,
   PersonAvatar,
   PlaceTile,
   UnresolvedTimer,
 } from "../components/issueDisplay";
 import {
+  type AwardList,
+  awardLists,
   chipForFilter,
   filterForChip,
   isJuryOnly,
@@ -369,30 +372,14 @@ export function FindTab(props: PhoneTabProps) {
   );
 }
 
-type AwardList = "decide" | "apply" | "done";
-
 /**
- * Resolved issues for the jury: issues without an award, awards that wait
- * for external application, and applied awards.
+ * The jury award lists: resolved issues without an award, awards that wait
+ * for external application (also on reopened issues) and applied awards.
  */
 export function AwardsTab(props: PhoneTabProps) {
   const { state, workflow, now } = props;
   const [list, setList] = useState<AwardList>("decide");
-  const resolved = sortByUnresolved(
-    state.issues.filter((issue) => issue.status === "resolved"),
-    state.resolutions,
-    now,
-  );
-  const awardOf = (issue: Issue) =>
-    state.awards.find((award) => award.issue_id === issue.id);
-  const lists: Record<AwardList, Issue[]> = {
-    decide: resolved.filter((issue) => !awardOf(issue)),
-    apply: resolved.filter((issue) => {
-      const award = awardOf(issue);
-      return award && !award.applied_at;
-    }),
-    done: resolved.filter((issue) => awardOf(issue)?.applied_at),
-  };
+  const lists = awardLists(state);
   const archived = Boolean(state.event?.archived);
   return (
     <div className="space-y-4">
@@ -424,9 +411,8 @@ export function AwardsTab(props: PhoneTabProps) {
       </div>
       {lists[list].length ? (
         <ul className="space-y-2.5">
-          {lists[list].map((issue) => {
-            const team = state.teams.find((item) => item.id === issue.team_id);
-            const award = awardOf(issue);
+          {lists[list].map((row) => {
+            const { issue, team, award } = row;
             return (
               <li key={issue.id} className="rounded-xl border bg-card p-3">
                 <button
@@ -437,8 +423,11 @@ export function AwardsTab(props: PhoneTabProps) {
                 >
                   <span className="flex items-center gap-2 text-xs text-muted-foreground">
                     <span className="font-mono">ISS-{issue.number}</span>·
-                    <span className="truncate">{team?.name}</span>
-                    <span className="ml-auto">
+                    <span className="truncate">
+                      {team?.name ?? "Team unavailable"}
+                      {team?.location && ` · ${team.location}`}
+                    </span>
+                    <span className="ml-auto shrink-0">
                       <UnresolvedTimer
                         issue={issue}
                         resolutions={state.resolutions}
@@ -450,7 +439,11 @@ export function AwardsTab(props: PhoneTabProps) {
                   <span className="mt-1.5 block text-[15px] leading-snug font-medium">
                     {issue.description}
                   </span>
+                  <span className="mt-1 block text-xs text-muted-foreground">
+                    {issue.category}
+                  </span>
                 </button>
+                <AwardEvidence row={row} />
                 {award && (
                   <div className="mt-3 flex items-center gap-3">
                     <span className="text-2xl font-bold tabular-nums">
@@ -525,9 +518,7 @@ export function MeTab(props: PhoneTabProps & { onSessionChange: () => void }) {
   const theme = useTheme();
   const name =
     state.members.find((item) => item.person.id === user.id)?.person.name ??
-    (typeof user.user_metadata.name === "string"
-      ? user.user_metadata.name
-      : undefined) ??
+    user.name ??
     username ??
     user.email ??
     "Your account";

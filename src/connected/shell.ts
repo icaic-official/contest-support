@@ -1,9 +1,9 @@
-import type { User } from "@supabase/supabase-js";
+import type { AccountIdentity } from "@/backend/contracts";
 import type { SessionData } from "./hooks/useSessionSnapshot";
 
 /** What the UI selector passes to the contestant and organiser shells. */
 export interface ShellProps {
-  user: User;
+  user: AccountIdentity;
   /** The organizer-assigned username, or null for an older email login. */
   username: string | null;
   data: SessionData;

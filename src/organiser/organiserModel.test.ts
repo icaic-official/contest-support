@@ -3,12 +3,14 @@ import type { Issue, Membership, Resolution, Snapshot } from "@/connected/model"
 import {
   ageClass,
   ageTier,
+  awardLists,
   chipForFilter,
   filterForChip,
   isJuryOnly,
   issueAbilities,
   issuesByNumber,
   matchesChip,
+  openableIssues,
   organiserTabs,
   placeOf,
   primaryAction,
@@ -301,5 +303,104 @@ describe("issueAbilities and primaryAction", () => {
       member({ roles: ["volunteer"], is_admin: true }),
     );
     expect(Object.values(can).some(Boolean)).toBe(false);
+  });
+});
+
+describe("jury award lists (T0009)", () => {
+  const jury = member({ roles: ["jury"] });
+  const resolvedAt = "2026-10-17T10:30:00Z";
+  function resolution(issueId: string, at: string): Resolution {
+    return {
+      id: `resolution-${issueId}`,
+      session_id: "session",
+      issue_id: issueId,
+      actor: other,
+      actor_name: "Priya",
+      at,
+      summary: "Fixed",
+      reopened_at: null,
+      reopened_by: null,
+      reopened_name: null,
+      reason: null,
+    };
+  }
+  function award(
+    issueId: string,
+    at: string,
+    appliedAt: string | null = null,
+  ): Snapshot["awards"][number] {
+    return {
+      id: `award-${issueId}`,
+      issue_id: issueId,
+      resolution_id: `resolution-${issueId}`,
+      minutes: 0,
+      explanation: "No change",
+      actor_name: "Jury",
+      at,
+      applied_at: appliedAt,
+      applied_name: appliedAt ? "Lead" : null,
+    };
+  }
+  function state(overrides: Partial<Snapshot>): Snapshot {
+    return {
+      session: {
+        id: "session",
+        event_id: "event",
+        name: "Primary",
+        intake_open: true,
+        categories: ["Network"],
+        revision: 1,
+        max_image_bytes: 1048576,
+        max_images_per_issue: 5,
+        max_image_bytes_per_issue: 5242880,
+      },
+      event: { id: "event", name: "Event", archived: false },
+      membership: jury,
+      teams: [],
+      issues: [],
+      resolutions: [],
+      awards: [],
+      history: [],
+      attachments: [],
+      pending_removals: [],
+      members: [],
+      audit: [],
+      server_time: resolvedAt,
+      ...overrides,
+    };
+  }
+  const decide = issue({ id: "decide", number: 1, status: "resolved", resolved_at: resolvedAt });
+  const reopened = issue({ id: "reopened", number: 2, status: "claimed", owner: other });
+  const applied = issue({ id: "applied", number: 3, status: "resolved", resolved_at: resolvedAt });
+  const snapshot = state({
+    issues: [decide, reopened, applied],
+    resolutions: [
+      resolution("decide", resolvedAt),
+      { ...resolution("reopened", "2026-10-17T10:10:00Z"), reopened_at: "2026-10-17T10:20:00Z" },
+      resolution("applied", "2026-10-17T10:05:00Z"),
+    ],
+    awards: [
+      award("reopened", "2026-10-17T10:12:00Z"),
+      award("applied", "2026-10-17T10:06:00Z", "2026-10-17T10:07:00Z"),
+    ],
+  });
+
+  it("keeps a pending award on a reopened issue in To apply", () => {
+    const lists = awardLists(snapshot);
+    expect(lists.decide.map((row) => row.issue.id)).toEqual(["decide"]);
+    expect(lists.apply.map((row) => row.issue.id)).toEqual(["reopened"]);
+    expect(lists.apply[0]?.resolution?.reopened_at).not.toBeNull();
+    expect(lists.done.map((row) => row.issue.id)).toEqual(["applied"]);
+  });
+
+  it("lets a jury-only member open the reopened issue with a pending award", () => {
+    expect(openableIssues(snapshot, jury).map((item) => item.id)).toEqual([
+      "decide",
+      "applied",
+      "reopened",
+    ]);
+    expect(
+      openableIssues(snapshot, member({ roles: ["volunteer"] })),
+    ).toHaveLength(3);
   });
 });

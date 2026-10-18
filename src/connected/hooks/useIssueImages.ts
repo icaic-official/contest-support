@@ -1,17 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import {
-  attachmentPath,
-  ImageRequestError,
-  imageKind,
-  imageRejection,
-} from "../imageFile";
-import {
-  type ImageTransport,
-  isImageRequestError,
-  liveImageTransport,
-  type StartedImage,
-  thumbnailBlob,
-} from "../imageUpload";
+import { requireBackend } from "@/backend";
+import type { ImageTransport, StartedImage } from "@/backend/contracts";
+import { ImageRequestError } from "@/backend/errors";
+import { attachmentPath, imageKind, imageRejection } from "../imageFile";
+import { isImageRequestError, thumbnailBlob } from "../imageUpload";
 import type { Attachment, PendingRemoval } from "../model";
 
 /** The image limits of a session, in bytes and images. */
@@ -96,7 +88,7 @@ export function useIssueImages({
   attachments,
   pendingRemovals,
   onChanged,
-  transport = liveImageTransport,
+  transport = requireBackend().images,
   isPreviewOpen,
   onPreviewClose,
 }: IssueImagesOptions): IssueImagesState {
@@ -178,12 +170,7 @@ export function useIssueImages({
           await onChanged();
           return;
         } catch (cause) {
-          if (
-            !(
-              isImageRequestError(cause) &&
-              cause.message.startsWith("Upload the image before finishing.")
-            )
-          ) {
+          if (!(isImageRequestError(cause) && cause.incomplete)) {
             throw cause;
           }
         }

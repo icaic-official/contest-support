@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
-import type { User } from "@supabase/supabase-js";
-import { client, requireClient } from "../client";
+import { backend, requireBackend } from "@/backend";
+import type { AccountIdentity } from "@/backend/contracts";
+import { errorMessage } from "@/backend/errors";
 
-/** The signed-in Supabase user and the sign-out action. */
+/** The signed-in account and the sign-out action. */
 export interface AuthSession {
-  user: User | undefined;
+  user: AccountIdentity | undefined;
   /** True until the stored session has been restored. */
   loading: boolean;
   /** The last session restore or sign-out error. */
@@ -14,38 +15,42 @@ export interface AuthSession {
 
 /** Restores the stored session and follows later sign-in and sign-out events. */
 export function useAuthSession(): AuthSession {
-  const [user, setUser] = useState<User>();
+  const [user, setUser] = useState<AccountIdentity>();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   useEffect(() => {
-    if (!client) {
+    if (!backend) {
       setLoading(false);
       return;
     }
     let active = true;
-    const { data: subscription } = client.auth.onAuthStateChange(
-      (_event, session) => {
-        if (!active) return;
-        setUser(session?.user);
-        setLoading(false);
-      },
-    );
-    void client.auth.getSession().then(({ data, error: cause }) => {
+    const unsubscribe = backend.auth.subscribe((nextUser) => {
       if (!active) return;
-      setUser(data.session?.user);
-      if (cause) setError(cause.message);
+      setUser(nextUser);
       setLoading(false);
     });
+    void backend.auth
+      .currentUser()
+      .then((nextUser) => {
+        if (!active) return;
+        setUser(nextUser);
+        setLoading(false);
+      })
+      .catch((cause: unknown) => {
+        if (!active) return;
+        setError(errorMessage(cause));
+        setLoading(false);
+      });
     return () => {
       active = false;
-      subscription.subscription.unsubscribe();
+      unsubscribe();
     };
   }, []);
   function signOut() {
-    void requireClient()
+    void requireBackend()
       .auth.signOut()
-      .then(({ error: cause }) => {
-        if (cause) setError(cause.message);
+      .catch((cause: unknown) => {
+        setError(errorMessage(cause));
       });
   }
   return { user, loading, error, signOut };

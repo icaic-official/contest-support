@@ -13,9 +13,9 @@ import { emptyReply, type ReplyDraft } from "../actions/IssueForms";
 import { ReportForm } from "../actions/ReportForm";
 import {
   issueAbilities,
+  openableIssues,
   type OrganiserTab,
   organiserTabs,
-  visibleIssues,
 } from "../organiserModel";
 import { PhoneIssueView } from "./PhoneIssueView";
 import {
@@ -87,8 +87,7 @@ export function OrganiserPhoneApp({
 
   const tabs = organiserTabs(member);
   const currentTab = tabs.includes(tab) ? tab : tabs[0];
-  const issues = visibleIssues(state.issues, member);
-  const openedIssue = issues.find(
+  const openedIssue = openableIssues(state, member).find(
     (issue) => issue.id === workflow.selectedIssueId,
   );
   const archived = Boolean(state.event?.archived);

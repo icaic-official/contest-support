@@ -12,7 +12,7 @@ import {
   type IssueImagesState,
   useIssueImages,
 } from "@/connected/hooks/useIssueImages";
-import type { ImageTransport } from "@/connected/imageUpload";
+import type { ImageTransport } from "@/backend/contracts";
 import type { Snapshot } from "@/connected/model";
 import { cn } from "@/lib/utils";
 import { ActionDialog } from "./ActionDialog";

@@ -1,8 +1,8 @@
 import { useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { IssueImages } from "./IssueImages";
-import { ImageRequestError } from "./imageFile";
-import type { ImageTransport, StartedImage } from "./imageUpload";
+import { ImageRequestError } from "../backend/errors";
+import type { ImageTransport, StartedImage } from "../backend/contracts";
 import type { Attachment, PendingRemoval } from "./model";
 import "../index.css";
 
@@ -76,7 +76,10 @@ function Preview({
     async finish(_session, attachmentId) {
       const image = pending.current.get(attachmentId);
       if (!image?.original || !image.thumbnail) {
-        throw new ImageRequestError("Upload the image before finishing.", { restart: true });
+        throw new ImageRequestError("Upload the image before finishing.", {
+          restart: true,
+          incomplete: true,
+        });
       }
       if (image.ready) return;
       image.ready = true;

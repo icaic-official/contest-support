@@ -1,3 +1,4 @@
+import type { AccountCommand, MembershipInput } from "@/backend/contracts";
 import { statusNames } from "@/connected/labels";
 import type { Issue, Membership, Role, Snapshot } from "@/connected/model";
 
@@ -61,13 +62,12 @@ export function stepLimit(
   return Math.min(max, Math.max(min, start + step));
 }
 
-/** The parameters of the `set_image_limits` RPC. */
-export function imageLimitsParams(sessionId: string, limits: ImageLimits) {
+/** The image limits as the backend administration contract takes them. */
+export function imageLimitsInput(limits: ImageLimits) {
   return {
-    p_session: sessionId,
-    p_file_mb: limits.fileMb,
-    p_count: limits.count,
-    p_total_mb: limits.totalMb,
+    fileMegabytes: limits.fileMb,
+    count: limits.count,
+    totalMegabytes: limits.totalMb,
   };
 }
 
@@ -116,36 +116,17 @@ export function toggleRole(
   return { ...draft, roles: staffRoles.filter((item) => roles.has(item)) };
 }
 
-/** The membership fields that the server stores for a draft. */
-export function membershipValues(draft: MembershipDraft) {
-  const team = draft.kind === "team" && draft.teamId ? draft.teamId : null;
+/**
+ * The membership fields that the server stores for a draft. A team account
+ * has no staff roles and no admin rights.
+ */
+export function membershipInput(draft: MembershipDraft): MembershipInput {
+  const teamId = draft.kind === "team" && draft.teamId ? draft.teamId : null;
   return {
-    team,
-    roles: team ? [] : [...draft.roles],
-    admin: team ? false : draft.isAdmin,
+    teamId,
+    roles: teamId ? [] : [...draft.roles],
+    isAdmin: teamId ? false : draft.isAdmin,
   };
-}
-
-/** The parameters of `manage_member` that add or update a membership. */
-export function manageMemberParams(
-  sessionId: string,
-  userId: string,
-  draft: MembershipDraft,
-) {
-  const values = membershipValues(draft);
-  return {
-    p_session: sessionId,
-    p_user: userId.trim(),
-    p_team: values.team,
-    p_roles: values.roles,
-    p_admin: values.admin,
-    p_remove: false,
-  };
-}
-
-/** The parameters of `manage_member` that remove session access. */
-export function revokeMemberParams(sessionId: string, userId: string) {
-  return { p_session: sessionId, p_user: userId, p_remove: true };
 }
 
 /** A new account as the create form holds it. */
@@ -155,62 +136,27 @@ export interface NewAccount {
   membership: MembershipDraft;
 }
 
-/** One request body of the `admin` Edge Function. */
-export type AdminRequest =
-  | {
-      action: "create_account";
-      session_id: string;
-      username: string;
-      name: string;
-      team_id: string | null;
-      roles: Role[];
-      is_admin: boolean;
-    }
-  | {
-      action: "set_username";
-      session_id: string;
-      user_id: string;
-      username: string;
-    }
-  | { action: "reset_password"; session_id: string; user_id: string };
-
-/** The `admin` function body that creates an account. */
-export function createAccountRequest(
-  sessionId: string,
-  account: NewAccount,
-): AdminRequest {
-  const values = membershipValues(account.membership);
+/** The account command that creates an account. */
+export function createAccountCommand(account: NewAccount): AccountCommand {
   return {
     action: "create_account",
-    session_id: sessionId,
     username: account.username.trim(),
     name: account.name.trim(),
-    team_id: values.team,
-    roles: values.roles,
-    is_admin: values.admin,
+    ...membershipInput(account.membership),
   };
 }
 
-/** The `admin` function body that gives an account its first username. */
-export function setUsernameRequest(
-  sessionId: string,
+/** The account command that gives an account its first username. */
+export function setUsernameCommand(
   userId: string,
   username: string,
-): AdminRequest {
-  return {
-    action: "set_username",
-    session_id: sessionId,
-    user_id: userId,
-    username: username.trim(),
-  };
+): AccountCommand {
+  return { action: "set_username", userId, username: username.trim() };
 }
 
-/** The `admin` function body that issues a new temporary password. */
-export function resetPasswordRequest(
-  sessionId: string,
-  userId: string,
-): AdminRequest {
-  return { action: "reset_password", session_id: sessionId, user_id: userId };
+/** The account command that issues a new temporary password. */
+export function resetPasswordCommand(userId: string): AccountCommand {
+  return { action: "reset_password", userId };
 }
 
 /** One session member as the snapshot holds it. */

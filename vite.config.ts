@@ -7,5 +7,8 @@ export default defineConfig({
   resolve: {
     alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) },
   },
-  test: { include: ["src/**/*.test.ts", "scripts/**/*.test.mjs"] },
+  test: {
+    include: ["src/**/*.test.ts", "scripts/**/*.test.mjs"],
+    exclude: ["**/hostedHttp.test.ts"],
+  },
 });

@@ -5,11 +5,8 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  errorMessage,
-  loginIdentifier,
-  requireClient,
-} from "@/connected/client";
+import { requireBackend } from "@/backend";
+import { errorMessage } from "@/backend/errors";
 
 /** The public sign-in page. Organizers create every account. */
 export function SignIn() {
@@ -41,11 +38,10 @@ export function SignIn() {
           setError("");
           void (async () => {
             try {
-              const result = await requireClient().auth.signInWithPassword({
-                email: loginIdentifier(String(data.get("username") ?? "")),
-                password: String(data.get("password") ?? ""),
-              });
-              if (result.error) throw result.error;
+              await requireBackend().auth.signIn(
+                String(data.get("username") ?? ""),
+                String(data.get("password") ?? ""),
+              );
             } catch (cause) {
               setError(errorMessage(cause));
             } finally {

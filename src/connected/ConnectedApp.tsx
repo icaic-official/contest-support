@@ -14,7 +14,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { PasswordForm } from "@/screens/PasswordForm";
 import { SignIn } from "@/screens/SignIn";
-import { client } from "./client";
+import { backend, backendSetupMessage } from "@/backend";
 import { useAccountStatus } from "./hooks/useAccountStatus";
 import { useAuthSession } from "./hooks/useAuthSession";
 import { Workspace } from "./Workspace";
@@ -42,13 +42,10 @@ export function ConnectedApp() {
   let content: ReactNode;
   if (auth.loading) {
     content = <StatusMessage>Restoring your session…</StatusMessage>;
-  } else if (!client) {
+  } else if (!backend) {
     content = (
       <Alert variant="destructive" className="max-w-md">
-        <AlertDescription>
-          Set VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY in .env.local.
-          See docs/cloud-onboarding.md.
-        </AlertDescription>
+        <AlertDescription>{backendSetupMessage}</AlertDescription>
       </Alert>
     );
   } else if (!user) {

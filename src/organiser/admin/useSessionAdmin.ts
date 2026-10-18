@@ -1,18 +1,17 @@
 import { useRef, useState } from "react";
-import { z } from "zod";
-import { errorMessage, requireClient } from "@/connected/client";
+import { requireBackend } from "@/backend";
+import type { AccountCommand } from "@/backend/contracts";
+import { errorMessage } from "@/backend/errors";
 import type { Snapshot } from "@/connected/model";
 import {
-  type AdminRequest,
   type ImageLimits,
   type MembershipDraft,
   type NewAccount,
-  createAccountRequest,
-  imageLimitsParams,
-  manageMemberParams,
-  resetPasswordRequest,
-  revokeMemberParams,
-  setUsernameRequest,
+  createAccountCommand,
+  imageLimitsInput,
+  membershipInput,
+  resetPasswordCommand,
+  setUsernameCommand,
 } from "./adminModel";
 
 /** A temporary password that the admin shares once with the account owner. */
@@ -42,8 +41,6 @@ export interface SessionAdmin {
   revokeAccess: (userId: string) => Promise<boolean>;
 }
 
-const passwordSchema = z.object({ temporary_password: z.string() });
-
 /**
  * Runs the session administration requests of the admin pages: intake, image
  * limits, accounts and memberships. Only one request runs at a time. A
@@ -63,9 +60,7 @@ export function useSessionAdmin(
   const guard = useRef(false);
   const sessionId = state.session?.id ?? "";
 
-  async function run(
-    work: () => Promise<{ error: unknown }>,
-  ): Promise<boolean> {
+  async function run(work: () => Promise<void>): Promise<boolean> {
     if (guard.current) return false;
     guard.current = true;
     setBusy(true);
@@ -73,8 +68,7 @@ export function useSessionAdmin(
     setNotice("");
     setCredentials(undefined);
     try {
-      const result = await work();
-      if (result.error) throw result.error;
+      await work();
       await refresh();
       setNotice("Administration action completed.");
       return true;
@@ -88,29 +82,17 @@ export function useSessionAdmin(
   }
 
   /**
-   * Calls the `admin` Edge Function. A new temporary password becomes the
-   * one-time credentials, with the username of the account.
+   * Sends an account command. A new temporary password becomes the one-time
+   * credentials, with the username of the account.
    */
   async function account(
-    body: AdminRequest,
+    command: AccountCommand,
     username: string,
-  ): Promise<{ error: unknown }> {
-    const result = await requireClient().functions.invoke("admin", { body });
-    if (
-      result.error &&
-      "context" in result.error &&
-      result.error.context instanceof Response
-    ) {
-      const reply: unknown = await result.error.context.json();
-      if (reply && typeof reply === "object" && "error" in reply) {
-        return { error: { message: String(reply.error) } };
-      }
+  ): Promise<void> {
+    const result = await requireBackend().admin.account(sessionId, command);
+    if (result.temporaryPassword) {
+      setCredentials({ username, password: result.temporaryPassword });
     }
-    if (!result.error && result.data?.temporary_password) {
-      const parsed = passwordSchema.parse(result.data);
-      setCredentials({ username, password: parsed.temporary_password });
-    }
-    return result;
   }
 
   function usernameOf(userId: string): string {
@@ -128,47 +110,39 @@ export function useSessionAdmin(
     credentials,
     dismissCredentials: () => setCredentials(undefined),
     setIntake: (open) =>
-      run(async () =>
-        requireClient().rpc("set_intake", { p_session: sessionId, p_open: open }),
-      ),
+      run(() => requireBackend().admin.setIntake(sessionId, open)),
     saveImageLimits: (limits) =>
-      run(async () =>
-        requireClient().rpc(
-          "set_image_limits",
-          imageLimitsParams(sessionId, limits),
+      run(() =>
+        requireBackend().admin.setImageLimits(
+          sessionId,
+          imageLimitsInput(limits),
         ),
       ),
     createAccount: (input) =>
       run(() =>
         account(
-          createAccountRequest(sessionId, input),
+          createAccountCommand(input),
           input.username.trim().toLowerCase(),
         ),
       ),
     setUsername: (userId, username) =>
       run(() =>
         account(
-          setUsernameRequest(sessionId, userId, username),
+          setUsernameCommand(userId, username),
           username.trim().toLowerCase(),
         ),
       ),
     saveMembership: (userId, draft) =>
-      run(async () =>
-        requireClient().rpc(
-          "manage_member",
-          manageMemberParams(sessionId, userId, draft),
+      run(() =>
+        requireBackend().admin.saveMember(
+          sessionId,
+          userId.trim(),
+          membershipInput(draft),
         ),
       ),
     resetPassword: (userId) =>
-      run(() =>
-        account(resetPasswordRequest(sessionId, userId), usernameOf(userId)),
-      ),
+      run(() => account(resetPasswordCommand(userId), usernameOf(userId))),
     revokeAccess: (userId) =>
-      run(async () =>
-        requireClient().rpc(
-          "manage_member",
-          revokeMemberParams(sessionId, userId),
-        ),
-      ),
+      run(() => requireBackend().admin.removeMember(sessionId, userId)),
   };
 }

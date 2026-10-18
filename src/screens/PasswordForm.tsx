@@ -11,7 +11,8 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { errorMessage, requireClient } from "@/connected/client";
+import { requireBackend } from "@/backend";
+import { errorMessage } from "@/backend/errors";
 
 const fields = [
   {
@@ -70,15 +71,10 @@ export function PasswordForm({
             setError("");
             void (async () => {
               try {
-                const updated = await requireClient().auth.updateUser({
-                  password: value("password"),
-                  current_password: value("current"),
-                });
-                if (updated.error) throw updated.error;
-                const completed = await requireClient().rpc(
-                  "complete_password_change",
+                await requireBackend().auth.changePassword(
+                  value("current"),
+                  value("password"),
                 );
-                if (completed.error) throw completed.error;
                 done();
               } catch (cause) {
                 setError(errorMessage(cause));

@@ -1,0 +1,13 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "minsky-d1-proof-ci",
+  "account_id": "458ad6a930b0fb717796dfa19ca6a2b1",
+  "compatibility_date": "2026-10-17",
+  "d1_databases": [{
+    "binding": "DB",
+    "database_name": "minsky-d1-proof-ci",
+    "database_id": "06560c1c-8907-47d6-b2b6-f22e129ebbe4",
+    "migrations_dir": "src/server/adapters/d1/migrations",
+    "remote": true
+  }]
+}

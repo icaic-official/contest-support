@@ -22,6 +22,99 @@
 
 ## Current scope
 
+**Parallel T0009 maintenance, 2026-10-18.** The owner requested an update to [PR #23](https://github.com/GiftedNovaHD/minsky/pull/23).
+Use its existing `feature/t0009-jury-worklist` branch in a separate worktree.
+Merge current `main` at `7d19b00` and verify current behavior before owner review.
+Preserve the separate T0020 connector checkout and scope.
+Use the existing `Backend` contracts, authorized snapshots, and shared server workflow rules.
+Keep Supabase active. Add no schema, backend feature, provider implementation, or runtime dependency.
+Use only UUID-owned fictional fixtures in Minsky CI, `ghtztmovdkhuketcbjmq`, for hosted acceptance.
+The owner approved the exact T0009 `cloud-test` branch addition on 2026-10-18. Preserve all other entries and protection rules.
+Do not deploy the application, merge the PR, or migrate data.
+Required checks and hosted acceptance must pass before PR #23 is ready for owner review.
+
+**Active T0020 connector, 2026-10-18.** The separate connector goal remains active on `feature/t0020-cloudflare-connector`.
+Its scope includes all backend operations, isolated hosted verification, and an empty Cloudflare installation.
+Keep its checkout unchanged during T0009 maintenance. See [T0020](docs/tickets.md#t0020-complete-cloudflare-connector).
+
+**T0019 shared server workflow, 2026-10-18.** Use `feature/t0019-shared-server-workflow` from updated `main` at `0c797ad`.
+The owner authorized this extraction while PR #40 was open. The branch started independently of its authentication branch.
+PR #40 merged at `68e8642` on 2026-10-17 at 17:16:41 UTC. This branch now includes that updated `main`.
+Preserve the merged authentication behavior. The owner also requested code cleanup and completion of its hosted verification during PR #41 review.
+PR #39 merged the bounded D1 transaction proof.
+Extract the existing nine issue commands into one provider-independent server service.
+Verify an actual trusted Supabase execution path with isolated fictional CI fixtures before expanding D1 workflow persistence.
+Retain database constraints, atomic commits, current-access checks, and stale-state guards.
+Align the bounded D1 `claim` and `message` proof with the same shared decisions.
+See [the workflow reference](docs/server-workflow.md) and [verification guide](docs/verify-server-workflow.md).
+Keep Supabase active and its legacy browser path available during replacement verification.
+Do not deploy to the development backend without the required authorization.
+The owner reviews and merges. Bounded subagent work is authorized.
+The owner confirmed Workers Paid activation during PR #41 review.
+The isolated authentication Worker accepts its 1,000 ms CPU cap. Local hosted HTTP and protected authentication on merged `main` pass.
+Record PR #41's hosted results separately from that protected `main` run.
+Full D1 workflow persistence, R2, notification delivery, migration tooling, AWS, and Terraform remain later work.
+Do not export real data, reset real accounts, or switch backends.
+
+**T0018 Cloudflare authentication, 2026-10-18.** PR #39 merged at `0c797ad` on 2026-10-17 at 15:49:49 UTC.
+PR #40 merged T0018 at `68e8642` on 2026-10-17 at 17:16:41 UTC.
+Use `feature/t0018-cloudflare-authentication` from that updated `main`.
+Implement the bounded authentication API and browser adapter with maintained Better Auth, D1 credential guards, and fictional fixtures.
+See [the reference](docs/cloudflare-authentication.md), [identity choice](docs/cloudflare-authentication-choice.md), and [verification guide](docs/verify-cloudflare-authentication.md).
+Keep Supabase active. The complete connector, real-account migration, exports, and backend switch remain later work.
+Use local development databases and the separate hosted `minsky-auth-ci` database.
+The owner approved adding only `feature/t0018-cloudflare-authentication` to the existing `cloud-test` branch allowlist on 2026-10-18. Preserve the other entries and protection rules.
+Measured password CPU exceeds Workers Free's allowance. The initial protected HTTP check hit a runtime resource limit.
+The owner initially deferred the paid subscription on 2026-10-18, then confirmed activation during PR #41 review.
+The configuration requests a 1,000 ms CPU cap. Paid accepts that setting; the earlier Free deployment rejected it with error `100328`.
+Use the current-state record for the later paid verification results.
+The owner reviewed and merged T0018. Bounded subagent work remains authorized within the active ticket.
+
+**T0017 D1 transaction proof, 2026-10-17.** Start `feature/t0017-d1-transaction-proof` from updated `main` at `53f9dfd`.
+Implement one complete command through a provider-independent application-store interface and a D1 adapter.
+Commit the state change, retry receipt, history, and notification record together.
+Use fictional fixtures. Obtain hosted D1 evidence before calling the transaction pattern verified.
+See [the proof guide](docs/d1-transaction-proof.md) and [implementation plan](docs/cloudflare-implementation-plan.md).
+Keep Supabase active. Authentication and the remaining connector operations follow the proof.
+Migration tooling follows connector verification. Real-data exports and the backend switch remain later work.
+AWS adapters and Terraform remain deferred.
+
+The owner selected organizer-issued replacement temporary passwords for the later migration.
+Require a password change before contest access.
+Preserve account IDs, memberships, permissions, and history. Existing passwords and password-hash import are not required.
+
+The owner authorizes isolated Cloudflare development and CI resources in the existing account for this work.
+Keep development and CI resources separate. Confirm the account before provisioning.
+Check existing Wrangler access before requesting credentials. Keep tokens out of chat and logs.
+
+The existing Wrangler OAuth login was checked against account `458ad6a930b0fb717796dfa19ca6a2b1`, which matches the repository configuration.
+Document the concrete need and cost before any paid upgrade.
+Subagents may perform independent, bounded tasks.
+
+The earlier scope records below retain the authorization limits of those tickets.
+T0017 supplies the later resource authorization above. It does not authorize real-data exports or a backend switch.
+
+**Parallel provider work, 2026-10-17.** The user authorized T0015 shared provider tests and T0016 Cloudflare design during PR #32 review.
+Both branches started from PR #32 at `d158906` under this explicit branch exception.
+PR #32 merged at `ef6a029`. T0015 then merged in [PR #37](https://github.com/GiftedNovaHD/minsky/pull/37) at `738ef4a`.
+T0016 uses `feature/t0016-cloudflare-backend-design`, which now includes both merges.
+Its scope is the [backend design](docs/cloudflare-backend-design.md) and [implementation plan](docs/cloudflare-implementation-plan.md).
+Keep provider imports and privileged setup outside the shared scenarios.
+Use the same behavior assertions for each provider, including a possible future AWS adapter.
+Keep Supabase active. Design approval does not authorize resource creation, credential exports, deployment, or data migration.
+PR #36 merged T0016 on 2026-10-17 at `b68ef72`. The merge accepts the design only. It does not authorize resource creation, credential exports, deployment, or data migration.
+AWS implementation and Terraform remain deferred.
+See [T0015](docs/tickets.md#t0015-shared-provider-tests) for the merged test scope.
+
+**T0014 backend adapters, 2026-10-17.** The user authorized the shared interfaces and Supabase extraction before the Cloudflare migration.
+Use `feature/t0014-backend-adapters`, from updated `main` at `de92d54`.
+This start is authorized while the earlier PRs remain open.
+Preserve existing server authorization, transactions, accounts, and image behavior.
+The selected future target is Workers, D1 with a SQLite rewrite, private R2, and Durable Objects for live updates.
+Preserve existing data during that later migration.
+Other providers, Terraform, provider resource changes, and deployment remain outside T0014.
+See [T0014](docs/tickets.md#t0014-backend-adapters) and [backend contracts](docs/backend-contracts.md).
+
 **Automatic frontend builds (2026-10-17):** the user authorized branch previews and automatic stable deployments after merges to `main`.
 Use GitHub Actions to publish the existing `minsky-dev` and `minsky-docs` Workers after all required CI jobs pass.
 Keep independent Cloudflare Git builds disabled.

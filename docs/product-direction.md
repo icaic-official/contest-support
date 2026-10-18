@@ -4,6 +4,12 @@ This document preserves the agreed direction from [PLAN.md](../PLAN.md).
 Only requirements listed in [current-state.md](current-state.md) describe implemented behavior.
 The user selects later scope after demo feedback.
 
+Jury worklist maintenance (2026-10-18): [T0009](jury-worklist.md) remains on its existing PR #23 branch.
+It uses authorized `Backend` snapshots and existing workflow actions for decisions and external confirmations.
+The owner authorized current-main integration and verification in a separate worktree alongside T0020 connector work.
+The connector scope remains separate. Supabase remains active.
+Historical local results do not establish current compatibility or hosted acceptance.
+
 Team-search status (2026-10-15): [T0008](tickets.md#t0008--fuzzy-team-search) merged into `main` in PR #22.
 Staff search the current session's team names and locations from the issue queue.
 Volunteers and specialists use the same search to choose a team before they report an issue.
@@ -47,7 +53,8 @@ The broader organizer tools below remain incomplete.
 
 ## Provisional architecture and milestones
 
-Cloudflare Workers and Supabase are the selected cloud direction.
+Cloudflare Workers hosts the frontend, and Supabase runs the current backend.
+The selected future backend is described in [backend migration direction](#backend-migration-direction).
 On 2026-10-02, the user prioritized working cloud features and deferred resilience.
 Assume connectivity during development.
 Outage planning no longer blocks backend work.
@@ -56,12 +63,13 @@ Necessary paid services are acceptable after the need and cost are identified.
 
 A developer pilot and production capacity validation are separate milestones.
 
-Architecture clarification (2026-10-02): Cloudflare serves the React frontend as static assets.
-All backend functionality resides in Supabase.
-Use managed Auth, Postgres, Realtime, and Storage.
-Use database functions for transactional workflows.
-Use Edge Functions for privileged account administration.
-This replaces the earlier proposal for privileged Worker endpoints.
+The implemented architecture uses Supabase Auth, Postgres, Realtime, and private Storage.
+Database functions enforce workflow transactions and permissions.
+Edge Functions handle privileged account administration and image operations.
+T0014 places the browser integration behind [backend contracts](backend-contracts.md).
+T0019 extracts the existing issue decisions into a [shared server service](server-workflow.md).
+An opt-in Supabase function executes that service for replacement verification.
+The active application retains the legacy PostgreSQL workflow during this transition.
 
 Supabase manages the services.
 Minsky still requires repository-owned migrations and functions that implement its schema, authorization policies, and business rules.
@@ -88,6 +96,15 @@ Actual authorization, synchronization, deployment, capacity, and recovery behavi
 
 ## Unresolved decisions
 
+T0018 selects maintained Better Auth for experimental Cloudflare authentication.
+See [the identity choice](cloudflare-authentication-choice.md) and [API reference](cloudflare-authentication.md).
+The owner selected organizer-issued replacement temporary passwords for migration on 2026-10-17.
+Users must change these passwords before contest access.
+Existing passwords do not need to survive. Password-hash import is not required.
+Preserve account IDs, memberships, permissions, and history.
+Credential distribution, recovery, and login revocation need verification before account cutover.
+The final transfer also needs a reconciliation check and a tested rollback procedure.
+
 Outage handling remains deferred until after cloud feature development.
 Manual fallback, offline capture, and venue-local operation remain unselected.
 Do not make these decisions a prerequisite for T0003.
@@ -111,3 +128,55 @@ These identifiers are not mailboxes.
 Credential distribution and organizer-issued resets replace email invitations and email recovery.
 Keep team accounts shared and staff identities individual.
 Preserve existing Auth UUIDs, history, and permissions when you assign a username.
+
+## Backend migration direction
+
+On 2026-10-17, the user selected Cloudflare D1 with a SQLite rewrite.
+The user also required preservation of existing data and requested Durable Objects for live updates.
+This decision replaces Supabase as the long-term backend target.
+Supabase remains active during Cloudflare implementation and verification.
+
+The selected target has these responsibilities.
+
+| Component | Planned responsibility |
+| --- | --- |
+| Workers | Serve the frontend and authenticated backend operations. Check current access before reads and commands. |
+| D1 | Store accounts' application records, memberships, issues, activity, resolutions, awards, and image metadata. |
+| R2 | Store original images and thumbnails privately. Backend operations check access before file reads and writes. |
+| Durable Objects | Manage live connections and notify authorized clients of changes. Clients refetch their permitted snapshots. |
+
+D1 remains the source of saved workflow state.
+Live messages do not grant access and do not carry private issue data.
+A later implementation must define how committed changes reach subscribers and how clients recover missed notifications.
+The SQLite adapter must preserve the existing decisions through the same shared service and guarded commits.
+
+The shared Minsky interfaces, Supabase adapter, provider tests, and Cloudflare design merged before T0017.
+Hosted Supabase contract checks provide the comparison point for the replacement backend.
+T0017's bounded D1 transaction proof merged in PR #39 at `0c797ad`.
+T0018 authentication merged in PR #40 at `68e8642` on 2026-10-17 at 17:16:41 UTC.
+Its initial hosted HTTP verification reached a Workers Free resource limit.
+The owner activated Workers Paid during PR #41 review. The hosted HTTP suite now passes.
+See [current state](current-state.md) for separate local hosted and protected GitHub results.
+T0019 verifies the extracted server workflow through Supabase before further D1 workflow persistence.
+Its branch started independently at `0c797ad` and preserves the merged authentication behavior.
+The remaining connector operations follow that shared-rule verification.
+Full migration tooling follows connector verification. Real-data exports and the backend switch remain later phases.
+See [the proof guide](d1-transaction-proof.md) and [implementation plan](cloudflare-implementation-plan.md).
+
+The migration preserves account IDs, relationships, historical actors, timestamps, resolution cycles, awards, external application status, image visibility, and file contents.
+T0014 implemented only the interfaces and Supabase extraction.
+The owner now authorizes isolated Cloudflare development and CI resources in the existing account for connector work.
+Keep those resources separate and verify the account before provisioning.
+Check existing Wrangler access before requesting credentials. Keep tokens out of chat and logs.
+
+Document the concrete need and cost before any paid upgrade.
+Subagents may perform independent, bounded tasks.
+AWS implementations and Terraform remain deferred until a concrete deployment needs them.
+
+On 2026-10-17, the user authorized shared provider tests and Cloudflare design in parallel with PR #32 review.
+T0015 contains the test work on its own branch.
+T0016 records the [proposed architecture](cloudflare-backend-design.md) and [implementation plan](cloudflare-implementation-plan.md).
+Neither design work nor provider tests migrate existing data.
+Possible AWS testing motivates separate domain rules, transactional persistence, identity, image storage, and live-delivery interfaces.
+Cloudflare implementation still requires a verified D1 transaction pattern and a selected identity implementation.
+The owner selected replacement temporary passwords rather than password-hash import for the later migration.

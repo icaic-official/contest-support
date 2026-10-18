@@ -7,7 +7,8 @@ import {
   WifiOff,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { statusNames } from "@/connected/labels";
+import type { JuryRow } from "@/connected/jury";
+import { formatDate, statusNames } from "@/connected/labels";
 import { type Issue, type Resolution, unresolvedTime } from "@/connected/model";
 import { clockDuration } from "@/connected/ui";
 import { cn } from "@/lib/utils";
@@ -188,5 +189,41 @@ export function PersonAvatar({
         className,
       )}
     />
+  );
+}
+
+/**
+ * The resolution that a jury decision refers to (T0009). A pending award
+ * refers to the resolution of its decision, also when the issue was reopened
+ * later. "Reopened" marks a pending award on an unresolved issue.
+ */
+export function AwardEvidence({ row }: { row: JuryRow }) {
+  const { issue, resolution, award } = row;
+  return (
+    <div className="mt-2 space-y-1 text-xs">
+      {award && issue.status !== "resolved" && (
+        <Badge variant="outline" className="text-status-escalated">
+          <StatusIcon status={issue.status} />
+          Reopened · {statusNames[issue.status]}
+        </Badge>
+      )}
+      <p className="text-muted-foreground">
+        <span className="font-medium text-foreground">
+          {award ? "Award resolution: " : "Resolution: "}
+        </span>
+        {resolution?.summary ?? "Resolution unavailable"}
+      </p>
+      {resolution && (
+        <p className="text-muted-foreground">
+          Resolved by {resolution.actor_name} ·{" "}
+          <time dateTime={resolution.at}>{formatDate(resolution.at)}</time>
+        </p>
+      )}
+      {resolution?.reopened_at && (
+        <p className="text-status-escalated">
+          This award relates to an earlier resolution.
+        </p>
+      )}
+    </div>
   );
 }

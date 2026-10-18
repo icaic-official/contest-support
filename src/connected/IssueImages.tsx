@@ -1,6 +1,6 @@
 import { useId, useRef } from "react";
 import { type ImageLimits, useIssueImages } from "./hooks/useIssueImages";
-import type { ImageTransport } from "./imageUpload";
+import type { ImageTransport } from "@/backend/contracts";
 import type { Attachment, PendingRemoval } from "./model";
 import { Icon } from "./ui";
 

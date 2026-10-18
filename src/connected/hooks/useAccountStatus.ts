@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
-import { type AccountStatus, accountStatus, errorMessage } from "../client";
+import { requireBackend } from "@/backend";
+import type { AccountStatus } from "@/backend/contracts";
+import { errorMessage } from "@/backend/errors";
 
 /** Password and session state of the signed-in account. */
 export interface AccountState {
@@ -24,7 +26,7 @@ export function useAccountStatus(userId: string | undefined): AccountState {
     setAccount(undefined);
     async function refreshAccount() {
       try {
-        const next = await accountStatus();
+        const next = await requireBackend().auth.accountStatus();
         if (!active) return;
         setAccount(next);
         setError("");

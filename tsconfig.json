@@ -15,6 +15,7 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true,
+    "allowImportingTsExtensions": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "baseUrl": ".",
@@ -26,8 +27,14 @@
     "src",
     "tests",
     "vite.config.ts",
+    "vitest.d1.config.ts",
+    "vitest.workflow.config.ts",
+    "vitest.auth.config.ts",
+    "vitest.auth-http.config.ts",
+    "playwright.auth.config.ts",
     "playwright.config.ts",
     "playwright.cloud.config.ts",
+    "playwright.providers.config.ts",
     "playwright.docs.config.ts",
     "site/tests"
   ]

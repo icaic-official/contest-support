@@ -3,7 +3,7 @@ title: Feature status
 description: Distinguish merged features, pending changes, and unverified operating conditions.
 ---
 
-Status checked on **17 October 2026** against the repository and GitHub pull requests.
+Status checked on **18 October 2026** against the repository and GitHub pull requests.
 This page is a dated record, not a live deployment dashboard.
 
 ## Merged into main
@@ -17,6 +17,12 @@ This page is a dated record, not a live deployment dashboard.
 | [T0010](https://github.com/GiftedNovaHD/minsky/pull/24) | Refresh behavior and cloud fixture cleanup fixes. |
 | [T0012](https://github.com/GiftedNovaHD/minsky/pull/30) | Reply text clears after a successful retry without duplicate history entries. |
 | [T0013](https://github.com/GiftedNovaHD/minsky/pull/31) | Delayed image downloads and errors cannot replace the current preview. |
+| [T0014](https://github.com/GiftedNovaHD/minsky/pull/32) | Shared backend interfaces and the active Supabase adapter. |
+| [T0015](https://github.com/GiftedNovaHD/minsky/pull/37) | Shared provider behavior tests, verified against isolated Supabase fixtures. |
+| [T0016](https://github.com/GiftedNovaHD/minsky/pull/36) | Proposed Cloudflare architecture and implementation plan. |
+| [T0017](https://github.com/GiftedNovaHD/minsky/pull/39) | Verified bounded D1 transaction proof for claims and messages. The complete Cloudflare connector remains incomplete. |
+| [T0018 Cloudflare authentication](https://github.com/GiftedNovaHD/minsky/pull/40) | Experimental username authentication, cookie sessions, and organizer recovery. Hosted HTTP checks pass on Workers Paid with isolated fictional fixtures. The full connector and migration remain incomplete. |
+| [T0019 shared server workflow](https://github.com/GiftedNovaHD/minsky/pull/41) | Merged at `7d19b00`. All nine command decisions use a shared service on the isolated Supabase verification path. D1 still supports only claims and messages. |
 
 ## Pending changes
 
@@ -24,7 +30,11 @@ This page is a dated record, not a live deployment dashboard.
 | --- | --- |
 | [T0006 announcements](https://github.com/GiftedNovaHD/minsky/pull/20) | Open pull request. |
 | [T0007 independent installations](https://github.com/GiftedNovaHD/minsky/pull/21) | Open pull request. Packaging exists on its branch. Container operation remains unverified. |
-| [T0009 jury worklist](https://github.com/GiftedNovaHD/minsky/pull/23) | Draft pull request. |
+| [T0009 jury worklist](https://github.com/GiftedNovaHD/minsky/pull/23) | Includes current main. Local checks, hosted acceptance, protected CI, and scoped cleanup pass on runtime source `f45d03f`. Prepared for owner review. |
+| T0020 complete Cloudflare connector | Active development. Supabase remains the active application backend. |
+
+Supabase remains the active backend.
+The active browser retains the existing SQL workflow. The shared-service replacement path remains opt-in.
 
 T0011 adds this documentation site.
 The initial docs deployment did not deploy the Minsky application or apply database migrations.

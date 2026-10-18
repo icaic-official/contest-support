@@ -1,5 +1,7 @@
 # Current state
 
+The newest record appears first. Older sections describe their own revisions and targets.
+
 ## T0015 Session tab (2026-10-18)
 
 The step 2a follow-up of T0015 is on `feature/t0015-frontend-redesign`. It is not merged or deployed.
@@ -40,6 +42,873 @@ See [frontend architecture](frontend-architecture.md).
 Local type checking, lint, build, 70 unit and database tests and 28 mocked browser tests passed.
 The browser tests ran in a job VM without `NODE_ENV=production`.
 Protected cloud tests and hosted checks were not run.
+
+## T0009 parallel maintenance, 2026-10-18
+
+The owner requested current-main integration and verification of [PR #23](https://github.com/GiftedNovaHD/minsky/pull/23).
+Work uses the existing `feature/t0009-jury-worklist` branch in `/tmp/minsky-t0009`.
+The integration baseline is `main` at `7d19b00`, which includes PR #41.
+This T0009 run did not edit the separate connector checkout.
+T0020 retains its complete-connector and empty-installation scope.
+
+The worklist uses provider-neutral `Backend` contracts and authorized snapshots.
+Existing workflow operations enforce current permissions, transitions, stale revisions, and request receipts at the server.
+Supabase remains active. This maintenance adds no schema, backend feature, provider implementation, or runtime dependency.
+The owner reviews and merges. No application deployment or data migration is authorized.
+
+### Current local checks
+
+| Check | Observed result |
+| --- | --- |
+| `npm run typecheck`, `npm run lint`, `npm run build` | Passed. The final build emits a 308.24 kB JavaScript bundle without a size warning. |
+| `npm run check:functions`, `npm run test:functions` | Passed. All 12 function tests passed. |
+| `npm run docs:build` | Passed. Built 14 pages and checked 566 local links and assets. The existing `/404` route warning remains. |
+| `npm run test:providers:list` | Listed eight scenarios. This lists tests and does not verify a hosted provider. |
+| `npm test` | Passed all 276 tests in 22 files in 33.88 seconds after the resource-heavy browser suites ended. |
+| `npm test -- --no-file-parallelism` | Passed all 276 tests in 22 files in 73.30 seconds. No assertion or timeout changed. |
+| `npm run test:e2e -- --workers=2 --output=/tmp/minsky-t0009-e2e-results` | Passed all 44 cases in 42.5 seconds, including all ten jury cases. |
+| `npm run docs:test` | Passed all three cases in 4.9 seconds. |
+| Repository Markdown links | Checked 181 local links in eight affected root documents. Passed. |
+| `npm run test:auth:browser -- --output=/tmp/minsky-t0009-auth-results` | Passed all three cases in 9.6 seconds. The local HTTPS Worker logged expected self-signed TLS alerts. |
+
+Initial setup attempts hit sandbox `esbuild` `EPERM`, loopback restrictions, and missing or incomplete Chromium binaries.
+The checks passed after correcting permissions and installing the pinned browser.
+One default-parallel unit attempt timed out during resource-heavy concurrent checks and then hit a cleanup assertion.
+Both serial and default-parallel execution passed afterward. No timeout or assertion changed.
+
+The application suite covers eligibility, ordering, zero-minute decisions, reopening, two-client updates, and uncertain retries.
+It checks drafts, focus, queue independence, role and session changes, membership removal, archival, failed reads, and isolation.
+These browser cases use simulated transport with the current migration-owned PostgreSQL rules, snapshots, and workflow transactions.
+They do not establish hosted acceptance.
+Desktop and 320px and 390px screenshots were inspected without visible clipping.
+Keyboard navigation, return focus, CSS zoom, and reflow checks pass.
+
+Two new test assumptions required correction.
+The isolation precondition tried to reply to a resolved issue. The server correctly rejected that action.
+The test now reopens the issue before replying.
+The membership-removal test expected an exception, but the current snapshot intentionally returns null membership and empty protected data.
+The test now checks that exact authorized response.
+Concurrent browser suites also shared an output directory and hit an artifact `ENOENT` error.
+Separate `/tmp` output directories corrected the artifact collision without changing application assertions.
+
+### Hosted and protected checks
+
+The hosted-service CLI run targets only Minsky CI, `ghtztmovdkhuketcbjmq`.
+Prerequisite inspection found all nine local migrations and the account and attachment functions already present.
+An unrelated remote migration, `202610110002`, remains unchanged.
+The final full local CLI run against hosted services passed all 16 cases in 2.3 minutes.
+It started at `2026-10-18T03:06:52.639Z` and used runtime source revision `f45d03f`.
+Two real jury cases check Realtime updates and wait for the confirmed snapshot before checking draft and focus preservation.
+They also cover zero-minute decisions, reopening, re-resolution, and committed actions whose responses are deliberately dropped.
+Award and external-confirmation retries retain identical request IDs.
+The tests confirm one award, one confirmation, and one history entry for each action.
+
+The first full hosted attempt passed 15 of 16 cases.
+Its second new jury case failed at a status-selector locator before completing.
+The exact label included wrapped option text. The corrected locator uses the exact **Status** combobox role.
+This correction changes no application assertion.
+
+Cleanup checks found zero remaining run-owned records in all 16 categories, including Storage, Auth, and request receipts.
+Both the completed run and the failed attempt were checked.
+Audit records are `/tmp/t0009-cloud-audit-1792292812639-cleanup.json` and `/tmp/t0009-cloud-audit-1792292637288-cleanup.json`.
+Unrelated fixtures, migrations, and provider configuration remain unchanged.
+
+The owner approved adding only `feature/t0009-jury-worklist` to the protected `cloud-test` branch allowlist.
+The branch policy was added as ID `63431065`.
+The four existing entries and branch protection ID `69128862` remain unchanged.
+Ordinary [push checks](https://github.com/GiftedNovaHD/minsky/actions/runs/39092550990) and [PR checks](https://github.com/GiftedNovaHD/minsky/actions/runs/39092552506) passed on `f45d03f`.
+The protected `existing_backend=true` check passed on `f45d03f` in [run 39092567628](https://github.com/GiftedNovaHD/minsky/actions/runs/39092567628).
+Its results are separate from the local hosted-service CLI run:
+
+| Protected check | Observed result |
+| --- | --- |
+| Unit and database tests | All 276 passed. |
+| Function tests | All 12 passed. |
+| Application browser tests | All 44 passed. |
+| Authentication and documentation browser tests | All three cases in each suite passed. |
+| Hosted application journey | All 16 cases passed in 2.9 minutes. |
+| Supabase shared provider scenarios | All eight passed in 1.8 minutes. |
+| Hosted shared server workflow | All five passed. |
+
+No recovery journals remained after provider and workflow cleanup.
+The deployment job and all six backend preparation steps were skipped.
+Repository variable `CLOUDFLARE_DEPLOY_ENABLED=false` is confirmed. No application deployment was performed.
+
+### Integration boundaries and remaining checks
+
+The worklist changes overlap T0020 at `ConnectedApp.tsx` navigation, selection, and issue-detail return handling.
+Shared styles contain a separate jury-worklist block.
+Planning-document changes preserve T0020's connector scope. This T0009 run did not edit that checkout.
+
+Required verification and hosted acceptance pass for runtime source `f45d03f`.
+PR #23 is prepared for owner review.
+The final follow-up changes documentation only. It does not change that verified runtime source.
+Checks for the documentation follow-up must be reported against its own revision after the commit exists.
+No required runtime verification remains outstanding.
+The 2026-10-15 results below are historical and do not establish current-main compatibility.
+Record local browser simulations, hosted-service CLI runs, and protected GitHub Actions results separately.
+Physical devices, native browser zoom, screen readers, and other browser engines remain unverified.
+
+## T0009 jury worklist (2026-10-15)
+
+Historical record. These results apply to the stated revision only.
+Current-main integration and verification appear in the 2026-10-18 record above.
+
+Implemented on `feature/t0009-jury-worklist`, from updated `main` at `1ed603a`.
+Source revision: `2ce66bd`; [draft PR #23](https://github.com/notbowen/minsky/pull/23).
+The user authorized this work independently of the open T0005–T0008 branches.
+Those branches were not merged or copied into this implementation.
+The feature is not deployed. The user reviews and merges; merge does not deploy.
+
+Implemented:
+
+- Jury and combined-role members have a separate sidebar entry. Admin-only,
+  support-only, and contestant accounts gain no new capabilities.
+- **Needs decision** lists resolved issues without an award, oldest resolution
+  first. **Pending external application** lists every unapplied award, oldest
+  decision first, including zero-minute decisions and reopened issues. Counts,
+  resolution evidence, authenticated attribution, and timing use the existing snapshot.
+- Existing issue details and forms handle decisions and explicit external
+  confirmation. Jury-only members can reach a reopened issue's pending award.
+  Return focus goes to the originating row or section heading. Queue filters and
+  selection remain independent. Re-resolution does not create a second award.
+- Existing refresh, Realtime invalidations, revision checks, and request receipts
+  are reused. No schema, policy, backend function, provider resource, or runtime
+  dependency was added. The HTML title no longer refers to the retired local demo.
+
+Verification:
+
+| Check | Observed result |
+| --- | --- |
+| Type checking, lint, production build, Deno function check | Passed locally |
+| `npm test` | All 34 focused and database tests passed, including 12 new worklist cases |
+| `npm run test:e2e` | All 10 browser cases passed: seven jury cases and three existing public-page cases |
+| Local two-client updates | Passed with simulated Auth/HTTP/Realtime transport and actual migration-owned PostgreSQL RLS, snapshots, and workflow transactions |
+| Cloud integration | Could not start: the credential lookup for the isolated Minsky CI project failed before fixture creation |
+| Protected GitHub cloud job and hosted deployment | Not run; no deployment was performed |
+| Dependency audit | `npm audit --audit-level=high` reported zero vulnerabilities |
+| Documentation | All 63 local links/anchors and whitespace checks passed |
+
+Browser plugin not available; repository Playwright/Chromium was used at
+`http://127.0.0.1:4173`. Checks covered eligibility, ordering, zero-minute decisions,
+reopened confirmations, queue-filter independence, two-client updates, preserved
+drafts, lost-response retries without duplicate decisions, session/role changes,
+membership removal, archival, failed reads, refresh, empty states, and focus.
+The screenshot case checks page title, meaningful content, interactions, and
+absence of application errors or warnings. Desktop and 390/320px screenshots
+were reviewed; 720px reflow and 200% CSS zoom are also automated. Native browser
+zoom, physical phones, screen readers, and other browser engines remain unverified.
+Screenshots, traces, and browser output are outside the repository under `/tmp`.
+
+The build retains the main-bundle size warning. Deno synchronized workspace
+metadata with dependency versions already accepted on `main`; the function's
+resolved dependencies are unchanged. The Google TypeScript guide was read before
+source changes. Repository double quotes, React component capitalization, and
+inferred component returns are deliberate existing style/framework exceptions.
+
+Verification corrections: the first network commands lacked sandbox network
+access, then passed with that access. The first dependency install used an
+unwritable home cache, then passed with a `/tmp` cache. Fixture UUID defaults were
+typed explicitly, the Playwright fixture callback was renamed to avoid a React
+Hook lint false positive, and overly strict label locators were corrected.
+The simulated Realtime payload now includes PostgreSQL column metadata. Browser
+testing caught the return-focus case after a row moved sections; it was corrected
+before the passing run. None of those failed attempts count as passing checks.
+
+The [specification](jury-worklist.md) and [manual walkthrough](manual-verification.md#13-jury-worklist-t0009)
+record remaining acceptance. Cloud results must not be inferred from local
+transport simulations. The hosted test includes zero-minute award, reopening,
+external confirmation, re-resolution, and rejection of a second award, but is unverified.
+
+### PR23 review fixes (2026-10-15)
+
+The shared cloud journey now saves the volunteer's changed password in its
+private fixture file and restores the event's previous archive state in `finally`,
+including when an assertion fails. The later jury case can reuse that fixture
+without inheriting stale credentials or an archived event. All updates stay
+within the run's UUID-scoped fixture; no shared project state was changed.
+
+The two-client browser case now waits for the first client's completed snapshot
+response containing the other issue's award before checking the explanation
+draft and keyboard focus. An unchanged pre-refresh draft can no longer satisfy
+the check before that response arrives.
+
+After these fixes, type checking, lint, build, Deno checking, all 34 unit/database
+tests, and all 10 credential-free browser cases passed. Browser plugin not
+available; Playwright used system Chromium and a temporary configuration outside
+the repository. The cloud runner still cannot retrieve credentials for the
+isolated Minsky CI project `ghtztmovdkhuketcbjmq`; it stopped before fixture
+creation. Listing the cloud suite confirms 13 cases, but does not execute them.
+Hosted verification remains unverified, and PR23 remains a draft. The build
+retains its existing bundle-size warning. No deployment was performed.
+
+
+## PR #41 review corrections and paid authentication, 2026-10-18
+
+The owner requested the PR #41 fixes, a second review, bounded code cleanup, and completion of hosted authentication verification.
+Implementation commit `7abaf2e` is on `feature/t0019-shared-server-workflow` and is pushed to PR #41.
+The owner confirmed Workers Paid activation during this run.
+Supabase remains the active application backend. The owner still reviews and merges.
+
+### Expiry correction and code review
+
+The review found one P2 defect in the shared Supabase commit path.
+`statement_timestamp()` retained the statement's start time while the commit waited on locks.
+A login that expired during that wait could still authorize a write or receipt replay.
+
+Migration `202610180002_shared_workflow_expiry.sql` replaces the read helper with current wall-clock checks.
+The helper is volatile because its result can change during a statement.
+The installed initial migration remains unchanged, and the service-only grants remain in place.
+Two embedded PostgreSQL regressions simulate expiry during a commit statement.
+Both failed before the correction and pass afterward, without workflow writes or receipt replay.
+
+The cleanup removes unused D1 permission projections and repeated text normalization from the persistence adapter.
+The shared service counts each text value's Unicode code points once.
+Authentication now reuses its existing cryptographic secret generator.
+Password parameters, credential gates, attempt limits, and current-access guards remain unchanged.
+The second review found no additional defect in the affected paths.
+Existing D1 and database tests retain their local quote style. Runtime imports retain the extensions required by their tools.
+
+### Observed verification
+
+- Local: all 264 tests pass across 21 files, including 23 shared PostgreSQL cases and 42 bounded D1 cases.
+- Local: type checking, lint, the application build, Deno function checks, and all 12 function tests pass.
+- Browser: all 34 application cases and three local HTTPS authentication cases pass.
+- Documentation: the build checks 14 pages and 566 local links and assets. All three documentation browser cases pass.
+- Hosted Supabase: all five focused cases pass on `7abaf2e` through the CI workflow function at version 3. The run began at 2026-10-18 02:26:13 UTC and took 43.48 seconds.
+- Hosted D1: all 42 bounded proof cases pass on `7abaf2e`. The run began at 2026-10-18 02:26:57 UTC and took 31.46 seconds.
+- Hosted authentication HTTP: the complete case passes on `7abaf2e`. The run began at 2026-10-18 02:25:21 UTC and took 20.42 seconds.
+- Final authentication deployment: the same HTTP case passes again after restoring the reviewed PR source. The run began at 2026-10-18 02:39:22 UTC and took 16.67 seconds.
+- Protected authentication: [run 39089988536](https://github.com/GiftedNovaHD/minsky/actions/runs/39089988536) passes on merged `main` at `68e8642`. All 30 hosted account cases pass in 454.95 seconds. The complete hosted HTTP case passes in 121.67 seconds.
+- Ordinary PR #41 CI: `checks`, `secrets`, and `dependencies` pass on `7abaf2e` in [push run 39090161332](https://github.com/GiftedNovaHD/minsky/actions/runs/39090161332) and [PR run 39090164240](https://github.com/GiftedNovaHD/minsky/actions/runs/39090164240).
+
+The hosted runners verified scoped fixture cleanup and removed their recovery journals.
+The authentication HTTP case checks the password-change lifecycle, temporary-password gates, recovery, permissions, cookies, revoked sessions, CSRF protection, and origins.
+The local HTTPS fixture reports expected self-signed certificate alerts. All three browser assertions pass.
+
+### Hosted changes and evidence boundaries
+
+The Supabase project list confirmed Minsky CI, `ghtztmovdkhuketcbjmq`, before mutation.
+An isolated operational directory fetched the complete migration history, including the CI-only announcement migration.
+The fetched initial workflow migration differed only in empty lines. Its recorded source was preserved.
+The dry run selected only `202610180002_shared_workflow_expiry.sql`, and that migration was applied.
+The current workflow function was deployed only to Minsky CI, at version 3 with `verify_jwt=false`.
+Its bundle SHA-256 is `ae8b4836df76cccc2e0927f09d02e46e1b70580e6eee592e1ef566a742035174`.
+The first post-migration hosted run also passed five cases before the function refresh. The final run above verifies the refreshed function.
+
+The bounded D1 proof used the separate `minsky-d1-proof-ci` database, `06560c1c-8907-47d6-b2b6-f22e129ebbe4`.
+Authentication used only `minsky-auth-ci`, database `5d746d29-0a66-4346-96a6-4974126685d7`, in account `458ad6a930b0fb717796dfa19ca6a2b1`.
+The authentication database required no new migrations.
+Workers Paid accepted the existing 1,000 ms cap. The earlier Free-plan error `100328` no longer blocks deployment.
+The PR #41 HTTP run used Worker version `9504e46d-e216-44eb-9065-cc36492e6fd9`.
+The protected `main` run deployed version `7eedbdc3-ac11-48dc-ba69-6a67ec6a43f1`.
+Its recovery-artifact step found no remaining fixture journals after both suites passed.
+After that run, the CI Worker was restored to the reviewed PR source at version `afaa6c59-1143-4a0b-9593-a8263a5c5dc6`.
+The repeated HTTP suite passed against that final deployment and verified scoped cleanup.
+The maintained scrypt settings remain unchanged.
+
+The protected authentication workflow uses `main`, which the existing `cloud-test` allowlist already permits.
+It verifies the merged PR #40 source. The PR #41 hosted runs separately verify the revised source.
+The environment's four branch entries and its protection rules remain unchanged.
+This run made no development backend deployment, real-account change, data export, or active backend switch.
+
+### Run report
+
+1. Summary of changes. Corrected expiry after lock waits, added two regression cases, removed duplicate adapter work, and verified hosted authentication on Workers Paid.
+2. Files changed. Added `supabase/migrations/202610180002_shared_workflow_expiry.sql`. Updated `src/server/adapters/supabase/store.test.ts`, `src/server/adapters/d1/store.ts`, `src/server/adapters/cloudflare/authentication.ts`, and `src/server/workflow.ts`. Updated `AGENTS.md`, `PLAN.md`, `docs/current-state.md`, `docs/tickets.md`, `docs/server-workflow.md`, and `docs/verify-server-workflow.md`. Updated `docs/cloudflare-authentication-choice.md`, `docs/verify-cloudflare-authentication.md`, `docs/product-direction.md`, `docs/cloudflare-backend-design.md`, and `site/src/content/docs/reference/status.md`.
+3. Commands run. Used `git status`, `log`, `diff`, `fetch`, `add`, `commit`, and `push`. Used `gh api`, `workflow run`, `run view`, `run list`, `pr checks`, and `pr edit`. Read repository files with `cat`, `sed`, and `rg`. Read the Google TypeScript guide and Cloudflare's limits and pricing. Ran `npm test`, `typecheck`, `lint`, `build`, `check:functions`, `test:functions`, `test:e2e`, `test:auth:browser`, `docs:build`, and `docs:test`. Ran `test:workflow:hosted`, `test:d1:hosted`, and `test:auth:http` with the isolated targets. Supabase commands included `projects list`, `link`, `migration fetch`, `db push --dry-run`, `db push --yes`, `functions deploy`, and `functions list`. Ran `node scripts/auth-target.mjs`, Wrangler CI migrations and deployment, local Markdown link checks, and `git diff --check`. Provider access and local sockets required escalation. The two new regressions failed before the fix. The first migration comparison stopped on empty-line differences before any mutation.
+4. Build/test results. All listed local, hosted, protected authentication, and ordinary implementation CI checks pass.
+5. Manual verification steps. Inspected expiry semantics, migration history, target isolation, service-only grants, retry behavior, permission guards, refactor equivalence, and fixture cleanup. Interactive product screens were not manually repeated. Automated browser checks cover the existing phone and keyboard regressions.
+6. Risks. The active application still uses legacy SQL. The replacement workflow is deployed only to CI. T0019's protected Supabase job was not run because its branch remains outside the existing allowlist. Full D1 persistence, live delivery, migration, and contest capacity remain unverified.
+7. Follow-up tickets. Owner review and merge of T0019. Existing candidates remain the remaining D1 commands, full connector verification, and an approved Supabase-path activation.
+8. Docs that need updating. None for this scope.
+
+## T0019 shared server workflow, 2026-10-18
+
+T0019 starts from updated `main` at `0c797ad` on `feature/t0019-shared-server-workflow`.
+The separate worktree is `/tmp/minsky-t0019`.
+The authentication checkout remains unchanged.
+The owner merged PR #40 into `main` at `68e8642` on 2026-10-17 at 17:16:41 UTC.
+T0019 then merged that updated main to resolve review conflicts and preserve the authentication implementation.
+Its protected HTTP authentication result remains incomplete after the Workers Free resource limit.
+No paid subscription change occurred.
+
+The [workflow reference](server-workflow.md) inventories all nine existing commands and their effective SQL definitions.
+`WorkflowService` now makes the shared decisions and coordinates request receipts and guarded commits.
+The Supabase `workflow` Edge Function verifies the bearer with Auth, then calls the shared service.
+Service-only persistence functions recheck current access and captured state under locks.
+PostgreSQL supplies authoritative commit timestamps and atomic state, history, notification, and receipt writes.
+The active browser adapter retains the legacy SQL path during replacement verification.
+D1 still supports only `claim`, `message`, and its limited issue view. Its commands now use the shared decisions and orchestration.
+
+Review is in [PR #41](https://github.com/GiftedNovaHD/minsky/pull/41).
+The final implementation commit is `61da723438a435586b1c1332939e5a30353a4a1d`.
+
+### Observed verification
+
+- Local after main integration: 262 tests pass across 21 files. These include 21 shared PostgreSQL cases, 42 local D1 cases, and authentication regressions.
+- Local: type checking, lint, application build, Deno function checks, 12 function tests, all 34 application browser regressions, and three HTTPS authentication browser cases pass.
+- Documentation: the build checks 14 pages and 566 local links/assets. All three documentation browser tests pass.
+- Hosted Supabase: all five focused cases pass through the deployed `workflow` function on Minsky CI, `ghtztmovdkhuketcbjmq`. The final run checked committed implementation `61da723438a435586b1c1332939e5a30353a4a1d`. It began at 2026-10-17 17:28:18 UTC and took 49.25 seconds.
+- Hosted D1: all 42 changed bounded-proof cases pass against `minsky-d1-proof-ci`, database `06560c1c-8907-47d6-b2b6-f22e129ebbe4`. The run began at 2026-10-17 17:12:57 UTC and took 69.32 seconds. Fixture deletion checks passed.
+- Ordinary GitHub Actions: [implementation run 39053057235](https://github.com/GiftedNovaHD/minsky/actions/runs/39053057235) passed `checks`, `secrets`, and `dependencies` on `8f8145c`. Cloud and deployment jobs did not run.
+- Ordinary GitHub Actions after main integration: [run 39053704275](https://github.com/GiftedNovaHD/minsky/actions/runs/39053704275) passed on `42caed9`. The final submit-validation assertion follows that run.
+- Protected GitHub Actions: not run for T0019. The `cloud-test` branch allowlist excludes this branch. Its existing entries and protection rules remain unchanged.
+
+Hosted Supabase verifies the shared lifecycle, all command variants, persisted history, public/private separation, and team/session isolation.
+It also verifies duplicate and conflicting request IDs, concurrent claims, and a response lost after commit followed by retry.
+It also rejects forged browser identity fields, unsigned callers, direct browser commit plans, and a permission change between read and commit.
+The additional local PostgreSQL cases test credential, login, account, event, membership, intake, and private-state changes before commit, repeated resolution timing, rollback, and direct table denial.
+The [verification guide](verify-server-workflow.md) gives exact commands and recovery steps.
+
+### CI preparation and cleanup
+
+The project list confirmed the target as Minsky CI before changes.
+An operational directory fetched its existing migration history, including `202610110002_announcements`.
+The dry run selected only `202610180001_shared_workflow.sql`.
+The CLI applied that migration. It made no history repair or unrelated migration change.
+The applied source matches the repository migration.
+The main-merge resolution did not change the shared service, Supabase function, commit migration, or D1 adapter.
+The final compatibility review also preserved ignored contestant team overrides, including malformed unused values.
+A local regression and the hosted identity-boundary case verify this input behavior.
+The bounded D1 claim/message paths remain unchanged by that submit validation fix.
+Local D1 now loads migrations `0001` through `0004`. The hosted proof retains `0001` and `0002`.
+The CLI deployed only the new `workflow` function, at version 2 with `verify_jwt=false`. Its handler verifies every bearer itself.
+Its deployment ID is `a8d178ba-7c60-459c-a64e-ba155cc50ddb`.
+The CLI reported bundle SHA-256 `ef1eb24f67d037ca4648a47044b65fc4b89e67c7e6e043ed6dda57d37b76cabf`.
+No development backend deployment, real-account change, backend switch, or data export occurred.
+
+The first hosted attempt passed four cases. Its fifth fixture setup hit Auth's password-update rate limit.
+A second attempt hit the same limit during setup. Both cleaned up their own records.
+The final harness uses one UUID-owned run and organizer-provisioned fixture passwords.
+It still completes the real mandatory-password database gate after Auth changes the hash.
+Existing authentication scenarios retain their normal setup and checks.
+The passing run removed its recovery journal after ownership-checked cleanup.
+These results do not verify the user password-change endpoint or live notification delivery.
+The final runner also passed its read-only database and function prerequisites before fixture creation.
+A wrong-target invocation refused to create fixtures.
+Explicit `.ts` imports support the Deno runtime. The no-emit TypeScript check permits these imports.
+Existing D1 and SQL test files retain their local quote style.
+
+### Run report
+
+1. Summary of changes. Extracted existing workflow decisions and request orchestration. Added a trusted Supabase execution path and aligned the bounded D1 proof.
+2. Files changed. Created `src/server/workflow.ts`, `src/server/workflow.test.ts`, `src/server/adapters/supabase/store.ts`, `src/server/adapters/supabase/store.test.ts`, `src/server/adapters/supabase/http.ts`, and `src/server/adapters/supabase/http.test.ts`. Created `src/backend/supabase/workflow.ts`, `src/backend/supabase/workflow.test.ts`, `supabase/functions/workflow/index.ts`, `supabase/functions/workflow/deno.json`, and `supabase/functions/workflow/deno.lock`. Created `supabase/migrations/202610180001_shared_workflow.sql`, `tests/workflow/supabase.test.ts`, `scripts/workflow-proof.mjs`, `vitest.workflow.config.ts`, `docs/server-workflow.md`, and `docs/verify-server-workflow.md`. Updated `src/server/adapters/d1/store.ts`, `tests/providers/supabase/fixture.ts`, `.github/workflows/checks.yml`, `supabase/config.toml`, `eslint.config.js`, `package.json`, `playwright.config.ts`, and `tsconfig.json`. Updated `AGENTS.md`, `PLAN.md`, `README.md`, `docs/backend-contracts.md`, `docs/provider-test-contracts.md`, `docs/cloudflare-backend-design.md`, `docs/cloudflare-implementation-plan.md`, `docs/d1-transaction-proof.md`, `docs/product-direction.md`, `docs/tickets.md`, `docs/current-state.md`, and `site/src/content/docs/reference/status.md`. Removed `src/server/issueRules.ts`.
+3. Commands run. Used `git` for status, fetch, worktree creation, diffs, commits, trailer checks, push, and the merge from updated main. Used `gh` for PR inspection, creation, checks, and environment-policy reads. Read source and migrations with `cat`, `sed`, and `rg`. Read the official TypeScript guide and Supabase Auth documentation. Ran `npm run typecheck`, `lint`, `build`, `check:functions`, `test:functions`, `test:e2e`, `test:providers:list`, `docs:build`, and `docs:test`. Ran `npm test`, `npm run test:auth:browser`, `npm ci --prefix site`, and `playwright install chromium`. Ran `npm run test:workflow:hosted` and `npm run test:d1:hosted` with explicit isolated targets. Supabase commands included `projects list`, `link`, `migration list`, `migration fetch`, `db push --dry-run`, `db push --yes`, `functions deploy`, and `functions list`. Confirmed existing Cloudflare access with `wrangler whoami`. Ran documentation path, writing, and whitespace checks. Initial sandbox Git, sockets, provider access, and Deno downloads needed escalation. Corrected initial test compilation and lint issues. Excluded the hosted Vitest suite from Playwright discovery and supplied its missing browser binary under `/tmp`. Astro required a local locked install instead of a dependency symlink.
+4. Build/test results. The list above gives observed passing results. Initial hosted failures were fixture Auth rate limits. Protected GitHub results remain separate and unverified.
+5. Manual verification steps. Inspected effective migrations, identity boundaries, commit dependencies, provider targets, cleanup scope, and unchanged environment restrictions. Bounded agents independently inventoried rules, implemented persistence/tests, and reviewed the shared service. Manual product UI checks: not repeated. The active UI path remains unchanged.
+6. Risks. The active backend still uses legacy SQL. The new path has verification evidence on CI only. D1 identity-backed workflows need commit guards for credential generations and Better Auth session expiry and deletion. Full D1 commands, live delivery, installation, migration, and contest capacity remain unverified. T0018's hosted HTTP check remains incomplete.
+7. Follow-up tickets. Owner review and merge of T0019. Later candidates are remaining D1 persistence through the shared service, full connector verification, and an approved Supabase-path activation. PR #40 has merged. Its authentication source remains unchanged by this extraction. AWS, Terraform, R2, and migration tooling remain deferred.
+8. Docs that need updating. None for the completed scope. A later approved protected run must add its separate evidence.
+
+
+## T0018 Cloudflare authentication, 2026-10-18
+
+T0018 starts from `main` at `0c797ad` after PR #39 merged on 2026-10-17 at 15:49:49 UTC.
+The working tree was clean. The branch is `feature/t0018-cloudflare-authentication`.
+[PR #40](https://github.com/GiftedNovaHD/minsky/pull/40) contains implementation commit `48ed3dbc2f1359e8160610fdfe7ffa4cec313f44`.
+The owner reviews and merges.
+Supabase remains the active application backend. No real-data export, real-account reset, migration, or backend switch occurred.
+
+### Implemented behavior
+
+Better Auth `1.7.10` supplies username authentication and signed cookie sessions through a server identity adapter.
+The bounded browser adapter implements the shared `Authentication` interface.
+The HTTP boundary enforces exact origins, JSON requests, custom headers, and current CSRF tokens.
+Hosted cookies are host-only, Secure, HttpOnly, SameSite Strict, and fixed to eight hours without refresh.
+Every protected request checks current identity and approved D1 login state.
+
+Guarded D1 operations preserve account IDs, memberships, permissions, and history.
+Organizer resets require admin access to every assigned session. Any archived assigned event blocks the reset.
+Temporary-password gates and revoked credentials are enforced at the server.
+Resets revoke prior sessions before hashing. A persisted operation ID prevents older updates from replacing newer credentials.
+Interrupted create or reset operations remain restricted and can receive another authorized reset.
+Self changes hash before one atomic credential batch so a sole organizer can retry a rejected change.
+An unknown commit outcome requires checking the new credentials. It does not prove a rollback.
+
+The same temporary-authentication lifecycle assertions now serve Supabase and Cloudflare.
+Cloudflare's complete workflow, image, and live-update provider scenarios remain later connector work.
+See the [API reference](cloudflare-authentication.md), [choice and costs](cloudflare-authentication-choice.md), and [verification guide](verify-cloudflare-authentication.md).
+
+### PR review corrections, 2026-10-18
+
+The owner requested both PR #40 review fixes on the existing ticket branch.
+Password changes now create a guarded replacement login without consuming another public username attempt.
+The separate password-change limit, current-password verification, and credential-generation checks still apply.
+Login, logout, and password changes invalidate overlapping subscription reads when each request finishes.
+This prevents delayed reads from replacing the completed browser state after success, rejection, or an uncertain response.
+
+Two added D1 cases check the exhausted username window and the separate password-change limit.
+Eleven added transport cases check delayed focus, polling, and subscription reads, including failed logout requests.
+All 224 local tests pass across 17 files. This includes 30 D1 account cases and 23 browser-adapter cases.
+All three HTTPS authentication browser cases pass. Type checking, ESLint, the application build, and whitespace checks pass.
+The existing application chunk-size warning remains.
+The original delayed-logout reproduction now ends with the signed-out notification.
+The new password-change regression failed with 429 before the fix and passes afterward.
+
+Commands were `npm test`, `npm run typecheck`, `npm run lint`, `npm run build`, and `git diff --check`.
+The browser run used `PLAYWRIGHT_BROWSERS_PATH=/tmp/minsky-playwright npm run test:auth:browser`.
+The focused account command used `npm run test:auth -- --testNamePattern='last permitted username login|separate password-change attempt limit'`.
+The initial sandbox run could not open the emulator's local socket. The authorized rerun reached the regression assertion.
+No product screens changed. Interactive phone and keyboard checks were not repeated.
+The hosted HTTP result remains incomplete until Workers Paid is active and protected verification passes.
+
+`node scripts/auth-target.mjs` confirmed the existing account and isolated `minsky-auth-ci` database before fixture writes.
+The local CLI then ran these two regression cases against hosted D1:
+
+```sh
+npm run test:auth:hosted -- \
+  --account=458ad6a930b0fb717796dfa19ca6a2b1 \
+  --database=5d746d29-0a66-4346-96a6-4974126685d7 \
+  '--test-name-pattern=last permitted username login|separate password-change attempt limit'
+```
+
+Both cases passed in 79.93 seconds. The other 28 cases were skipped.
+The fixtures verified scoped cleanup. This was a focused local CLI run, separate from protected GitHub Actions.
+No schema, Worker deployment, or paid subscription changed during this correction run.
+
+### Resources and execution evidence
+
+Existing Wrangler OAuth access matched account `458ad6a930b0fb717796dfa19ca6a2b1` before provisioning.
+Development and HTTPS browser checks use disposable local databases.
+Hosted checks use separate `minsky-auth-ci`, ID `5d746d29-0a66-4346-96a6-4974126685d7`, in APAC with read replication disabled.
+All four repository migrations are applied there.
+The dedicated Worker is `https://minsky-auth-ci.icaic-minsky.workers.dev`.
+Its private random secret was installed without printing or storing the value in repository files.
+The protected job deployed Worker version `99cbba19-3afd-4e46-ab15-e09f7bd3115a` from `8cfd7a5`.
+
+| Check | Observed result |
+| --- | --- |
+| Local unit, script, PostgreSQL, D1, and authentication checks | 211 tests passed across 17 files. Includes 28 account cases and three password-component cases. |
+| Local type checking and ESLint | Passed. |
+| Application build | Passed. Existing large-chunk warning remains. |
+| Supabase function checks | Deno type checks passed. All 12 attachment function tests passed. |
+| Existing application browser regressions | All 34 passed. These tests use mocked provider responses. |
+| Local authentication browser security | All three passed against Chromium, HTTPS workerd, and isolated D1. |
+| Documentation build and browser checks | 14 pages and 566 links checked. All three browser cases passed. Existing duplicate `/404` warning remains. |
+| Shared provider registry | Eight scenarios listed. The existing Supabase scenario now uses the extracted authentication helper. |
+| Dependency audit | Root and site lockfile audits reported zero vulnerabilities. |
+| Local CLI against hosted D1 | All 28 cases passed across the initial run and focused verification. Initial run: 25 of 26 passed in 719.74 seconds. Focused run: three passed in 61.96 seconds. |
+| Hosted Worker HTTP | One comprehensive scenario passed in 108.29 seconds. It used the real adapter and shared lifecycle assertions. |
+| Protected GitHub Actions | [Run 39049037968](https://github.com/GiftedNovaHD/minsky/actions/runs/39049037968) on `8cfd7a5` passed ordinary checks and all 28 hosted D1 account cases. The hosted HTTP scenario failed when Cloudflare terminated a password-change request for exceeding runtime resources. |
+
+The first protected dispatch permitted only `main`, `feature/t0014-backend-adapters`, and `feature/t0015-provider-contract-tests`.
+The owner then approved adding the exact T0018 branch to that allowlist on 2026-10-18 SGT.
+The three prior entries and the environment protection remained in place. The first rejected job used no hosted credentials.
+Protected run `39049037968` passed its target check, schema step, and deployment using the existing GitHub credential.
+Its complete 28-case hosted D1 step passed in about 332 seconds.
+A final focused hosted check populated issue history before reset and proved that the history, receipt, and notifications remained unchanged.
+That additional case passed in 201.27 seconds, with 27 other cases skipped and scoped cleanup verified.
+A later assertion-only change discards credential-bearing success values before expected-rejection checks.
+This prevents a failing test from printing a generated password or cookie. Runtime behavior is unchanged.
+
+The initial hosted D1 run returned an uncertain database outcome in the sole-organizer retry case.
+The focused run passed that case and the two added regressions for Unicode equivalence and a lost committed response.
+The focused run skipped the other 25 cases. It was not a complete 28-case run.
+All fixtures verified scoped cleanup and removed their recovery journals.
+
+The final hosted HTTP run started on 2026-10-18 at 00:07:32 SGT.
+It checked exact 401 and 403 rejections, mandatory changes, reset recovery, cross-session permissions, expiry, revocation, cookies, origins, and CSRF.
+A prior read encountered a connection reset. The fixture driver now retries safe GET requests at most three times.
+It never automatically retries a state-changing request.
+All local-CLI hosted HTTP cleanup assertions passed. The protected failed HTTP run also completed fixture cleanup.
+The shared IP-attempt counter remains for daily expiry because no single fixture owns it.
+
+The HTTPS browser suite checked cookie flags, scope, restoration, no browser credential storage, logout replay, stale passwords, other-browser revocation, hostile previews, preflight, and forged forms.
+Those browser checks disabled traces, screenshots, and videos.
+The browser runner verified empty UUID fixture records and removed its temporary database directory.
+No new product screen requires a manual phone-layout check in this ticket.
+
+### Password resource limits
+
+Local workerd samples measured 56 to 62 ms for hashing and 52 to 61 ms for verification.
+Hosted adaptive analytics recorded 66.425 ms for verification and 75.577 ms for an initial hash sample.
+A separate small hash sample recorded a 96.311 ms median and a 196.446 ms 99th percentile.
+These samples exceed the Workers Free 10 ms CPU allowance.
+The selected maintained hash therefore needs a larger CPU allowance for dependable hosting.
+The [choice record](cloudflare-authentication-choice.md#resource-evidence-and-deployment-cost) documents Standard's minimum US$5 monthly cost and usage charges.
+No paid upgrade occurred. Three temporary benchmark Workers were deleted.
+The protected HTTP failure produced one `exceededResources` invocation at 252.901 ms CPU.
+The same invocation reported 16,724,317 bytes of memory in adaptive metrics. That value does not establish peak native allocation or concurrent capacity.
+Cloudflare rejected a 1,000 ms CPU setting with error `100328`, which confirms that this account is on Workers Free.
+The repository now requests that bounded CPU allowance for later paid verification. The rejected deployment did not change the active Worker.
+The owner chose to obtain the subscription later on 2026-10-18 SGT. Hosted HTTP verification remains incomplete for the selected target plan.
+Do not infer reliable Free operation from the earlier successful CLI runs.
+These checks do not establish a fresh supported installation, production capacity, or contest latency targets.
+
+### Limits and follow-up
+
+The active Supabase backend is unchanged.
+The remaining hosted HTTP result requires Workers Paid and another protected run. No paid upgrade occurred.
+The Cloudflare connector still lacks the remaining workflow operations, private R2 images, and Durable Object notification delivery.
+Better Auth upgrades must recheck the pinned schema and password format before deployment.
+The experimental session summaries use IDs as names until the complete contest-session schema exists.
+Venue-wide IP rate limits need later capacity review.
+A Cloudflare owner-recovery procedure for lost sole-organizer credentials is required before independent installations are supported.
+Full migration tooling, real-data exports, and cutover remain later authorized phases. AWS and Terraform remain deferred.
+
+
+### Commands run and file inventory
+
+The run used Git inspection, fetch, branch creation, and PR #39 metadata checks.
+It used existing Wrangler access, D1 target inspection, isolated database creation, migrations, Worker deployment, private secret installation, and version inspection.
+A later deployment with the prepared CPU cap failed with Cloudflare error `100328` on Free.
+Read-only analytics established the resource rejection. The existing login received 403 for billing access. No subscription action ran.
+It installed exact `better-auth@1.7.10` with npm.
+The verification commands were `npm run typecheck`, `npm run lint`, `npm run build`, `npm test`, `npm run check:functions`, and `npm run test:functions`.
+Browser commands were `npm run test:e2e`, `npm run test:auth:browser`, and `npm run docs:test`, with Chromium installed under `/tmp/minsky-playwright`.
+Documentation checks used `npm run docs:build`, `npm run test:providers:list`, and `git diff --check`.
+Both package lockfiles passed `npm audit --package-lock-only --audit-level=high` in their respective package directories.
+The focused suites used `npm run test:auth`, `npm run test:auth:hosted`, and `node scripts/auth-http-test.mjs` with the explicit CI targets.
+Hash measurements used `node scripts/auth-hash-benchmark.mjs` locally and with the explicit hosted account and separate operations.
+`node scripts/auth-target.mjs` verified the automatic target guard.
+The run created PR #40 and dispatched `checks.yml` with `cloudflare_auth=true`.
+All new commits passed the exact required co-author trailer check before push.
+Default exports in Worker entry points and test configuration follow the framework requirement.
+
+Initial sandbox network and socket restrictions required authorized retries.
+An initial browser launch lacked Chromium until the configured `/tmp` installation was selected.
+The first hosted HTTP run had a connection reset. The D1 run and benchmark propagation limits are recorded above.
+No new product screens received manual layout verification. Browser checks supplied the observed interaction evidence.
+The owner still reviews and merges the PR. Remaining connector work follows that merge and scope selection.
+Relevant ticket documentation is current. Broader release gaps remain tracked in the existing documentation release plan.
+
+The created or modified files are:
+
+```text
+.github/workflows/checks.yml
+AGENTS.md
+PLAN.md
+README.md
+deno.lock
+docs/backend-contracts.md
+docs/cloud-onboarding.md
+docs/cloudflare-authentication-choice.md
+docs/cloudflare-authentication.md
+docs/cloudflare-backend-design.md
+docs/cloudflare-implementation-plan.md
+docs/current-state.md
+docs/d1-transaction-proof.md
+docs/manual-verification.md
+docs/product-direction.md
+docs/provider-test-contracts.md
+docs/tickets.md
+docs/verify-cloudflare-authentication.md
+eslint.config.js
+package-lock.json
+package.json
+playwright.auth.config.ts
+playwright.config.ts
+scripts/auth-browser-fixture.mjs
+scripts/auth-hash-benchmark.mjs
+scripts/auth-http-test.mjs
+scripts/auth-target.mjs
+scripts/auth-test.mjs
+site/src/content/docs/reference/status.md
+src/backend/cloudflare/authentication.test.ts
+src/backend/cloudflare/authentication.ts
+src/server/adapters/cloudflare/authentication.test.ts
+src/server/adapters/cloudflare/authentication.ts
+src/server/adapters/cloudflare/hostedHttp.test.ts
+src/server/adapters/cloudflare/identity.ts
+src/server/adapters/cloudflare/password.test.ts
+src/server/adapters/cloudflare/password.ts
+src/server/adapters/cloudflare/worker.ts
+src/server/adapters/d1/migrations/0003_authentication.sql
+src/server/adapters/d1/migrations/0004_identity.sql
+src/server/adapters/d1/testFixture.ts
+src/server/authentication.ts
+src/server/authenticationHttp.test.ts
+src/server/authenticationHttp.ts
+tests/auth/fixtureWorker.ts
+tests/auth/security.spec.ts
+tests/auth/wrangler.jsonc
+tests/providers/scenarios/authentication-lifecycle.ts
+tests/providers/scenarios/authentication.ts
+tsconfig.json
+vite.config.ts
+vitest.auth-http.config.ts
+vitest.auth.config.ts
+wrangler.auth-ci.jsonc
+```
+
+## T0017 D1 transaction proof, 2026-10-17
+
+T0017 starts from merged `main` at `53f9dfd` on `feature/t0017-d1-transaction-proof`.
+The working tree was clean. Open PRs #20, #21, and #23 cover separate tickets.
+Supabase remains active. This ticket adds an experimental store, not a complete Cloudflare connector.
+
+The owner selected organizer-issued replacement temporary passwords for the later migration.
+Mandatory changes preserve the contest-access gate. Account IDs, memberships, permissions, and history remain required.
+Password-hash import is no longer required. Earlier T0016 reports below describe their original decisions.
+Authentication and remaining connector operations follow this proof. Migration tooling follows connector verification.
+
+### Scope and target
+
+The provider-independent `ApplicationStore` implements `claim`, `message`, and a limited authorized issue view.
+Each command commits its state, actor/request receipt, authenticated history, audience sequence, and notification records together.
+False, missing, or stale assertions cause a database error and roll back the batch.
+A separate internal issue version detects private changes without exposing them through public revisions.
+Original message text remains in receipt comparison. Stored history trims the text.
+
+Existing Wrangler OAuth access matched account `458ad6a930b0fb717796dfa19ca6a2b1` before provisioning.
+The owner authorized isolated development and CI resources. Development uses temporary local D1 databases.
+The new hosted CI database is `minsky-d1-proof-ci`, ID `06560c1c-8907-47d6-b2b6-f22e129ebbe4`, in APAC.
+Both proof migrations are applied. Read replication is disabled.
+No paid upgrade, real-data export, real-account reset, application deployment, or backend switch occurred.
+The static frontend configurations have no D1 binding.
+
+### Verification
+
+The hosted suite passed all 42 cases on committed implementation revision `edb4bd05202ba0ee1443e032605bcabfb7d6b621`.
+The run started at 2026-10-17 14:47:48 UTC and completed in 192.50 seconds.
+It used the ordinary remote D1 binding with read replication disabled.
+Each fixture verified deletion of its own workflow and access records. All final-run recovery journals were removed.
+A separate fixture remained readable while another fixture's cleanup ran.
+
+The cases prove these bounded behaviors on hosted D1:
+
+- Failed permission, state, false, and NULL assertions roll back receipts and every command write.
+- Competing claims have one winner. Equal duplicate requests replay one history entry. Different command content rejects request-ID reuse.
+- A lost committed response produces an unknown outcome. Retrying the original request returns the saved result without another write.
+- Membership revocation, account restrictions, login expiry or revocation, team changes, and event archival prevent unauthorized commits and receipt replay.
+- A primary snapshot racing revocation returns one permitted view or no view. The next read after revocation denies access.
+- Private messages change only internal versions and staff notifications. Contestant history, public revisions, and team sequences remain unchanged.
+- Private conflicts trigger bounded internal reevaluation. Exhausted retries expose an unknown outcome, without a private conflict signal.
+
+Ordinary [PR CI](https://github.com/GiftedNovaHD/minsky/actions/runs/39042256683) passed `checks`, `secrets`, and `dependencies` on `edb4bd0`.
+The protected cloud job and frontend deployment job were skipped. A skipped cloud job is not hosted evidence.
+[PR #39](https://github.com/GiftedNovaHD/minsky/pull/39) contains the implementation for owner review.
+The [proof guide](d1-transaction-proof.md) contains exact commands, target checks, and recovery steps.
+This local CLI run against hosted D1 is separate from protected GitHub Actions verification.
+
+### Run report
+
+1. Summary of changes. Added the bounded D1 command foundation, SQLite migrations, independent rules, isolated tests, recovery journals, and owner decisions.
+2. Files changed. Created `src/server/applicationStore.ts`, `src/server/issueRules.ts`, `src/server/adapters/d1/connection.ts`, `src/server/adapters/d1/store.ts`, `src/server/adapters/d1/store.test.ts`, `src/server/adapters/d1/testFixture.ts`, both migrations under `src/server/adapters/d1/migrations/`, `scripts/d1-proof.mjs`, `vitest.d1.config.ts`, `wrangler.d1-proof.jsonc`, and `docs/d1-transaction-proof.md`. Updated `AGENTS.md`, `PLAN.md`, `README.md`, `package.json`, `tsconfig.json`, `eslint.config.js`, `docs/backend-contracts.md`, `docs/provider-test-contracts.md`, `docs/cloudflare-backend-design.md`, `docs/cloudflare-implementation-plan.md`, `docs/product-direction.md`, `docs/tickets.md`, `docs/current-state.md`, and `site/src/content/docs/reference/status.md`.
+3. Commands run. Git inspection, fetch, branch creation, diff checks, commits, trailer checks, and pushes. GitHub PR creation, edits, and CI queries. File inspection with `cat`, `sed`, and `rg`. Wrangler `whoami`, `d1 list`, `d1 create`, `d1 info`, `d1 migrations apply`, and `d1 migrations list`. Ran `npm run typecheck`, `npm run lint`, `npm run build`, `npm test`, `npm run test:d1`, `npm run check:functions`, `npm run test:functions`, `npm run test:e2e`, `npm run test:providers:list`, `npm ci --prefix site`, `npm run docs:build`, `npm run docs:test`, the STE checker, and `git diff --check`. Ran hosted proof commands with explicit target IDs. A wrong-target runner check rejected access before fixture creation.
+4. Build and test results. Type checking, lint, application build, function checks, 157 local tests, 12 function tests, 34 browser tests, and three docs browser tests pass. The final focused local and hosted suites each pass all 42 D1 cases. Docs build checks 14 pages and 566 local links/assets. The first D1 run lacked sandbox socket permission. The first executable run passed 35 of 36 cases, with a claim-text expectation mismatch that is corrected. Initial lint found missing Node globals in the new script, now imported. The first docs build lacked installed site dependencies, then passed after installation. Known build warnings remain the app chunk size and duplicate docs 404 route. Hosted D1 and ordinary GitHub CI pass on implementation revision `edb4bd0`. Initial Git writes, GitHub access, and local socket tests required sandbox escalation. An exploratory `/tmp` scan hit protected system directories and was replaced with a scoped path scan.
+5. Manual verification. Checked the current repository, base revision, open PRs, account and database targets, provider boundaries, authorization dependencies, and fixture deletion scope. Two bounded subagents added adversarial tests and reviewed correctness independently. Manual product UI checks were not repeated because the product UI did not change. Documented manual fixture-recovery commands were not executed.
+6. Risks. Authentication, HTTP handlers, remaining operations, R2, notification delivery, complete connector tests, installation, migration, and contest capacity remain unverified. This proof does not authorize the later backend switch. Failed or interrupted fixture cleanup retains a credential-free recovery journal under `/tmp/minsky-d1-proof-*`.
+7. Follow-up tickets. Complete T0017 review and owner merge. Authentication and remaining connector operations are next candidates. Full migration tooling follows connector verification. AWS adapters and Terraform remain deferred.
+8. Docs that need updating. None for this proof. Later authentication and connector work must update the existing design and implementation plan with its own evidence.
+
+## PR #36 merge-conflict repair, 2026-10-17
+
+The user merged T0015 in [PR #37](https://github.com/GiftedNovaHD/minsky/pull/37) at `738ef4a` on 2026-10-17 at 13:44:12 UTC.
+PR #36 now includes that `main` revision. Its remaining changes are documentation only.
+The records below retain the original verification results. T0015's hosted results are not a new cloud run for this repair.
+
+1. Summary of changes. Merged `main` into the T0016 branch. Retained the shared provider tests, Supabase fixes, and Cloudflare design. Updated current planning and ticket status after PR #37 merged.
+2. Files changed. Resolved `AGENTS.md`, `PLAN.md`, `README.md`, `docs/current-state.md`, and `docs/tickets.md`. Updated `docs/cloudflare-implementation-plan.md` to use the merged test suite and its coverage limits. Other merged files match `main`.
+3. Commands run. Git status, log, branch, remote, fetch, switch, merge, diff, commit, trailer check, and push. GitHub PR and check queries. Read documents with `cat`, `sed`, and `rg`. Ran Python documentation checks, the STE structural checker, and `git diff --check`. Initial GitHub access and branch switching required sandbox escalation.
+4. Build and test results. Documentation paths, anchors, heading structure, conflict-marker checks, and whitespace checks pass. Application builds, browser tests, and cloud tests were not run for this documentation-only repair.
+5. Manual verification. Compared the resolved records with PR #37's merge and verification evidence. Confirmed that application code, tests, workflows, and dependency files match `main` exactly.
+6. Risks. None added by this repair. The proposed Cloudflare implementation and migration remain unverified, as recorded in T0016.
+7. Follow-up tickets. At the time of this report, T0016 still awaited review in PR #36. The user merged PR #36 at `b68ef72` on 2026-10-17 at 13:50:36 UTC. T0015 is merged.
+8. Docs that need updating. None for this repair. Record future identity decisions and implementation evidence in T0016's existing plan.
+
+## T0016 Cloudflare backend design, 2026-10-17
+
+The user authorized this design in parallel with shared provider tests while PR #32 was under review.
+`feature/t0016-cloudflare-backend-design` started from that PR at `d158906`.
+The user then merged PR #32 at `ef6a029` on 2026-10-17 at 12:51:42 UTC.
+This branch now includes that merge commit.
+The user merged T0016 in [PR #36](https://github.com/GiftedNovaHD/minsky/pull/36) at `b68ef72` on 2026-10-17 at 13:50:36 UTC. The design review is complete.
+The [design](cloudflare-backend-design.md) separates existing contracts from proposed server components.
+The [implementation plan](cloudflare-implementation-plan.md) defines bounded phases and acceptance evidence.
+Supabase remains active. No Cloudflare backend, authentication replacement, or data migration is implemented here.
+
+1. Summary of changes. Prepared the Cloudflare architecture and implementation acceptance plan. Recorded the parallel branch exception and AWS portability motivation.
+2. Files changed. `AGENTS.md`, `PLAN.md`, `README.md`, `docs/cloudflare-backend-design.md`, `docs/cloudflare-implementation-plan.md`, `docs/current-state.md`, `docs/product-direction.md`, and `docs/tickets.md`.
+3. Commands run. Git status, branch and worktree inspection, source reads with `sed`, `cat`, and `rg`, Python documentation checks, the STE writing checker, and `git diff --check`. The initial `python` command was unavailable. The checks ran with `python3`. Consulted current official Cloudflare and Supabase documentation.
+4. Build and test results. Documentation paths, heading structure, and whitespace pass. The structural writing check passes with synonym warnings disabled after review. Its initial pass flagged terminology such as confirmed rejection and validated response. Those terms retain distinct meanings. Application builds and tests were not run for this prose-only change. Cloudflare behavior remains unverified.
+5. Manual verification. Compared the design with `Backend`, workflow transactions, private signals, password restrictions, and image lifecycle code. Checked primary provider references near factual claims.
+6. Risks. The D1 assertion pattern, replacement identity implementation, hash compatibility, hosted limits, notification latency, and post-write rollback require implementation evidence. None is presented as verified.
+7. Follow-up tickets. Review T0015 and T0016. T0014 merged. The implementation plan defines later phases without opening speculative development tickets.
+8. Docs that need updating. Record approved identity settings and measured implementation results when those decisions and tests are complete.
+
+## T0015 shared provider tests, 2026-10-17
+
+[PR #37](https://github.com/GiftedNovaHD/minsky/pull/37) implements and verifies the shared provider suite.
+The [protected run](https://github.com/GiftedNovaHD/minsky/actions/runs/39036173268) passed on code revision `672ec6d` with `existing_backend=true`.
+All 14 existing hosted UI tests passed in 3.0 minutes. All eight shared provider scenarios passed in 2.0 minutes.
+The ordinary checks, secret scan, and dependency audits passed too.
+Fixture cleanup completed without retained recovery files. The run produced no recovery artifact.
+This documentation update changes no application, workflow, or test code.
+
+The user authorized this work in parallel with T0016 Cloudflare design while PR #32 was under review.
+PR #32 then merged at `ef6a029`. Both follow-up branches include that revision.
+T0015 implements [shared test contracts](provider-test-contracts.md) and a [run and recovery guide](run-provider-tests.md).
+Supabase is the first hosted fixture implementation. Cloudflare and AWS implementations remain future work.
+
+The scenarios call the real browser adapter through a typed bridge.
+Each connected account has a separate browser context, including its cookies and storage.
+Six credential-free browser tests check the bridge itself, including HttpOnly cookie isolation and deliberate callback failures.
+Those synthetic tests do not count as hosted provider verification.
+
+The first hosted shared run passed six cases and failed two.
+Image downloads remained available after membership removal, and the live-update case did not receive all required notifications.
+Fixture cleanup completed. Read-only checks found zero remaining records, accounts, receipts, or image objects for the captured first fixture identifiers.
+The strict assertions remain in place. The branch corrects the discovered defects.
+
+The image diagnostic confirmed that `snapshot.membership` was null after removal.
+The original download and a browser-only `no-store` request still returned HTTP 200 with `CF-Cache-Status: HIT`.
+A fresh Supabase `cacheNonce` combined with `cache: no-store` returned HTTP 400 with `DYNAMIC` after revocation.
+The targeted hosted case then passed, including access after membership restoration and complete fixture cleanup.
+The adapter now uses both controls. A focused SDK request test checks them.
+This correction affects new download calls. It cannot retract image bytes already received.
+
+The live diagnostic found a subscription-readiness race.
+All three clients reported connected. Two received the public change, while the third missed it.
+The third account remained valid and its snapshot contained the issue.
+Its database subscription became ready only after the other clients received that change.
+The adapter now sets `postgres_changes_options.wait` to `true`.
+It delays its ready signal until the database subscription is active.
+The focused adapter checks pass. One local attempt hit the provider Auth rate limit during fixture setup and cleaned up without running the scenario.
+The next targeted hosted run passed with unchanged assertions in 25.9 seconds, including setup and cleanup.
+No rate limit or provider setting changed.
+
+The [first protected run](https://github.com/GiftedNovaHD/minsky/actions/runs/39035271460) passed 13 of 14 existing hosted UI tests.
+The layout test remained at `Connecting` during its five-second assertion. The shared suite did not run after that failure.
+Further inspection found that the SDK reuses a channel topic while asynchronous removal is pending.
+A regression test reproduced the collision for independent subscriptions on one `Backend`.
+The adapter now assigns each subscription a unique topic. The regression test passes.
+This also protects rapid unsubscribe and resubscribe, including React StrictMode cleanup.
+The shared live scenario now checks multiple subscriptions on one `Backend` and immediate cancellation followed by replacement.
+
+A targeted UI rerun still failed its original five-second assertion after channel isolation.
+Temporary metadata-only diagnostics found two invalid-input errors for subscriptions with an empty session ID.
+The valid subscription became ready after 9.627 seconds. The UI showed `Live` by 10.041 seconds.
+The dashboard now waits for session selection before it subscribes. Initial reads and polling remain active.
+A browser regression fails before that guard and passes after it.
+The diagnostic code was removed. The original hosted assertion remains unchanged.
+The targeted hosted layout case then passed in 24.2 seconds with complete fixture cleanup.
+
+The separate Cloudflare design is in [PR #36](https://github.com/GiftedNovaHD/minsky/pull/36).
+Its ordinary GitHub checks, secret scan, and dependency audits pass.
+That design does not implement a Cloudflare connector or migrate existing data.
+
+1. Summary of changes. Added provider-neutral behavior scenarios, isolated browser clients, Supabase fixtures, exact-ID recovery, and protected CI execution. Recorded the parallel branch exception and PR #32 merge.
+2. Files changed. Added `tests/providers/`, `tests/provider-bridge.spec.ts`, `playwright.providers.config.ts`, `scripts/provider-test.mjs`, `scripts/provider-test-options.mjs`, `scripts/provider-test-options.test.mjs`, `scripts/provider-fixture.test.mjs`, `docs/provider-test-contracts.md`, and `docs/run-provider-tests.md`. Updated `.github/workflows/checks.yml`, `package.json`, `playwright.config.ts`, `tsconfig.json`, `eslint.config.js`, `tests/landing.spec.ts`, `tests/workspace-refresh.spec.ts`, `src/connected/ConnectedApp.tsx`, `src/backend/supabase/backend.ts`, `src/backend/supabase/backend.test.ts`, `src/backend/supabase/images.ts`, `src/backend/supabase/images.test.ts`, `README.md`, `AGENTS.md`, `PLAN.md`, `docs/backend-contracts.md`, `docs/cloud-onboarding.md`, `docs/tickets.md`, and this record.
+3. Commands run. Git and GitHub inspection, fetch, isolated worktree creation, and fast-forward to merged `main`. Locked npm installs, type checking, lint, build, unit tests, Deno checks, browser tests, docs build and browser checks, scenario discovery, import-boundary checks, documentation link checks, and whitespace checks. Added the exact T0015 branch to the existing `cloud-test` allowlist. Ran the shared suite against Minsky CI and read-only fixture cleanup queries. No development migration or deployment ran.
+4. Build and test results. Type checking, lint, app build, docs build, function checks, 115 unit and database tests, 12 function tests, six browser bridge tests, and three docs browser tests pass. The initial full isolated browser run passed 32 cases and failed a pre-existing keyboard test that pressed Tab before sign-in rendering completed. The corrected test waits for the sign-in heading. All 33 ordinary browser cases then passed on an isolated server. The session-selection regression adds one case, and all 34 now pass. The final protected run passed all 14 hosted UI tests and all eight shared scenarios after the earlier failures recorded above.
+5. Manual verification. Reviewed provider imports, typed errors, cookie isolation, image byte transfer, callback cleanup, and exact fixture ownership. Verified the CI target is `ghtztmovdkhuketcbjmq` and the deployment switch remains `false`. No shared development account journey ran.
+6. Risks. The existing CI backend includes unmerged announcement migration `202610110002`, so these runs use its existing schema and functions. The suite does not verify fresh installation, migration correctness, capacity, or an unimplemented provider. At the time of this report, PRs #36 and #37 both updated planning documents. PR #36 later reconciled those documents and merged at `b68ef72`.
+7. Follow-up tickets. T0015 merged in PR #37, and T0016 design merged in PR #36. Complete the identity, transaction, notification, connector, and migration acceptance work in the implementation plan before cutover. AWS implementation and Terraform remain deferred.
+8. Docs that need updating. At the time of this report, reconcile the shared planning documents after the first parallel PR merges. PR #36 later completed that reconciliation.
+
+## T0014 existing backend verification, 2026-10-17
+
+The [completed hosted run](https://github.com/GiftedNovaHD/minsky/actions/runs/39027288113) passed on `a3b3c70` with `existing_backend=true`.
+All 14 hosted cases passed in 2.8 minutes, and global teardown completed without a cleanup error or retained recovery file.
+The ordinary CI jobs passed too. PR #32 is ready for user review.
+The following documentation update changes no application, workflow, or test code.
+
+The run recorded all seven repository migration versions and the additional announcement version `202610110002`.
+The active functions were `admin` version 6, `attachments` version 2, and `announcement-images` version 3.
+This verifies the shared interfaces and Supabase adapter against the prepared CI backend.
+It does not verify a fresh installation, a Cloudflare backend, or the published Cloudflare frontend.
+`CLOUDFLARE_DEPLOY_ENABLED` remains `false`.
+
+The owner replaced `SUPABASE_ACCESS_TOKEN` in `cloud-test`.
+The [retry on `1a5349b`](https://github.com/GiftedNovaHD/minsky/actions/runs/39026364030) passed the ordinary checks, connected to Minsky CI, and applied Auth configuration.
+Database preparation then stopped because remote migration `202610110002` is absent from PR #32.
+That version belongs to `202610110002_announcements.sql` in open PR #20.
+The retry deployed no functions and created no fixtures.
+
+PR #32 changes no files under `supabase/` compared with its merge base on `main`.
+The new `existing_backend` workflow input permits a regression check against the already deployed CI backend.
+It records migration and function versions, then skips backend preparation.
+The default remains backend preparation with the migration-history check.
+Neither mode resets the database or repairs its migration history.
+
+1. Summary of changes. Added an explicit existing-backend mode for the hosted connector check after tracing the migration mismatch to PR #20. Added a prerequisite check before fixture creation. Prepared the missing merged CI backend and recovered the failed run's temporary records.
+2. Files changed. `.github/workflows/checks.yml`, `scripts/check-cloud-backend.mjs`, `scripts/check-cloud-backend.test.mjs`, `docs/cloud-onboarding.md`, `docs/tickets.md`, and `docs/current-state.md`.
+3. Commands run. Git status, fetch, worktree creation, source and migration inspection, commit, trailer verification, and push. GitHub metadata queries, workflow dispatch, run monitoring, failed-log inspection, and PR updates. YAML and shell checks, documentation path checks, and `git diff --check`. Supabase project list, isolated link, read-only database queries, migration fetch into a temporary directory, migration dry run and push, function deployment, and test-origin configuration. `npm ci --offline --no-audit --no-fund`, the prerequisite unit suite, lint, the live prerequisite check, fixture recovery through the existing cleanup function, and zero-count queries.
+4. Build and test results. Final GitHub CI passed type checking, lint, both builds, function checks, 99 unit and database tests, 12 function tests, 27 app browser tests, three docs browser tests, and 14 hosted cases. The docs build checked 14 pages and 566 local links and assets. Earlier ordinary CI passed on `1a5349b` and `81eddfb`. The first existing-backend run passed five hosted tests and failed nine because CI lacked the image schema and function. Teardown stopped at the missing attachments table. Recovery completed after CI preparation. All ten prerequisite tests and the live prerequisite check pass. The sandbox blocked esbuild's install check. Dependency installation passed outside the sandbox. Initial checks caught an incorrect parameterized fixture and missing JavaScript global declarations. Both were corrected.
+5. Manual verification. Confirmed target `ghtztmovdkhuketcbjmq`, the CI environment branch restrictions, the replacement secret timestamp, and `CLOUDFLARE_DEPLOY_ENABLED=false`. Compared PR #32's Supabase files with `main`. Confirmed zero remaining events, sessions, teams, people, Auth accounts, and command receipts for the recovered fixture identifiers.
+6. Risks. A regression run against the existing backend does not verify a fresh backend installation. Minsky CI includes an unmerged announcement migration. Full backend preparation still requires reconciliation of that difference. The prerequisite check verifies version records and function availability, not source equivalence. The existing Cloudflare frontend still needs a configured build.
+7. Follow-up tickets. The user reviews and merges T0014 in PR #32. Resolve the CI migration history with the PR #20 work before a later backend installation check. Shared contract checks, Cloudflare implementation, and migration rehearsal remain later work.
+8. Docs that need updating. None for this verification.
+
+The [first existing-backend run](https://github.com/GiftedNovaHD/minsky/actions/runs/39026689165) tested `81eddfb`.
+Its version log showed that CI lacked `202610110001_attachments.sql` and `202610140001_attachment_fixes.sql`.
+CI had `admin` version 4 and `announcement-images` version 2, but no `attachments` function.
+The tests started without those prerequisites, and fixture teardown could not query the missing table.
+The new prerequisite check prevents that sequence.
+
+CI preparation used a temporary directory with the fetched remote announcement migration and the merged repository migrations.
+The dry run selected only the two missing image migrations.
+Both applied without seeds or a reset. The `admin` and `attachments` functions then deployed from the reviewed source.
+The test origin remains `http://127.0.0.1:4174`.
+The announcements migration, function, and data remain intact.
+
+Recovery identified event `7c800db8-716b-40e6-bbd5-aff5c381d10a` through its unique test tag and the run's account-creation window.
+Exact generated account names and session memberships identified its nine temporary accounts, including the legacy-account test.
+The existing fixture cleanup deleted that event, its two sessions, and those accounts.
+Read-only queries confirmed zero remaining records for the recovered identifiers, including command receipts.
+No development project records were involved.
+
+## T0014 update after the documentation merge, 2026-10-17
+
+The user merged PR #29 at `aaa6bbc` on 2026-10-17 at 10:36:06 UTC.
+PR #32 now includes that revision, including the earlier reply retry and image preview fixes.
+The shared interfaces and Supabase adapter remain the active work.
+Hosted Supabase verification precedes the Cloudflare adapter and any data migration.
+
+1. Summary of changes. Merged current `main` into the connector branch and retained both sets of project records. Recorded the confirmed migration order and PR #29 merge. Restricted the existing `cloud-test` environment to `main` and `feature/t0014-backend-adapters`.
+2. Files changed. Resolved `AGENTS.md`, `PLAN.md`, `docs/cloud-onboarding.md`, `docs/current-state.md`, and `docs/tickets.md`. The merge also brings the already-reviewed documentation site, deployment workflow, reply retry cleanup, image preview guards, and their tests into this branch.
+3. Commands run. Git fetch, worktree creation, merge, diff, status, commit, trailer verification, and push. GitHub PR, variable, secret-name, environment, and branch-policy queries. GitHub environment branch-policy updates, PR description update, workflow dispatch, run inspection, and failed-log inspection. `npm ci --offline --no-audit --no-fund` for the root and docs packages. Type checking, lint, both builds, unit and database tests, both Deno checks, app browser tests, and docs browser tests. A second app build uses the existing public GitHub variables. HTTP asset inspection and a local Chromium sign-in check verify the missing-settings diagnosis.
+4. Build and test results. Type checking, lint, both builds, and both Deno checks pass. `npm test` passes 89 tests. The function suite passes 12 tests. The app browser suite passes 27 tests, and the docs browser suite passes three tests. The docs build checks 14 HTML pages and 566 local links and assets. Its existing duplicate `/404` warning remains. The configured app build retains the existing chunk-size warning.
+5. Manual verification. Reviewed the merged application and provider boundaries. The configured local build displays the sign-in form, omits the setup error, and reports no browser page errors. No account login or shared development record write was part of this check. The hosted test target is `Minsky CI`, reference `ghtztmovdkhuketcbjmq`.
+6. Risks. Hosted Supabase verification is blocked by the access-token format error recorded below. The old Cloudflare preview and the stable app both serve bundles without the development Supabase URL or publishable key. They cannot connect until a configured frontend build replaces them. The deployment switch remains `false`. The GitHub environment has branch restrictions but no required-reviewer rule. The account-plan API did not expose a plan, so reviewer availability remains unverified.
+7. Follow-up tickets. Complete T0014 hosted verification and user review. Test the same contracts against Cloudflare before a migration rehearsal and data cutover. Other provider adapters and Terraform remain deferred.
+8. Docs that need updating. Add the hosted run result after it finishes. Record frontend deployment separately when publication is activated.
+
+The user supplied the old preview URL `https://ccdd90fb-minsky-dev.icaic-minsky.workers.dev`.
+That preview serves `index-B4jx6y34.js`. The stable app serves `index-CSDiNndQ.js`.
+Both bundles contain the setup message and omit the development Supabase URL and publishable key prefix.
+Setting GitHub variables does not change already published assets.
+No application or documentation deployment occurred in this update.
+
+The [hosted workflow](https://github.com/GiftedNovaHD/minsky/actions/runs/39025809230) ran on `6f46e54`.
+Its ordinary checks, secret scan, and dependency audits passed.
+The cloud job confirmed the CI project reference, then failed at `supabase link`.
+The CLI reported an invalid `SUPABASE_ACCESS_TOKEN` format and required an `sbp_` personal access token.
+Configuration changes, migrations, function deployment, and fixture creation did not run.
+The owner must replace that environment secret before the hosted check can proceed.
+The separate [push run](https://github.com/GiftedNovaHD/minsky/actions/runs/39025807758) passed on the same revision.
+PR #32 remains in draft until hosted verification passes.
+
+## T0014 backend adapters 2026-10-17
+
+The branch is `feature/t0014-backend-adapters`, from updated `main` at `de92d54`.
+The user authorized this first migration step while the other pull requests remain open.
+
+1. Summary of changes. The UI now uses `Backend` for authentication, session reads, workflows, administration, images, and live updates. Supabase implements those contracts through the existing services. Server permissions, database functions, and provider resources remain unchanged. The reference and product direction distinguish this extraction from the later D1 migration.
+2. Files changed. Added `src/backend/contracts.ts`, `errors.ts`, `index.ts`, `supabase/backend.ts`, `supabase/images.ts`, `supabase/backend.test.ts`, and `supabase/images.test.ts`. Moved `src/connected/client.test.ts` to `src/backend/supabase/login.test.ts` and removed `src/connected/client.ts`. Updated `src/connected/ConnectedApp.tsx`, `IssueImages.tsx`, `imageFile.ts`, `imagePreview.tsx`, and `imageUpload.ts`. Updated `tests/workspace-refresh.spec.ts` and `eslint.config.js`. Added `docs/backend-contracts.md`. Updated `AGENTS.md`, `PLAN.md`, `README.md`, `docs/tickets.md`, `docs/product-direction.md`, `docs/cloud-onboarding.md`, and this record.
+3. Commands run. Git status, diff, fetch, and worktree creation. Repository inspection with `rg`, `sed`, and `cat`. `gh pr list` and `gh api repos/GiftedNovaHD/minsky/environments`. `npm ci --offline --no-audit --no-fund`. `npx deno fmt --single-quote src/backend`. `npm run typecheck`, `npm run lint`, `npm run build`, `npm test -- src/backend/supabase`, `npm test`, `npm run check:functions`, `npm run test:functions`, and `npm run test:e2e`. `git diff --check` and a Python check of documentation paths and anchors. Commit, trailer verification, push, and PR preparation complete the repository workflow.
+4. Build and test results. Local type checking, lint, and build pass. The unit and embedded database suite passes 70 tests. The function suite passes 12 tests. Both functions pass Deno type checking. The browser suite passes 19 Chromium tests. The sandbox blocked the dependency install check and browser server. It also affected the existing child-process stderr test. Those commands pass outside the sandbox. Initial checks caught a test URL mismatch, test type errors, lint errors, and a moved helper still imported by the attachment function. The corrections retain that helper at its original path.
+5. Manual verification. Reviewed the extraction and provider imports against the existing calls. Automated browser checks cover narrow layouts, keyboard controls, image retries, membership refresh, and workflow retry IDs. No new manual hosted account journey ran. The protected hosted check remains pending.
+6. Risks. GitHub reports zero configured environments, so `cloud-test` cannot run. No hosted verification result is claimed for this revision. PRs #30 and #31 also edit the reply and image components. Their eventual merge may require conflict resolution and another verification run. The interfaces do not prove a Cloudflare implementation, password migration, or production capacity. Existing UI files retain double-quoted strings for consistency. New backend modules use single-quoted strings under the Google TypeScript Style Guide.
+7. Follow-up tickets. Complete T0014 protected cloud verification and user review. The next candidate is a shared hosted contract suite before the Cloudflare implementation. Authentication migration, D1, R2, Durable Objects, and eventual data cutover remain later work. Other providers and Terraform remain deferred.
+8. Docs that need updating. None for the implemented extraction. Future hosted verification must add its result to this record.
+
+The [backend contracts](backend-contracts.md) describe the interfaces and retry rules.
+The [cloud onboarding guide](cloud-onboarding.md#verification-and-protected-cloud-ci) lists the `cloud-test` environment configuration.
+
+[Draft PR #32](https://github.com/GiftedNovaHD/minsky/pull/32) contains implementation commit `408dafa`.
+[GitHub Checks](https://github.com/GiftedNovaHD/minsky/actions/runs/39022916356) and the [secret and dependency checks](https://github.com/GiftedNovaHD/minsky/actions/runs/39022916361) passed for that commit.
+The protected cloud job was skipped.
+An in-memory ESLint check also confirmed that UI imports of the SDK and provider implementation fail lint.
+
+The independent [Cloudflare build for `minsky-dev`](https://dash.cloudflare.com/458ad6a930b0fb717796dfa19ca6a2b1/workers/services/view/minsky-dev/production/builds/41169b14-a851-4c69-8c39-d696b3da6a9f) failed.
+Its GitHub check exposes no failure details.
+A read-only Builds API request returned HTTP 401 with `Authentication error`, so the cause remains unverified.
+`npx --no-install wrangler --help` succeeded but could not write its diagnostic log in the sandbox.
+The failed provider check and missing protected environment remain recorded setup gaps.
+The PR stays in draft.
 
 ## T0011 update from main (2026-10-17)
 

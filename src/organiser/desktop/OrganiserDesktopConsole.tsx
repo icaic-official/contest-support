@@ -15,7 +15,11 @@ import { emptyReply, type ReplyDraft } from "../actions/IssueForms";
 import { ReportForm } from "../actions/ReportForm";
 import { AdminFeedback } from "../admin/AccountAccess";
 import { type SessionAdmin, useSessionAdmin } from "../admin/useSessionAdmin";
-import { issueAbilities, visibleIssues } from "../organiserModel";
+import {
+  issueAbilities,
+  openableIssues,
+  visibleIssues,
+} from "../organiserModel";
 import { AccountsPage, OverviewPage, SettingsPage } from "./AdminPages";
 import { AwardReviewPage } from "./AwardReviewPage";
 import {
@@ -167,16 +171,14 @@ export function OrganiserDesktopConsole({
   const pages = groups.flatMap((group) => group.pages);
   const currentPage = pages.includes(page) ? page : pages[0];
   const issues = visibleIssues(state.issues, member);
-  const openedIssue = issues.find(
+  const openedIssue = openableIssues(state, member).find(
     (issue) => issue.id === workflow.selectedIssueId,
   );
   const archived = Boolean(state.event?.archived);
   const canReport = isSupport(member);
   const personName =
     state.members.find((item) => item.person.id === user.id)?.person.name ??
-    (typeof user.user_metadata.name === "string"
-      ? user.user_metadata.name
-      : undefined) ??
+    user.name ??
     username ??
     user.email ??
     "Your account";

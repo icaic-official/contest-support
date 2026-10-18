@@ -4,17 +4,16 @@ import {
   accountKind,
   actorName,
   auditActionText,
-  createAccountRequest,
+  createAccountCommand,
   draftOfMembership,
-  imageLimitsParams,
+  imageLimitsInput,
   isCompleteMembership,
   isValidLimit,
   isValidUsername,
   limitsOfSession,
-  manageMemberParams,
-  resetPasswordRequest,
-  revokeMemberParams,
-  setUsernameRequest,
+  membershipInput,
+  resetPasswordCommand,
+  setUsernameCommand,
   statusCounts,
   stepLimit,
   toggleRole,
@@ -83,10 +82,12 @@ describe("image limits", () => {
     expect(stepLimit("fileMb", Number.NaN, 1)).toBe(2);
   });
 
-  it("maps the limits to the RPC parameters", () => {
-    expect(
-      imageLimitsParams(sessionId, { fileMb: 5, count: 4, totalMb: 20 }),
-    ).toEqual({ p_session: sessionId, p_file_mb: 5, p_count: 4, p_total_mb: 20 });
+  it("maps the limits to the administration contract", () => {
+    expect(imageLimitsInput({ fileMb: 5, count: 4, totalMb: 20 })).toEqual({
+      fileMegabytes: 5,
+      count: 4,
+      totalMegabytes: 20,
+    });
   });
 });
 
@@ -129,56 +130,41 @@ describe("membership drafts", () => {
     expect(toggleRole(added, "jury", false).roles).toEqual(["volunteer"]);
   });
 
-  it("maps a staff draft to manage_member", () => {
+  it("maps a staff draft to a membership", () => {
     expect(
-      manageMemberParams(sessionId, ` ${userId} `, {
+      membershipInput({
         kind: "staff",
         teamId: "",
         roles: ["specialist"],
         isAdmin: true,
       }),
-    ).toEqual({
-      p_session: sessionId,
-      p_user: userId,
-      p_team: null,
-      p_roles: ["specialist"],
-      p_admin: true,
-      p_remove: false,
-    });
+    ).toEqual({ teamId: null, roles: ["specialist"], isAdmin: true });
   });
 
   it("drops staff roles and admin rights from a team account", () => {
     expect(
-      manageMemberParams(sessionId, userId, {
+      membershipInput({
         kind: "team",
         teamId,
         roles: ["volunteer"],
         isAdmin: true,
       }),
-    ).toMatchObject({ p_team: teamId, p_roles: [], p_admin: false });
+    ).toEqual({ teamId, roles: [], isAdmin: false });
     expect(
-      manageMemberParams(sessionId, userId, {
+      membershipInput({
         kind: "staff",
         teamId,
         roles: ["jury"],
         isAdmin: false,
       }),
-    ).toMatchObject({ p_team: null, p_roles: ["jury"] });
-  });
-
-  it("maps a removal to manage_member", () => {
-    expect(revokeMemberParams(sessionId, userId)).toEqual({
-      p_session: sessionId,
-      p_user: userId,
-      p_remove: true,
-    });
+    ).toEqual({ teamId: null, roles: ["jury"], isAdmin: false });
   });
 });
 
-describe("admin function requests", () => {
+describe("account commands", () => {
   it("creates a staff account", () => {
     expect(
-      createAccountRequest(sessionId, {
+      createAccountCommand({
         name: " Alex Morgan ",
         username: " alex-morgan ",
         membership: {
@@ -190,18 +176,17 @@ describe("admin function requests", () => {
       }),
     ).toEqual({
       action: "create_account",
-      session_id: sessionId,
       username: "alex-morgan",
       name: "Alex Morgan",
-      team_id: null,
+      teamId: null,
       roles: ["volunteer", "jury"],
-      is_admin: false,
+      isAdmin: false,
     });
   });
 
   it("creates a team account without staff roles", () => {
     expect(
-      createAccountRequest(sessionId, {
+      createAccountCommand({
         name: "Team Aurora",
         username: "team-aurora",
         membership: {
@@ -211,20 +196,18 @@ describe("admin function requests", () => {
           isAdmin: true,
         },
       }),
-    ).toMatchObject({ team_id: teamId, roles: [], is_admin: false });
+    ).toMatchObject({ teamId, roles: [], isAdmin: false });
   });
 
   it("sets a username and resets a password", () => {
-    expect(setUsernameRequest(sessionId, userId, " alex ")).toEqual({
+    expect(setUsernameCommand(userId, " alex ")).toEqual({
       action: "set_username",
-      session_id: sessionId,
-      user_id: userId,
+      userId,
       username: "alex",
     });
-    expect(resetPasswordRequest(sessionId, userId)).toEqual({
+    expect(resetPasswordCommand(userId)).toEqual({
       action: "reset_password",
-      session_id: sessionId,
-      user_id: userId,
+      userId,
     });
   });
 });

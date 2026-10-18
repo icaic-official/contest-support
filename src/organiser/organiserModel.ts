@@ -7,6 +7,7 @@ import {
   type Snapshot,
   unresolvedTime,
 } from "@/connected/model";
+import { type JuryRow, juryWorklists } from "@/connected/jury";
 import { normalizeTeamText } from "@/connected/teamSearch";
 
 /** A tab of the organiser phone app. */
@@ -47,6 +48,60 @@ export function visibleIssues(
   return isJuryOnly(member)
     ? issues.filter((issue) => issue.status === "resolved")
     : [...issues];
+}
+
+/**
+ * The issues that this person can open. Jury members can also open an issue
+ * that was reopened after its award, while the award waits for external
+ * application (T0009). The ordinary jury queue stays resolved only.
+ */
+export function openableIssues(state: Snapshot, member: Membership): Issue[] {
+  const issues = visibleIssues(state.issues, member);
+  if (!isJuryOnly(member)) return issues;
+  const pending = juryWorklists(state)
+    .application.map((row) => row.issue)
+    .filter((issue) => issue.status !== "resolved");
+  return [...issues, ...pending];
+}
+
+/** A list of the jury award pages. */
+export type AwardList = "decide" | "apply" | "done";
+
+/**
+ * The jury award lists. "decide" and "apply" are the T0009 worklists:
+ * resolved issues without an award, oldest resolution first, and every award
+ * that waits for external application, also on a reopened issue and with
+ * zero minutes, oldest decision first. "done" holds resolved issues with an
+ * applied award, latest confirmation first.
+ */
+export function awardLists(state: Snapshot): Record<AwardList, JuryRow[]> {
+  const { decision, application } = juryWorklists(state);
+  const resolutions = (issueId: string) =>
+    state.resolutions.filter((item) => item.issue_id === issueId);
+  const done = state.awards
+    .filter((award) => award.applied_at)
+    .flatMap((award): JuryRow[] => {
+      const issue = state.issues.find((item) => item.id === award.issue_id);
+      if (!issue || issue.status !== "resolved") return [];
+      return [
+        {
+          issue,
+          team: state.teams.find((team) => team.id === issue.team_id),
+          resolution: state.resolutions.find(
+            (item) => item.id === award.resolution_id,
+          ),
+          resolutions: resolutions(issue.id),
+          award,
+        },
+      ];
+    })
+    .sort(
+      (a, b) =>
+        Date.parse(b.award?.applied_at ?? "") -
+          Date.parse(a.award?.applied_at ?? "") ||
+        a.issue.number - b.issue.number,
+    );
+  return { decide: decision, apply: application, done };
 }
 
 /** A filter chip of the queue. */

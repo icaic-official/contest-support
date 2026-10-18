@@ -5,15 +5,12 @@ import {
   useRef,
   useState,
 } from "react";
-import { z } from "zod";
-import { errorMessage, requireClient, snapshot } from "../client";
-import { membershipSchema, type Snapshot } from "../model";
+import { requireBackend } from "@/backend";
+import type { SessionSummary } from "@/backend/contracts";
+import { errorMessage } from "@/backend/errors";
+import type { Snapshot } from "../model";
 
-/** A contest session where the signed-in person has a membership. */
-export interface SessionSummary {
-  id: string;
-  name: string;
-}
+export type { SessionSummary };
 
 /** Shared session data for every UI. Read it; do not copy it into state. */
 export interface SessionData {
@@ -26,7 +23,7 @@ export interface SessionData {
   loaded: boolean;
   /** The last refresh error. The snapshot is cleared when it is set. */
   refreshError: string;
-  /** True while the Realtime channel is subscribed. */
+  /** True while the live update channel is connected. */
   connected: boolean;
   /** Server time minus local time, in milliseconds. Pass it to useNow. */
   clockOffset: Readonly<RefObject<number>>;
@@ -35,10 +32,6 @@ export interface SessionData {
   /** Changes the session and discards data from the previous one. */
   selectSession: (sessionId: string) => void;
 }
-
-const sessionListSchema = z.array(
-  z.object({ id: z.string().uuid(), name: z.string() }),
-);
 
 /**
  * Loads the person's sessions and the selected session snapshot. It refreshes
@@ -61,25 +54,13 @@ export function useSessionSnapshot(userId: string): SessionData {
     // revision. A write waits for its own refresh before enabling controls.
     const task = refreshQueue.current.then(async () => {
       try {
-        const membershipsResult = await requireClient()
-          .from("memberships")
-          .select("*")
-          .eq("user_id", userId);
-        if (membershipsResult.error) throw membershipsResult.error;
-        const members = z.array(membershipSchema).parse(membershipsResult.data);
-        const sessionResult = await requireClient()
-          .from("sessions")
-          .select("id,name")
-          .in(
-            "id",
-            members.map((m) => m.session_id),
-          );
-        if (sessionResult.error) throw sessionResult.error;
-        const list = sessionListSchema.parse(sessionResult.data);
+        const list = await requireBackend().workflows.sessions(userId);
         const nextSession = list.some((s) => s.id === sessionId)
           ? sessionId
           : (list[0]?.id ?? "");
-        const next = nextSession ? await snapshot(nextSession) : undefined;
+        const next = nextSession
+          ? await requireBackend().workflows.snapshot(nextSession)
+          : undefined;
         if (run !== generation.current) return;
         setSessions(list);
         setSessionId(nextSession);
@@ -102,48 +83,20 @@ export function useSessionSnapshot(userId: string): SessionData {
   useEffect(() => {
     void refresh();
     setConnected(false);
-    const channel = requireClient()
-      .channel(`session-${sessionId}-${userId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "changes",
-          filter: `session_id=eq.${sessionId}`,
-        },
-        () => {
-          void refresh();
-        },
-      )
-      .on(
-        "postgres_changes",
-        {
-          event: "UPDATE",
-          schema: "public",
-          table: "sessions",
-          filter: `id=eq.${sessionId}`,
-        },
-        () => {
-          void refresh();
-        },
-      )
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "staff_changes",
-          filter: `session_id=eq.${sessionId}`,
-        },
-        () => {
-          void refresh();
-        },
-      )
-      .subscribe((status) => {
-        setConnected(status === "SUBSCRIBED");
-        if (status === "SUBSCRIBED") void refresh();
-      });
+    // The first refresh selects a session. Empty IDs produce invalid live filters.
+    const unsubscribe = sessionId
+      ? requireBackend().updates.subscribe({
+          sessionId,
+          userId,
+          onChange: () => {
+            void refresh();
+          },
+          onConnection: (isConnected) => {
+            setConnected(isConnected);
+            if (isConnected) void refresh();
+          },
+        })
+      : undefined;
     // Poll current membership as a backstop: a revoked subscriber receives no further data.
     const interval = window.setInterval(() => {
       void refresh();
@@ -160,7 +113,7 @@ export function useSessionSnapshot(userId: string): SessionData {
       window.clearInterval(interval);
       window.removeEventListener("focus", focus);
       window.removeEventListener("online", focus);
-      void requireClient().removeChannel(channel);
+      unsubscribe?.();
     };
   }, [refresh, sessionId, userId]);
   const selectSession = useCallback((next: string) => {

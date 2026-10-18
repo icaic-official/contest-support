@@ -10,6 +10,12 @@ Review light and dark themes at desktop and 320px widths.
 The sign-in footer and sidebar links open the guides in a new tab to preserve the workspace.
 Those links reach the development app only after its separate frontend deployment.
 
+## Experimental Cloudflare authentication
+
+Follow [Verify Cloudflare authentication](verify-cloudflare-authentication.md) for isolated HTTPS browser checks.
+These checks use fictional local accounts. They do not switch the connected application from Supabase.
+The account reference records current cookie, origin, recovery, and session restrictions.
+
 ## Connected application
 
 Use the linked development project and organizer-provided username and password accounts.
@@ -325,3 +331,67 @@ See [fixture recovery](cloud-onboarding.md#fixture-recovery) for failed cloud cl
 Record observed results in [current-state.md](current-state.md).
 Suggested manual checks are not completed checks.
 Browser automation does not establish results for real devices, assistive technology, or capacity.
+
+## 13. Jury worklist (T0009)
+
+Run these checks on the current T0009 revision after merging current `main`.
+For hosted acceptance, confirm Minsky CI project `ghtztmovdkhuketcbjmq` before creating UUID-owned fictional accounts and records.
+Delete only that run's fixtures. Verify cleanup after the run. Use jury-only, combined jury/support, support-only,
+admin-only, and contestant accounts. Do not use real contest reports as fixtures.
+This is a checklist, not evidence that hosted or physical-device checks have passed.
+
+1. As jury or a combined-role member, open **Jury worklist** in the sidebar.
+   On phones use **Menu** first. Other roles must not have this entry; admin alone
+   does not grant jury powers. The initial issue screen remains available.
+2. Prepare resolved issues without decisions, a zero-minute pending award, a
+   pending award on a reopened issue, an applied award, and a reopened issue with
+   no award. Compare both sections and their counts with the specification's
+   eligibility table. Order decisions by resolution time and applications by award time.
+3. As a combined-role member, filter the ordinary queue, then open the worklist.
+   Its lists must still cover the entire authorized session. Also check independence from the chosen team search filter.
+   Returning to the ordinary queue retains its filter and selected issue.
+4. Check team/location, status, resolution summary/actor/time, unresolved duration,
+   and award explanation/actor/time. Pending awards on reopened issues identify
+   the earlier resolution. Compare duration with issue details; resolved intervals
+   are excluded and first-assignment delay is separate.
+5. Use **View issue**, record an explicit zero-minute decision with a public
+   explanation, and return. It must leave **Needs decision** and enter **Pending
+   external application**. Zero is not a missing award and is not automatically applied.
+6. As support, reopen an issue with a pending award. As jury-only, reach it from
+   the worklist and confirm external application with the existing required
+   checkbox. It leaves the pending list. Minsky does not change the external clock.
+   Resolve it again: its existing award and confirmation remain, with no second decision.
+7. Open two signed-in browser contexts. In one, edit an explanation draft; in
+   the other, award a different issue. Lists/counts update without clearing the
+   unrelated draft or stealing focus. Confirm an award in one context and check
+   removal in the other. Check refresh and reconnect. Use the automated retry
+   cases to verify lost award and confirmation responses reuse the request ID.
+   Confirm one award, one confirmation, and one history entry for each action.
+8. Switch sessions while viewing details. Selection clears and records belong
+   only to the next session. Losing the jury role removes its entry and returns
+   to an available screen; losing membership clears protected records. Password
+   setup/reset must retain the existing account-readiness gate.
+9. Check keyboard opening and **Back to jury worklist**. Focus returns to the
+   originating row, or its section heading if the row moved or disappeared.
+   Check a reopened unawarded issue leaving the decision list. Archived records
+   remain readable while decisions and confirmations are unavailable.
+10. Check desktop, 390px/320px phones, native browser 200% zoom, and screen-reader
+    labels. No text/control should clip or cause horizontal overflow. Distinguish
+    loading/read errors from valid empty sections; failed reads must clear stale data.
+
+Record results and remaining limits in [current state](current-state.md#t0009-parallel-maintenance-2026-10-18).
+The credential-free browser harness exercises actual migrations and RLS with
+simulated hosted transport. It does not establish real Auth, Storage, Realtime,
+deployment, offline operation, or capacity results.
+
+For isolated hosted acceptance from a local CLI, follow the credential prerequisites in [cloud onboarding](cloud-onboarding.md#verification-and-protected-cloud-ci).
+Then run the current cloud suite against the explicit CI target:
+
+```sh
+MINSKY_TEST_PROJECT_REF=ghtztmovdkhuketcbjmq npm run test:cloud
+```
+
+Do not apply unrelated remote migrations or change provider configuration for this test.
+If cleanup retains a recovery file, follow [fixture recovery](cloud-onboarding.md#fixture-recovery).
+Record local simulations, hosted-service CLI results, and protected GitHub Actions results separately.
+A skipped protected job is not a pass. The owner approved the exact T0009 branch-only environment policy addition on 2026-10-18.

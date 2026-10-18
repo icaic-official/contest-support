@@ -1,16 +1,12 @@
 import { useState } from "react";
 import { cn } from "@/lib/utils";
-import type { Issue } from "@/connected/model";
 import { clockDuration } from "@/connected/ui";
 import { ApplyForm, AwardForm } from "../actions/IssueForms";
 import { AwardReceipt } from "../components/IssueDetails";
-import { UnresolvedTimer } from "../components/issueDisplay";
-import { issueAbilities, sortByUnresolved } from "../organiserModel";
+import { AwardEvidence, UnresolvedTimer } from "../components/issueDisplay";
+import { type AwardList, awardLists, issueAbilities } from "../organiserModel";
 import type { ConsolePageProps } from "./consoleProps";
-import { latestResolver } from "./consoleModel";
 import { PageHeader } from "./QueuePages";
-
-type AwardList = "decide" | "apply" | "done";
 
 const lists: readonly [AwardList, string][] = [
   ["decide", "To decide"],
@@ -19,29 +15,15 @@ const lists: readonly [AwardList, string][] = [
 ];
 
 /**
- * Resolved issues for the jury: issues without an award, awards that wait
- * for confirmation in the external contest system, and applied awards. The
- * award form and the confirmation form are on each card. A decision does not
- * change the contest clock.
+ * The jury award lists: resolved issues without an award, awards that wait
+ * for confirmation in the external contest system (also on reopened issues)
+ * and applied awards. The award form and the confirmation form are on each
+ * card. A decision does not change the contest clock.
  */
 export function AwardReviewPage({ props }: { props: ConsolePageProps }) {
   const { state, member, workflow, now } = props;
   const [list, setList] = useState<AwardList>("decide");
-  const resolved = sortByUnresolved(
-    state.issues.filter((issue) => issue.status === "resolved"),
-    state.resolutions,
-    now,
-  );
-  const awardOf = (issue: Issue) =>
-    state.awards.find((award) => award.issue_id === issue.id);
-  const issuesOf: Record<AwardList, Issue[]> = {
-    decide: resolved.filter((issue) => !awardOf(issue)),
-    apply: resolved.filter((issue) => {
-      const award = awardOf(issue);
-      return award && !award.applied_at;
-    }),
-    done: resolved.filter((issue) => awardOf(issue)?.applied_at),
-  };
+  const issuesOf = awardLists(state);
   const shown = issuesOf[list];
   return (
     <div className="space-y-6">
@@ -74,9 +56,8 @@ export function AwardReviewPage({ props }: { props: ConsolePageProps }) {
       </div>
       {shown.length ? (
         <ul className="grid gap-4">
-          {shown.map((issue) => {
-            const team = state.teams.find((item) => item.id === issue.team_id);
-            const award = awardOf(issue);
+          {shown.map((row) => {
+            const { issue, team, award } = row;
             const can = issueAbilities(issue, state, member);
             return (
               <li
@@ -86,7 +67,8 @@ export function AwardReviewPage({ props }: { props: ConsolePageProps }) {
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
                     <span className="font-mono">ISS-{issue.number}</span>·
-                    <span>{team?.name}</span>·<span>{team?.location}</span>
+                    <span>{team?.name ?? "Team unavailable"}</span>·
+                    <span>{team?.location}</span>·<span>{issue.category}</span>
                   </div>
                   <h2 className="mt-1.5 font-medium break-words">
                     <button
@@ -98,7 +80,8 @@ export function AwardReviewPage({ props }: { props: ConsolePageProps }) {
                       {issue.description}
                     </button>
                   </h2>
-                  <dl className="mt-4 grid grid-cols-3 gap-3 text-sm">
+                  <AwardEvidence row={row} />
+                  <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
                     <div>
                       <dt className="text-xs text-muted-foreground">
                         Unresolved
@@ -122,14 +105,6 @@ export function AwardReviewPage({ props }: { props: ConsolePageProps }) {
                                 Date.parse(issue.created_at),
                             )
                           : "—"}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt className="text-xs text-muted-foreground">
-                        Resolved by
-                      </dt>
-                      <dd className="truncate">
-                        {latestResolver(issue, state.resolutions) ?? "—"}
                       </dd>
                     </div>
                   </dl>

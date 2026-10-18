@@ -82,6 +82,8 @@ test("sign-in fits phone widths and supports skip navigation", async ({
     fullPage: true,
   });
   await page.reload();
+  await expect(page.getByRole("heading", { name: "Sign in", exact: true }))
+    .toBeVisible();
   await page.keyboard.press("Tab");
   await expect(
     page.getByRole("link", { name: "Skip to main content" }),

@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
-import { errorMessage, execute } from "../client";
+import { requireBackend } from "@/backend";
+import { errorMessage, WorkflowRejectedError } from "@/backend/errors";
 import type { Command } from "../model";
 
 /** Options for one workflow command. */
@@ -83,7 +84,11 @@ export function useCommand({
         : { request: crypto.randomUUID(), command, onSuccess };
     remember(request);
     try {
-      const id = await execute(sessionId, request.request, request.command);
+      const id = await requireBackend().workflows.execute(
+        sessionId,
+        request.request,
+        request.command,
+      );
       remember(undefined);
       // A retry must complete the original form's cleanup before enabling edits.
       request.onSuccess?.();
@@ -94,13 +99,7 @@ export function useCommand({
     } catch (cause) {
       // Known server rejections are definitive. Transport failures retain the same
       // request UUID for an explicit retry, including submissions and messages.
-      if (
-        cause &&
-        typeof cause === "object" &&
-        "code" in cause &&
-        typeof cause.code === "string" &&
-        cause.code
-      ) {
+      if (cause instanceof WorkflowRejectedError) {
         remember(undefined);
       }
       await refresh();

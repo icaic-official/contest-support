@@ -67,6 +67,8 @@ GitHub reads checked PR #42, PR #43, Actions runs, variable and secret names, th
 `gh pr create --draft` prepared PR #43.
 The owner later approved one protected branch entry. `gh api --method POST` added only `feature/t0021-cloudflare-development-install` as entry `63467138`.
 Read-only API checks confirm all six earlier entries and rule `69128862` remain unchanged.
+The first protected dispatch was canceled during ordinary prerequisites to save the recovered-fixture evidence before final verification.
+It performed no hosted test or provider change. A new dispatch uses the final evidence revision.
 
 Local checks included these commands:
 
@@ -126,7 +128,7 @@ Read-only deployment checks exercised the actual static guard, complete prefligh
 The Builds API read used exact Worker tags and returned `403` for both stable Workers.
 The supplementary compound count audit could not confirm its query result. A scalar-count query then verifies zero rows across all 27 store CI tables.
 
-Later private commands include `final-connector-ci.mjs`, `recover-final-store.mjs`, and `rerun-final-store.mjs` under `/tmp/minsky-t0021-operations/`.
+Later private commands include `final-connector-ci.mjs`, `recover-final-store.mjs`, `rerun-final-store.mjs`, and `recover-final-accounts.mjs --apply` under `/tmp/minsky-t0021-operations/`.
 They deploy only the pinned full CI target, recover only a journal-owned store fixture, and repeat the unchanged direct suites.
 No raw failed child output was printed or saved. The narrow diagnostic reports only case positions and error categories.
 
@@ -156,15 +158,19 @@ The hosted D1-only suites pass all 70 workflow cases and 82 account cases, with 
 
 Ordinary push and PR CI pass on `f6864f6`.
 The final public configuration, its test, and evidence also require ordinary CI. See [PR #43 checks](https://github.com/GiftedNovaHD/minsky/pull/43/checks) for that source's current result.
-The owner approved the exact T0021 protected branch entry. It is installed; protected final verification remains to run.
+The owner approved the exact T0021 protected branch entry. It is installed. The final protected result is recorded in PR #43.
 Ordinary push and PR checks also pass on final executable/configuration source `33e76b2`.
 That source passes all eight official hosted provider cases and the complete hosted UI case on CI Worker version `1e41f5ce-230e-4f4b-b270-659ecea85a73`.
 The final direct workflow attempt passes 69 cases and fails one; its cause is unconfirmed because private output was not retained.
 Atomic scoped recovery passes 17 ownership checks and 18 independent absence checks, then removes its journal.
 A complete unchanged repeat passes all 70 workflow cases. The following account run passes 75 cases and fails seven, including network and cleanup errors, with three journals retained.
-That account run is not a pass. Its recovery and further results are recorded in PR #43.
-The later authorization/evidence commit changes documentation only.
-Local hosted results do not replace that protected result.
+That account run is not a pass.
+Account recovery passes at 12:49:00 UTC. Two journals are already empty; the third retains only its marked records.
+Each recovery passes 30 atomic ownership guards and 23 final atomic and independent absence checks before journal removal.
+All 27 application tables are empty, foreign-key violations are zero, and shared IP counters are unchanged.
+This recovery does not diagnose the seven failures. Further repeats and the final protected result are recorded in PR #43.
+The authorization/evidence commits change documentation only.
+The latest protected result is linked from PR #43. Local hosted results do not replace it.
 Activation and subsequent automated stable deployment are not run. Both remain behind the explicit activation approval.
 
 ## 5. Manual verification steps
@@ -182,7 +188,7 @@ Verify a subsequent automated stable deployment too. These are pending steps, no
 
 ## 6. Risks
 
-Protected final verification and activation remain incomplete.
+Activation remains incomplete. Read the final protected result in PR #43; do not infer it from earlier local passes.
 Current access cannot read Workers Builds settings. The earlier owner confirmation remains historical evidence.
 The first stable activation has no earlier complete stable Worker. Repair must use verified candidate code with the stable configuration and preserve the stable secret.
 Two active Workers sharing these notifications could deliver hints to the wrong namespace. The activation procedure stops the candidate first.
@@ -197,7 +203,7 @@ AWS, GCP, Azure, Terraform, Docker packaging, and data migration tooling remain 
 ## 8. Documentation that needs updating
 
 The PR checks and description record the final ordinary CI result and source.
-Record protected results after the approved branch run completes.
-The current PR description records later local fixture recovery, repeats, and exact protected run results separately.
+The current PR description owns the final protected run link and result, separately from local hosted runs.
+This report records the completed local recovery and its limits.
 After approval and activation, record the approved main revision, stable namespace/version, and subsequent automated deployment.
 Current procedures state these pending gates explicitly.

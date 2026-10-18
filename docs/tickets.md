@@ -58,7 +58,7 @@ T0008 fuzzy team search merged into `main` in [PR #22](https://github.com/notbow
 ## T0021 Fresh Cloudflare development installation
 
 Branch: `feature/t0021-cloudflare-development-install`, from PR #42 head `2b6f6f0` in a separate worktree.
-Status: [Draft PR #43](https://github.com/GiftedNovaHD/minsky/pull/43) includes merged main at `104d9d1`. Fresh development and separate installation verification pass. The owner approved its exact protected branch entry. Protected final checks remain to run; activation still requires separate approval.
+Status: [PR #43](https://github.com/GiftedNovaHD/minsky/pull/43) includes merged main at `104d9d1`. Fresh development and separate installation verification pass. The owner approved its exact protected branch entry. Its current final verification result is recorded in the PR. Activation still requires separate approval.
 Summary: Prepare a fresh Cloudflare development installation and guarded deployment automation. Keep Supabase intact and active until the owner approves the concrete URL switch.
 
 The owner authorizes this ticket before PR #42 merges.

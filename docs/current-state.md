@@ -73,7 +73,8 @@ Final type, lint, both builds, Deno checks, and all 12 function cases pass too.
 The final source adds this configuration test, public configuration, and operational records.
 Its ordinary CI results are available in [PR #43 checks](https://github.com/GiftedNovaHD/minsky/pull/43/checks).
 The [run report](t0021-run-report.md) owns the full command and file lists.
-Activation, protected final verification, and a subsequent automated stable deployment remain incomplete.
+Activation and a subsequent automated stable deployment remain incomplete.
+The latest protected result is recorded separately in PR #43.
 
 ### Final executable verification and protected access
 
@@ -90,7 +91,12 @@ The complete unchanged workflow repeat then passes all 70 cases without skips.
 The following account run passes 75 cases and fails seven, retaining three fixture journals.
 The failures include network and cleanup errors. That account run is not a pass.
 The existing earlier 82-case pass remains evidence only for its recorded run.
-The follow-up recovery, any repeat, and protected final result are recorded in [PR #43](https://github.com/GiftedNovaHD/minsky/pull/43).
+The account-fixture recovery audit passes at 12:49:00 UTC.
+Two journals already have no remaining records. The third contains only its marked application and authentication records.
+Each recovery batch passes 30 atomic ownership guards and 23 final atomic and independent absence checks before journal removal.
+All 27 application tables are empty. Foreign-key violations are zero. Shared IP counters are unchanged.
+Recovery does not diagnose the seven test failures or turn that test run into a pass.
+The follow-up repeats and final protected result are recorded in [PR #43](https://github.com/GiftedNovaHD/minsky/pull/43).
 Protected verification uses the separately approved exact branch entry. It does not replace a local hosted result.
 The authorization and evidence update changes documentation only. Application code and final deployment configuration remain those tested on `33e76b2`.
 

@@ -2,6 +2,7 @@
 
 This page describes how the T0015 frontend is organized.
 It records the foundation (step 1 of T0015) and the three layouts that replaced the placeholders: the organiser phone app, the organiser desktop console and the contestant app.
+It also records the step 5 integration with `main` on 2026-10-18: the backend contracts and the T0009 jury rules.
 See [T0015](tickets.md#t0015--organiser-and-contestant-frontend-redesign) for scope and decisions.
 
 ## Stack
@@ -38,7 +39,7 @@ Always show a status with an icon or a label too. Do not use color alone.
 
 The redesigned screens use **Inter** for text and **JetBrains Mono** for timers.
 Both fonts come from `@fontsource-variable` packages and are part of the build. The app does not load fonts from a third-party server.
-The older workflow screens still use Public Sans from `public/fonts/`.
+The image preview page still uses Public Sans from `public/fonts/`, through `src/styles.css`.
 
 `src/lib/theme.ts` stores the light, dark or device theme choice in local storage.
 `applyTheme()` runs in `src/main.tsx` before the first render. `ThemeToggle` in `src/components/theme-toggle.tsx` lets a person change the theme.
@@ -52,7 +53,17 @@ Thus the older element rules, such as `button` and `input`, cannot change shadcn
 
 Do not put shadcn components inside a `.legacy-ui` element.
 No workspace screen uses `legacy-ui` any more. Only the image preview page (`src/connected/imagePreview.tsx`, `image-preview.html`) still uses it.
-Step 5 of T0015 removes the rules that the preview page does not use.
+The plan was that step 5 of T0015 removes the rules that the preview page does not use.
+This did not occur. On 2026-10-18, `src/styles.css` still has all 1,748 lines, and the Public Sans font in `public/fonts/` is still part of the build.
+The removal is a follow-up. Before you remove a rule, check the preview page in the browser.
+
+## Backend access
+
+The frontend does not call Supabase directly.
+Hooks, `SignIn`, `PasswordForm`, `useSessionAdmin` and `useIssueImages` call `requireBackend()` from `src/backend/index.ts`.
+That function returns the `Backend` from `src/backend/contracts.ts`, or it throws the setup message when `.env.local` has no public connection settings.
+The current implementation is in `src/backend/supabase/`. See [backend contracts](backend-contracts.md).
+The old `src/connected/client.ts` was removed on `main` and is not part of T0015.
 
 ## From sign-in to a UI
 
@@ -80,7 +91,7 @@ Each shell receives `ShellProps` from `src/connected/shell.ts`:
 
 | Prop | Meaning |
 | --- | --- |
-| `user` | The Supabase user. |
+| `user` | The `AccountIdentity` from `src/backend/contracts.ts`: `id`, with optional `email` and `name`. |
 | `username` | The organizer-assigned username, or `null` for an older email login. |
 | `data` | The `SessionData` from `useSessionSnapshot`. |
 | `changePassword()` | Opens the voluntary password change screen. |
@@ -93,10 +104,11 @@ Thus a pending request and the selected issue stay the same when the viewport ch
 
 All hooks are in `src/connected/hooks/`.
 They contain the data behavior that existed in `ConnectedApp.tsx` before T0015. The behavior did not change.
+Since the step 5 merge, they call the `Backend` contracts through `requireBackend()`.
 
 | Hook | Responsibility |
 | --- | --- |
-| `useAuthSession()` | Restores the stored session and follows sign-in and sign-out. Returns `user`, `loading`, `error` and `signOut`. |
+| `useAuthSession()` | Uses `requireBackend().auth`. Restores the stored session and follows sign-in and sign-out. Returns `user`, `loading`, `error` and `signOut`. |
 | `useAccountStatus(userId)` | Reads `account_status` every 10 seconds and on focus. Returns `account`, `error` and `recheck()`. |
 | `useSessionSnapshot(userId)` | Loads memberships, the session list and the selected snapshot. Reads run in sequence. A generation counter discards responses for an earlier session. It refreshes on Realtime changes, every 10 seconds, on focus and when the browser is online again. It clears the snapshot after an error. It records the server clock offset. |
 | `useCommand({ sessionId, refresh, onRecorded })` | Runs workflow commands one at a time. A second click while a command runs does nothing. After a transport failure, the command keeps its request UUID until `retry()`. A server rejection clears it. `onSuccess` clears the form before the refresh, including after a retry (T0012). |
@@ -149,15 +161,15 @@ Shared organiser parts are one level up, so the desktop console can use them:
 
 | File | Content |
 | --- | --- |
-| `organiserModel.ts` | Pure rules: tabs by role, jury-only visibility, queue chips, sort order, age tiers, hall and table from a location, issue number search, the allowed actions of an issue and its primary action. `organiserModel.test.ts` tests them. |
-| `components/issueDisplay.tsx` | Status badge (icon and label), place tile, unresolved timer, **Live**/**Reconnecting** badge and avatar. |
+| `organiserModel.ts` | Pure rules: tabs by role, jury-only visibility, the T0009 award lists (`awardLists`) and openable issues (`openableIssues`), queue chips, sort order, age tiers, hall and table from a location, issue number search, the allowed actions of an issue and its primary action. `organiserModel.test.ts` tests them. |
+| `components/issueDisplay.tsx` | Status badge (icon and label), place tile, unresolved timer, **Live** or **Reconnecting** badge, avatar and `AwardEvidence`. |
 | `components/IssueDetails.tsx` | Timers, lifecycle bar, owner, handoff banner, award receipt, resolution history and activity. |
 | `actions/IssueForms.tsx` | `ReplyForm`, `ResolveForm`, `EscalateForm`, `ReopenForm`, `AwardForm` and `ApplyForm`. Each form takes the issue, the `CommandRunner` and `onDone`. |
 | `actions/ReportForm.tsx` | Report for a team, with `TeamSearch`. |
 | `actions/OrganiserImages.tsx` | `ImageGallery`, `ImageUploadForm`, `ImagePreviewDialog` and `OrganiserImages`. They use `useIssueImages`. |
 | `actions/ActionSheet.tsx` | `ActionSheet` (a vaul bottom sheet with a **Cancel** button) and `CommandFeedback` (the command error and **Retry last request**). `showCancel` hides **Cancel** when the content has its own **Done** button. `onClosed` runs after the closing animation. |
-| `admin/adminModel.ts` | Pure admin rules: the username pattern, image limit bounds and steps, the membership draft (Staff or Team, roles, Admin), and the request bodies of `set_image_limits`, `manage_member` and the `admin` Edge Function. `adminModel.test.ts` tests them. |
-| `admin/useSessionAdmin.ts` | The admin requests: intake, image limits, create account, set username, membership, password reset and removal. One request runs at a time (a ref guard). It holds the error, the notice and the one-time credentials. A recorded request refreshes the snapshot. |
+| `admin/adminModel.ts` | Pure admin rules: the username pattern, image limit bounds and steps, the membership draft (Staff or Team, roles, Admin), and the request inputs for the `Backend` admin contract. `createAccountCommand`, `setUsernameCommand` and `resetPasswordCommand` build an `AccountCommand`. `membershipInput` builds a `MembershipInput`. `imageLimitsInput` builds the image limits. `adminModel.test.ts` tests them. |
+| `admin/useSessionAdmin.ts` | The admin requests through `requireBackend().admin`: intake, image limits, create account, set username, membership, password reset and removal. One request runs at a time (a ref guard). It holds the error, the notice and the one-time credentials. A recorded request refreshes the snapshot. |
 | `admin/SessionSettings.tsx` | `StatusCounts` (icon and label per status), `IntakeSwitch` and `ImageLimitsForm` (number fields with labelled − and + buttons). |
 | `admin/AccountForms.tsx` | `MembershipFields`, `CreateAccountForm`, `UsernameForm`, `MembershipForm` and `AssignByIdForm`. |
 | `admin/CredentialReveal.tsx` | The one-time username and temporary password, with copy buttons and **Done**. |
@@ -169,6 +181,7 @@ The admin parts take a `SessionAdmin` from `useSessionAdmin` or plain callbacks.
 These rules apply:
 
 - Tabs follow the combined roles. Volunteers and specialists get Queue, Mine, Find and Me. Jury members get Awards. A jury-only member sees resolved issues only, as before T0015. Admins also get Session.
+- The Awards tab shows the lists from `awardLists()`. See [Jury award lists](#jury-award-lists).
 - The queue chips map to the shared status filter of `useWorkflowState`. Waiting is `open`, Handoffs is `escalated` and Resolved is `resolved`. Every other value, including `all` and `claimed` after a reopen, shows All active.
 - Cards are sorted by unresolved time, longest first. The timer is neutral below 10 minutes, amber below 20 minutes and rose after that. A resolved issue stays neutral.
 - A recorded command selects its issue, so the issue view opens. An inline **Claim** or **Accept** on a card returns to the list. **Claim and go** opens the issue.
@@ -194,7 +207,7 @@ It uses the same hooks, rules and forms as the phone app. It adds no workflow ru
 | `QueuePages.tsx` | `QueuePage` (status cards, status tabs with counts, T0008 team filter, issue table), `MinePage`, `HandoffsPage`, `TeamsPage` and the shared `PageHeader`. |
 | `IssueTable.tsx` | `IssueTable` (number, status with icon and label, report and category, team and location, owner, aging timer, **Claim** or **Accept**) and `StatCards`. |
 | `IssueSheet.tsx` | The issue side sheet: timer cards, owner, lifecycle steps with times, handoff banner, actions, the Activity, Images and Outcome & award tabs and the reply composer. |
-| `AwardReviewPage.tsx` | Resolved issues in three lists: To decide, To apply and Applied. Each card has the award form or the confirmation form. |
+| `AwardReviewPage.tsx` | The lists from `awardLists()`: To decide, To apply and Applied. Each card shows `AwardEvidence` and has the award form or the confirmation form. |
 | `AdminPages.tsx` | `OverviewPage`, `AccountsPage` (table, filter, **Create account** and **Manage** dialogs with the one-time credentials) and `SettingsPage` (intake, image limits, categories). |
 | `consoleModel.ts` | Pure rules: pages by role, sidebar counts, queue tabs, status card numbers, category counts, award totals, owner workload and palette search. `consoleModel.test.ts` tests them. |
 | `consoleProps.ts` | `ConsolePageProps`, which every page receives, and the heading id. |
@@ -219,16 +232,48 @@ These rules apply:
 - The intake switch in the sidebar and the admin pages share one `useSessionAdmin`, so one admin request runs at a time. Admin errors and notices show at the top of the page and in the open dialog.
 - The sidebar choice (expanded or collapsed) is kept in local storage under `minsky:console-sidebar`.
 
+## Jury award lists
+
+T0009 added a separate jury worklist on `main`. See [the worklist specification](jury-worklist.md).
+The step 5 merge moved its rules into the phone Awards tab (`AwardsTab` in `PhoneTabs.tsx`) and the desktop `AwardReviewPage`.
+The legacy `src/connected/JuryWorklist.tsx` and its styles were removed.
+
+`awardLists(state)` in `organiserModel.ts` uses `juryWorklists()` from `src/connected/jury.ts`. It gives three lists:
+
+- **To decide**: resolved issues without an award, oldest resolution first.
+- **To apply**: every award that waits for external application, oldest decision first. This includes zero-minute awards and awards on reopened issues.
+- **Applied**: resolved issues with an applied award, latest confirmation first.
+
+These rules apply:
+
+- `AwardEvidence` shows the resolution summary of the award, the resolver and the time.
+  When an issue with an award is not resolved, it shows a **Reopened** badge with the current status.
+  When the award resolution was reopened, it also shows "This award relates to an earlier resolution."
+- `openableIssues(state, member)` adds reopened issues with a pending award for a jury-only member. Thus that member can open the issue and confirm the application.
+  The ordinary queue of a jury-only member still shows resolved issues only.
+- The T0015 design differs from `docs/jury-worklist.md` in two ways.
+  The desktop award and confirmation forms stay on the Award review cards.
+  There is no separate **Jury worklist** sidebar entry and no **Back to jury worklist** button. The Award review page and the Awards tab are the worklist.
+
 ## Root elements
 
 The root element of each layout has `data-ui="contestant"`, `data-ui="organiser-phone"` or `data-ui="organiser-desktop"`.
 `tests/ui-selection.spec.ts` uses this attribute to check the UI selection. Keep it on the root element of each layout.
 
 Put components that both organiser layouts use in `src/organiser/`.
-Keep `IssueImages`, `TeamSearch`, `teamSearch.ts`, `model.ts`, `client.ts` and the image modules. Restyle them only.
+Keep `IssueImages`, `TeamSearch`, `teamSearch.ts`, `model.ts`, `jury.ts` and the image modules. Restyle them only.
 The legacy workspace (`src/connected/legacy/`) was removed with the desktop console.
 
 ## Local checks
 
 `npm run dev` and `npm run test:e2e` need a development build of React.
 If your shell sets `NODE_ENV=production`, unset it first. Otherwise the page stays blank with the error `$RefreshReg$ is not defined`.
+
+Playwright 1.64 needs its matching Chromium build. If the default browser folder is not writable, set `PLAYWRIGHT_BROWSERS_PATH` to a writable folder and install Chromium there:
+
+```sh
+export PLAYWRIGHT_BROWSERS_PATH="$HOME/.cache/ms-playwright"
+npx playwright install chromium
+```
+
+`npm run build` reports a warning: the main JavaScript chunk is about 511 kB, above the 500 kB warning limit. The build still passes. Code splitting is a follow-up.

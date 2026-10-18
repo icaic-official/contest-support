@@ -1,6 +1,8 @@
 # Minsky frontend redesign: concepts and directions
 
-Status: **direction chosen, not implemented** (2026-10-17). See [section 6](#6-chosen-direction-2026-10-17).
+Status: **direction chosen (2026-10-17) and implemented in T0015 (2026-10-18)** on `feature/t0015-frontend-redesign`. The PR is not merged yet. See [section 6](#6-chosen-direction-2026-10-17).
+This file is the design record. [Frontend architecture](../../docs/frontend-architecture.md) describes the implemented code.
+Sections 1 to 5 describe the app before T0015 and the proposals at that time.
 The mockups use fictional sample data. They do not connect to Supabase.
 
 ## 1. What the app does today
@@ -109,6 +111,8 @@ Use a combination. Each direction solves a different problem, and the same compo
 
 ## 6. Chosen direction (2026-10-17)
 
+Implemented on 2026-10-18 in T0015, together with a separate organiser desktop console. See [frontend architecture](../../docs/frontend-architecture.md) and [How the open decisions were resolved](#how-the-open-decisions-were-resolved).
+
 The user chose **A (shadcn/ui console) combined with D (phone-first field mode)**:
 
 - **Organisers use phones.** Volunteers, specialists, jury members and session admins open Minsky in a phone browser.
@@ -153,9 +157,20 @@ The account type selects the UI after sign-in. A membership with `team_id` gets 
 3. **Category descriptions and icons** on the contestant tiles. Categories are plain strings today. Proposed: use a generic icon and no description until a category editor exists.
 4. **Mockup items that need new data** stay out of scope: "Near me" or the helper's zone, quick replies, a floor map, and configurable aging thresholds.
 
+### How the open decisions were resolved
+
+The user and the T0015 ticket settled the four open decisions on 2026-10-17:
+
+1. **Organisers on a desktop or tablet** get a separate desktop console in the style of `a-console.html` at 1024 px and wider. The centred column was not built. Below 1024 px, organisers get the phone app.
+2. **Contestants on a phone** get no phone layout. The contestant app is a desktop layout and needs a window at least 1024 px wide. The single-column fallback was not built.
+3. **Category tiles** show the category name and one generic icon, with no description. The category data did not change.
+4. **Mockup items that need new data** stay out of scope: "Near me" or helper zones, quick replies, a floor map, configurable aging thresholds, and category icons or descriptions.
+
+The step 5 integration also moved the T0009 jury worklist into the phone **Awards** tab and the desktop **Award review** page. See [frontend architecture](../../docs/frontend-architecture.md#jury-award-lists).
+
 ### Proposed implementation split
 
-The work is too large for one change. Proposed chats, all on one ticket branch:
+The work is too large for one change. Proposed chats, all on one ticket branch. The work followed this split. The desktop console became an extra step 4 (step 2b), and integration became step 5. See [T0015](../../docs/tickets.md#t0015--organiser-and-contestant-frontend-redesign).
 
 1. **Foundation:** Tailwind v4, shadcn/ui setup, design tokens, split `ConnectedApp.tsx` into data hooks, sign-in and password screens, and selection of the UI by account type.
 2. **Organiser app:** tabs, queue, issue view, sheets, find, awards, session admin. This step can split further.

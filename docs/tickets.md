@@ -2,9 +2,10 @@
 
 These tickets describe development work, not contestant issues.
 
-The frontend redesign [T0015 organiser and contestant frontend redesign](#t0015--organiser-and-contestant-frontend-redesign) is in progress on its own branch.
+The frontend redesign [T0015 organiser and contestant frontend redesign](#t0015--organiser-and-contestant-frontend-redesign) is in progress on its own branch. Step 5, integration, merged current `main` on 2026-10-18.
 The active connector ticket is [T0020 complete Cloudflare connector](#t0020-complete-cloudflare-connector).
 The owner also authorized [T0009 jury worklist maintenance](#t0009--jury-worklist) in parallel on its existing PR branch.
+T0009 merged into `main` in [PR #23](https://github.com/GiftedNovaHD/minsky/pull/23) at `c144a2a` on 2026-10-18.
 The two checkouts and scopes remain separate. Supabase remains active.
 PR #41 merged the shared server workflow at `7d19b00` on 2026-10-18.
 Migration tooling and backend cutover remain outside both current tasks.
@@ -26,6 +27,15 @@ Status: Current state, with the PR and merge revision when merged.
 Summary: One or two sentences that state the goal and result.
 
 Optional sections describe scope, behavior, decisions, and exclusions.
+
+### Integration decision for T0009 (2026-10-18)
+
+T0009 merged into `main` with a separate **Jury worklist** screen. The T0015 integration did not keep that screen.
+Its rules moved into the phone **Awards** tab and the desktop **Award review** page, through `awardLists()`, `openableIssues()` and `AwardEvidence`.
+The lists are To decide, To apply and Applied. They keep the T0009 eligibility and order rules, including zero-minute awards and pending awards on reopened issues.
+A jury-only member can open a reopened issue that has a pending award.
+The design differs from [the T0009 specification](jury-worklist.md) in two ways: the desktop award and confirmation forms stay on the Award review cards, and there is no **Jury worklist** sidebar entry or **Back to jury worklist** button.
+See [frontend architecture](frontend-architecture.md#jury-award-lists).
 
 ### Acceptance criteria
 
@@ -880,7 +890,8 @@ No schema, backend feature, provider implementation, or runtime dependency is pa
 ## T0015 — Organiser and contestant frontend redesign
 
 Branch: `feature/t0015-frontend-redesign`, from updated `main` at `aaa6bbc`.
-Status: design accepted. Implementation is in progress across several chats. The user reviews and merges the PR.
+Status: design accepted. Steps 1 to 4 are implemented. Step 5, integration, is in progress across several chats. The user reviews and merges the PR.
+This ticket is different from [T0015 shared provider tests](#t0015-shared-provider-tests) from PR #37. The two records share the ticket number. Keep their anchors separate.
 
 ### Progress
 
@@ -889,7 +900,11 @@ Status: design accepted. Implementation is in progress across several chats. The
 - [x] **Step 2a follow-up, redesigned Session tab (2026-10-18).** The admin Session tab uses shadcn/ui. It has status counts, the intake switch, image limits with steppers, the account list, a new account sheet with the one-time credential screen, and an account sheet for the username, membership, password reset and access removal. Reset and removal need confirmation. The request logic is in `useSessionAdmin` and the forms are in `src/organiser/admin/`, so the desktop console can use them. See [frontend architecture](frontend-architecture.md#organiser-phone-app).
 - [x] **Step 3, contestant desktop app (2026-10-17).** `ContestantApp` no longer uses the legacy workspace. It has a top bar, the team's reports, an issue page with a live timer and a four-step tracker, an inline reopen form, an award card, chat messages, team-visible images and a report form with category tiles. See [frontend architecture](frontend-architecture.md#contestant-app). The Playwright test `team-search.spec.ts` "a refreshed contestant membership drops the hidden staff team filter" and the cloud specs `journey.spec.ts` and `attachments.spec.ts` still use the old contestant selectors. Step 5 updates them.
 - [x] **Step 4 (step 2b), organiser desktop console (2026-10-18).** `OrganiserDesktopConsole` no longer uses the legacy workspace. It has a collapsible sidebar with the session switcher, pages by role, the intake switch and the person menu. The top bar has the breadcrumb, the ⌘K command palette, **Live** or **Reconnecting** and the theme menu. It has the queue with status cards, tabs, the team filter and a data table, an issue side sheet with a two-mode composer, Award review, Overview, Accounts and Session settings. `src/connected/legacy/` is deleted. See [frontend architecture](frontend-architecture.md#organiser-desktop-console). With this step, 11 local Playwright tests fail because they use the old desktop selectors (`.issue-list .issue-card`, the old reply and membership forms): all 6 tests in `team-search.spec.ts` and all 5 tests in `workspace-refresh.spec.ts`. The cloud specs `journey.spec.ts` and `attachments.spec.ts` use the old desktop selectors too. Step 5 updates them.
-- [ ] Step 5, integration: Playwright selectors, documentation and the PR.
+- [ ] **Step 5, integration (started 2026-10-18).** Parallel chats share the ticket branch:
+  - [x] Merge of `main` at `069b249`. The UI uses `requireBackend()` and the `Backend` contracts. `src/connected/client.ts` was removed on `main`. The T0009 rules are in the phone Awards tab and the desktop Award review page. Local lint, type checking, build, `npm run check:functions` and 346 unit and database tests passed. 27 mocked browser tests passed and 20 failed on old selectors. See [current state](current-state.md#t0015-frontend-redesign-integration-2026-10-18).
+  - [x] Documentation for the redesigned UIs (2026-10-18): README, frontend architecture, current state, manual verification, product direction, the design record and the T0009 note.
+  - [ ] Playwright selector updates: jury specs and the local journey, team search and refresh specs, and the cloud specs.
+  - [ ] Visual pass and the PR.
 
 The user requested a complete frontend redesign on 2026-10-17.
 They reviewed four mockup directions in [`design/redesign/`](../design/redesign/README.md).
@@ -915,11 +930,21 @@ They chose direction A (shadcn/ui console) combined with direction D (phone-firs
 - [ ] The organiser phone app works at 390 px wide with keyboard and touch. Every gesture has a button alternative.
 - [ ] The organiser desktop console and the contestant desktop app work at 1280 px wide.
 - [ ] Build, lint, type checking, unit tests and the Playwright journey pass. Selectors are updated for the new UI.
-- [ ] README and `docs/` describe the new UI. `docs/manual-verification.md` covers both UIs.
+- [x] README and `docs/` describe the new UI. `docs/manual-verification.md` covers both UIs. Documentation updated on 2026-10-18.
 - [ ] The user reviews and merges the pull request. Deployment remains a separate step.
+
+### Verification
+
+To be recorded by the final step: the Playwright results after the selector updates, the browser and visual checks at 390 × 844 and 1280 × 800 in both themes, and the PR checks.
+`npm run test:cloud` cannot run in the Lapiz environment because it has no cloud credentials.
 
 ### Risk
 
-Open PRs for T0006, T0007, T0009 and T0014 change `src/connected/`.
-Whichever merges second needs conflict resolution.
+T0009 and T0014 merged into `main`, and step 5 resolved their conflicts.
+If the T0006 and T0007 PRs are still open, they can change `src/connected/`. Whichever merges second needs conflict resolution.
+
+### Follow-up candidates
+
+- Remove the legacy rules in `src/styles.css` that the image preview page does not use, or restyle the preview page with Tailwind.
+- Split the main JavaScript chunk to remove the build warning.
 

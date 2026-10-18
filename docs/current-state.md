@@ -2,6 +2,82 @@
 
 The newest record appears first. Older sections describe their own revisions and targets.
 
+## T0015 frontend redesign integration (2026-10-18)
+
+Step 5 of T0015 is on `feature/t0015-frontend-redesign`. It is not merged or deployed.
+The user reviews and merges the PR. Deployment is a separate explicit step.
+See [T0015](tickets.md#t0015--organiser-and-contestant-frontend-redesign) and [frontend architecture](frontend-architecture.md).
+
+This ticket is the frontend redesign. It is a different record from [T0015 shared provider tests](tickets.md#t0015-shared-provider-tests) from PR #37.
+The two records share the ticket number. Their anchors stay separate.
+
+### Implemented capabilities
+
+After sign-in, the membership selects the UI:
+
+- A team membership gets the **contestant desktop app**. It has the team's reports, an issue page with a live unresolved timer and a four-step tracker, resolution cards, an inline reopen form, an award card, chat messages, team-visible images and a report form with category tiles.
+- Other memberships below 1024 px get the **organiser phone app**. It has bottom tabs by role: Queue, Mine, Find, Awards, Session for admins, and Me. Issues open in a full-screen view with a bottom action bar and sheets.
+- Other memberships at 1024 px and wider get the **organiser desktop console**. It has a collapsible sidebar, a ⌘K command palette, a queue table with status cards and tabs, an issue side sheet with a public or internal composer, Award review, Teams & tables, Overview, Accounts and Session settings.
+
+All three UIs use shadcn/ui, Tailwind CSS v4, the same data hooks and light and dark themes.
+The organiser layouts share the action forms, the admin forms and the rules in `src/organiser/organiserModel.ts`.
+
+### Merge of `main`
+
+The integration merged `origin/main` into the branch. The merge commit is `069b249`.
+That merge brought T0009 jury worklist (PR #23), the T0014 backend contracts in `src/backend/`, the T0016 to T0019 Cloudflare work and Playwright 1.64.
+
+- The hooks, sign-in, password change, `useSessionAdmin` and `useIssueImages` use `requireBackend()` and the `Backend` contracts. `src/connected/client.ts` was removed on `main`.
+- `ShellProps.user` is an `AccountIdentity`.
+- The admin model builds `AccountCommand` and `MembershipInput` values.
+- The T0009 rules are in the phone Awards tab and the desktop Award review page, through `awardLists()`, `openableIssues()` and `AwardEvidence`. The legacy `src/connected/JuryWorklist.tsx` was removed.
+- `deno.lock` workspace dependencies were synced with the new frontend packages.
+
+### Local checks recorded by the integration chat
+
+The integration chat recorded these results at the merge revision:
+
+- `npm run lint`, `npm run typecheck` and `npm run check:functions` passed.
+- `npm run build` passed with one warning: the main JavaScript chunk is about 511 kB, above the 500 kB warning limit.
+- `npm test` passed 346 tests.
+- `npm run test:e2e` passed 27 tests and failed 20 tests. The failures use selectors of the old UI. Parallel step 5 chats update them.
+- `npm run test:cloud` was not run. No cloud credentials exist in the Lapiz environment.
+
+### Verification
+
+To be recorded by the final step: the Playwright results after the selector updates, the browser and visual checks at 390 × 844 and 1280 × 800 in both themes, and the PR checks.
+
+### Limitations
+
+- The contestant app has no phone layout. It needs a window at least 1024 px wide.
+- The organiser desktop console needs a window at least 1024 px wide. Narrower windows get the phone app.
+- Mockup items that need new data are out of scope: "Near me" and helper zones, quick replies, a floor map, configurable aging thresholds, and category icons and descriptions. Category tiles use one generic icon.
+- `npm run build` reports the chunk-size warning above. Code splitting is not done.
+- `src/styles.css` still holds all legacy styles (1,748 lines), with the Public Sans font. Only the image preview page uses them, inside `.legacy-ui`. Step 5 did not remove the unused rules. This is follow-up work.
+- The T0015 design differs from [the T0009 specification](jury-worklist.md) in two ways. The desktop award and confirmation forms stay on the Award review cards. There is no separate **Jury worklist** sidebar entry and no **Back to jury worklist** button.
+- The ticket number T0015 is also used by the earlier shared provider tests record.
+
+## T0015 organiser desktop console (2026-10-18)
+
+Step 4 (step 2b) of T0015 is on `feature/t0015-frontend-redesign` at `4bad47d`. It is not merged or deployed.
+At 1024 px and wider, organisers get the console from `a-console.html` instead of the legacy workspace.
+It reuses the phone app forms, `useSessionAdmin` and the shared rules. `consoleModel.ts` holds the page, tab, count and search rules and has unit tests.
+`src/connected/legacy/` was deleted.
+See [frontend architecture](frontend-architecture.md#organiser-desktop-console).
+
+After this step, 11 mocked browser tests failed because they used the old desktop selectors: all 6 tests in `team-search.spec.ts` and all 5 tests in `workspace-refresh.spec.ts`.
+The cloud specs `journey.spec.ts` and `attachments.spec.ts` also used the old desktop selectors. Step 5 updates them.
+Protected cloud tests and hosted checks were not run.
+
+## T0015 contestant desktop app (2026-10-17)
+
+Step 3 of T0015 is on `feature/t0015-frontend-redesign`. It is not merged or deployed.
+Team accounts get the contestant app from `f-contestant-desktop.html` instead of the legacy workspace.
+It shows only public history and team-visible images. `contestantView.ts` holds the pure view rules and has unit tests.
+See [frontend architecture](frontend-architecture.md#contestant-app).
+
+After this step, one mocked browser test in `team-search.spec.ts` and the cloud specs `journey.spec.ts` and `attachments.spec.ts` still used the old contestant selectors. Step 5 updates them.
+
 ## T0015 Session tab (2026-10-18)
 
 The step 2a follow-up of T0015 is on `feature/t0015-frontend-redesign`. It is not merged or deployed.

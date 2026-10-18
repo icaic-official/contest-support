@@ -54,8 +54,9 @@ export function workflowText(value: string): string {
   return value.replace(/^ +| +$/g, '');
 }
 function validText(value: unknown): value is string {
-  return typeof value === 'string' && Array.from(workflowText(value)).length >= 1 &&
-    Array.from(workflowText(value)).length <= 2000;
+  if (typeof value !== 'string') return false;
+  const length = Array.from(workflowText(value)).length;
+  return length >= 1 && length <= 2000;
 }
 
 /** Keep original text and additional JSON fields for receipt equality. */

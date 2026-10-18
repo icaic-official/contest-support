@@ -138,3 +138,7 @@ The rejected deployment left the prior Worker active.
 The owner selected subscription activation later. No paid upgrade occurred.
 The committed configuration retains the bounded CPU setting for verification after activation.
 The earlier successful HTTP runs do not establish dependable operation on Free.
+
+During PR #41 review, the owner requested completion of this verification and started Workers Paid activation.
+The 1,000 ms cap and maintained password parameters remain unchanged.
+Activation and a passing hosted run must precede a verified result.

@@ -25,7 +25,7 @@
 **T0019 shared server workflow, 2026-10-18.** Use `feature/t0019-shared-server-workflow` from updated `main` at `0c797ad`.
 The owner authorized this extraction while PR #40 was open. The branch started independently of its authentication branch.
 PR #40 merged at `68e8642` on 2026-10-17 at 17:16:41 UTC. This branch now includes that updated `main`.
-Preserve the merged authentication implementation. T0019 changes only the shared issue workflow and its adapters.
+Preserve the merged authentication behavior. The owner also requested code cleanup and completion of its hosted verification during PR #41 review.
 PR #39 merged the bounded D1 transaction proof.
 Extract the existing nine issue commands into one provider-independent server service.
 Verify an actual trusted Supabase execution path with isolated fictional CI fixtures before expanding D1 workflow persistence.
@@ -36,7 +36,7 @@ Keep Supabase active and its legacy browser path available during replacement ve
 Do not deploy to the development backend without the required authorization.
 The owner reviews and merges. Bounded subagent work is authorized.
 PR #40's hosted HTTP check remains incomplete after a Workers Free resource limit.
-Workers Paid remains deferred. Do not enable a subscription.
+The owner is activating Workers Paid. Wait for confirmation before deploying the isolated authentication Worker and repeating hosted checks.
 Full D1 workflow persistence, R2, notification delivery, migration tooling, AWS, and Terraform remain later work.
 Do not export real data, reset real accounts, or switch backends.
 
@@ -49,7 +49,8 @@ Keep Supabase active. The complete connector, real-account migration, exports, a
 Use local development databases and the separate hosted `minsky-auth-ci` database.
 The owner approved adding only `feature/t0018-cloudflare-authentication` to the existing `cloud-test` branch allowlist on 2026-10-18. Preserve the other entries and protection rules.
 Measured password CPU exceeds Workers Free's allowance. The protected HTTP check hit a runtime resource limit.
-The owner deferred the paid subscription on 2026-10-18. Keep that check incomplete until Workers Paid is active and verification passes.
+The owner initially deferred the paid subscription on 2026-10-18, then started activation during PR #41 review.
+Keep that check incomplete until Workers Paid is active and verification passes.
 The configuration requests a 1,000 ms CPU cap. Free rejects it with error `100328`. No paid upgrade occurred.
 The owner reviewed and merged T0018. Bounded subagent work remains authorized within the active ticket.
 

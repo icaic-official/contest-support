@@ -1,5 +1,5 @@
 import type { ApplicationStore, Caller, CommandResult, IssueCommand, IssueView } from "../../applicationStore";
-import { WorkflowService, workflowText } from "../../workflow.ts";
+import { WorkflowService } from "../../workflow.ts";
 import type { WorkflowPersistence, WorkflowRead, WorkflowDecision, WorkflowCommitResult } from "../../workflow.ts";
 import type { Command, Role } from "../../../connected/model.ts";
 import type { D1Connection } from "./connection";
@@ -21,9 +21,6 @@ interface State {
   session_version: number;
   event_version: number;
   archived: number;
-  staff: number;
-  support: number;
-  can_message: number;
   sequence: number;
   history: string;
   receipt_command: string | null;
@@ -39,9 +36,6 @@ const stateSql = `
     i.public_revision, i.write_version, a.access_version, l.version AS login_version,
     m.version AS membership_version, s.version AS session_version, e.version AS event_version,
     e.archived,
-    (m.is_admin = 1 OR EXISTS (SELECT 1 FROM membership_roles r WHERE r.session_id = m.session_id AND r.account_id = a.id)) AS staff,
-    EXISTS (SELECT 1 FROM membership_roles r WHERE r.session_id = m.session_id AND r.account_id = a.id AND r.role IN ('volunteer', 'specialist')) AS support,
-    (m.team_id IS NOT NULL OR EXISTS (SELECT 1 FROM membership_roles r WHERE r.session_id = m.session_id AND r.account_id = a.id)) AS can_message,
     COALESCE((SELECT sequence FROM audience_sequences q WHERE q.session_id = s.id AND q.audience = CASE
       WHEN m.is_admin = 1 OR EXISTS (SELECT 1 FROM membership_roles r WHERE r.session_id = m.session_id AND r.account_id = a.id)
       THEN 'staff' ELSE 'team:' || m.team_id END), 0) AS sequence,
@@ -113,50 +107,50 @@ export class D1ApplicationStore implements ApplicationStore, WorkflowPersistence
       if (!current || current.archived) return { outcome: "rejected", reason: "access" };
       return { outcome: "committed", issueId: read.receipt.issueId };
     }
-      const at = new Date().toISOString();
-      const assertionId = crypto.randomUUID();
-      const visible = decision.history.visibility === "public";
-      const audiences = visible ? ["staff", `team:${state.team_id}`] : ["staff"];
-      const prepare = (sql: string, ...values: Array<string | number | null>) => this.db.prepare(sql).bind(...values);
-      const statements = [
-        // Reserve first. A failed assertion must also roll back this receipt.
-        prepare("INSERT INTO command_receipts (actor, request_id, session_id, command, issue_id) VALUES (?, ?, ?, ?, ?)", caller.accountId, requestId, sessionId, canonical, state.issue_id),
-        prepare(`INSERT INTO command_assertions (id, valid) VALUES (?, CASE WHEN EXISTS (
-          SELECT 1 FROM (${stateSql}) current WHERE current.archived = 0
-            AND current.access_version = ? AND current.login_version = ? AND current.membership_version = ?
-            AND current.session_version = ? AND current.event_version = ? AND current.write_version = ?
-        ) THEN 1 ELSE 0 END)`, assertionId, caller.loginId, sessionId, state.issue_id, requestId, caller.accountId,
-          state.access_version, state.login_version, state.membership_version, state.session_version, state.event_version, state.write_version),
-        prepare(`UPDATE issues SET status = ?, owner = ?, first_assigned_at = ?,
-          public_revision = public_revision + ?, write_version = write_version + 1 WHERE id = ? AND write_version = ?`,
-          decision.issue?.status ?? state.status,
-          decision.issue?.owner ?? state.owner,
-          command.type === "claim" ? (state.first_assigned_at ?? at) : state.first_assigned_at,
-          visible ? 1 : 0, state.issue_id, state.write_version),
-        prepare("INSERT INTO command_assertions (id, valid) VALUES (?, CASE WHEN changes() = 1 THEN 1 ELSE 0 END)", `${assertionId}:write`),
-        prepare("INSERT INTO history (id, issue_id, actor, at, text, visibility) VALUES (?, ?, ?, ?, ?, ?)", crypto.randomUUID(), state.issue_id, caller.accountId, at,
-          workflowText(decision.history.text), decision.history.visibility),
-      ];
-      for (const audience of audiences) {
-        statements.push(
-          prepare(`INSERT INTO audience_sequences (session_id, audience, sequence) VALUES (?, ?, 1)
-            ON CONFLICT (session_id, audience) DO UPDATE SET sequence = sequence + 1`, sessionId, audience),
-          prepare(`INSERT INTO notifications (id, session_id, audience, sequence)
-            SELECT ?, session_id, audience, sequence FROM audience_sequences WHERE session_id = ? AND audience = ?`, crypto.randomUUID(), sessionId, audience),
-        );
+    const at = new Date().toISOString();
+    const assertionId = crypto.randomUUID();
+    const visible = decision.history.visibility === "public";
+    const audiences = visible ? ["staff", `team:${state.team_id}`] : ["staff"];
+    const prepare = (sql: string, ...values: Array<string | number | null>) => this.db.prepare(sql).bind(...values);
+    const statements = [
+      // Reserve first. A failed assertion must also roll back this receipt.
+      prepare("INSERT INTO command_receipts (actor, request_id, session_id, command, issue_id) VALUES (?, ?, ?, ?, ?)", caller.accountId, requestId, sessionId, canonical, state.issue_id),
+      prepare(`INSERT INTO command_assertions (id, valid) VALUES (?, CASE WHEN EXISTS (
+        SELECT 1 FROM (${stateSql}) current WHERE current.archived = 0
+          AND current.access_version = ? AND current.login_version = ? AND current.membership_version = ?
+          AND current.session_version = ? AND current.event_version = ? AND current.write_version = ?
+      ) THEN 1 ELSE 0 END)`, assertionId, caller.loginId, sessionId, state.issue_id, requestId, caller.accountId,
+        state.access_version, state.login_version, state.membership_version, state.session_version, state.event_version, state.write_version),
+      prepare(`UPDATE issues SET status = ?, owner = ?, first_assigned_at = ?,
+        public_revision = public_revision + ?, write_version = write_version + 1 WHERE id = ? AND write_version = ?`,
+        decision.issue?.status ?? state.status,
+        decision.issue?.owner ?? state.owner,
+        command.type === "claim" ? (state.first_assigned_at ?? at) : state.first_assigned_at,
+        visible ? 1 : 0, state.issue_id, state.write_version),
+      prepare("INSERT INTO command_assertions (id, valid) VALUES (?, CASE WHEN changes() = 1 THEN 1 ELSE 0 END)", `${assertionId}:write`),
+      prepare("INSERT INTO history (id, issue_id, actor, at, text, visibility) VALUES (?, ?, ?, ?, ?, ?)", crypto.randomUUID(), state.issue_id, caller.accountId, at,
+        decision.history.text, decision.history.visibility),
+    ];
+    for (const audience of audiences) {
+      statements.push(
+        prepare(`INSERT INTO audience_sequences (session_id, audience, sequence) VALUES (?, ?, 1)
+          ON CONFLICT (session_id, audience) DO UPDATE SET sequence = sequence + 1`, sessionId, audience),
+        prepare(`INSERT INTO notifications (id, session_id, audience, sequence)
+          SELECT ?, session_id, audience, sequence FROM audience_sequences WHERE session_id = ? AND audience = ?`, crypto.randomUUID(), sessionId, audience),
+      );
+    }
+    statements.push(prepare("DELETE FROM command_assertions WHERE id IN (?, ?)", assertionId, `${assertionId}:write`));
+    try {
+      await this.db.batch(statements);
+      return { outcome: "committed", issueId: state.issue_id };
+    } catch (error) {
+      // Only known SQLite rollbacks permit reevaluation. Transport failures stay unknown.
+      const message = error instanceof Error ? error.message : "";
+      if (!message.includes("CHECK constraint failed: valid = 1") &&
+          !message.includes("UNIQUE constraint failed: command_receipts.actor, command_receipts.request_id")) {
+        return { outcome: "unknown" };
       }
-      statements.push(prepare("DELETE FROM command_assertions WHERE id IN (?, ?)", assertionId, `${assertionId}:write`));
-      try {
-        await this.db.batch(statements);
-        return { outcome: "committed", issueId: state.issue_id };
-      } catch (error) {
-        // Only known SQLite rollbacks permit reevaluation. Transport failures stay unknown.
-        const message = error instanceof Error ? error.message : "";
-        if (!message.includes("CHECK constraint failed: valid = 1") &&
-            !message.includes("UNIQUE constraint failed: command_receipts.actor, command_receipts.request_id")) {
-          return { outcome: "unknown" };
-        }
-        return { outcome: "retry" };
-      }
+      return { outcome: "retry" };
+    }
   }
 }

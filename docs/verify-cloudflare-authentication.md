@@ -45,9 +45,10 @@ The database name must be `minsky-auth-ci`. Stop if any value differs.
 Development uses local databases. Neither the active Supabase projects nor the earlier D1 proof database is this target.
 
 The committed Worker configuration requests a 1,000 ms CPU cap per request.
-Cloudflare requires Workers Paid for that setting. The current account remains on Free by owner choice.
+Cloudflare requires Workers Paid for that setting.
 The protected D1 cases pass, but a protected password-change request exceeded runtime resources.
 Before deploying the Worker, activate the selected paid plan through an authorized account owner.
+The owner started activation during PR #41 review. Confirm completion before deployment.
 On Free, deployment fails with error `100328`. Do not reduce password cost to bypass that requirement.
 
 Only authorized maintainers apply schema or deploy this isolated CI Worker:

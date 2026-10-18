@@ -39,6 +39,8 @@ Record observed results in [current state](current-state.md).
 
 Expect every command to exit with code zero.
 Local tests include shared decisions, orchestration, Supabase commit guards, and the bounded D1 path.
+Two regression cases expire a login during a commit statement, before its final access check.
+Both new writes and receipt replays must fail without changing workflow records.
 Embedded PostgreSQL uses isolated in-process data.
 Local D1 uses Wrangler with remote bindings disabled.
 These checks do not establish hosted Supabase or hosted D1 results.
@@ -66,20 +68,26 @@ These checks do not establish hosted Supabase or hosted D1 results.
    npx supabase migration fetch --workdir "$workflow_ci_dir"
    ```
 
-4. If the new migration is absent remotely, copy it and inspect the proposed change.
+4. Copy the shared workflow migrations that are absent remotely.
+   Keep the fetched source for each migration that is already installed.
+   For an empty target, copy both files:
 
    ```sh
    cp supabase/migrations/202610180001_shared_workflow.sql "$workflow_ci_dir/supabase/migrations/"
+   cp supabase/migrations/202610180002_shared_workflow_expiry.sql "$workflow_ci_dir/supabase/migrations/"
    npx supabase db push --workdir "$workflow_ci_dir" --dry-run
    ```
 
-5. If the dry run lists only `202610180001_shared_workflow.sql`, apply that migration.
+   The existing CI target needs only `202610180002_shared_workflow_expiry.sql`.
+   The first migration remains unchanged from its installed source.
+
+5. If the dry run lists only the expected missing workflow migrations, apply them.
 
    ```sh
    npx supabase db push --workdir "$workflow_ci_dir" --yes
    ```
 
-6. If the migration already exists remotely, retain its recorded source and verify its equivalence before continuing.
+6. Verify that each installed workflow migration matches its repository source.
 7. Deploy the inspected function source from the repository checkout to that CI project.
 
    ```sh

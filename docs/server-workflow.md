@@ -91,6 +91,8 @@ The RPCs accept trusted server decisions. They are not browser mutation APIs.
 
 PostgreSQL retains atomic writes, foreign keys, uniqueness, timestamp constraints, and current-access checks.
 The commit locks current dependencies and rejects a changed decision state.
+The [expiry correction](../supabase/migrations/202610180002_shared_workflow_expiry.sql) checks the current wall clock after lock waits.
+A login that expires during a wait cannot authorize a write or receipt replay.
 Captured dependencies include the session, event, membership, person, account, credentials, login, teams, issue, current resolution, and award.
 A private issue version also detects changes to history, resolutions, and awards.
 Triggers maintain that version for legacy writers while both paths exist.

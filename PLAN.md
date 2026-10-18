@@ -1,5 +1,12 @@
 # Minsky planning record
 
+**PR #41 review follow-up, 2026-10-18.** The owner requested review fixes, code cleanup, and completion of authentication verification on the existing PR.
+Use `feature/t0019-shared-server-workflow`.
+Correct Supabase login expiry after lock waits with an additive migration. Preserve the installed migration source.
+The owner is activating Workers Paid. Wait for confirmation before deploying the isolated authentication Worker and repeating hosted checks.
+Retain the maintained password parameters and the 1,000 ms CPU cap.
+Supabase remains active. The owner reviews and merges.
+
 **Shared server workflow, 2026-10-18.** T0019 extracts the existing issue rules before further Cloudflare workflow implementation.
 Use `feature/t0019-shared-server-workflow` from updated `main` at `0c797ad`.
 The owner authorized this ticket while [PR #40](https://github.com/GiftedNovaHD/minsky/pull/40) was open.
@@ -19,7 +26,7 @@ Supabase remains active. The legacy browser workflow stays available during repl
 Development backend deployment requires separate authorization.
 The owner reviews and merges. Bounded subagent work is authorized.
 PR #40's protected HTTP verification remains incomplete after the Workers Free resource limit.
-Workers Paid remains deferred. Do not enable a subscription.
+The owner now handles Workers Paid activation under the PR #41 follow-up above. Hosted verification remains incomplete until activation and passing checks.
 Remaining D1 commands, R2, notification delivery, migration tooling, AWS, and Terraform remain later work.
 No real-data export, real-account reset, or backend switch is authorized.
 
@@ -33,7 +40,8 @@ See [the authentication reference](docs/cloudflare-authentication.md) and [verif
 Isolated development and CI resources remain authorized in the confirmed account. No paid upgrade occurred.
 The measured hash requires more CPU than Workers Free permits. The identity choice records the concrete Standard plan cost.
 The protected run passed all 28 hosted D1 account cases, then hit a Worker resource limit during HTTP password change.
-The owner deferred the subscription on 2026-10-18. Keep the protected HTTP result incomplete until paid verification passes.
+The owner initially deferred the subscription on 2026-10-18, then started activation during PR #41 review.
+Keep the protected HTTP result incomplete until paid verification passes.
 Supabase remains active. The remaining connector, real-data exports, migration, and backend switch remain later work.
 The owner reviews and merges.
 

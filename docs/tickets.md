@@ -96,6 +96,12 @@ The [verification guide](verify-server-workflow.md) gives the local and CI-only 
 [Current state](current-state.md) records observed results.
 An interface or an uncalled rule module does not complete this extraction.
 
+The PR #41 review found a login-expiry race after lock waits.
+An additive migration corrects the final access check for writes and receipt replays.
+Both new regression cases failed before the correction and pass afterward.
+The owner also requested bounded cleanup and completion of T0018's hosted HTTP verification.
+The owner is activating Workers Paid. Hosted authentication verification remains pending until activation and passing checks.
+
 ## T0018 Cloudflare authentication
 
 Branch: `feature/t0018-cloudflare-authentication`, from updated `main` at `0c797ad` after PR #39 merged.

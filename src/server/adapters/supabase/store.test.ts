@@ -412,6 +412,42 @@ describe("shared workflow through the Supabase persistence adapter", () => {
     expect(await durableState()).toEqual(before);
   });
 
+  it.each(["claim", "receipt replay"])("checks login expiry after a delayed %s commit", async (kind) => {
+    const issueId = await submit();
+    const command = { type: "claim", issue_id: issueId, revision: (await issue(issueId)).revision };
+    const requestId = randomUUID();
+    if (kind === "receipt replay") committed(await execute(volunteer, command, requestId));
+    const before = await durableState();
+
+    // A nested call retains the outer statement's start time, as a real commit
+    // does while it waits for a row lock. Delay until this login expires.
+    await db.exec(`
+      alter function public.shared_workflow_commit(uuid,uuid,uuid,uuid,jsonb,jsonb,jsonb)
+        rename to shared_workflow_commit_without_delay;
+      create function public.shared_workflow_commit(p_actor uuid,p_login uuid,p_session uuid,p_request uuid,
+        p_action jsonb,p_dependency jsonb,p_decision jsonb) returns jsonb
+      language plpgsql security definer set search_path = '' as $$
+      declare expiry timestamptz;
+      begin
+        select not_after into expiry from auth.sessions where id=p_login;
+        if expiry <= statement_timestamp() then raise exception 'Fixture expired before the delayed statement began.'; end if;
+        while clock_timestamp() <= expiry loop end loop;
+        return public.shared_workflow_commit_without_delay(p_actor,p_login,p_session,p_request,p_action,p_dependency,p_decision);
+      end $$;
+    `);
+    try {
+      await db.query("update auth.sessions set not_after=clock_timestamp()+interval '1 second' where user_id=$1", [volunteer]);
+      expect(await execute(volunteer, command, requestId)).toEqual({ outcome: "rejected", reason: "access" });
+      expect(await durableState()).toEqual(before);
+    } finally {
+      await db.exec(`
+        drop function public.shared_workflow_commit(uuid,uuid,uuid,uuid,jsonb,jsonb,jsonb);
+        alter function public.shared_workflow_commit_without_delay(uuid,uuid,uuid,uuid,jsonb,jsonb,jsonb)
+          rename to shared_workflow_commit;
+      `);
+    }
+  });
+
   it("rolls back issue, receipt, history, and notifications if a final notification insert fails", async () => {
     const issueId = await submit();
     const before = await durableState();

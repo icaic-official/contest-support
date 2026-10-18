@@ -3,7 +3,7 @@ import type { AccountCommand, AccountResult, SessionSummary } from '../../../bac
 import { AuthenticationError, type AuthenticationService, type AuthenticationSession } from '../../authentication';
 import type { D1Connection, D1Statement } from '../d1/connection';
 import type { IdentityProvider } from './identity';
-import type { PasswordHasher } from './password';
+import { randomSecret, type PasswordHasher } from './password';
 
 const usernameSchema = z.string().trim().toLowerCase().regex(/^[a-z0-9][a-z0-9_-]{2,31}$/);
 const passwordSchema = z.string().min(12).max(128);
@@ -43,10 +43,6 @@ const currentLoginSql = `SELECT a.*, l.id AS login_id, l.csrf
     AND b.expiresAt > strftime('%Y-%m-%dT%H:%M:%fZ', 'now') AND l.revoked = 0
     AND l.expires_at > unixepoch() AND l.credential_generation = a.credential_generation
     AND a.credential_state = 'ready'`;
-
-function secret(): string {
-  return Array.from(crypto.getRandomValues(new Uint8Array(32)), (byte) => byte.toString(16).padStart(2, '0')).join('');
-}
 
 /** Better Auth owns authentication. This adapter owns Minsky access and atomic credentials. */
 export class D1AuthenticationService implements AuthenticationService {
@@ -125,7 +121,7 @@ export class D1AuthenticationService implements AuthenticationService {
       this.statement(`INSERT INTO logins (id, account_id, expires_at, identity_session_id, credential_generation, csrf)
         SELECT ?, a.id, unixepoch(b.expiresAt), b.id, a.credential_generation, ?
         FROM accounts a JOIN ba_session b ON b.userId = a.id WHERE a.id = ? AND b.id = ?`,
-      loginId, secret(), signed.accountId, signed.identitySessionId),
+      loginId, randomSecret(), signed.accountId, signed.identitySessionId),
       this.statement('DELETE FROM command_assertions WHERE id = ?', assertionId),
     ]);
     return { cookie: signed.cookie };
@@ -224,7 +220,7 @@ export class D1AuthenticationService implements AuthenticationService {
       this.cleanupAssertions(gate.assertionId),
     );
     await this.guarded(gate.statements);
-    const password = secret() + 'A9!';
+    const password = randomSecret() + 'A9!';
     await this.completeCredentials(headers, target, operationId, password, true, sessionId);
     return { temporaryPassword: password };
   }

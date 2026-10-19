@@ -1,5 +1,15 @@
 # Minsky planning record
 
+**Reduce duplicate CI checks, 2026-10-20.** The owner requested removal of duplicate GitHub runs before considering a CI provider migration.
+T0022 starts from updated `main` at `4e43739`, after the owner merged PR #43.
+Use `feature/t0022-ci-run-deduplication` in a separate worktree.
+Repository branch pushes own ordinary checks and existing deployment prerequisites. Fork pull requests retain unprivileged checks.
+Same-repository pull request jobs skip without allocating runners. Their distinct names cannot satisfy the required ordinary check names.
+Keep scheduled security checks, manual protected suites, deployment guards, and existing environment rules.
+Same-repository PRs use branch-head evidence instead of a second test of GitHub's synthetic merge commit.
+Revert the workflow change to restore both executions. Cloudflare CI migration remains candidate work.
+The owner reviews and merges. No provider configuration, paid service, backend activation, or cloud-test allowlist change is authorized.
+
 **T0021 maintainability review follow-up, 2026-10-19.** The owner requests small changes in open PR #43 after verification of `0254f60`.
 Clarify workflow authorization and D1 transaction stages without changing behavior or atomic execution.
 Extend UI provider boundaries and shared account, image-limit, and reconnect assertions.

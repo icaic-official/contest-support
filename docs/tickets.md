@@ -2,10 +2,10 @@
 
 These tickets describe development work, not contestant issues.
 
-The active preparation ticket is [T0021 fresh Cloudflare development installation](#t0021-fresh-cloudflare-development-installation).
-It includes [T0020](#t0020-complete-cloudflare-connector), merged in [PR #42](https://github.com/GiftedNovaHD/minsky/pull/42) at `104d9d1`.
-The owner authorized parallel local preparation and resumed hosted work after that merge. Supabase remains active until separately approved activation.
-Existing Supabase trial data will not transfer. Leave its resources and accounts intact.
+The active ticket is [T0022 reduce duplicate CI checks](#t0022-reduce-duplicate-ci-checks).
+It starts after the owner merged [T0021](#t0021-fresh-cloudflare-development-installation) in [PR #43](https://github.com/GiftedNovaHD/minsky/pull/43) at `4e43739`.
+Supabase remains active until separately approved activation. Existing Supabase trial data will not transfer.
+Leave its resources and accounts intact.
 
 T0016 Cloudflare backend design merged in [PR #36](https://github.com/GiftedNovaHD/minsky/pull/36) at `b68ef72` on 2026-10-17.
 [T0015 shared provider tests](#t0015-shared-provider-tests) merged in [PR #37](https://github.com/GiftedNovaHD/minsky/pull/37).
@@ -55,14 +55,39 @@ These items stay deferred and are not part of T0005:
 
 T0008 fuzzy team search merged into `main` in [PR #22](https://github.com/notbowen/minsky/pull/22) on 2026-10-15 (SGT).
 
+## T0022 Reduce duplicate CI checks
+
+Branch: `feature/t0022-ci-run-deduplication`, from updated `main` at `4e43739`.
+Status: implementation and local verification pass. The PR records GitHub push and pull-request results separately. The owner reviews and merges.
+Summary: Run ordinary checks once per repository branch push. Retain fork PR checks and existing deployment and protected-test controls.
+
+Same-repository PR jobs skip without allocating runners and use distinct names.
+The ordinary required names remain `checks`, `secrets`, and `dependencies` on actual executions.
+These PRs use branch-head evidence. A second synthetic-merge check no longer runs.
+Cloudflare CI migration remains candidate work. This ticket does not change provider configuration or protected environment rules.
+
+### Acceptance criteria
+
+- [x] Repository branch updates run the ordinary suites once, including when a PR is open.
+- [x] Fork PRs retain all ordinary checks without provider credentials or deployment.
+- [x] Skipped PR jobs cannot satisfy required ordinary check names.
+- [x] Main and branch deployments retain their current prerequisites and cancellation rules.
+- [x] Scheduled security checks and manual protected suites retain their current routing.
+- [x] Workflow validation, local required checks, and PR push routing are recorded separately.
+
+### Verification
+
+The [dated record](current-state.md#t0022-ci-routing-verification-2026-10-20) separates local expression validation from GitHub evidence in the PR.
+Fork, schedule, and protected-dispatch behavior use local routing assertions. No live run of those events is part of this ticket.
+
 ## T0021 Fresh Cloudflare development installation
 
 Branch: `feature/t0021-cloudflare-development-install`, from PR #42 head `2b6f6f0` in a separate worktree.
-Status: [PR #43](https://github.com/GiftedNovaHD/minsky/pull/43) includes merged main at `104d9d1`. Fresh development and separate installation verification pass. The owner approved its exact protected branch entry. Its current final verification result is recorded in the PR. Activation still requires separate approval.
+Status: merged in [PR #43](https://github.com/GiftedNovaHD/minsky/pull/43) at `4e43739`. Fresh development and separate installation verification pass. The owner approved its exact protected branch entry. Its final verification result is recorded in the PR. Activation still requires separate approval.
 Summary: Prepare a fresh Cloudflare development installation and guarded deployment automation. Keep Supabase intact and active until the owner approves the concrete URL switch.
 
 The owner requests a maintainability review follow-up on 2026-10-19, after verification of `0254f60`.
-PR #43 is draft while this follow-up runs. Earlier passes verify their recorded revision.
+PR #43 was draft during this follow-up. Earlier passes verify their recorded revision.
 Clarify authorization and transaction stages, strengthen provider boundaries, and complete shared account, image-limit, and reconnect assertions.
 Keep existing behavior and atomic execution. Add only abstractions required by current callers.
 The owner limits Cloudflare spending to the existing $5 plan. Billing access returns `403`. The owner reports no extra charges on 2026-10-19; use bounded required verification and no optional stress tests.

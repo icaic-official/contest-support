@@ -120,7 +120,8 @@ See [the writing and deployment guide](site/src/content/docs/contributing/docume
 The initial docs deployment is explicitly authorized in T0011 before merge.
 The user selected CI-controlled deployment from `main`.
 Docs branch previews remain available. App branch previews are disabled until independent preview resources exist.
-GitHub Actions runs CI for pull requests and all branch pushes.
+GitHub Actions runs CI for all repository branch pushes and fork pull requests.
+Same-repository PRs use their branch-push results. See [event routing](docs/cloudflare-build-settings.md#events-and-prerequisites).
 Independent docs and app deployment jobs wait for `checks`, `secrets`, and `dependencies`.
 See [deployment setup](docs/cloudflare-builds.md) for credentials, activation, and backend limits.
 The fresh Cloudflare development candidate and a separate empty installation pass the complete application checks.

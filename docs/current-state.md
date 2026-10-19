@@ -1,5 +1,44 @@
 # Current state
 
+## T0022 CI routing verification, 2026-10-20
+
+The owner merged PR #43 at `4e43739` on 2026-10-19 at 12:29:54 UTC, then requested removal of duplicate CI checks.
+The isolated `feature/t0022-ci-run-deduplication` branch starts from that main revision.
+See [event routing](cloudflare-build-settings.md#events-and-prerequisites) for the implemented behavior and branch-head coverage.
+Reverting the workflow change restores both executions.
+
+### Local verification
+
+Checksum-verified `actionlint` 1.7.12 passes for `.github/workflows/checks.yml`.
+A temporary validator parses the actual YAML and evaluates its expressions with GitHub's `@actions/expressions` 0.3.61.
+All 11 scenarios pass. These cover main, feature, and Dependabot pushes, same-repository and fork PRs, the weekly schedule, and three protected dispatch selections.
+Structural comparison with `4e43739` confirms that only the three ordinary job conditions and display names changed.
+Deployment prerequisites, commands, credentials, targets, and concurrency are unchanged. Validation packages remain under `/tmp`.
+No repository dependency or application test was added.
+
+Types, lint, function checks, application build, and docs build pass. The docs check covers 13 pages and 531 local links and assets.
+All 657 unit/database/tooling tests, 70 local D1 tests, 12 function tests, 46 ordinary browser cases, and three authentication browser cases pass.
+The complete local connector runtime and React journeys pass. Fixture cleanup is verified and unrelated controls survive.
+All three docs browser cases pass.
+The initial sandboxed `npm ci` and validator child-process call hit sandbox restrictions. The locked installation and corrected validation harness pass afterward.
+The validator's first expected app-job route was incorrect. The existing deployment script handles the branch decision. No deployment behavior changed.
+Changed Markdown paths and `git diff --check` pass.
+
+### GitHub verification boundary
+
+The PR records the final push run and skipped same-repository PR run separately from local verification.
+No fork PR, schedule, or protected dispatch is created for this change. Their routes pass local expression evaluation only.
+The main-protection lookup returns `403` with a GitHub plan requirement. This run does not claim remote merge enforcement or change protection rules.
+No provider configuration, paid service, backend activation, or account setting changes.
+
+### Linked Supabase job investigation
+
+[Run 39332397673, job 118336975655](https://github.com/GiftedNovaHD/minsky/actions/runs/39332397673/job/118336975655) is a manually dispatched T0021 Supabase run on `4cf6405`.
+Its ordinary jobs passed. Its `test:cloud` step passed 15 of 16 cases and failed the authenticated journey's skip-link focus assertion.
+At `tests/cloud/journey.spec.ts:535`, `#main` remained inactive after Enter on the focused skip link.
+The later provider and workflow steps skipped after that failure. This was a test failure, not an exhausted-minute refusal.
+Logs do not establish the cause. Diagnosis and correction remain candidate work. This investigation does not rerun hosted tests or change fixtures.
+
 ## T0021 maintainability follow-up, 2026-10-19
 
 The owner requests a review follow-up in open [PR #43](https://github.com/GiftedNovaHD/minsky/pull/43).

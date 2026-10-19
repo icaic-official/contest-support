@@ -22,38 +22,15 @@
 
 ## Current scope
 
-Continue **T0021 fresh Cloudflare development installation** on `feature/t0021-cloudflare-development-install`.
-The owner authorized parallel preparation from PR #42's head, `2b6f6f0`, in `/tmp/minsky-t0021`.
-Keep PR #42's branch and checkout untouched.
-The owner merged PR #42 at `104d9d1` on 2026-10-18. T0021 now includes that main revision.
-The earlier restriction to local preparation ended at that merge. Reconcile review changes and run fresh checks before marking T0021 ready.
-The [ticket](docs/tickets.md#t0021-fresh-cloudflare-development-installation) records the acceptance gates.
-The owner requests a maintainability review follow-up in open PR #43 after verification of `0254f60`.
-Clarify existing workflow and transaction code, strengthen provider boundaries, and complete shared behavior assertions.
-Keep changes small. Reduce reader load without new speculative layers, interfaces, or synchronized state.
-The Cloudflare budget is the existing $5 monthly plan. Billing reads return `403`. The owner reports no extra charges on 2026-10-19 and permits bounded required verification. Do not run optional stress tests or add paid services.
-
-The owner requested all review fixes, cleanup, and fresh verification before the PR is ready.
-Remove obsolete proof paths, duplicate helpers, stale instructions, and repeated evidence summaries.
-Keep provider configuration and bootstrap inside the provider implementation.
-Preserve unique historical evidence in the planning and run records.
-Record PR #21 reuse and recommend its disposition. The owner decides whether to close PR #21.
-
-Isolated Cloudflare development, CI, and installation resources are authorized in account `458ad6a930b0fb717796dfa19ca6a2b1`.
-Confirm that account and the exact target before provider changes.
-Keep development, CI, and installation resources separate.
-On 2026-10-18, the owner approved only `feature/t0021-cloudflare-development-install` as one additional `cloud-test` branch entry. Preserve all six earlier entries and protection rule `69128862`. This approval does not authorize another branch, protection changes, or activation.
-Workers Paid and R2 are active. Document the concrete need and cost before any further paid upgrade.
-Bounded subagent work is authorized.
-
-Existing Supabase trial data is disposable. Transfer no accounts, passwords, records, images, or IDs.
-Preserve application behavior and database rules. Bootstrap a new administrator through the existing installation tool.
-Leave Supabase intact. Do not export data, reset its accounts, or delete its resources.
-Supabase remains active until the owner approves the concrete development URL switch.
-Preparation PR merge does not authorize activation. Follow [the activation procedure](docs/activate-cloudflare-development.md).
-Docker packaging, AWS, GCP, Azure, Terraform, and data migration tooling remain deferred.
-The owner reviews and merges both PRs.
-Earlier ticket decisions and authorization limits remain in [PLAN.md](PLAN.md) and their dated verification records.
+Implement **T0022 reduce duplicate CI checks** on `feature/t0022-ci-run-deduplication` from updated `main` at `4e43739`.
+The owner merged T0021 in PR #43, then requested this bounded CI change.
+See [the ticket](docs/tickets.md#t0022-reduce-duplicate-ci-checks) and the latest decision in [PLAN.md](PLAN.md).
+Preserve branch-push deployment prerequisites, fork PR checks, scheduled security jobs, and manual protected suites.
+Skipped same-repository PR jobs must not satisfy the names of required checks.
+Do not migrate CI providers, change provider settings, add paid services, activate Cloudflare development, or alter cloud-test rules.
+Supabase remains active. Backend activation requires the separate [activation procedure](docs/activate-cloudflare-development.md).
+Earlier provider permissions and unique verification records remain in PLAN.md and the dated run records.
+The owner reviews and merges.
 
 ## Code and documentation cleanup
 

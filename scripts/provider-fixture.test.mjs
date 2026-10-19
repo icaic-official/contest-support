@@ -10,6 +10,7 @@ import {
   cleanupFixture,
   createFixture,
 } from '../tests/providers/supabase/fixture';
+import { createdAccountMarkers } from '../tests/providers/contracts';
 
 vi.mock('@supabase/supabase-js', () => ({ createClient: vi.fn() }));
 
@@ -29,6 +30,7 @@ beforeEach(async () => {
     sessionIds: [randomUUID(), randomUUID()],
     teamIds: [randomUUID(), randomUUID(), randomUUID()],
     accountIds: [],
+    createdAccounts: [],
   };
   vi.stubEnv('MINSKY_TEST_PROJECT_REF', journal.project);
   vi.stubEnv('SUPABASE_ANON_KEY', 'test-public');
@@ -43,7 +45,7 @@ afterEach(async () => {
 
 /** A narrow control-plane double. It does not implement Backend behavior. */
 function controlPlane(
-  { event, sessions = [], users = [], failDelete = false } = {},
+  { event, sessions = [], users = [], memberships = [], people = [], failDelete = false } = {},
 ) {
   const deletions = [];
   const client = {
@@ -56,7 +58,7 @@ function controlPlane(
           maybeSingle: async () => ({ data: event ?? null, error: null }),
         })),
         in: vi.fn(async () => ({
-          data: table === 'sessions' ? sessions : [],
+          data: table === 'sessions' ? sessions : table === 'memberships' ? memberships : table === 'people' ? people : [],
           error: null,
         })),
       })),
@@ -194,6 +196,44 @@ describe('provider fixture recovery boundaries', () => {
       'remove fixture attachments',
     );
     expect(JSON.parse(await readFile(path, 'utf8'))).toEqual(journal);
+  });
+
+  test('retains exact account UUIDs before cleanup after a lost application create response', async () => {
+    const marker = createdAccountMarkers(journal.runId).staff;
+    journal.createdAccounts = [marker];
+    const owned = { id: randomUUID(), email: `${marker.username}@accounts.minsky.invalid`, user_metadata: { name: marker.name } };
+    const foreign = { id: randomUUID(), email: `${marker.username}-foreign@accounts.minsky.invalid`, user_metadata: { name: marker.name } };
+    await writeFile(path, JSON.stringify(journal));
+    const setup = { users: [owned, foreign], memberships: [{ user_id: owned.id, session_id: journal.sessionIds[0] }],
+      people: [{ id: owned.id, name: marker.name, username: marker.username }] };
+    const failed = controlPlane({ ...setup, failDelete: true });
+    await expect(cleanupFixture(path)).rejects.toThrow('remove fixture attachments');
+    const saved = JSON.parse(await readFile(path, 'utf8'));
+    expect(saved.accountIds).toEqual([owned.id]);
+    expect(saved.createdAccounts).toEqual([{ ...marker, id: owned.id }]);
+    expect(JSON.stringify(saved)).not.toContain('test-private');
+    expect(failed.deletions).toHaveLength(1);
+    const recovered = controlPlane(setup);
+    await cleanupFixture(path);
+    expect(recovered.deletions.filter(({ table }) => ['people', 'auth.users'].includes(table))).toEqual([
+      { table: 'people', ids: [owned.id] }, { table: 'auth.users', ids: [owned.id] },
+    ]);
+    expect(JSON.stringify(recovered.deletions)).not.toContain(foreign.id);
+    expect(existsSync(path)).toBe(false);
+  });
+
+  test('refuses a created account with foreign membership or a changed person marker before deletion', async () => {
+    const marker = createdAccountMarkers(journal.runId).contestant;
+    journal.createdAccounts = [marker];
+    const user = { id: randomUUID(), email: `${marker.username}@accounts.minsky.invalid`, user_metadata: { name: marker.name } };
+    await writeFile(path, JSON.stringify(journal));
+    const foreign = controlPlane({ users: [user], memberships: [{ user_id: user.id, session_id: randomUUID() }] });
+    await expect(cleanupFixture(path)).rejects.toThrow('crosses this fixture boundary');
+    expect(foreign.deletions).toEqual([]);
+    const changed = controlPlane({ users: [user], people: [{ id: user.id, name: 'Unrelated person', username: marker.username }] });
+    await expect(cleanupFixture(path)).rejects.toThrow('exact fixture marker');
+    expect(changed.deletions).toEqual([]);
+    expect(existsSync(path)).toBe(true);
   });
 
   test('attempts scoped cleanup after partial setup fails and saves no credentials', async () => {

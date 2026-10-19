@@ -167,6 +167,8 @@ async function execute(request: Request): Promise<unknown> {
     }
     case 'discardNextWorkflowResponse':
       return provider.discardNextWorkflowResponse();
+    case 'discardNextAccountResponse':
+      return provider.discardNextAccountResponse();
     case 'close':
       for (const id of subscriptions.keys()) stopSubscription(id);
       return provider.close();

@@ -2,7 +2,7 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { readFile, rename, unlink, writeFile } from 'node:fs/promises';
 import { z } from 'zod';
 import { createSupabaseBackend } from '../../../src/backend/supabase/backend';
-import type { Actor, ScenarioData, TestAccount } from '../contracts';
+import { createdAccountMarkers, type Actor, type ScenarioData, type TestAccount } from '../contracts';
 
 export interface SupabaseFixture extends ScenarioData {
   url: string;
@@ -19,7 +19,13 @@ const journalSchema = z.object({
   sessionIds: z.tuple([uuid, uuid]),
   teamIds: z.tuple([uuid, uuid, uuid]),
   accountIds: z.array(uuid),
-}).strict();
+  createdAccounts: z.array(z.object({ name: z.string(), username: z.string(), id: uuid.optional() }).strict()).default([]),
+}).strict().refine((journal) => {
+  const markers = Object.values(createdAccountMarkers(journal.runId));
+  return new Set(journal.accountIds).size === journal.accountIds.length &&
+    new Set(journal.createdAccounts.map((account) => account.username)).size === journal.createdAccounts.length &&
+    journal.createdAccounts.every((account) => markers.some((marker) => marker.name === account.name && marker.username === account.username));
+});
 type Journal = z.infer<typeof journalSchema>;
 
 const actors: Actor[] = [
@@ -93,7 +99,10 @@ export async function createFixture(
     sessionIds: [crypto.randomUUID(), crypto.randomUUID()],
     teamIds: [crypto.randomUUID(), crypto.randomUUID(), crypto.randomUUID()],
     accountIds: [],
+    createdAccounts: [],
   };
+  const createdAccounts = createdAccountMarkers(journal.runId);
+  journal.createdAccounts = Object.values(createdAccounts);
   // Never overwrite a recovery file from an interrupted run.
   await writeFile(path, JSON.stringify(journal), { mode: 0o600, flag: 'wx' });
   const admin = service();
@@ -234,6 +243,7 @@ export async function createFixture(
       otherSessionId: journal.sessionIds[1],
       teamId: journal.teamIds[0],
       accounts: accounts as Record<Actor, TestAccount>,
+      createdAccounts,
     };
     return { ...data, url: config.url, publicKey: config.publicKey };
   } catch (error) {
@@ -280,11 +290,18 @@ export async function cleanupFixture(path: string): Promise<void> {
     const listed = await admin.auth.admin.listUsers({ page, perPage: 100 });
     checked(listed.error, 'find fixture accounts');
     users.push(
-      ...listed.data.users.filter((user) =>
-        user.user_metadata.provider_test_run === journal.runId
-      ),
+      ...listed.data.users.filter((user) => user.user_metadata.provider_test_run === journal.runId ||
+        journal.createdAccounts.some((marker) => user.user_metadata.name === marker.name &&
+          user.email === `${marker.username}@accounts.minsky.invalid`)),
     );
     if (listed.data.users.length < 100) break;
+  }
+  for (const marker of journal.createdAccounts) {
+    const matching = users.filter((user) => user.user_metadata.name === marker.name && user.email === `${marker.username}@accounts.minsky.invalid`);
+    if (matching.length > 1 || marker.id && matching.some((user) => user.id !== marker.id)) {
+      throw new Error('A created fixture account has an ambiguous ownership marker.');
+    }
+    if (matching[0]) marker.id = matching[0].id;
   }
   for (const id of journal.accountIds) {
     const existing = await admin.auth.admin.getUserById(id);
@@ -293,11 +310,32 @@ export async function cleanupFixture(path: string): Promise<void> {
     }
     if (
       existing.data.user &&
-      existing.data.user.user_metadata.provider_test_run !== journal.runId
+      existing.data.user.user_metadata.provider_test_run !== journal.runId &&
+      !journal.createdAccounts.some((marker) => marker.id === id && existing.data.user?.user_metadata.name === marker.name &&
+        existing.data.user.email === `${marker.username}@accounts.minsky.invalid`)
     ) {
       throw new Error('Recovery account does not belong to this run.');
     }
   }
+  const accountIds = [...new Set([...journal.accountIds, ...users.map((user) => user.id)])];
+  if (accountIds.length) {
+    const memberships = await admin.from('memberships').select('user_id,session_id').in('user_id', accountIds);
+    checked(memberships.error, 'validate created account memberships');
+    if (memberships.data?.some((member) => !journal.sessionIds.includes(member.session_id))) {
+      throw new Error('A recovery membership crosses this fixture boundary.');
+    }
+    const people = await admin.from('people').select('id,name,username').in('id', accountIds);
+    checked(people.error, 'validate created account identities');
+    for (const person of people.data ?? []) {
+      const marker = journal.createdAccounts.find((account) => account.id === person.id);
+      if (marker && (person.name !== marker.name || person.username !== marker.username)) {
+        throw new Error('A created account does not have its exact fixture marker.');
+      }
+    }
+  }
+  // Save discovered UUIDs before any deletion. A lost create response needs no password for recovery.
+  journal.accountIds = accountIds;
+  await saveJournal(path, journal);
   const attachments = await admin.from('attachments').select(
     'id,session_id,issue_id',
   ).in('session_id', journal.sessionIds);
@@ -341,11 +379,13 @@ export async function cleanupFixture(path: string): Promise<void> {
     (await admin.from('events').delete().eq('id', journal.eventId)).error,
     'remove fixture event',
   );
-  for (const user of users) {
+  for (const id of accountIds) {
     checked(
-      (await admin.from('people').delete().eq('id', user.id)).error,
+      (await admin.from('people').delete().eq('id', id)).error,
       'remove fixture person',
     );
+  }
+  for (const user of users) {
     checked(
       (await admin.auth.admin.deleteUser(user.id)).error,
       'remove fixture login',

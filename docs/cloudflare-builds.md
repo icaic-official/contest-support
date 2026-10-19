@@ -1,114 +1,94 @@
-# Enable deployment after CI passes
+# Configure deployment after CI passes
 
-Use this guide to publish both static Workers after GitHub Actions checks pass.
-Branch pushes update previews. Pushes to `main`, including merges, update the stable sites.
-Use the [settings reference](cloudflare-build-settings.md) for exact names and values.
+Use this guide to configure the repository's development deployment automation.
+Use [deployment settings](cloudflare-build-settings.md) for exact variables and target checks.
+Use [activation](activate-cloudflare-development.md) for the separate fresh-installation approval process.
 
-## Prepare the two Workers
+## Keep the current backend until activation
 
-Complete these steps in the existing Minsky Cloudflare account:
+`MINSKY_DEV_BACKEND` defaults to `supabase` when absent.
+This preserves the current development application during preparation.
+The app build sets `VITE_BACKEND` explicitly. A shell's inherited value cannot select a different backend.
 
-1. Open **Workers & Pages**.
-2. Select `minsky-dev`.
-3. Under **Settings**, open **Builds**.
-4. If automatic Git builds are connected, disable their automatic builds or disconnect the repository.
-5. On the **Domains** tab, under **Worker URL**, turn on **Preview**.
-6. Repeat the steps for `minsky-docs`.
+Before activation, do not set `MINSKY_DEV_BACKEND=cloudflare` or deploy a full Worker to `minsky-dev`.
+Preparation PR merge does not approve the backend switch.
 
-Keep the stable `workers.dev` addresses enabled.
-Enable preview routing in the dashboard before the first branch preview.
-Do not deploy a feature branch to the stable Worker to change this setting.
-The next `main` deployment preserves the setting through `preview_urls: true` in both Wrangler files.
-See [Cloudflare preview routing](https://developers.cloudflare.com/workers/previews/custom-domains/).
+## Prepare the Workers and repository settings
 
-## Add the GitHub settings
+You need repository Actions administration and access to the confirmed Cloudflare account.
+Check existing Wrangler access before requesting a new token.
+Keep independent Cloudflare Git builds disabled for `minsky-dev` and `minsky-docs`.
+A separate provider build could bypass CI or replace the complete application with static assets.
 
-You need permission to manage repository Actions secrets and variables.
-Complete these steps for `GiftedNovaHD/minsky`:
+For docs branch previews, enable preview routing on the existing `minsky-docs` Worker.
+The workflow disables application branch previews. No preview receives stable development database bindings.
+A future app preview needs independent provider resources and separate verification.
 
-1. In Cloudflare, create an API token with the **Edit Cloudflare Workers** template.
-2. Restrict the token to account `458ad6a930b0fb717796dfa19ca6a2b1`.
-3. Open GitHub **Settings**, then **Secrets and variables**, then **Actions**.
-4. Add the token as the repository secret `CLOUDFLARE_API_TOKEN`.
-5. Add the repository variable `VITE_SUPABASE_URL` with `https://ovymmobupzowotvrywek.supabase.co`.
-6. Add the repository variable `VITE_SUPABASE_PUBLISHABLE_KEY` with the development project's public key.
-7. Add the repository variable `CLOUDFLARE_DEPLOY_ENABLED` with `true`.
+Store the deployment API token privately as the repository Actions secret `CLOUDFLARE_API_TOKEN`.
+Restrict it to account `458ad6a930b0fb717796dfa19ca6a2b1`.
+See [the permission reference](cloudflare-build-settings.md#repository-settings).
+Never put a token in chat, Git, `VITE_` variables, or build artifacts.
 
-Keep the token out of chat, Git, and frontend variables.
-Use the Supabase publishable key or legacy `anon` key. Never use a service-role key or `sb_secret_` key.
-`VITE_ENVIRONMENT` and the Cloudflare account ID are already set in the workflow.
-The docs site requires no Supabase credentials.
-See [Cloudflare token setup](https://developers.cloudflare.com/workers/ci-cd/external-cicd/github-actions/).
+For the current Supabase application, set these public repository variables:
 
-## Verify the T0011 preview first
+| Variable | Value |
+| --- | --- |
+| `MINSKY_DEV_BACKEND` | `supabase`, or absent before activation. |
+| `VITE_SUPABASE_URL` | `https://ovymmobupzowotvrywek.supabase.co` |
+| `VITE_SUPABASE_PUBLISHABLE_KEY` | The development project's public publishable key or legacy `anon` key. |
+| `CLOUDFLARE_DEPLOY_ENABLED` | `true` enables eligible publishing jobs. `false` pauses both. |
 
-Use the open T0011 branch before merging it:
+Do not use service-role or `sb_secret_` keys.
+The workflow fixes the account and sets `VITE_ENVIRONMENT=development`.
+The docs job requires no app configuration or Supabase credentials.
 
-1. Open **Actions**, then **Checks** in GitHub.
-2. Select the latest successful **push** run for `feature/t0011-documentation-site`.
-3. Select **Re-run all jobs** after adding the settings.
-4. Wait for `checks`, `secrets`, and `dependencies` to pass.
-5. Confirm that `deploy` publishes both Workers and passes both revision checks.
-6. Open both URLs in the run summary.
-7. Check a docs deep link, search, phone navigation, and a missing page.
-8. Check that the app loads with its development backend settings.
+## Verify eligible deployments
 
-Select the push run. Pull request runs never deploy.
-Manual **Run workflow** dispatch runs the protected Supabase cloud job and does not publish either frontend.
-If a newer commit exists, rerun that commit's push run. The deployment script skips old revisions.
-A failed or cancelled prerequisite prevents deployment.
+Push runs can publish after `checks`, `secrets`, and `dependencies` pass for that revision.
+Pull request runs and manual dispatch do not publish stable sites or previews.
+The manual protected cloud jobs remain separate.
 
-## Enable account and image checks on an app preview
+On an eligible feature branch, confirm that `deploy` publishes only the docs preview.
+Confirm that the script skips the app upload.
+On `main`, confirm that `deploy` publishes docs and `deploy-app` publishes the selected application.
+The two jobs are independent. Invalid app configuration must not block docs publication.
+Check each job's run summary and `/minsky-revision.json`.
 
-Before testing account or image operations, register the app preview origin:
+For the active Supabase mode, the app job first confirms the live Worker has no D1, R2, or Durable Object bindings.
+If Cloudflare is already active, this check refuses the static upload.
+An absent backend variable cannot silently replace an activated full Worker.
 
-1. Copy the app preview origin from the successful run summary.
-2. Confirm that the app uses the Minsky development backend.
-3. Have an authorized operator add the origin to the development functions' `ALLOWED_ORIGINS` secret.
-4. Preserve every existing allowed origin when updating the secret.
-5. Check any Auth URL settings required by the flow under test.
-6. Use fictional development accounts to check account administration and both image visibility modes.
+For approved Cloudflare activation, follow the exact sequence in the activation guide.
+That process commits a generated public config with real identifiers and sets the required Cloudflare deployment variables.
+The app job then confirms the account, database metadata, migration list, private bucket target, and `AUTH_SECRET` metadata before upload.
+Its build and upload must agree on the backend, revision, config path, D1 UUID, bucket name, and origin.
+No job applies development migrations, initializes an administrator, or rotates authentication secrets.
+After upload, the job checks the deployed bindings and anonymous rejection at `/api/auth/session`.
 
-Use the complete origin, including `https://`, without a path.
-Do not replace the origin list with a wildcard.
-See [why preview origins need separate setup](cloudflare-preview-behavior.md#why-an-app-preview-can-load-but-reject-function-calls).
-
-## Review and merge T0011
-
-Before the merge, confirm that the development backend matches the frontend revision.
-The merged app includes `supabase/migrations/202610140001_attachment_fixes.sql` and its matching attachment function.
-The latest recorded hosted attachment verification predates that correction.
-Check the backend deployment record before enabling a stable app update.
-If the backend is not ready, set `CLOUDFLARE_DEPLOY_ENABLED=false` before merging.
-Complete the separate backend release before re-enabling deployment and rerunning the latest `main` push.
-The automation publishes only static assets.
-
-1. Review PR #29 and its latest CI results.
-2. Have the user merge the approved PR into `main`.
-3. Open the new `main` **Checks** run.
-4. Confirm that all three prerequisite jobs pass before `deploy` starts.
-5. Confirm that both stable URLs report the merged revision in `/minsky-revision.json`.
-6. Run the read-only docs browser checks against the stable site.
+After each deployment, run the appropriate application checks at the reported URL.
+A matching publication record and binding check do not prove authenticated behavior.
+For docs, run the read-only browser checks:
 
 ```sh
 MINSKY_DOCS_URL=https://minsky-docs.icaic-minsky.workers.dev npm run docs:test
 ```
 
-Record the source revision, run URL, site URLs, and observed results in `docs/current-state.md`.
-Update older feature branches from `main` before expecting them to use this workflow.
-No permanent preview branch is needed.
+Record source revisions, run URLs, deployed versions, and observed results in `docs/current-state.md`.
+The guarded Cloudflare deployment path requires hosted verification on the final revision.
+Use the current-state record to determine which deployment checks passed.
 
-## Stop or retry deployment
+## Pause, retry, and recover
 
-To pause future deployments, set `CLOUDFLARE_DEPLOY_ENABLED` to `false`.
-Cancel any deployment already in progress separately.
-Resolve the backend or hosting problem before enabling the variable again.
-If an upload or revision check fails, inspect the `deploy` log.
-Rerun the latest push run after correcting the problem.
-The app and docs uploads are separate operations, so one can succeed before the other fails.
+Set `CLOUDFLARE_DEPLOY_ENABLED=false` to pause future app and docs deployments.
+Cancel jobs already publishing separately.
+Correct the target or backend problem before enabling publishing again.
+Rerun the latest approved push run. Old revisions and deleted branches skip uploads.
+If one job succeeds and the other fails, inspect both summaries before retrying.
 
-To retire a branch preview, copy its preview name from the run summary.
-Delete that preview from each Worker in the Cloudflare dashboard after the branch no longer needs it.
-Branch deletion does not delete Cloudflare previews automatically.
-Check GitHub Actions and Cloudflare usage after activation.
-No paid upgrade is part of this setup.
+Do not switch the backend variable to `supabase` to repair a Cloudflare application.
+The binding guard rejects that assets-only replacement.
+Use the [activation recovery procedure](activate-cloudflare-development.md#recover-a-failed-activation) and retain the new installation's records.
+
+To retire a docs branch preview, use its exact name from the run summary and the Cloudflare dashboard.
+Branch deletion does not remove previews automatically.
+No additional paid upgrade is part of this preparation.

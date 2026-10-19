@@ -14,7 +14,9 @@ Both providers use the same workflow decisions. The active Supabase browser path
 
 [Read the user and operator guides](https://minsky-docs.icaic-minsky.workers.dev).
 Use [the installation guide](site/src/content/docs/operators/installation.md) for an isolated Cloudflare instance.
-See [current state](docs/current-state.md#pr-42-review-fixes-and-cleanup-2026-10-18) for source-specific checks and [migration gates](docs/product-direction.md#migration-and-cutover-gates) for deferred cutover work.
+T0021 prepares a fresh Cloudflare development installation after PR #42 merged at `104d9d1`.
+It transfers no existing Supabase records or accounts. Supabase stays intact and active until the owner approves the concrete backend switch.
+See [current state](docs/current-state.md) for source-specific checks and [activation](docs/activate-cloudflare-development.md) for the remaining gates.
 These are development installations that require connectivity. Live-contest readiness and capacity for 800 simultaneous users remain unverified.
 
 ## Local development
@@ -50,6 +52,9 @@ See [cloud onboarding](docs/cloud-onboarding.md#contributor-setup) for provider 
 | --- | --- |
 | `npm run dev` | Start the local frontend. |
 | `npm run build` | Check types and create static assets in `dist/`. |
+| `npm run deploy` | Build and publish the selected app through guarded deployment tooling. Requires an eligible repository push context and approved activation settings. |
+| `node scripts/deploy-workers.mjs --check --site=app` | Validate the selected deployment target without provider changes. Use `--site=docs` for independent docs settings. |
+| `node scripts/deploy-workers.mjs --build --site=app` | Build the explicitly selected backend and record its revision before guarded publication. |
 | `npm run preview` | Serve built assets locally. |
 | `npm run typecheck` | Check TypeScript. |
 | `npm run lint` | Run ESLint. |
@@ -83,6 +88,8 @@ npx playwright install chromium
 Deno and the provider CLIs are pinned npm dependencies.
 For `npm run test:cloud` and `npm run test:hosted`, follow [cloud verification](docs/cloud-onboarding.md#verification-and-protected-cloud-ci).
 For shared adapter checks, follow [Run the shared provider tests](docs/run-provider-tests.md).
+The two hosted store commands accept the optional [D1 API transport](docs/run-provider-tests.md#use-the-d1-api-transport).
+Run those API commands in sequence. Default binding checks and protected CI keep their existing transport.
 `VITE_BACKEND` defaults to `supabase`. An isolated Cloudflare application build sets `VITE_BACKEND=cloudflare` and uses its own origin.
 Cloudflare cookies and API requests require the same origin. A plain Vite server does not supply that API.
 If an existing cloud fixture cleanup fails, follow [fixture recovery](docs/cloud-onboarding.md#fixture-recovery).
@@ -111,11 +118,14 @@ npm run docs:dev
 The deployment configuration is `wrangler.docs.jsonc`.
 See [the writing and deployment guide](site/src/content/docs/contributing/documentation.md).
 The initial docs deployment is explicitly authorized in T0011 before merge.
-The user selected automatic branch previews and deployment from `main` for both sites.
+The user selected CI-controlled deployment from `main`.
+Docs branch previews remain available. App branch previews are disabled until independent preview resources exist.
 GitHub Actions runs CI for pull requests and all branch pushes.
-The deployment job waits for `checks`, `secrets`, and `dependencies` before publishing either Worker.
+Independent docs and app deployment jobs wait for `checks`, `secrets`, and `dependencies`.
 See [deployment setup](docs/cloudflare-builds.md) for credentials, activation, and backend limits.
-The workflow requires account setup. The first automatic deployments remain unverified.
+The fresh Cloudflare development candidate and a separate empty installation pass the complete application checks.
+Stable URL activation and subsequent automated deployment remain unverified and require owner approval.
+PR #42 merged at `104d9d1`. T0021 includes the accepted connector and its final verification records.
 
 ### Repository records
 
@@ -131,6 +141,8 @@ The workflow requires account setup. The first automatic deployments remain unve
 - [Server workflow reference](docs/server-workflow.md) inventories existing rules and the shared service and persistence boundaries.
 - [Verify the shared server workflow](docs/verify-server-workflow.md) gives local, CI-only hosted, and recovery commands.
 - [Backend contracts](docs/backend-contracts.md) describe the provider interfaces and their behavior.
+- [Add a backend provider](docs/add-provider.md) gives contributor interfaces, registration points, installation, cleanup, and required shared verification.
+- [Activate Cloudflare development](docs/activate-cloudflare-development.md) gives the fresh-installation approval, deployment, verification, and recovery gates.
 - [Cloudflare backend design](docs/cloudflare-backend-design.md) explains the implemented server boundaries.
 - [Cloudflare authentication reference](docs/cloudflare-authentication.md) defines the experimental API, browser sessions, and account rules.
 - [Authentication choice](docs/cloudflare-authentication-choice.md) records Better Auth, maintained crypto, resource measurements, and costs.

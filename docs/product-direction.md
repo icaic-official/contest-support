@@ -103,12 +103,13 @@ Actual authorization, synchronization, deployment, capacity, and recovery behavi
 
 T0018 selected maintained Better Auth for bounded Cloudflare authentication. T0020 retains it in the complete connector.
 See [the identity choice](cloudflare-authentication-choice.md) and [API reference](cloudflare-authentication.md).
-The owner selected organizer-issued replacement temporary passwords for migration on 2026-10-17.
-Users must change these passwords before contest access.
-Existing passwords do not need to survive. Password-hash import is not required.
-Preserve account IDs, memberships, permissions, and history.
-Credential distribution, recovery, and login revocation need verification before account cutover.
-The final transfer also needs a reconciliation check and a tested rollback procedure.
+On 2026-10-18, the owner selected a fresh Cloudflare development installation in T0021.
+Existing Supabase records are disposable trial data, including the administrator.
+Transfer no accounts, passwords, issues, history, images, or IDs.
+Create a new administrator through the supported bootstrap process and require a temporary-password change.
+This replaces the 2026-10-17 data-preservation decision. Preserve application behavior and database rules.
+Leave Supabase intact. Do not export data, reset its accounts, or delete its resources.
+Credential distribution, recovery, expiry, and revocation require fresh verification before activation.
 
 Outage handling remains deferred until after cloud feature development.
 Manual fallback, offline capture, and venue-local operation remain unselected.
@@ -137,7 +138,7 @@ Preserve existing Auth UUIDs, history, and permissions when you assign a usernam
 ## Backend migration direction
 
 On 2026-10-17, the user selected Cloudflare D1 with a SQLite rewrite and Durable Objects for live updates.
-Cloudflare is the long-term backend target. Supabase remains active until the owner approves migration and cutover.
+Cloudflare is the long-term backend target. Supabase remains active until the owner approves the concrete development URL switch.
 The [backend design](cloudflare-backend-design.md) explains the current connector boundaries.
 The [dated verification record](current-state.md#t0020-connector-implementation-2026-10-18) records implementation evidence.
 
@@ -154,33 +155,25 @@ D1 remains the source of saved workflow state.
 Live messages carry no private issue data and grant no access.
 The SQLite adapter applies the same `WorkflowService` decisions through guarded commits.
 Future providers must preserve the `Backend` contract and the shared workflow rules.
-AWS implementation and Terraform remain deferred until the owner selects a concrete deployment.
+AWS, GCP, Azure, and Terraform implementations remain future contributions.
+See [Add a backend provider](add-provider.md) for contributor requirements.
 
 ### Migration and cutover gates
 
-Connector verification does not authorize real-data exports, account resets, or a backend switch.
-Data migration tooling and cutover require a separate owner decision and explicit source and destination checks.
+T0021 prepares a fresh installation. It does not transfer existing records.
+Connector verification and preparation PR merge do not authorize a backend switch.
+The [activation procedure](activate-cloudflare-development.md) defines the separate owner approval gate.
 The completed implementation phases remain in the [historical plan](https://github.com/GiftedNovaHD/minsky/blob/88ea5020a0f9dfc34a32ed7fbd84dfea07423297/docs/cloudflare-implementation-plan.md).
 
-A later migration must preserve account IDs, relationships, memberships, permissions, historical actors, and timestamp precision.
-It must also preserve resolution cycles, awards, external application status, image visibility, file contents, and retry receipts.
-The owner selected organizer-issued replacement temporary passwords. Password-hash import is not required.
-Every account must change its replacement password before contest access.
+Before activation, complete these gates:
 
-Before cutover, complete these gates:
+1. Merge PR #42, update T0021 from main, and reconcile review changes.
+2. Install the reviewed revision into dedicated development resources through the authoritative installation guide.
+3. Verify shared behavior with fictional accounts, private images, live updates, password changes, and owner recovery.
+4. Run required local and hosted checks. Record local hosted and protected GitHub Actions results separately.
+5. Present exact targets, approved revision, settings, commands, verification criteria, and recovery to the owner.
+6. Obtain approval, switch the development URL, and verify another automated deployment retains Cloudflare mode and its bindings.
 
-1. Install the selected revision into an empty isolated environment and verify the complete application.
-2. Compare source and destination IDs, values, references, timestamps, receipts, image hashes, and authorized snapshots.
-3. Verify replacement temporary passwords, mandatory changes, organizer recovery, and old-session rejection.
-4. Rehearse a write pause, final synchronization, and restoration on isolated resources.
-5. Record the approved revision, exact targets, measured resource requirements, maintenance window, and rollback procedure.
-6. Obtain owner approval before the live switch.
-
-The migration manifest records source revision, schema versions, export time, counts, and comparison results.
-Counts alone are insufficient. There must be no unexplained differences.
-Encrypted exports stay outside repository files and test artifacts.
-
-Use one writable backend at a time. Background dual writes are not part of the migration direction.
-Before Cloudflare accepts new writes, rollback can restore the unchanged Supabase application after verification.
-After Cloudflare accepts writes, rollback must preserve those writes or keep writes paused while operators repair the installation.
-Switching URLs alone is not a post-write rollback procedure.
+Supabase stays intact throughout this process. Earlier records do not appear in the fresh installation.
+Recovery must retain new Cloudflare records. Do not imply that switching back to Supabase transfers those records.
+Use a known compatible full Worker revision for application recovery after new writes begin.

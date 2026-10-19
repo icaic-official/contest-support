@@ -4,9 +4,14 @@ Use this guide to check an implemented provider against Minsky's shared behavior
 Use an isolated test backend. Never use development or production accounts.
 For the suite's responsibilities and limits, see [the test contracts](provider-test-contracts.md).
 
-Both drivers use the same eight shared scenarios.
+Both drivers use the same 11 shared scenarios.
+The added account-creation, image-limit, and reconnect cases require fresh hosted verification.
+Earlier eight-case results do not verify these additions.
 Record local checks, CLI runs against hosted resources, and protected GitHub runs separately.
 See [current state](current-state.md) for tested revisions, results, and cleanup evidence.
+For a new implementation, complete [Add a backend provider](add-provider.md) before using this runner.
+The runner currently accepts only `supabase` and `cloudflare`.
+The commands below verify existing implementations. They do not register a provider or provision a new installation.
 
 ## List the scenarios without credentials
 
@@ -95,9 +100,9 @@ The runner checks the generated configuration, live target metadata, and the pro
 Fixture setup checks required migrations and schema fields before creating records.
 Each browser context uses real hosted cookies, API requests, and WebSockets.
 Only test bridge assets come from the local Vite server.
-Both providers run the same eight behavior assertions.
+Both providers run the same 11 behavior scenarios.
 
-A passing run exits with code zero after all eight cases and cleanup.
+A passing run exits with code zero after all 11 cases and cleanup.
 Cleanup verifies the owned D1 records, exact R2 keys, and Durable Object state before deleting the identifiers-only journal.
 The selected Worker must expose the trusted `SessionMaintenance` service entrypoint from this revision.
 The fixture checks that internal binding before it creates records. It does not use a public setup or cleanup route.
@@ -178,7 +183,7 @@ npm run test:connector:workflow:hosted -- \
   --database=341350ba-7c74-4c46-8b21-edfdcda475f5
 ```
 
-The runner must report every workflow case passed, with zero failures or skipped cases.
+The expected result is `Hosted full D1 workflow: 70 passed, 0 failed, 0 skipped.`
 This runner uses production identity guards and the reviewed D1-only configuration.
 It requires the checkout's exact applied migration list, but applies no migrations itself.
 Its result does not check Worker execution, images, the product UI, or live delivery.
@@ -192,7 +197,7 @@ npm run test:connector:accounts:hosted -- \
   --database=341350ba-7c74-4c46-8b21-edfdcda475f5
 ```
 
-The runner must report every account case passed, with zero failures or skipped cases.
+The expected result is `Hosted connector accounts: 82 passed, 0 failed, 0 skipped.`
 This command checks current permissions, identity expiry, credential generation, revocation, and rollback inside account batches.
 It uses maintained password hashing and the same reviewed D1-only configuration.
 The runner includes four fixed authentication files:
@@ -207,7 +212,7 @@ Each case creates its own UUID-scoped fixture. Each file owns its identity servi
 Fixture setup, credential snapshots, and cleanup checks use D1 batches with the same row assertions.
 The local `npm run test:auth` suite includes one additional execution-clock probe and must pass all 83 cases.
 Record that local result separately from the 82 hosted cases.
-Both connector runners reject test filters, count overrides, and configuration overrides beyond the required target options.
+Both connector runners reject test filters, count overrides, and configuration overrides beyond the documented target and transport options.
 Both direct D1 runners retain their own fixture journals if cleanup fails. They use the original reviewed repository configuration.
 
 Both runners report numeric progress at least every 15 seconds while their test process runs.
@@ -217,6 +222,62 @@ Accumulated call time can exceed elapsed time because database calls can overlap
 Reported SQL time is partial. Calls such as `first()` return rows without provider timing metadata.
 Progress excludes case names, SQL text, bound values, result rows, credentials, and raw provider errors.
 The final result still requires every case to pass without failures or skips.
+
+### Use the D1 API transport
+
+The commands above use native D1 bindings through the local Wrangler preview proxy.
+This remains the default transport and the transport used by protected GitHub checks.
+If that local proxy disconnects, you can select `--transport=api` for these two store suites.
+Read-only probes reproduced a failure while the local proxy forwarded requests to the remote preview Worker.
+The underlying connection fault remains unresolved. This option bypasses that proxy for database requests.
+
+Use the same prepared D1-only CI target and existing Wrangler access.
+The runner confirms the account, database, configuration, and applied migrations before it starts fixtures.
+It reads the existing Wrangler token into memory and passes it privately to the test process.
+Do not export a token manually or put credentials in commands, Git, frontend builds, logs, or ordinary CI artifacts.
+This option creates no hosted resources.
+
+Run the complete workflow suite first:
+
+```sh
+npm run test:connector:workflow:hosted -- \
+  --transport=api \
+  --config=src/server/adapters/cloudflare/deploy/connector-store-ci.wrangler.jsonc \
+  --account=458ad6a930b0fb717796dfa19ca6a2b1 \
+  --database=341350ba-7c74-4c46-8b21-edfdcda475f5
+```
+
+The expected result is `Hosted full D1 workflow: 70 passed, 0 failed, 0 skipped.`
+After that command finishes, run the complete account suite:
+
+```sh
+npm run test:connector:accounts:hosted -- \
+  --transport=api \
+  --config=src/server/adapters/cloudflare/deploy/connector-store-ci.wrangler.jsonc \
+  --account=458ad6a930b0fb717796dfa19ca6a2b1 \
+  --database=341350ba-7c74-4c46-8b21-edfdcda475f5
+```
+
+The expected result is `Hosted connector accounts: 82 passed, 0 failed, 0 skipped.`
+The API option uses the same files, assertions, case counts, and timeouts as the binding transport.
+The API transport runs files in sequence with one worker. Native account checks retain four workers.
+Tests can still run concurrent operations inside each case. The runner adds no retries or case filters.
+Each database batch uses one API request and retains transaction rollback, result metadata, numeric values, and null values.
+
+Run these API commands in sequence. Do not run another API store check concurrently.
+Both API suites space request starts by 300 milliseconds.
+One active file can make about 1,000 requests in five minutes at that pace.
+A four-file API run passed 81 cases and timed out one case.
+Sequential files give each case the full request budget without increasing that timeout.
+Cloudflare's [shared API limit](https://developers.cloudflare.com/fundamentals/api/reference/limits/) is 1,200 requests in five minutes.
+Other API activity can use the same allowance. An HTTP 429 response fails the check without a retry.
+
+Keep the same progress and fixture-journal requirements described above.
+If a request loses its response, its database outcome can be unknown. Inspect retained journals before cleanup.
+Follow [direct D1 fixture recovery](#recover-direct-d1-fixtures) if cleanup is incomplete.
+Record the selected transport with the result.
+An API result checks database behavior through the D1 HTTP API.
+It does not replace protected native-binding checks, Worker execution checks, or browser checks.
 
 ## Check the hosted React application
 
@@ -239,10 +300,11 @@ Record the tested source revision and installation result in the current-state r
 
 1. Configure the existing `cloud-test` environment as described in [cloud onboarding](cloud-onboarding.md#verification-and-protected-cloud-ci).
 2. Check that the environment permits the reviewed branch. Preserve the existing entries and protection rules.
-3. To check Supabase against the prepared CI backend, dispatch the reviewed ticket branch:
+3. Select the branch that contains the reviewed revision. The example below selects merged `main`:
 
    ```sh
-   gh workflow run checks.yml --repo GiftedNovaHD/minsky --ref feature/t0020-cloudflare-connector -f existing_backend=true
+   MINSKY_REVIEW_REF='main'
+   gh workflow run checks.yml --repo GiftedNovaHD/minsky --ref "$MINSKY_REVIEW_REF" -f existing_backend=true
    ```
 
 4. Check both the existing hosted suite and the shared provider suite in the `cloud` job.
@@ -253,11 +315,14 @@ It does not skip fixture creation or cleanup and does not check a fresh installa
 Use the default preparation mode only when the remote migration history matches the intended backend revision.
 The [earlier CI preparation record](current-state.md#t0014-existing-backend-verification-2026-10-17) includes an extra announcement migration.
 Inspect the live migration history before preparation rather than assuming it matches a clean checkout.
+For an unmerged ticket, set `MINSKY_REVIEW_REF` to its reviewed branch.
+Check that the protected environment permits that exact branch before dispatch.
+If it does not, obtain authorization before changing an allowlist entry or protection rule.
 
 For the complete Cloudflare connector, select its separate input:
 
 ```sh
-gh workflow run checks.yml --repo GiftedNovaHD/minsky --ref feature/t0020-cloudflare-connector -f cloudflare_connector=true
+gh workflow run checks.yml --repo GiftedNovaHD/minsky --ref "$MINSKY_REVIEW_REF" -f cloudflare_connector=true
 ```
 
 Use only the connector mode for that dispatch.
@@ -268,8 +333,8 @@ It prepares the separate full connector database before it builds and deploys th
 It runs the shared contracts and React journey against that full connector.
 The private bucket, service activation, and initial Worker secret must exist before this job can pass.
 The workflow does not activate a paid service or create the bucket.
-Record the protected result and tested revision in [current state](current-state.md#t0020-connector-implementation-2026-10-18), separately from hosted CLI results.
-The existing allowlist includes the T0020 branch. Preserve the other entries and protection rules.
+Record the protected result and tested revision in [current state](current-state.md), separately from hosted CLI results.
+Preserve unrelated allowlist entries and protection rules.
 Earlier protected authentication runs do not check this complete connector job.
 Record protected Supabase verification separately from Cloudflare CLI runs and the protected connector job.
 

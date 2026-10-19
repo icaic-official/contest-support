@@ -58,11 +58,30 @@ export async function runHostedStore(arguments_, dependencies = {}) {
   const [name, ...targetArguments] = arguments_;
   if (!Object.hasOwn(suites, name)) throw new Error('Select the complete workflow or accounts suite.');
   const suite = suites[name];
-  const options = storeArguments(targetArguments);
+  const transportArguments = targetArguments.filter((argument) => argument.startsWith('--transport='));
+  if (transportArguments.length > 1 || transportArguments.length === 1 &&
+      !['--transport=binding', '--transport=api'].includes(transportArguments[0])) {
+    throw new Error('Select --transport=binding or --transport=api once.');
+  }
+  const transport = transportArguments[0]?.slice('--transport='.length) ?? 'binding';
+  // One API file can use the shared rate budget without making each account
+  // operation wait behind four separately paced files. Test limits stay intact.
+  const maxWorkers = transport === 'api' ? 1 : suite.maxWorkers;
+  const options = storeArguments(targetArguments.filter((argument) => !argument.startsWith('--transport=')));
   const settings = await readStoreTarget(options);
   const runWrangler = dependencies.runWrangler ?? wranglerRunner(settings, settings.configPath);
   await confirmTarget(options, settings, runWrangler);
   await assertCurrentMigrations(settings, runWrangler);
+  let apiToken;
+  if (transport === 'api') {
+    try {
+      const credential = JSON.parse(await runWrangler(['auth', 'token', '--json']));
+      if (!['oauth', 'api_token'].includes(credential.type) || typeof credential.token !== 'string' || !credential.token) throw new Error();
+      apiToken = credential.token;
+    } catch {
+      throw new Error('Existing Wrangler access could not supply the private D1 API credential. No fixtures started.');
+    }
+  }
   const report = dependencies.report ?? ((message) => process.stdout.write(message + '\n'));
   const directory = await mkdtemp(join(process.env.RUNNER_TEMP ?? tmpdir(), 'minsky-connector-store-'));
   const testConfig = join(directory, 'vitest.config.mjs');
@@ -74,18 +93,28 @@ export async function runHostedStore(arguments_, dependencies = {}) {
       test: {
         include: suite.include.map((file) => resolve(repositoryRoot, file)),
         testTimeout: 120_000, hookTimeout: 120_000,
-        fileParallelism: suite.maxWorkers > 1, maxWorkers: suite.maxWorkers,
+        fileParallelism: maxWorkers > 1, maxWorkers,
         reporters: [['json', { stdout: true }],
           [resolve(repositoryRoot, 'src/server/adapters/cloudflare/tooling/hosted-progress-reporter.mjs'), { total: suite.total }]],
       },
     })};\n`, { mode: 0o600 });
     const environment = { ...safeWranglerEnvironment(), MINSKY_CONNECTOR_D1_CONFIG: settings.configPath,
-      CLOUDFLARE_ACCOUNT_ID: settings.accountId, MINSKY_D1_METRICS: '1',
+      CLOUDFLARE_ACCOUNT_ID: settings.accountId, MINSKY_D1_METRICS: '1', MINSKY_CONNECTOR_D1_TRANSPORT: transport,
       // D1Fixture uses tmpdir(). Each child owns its journals even when another
       // suite runs concurrently against the same reviewed configuration.
       TMPDIR: directory,
     };
     delete environment.MINSKY_AUTH_REMOTE;
+    // The CLI option owns transport selection. Inherited shell values cannot
+    // inject a credential, destination, or faster request interval.
+    delete environment.MINSKY_CONNECTOR_D1_API_TOKEN;
+    delete environment.MINSKY_CONNECTOR_D1_API_INTERVAL_MS;
+    delete environment.MINSKY_CONNECTOR_D1_DATABASE_ID;
+    if (transport === 'api') {
+      environment.MINSKY_CONNECTOR_D1_API_TOKEN = apiToken;
+      environment.MINSKY_CONNECTOR_D1_API_INTERVAL_MS = '300';
+      environment.MINSKY_CONNECTOR_D1_DATABASE_ID = settings.databaseId;
+    }
     const execute = dependencies.execute ?? ((argumentsChild, commandOptions) =>
       runHostedChild(argumentsChild, commandOptions, { report, expectedTotal: suite.total }));
     const result = await execute([resolve(repositoryRoot, 'node_modules/vitest/vitest.mjs'), 'run', '--config', testConfig], {

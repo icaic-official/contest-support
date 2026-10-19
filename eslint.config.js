@@ -2,6 +2,17 @@ import js from "@eslint/js";
 import tseslint from "typescript-eslint";
 import hooks from "eslint-plugin-react-hooks";
 import globals from "globals";
+
+// UI, shared server rules, and shared scenarios use the same provider boundary.
+// The selected backend and its contracts remain valid application imports.
+const providerImportPattern = [
+  "^(?:@supabase/|@aws-sdk/|@cloudflare/|@google-cloud/|@azure/|cloudflare(?::|/|$)|wrangler(?:/|$)|miniflare(?:/|$)|better-auth(?:/|$))",
+  String.raw`(^|/)backend/(?!contracts(?:\.ts)?$|errors(?:\.ts)?$|index(?:\.ts)?$)`,
+  String.raw`(^|/)adapters/`,
+  String.raw`^(?:\.\.?/)+(?:supabase|cloudflare|aws|gcp|azure)(?:/|$)`,
+].join("|");
+const providerImportMessage = "Keep provider SDKs and implementations inside provider modules. Use the shared contracts.";
+
 export default tseslint.config(
   { ignores: ["dist", "node_modules", "playwright-report", "test-results", "site/dist", "site/.astro", "site/node_modules", "**/.wrangler/**"] },
   js.configs.recommended,
@@ -10,7 +21,7 @@ export default tseslint.config(
     files: ["**/*.{ts,tsx}"],
     languageOptions: { globals: { ...globals.browser, ...globals.node } },
     plugins: { "react-hooks": hooks },
-    // Preserve the demo's existing Hooks checks during this tooling upgrade.
+    // Preserve the existing Hooks checks during this tooling upgrade.
     // Version 7's recommended preset also adds React Compiler diagnostics.
     rules: {
       "react-hooks/rules-of-hooks": "error",
@@ -19,13 +30,20 @@ export default tseslint.config(
   },
   {
     files: ["src/**/*.{ts,tsx}"],
-    ignores: ["src/backend/supabase/**", "src/backend/index.ts", "src/server/adapters/**"],
+    ignores: ["src/backend/*/**", "src/backend/index.ts", "src/server/**"],
     rules: {
       "no-restricted-imports": ["error", {
         patterns: [{
-          group: ["@supabase/*", "**/backend/supabase/**", "./supabase/**"],
-          message: "Use the backend contracts. Provider imports belong in src/backend/supabase or src/backend/index.ts.",
+          regex: providerImportPattern,
+          message: providerImportMessage,
         }],
+      }],
+      "no-restricted-syntax": ["error", {
+        selector: `ImportExpression[source.value=/${providerImportPattern.replaceAll("/", "\\/")}/]`,
+        message: providerImportMessage,
+      }, {
+        selector: "ImportExpression[source.type!='Literal']",
+        message: "Use a literal dynamic import path so the provider boundary can be checked.",
       }],
     },
   },
@@ -34,8 +52,8 @@ export default tseslint.config(
     ignores: ["src/server/adapters/**"],
     rules: {
       "no-restricted-imports": ["error", {
-        patterns: [{
-          group: ["@supabase/*", "@aws-sdk/*", "cloudflare:*", "@cloudflare/*", "**/adapters/**"],
+        patterns: [{ regex: providerImportPattern, message: providerImportMessage }, {
+          group: ["**/backend/index", "**/backend/index.ts"],
           message: "Server contracts and domain rules must not import provider adapters.",
         }],
       }],
@@ -49,11 +67,9 @@ export default tseslint.config(
     ],
     rules: {
       "no-restricted-imports": ["error", {
-        patterns: [{
+        patterns: [{ regex: providerImportPattern, message: providerImportMessage }, {
           group: [
-            "@supabase/*", "@aws-sdk/*", "cloudflare:*", "@cloudflare/*",
             "**/backend/index", "**/backend/index.ts",
-            "**/backend/supabase/**", "**/backend/cloudflare/**", "**/backend/aws/**",
             "**/providers/supabase/**", "**/providers/cloudflare/**", "**/providers/aws/**",
             "../supabase/**", "../cloudflare/**", "../aws/**", "**/cloud/**",
           ],

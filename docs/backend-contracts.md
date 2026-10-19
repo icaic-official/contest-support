@@ -10,6 +10,7 @@ The contracts describe Minsky operations.
 They do not expose database queries, access tokens, provider clients, or channel objects.
 The server still checks permissions and applies each workflow command as a transaction.
 A transaction commits all changes for a command together, or commits none.
+For implementation and registration steps, use [Add a backend provider](add-provider.md).
 
 ## Shared server workflow
 
@@ -86,9 +87,19 @@ See [installation](../site/src/content/docs/operators/installation.md), [provide
 | [imageFile.ts](../src/connected/imageFile.ts) | Defines file checks, attachment paths, and error classification shared with the attachment function. |
 
 The UI imports the contracts and `requireBackend()`.
-`npm run lint` rejects provider imports outside provider adapter modules and the backend entry point.
-The active application server functions remain specific to Supabase.
+ESLint restricts provider SDKs, browser implementations, and server adapters in shared application code.
+The UI can import the contracts, shared errors, and selected backend factory.
+The same provider pattern protects shared server rules and test scenarios.
+ESLint checks static imports, re-exports, and literal dynamic UI imports.
+ESLint rejects computed dynamic UI paths because it cannot determine their provider.
+Provider modules and the backend registration file retain access to their implementation dependencies.
 Both complete browser adapters have provider-owned fixture drivers.
+
+`Backend` defines behavior without requiring a distinct browser transport for every hosting provider.
+The current Cloudflare browser transport uses HTTP, cookies, and WebSockets without Cloudflare SDKs.
+A server with that same protocol can reuse it. Different protocols can implement `Backend` directly.
+Deployment bindings and provider secrets remain outside the shared application contracts.
+AWS, GCP, and Azure have no implementation or verified installation path.
 
 Supabase builds use `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY`.
 For a Supabase build, `backend` is `undefined` when either value is missing.

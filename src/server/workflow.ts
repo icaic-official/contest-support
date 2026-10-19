@@ -97,64 +97,112 @@ export function equalWorkflowJson(left: unknown, right: unknown): boolean {
 /** Existing workflow decisions. Persistence must reject changes to the captured state. */
 export function decideWorkflow(state: WorkflowState, command: Command): WorkflowDecision | Rejection {
   const { membership: member, issue, actor } = state;
-  if (state.archived) return reject('access');
-  const support = member.roles.includes('volunteer') || member.roles.includes('specialist');
-  const jury = member.roles.includes('jury');
-  const staff = member.is_admin || member.roles.length > 0;
-  if (command.type === 'submit') {
-    if (member.team_id === null && !support || member.team_id !== null && !state.session.intake_open) return reject('access');
-    const teamId = member.team_id ?? command.team_id;
-    if (!teamId || !state.teams.includes(teamId) || !state.session.categories.includes(command.category)) return reject('input');
-    const description = workflowText(command.description);
-    return { type: 'submit', issueId: null, teamId, submission: { category: command.category, description },
-      history: { text: `Issue submitted: ${description}`, visibility: 'public' } };
+  if (state.archived) {
+    return reject('access');
   }
-  if (!issue || !staff && member.team_id !== issue.team_id) return reject('access');
-  if (issue.revision !== command.revision) return reject('state');
-  const decision: WorkflowDecision = { type: command.type, issueId: issue.id, teamId: issue.team_id,
-    history: { text: '', visibility: 'public' } };
+  const hasSupportRole = member.roles.includes('volunteer') || member.roles.includes('specialist');
+  const hasJuryRole = member.roles.includes('jury');
+  const isStaff = member.is_admin || member.roles.length > 0;
+
+  if (command.type === 'submit') {
+    const lacksSubmissionRole = member.team_id === null && !hasSupportRole;
+    const teamIntakeClosed = member.team_id !== null && !state.session.intake_open;
+    if (lacksSubmissionRole || teamIntakeClosed) {
+      return reject('access');
+    }
+    const teamId = member.team_id ?? command.team_id;
+    if (!teamId || !state.teams.includes(teamId) || !state.session.categories.includes(command.category)) {
+      return reject('input');
+    }
+    const description = workflowText(command.description);
+    return {
+      type: 'submit', issueId: null, teamId,
+      submission: { category: command.category, description },
+      history: { text: `Issue submitted: ${description}`, visibility: 'public' },
+    };
+  }
+
+  if (!issue) {
+    return reject('access');
+  }
+  const isIssueTeam = member.team_id === issue.team_id;
+  if (!isStaff && !isIssueTeam) {
+    return reject('access');
+  }
+  if (issue.revision !== command.revision) {
+    return reject('state');
+  }
+  const decision: WorkflowDecision = {
+    type: command.type, issueId: issue.id, teamId: issue.team_id,
+    history: { text: '', visibility: 'public' },
+  };
   switch (command.type) {
     case 'claim':
-      if (!support || issue.status !== 'open') return reject('state');
+      if (!hasSupportRole || issue.status !== 'open') {
+        return reject('state');
+      }
       decision.issue = { status: 'claimed', owner: actor.id };
       decision.history.text = 'Issue claimed.';
       break;
     case 'escalate':
-      if (!support || issue.owner !== actor.id || issue.status !== 'claimed') return reject('state');
+      if (!hasSupportRole || issue.owner !== actor.id || issue.status !== 'claimed') {
+        return reject('state');
+      }
       decision.issue = { status: 'escalated' };
       decision.history.text = 'Specialist handoff requested. Current owner retained.';
       break;
     case 'accept':
-      if (!member.roles.includes('specialist') || issue.status !== 'escalated' || issue.owner === actor.id) return reject('state');
+      if (!member.roles.includes('specialist') || issue.status !== 'escalated' || issue.owner === actor.id) {
+        return reject('state');
+      }
       decision.issue = { status: 'claimed', owner: actor.id };
       decision.history.text = 'Specialist accepted ownership.';
       break;
-    case 'message':
-      if (issue.status === 'resolved' || member.team_id === null && !support && !jury || command.visibility === 'internal' && !staff) return reject('state');
+    case 'message': {
+      const canReply = member.team_id !== null || hasSupportRole || hasJuryRole;
+      const canUseVisibility = command.visibility !== 'internal' || isStaff;
+      if (issue.status === 'resolved' || !canReply || !canUseVisibility) {
+        return reject('state');
+      }
       decision.history = { text: workflowText(command.text), visibility: command.visibility };
       break;
+    }
     case 'resolve':
-      if (!support || issue.owner !== actor.id || !['claimed', 'escalated'].includes(issue.status)) return reject('state');
+      if (!hasSupportRole || issue.owner !== actor.id || !['claimed', 'escalated'].includes(issue.status)) {
+        return reject('state');
+      }
       decision.issue = { status: 'resolved' };
       decision.resolution = { summary: workflowText(command.summary) };
       decision.history.text = `Resolved: ${decision.resolution.summary}`;
       break;
     case 'reopen':
-      if (issue.status !== 'resolved' || !support && member.team_id !== issue.team_id) return reject('state');
+      if (issue.status !== 'resolved' || (!hasSupportRole && !isIssueTeam)) {
+        return reject('state');
+      }
       decision.issue = { status: 'claimed' };
       decision.reopen = { reason: workflowText(command.reason) };
       decision.history.text = `Reopened: ${decision.reopen.reason}`;
       break;
     case 'award':
-      if (!jury || issue.status !== 'resolved' || !state.resolution || state.award) return reject('state');
-      decision.award = { resolutionId: state.resolution.id, minutes: command.minutes, explanation: workflowText(command.explanation) };
+      if (!hasJuryRole || issue.status !== 'resolved' || !state.resolution || state.award) {
+        return reject('state');
+      }
+      decision.award = {
+        resolutionId: state.resolution.id,
+        minutes: command.minutes,
+        explanation: workflowText(command.explanation),
+      };
       decision.history.text = `${command.minutes} minutes awarded: ${decision.award.explanation}`;
       break;
-    case 'apply':
-      if (!support && !jury || !state.award || state.award.applied_at !== null) return reject('state');
+    case 'apply': {
+      const canConfirmAward = hasSupportRole || hasJuryRole;
+      if (!canConfirmAward || !state.award || state.award.applied_at !== null) {
+        return reject('state');
+      }
       decision.apply = { awardId: state.award.id };
       decision.history.text = 'External application confirmed. No contest clock was changed by Minsky.';
       break;
+    }
   }
   return decision;
 }

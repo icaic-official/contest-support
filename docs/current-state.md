@@ -17,7 +17,7 @@ The existing stable activation remains at source `4e43739`; this frontend change
 Earlier activation and protected results do not verify this expanded frontend diff.
 Final source revisions and fresh GitHub checks belong in PR #45, separately from the local results below.
 
-Local verification passes 658 unit/database/tooling cases, 56 ordinary browser cases, 12 function cases, three authentication browser cases, three docs browser cases, and both complete local runtime journeys.
+Local verification passes 658 unit/database/tooling cases, 57 ordinary browser cases, 12 function cases, three authentication browser cases, three docs browser cases, and both complete local runtime journeys.
 Type checking, lint, application build, docs build, and shared scenario discovery pass.
 The docs build checks 13 HTML pages and 534 local links and assets.
 Codex inspects fictional jury screens at 320px and 390px. Text and controls fit both widths.
@@ -33,6 +33,11 @@ The first full browser run passes 54/56 and fails two artifact closures because 
 An unchanged rerun with its own output directory passes 56/56.
 New browser-test locator mistakes are corrected before these final runs.
 A review finding about the current phone link leaving Menu open is corrected and receives a keyboard regression check.
+A later hosted-test review finds one old expectation that optional password change resets the section to Issues.
+The hosted test now requires `/account` after the change and reload, then explicitly opens Issues before checking sign-out and sign-in.
+A new fictional-response browser case covers cancellation, save, completion, and reload at `/account`.
+Superseded protected runs `39324916481` and `39324966455` are stopped before any hosted fixture job starts.
+Final checks use the later test revision. The application source and deployment configuration remain unchanged from `5ca804f`.
 
 The [run report](t0021-run-report.md#frontend-organization-and-routing-2026-10-20) records this follow-up.
 

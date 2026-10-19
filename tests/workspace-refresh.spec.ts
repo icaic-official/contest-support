@@ -152,6 +152,10 @@ async function openWorkspace(
         writes.push({ path, body: route.request().postDataJSON() });
         result = null;
         break;
+      case '/rest/v1/rpc/complete_password_change':
+        writes.push({ path, body: null });
+        result = null;
+        break;
       case '/rest/v1/rpc/workflow': {
         const body = route.request().postDataJSON();
         workflowRequests.push(body);
@@ -192,6 +196,42 @@ async function openWorkspace(
   }
   return { state, writes, workflowRequests };
 }
+
+test('optional password change and cancellation return to My account and preserve its URL', async ({ page }) => {
+  const { writes } = await openWorkspace(page, undefined, { path: '/account' });
+  const accountHeading = page.getByRole('heading', { name: 'My account', exact: true });
+  const changePassword = page.getByRole('button', { name: 'Change password', exact: true });
+  const passwordHeading = page.getByRole('heading', { name: 'Change your password', exact: true });
+  const accountLink = page.getByRole('navigation').getByRole('link', {
+    name: 'My account',
+    exact: true,
+  });
+  await expect(accountHeading).toBeVisible();
+  await changePassword.click();
+  await expect(passwordHeading).toBeVisible();
+  await expect(page).toHaveURL('/account');
+  await page.getByRole('button', { name: 'Return to dashboard', exact: true }).click();
+  await expect(accountHeading).toBeVisible();
+  await expect(page).toHaveURL('/account');
+  await expect(accountLink).toHaveAttribute('aria-current', 'page');
+  expect(writes).toEqual([]);
+
+  await changePassword.click();
+  await expect(passwordHeading).toBeVisible();
+  await page.getByLabel('Current password', { exact: true }).fill('fixture-password');
+  await page.getByLabel('New password', { exact: true }).fill('replacement-fixture-password');
+  await page.getByLabel('Confirm password', { exact: true }).fill('replacement-fixture-password');
+  await page.getByRole('button', { name: 'Save password', exact: true }).click();
+  await expect(accountHeading).toBeVisible();
+  await expect(passwordHeading).toHaveCount(0);
+  await expect(page).toHaveURL('/account');
+  await expect(accountLink).toHaveAttribute('aria-current', 'page');
+  expect(writes).toEqual([{ path: '/rest/v1/rpc/complete_password_change', body: null }]);
+  await page.reload();
+  await expect(accountHeading).toBeVisible();
+  await expect(page).toHaveURL('/account');
+  await expect(accountLink).toHaveAttribute('aria-current', 'page');
+});
 
 for (const route of [
   { path: '/issues', heading: 'Issue Queue', label: 'Issues' },

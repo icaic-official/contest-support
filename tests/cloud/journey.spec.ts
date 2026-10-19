@@ -772,13 +772,22 @@ test("admin UI assigns combined roles; password change, refresh and logout work"
     .getByRole("button", { name: "Save password", exact: true })
     .click();
   await expect(
-    page.getByRole("heading", { name: "Issue Queue" }),
+    page.getByRole("heading", { name: "My account", exact: true }),
   ).toBeVisible();
+  await expect(page).toHaveURL("/account");
   // Later cloud tests sign in through the same UUID-scoped fixture accounts.
   const state = fixture();
   state.accounts.volunteer.password = password;
   save(state);
   await page.reload();
+  await expect(
+    page.getByRole("heading", { name: "My account", exact: true }),
+  ).toBeVisible();
+  await expect(page).toHaveURL("/account");
+  await page
+    .getByRole("navigation", { name: "Workspace navigation" })
+    .getByRole("link", { name: "Issues", exact: true })
+    .click();
   await expect(
     page.getByRole("heading", { name: "Issue Queue" }),
   ).toBeVisible();

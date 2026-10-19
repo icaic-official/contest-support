@@ -80,8 +80,13 @@ export function wranglerArguments(worker, plan) {
 }
 
 export function previewAddress(output) {
-  const urls = JSON.parse(output).preview?.urls;
-  const address = urls?.find((value) => {
+  let urls;
+  try {
+    // Wrangler can print asset progress before its final JSON preview result.
+    const start = [...output.matchAll(/^\s*\{\s*"preview"\s*:/gm)].at(-1)?.index;
+    if (start !== undefined) urls = JSON.parse(output.slice(start)).preview?.urls;
+  } catch { /* Report a fixed error without exposing provider output. */ }
+  const address = Array.isArray(urls) && urls.find((value) => {
     try {
       const url = new URL(value);
       return url.protocol === "https:" && url.hostname.endsWith(".icaic-minsky.workers.dev") &&

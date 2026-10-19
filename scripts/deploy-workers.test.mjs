@@ -95,6 +95,21 @@ it("uses Cloudflare's preview URL and rejects missing or unrelated URLs", () => 
   expect(() => previewAddress("{}")).toThrow();
 });
 
+it("reads the final preview result after asset progress and keeps failures private", () => {
+  const url = "https://branch-minsky-docs.icaic-minsky.workers.dev";
+  const progress = "🌀 Building list of assets...\n+ /images/{fixture}.png\n{\"assets\": 13}\n";
+  const result = JSON.stringify({ preview: { urls: [url] } }, null, 2);
+  expect(previewAddress(progress + result + "\n")).toBe(url);
+  for (const output of [progress, progress + "{\"preview\":", progress + result + "\ntrailing output",
+    progress + JSON.stringify({ preview: { urls: url } }),
+    progress + JSON.stringify({ preview: { urls: ["https://evil.example"] } }),
+    progress + JSON.stringify({ preview: { urls: ["http://branch-minsky-docs.icaic-minsky.workers.dev"] } }),
+    progress + JSON.stringify({ preview: { urls: ["https://user:pass@branch-minsky-docs.icaic-minsky.workers.dev"] } }),
+  ]) {
+    expect(() => previewAddress(output)).toThrow("Cloudflare did not return a Minsky preview URL.");
+  }
+});
+
 it("verifies the deployed revision and fails when propagation never completes", async () => {
   const request = vi.fn().mockRejectedValueOnce(new Error("DNS pending"))
     .mockResolvedValueOnce({ ok: true, json: async () => ({ sha: "older" }) })

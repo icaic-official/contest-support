@@ -79,6 +79,19 @@ The existing $5 monthly plan remains the limit. This work adds no paid service o
 The procedure preserves Cloudflare records, private objects, and secrets during repair. It authorizes no automatic return to Supabase.
 Earlier dated sections below retain their original state, failed attempts, and source-specific evidence.
 
+### Documentation preview follow-up
+
+The operational records PR uses source `6cfe1d2`. Its [PR CI](https://github.com/GiftedNovaHD/minsky/actions/runs/39267388899) passes all ordinary checks.
+Its [push run](https://github.com/GiftedNovaHD/minsky/actions/runs/39267328994) also passes `checks`, `secrets`, and `dependencies`. The app job skips its preview as required.
+The docs preview upload succeeds, but the publisher then fails to parse Wrangler output. Pinned Wrangler prints asset progress before its final JSON result.
+The existing parser expects JSON at the start of stdout. The stable app and independent stable docs remain on the verified versions above.
+
+[PR #45](https://github.com/GiftedNovaHD/minsky/pull/45) adds a bounded parser correction and one regression case.
+The parser reads the final preview JSON document and retains every URL guard. Malformed output returns the existing fixed error without printing provider output.
+All 31 deployment cases and lint pass locally. Fresh ordinary CI and the actual docs preview result belong in that PR.
+This follow-up changes no application runtime, generated config, protected fixture, or workflow. It does not redeploy the stable app.
+Owner review and merge of this operational follow-up remain pending.
+
 ## T0021 maintainability follow-up, 2026-10-19
 
 The owner requests a review follow-up in open [PR #43](https://github.com/GiftedNovaHD/minsky/pull/43).

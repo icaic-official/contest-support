@@ -1,5 +1,12 @@
 # Minsky planning record
 
+**PR #45 retry review fixes, 2026-10-20.** The owner requests backend and frontend fixes through separate subagents.
+Bind uncertain workflow requests to their authenticated actor and original contest session.
+Retain each request ID through transient account-check failures. Continue to hide protected content while the check fails.
+Verify explicit retries, access removal, identity changes, and duplicate prevention.
+Keep provider resources, deployment settings, server authorization, and transaction rules unchanged.
+The owner reviews and merges the existing PR. The separate cached-image concern remains follow-up work.
+
 **T0021 frontend follow-up, 2026-10-20.** The owner requests separate feature modules and URL routing in existing PR #45.
 Use the existing ticket checkout and branch. Preserve shared session state, workflow requests, access rules, and both providers.
 Verify direct links, reload, browser history, phone navigation, and current membership checks.

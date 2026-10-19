@@ -523,11 +523,14 @@ test("real accounts share the journey, private notes stay private, and phone/ref
     await staff.goto("/");
     await expect(
       staff.getByRole("heading", { name: "Issue Queue" }),
-    ).toBeVisible();
-    await staff.keyboard.press("Tab");
-    await expect(
-      staff.getByRole("link", { name: "Skip to main content" }),
     ).toBeFocused();
+    const skipLink = staff.getByRole("link", { name: "Skip to main content" });
+    // Route navigation focuses the heading. Reach the skip link by keyboard.
+    for (let step = 0; step < 8; step++) {
+      await staff.keyboard.press("Shift+Tab");
+      if (await skipLink.evaluate((link) => link === document.activeElement)) break;
+    }
+    await expect(skipLink).toBeFocused();
     await staff.keyboard.press("Enter");
     await expect(staff.locator("#main")).toBeFocused();
     await expect(staff.getByRole("button", { name: "Reset demo" })).toHaveCount(

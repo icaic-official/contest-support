@@ -10,9 +10,15 @@ Provider SDKs and provider configuration remain outside the UI.
 [`App.tsx`](../src/app/App.tsx) restores authentication and checks account access.
 It requires temporary-password changes before it renders the workspace.
 An invalid login or an account without membership cannot read session data.
+It retains pending workflow metadata for the authenticated actor while a failed account check hides the workspace.
+Signing out or changing the authenticated actor clears that metadata.
 
-[`Workspace.tsx`](../src/app/Workspace.tsx) owns the selected session, authorized snapshot, live connection, and workflow requests.
-It retains request IDs after an uncertain write so an explicit retry cannot duplicate an action.
+[`Workspace.tsx`](../src/app/Workspace.tsx) owns the selected session, authorized snapshot, live connection, and workflow execution.
+Pending metadata records the original actor, session, request ID, and command.
+An explicit retry uses that same request even if access removal selects another session.
+The server can reject the retry if access to the original session is lost.
+Account-check recovery does not automatically repeat a write.
+This metadata stays in memory. A full page reload discards it.
 It also retains issue selection, filters, and report-panel state when the user changes sections.
 Screen components receive that state and the existing operations through props.
 There is no second polling loop, live connection, or workflow implementation for each screen.

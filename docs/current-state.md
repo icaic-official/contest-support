@@ -1,5 +1,25 @@
 # Current state
 
+## PR #45 retry review fixes, 2026-10-20
+
+The owner requests the backend and frontend retry fixes from the PR #45 review.
+Pending workflow metadata now records the authenticated actor and original contest session above the account-check gate.
+A failed account check still hides protected content. Recovery retains the original request ID and command for an explicit retry.
+Access removal can select another session, but the retry still reaches the original session's server access check.
+Signing out or changing the actor clears the pending metadata.
+Late responses from an unmounted workspace cannot complete a different request or run stale form callbacks.
+These fixes change neither server authorization nor provider configuration.
+
+The earlier protected Supabase run [39326130328](https://github.com/GiftedNovaHD/minsky/actions/runs/39326130328) fails two of 16 hosted cases on `adff06c`.
+One keyboard assertion assumes initial document focus after route navigation. One jury assertion reads rows before the route loads.
+The updated checks require heading focus, keyboard access to the skip link, and both jury rows before checking order.
+Fixture cleanup completes in that failed run. It remains failed evidence.
+
+The owner previously requested manual publication of application source `adff06c` before merge.
+This retry follow-up does not publish the stable application.
+PR #45 is draft during fresh verification. The [run report](t0021-run-report.md#retry-review-fixes-2026-10-20) records the checks and remaining limits.
+The cached staff-image preview concern remains separate follow-up work.
+
 ## T0021 frontend routes and feature modules, 2026-10-20
 
 The owner extends existing [PR #45](https://github.com/GiftedNovaHD/minsky/pull/45) with frontend organization and browser routing.
@@ -13,7 +33,7 @@ Direct paths survive sign-in and reload. Browser history restores the section.
 The workspace retains issue filters, selection, and uncertain workflow requests across section changes.
 Membership checks guard administration and jury routes after the current snapshot loads.
 Server authorization, atomic workflow commands, provider implementations, deployment settings, and fixture cleanup remain unchanged.
-The existing stable activation remains at source `4e43739`; this frontend change awaits owner review and merge.
+The original activation uses source `4e43739`. The owner later requests [manual publication of `adff06c`](t0021-run-report.md#owner-requested-manual-frontend-publication-2026-10-20) before merge.
 Earlier activation and protected results do not verify this expanded frontend diff.
 Final source revisions and fresh GitHub checks belong in PR #45, separately from the local results below.
 

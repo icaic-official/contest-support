@@ -99,6 +99,20 @@ Check reply retries with isolated accounts and controlled request failures:
 
 The retry cases in `tests/workspace-refresh.spec.ts` automate these checks with mocked responses.
 
+Check submission retries through account-check failures:
+
+1. Lose a submission response after the server records the issue.
+2. Fail the next account check. Check that contest data disappears.
+3. Restore the account check. Check that **Retry last request** returns without an automatic write.
+4. Select **Retry last request**. Check that one issue exists and the request ID stays the same.
+5. Repeat with a response delayed until after account-check recovery. Check that focus stays on the current page.
+6. Sign out with an uncertain request. Sign in again and check that the old retry is absent.
+
+With isolated contestant memberships in two sessions, lose a submission response and remove the original session membership.
+Let the page select the remaining session. Retry the request and check that the server rejects access to the original session.
+Check that the remaining session contains no copy of the submitted issue.
+The cases in `tests/workflow-session-retry.spec.ts` exercise these session checks through the embedded PostgreSQL fixture.
+
 ## 5. Resolution and award
 
 1. Resolve the issue with a preset or **Custom** summary.

@@ -8,7 +8,7 @@ Staff can attach images to issues and choose staff-only or team visibility.
 
 The app uses React, TypeScript, and Vite.
 Its shared [backend contract](docs/backend-contracts.md) has Supabase and Cloudflare implementations.
-The [development application](https://minsky-dev.icaic-minsky.workers.dev) runs Cloudflare at the approved source `4e43739`.
+The [development application](https://minsky-dev.icaic-minsky.workers.dev) runs Cloudflare. See [current state](docs/current-state.md) for its deployed source.
 The Cloudflare installation serves the frontend and API through Workers, with D1, private R2 images, and Durable Object live updates.
 Both providers retain the shared workflow behavior. Supabase resources and accounts remain intact.
 

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { backend, backendSetupMessage, requireBackend } from "../backend";
 import type { AccountIdentity, AccountStatus } from "../backend/contracts";
 import { errorMessage } from "../backend/errors";
@@ -6,6 +6,7 @@ import { Brand } from "../connected/ui";
 import { PasswordForm } from "../features/account/PasswordForm";
 import { SignInPage } from "../features/authentication/SignInPage";
 import { Workspace } from "./Workspace";
+import type { PendingWorkflowRequest } from "./workflowRequest";
 
 export function App() {
   const [user, setUser] = useState<AccountIdentity>();
@@ -15,6 +16,8 @@ export function App() {
   const [account, setAccount] = useState<AccountStatus>();
   const [accountError, setAccountError] = useState("");
   const [accountRetry, setAccountRetry] = useState(0);
+  // Account checks hide the workspace. Keep uncertain writes for the same actor.
+  const pendingRequest = useRef<PendingWorkflowRequest | undefined>(undefined);
   const userId = user?.id;
   useEffect(() => {
     if (!backend) {
@@ -22,19 +25,19 @@ export function App() {
       return;
     }
     let active = true;
-    const unsubscribe = backend.auth.subscribe((nextUser) => {
+    function acceptUser(nextUser: AccountIdentity | undefined) {
       if (!active) return;
+      if (pendingRequest.current?.actorId !== nextUser?.id) {
+        pendingRequest.current = undefined;
+      }
       setUser(nextUser);
       setLoading(false);
       if (!nextUser) setPasswordSetup(false);
-    });
+    }
+    const unsubscribe = backend.auth.subscribe(acceptUser);
     void backend.auth
       .currentUser()
-      .then((nextUser) => {
-        if (!active) return;
-        setUser(nextUser);
-        setLoading(false);
-      })
+      .then(acceptUser)
       .catch((cause: unknown) => {
         if (!active) return;
         setError(errorMessage(cause));
@@ -141,6 +144,7 @@ export function App() {
             key={user.id}
             user={user}
             username={account.username}
+            pendingRequest={pendingRequest}
             changePassword={() => setPasswordSetup(true)}
             signOut={signOut}
           />

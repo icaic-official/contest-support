@@ -1,5 +1,6 @@
 import {
   type MouseEvent,
+  type RefObject,
   useCallback,
   useEffect,
   useRef,
@@ -30,17 +31,20 @@ import type { ActionOptions } from "../features/issues/actions";
 import { IssuesPage, type IssuesView } from "../features/issues/IssuesPage";
 import { initialTeamSelection } from "../features/issues/teamSearch";
 import { JuryPage } from "../features/jury/JuryPage";
+import type { PendingWorkflowRequest } from "./workflowRequest";
 
 export function Workspace({
   user,
   username,
   changePassword,
   signOut,
+  pendingRequest: pending,
 }: {
   user: AccountIdentity;
   username: string | null;
   changePassword: () => void;
   signOut: () => void;
+  pendingRequest: RefObject<PendingWorkflowRequest | undefined>;
 }) {
   const [sessions, setSessions] = useState<Array<{ id: string; name: string }>>(
     [],
@@ -64,14 +68,18 @@ export function Workspace({
   const [now, setNow] = useState(Date.now());
   const clockOffset = useRef(0);
   const inFlight = useRef(false);
-  const pending = useRef<
-    | {
-        request: string;
-        command: Command;
-        onSuccess?: () => void;
+  const mounted = useRef(false);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      // Keep retry metadata across the account gate, but discard callbacks
+      // that refer to forms in this workspace after those forms unmount.
+      if (pending.current?.actorId === user.id) {
+        pending.current.onSuccess = undefined;
       }
-    | undefined
-  >(undefined);
+    };
+  }, [pending, user.id]);
   const generation = useRef(0);
   const refreshQueue = useRef<Promise<void>>(Promise.resolve());
   const refresh = useCallback(() => {
@@ -169,7 +177,10 @@ export function Workspace({
     command: Command,
     { retry = false, onSuccess }: ActionOptions = {},
   ): Promise<boolean> {
-    if (inFlight.current || (!retry && pending.current)) return false;
+    if (!mounted.current || inFlight.current || (!retry && pending.current)) {
+      return false;
+    }
+    if (retry && pending.current?.actorId !== user.id) return false;
     inFlight.current = true;
     setBusy(true);
     setNotice("");
@@ -177,18 +188,26 @@ export function Workspace({
     const request =
       retry && pending.current
         ? pending.current
-        : { request: crypto.randomUUID(), command, onSuccess };
+        : {
+            actorId: user.id,
+            sessionId: session,
+            request: crypto.randomUUID(),
+            command,
+            onSuccess,
+          };
     pending.current = request;
     try {
       const id = await requireBackend().workflows.execute(
-        session,
+        request.sessionId,
         request.request,
         request.command,
       );
+      if (pending.current !== request || !mounted.current) return false;
       pending.current = undefined;
       // A retry must complete the original form's cleanup before enabling edits.
       request.onSuccess?.();
       await refresh();
+      if (!mounted.current) return false;
       if (!juryView) {
         setIssuesView((current) => ({
           ...current,
@@ -199,17 +218,19 @@ export function Workspace({
       setNotice("Action recorded in shared history.");
       return true;
     } catch (cause) {
+      if (pending.current !== request || !mounted.current) return false;
       // Known server rejections are definitive. Transport failures retain the same
       // request UUID for an explicit retry, including submissions and messages.
       if (cause instanceof WorkflowRejectedError) {
         pending.current = undefined;
       }
       await refresh();
+      if (!mounted.current) return false;
       setError(errorMessage(cause));
       return false;
     } finally {
       inFlight.current = false;
-      setBusy(false);
+      if (mounted.current) setBusy(false);
     }
   }
   const m = state?.membership;

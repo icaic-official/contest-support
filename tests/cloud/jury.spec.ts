@@ -129,6 +129,8 @@ test("two hosted clients update the ordered worklist while preserving drafts, fo
     const selected = await page.locator(".issue-card[aria-pressed=true] .issue-cell strong").allTextContents();
     await page.getByRole("navigation").getByRole("link", { name: "Jury worklist", exact: true }).click();
     const decisions = page.getByRole("region", { name: /^Needs decision/ });
+    await expect(decisions.getByRole("article", { name: `Issue ISS-${first.number}`, exact: true })).toBeVisible();
+    await expect(decisions.getByRole("article", { name: `Issue ISS-${second.number}`, exact: true })).toBeVisible();
     const order = await decisions.getByRole("article").evaluateAll((rows) => rows.map((row) => row.getAttribute("aria-label")));
     expect(order.indexOf(`Issue ISS-${first.number}`)).toBeGreaterThanOrEqual(0);
     expect(order.indexOf(`Issue ISS-${first.number}`)).toBeLessThan(order.indexOf(`Issue ISS-${second.number}`));

@@ -100,6 +100,8 @@ The owner merged PR #43 and separately approved the concrete activation. No acti
 On 2026-10-20, the owner adds separate frontend feature modules and browser routes to that PR.
 The follow-up preserves shared session state, workflow rules, both providers, configuration, and all target guards.
 Fresh verification and owner review cover the expanded diff. The owner merges it.
+The owner's later review requests session-bound retries and retention of uncertain request IDs through transient account-check failures.
+Those fixes require fresh verification. See [the frontend reference](frontend-structure.md) for the request lifetime and retry behavior.
 
 ## T0020 Complete Cloudflare connector
 

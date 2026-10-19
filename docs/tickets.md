@@ -59,11 +59,12 @@ T0008 fuzzy team search merged into `main` in [PR #22](https://github.com/notbow
 
 Branch: `feature/t0022-ci-run-deduplication`, from updated `main` at `4e43739`.
 Status: implementation and local verification pass in [PR #46](https://github.com/GiftedNovaHD/minsky/pull/46). The PR records GitHub push and pull-request results separately. The owner reviews and merges.
-Summary: Run ordinary checks once per repository branch push. Retain fork PR checks and existing deployment and protected-test controls.
+Summary: Run ordinary checks once per repository branch push. Retain fork PR checks and correct the observed docs-preview output parsing failure.
 
 Same-repository PR jobs skip without allocating runners and use distinct names.
 The ordinary required names remain `checks`, `secrets`, and `dependencies` on actual executions.
 These PRs use branch-head evidence. A second synthetic-merge check no longer runs.
+Wrangler can print asset progress before its JSON response. The preview parser accepts that prefix and retains URL and revision checks.
 Cloudflare CI migration remains candidate work. This ticket does not change provider configuration or protected environment rules.
 
 ### Acceptance criteria
@@ -74,6 +75,7 @@ Cloudflare CI migration remains candidate work. This ticket does not change prov
 - [x] Main and branch deployments retain their current prerequisites and cancellation rules.
 - [x] Scheduled security checks and manual protected suites retain their current routing.
 - [x] Workflow validation, local required checks, and PR push routing are recorded separately.
+- [x] The docs parser accepts progress-prefixed Wrangler output and rejects malformed responses.
 
 ### Verification
 

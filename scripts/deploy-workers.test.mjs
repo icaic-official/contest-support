@@ -95,6 +95,28 @@ it("uses Cloudflare's preview URL and rejects missing or unrelated URLs", () => 
   expect(() => previewAddress("{}")).toThrow();
 });
 
+it("reads preview JSON after asset progress and rejects malformed responses", async () => {
+  const url = "https://branch-minsky-docs.icaic-minsky.workers.dev";
+  const payload = JSON.stringify({ preview: { urls: [url] } }, null, 2);
+  const output = `🌀 Building list of assets...\n🌀 Starting asset upload...\n${payload}\n`;
+  expect(previewAddress(output)).toBe(url);
+  for (const invalid of [
+    `Progress without JSON: ${url}`, `Progress\n{broken JSON`, `${output}trailing output`,
+    JSON.stringify({ preview: { urls: url } }),
+    JSON.stringify({ preview: { urls: ["https://evil.example"] } }),
+  ]) {
+    expect(() => previewAddress(invalid)).toThrow(/Cloudflare did not return/);
+  }
+  const mocks = deploymentMocks();
+  mocks.execute.mockReturnValue(output);
+  await deployWorkers(env, { ...mocks, site: "docs" });
+  expect(mocks.verify).toHaveBeenCalledWith(url, { sha });
+  mocks.verify.mockClear();
+  mocks.execute.mockReturnValue(`Progress\n{broken JSON`);
+  await expect(deployWorkers(env, { ...mocks, site: "docs" })).rejects.toThrow("valid preview JSON");
+  expect(mocks.verify).not.toHaveBeenCalled();
+});
+
 it("verifies the deployed revision and fails when propagation never completes", async () => {
   const request = vi.fn().mockRejectedValueOnce(new Error("DNS pending"))
     .mockResolvedValueOnce({ ok: true, json: async () => ({ sha: "older" }) })

@@ -118,6 +118,7 @@ These checks verify publication, selection, bindings, and an anonymous denial.
 Authenticated authorization, private images, recovery, and live updates require the separate application checks.
 
 Docs previews use a normalized branch name with a 12-character SHA-256 suffix.
+The preview parser accepts asset-progress lines before the JSON response. Malformed JSON and URLs outside the permitted Worker domain remain rejected.
 The script runs `wrangler preview` with `--ignore-base-config`, the revision tag, and JSON output.
 Stable publication uses `wrangler deploy` with the reviewed configuration.
 Docs deployment never reads app backend variables or configuration.

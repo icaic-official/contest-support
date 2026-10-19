@@ -7,8 +7,9 @@ The isolated `feature/t0022-ci-run-deduplication` branch starts from that main r
 See [event routing](cloudflare-build-settings.md#events-and-prerequisites) for the implemented behavior and branch-head coverage.
 Reverting the workflow change restores both executions.
 
-### Local verification
+### Initial local verification
 
+These application runs precede the parser-only follow-up below. The PR records final source-specific GitHub results.
 Checksum-verified `actionlint` 1.7.12 passes for `.github/workflows/checks.yml`.
 A temporary validator parses the actual YAML and evaluates its expressions with GitHub's `@actions/expressions` 0.3.61.
 All 11 scenarios pass. These cover main, feature, and Dependabot pushes, same-repository and fork PRs, the weekly schedule, and three protected dispatch selections.
@@ -23,6 +24,19 @@ All three docs browser cases pass.
 The initial sandboxed `npm ci` and validator child-process call hit sandbox restrictions. The locked installation and corrected validation harness pass afterward.
 The validator's first expected app-job route was incorrect. The existing deployment script handles the branch decision. No deployment behavior changed.
 Changed Markdown paths and `git diff --check` pass.
+
+### Docs preview follow-up
+
+The [push run on `96503c2`](https://github.com/GiftedNovaHD/minsky/actions/runs/39335199415) passes `checks`, `secrets`, and `dependencies`.
+Its app job correctly skips branch publication. Its docs job fails while parsing Wrangler stdout after publication.
+The first stdout line is asset-progress text, even with `--json`. The unchanged parser expected JSON from the first byte.
+This failure is separate from the duplicate-job routing. The parser now reads the JSON object after leading progress lines.
+Malformed JSON, trailing output, invalid URL lists, and unrelated domains remain rejected. Revision verification remains mandatory.
+All 31 focused deployment tests pass, including the progress-prefixed publication path and rejection cases.
+Types, lint, and both builds pass after the parser correction.
+The first full repeat passes 657 cases but hits the existing provider-boundary test's 5,000 ms timeout during concurrent lint/build work.
+That unchanged file then passes all five cases in isolation. The full suite passes all 658 cases without concurrent builds. No timeout or assertion changed.
+Fresh final verification follows in the PR. This change adds no resource, credential, dependency, or provider setting.
 
 ### GitHub verification boundary
 

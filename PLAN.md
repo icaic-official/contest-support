@@ -6,6 +6,8 @@ Use `feature/t0022-ci-run-deduplication` in a separate worktree.
 Repository branch pushes own ordinary checks and existing deployment prerequisites. Fork pull requests retain unprivileged checks.
 Same-repository pull request jobs skip without allocating runners. Their distinct names cannot satisfy the required ordinary check names.
 Keep scheduled security checks, manual protected suites, deployment guards, and existing environment rules.
+Required checks on `96503c2` pass, but the existing docs preview parser fails on Wrangler asset progress before its JSON response.
+Correct that parser within T0022 so previews remain usable. Keep URL restrictions and revision verification. Add focused rejection coverage.
 Same-repository PRs use branch-head evidence instead of a second test of GitHub's synthetic merge commit.
 Revert the workflow change to restore both executions. Cloudflare CI migration remains candidate work.
 The owner reviews and merges. No provider configuration, paid service, backend activation, or cloud-test allowlist change is authorized.

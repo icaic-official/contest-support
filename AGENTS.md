@@ -27,6 +27,7 @@ The owner merged T0021 in PR #43, then requested this bounded CI change.
 See [the ticket](docs/tickets.md#t0022-reduce-duplicate-ci-checks) and the latest decision in [PLAN.md](PLAN.md).
 Preserve branch-push deployment prerequisites, fork PR checks, scheduled security jobs, and manual protected suites.
 Skipped same-repository PR jobs must not satisfy the names of required checks.
+Correct the observed docs-preview JSON parsing failure. Preserve URL restrictions, revision checks, and provider targets.
 Do not migrate CI providers, change provider settings, add paid services, activate Cloudflare development, or alter cloud-test rules.
 Supabase remains active. Backend activation requires the separate [activation procedure](docs/activate-cloudflare-development.md).
 Earlier provider permissions and unique verification records remain in PLAN.md and the dated run records.

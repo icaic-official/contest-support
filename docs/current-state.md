@@ -26,7 +26,10 @@ Changed Markdown paths and `git diff --check` pass.
 
 ### GitHub verification boundary
 
-The PR records the final push run and skipped same-repository PR run separately from local verification.
+[PR #46](https://github.com/GiftedNovaHD/minsky/pull/46) records the final push and PR runs separately from local verification.
+Its [first PR run](https://github.com/GiftedNovaHD/minsky/actions/runs/39335043678) skips every job on `57763aa`. No duplicate runner starts.
+GitHub displays the ordinary jobs' name expressions without evaluating them. Those labels differ from the required ordinary names.
+The first push check is superseded before deployment to record this observed display behavior. Its cancellation is not a test failure.
 No fork PR, schedule, or protected dispatch is created for this change. Their routes pass local expression evaluation only.
 The main-protection lookup returns `403` with a GitHub plan requirement. This run does not claim remote merge enforcement or change protection rules.
 No provider configuration, paid service, backend activation, or account setting changes.

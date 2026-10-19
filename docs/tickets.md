@@ -58,7 +58,7 @@ T0008 fuzzy team search merged into `main` in [PR #22](https://github.com/notbow
 ## T0022 Reduce duplicate CI checks
 
 Branch: `feature/t0022-ci-run-deduplication`, from updated `main` at `4e43739`.
-Status: implementation and local verification pass. The PR records GitHub push and pull-request results separately. The owner reviews and merges.
+Status: implementation and local verification pass in [PR #46](https://github.com/GiftedNovaHD/minsky/pull/46). The PR records GitHub push and pull-request results separately. The owner reviews and merges.
 Summary: Run ordinary checks once per repository branch push. Retain fork PR checks and existing deployment and protected-test controls.
 
 Same-repository PR jobs skip without allocating runners and use distinct names.

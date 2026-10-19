@@ -19,7 +19,8 @@ The [activation guide](activate-cloudflare-development.md) owns the backend swit
 Repository branch pushes run `checks`, `secrets`, and `dependencies`, including when a PR is open.
 Fork PRs run those same jobs against GitHub's synthetic merge commit without provider credentials.
 Same-repository PRs use the branch-head results. They do not run a second synthetic-merge suite.
-Their skipped jobs use the names `checks-covered-by-push`, `secrets-covered-by-push`, and `dependencies-covered-by-push`.
+Their job-name expressions select `checks-covered-by-push`, `secrets-covered-by-push`, and `dependencies-covered-by-push`.
+GitHub can display the expression text when it skips a job before evaluation. Both forms differ from the ordinary required check names.
 The skipped names are informational. Required branch checks use the ordinary names.
 A same-repository PR needs a passing push run for its head revision. A new commit triggers a fresh push run.
 

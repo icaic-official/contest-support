@@ -30,7 +30,7 @@ async function login(page: Page, name = "jury") {
 async function openWorklist(page: Page) {
   await page
     .getByRole("navigation")
-    .getByRole("button", { name: "Jury worklist", exact: true })
+    .getByRole("link", { name: "Jury worklist", exact: true })
     .click();
   await expect(
     page.getByRole("heading", { name: "Jury worklist", exact: true }),
@@ -84,7 +84,7 @@ test("lists outstanding work across queue filters and returns keyboard focus to 
   await expect(target).toBeFocused();
   await page
     .getByRole("navigation")
-    .getByRole("button", { name: "Issues", exact: true })
+    .getByRole("link", { name: "Issues", exact: true })
     .click();
   await expect(page.getByLabel("Status")).toHaveValue("resolved");
   await expect(page.getByRole("combobox", { name: "Find a team" })).toHaveValue("Aurora");
@@ -376,7 +376,7 @@ test("existing details retain public and internal separation and team/session is
   await expect(page.getByText("Public service update", { exact: true })).toBeVisible();
   await expect(page.getByText("Private staff investigation", { exact: true })).toHaveCount(0);
   await expect(page.locator(".issue-card").filter({ hasText: "ISS-2" })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Jury worklist", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Jury worklist", exact: true })).toHaveCount(0);
 });
 
 test("session and role changes clear selection and do not grant other roles a jury entry", async ({
@@ -390,7 +390,7 @@ test("session and role changes clear selection and do not grant other roles a ju
     const member = await context.newPage();
     await login(member, name);
     await expect(
-      member.getByRole("button", { name: "Jury worklist", exact: true }),
+      member.getByRole("link", { name: "Jury worklist", exact: true }),
     ).toHaveCount(0);
     await context.close();
   }
@@ -401,7 +401,7 @@ test("session and role changes clear selection and do not grant other roles a ju
     .click();
   await page.getByLabel("Contest session").selectOption(local.sessions[1]);
   await expect(
-    page.getByRole("button", { name: "Jury worklist", exact: true }),
+    page.getByRole("link", { name: "Jury worklist", exact: true }),
   ).toHaveCount(0);
   await expect(
     page.getByRole("heading", { name: "Issue Queue", exact: true }),
@@ -420,7 +420,7 @@ test("session and role changes clear selection and do not grant other roles a ju
   );
   local.broadcast();
   await expect(
-    page.getByRole("button", { name: "Jury worklist", exact: true }),
+    page.getByRole("link", { name: "Jury worklist", exact: true }),
   ).toHaveCount(0);
   await expect(page.getByLabel("Public award explanation")).toHaveCount(0);
   await local.db.query("delete from public.memberships where user_id=$1", [

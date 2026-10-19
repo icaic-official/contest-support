@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { IssueImages } from "./IssueImages";
+import { IssueImages } from "../features/issues/IssueImages";
 import { ImageRequestError } from "../backend/errors";
 import type { ImageTransport, StartedImage } from "../backend/contracts";
 import type { Attachment, PendingRemoval } from "./model";

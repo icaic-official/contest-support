@@ -5,7 +5,7 @@ import {
   type Resolution,
   type Snapshot,
   unresolvedTime,
-} from "./model";
+} from "../../connected/model";
 
 const issue: Issue = {
   id: "issue",

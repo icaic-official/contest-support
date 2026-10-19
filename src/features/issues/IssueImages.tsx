@@ -1,11 +1,11 @@
 import { useEffect, useId, useRef, useState } from "react";
-import { attachmentPath, imageKind, imageRejection } from "./imageFile";
+import { attachmentPath, imageKind, imageRejection } from "../../connected/imageFile";
 import { isImageRequestError, thumbnailBlob } from "./imageUpload";
-import { requireBackend } from "../backend";
-import type { ImageTransport, StartedImage } from "../backend/contracts";
-import { ImageRequestError } from "../backend/errors";
-import type { Attachment, PendingRemoval } from "./model";
-import { Icon } from "./ui";
+import { requireBackend } from "../../backend";
+import type { ImageTransport, StartedImage } from "../../backend/contracts";
+import { ImageRequestError } from "../../backend/errors";
+import type { Attachment, PendingRemoval } from "../../connected/model";
+import { Icon } from "../../connected/ui";
 
 export function IssueImages({
   sessionId,

@@ -9,7 +9,7 @@ async function login(page: Page, name = "jury") {
   await page.getByLabel("Password", { exact: true }).fill(details.password);
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await expect(page.locator(".connection-status")).toContainText("Live");
-  await page.getByRole("navigation").getByRole("button", { name: "Jury worklist", exact: true }).click();
+  await page.getByRole("navigation").getByRole("link", { name: "Jury worklist", exact: true }).click();
 }
 
 function viewIssue(page: Page, number: number) {
@@ -123,11 +123,11 @@ test("two hosted clients update the ordered worklist while preserving drafts, fo
   const other = await context.newPage();
   try {
     await login(page, "combined");
-    await page.getByRole("navigation").getByRole("button", { name: "Issues", exact: true }).click();
+    await page.getByRole("navigation").getByRole("link", { name: "Issues", exact: true }).click();
     await page.getByRole("combobox", { name: "Status", exact: true }).selectOption("open");
     const queue = await page.locator(".issue-card .issue-cell strong").allTextContents();
     const selected = await page.locator(".issue-card[aria-pressed=true] .issue-cell strong").allTextContents();
-    await page.getByRole("navigation").getByRole("button", { name: "Jury worklist", exact: true }).click();
+    await page.getByRole("navigation").getByRole("link", { name: "Jury worklist", exact: true }).click();
     const decisions = page.getByRole("region", { name: /^Needs decision/ });
     const order = await decisions.getByRole("article").evaluateAll((rows) => rows.map((row) => row.getAttribute("aria-label")));
     expect(order.indexOf(`Issue ISS-${first.number}`)).toBeGreaterThanOrEqual(0);
@@ -169,7 +169,7 @@ test("two hosted clients update the ordered worklist while preserving drafts, fo
       await page.screenshot({ path: testInfo.outputPath(`jury-hosted-${width}.png`), fullPage: true });
     }
     await page.setViewportSize({ width: 1280, height: 900 });
-    await page.getByRole("navigation").getByRole("button", { name: "Issues", exact: true }).click();
+    await page.getByRole("navigation").getByRole("link", { name: "Issues", exact: true }).click();
     await expect(page.getByRole("combobox", { name: "Status", exact: true })).toHaveValue("open");
     expect(await page.locator(".issue-card .issue-cell strong").allTextContents()).toEqual(queue);
     expect(await page.locator(".issue-card[aria-pressed=true] .issue-cell strong").allTextContents()).toEqual(selected);

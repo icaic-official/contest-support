@@ -131,7 +131,7 @@ does not erase an award, undo its application, or create another award decision.
   The Supabase adapter retains its guarded SQL path. The Cloudflare adapter uses the shared service and atomic D1 commits.
 - Merge current `main` into the existing PR branch without rewriting commits.
   Preserve current authentication, backend contracts, shared workflow integration, images, and refresh handling.
-  Keep changes to `ConnectedApp.tsx` and shared styles focused on worklist integration.
+  Keep changes to `src/app/Workspace.tsx`, `src/features/jury/`, and shared styles focused on worklist integration.
 - Follow the existing dark green theme. Use readable desktop lists and stacked
   phone rows, named controls, keyboard navigation, visible focus, and text labels
   for statuses. Check 320/390px widths and 200% zoom without horizontal overflow.

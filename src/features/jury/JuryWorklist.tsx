@@ -1,7 +1,7 @@
 import { type ReactNode, useEffect, useMemo, useState } from "react";
-import { type Issue, type Snapshot, unresolvedTime } from "./model";
+import { type Issue, type Snapshot, unresolvedTime } from "../../connected/model";
 import { type JuryRow, type JurySection, juryWorklists } from "./jury";
-import { clockDuration } from "./ui";
+import { clockDuration } from "../../connected/ui";
 
 const sections: Array<{ id: JurySection; title: string; description: string }> =
   [

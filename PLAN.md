@@ -1,5 +1,10 @@
 # Minsky planning record
 
+**T0021 frontend follow-up, 2026-10-20.** The owner requests separate feature modules and URL routing in existing PR #45.
+Use the existing ticket checkout and branch. Preserve shared session state, workflow requests, access rules, and both providers.
+Verify direct links, reload, browser history, phone navigation, and current membership checks.
+Keep provider resources and deployment settings unchanged. The owner reviews and merges the expanded PR.
+
 **T0021 owner merge and approved activation, 2026-10-19.** The owner merged PR #43 at `4e43739ac2ce56cca7e7739e4db189aa2854d4a9`.
 Its tree matches final protected source `2125875653db9157f686c5f46cdddf8519c290d1`.
 The main push checks pass in [run 39252514749, attempt 1](https://github.com/GiftedNovaHD/minsky/actions/runs/39252514749/attempts/1).

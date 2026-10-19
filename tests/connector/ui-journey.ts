@@ -125,7 +125,7 @@ export async function runUiJourney(browser: Browser, fixture: UiFixture, options
 
   async function administration(workspace: Workspace) {
     await workspace.page.getByRole('navigation', { name: 'Workspace navigation' })
-      .getByRole('button', { name: 'Administration', exact: true }).click();
+      .getByRole('link', { name: 'Administration', exact: true }).click();
     await expect(workspace.page.getByRole('heading', { name: 'Session administration', exact: true })).toBeVisible();
   }
 
@@ -176,11 +176,11 @@ export async function runUiJourney(browser: Browser, fixture: UiFixture, options
     await menu.focus();
     await volunteer.page.keyboard.press('Enter');
     await expect(navigation).toBeVisible();
-    await navigation.getByRole('button', { name: 'My account', exact: true }).focus();
+    await navigation.getByRole('link', { name: 'My account', exact: true }).focus();
     await volunteer.page.keyboard.press('Enter');
     await expect(volunteer.page.getByRole('heading', { name: 'My account', exact: true })).toBeFocused();
     await menu.click();
-    await navigation.getByRole('button', { name: 'Issues', exact: true }).focus();
+    await navigation.getByRole('link', { name: 'Issues', exact: true }).focus();
     await volunteer.page.keyboard.press('Enter');
     await expect(volunteer.page.locator('#workspace-heading')).toBeFocused();
     expect(await volunteer.page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
@@ -266,7 +266,7 @@ export async function runUiJourney(browser: Browser, fixture: UiFixture, options
     const issueReference = (await contestant.page.locator('.detail-heading > strong').textContent())!.trim();
     expect(issueReference).toMatch(/^ISS-\d+$/);
     await jury.page.getByRole('navigation', { name: 'Workspace navigation' })
-      .getByRole('button', { name: 'Jury worklist', exact: true }).click();
+      .getByRole('link', { name: 'Jury worklist', exact: true }).click();
     await expect(jury.page.getByRole('heading', { name: 'Jury worklist', exact: true })).toBeVisible();
     const decisionRow = jury.page.locator('#jury-decision').getByRole('article', { name: `Issue ${issueReference}`, exact: true });
     const applicationRow = jury.page.locator('#jury-application').getByRole('article', { name: `Issue ${issueReference}`, exact: true });
@@ -302,7 +302,9 @@ export async function runUiJourney(browser: Browser, fixture: UiFixture, options
     await expect(contestant.page.getByRole('heading', { name: '5 minutes awarded', exact: true })).toBeVisible();
     await expect(contestant.page.getByText('Applied externally', { exact: true })).toBeVisible();
     await expect(contestant.page.locator('.detail .timer-state')).toContainText('Running');
-    await contestant.page.reload();
+    const reloaded = await contestant.page.reload();
+    expect(reloaded?.status()).toBe(200);
+    await expect(contestant.page).toHaveURL(new URL('/issues', fixture.origin).href);
     await chooseIssue(contestant.page, description);
     await expect(owner(contestant.page)).toHaveText(specialistName);
     await expect(contestant.page.getByText(publicText, { exact: true })).toBeVisible();

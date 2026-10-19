@@ -1,5 +1,41 @@
 # Current state
 
+## T0021 frontend routes and feature modules, 2026-10-20
+
+The owner extends existing [PR #45](https://github.com/GiftedNovaHD/minsky/pull/45) with frontend organization and browser routing.
+The original `ConnectedApp.tsx` mixed authentication, the workspace, issue screens, administration, and account settings in 2,101 lines.
+`src/app/` now owns the account gate and shared workspace.
+`src/features/` separates issues, administration, account settings, authentication, and jury worklists.
+The [frontend reference](frontend-structure.md) records each responsibility and route.
+
+The sidebar uses links to `/issues`, `/administration`, `/account`, and `/jury`.
+Direct paths survive sign-in and reload. Browser history restores the section.
+The workspace retains issue filters, selection, and uncertain workflow requests across section changes.
+Membership checks guard administration and jury routes after the current snapshot loads.
+Server authorization, atomic workflow commands, provider implementations, deployment settings, and fixture cleanup remain unchanged.
+The existing stable activation remains at source `4e43739`; this frontend change awaits owner review and merge.
+Earlier activation and protected results do not verify this expanded frontend diff.
+Final source revisions and fresh GitHub checks belong in PR #45, separately from the local results below.
+
+Local verification passes 658 unit/database/tooling cases, 56 ordinary browser cases, 12 function cases, three authentication browser cases, three docs browser cases, and both complete local runtime journeys.
+Type checking, lint, application build, docs build, and shared scenario discovery pass.
+The docs build checks 13 HTML pages and 534 local links and assets.
+Codex inspects fictional jury screens at 320px and 390px. Text and controls fit both widths.
+Keyboard, same-route phone navigation, current membership changes, refresh, and CSS zoom checks pass in Chromium.
+Physical devices and native browser zoom remain unverified.
+
+The first complete local UI journey fails when `/issues` reloads because its temporary asset setup omits the deployment's existing single-page fallback.
+The local setup now uses that same fallback. The journey also asserts HTTP 200 and the retained `/issues` path after reload.
+The complete rerun passes with scoped D1, R2, and live-connection cleanup. Unrelated fixture controls survive.
+The first ordinary unit run passes 656/658; two unchanged five-second checks time out during concurrent work.
+The complete run with two workers passes 658/658. No timeout or assertion changes.
+The first full browser run passes 54/56 and fails two artifact closures because concurrent browser commands share an output directory.
+An unchanged rerun with its own output directory passes 56/56.
+New browser-test locator mistakes are corrected before these final runs.
+A review finding about the current phone link leaving Menu open is corrected and receives a keyboard regression check.
+
+The [run report](t0021-run-report.md#frontend-organization-and-routing-2026-10-20) records this follow-up.
+
 ## T0021 approved activation, 2026-10-19
 
 The [stable development URL](https://minsky-dev.icaic-minsky.workers.dev) uses Cloudflare from approved source `4e43739ac2ce56cca7e7739e4db189aa2854d4a9`. Activation and a subsequent automated deployment pass their application and live configuration checks.

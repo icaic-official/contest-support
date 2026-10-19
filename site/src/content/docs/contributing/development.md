@@ -31,6 +31,14 @@ The local app runs at `http://127.0.0.1:5173`.
 It uses the configured backend.
 Docker is optional for connected development.
 
+## Find application code
+
+`src/app/` owns authentication checks, session state, URL routes, and the shared workspace.
+`src/features/` separates issues, administration, account settings, sign-in, and jury worklists.
+`src/connected/` retains shared models, image validation, and UI helpers.
+Features use the selected backend contracts. Provider SDKs stay inside provider implementations.
+See the repository's [frontend structure](https://github.com/GiftedNovaHD/minsky/blob/main/docs/frontend-structure.md) for the module and route reference.
+
 ## Run the checks
 
 | Command | Purpose |

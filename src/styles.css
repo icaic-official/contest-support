@@ -472,9 +472,13 @@ small {
 }
 .sidebar-navigation button:hover,
 .sidebar-navigation a:hover,
-.sidebar-navigation button[aria-current="page"] {
+.sidebar-navigation a[aria-current="page"] {
   color: var(--accent);
   background: #17281a;
+}
+.sidebar-navigation a[aria-disabled="true"] {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 .sidebar-navigation svg {
   width: 22px;

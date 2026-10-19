@@ -95,7 +95,11 @@ The [current activation record](current-state.md#t0021-approved-activation-2026-
 
 See [the current activation record](current-state.md#t0021-approved-activation-2026-10-19) for tested revisions and separate verification sources.
 See [the run report](t0021-run-report.md#owner-merge-and-approved-activation-2026-10-19) for the final operational report.
-The owner merged PR #43 and separately approved the concrete activation. No activation or repeat-deployment gate remains. [PR #45](https://github.com/GiftedNovaHD/minsky/pull/45) records the results and fixes a confirmed docs-preview output parser failure. It preserves application code, configuration, workflow rules, and all target guards. Its owner review and merge remain pending.
+The owner merged PR #43 and separately approved the concrete activation. No activation or repeat-deployment gate remains.
+[PR #45](https://github.com/GiftedNovaHD/minsky/pull/45) records the results and fixes a confirmed docs-preview output parser failure.
+On 2026-10-20, the owner adds separate frontend feature modules and browser routes to that PR.
+The follow-up preserves shared session state, workflow rules, both providers, configuration, and all target guards.
+Fresh verification and owner review cover the expanded diff. The owner merges it.
 
 ## T0020 Complete Cloudflare connector
 

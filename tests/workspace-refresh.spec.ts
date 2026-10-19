@@ -12,14 +12,24 @@ interface WorkflowRequest {
   p_action: Command;
 }
 
+interface WorkspaceOptions {
+  path?: string;
+  isAdmin?: boolean;
+  roles?: Membership['roles'];
+}
+
 /** Opens the real UI with isolated Auth and database responses. */
-async function openWorkspace(page: Page, firstWrite?: 'uncertain' | 'rejected') {
+async function openWorkspace(
+  page: Page,
+  firstWrite?: 'uncertain' | 'rejected',
+  options: WorkspaceOptions = {},
+) {
   const membership: Membership = {
     session_id: SESSION_ID,
     user_id: USER_ID,
     team_id: null,
-    roles: ['volunteer'],
-    is_admin: true,
+    roles: options.roles ?? ['volunteer'],
+    is_admin: options.isAdmin ?? true,
   };
   const state: Snapshot = {
     session: {
@@ -170,13 +180,149 @@ async function openWorkspace(page: Page, firstWrite?: 'uncertain' | 'rejected') 
       body: JSON.stringify(result),
     });
   });
-  await page.goto('/');
+  await page.goto(options.path ?? '/');
+  await expect(page.getByRole('heading', { name: 'Sign in', exact: true })).toBeVisible();
+  if (options.path) await expect(page).toHaveURL(options.path);
   await page.getByLabel('Username', { exact: true }).fill('reviewer');
   await page.getByLabel('Password', { exact: true }).fill('fixture-password');
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
-  await expect(page.locator('#issue-heading')).toHaveText('Original issue');
+  await expect(page.getByRole('navigation', { name: 'Workspace navigation' })).toBeVisible();
+  if (!options.path || options.path === '/issues') {
+    await expect(page.locator('#issue-heading')).toHaveText('Original issue');
+  }
   return { state, writes, workflowRequests };
 }
+
+for (const route of [
+  { path: '/issues', heading: 'Issue Queue', label: 'Issues' },
+  { path: '/administration', heading: 'Session administration', label: 'Administration' },
+  { path: '/account', heading: 'My account', label: 'My account' },
+  { path: '/jury', heading: 'Jury worklist', label: 'Jury worklist' },
+]) {
+  test(`direct ${route.path} access keeps its screen through sign-in and reload`, async ({ page }) => {
+    await openWorkspace(page, undefined, { path: route.path, roles: ['volunteer', 'jury'] });
+    const heading = page.getByRole('heading', { name: route.heading, exact: true });
+    const link = page.getByRole('navigation').getByRole('link', {
+      name: route.label,
+      exact: true,
+    });
+    await expect(page).toHaveURL(route.path);
+    await expect(heading).toBeVisible();
+    await expect(link).toHaveAttribute('href', route.path);
+    await expect(link).toHaveAttribute('aria-current', 'page');
+    await page.reload();
+    await expect(page).toHaveURL(route.path);
+    await expect(heading).toBeVisible();
+    await expect(link).toHaveAttribute('aria-current', 'page');
+  });
+}
+
+test('workspace links and browser history restore the selected screen', async ({ page }) => {
+  await openWorkspace(page);
+  const navigation = page.getByRole('navigation', { name: 'Workspace navigation' });
+  await expect(page).toHaveURL('/issues');
+  await navigation.getByRole('link', { name: 'My account', exact: true }).click();
+  await expect(page).toHaveURL('/account');
+  await expect(page.getByRole('heading', { name: 'My account', exact: true })).toBeFocused();
+  await navigation.getByRole('link', { name: 'Administration', exact: true }).click();
+  await expect(page).toHaveURL('/administration');
+  await expect(
+    page.getByRole('heading', { name: 'Administration', exact: true }),
+  ).toBeFocused();
+  await page.goBack();
+  await expect(page).toHaveURL('/account');
+  await expect(page.getByRole('heading', { name: 'My account', exact: true })).toBeVisible();
+  await expect(navigation.getByRole('link', { name: 'My account', exact: true })).toHaveAttribute(
+    'aria-current',
+    'page',
+  );
+  await page.goBack();
+  await expect(page).toHaveURL('/issues');
+  await expect(page.locator('#issue-heading')).toHaveText('Original issue');
+  await page.goForward();
+  await expect(page).toHaveURL('/account');
+  await expect(page.getByRole('heading', { name: 'My account', exact: true })).toBeVisible();
+  await page.setViewportSize({ width: 390, height: 844 });
+  const menu = page.getByRole('button', { name: 'Menu', exact: true });
+  await expect(menu).toHaveAttribute('aria-expanded', 'false');
+  await expect(navigation).toBeHidden();
+  await menu.focus();
+  await page.keyboard.press('Enter');
+  await expect(menu).toHaveAttribute('aria-expanded', 'true');
+  await navigation.getByRole('link', { name: 'My account', exact: true }).focus();
+  await page.keyboard.press('Enter');
+  await expect(page).toHaveURL('/account');
+  await expect(menu).toHaveAttribute('aria-expanded', 'false');
+  await expect(navigation).toBeHidden();
+  await expect(page.getByRole('heading', { name: 'My account', exact: true })).toBeFocused();
+});
+
+test('the issue filters and selected issue survive a visit to My account', async ({ page }) => {
+  const { state } = await openWorkspace(page);
+  state.issues.push({
+    ...state.issues[0],
+    id: '00000000-0000-4000-8000-000000000301',
+    number: 2,
+    description: 'Another open issue',
+  });
+  await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+  await expect(page.locator('.issue-card')).toHaveCount(2);
+  await page.getByRole('combobox', { name: 'Status', exact: true }).selectOption('open');
+  const teamSearch = page.locator('#queue-team-search');
+  await teamSearch.fill('Aurora');
+  await page.getByRole('option', { name: /Aurora/ }).click();
+  const selected = page.locator('.issue-card').filter({ hasText: 'Another open issue' });
+  await selected.click();
+  await expect(page.locator('#issue-heading')).toHaveText('Another open issue');
+  const navigation = page.getByRole('navigation', { name: 'Workspace navigation' });
+  await navigation.getByRole('link', { name: 'My account', exact: true }).click();
+  await expect(page).toHaveURL('/account');
+  await expect(page.getByRole('heading', { name: 'My account', exact: true })).toBeVisible();
+  await navigation.getByRole('link', { name: 'Issues', exact: true }).click();
+  await expect(page).toHaveURL('/issues');
+  await expect(page.getByRole('combobox', { name: 'Status', exact: true })).toHaveValue('open');
+  await expect(teamSearch).toHaveValue('Aurora');
+  await expect(page.locator('.issue-card')).toHaveCount(2);
+  await expect(selected).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('#issue-heading')).toHaveText('Another open issue');
+});
+
+test('an unknown URL shows a missing page and offers a link to Issues', async ({ page }) => {
+  await openWorkspace(page, undefined, { path: '/unknown/page' });
+  await expect(page).toHaveURL('/unknown/page');
+  await expect(page.getByRole('heading', { name: 'Page not found', exact: true })).toBeVisible();
+  const returnLink = page.getByRole('link', { name: 'Return to issues', exact: true });
+  await expect(returnLink).toHaveAttribute('href', '/issues');
+  await returnLink.click();
+  await expect(page).toHaveURL('/issues');
+  await expect(page.locator('#issue-heading')).toHaveText('Original issue');
+  await expect(page.getByRole('heading', { name: 'Page not found', exact: true })).toHaveCount(0);
+});
+
+for (const path of ['/administration', '/jury']) {
+  test(`a member without permission cannot open ${path}`, async ({ page }) => {
+    await openWorkspace(page, undefined, { path, isAdmin: false });
+    await expect(page).toHaveURL('/issues');
+    await expect(page.locator('#issue-heading')).toHaveText('Original issue');
+    await expect(page.getByRole('heading', { name: 'Session administration', exact: true })).toHaveCount(0);
+    await expect(page.getByRole('heading', { name: 'Jury worklist', exact: true })).toHaveCount(0);
+    const navigation = page.getByRole('navigation', { name: 'Workspace navigation' });
+    await expect(navigation.getByRole('link', { name: 'Administration', exact: true })).toHaveCount(0);
+    await expect(navigation.getByRole('link', { name: 'Jury worklist', exact: true })).toHaveCount(0);
+  });
+}
+
+test('a refreshed membership removes administration access and changes the URL', async ({ page }) => {
+  const { state } = await openWorkspace(page, undefined, { path: '/administration' });
+  await expect(page.getByRole('heading', { name: 'Session administration', exact: true })).toBeVisible();
+  if (!state.membership) throw new Error('The fixture membership is missing.');
+  state.membership.is_admin = false;
+  await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+  await expect(page).toHaveURL('/issues');
+  await expect(page.locator('#issue-heading')).toHaveText('Original issue');
+  await expect(page.getByRole('heading', { name: 'Session administration', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'Administration', exact: true })).toHaveCount(0);
+});
 
 test('waits for a selected session before subscribing to live updates', async ({ page }) => {
   const sessions: string[] = [];
@@ -200,15 +346,38 @@ backend.updates.subscribe = (input) => {
   expect(sessions.every((sessionId) => sessionId === SESSION_ID)).toBe(true);
 });
 
-test('an uncertain write retains its request ID until the user retries', async ({ page }) => {
+test('an uncertain write blocks workspace links and retains its request ID across browser history', async ({ page }) => {
   const { workflowRequests } = await openWorkspace(page, 'uncertain');
+  const navigation = page.getByRole('navigation', { name: 'Workspace navigation' });
+  const account = navigation.getByRole('link', { name: 'My account', exact: true });
+  await account.click();
+  await expect(page).toHaveURL('/account');
+  await navigation.getByRole('link', { name: 'Issues', exact: true }).click();
+  await expect(page).toHaveURL('/issues');
   await page.getByRole('textbox', { name: 'Message', exact: true }).fill('Preserve this reply.');
   await page.getByRole('button', { name: 'Send reply', exact: true }).click();
   const retry = page.getByRole('button', { name: 'Retry last request', exact: true });
   await expect(retry).toBeVisible();
   await expect(page.getByRole('button', { name: 'Send reply', exact: true })).toBeDisabled();
+  const workspaceLinks = navigation.locator('a[href^="/"]');
+  await expect(workspaceLinks).toHaveCount(3);
+  for (const link of await workspaceLinks.all()) {
+    await expect(link).toHaveAttribute('aria-disabled', 'true');
+  }
+  // aria-disabled alone cannot stop a browser click. Exercise the link handler.
+  await account.click({ force: true });
+  await expect(page).toHaveURL('/issues');
+  await expect(page.locator('#issue-heading')).toHaveText('Original issue');
+  await page.goBack();
+  await expect(page).toHaveURL('/account');
+  await expect(page.getByRole('heading', { name: 'My account', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Change password', exact: true })).toBeDisabled();
+  await expect(retry).toBeVisible();
   await retry.click();
   await expect(retry).not.toBeVisible();
+  for (const link of await workspaceLinks.all()) {
+    await expect(link).toHaveAttribute('aria-disabled', 'false');
+  }
   expect(workflowRequests).toHaveLength(2);
   expect(workflowRequests[1]).toEqual(workflowRequests[0]);
 });
@@ -380,7 +549,7 @@ test('refreshed roles and team assignments are the values saved by the membershi
 }) => {
   const { state, writes } = await openWorkspace(page);
   await page
-    .getByRole('button', { name: 'Administration', exact: true })
+    .getByRole('link', { name: 'Administration', exact: true })
     .click();
   const entry = page.locator('.account-entry');
   await entry.locator('summary').click();

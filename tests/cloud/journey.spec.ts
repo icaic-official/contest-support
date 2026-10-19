@@ -40,7 +40,7 @@ async function login(page: Page, name: string) {
   if (name === "admin") {
     await page
       .getByRole("navigation", { name: "Workspace navigation" })
-      .getByRole("button", { name: "Administration", exact: true })
+      .getByRole("link", { name: "Administration", exact: true })
       .click();
   }
 }
@@ -97,10 +97,10 @@ test("sidebar navigation respects roles and remains usable by keyboard on phones
     name: "Workspace navigation",
   });
   await expect(
-    navigation.getByRole("button", { name: "Administration", exact: true }),
+    navigation.getByRole("link", { name: "Administration", exact: true }),
   ).toHaveCount(0);
   await navigation
-    .getByRole("button", { name: "My account", exact: true })
+    .getByRole("link", { name: "My account", exact: true })
     .click();
   await expect(
     page.getByRole("heading", { name: "My account", exact: true }),
@@ -109,7 +109,7 @@ test("sidebar navigation respects roles and remains usable by keyboard on phones
     fixture().accounts.volunteer.username,
   );
   await expect(
-    navigation.getByRole("button", { name: "My account", exact: true }),
+    navigation.getByRole("link", { name: "My account", exact: true }),
   ).toHaveAttribute("aria-current", "page");
   await expect(
     page.getByRole("heading", { name: "Report an issue" }),
@@ -126,7 +126,7 @@ test("sidebar navigation respects roles and remains usable by keyboard on phones
     await menu.focus();
     await page.keyboard.press("Enter");
     await expect(menu).toHaveAttribute("aria-expanded", "true");
-    const issues = navigation.getByRole("button", {
+    const issues = navigation.getByRole("link", {
       name: "Issues",
       exact: true,
     });
@@ -160,12 +160,12 @@ test("sidebar navigation respects roles and remains usable by keyboard on phones
   await expect(navigation).toHaveCount(0);
   await login(page, "admin");
   await expect(
-    navigation.getByRole("button", { name: "Administration", exact: true }),
+    navigation.getByRole("link", { name: "Administration", exact: true }),
   ).toHaveAttribute("aria-current", "page");
   await expect(
     page.getByRole("heading", { name: "Session administration" }),
   ).toBeVisible();
-  await navigation.getByRole("button", { name: "Issues", exact: true }).click();
+  await navigation.getByRole("link", { name: "Issues", exact: true }).click();
   await expect(
     page.getByRole("heading", { name: "Session administration" }),
   ).toHaveCount(0);
@@ -174,7 +174,7 @@ test("sidebar navigation respects roles and remains usable by keyboard on phones
   ).toBeVisible();
   await page.reload();
   await expect(
-    navigation.getByRole("button", { name: "Issues", exact: true }),
+    navigation.getByRole("link", { name: "Issues", exact: true }),
   ).toHaveAttribute("aria-current", "page");
 });
 
@@ -757,7 +757,7 @@ test("admin UI assigns combined roles; password change, refresh and logout work"
   await login(page, "volunteer");
   await page
     .getByRole("navigation", { name: "Workspace navigation" })
-    .getByRole("button", { name: "My account", exact: true })
+    .getByRole("link", { name: "My account", exact: true })
     .click();
   await page
     .getByRole("button", { name: "Change password", exact: true })

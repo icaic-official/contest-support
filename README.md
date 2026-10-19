@@ -12,6 +12,10 @@ The [development application](https://minsky-dev.icaic-minsky.workers.dev) runs 
 The Cloudflare installation serves the frontend and API through Workers, with D1, private R2 images, and Durable Object live updates.
 Both providers retain the shared workflow behavior. Supabase resources and accounts remain intact.
 
+The frontend has separate feature modules for issues, administration, account settings, sign-in, and jury worklists.
+`src/app/` owns the shared workspace and URL routing.
+See [frontend structure](docs/frontend-structure.md) for module responsibilities, browser paths, and access checks.
+
 [Read the user and operator guides](https://minsky-docs.icaic-minsky.workers.dev).
 Use [the installation guide](site/src/content/docs/operators/installation.md) for an isolated Cloudflare instance.
 The owner merged T0021 in [PR #43](https://github.com/GiftedNovaHD/minsky/pull/43) at `4e43739` on 2026-10-19.

@@ -1,4 +1,4 @@
-import type { Issue, Resolution, Snapshot } from "./model";
+import type { Issue, Resolution, Snapshot } from "../../connected/model";
 
 export type JurySection = "decision" | "application";
 

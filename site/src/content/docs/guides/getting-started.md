@@ -37,6 +37,10 @@ Ask an organizer to check your membership if the workspace reports that you have
 - All users can change their password through **My account**.
 
 On a phone, select **Menu** to open the navigation.
+Each section has its own address: `/issues`, `/administration`, `/account`, or `/jury`.
+You can bookmark a section or use browser Back and Forward.
+Opening a section directly asks you to sign in when necessary and checks your current permissions.
+Refreshing retains the section and loads current session data.
 Use **Sign out** when you finish on a shared device.
 
 ## Recover access

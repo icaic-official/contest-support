@@ -1,4 +1,4 @@
-import { ImageRequestError } from "../backend/errors";
+import { ImageRequestError } from "../../backend/errors";
 
 export async function thumbnailBlob(file: Blob): Promise<Blob> {
   let bitmap: ImageBitmap;

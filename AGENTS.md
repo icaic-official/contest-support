@@ -23,7 +23,10 @@
 ## Current scope
 
 **T0021 fresh Cloudflare development installation is complete.** Its approved stable activation and subsequent automated deployment pass their recorded checks.
-The operational follow-up in [PR #45](https://github.com/GiftedNovaHD/minsky/pull/45) records those results and fixes docs-preview output parsing. The owner reviews and merges it.
+The follow-up in [PR #45](https://github.com/GiftedNovaHD/minsky/pull/45) records those results and fixes docs-preview output parsing.
+On 2026-10-20, the owner adds frontend feature modules and URL routing to that existing PR.
+Preserve shared session state, access checks, workflow behavior, both providers, and deployment guards.
+The PR remains draft until its fresh required checks pass. The owner reviews and merges it.
 The owner merged [PR #43](https://github.com/GiftedNovaHD/minsky/pull/43) at `4e43739ac2ce56cca7e7739e4db189aa2854d4a9` on 2026-10-19.
 Its tree matches the final protected source, `2125875653db9157f686c5f46cdddf8519c290d1`.
 The owner separately approved the concrete Cloudflare activation and a repeat automated deployment.

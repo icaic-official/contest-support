@@ -3,7 +3,7 @@ title: Feature status
 description: Distinguish merged features, pending changes, and unverified operating conditions.
 ---
 
-Status checked on **19 October 2026** against the repository and GitHub pull requests.
+Status checked on **20 October 2026** against the repository and GitHub pull requests.
 This page is a dated record, not a live deployment dashboard.
 
 ## Merged into main
@@ -31,6 +31,7 @@ This page is a dated record, not a live deployment dashboard.
 
 | Work | Status |
 | --- | --- |
+| [T0021 follow-up](https://github.com/GiftedNovaHD/minsky/pull/45) | Open follow-up. Activation records, docs-preview parsing, separate frontend feature modules, and browser routes. The owner reviews and merges. |
 | [T0006 announcements](https://github.com/GiftedNovaHD/minsky/pull/20) | Open pull request. |
 | [T0007 independent installations](https://github.com/GiftedNovaHD/minsky/pull/21) | Open pull request. Packaging exists on its branch. Container operation remains unverified. |
 

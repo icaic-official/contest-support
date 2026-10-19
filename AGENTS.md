@@ -22,38 +22,33 @@
 
 ## Current scope
 
-Continue **T0021 fresh Cloudflare development installation** on `feature/t0021-cloudflare-development-install`.
-The owner authorized parallel preparation from PR #42's head, `2b6f6f0`, in `/tmp/minsky-t0021`.
-Keep PR #42's branch and checkout untouched.
-The owner merged PR #42 at `104d9d1` on 2026-10-18. T0021 now includes that main revision.
-The earlier restriction to local preparation ended at that merge. Reconcile review changes and run fresh checks before marking T0021 ready.
-The [ticket](docs/tickets.md#t0021-fresh-cloudflare-development-installation) records the acceptance gates.
-The owner requests a maintainability review follow-up in open PR #43 after verification of `0254f60`.
-Clarify existing workflow and transaction code, strengthen provider boundaries, and complete shared behavior assertions.
-Keep changes small. Reduce reader load without new speculative layers, interfaces, or synchronized state.
-The Cloudflare budget is the existing $5 monthly plan. Billing reads return `403`. The owner reports no extra charges on 2026-10-19 and permits bounded required verification. Do not run optional stress tests or add paid services.
+**T0021 fresh Cloudflare development installation is complete.** Its approved stable activation and subsequent automated deployment pass their recorded checks.
+The owner merged [PR #43](https://github.com/GiftedNovaHD/minsky/pull/43) at `4e43739ac2ce56cca7e7739e4db189aa2854d4a9` on 2026-10-19.
+Its tree matches the final protected source, `2125875653db9157f686c5f46cdddf8519c290d1`.
+The owner separately approved the concrete Cloudflare activation and a repeat automated deployment.
+The owner confirmed that independent Cloudflare Git builds are disconnected for `minsky-dev` and `minsky-docs`.
+Use [the current record](docs/current-state.md#t0021-approved-activation-2026-10-19), [ticket](docs/tickets.md#t0021-fresh-cloudflare-development-installation), and [activation procedure](docs/activate-cloudflare-development.md).
+Keep the candidate's traffic and schedules disabled. Preserve the development D1 data, R2 objects, and existing `AUTH_SECRET`.
+Use the existing GitHub Actions publication path. App previews require independent resources. Docs publish independently.
 
-The owner requested all review fixes, cleanup, and fresh verification before the PR is ready.
-Remove obsolete proof paths, duplicate helpers, stale instructions, and repeated evidence summaries.
-Keep provider configuration and bootstrap inside the provider implementation.
-Preserve unique historical evidence in the planning and run records.
-Record PR #21 reuse and recommend its disposition. The owner decides whether to close PR #21.
-
-Isolated Cloudflare development, CI, and installation resources are authorized in account `458ad6a930b0fb717796dfa19ca6a2b1`.
-Confirm that account and the exact target before provider changes.
-Keep development, CI, and installation resources separate.
-On 2026-10-18, the owner approved only `feature/t0021-cloudflare-development-install` as one additional `cloud-test` branch entry. Preserve all six earlier entries and protection rule `69128862`. This approval does not authorize another branch, protection changes, or activation.
-Workers Paid and R2 are active. Document the concrete need and cost before any further paid upgrade.
+The Cloudflare account is `458ad6a930b0fb717796dfa19ca6a2b1`.
+Confirm that account and each exact target before provider changes.
+Keep development, CI, and installation-verification resources separate.
+Only `feature/t0021-cloudflare-development-install` received the additional `cloud-test` branch entry, `63467138`.
+Preserve the six earlier entries and protection rule `69128862`. Do not add branches or weaken protection.
+The budget remains the existing $5 monthly plan. Billing reads return `403`.
+The owner reports no extra charges on 2026-10-19. Run bounded required checks. Add no paid service or optional stress test.
 Bounded subagent work is authorized.
 
 Existing Supabase trial data is disposable. Transfer no accounts, passwords, records, images, or IDs.
-Preserve application behavior and database rules. Bootstrap a new administrator through the existing installation tool.
-Leave Supabase intact. Do not export data, reset its accounts, or delete its resources.
-Supabase remains active until the owner approves the concrete development URL switch.
-Preparation PR merge does not authorize activation. Follow [the activation procedure](docs/activate-cloudflare-development.md).
+Leave Supabase resources and accounts intact. Do not export data, reset accounts, or delete resources.
+Preserve both provider implementations, shared behavior, database rules, and scoped fixture cleanup.
+Keep provider configuration and bootstrap inside the provider implementation.
+Preserve unique historical evidence in planning and run records.
+[The PR #21 record](docs/pr21-installation-disposition.md) identifies reused safeguards and its recommended disposition. The owner decides whether to close it.
 Docker packaging, AWS, GCP, Azure, Terraform, and data migration tooling remain deferred.
-The owner reviews and merges both PRs.
-Earlier ticket decisions and authorization limits remain in [PLAN.md](PLAN.md) and their dated verification records.
+Do not start the next development ticket without the owner's instruction.
+Earlier ticket decisions and authorization limits remain in [PLAN.md](PLAN.md) and their dated records.
 
 ## Code and documentation cleanup
 
@@ -132,9 +127,11 @@ Ask only for missing decisions that materially affect scope or behavior.
 ## Cloud development and deployment workflow
 
 Keep development, CI, and future production databases and credentials separate.
-The hosted `minsky-dev` app uses the `Minsky` development project.
-It is not production.
-`Minsky CI` is for isolated automated fixtures.
+The hosted `minsky-dev` app uses the complete Cloudflare development installation. It is not production.
+The Cloudflare development resources are `minsky-development` and private bucket `minsky-development-images`.
+Protected Cloudflare checks use the separate connector and store CI targets.
+The retained Supabase `Minsky` development project and `Minsky CI` project remain intact.
+Use `Minsky CI` only for isolated Supabase fixtures.
 No production project exists.
 
 For each ticket, use this sequence:
@@ -149,7 +146,7 @@ For each ticket, use this sequence:
 8. After automation setup, let GitHub Actions deploy docs and the selected application when the `main` CI checks pass. A Cloudflare application deployment includes the complete Worker. Coordinate migrations, bootstrap, secrets, and activation separately.
 
 Automatic frontend deployment requires GitHub deployment settings and passing `checks`, `secrets`, and `dependencies` jobs.
-Before setup is verified, report deployment separately from merge.
+Report deployment separately from merge. Record its exact source revision and workflow attempt.
 Prepare compatible backend changes before a dependent frontend merges, or pause frontend deployment for that release.
 Privileged GitHub cloud checks use the protected `cloud-test` environment and the separate CI project.
 Ordinary PR checks run without cloud credentials.

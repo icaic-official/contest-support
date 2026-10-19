@@ -1,5 +1,84 @@
 # Current state
 
+## T0021 approved activation, 2026-10-19
+
+The [stable development URL](https://minsky-dev.icaic-minsky.workers.dev) uses Cloudflare from approved source `4e43739ac2ce56cca7e7739e4db189aa2854d4a9`. Activation and a subsequent automated deployment pass their application and live configuration checks.
+The owner merged [PR #43](https://github.com/GiftedNovaHD/minsky/pull/43) at `4e43739ac2ce56cca7e7739e4db189aa2854d4a9`.
+The merged tree matches final protected source `2125875653db9157f686c5f46cdddf8519c290d1`, including the cleanup ownership correction.
+The owner separately approved the exact backend switch and a repeat automated deployment.
+The owner confirmed in the dashboard that independent Cloudflare Git builds are disconnected for `minsky-dev` and `minsky-docs`.
+API permissions still cannot confirm that setting. Credentials were not broadened for the read.
+No Supabase account, password, record, image, or ID transfers. Its resources and accounts remain intact.
+
+### Final pre-merge and merged-main checks
+
+| Evidence | Source | Observed result |
+| --- | --- | --- |
+| [Final push CI](https://github.com/GiftedNovaHD/minsky/actions/runs/39151111031) and [PR CI](https://github.com/GiftedNovaHD/minsky/actions/runs/39151114561) | `2125875` | All ordinary checks pass on the final PR head. |
+| [Protected Cloudflare run 39151128560](https://github.com/GiftedNovaHD/minsky/actions/runs/39151128560) | `2125875` | 70 workflow, 82 account, 11 shared scenarios, and one UI case pass. |
+| [Protected Supabase run 39151393804, attempt 2](https://github.com/GiftedNovaHD/minsky/actions/runs/39151393804/attempts/2) | `2125875` | 16 hosted, 11 shared scenarios, and five workflow cases pass. |
+| [Main push run 39252514749, attempt 1](https://github.com/GiftedNovaHD/minsky/actions/runs/39252514749/attempts/1) | `4e43739` | Ordinary checks pass. Publication remains disabled for this attempt. |
+
+The first Supabase attempt fails three browser waits. It remains a failed attempt.
+The unchanged second attempt passes. No assertion, timeout, target guard, or environment protection was weakened.
+Protected GitHub results remain separate from the earlier local hosted results recorded below and in [the run report](t0021-run-report.md).
+
+### Activation sequence and exact installation
+
+The confirmed Cloudflare account is `458ad6a930b0fb717796dfa19ca6a2b1`.
+The public settings are `src/server/adapters/cloudflare/deploy/development.settings.json`.
+The committed stable configuration is `src/server/adapters/cloudflare/deploy/development.wrangler.jsonc`.
+
+| Resource or setting | Approved value |
+| --- | --- |
+| Stable Worker and origin | `minsky-dev`, `https://minsky-dev.icaic-minsky.workers.dev` |
+| Stopped candidate | `minsky-development-candidate`, `https://minsky-development-candidate.icaic-minsky.workers.dev`, version `c15b6ab7-bba0-4e9f-9292-2c2bd345e9a3` |
+| Independent docs | `minsky-docs`, `https://minsky-docs.icaic-minsky.workers.dev` |
+| Development D1 | `minsky-development`, `a1832f97-4d4c-45c2-a848-8d3dfd0b74f5` |
+| Private R2 bucket | `minsky-development-images` |
+| Durable Object | `SessionLiveCoordinator`, binding `LIVE_UPDATES`, migration tag `v1` |
+| Stable Durable Object namespace | `71700338eed643d59185f4a777fcb7b2` |
+| Authentication | `AUTH_ORIGIN` equals the stable origin; private secret name `AUTH_SECRET` |
+| Schedule and CPU cap | `* * * * *`, 1,000 ms |
+
+Candidate traffic and scheduled dispatch stop at 12:40:00.638 UTC.
+The immediate candidate URL assertion fails after the provider changes. The operator retains the operation journal and does not repeat the mutation.
+A read-only reconciliation at 12:41:31 UTC confirms an HTTP `404`, disabled traffic, and no cron.
+The approved 30-minute drain ends at 13:10:00.638 UTC. The final prepublication check passes at 13:10:32 UTC, after the deadline, with zero pending notifications. Both later candidate checks retain disabled public and preview URLs and no cron.
+The supported private installation command creates stable `AUTH_SECRET` at 12:42 UTC.
+The secret-only intermediate stable version is `92edebbc-4e5f-4786-8708-4e06a79edbcc`. It still serves Supabase before publication.
+The Cloudflare frontend build and complete Worker dry run pass before publication.
+The six approved repository variables select Cloudflare, the committed stable configuration, the exact D1 UUID and name, the private bucket, and enabled publication. Existing publishing credentials remain unchanged.
+
+### Automated publication and stable verification
+
+[Publication attempt 2](https://github.com/GiftedNovaHD/minsky/actions/runs/39252514749/attempts/2) stops before either upload.
+The docs keyboard-search case times out at its existing 30-second index-response wait. Both publication jobs skip.
+The same case passes locally without source changes. Attempt 3 repeats the complete workflow and passes all ordinary and publication jobs.
+The cause of the first wait failure remains unconfirmed. No assertion, timeout, target guard, or protection rule changes.
+
+| Deployment | Workflow attempt and source | Stable Worker version | Verification |
+| --- | --- | --- | --- |
+| Initial activation | [Run 39252514749, attempt 3](https://github.com/GiftedNovaHD/minsky/actions/runs/39252514749/attempts/3), `4e43739` | `cd704354-5ca8-483c-998b-5bfe9ccd8d86` | All five required workflow jobs pass. CLI stable verification passes 14/14 at 13:42:36 UTC, with zero failures, skips, flaky results, infrastructure errors, or retained fixture journals. |
+| Subsequent deployment | [Run 39252514749, attempt 4](https://github.com/GiftedNovaHD/minsky/actions/runs/39252514749/attempts/4), `4e43739` | `9f3686bd-ffa8-46bf-977f-2d9554235d41` | All five required workflow jobs pass. CLI stable verification passes 14/14 at 14:07:38 UTC, with zero failures, skips, flaky results, infrastructure errors, or retained fixture journals. The namespace and all bindings match the first deployment. |
+
+The independent docs versions are `15908735-73c9-4b47-995a-3bef9adff37b` after first publication and `30632b99-25d9-42d3-9bed-49adc467ce51` after repeat publication.
+Both docs revision markers identify `4e43739`. Docs have no application bindings or cron.
+
+The bounded stable harness requires the exact merged HEAD and Cloudflare revision marker before fixture creation.
+It imports all 11 shared scenarios and the complete React journey unchanged.
+Separate checks cover installed-owner sign-in, anonymous rejection, private source paths, and independent documentation.
+Owner verification preserves the existing password and exact administrator account and session. It signs out its test login afterward.
+Fictional accounts verify the temporary-password requirement. No owner password reset or replacement is part of this verification.
+The final read-only audit passes at 14:11:54 UTC. It confirms the complete Worker, private R2, all six bindings, migration tag `v1`, one-minute cron, 1,000 ms CPU cap, disabled app previews, and the same stable namespace. The installation and existing owner remain. The owner completed its temporary-password change during the earlier installation trial; current sign-in preserves that state. Fixture cleanup removes only its proved records and R2 keys. Final counts are one account, zero issues, zero image records, and zero pending notifications. No fixture recovery journal remains.
+
+The first post-walkthrough read-only audit stops during public HTTP checks. Its cause is unconfirmed. Independent direct reads then return every expected marker and status. One unchanged repeat passes. The failed read record remains retained; no provider mutation or repair occurs.
+The stable phone walkthrough passes at 320 × 740 and 390 × 844. Codex visually inspects both fictional volunteer captures. Text and controls remain within each width. Keyboard menu and issue opening pass; refresh preserves the issue, owner, first assignment, elapsed time, and live connection. Its scoped cleanup passes. Physical devices and native browser zoom remain unverified. Owner review of this operational documentation remains separate from the completed activation.
+
+The existing $5 monthly plan remains the limit. This work adds no paid service or optional stress test.
+The procedure preserves Cloudflare records, private objects, and secrets during repair. It authorizes no automatic return to Supabase.
+Earlier dated sections below retain their original state, failed attempts, and source-specific evidence.
+
 ## T0021 maintainability follow-up, 2026-10-19
 
 The owner requests a review follow-up in open [PR #43](https://github.com/GiftedNovaHD/minsky/pull/43).

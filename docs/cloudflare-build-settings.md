@@ -26,7 +26,7 @@ Deployment eligibility does not authorize a change to those rules.
 | --- | --- | --- |
 | Actions secret | `CLOUDFLARE_API_TOKEN` | Private account-scoped deployment token. |
 | Actions variable | `CLOUDFLARE_DEPLOY_ENABLED` | `true` enables eligible publishing. Missing or `false` disables it. |
-| Actions variable | `MINSKY_DEV_BACKEND` | Missing or `supabase` preserves the current frontend. `cloudflare` selects the complete Worker after approval. |
+| Actions variable | `MINSKY_DEV_BACKEND` | `cloudflare` is the approved development selection. Missing or `supabase` selects static Supabase mode; the binding guard refuses that replacement after activation. |
 | Actions variable | `VITE_SUPABASE_URL` | `https://ovymmobupzowotvrywek.supabase.co`, required in Supabase mode. |
 | Actions variable | `VITE_SUPABASE_PUBLISHABLE_KEY` | Development public publishable key or legacy `anon` key, required in Supabase mode. |
 | Actions variable | `MINSKY_DEV_CLOUDFLARE_CONFIG` | Repository-relative generated Wrangler path, required in Cloudflare mode. |

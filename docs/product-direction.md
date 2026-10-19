@@ -4,11 +4,10 @@ This document preserves the agreed direction from [PLAN.md](../PLAN.md).
 Only requirements listed in [current-state.md](current-state.md) describe implemented behavior.
 The user selects later scope after demo feedback.
 
-Jury worklist maintenance (2026-10-18): [T0009](jury-worklist.md) remains on its existing PR #23 branch.
+Jury worklist status (2026-10-18): [T0009](jury-worklist.md) merged in PR #23 at `c144a2a`.
 It uses authorized `Backend` snapshots and existing workflow actions for decisions and external confirmations.
-The owner authorized current-main integration and verification in a separate worktree alongside T0020 connector work.
-The connector scope remains separate. Supabase remains active.
-Historical local results do not establish current compatibility or hosted acceptance.
+Its maintenance ran in a separate worktree alongside T0020.
+The active Cloudflare installation preserves the combined application. Verification applies only to its recorded source and provider.
 
 Team-search status (2026-10-15): [T0008](tickets.md#t0008--fuzzy-team-search) merged into `main` in PR #22.
 Staff search the current session's team names and locations from the issue queue.
@@ -26,7 +25,8 @@ They are not part of T0005.
 
 Implemented interface decision (2026-10-02): provide a public login landing page and a sidebar for the authenticated workspace.
 The user removed the old local demo, its commands, and tests that applied only to the demo.
-Supabase accounts and shared data are the only application mode.
+At that stage, Supabase accounts and shared data replaced the local demo.
+The later backend decision below retains Supabase as a provider option and selects Cloudflare for development.
 Isolated fixtures remain for verification.
 The broader organizer tools below remain incomplete.
 
@@ -46,15 +46,17 @@ The broader organizer tools below remain incomplete.
 - Contestants and helpers must be able to reopen resolved issues. T0002 implements reopening on the same issue and retains its history. Reopening continues an issue whose resolution needs review. A separate recurrence may still use a linked new report in future work. Linked-report controls remain outside T0002. The ticket records the implemented demo rules for ownership, timing, and awards.
 - The user confirmed that reopening resumes accumulated unresolved time and excludes time spent resolved. First-assignment delay remains separate. Awards remain discretionary.
 - Public replies and private notes are separate. The agreed direction includes photos, session announcements, in-app alerts, and browser push that users explicitly enable.
-- Staff upload JPEG, PNG, or WebP images on an issue. Each image records its uploader and time. The uploader chooses team-visible or staff-only visibility, and the choice stays fixed. Every staff member can upload while the event is active. Only the uploader can remove an image during that time. Contestants can view team-visible images on their own team's issues. Session admins set the per-session size and count limits. Resolved issues keep their images. Archived events keep the files for preview and download. T0005 stores the files in a private Supabase Storage bucket. Contestant uploads remain out of scope.
+- Staff upload JPEG, PNG, or WebP images on an issue. Each image records its uploader and time. The uploader chooses team-visible or staff-only visibility, and the choice stays fixed. Every staff member can upload while the event is active. Only the uploader can remove an image during that time. Contestants can view team-visible images on their own team's issues. Session admins set the per-session size and count limits. Resolved issues keep their images. Archived events keep the files for preview and download. The Supabase implementation uses a private Storage bucket. The active Cloudflare implementation uses private R2. Contestant uploads remain out of scope.
 - Shared incidents use explicit affected rosters, selective closure of linked reports, and bulk awards with recipient exceptions.
 - Awards use a separate ledger. One authorized decision precedes separate confirmation of external application. Contestants see the decision and application status. The demo permits explicit zero-minute decisions with a public explanation. It also supports preset and custom award amounts.
 - The agreed direction includes CSV roster imports and editing forms. Reporting uses dashboards only. Archived events permit reading only. The app does not automatically delete archived events.
 
 ## Provisional architecture and milestones
 
-Cloudflare Workers hosts the frontend, and Supabase runs the current backend.
-The selected future backend is described in [backend migration direction](#backend-migration-direction).
+Cloudflare Workers serves the frontend and backend at the stable development URL.
+D1 stores application records, private R2 stores images, and Durable Objects deliver live updates.
+Supabase remains a working provider implementation with its existing projects intact.
+The [backend direction](#backend-migration-direction) records the choice and approval gates.
 On 2026-10-02, the user prioritized working cloud features and deferred resilience.
 Assume connectivity during development.
 Outage planning no longer blocks backend work.
@@ -63,19 +65,20 @@ Necessary paid services are acceptable after the need and cost are identified.
 
 A developer pilot and production capacity validation are separate milestones.
 
-The implemented architecture uses Supabase Auth, Postgres, Realtime, and private Storage.
-Database functions enforce workflow transactions and permissions.
-Edge Functions handle privileged account administration and image operations.
+The Supabase implementation uses Auth, Postgres, Realtime, and private Storage.
+Its database functions enforce workflow transactions and permissions.
+Its Edge Functions handle privileged account administration and image operations.
 T0014 places the browser integration behind [backend contracts](backend-contracts.md).
 T0019 extracts the existing issue decisions into a [shared server service](server-workflow.md).
 An opt-in Supabase function executes that service for replacement verification.
-The active application retains the legacy PostgreSQL workflow during this transition.
+The Supabase browser adapter retains its guarded PostgreSQL workflow. The active Cloudflare adapter uses the shared service through atomic D1 commits.
 T0020 implements the complete Cloudflare connector and provider-owned installation tooling.
-Its local checks, hosted D1 tests, and all eight shared scenarios pass.
+Its original local checks, hosted D1 tests, and eight shared scenarios passed at their recorded revisions.
+T0021 expands the shared registry to 11 scenarios and verifies the fresh development installation.
 The complete hosted React journey and a separate documented empty-installation journey also pass.
 Scoped fixture cleanup and protected Cloudflare connector CI pass.
 
-Supabase manages the services.
+Each provider manages its own services.
 Minsky still requires repository-owned migrations and functions that implement its schema, authorization policies, and business rules.
 Those rules require tests.
 
@@ -109,7 +112,8 @@ Transfer no accounts, passwords, issues, history, images, or IDs.
 Create a new administrator through the supported bootstrap process and require a temporary-password change.
 This replaces the 2026-10-17 data-preservation decision. Preserve application behavior and database rules.
 Leave Supabase intact. Do not export data, reset its accounts, or delete its resources.
-Credential distribution, recovery, expiry, and revocation require fresh verification before activation.
+T0021 requires fresh credential distribution, recovery, expiry, and revocation checks before activation.
+The [verification record](current-state.md) distinguishes those checks from later deployment results.
 
 Outage handling remains deferred until after cloud feature development.
 Manual fallback, offline capture, and venue-local operation remain unselected.
@@ -123,7 +127,7 @@ Confirm production role and category configuration and integration requirements 
 Do not turn this direction into a speculative implementation backlog.
 
 Contributor decision (2026-10-02): the user permits full cloud credential access for contributors.
-The primary setup uses hosted Supabase, local frontend development, and cloud-side function bundling.
+The setup at that time used hosted Supabase, local frontend development, and cloud-side function bundling.
 Docker is optional.
 Keep privileged credentials outside Git and frontend builds.
 Cloud CI uses a protected, isolated test project.
@@ -138,7 +142,8 @@ Preserve existing Auth UUIDs, history, and permissions when you assign a usernam
 ## Backend migration direction
 
 On 2026-10-17, the user selected Cloudflare D1 with a SQLite rewrite and Durable Objects for live updates.
-Cloudflare is the long-term backend target. Supabase remains active until the owner approves the concrete development URL switch.
+Cloudflare is the active development backend after the separately approved T0021 switch.
+Supabase resources and accounts remain intact. No existing data or identifiers transferred.
 The [backend design](cloudflare-backend-design.md) explains the current connector boundaries.
 The [dated verification record](current-state.md#t0020-connector-implementation-2026-10-18) records implementation evidence.
 
@@ -160,14 +165,15 @@ See [Add a backend provider](add-provider.md) for contributor requirements.
 
 ### Migration and cutover gates
 
-T0021 prepares a fresh installation. It does not transfer existing records.
-Connector verification and preparation PR merge do not authorize a backend switch.
+T0021 installed a fresh development application without transferring existing records.
+The owner merged PR #43 at `4e43739`, then separately approved activation and repeat-deployment verification.
+Connector verification and a preparation PR merge alone do not authorize a backend switch.
 The [activation procedure](activate-cloudflare-development.md) defines the separate owner approval gate.
 The completed implementation phases remain in the [historical plan](https://github.com/GiftedNovaHD/minsky/blob/88ea5020a0f9dfc34a32ed7fbd84dfea07423297/docs/cloudflare-implementation-plan.md).
 
-Before activation, complete these gates:
+For a future backend switch, complete these gates:
 
-1. Merge PR #42, update T0021 from main, and reconcile review changes.
+1. Have the owner review and merge the preparation revision. Update from main and reconcile review changes.
 2. Install the reviewed revision into dedicated development resources through the authoritative installation guide.
 3. Verify shared behavior with fictional accounts, private images, live updates, password changes, and owner recovery.
 4. Run required local and hosted checks. Record local hosted and protected GitHub Actions results separately.

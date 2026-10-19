@@ -8,20 +8,23 @@ Staff can attach images to issues and choose staff-only or team visibility.
 
 The app uses React, TypeScript, and Vite.
 Its shared [backend contract](docs/backend-contracts.md) has Supabase and Cloudflare implementations.
-Supabase remains the active development backend.
+The [development application](https://minsky-dev.icaic-minsky.workers.dev) runs Cloudflare at the approved source `4e43739`.
 The Cloudflare installation serves the frontend and API through Workers, with D1, private R2 images, and Durable Object live updates.
-Both providers use the same workflow decisions. The active Supabase browser path retains its guarded SQL workflow during replacement verification.
+Both providers retain the shared workflow behavior. Supabase resources and accounts remain intact.
 
 [Read the user and operator guides](https://minsky-docs.icaic-minsky.workers.dev).
 Use [the installation guide](site/src/content/docs/operators/installation.md) for an isolated Cloudflare instance.
-T0021 prepares a fresh Cloudflare development installation after PR #42 merged at `104d9d1`.
-It transfers no existing Supabase records or accounts. Supabase stays intact and active until the owner approves the concrete backend switch.
-See [current state](docs/current-state.md) for source-specific checks and [activation](docs/activate-cloudflare-development.md) for the remaining gates.
+The owner merged T0021 in [PR #43](https://github.com/GiftedNovaHD/minsky/pull/43) at `4e43739` on 2026-10-19.
+The owner separately approved the concrete Cloudflare switch and repeat automated deployment.
+The installation transfers no Supabase accounts, passwords, records, images, or IDs.
+See [current state](docs/current-state.md#t0021-approved-activation-2026-10-19) for the observed deployment results and [activation](docs/activate-cloudflare-development.md) for the procedure.
 These are development installations that require connectivity. Live-contest readiness and capacity for 800 simultaneous users remain unverified.
 
 ## Local development
 
 Use npm with Node.js 22.13 or later within 22.x, or Node.js 24 or later. Docker is not required.
+The Vite setup below uses the retained Supabase implementation.
+For a complete isolated Cloudflare runtime, use the [installation guide](site/src/content/docs/operators/installation.md).
 
 ```sh
 npm ci
@@ -69,7 +72,7 @@ See [cloud onboarding](docs/cloud-onboarding.md#contributor-setup) for provider 
 | `npm run test:connector:accounts:hosted -- --config=… --account=… --database=…` | Check account guards on the same D1-only store CI target. |
 | `npm run cloudflare:install -- plan --settings=… --config=…` | Inspect an independent Cloudflare installation plan without provider changes. See the [installation guide](site/src/content/docs/operators/installation.md). |
 | `npm run test:workflow:hosted` | Verify the shared server through the deployed Supabase function on approved Minsky CI. See the [verification guide](docs/verify-server-workflow.md). |
-| `npm run test:auth` | Run experimental Cloudflare account and permission tests on local D1. |
+| `npm run test:auth` | Run Cloudflare account and permission tests on local D1. |
 | `npm run test:auth:browser` | Check cookies, origins, and request protection with a local HTTPS Worker and Chromium. |
 | `npm run test:auth:hosted -- --account=… --database=…` | Run account cases on the explicit isolated hosted authentication D1 target. |
 | `npm run test:auth:http -- --account=… --database=… --origin=…` | Check the isolated deployed authentication Worker. |
@@ -124,8 +127,8 @@ GitHub Actions runs CI for pull requests and all branch pushes.
 Independent docs and app deployment jobs wait for `checks`, `secrets`, and `dependencies`.
 See [deployment setup](docs/cloudflare-builds.md) for credentials, activation, and backend limits.
 The fresh Cloudflare development candidate and a separate empty installation pass the complete application checks.
-Stable URL activation and subsequent automated deployment remain unverified and require owner approval.
-PR #42 merged at `104d9d1`. T0021 includes the accepted connector and its final verification records.
+GitHub Actions publishes the complete Cloudflare application and independent docs after required main checks pass. The approved activation and a subsequent automated deployment both pass their recorded application checks.
+The [T0021 activation record](docs/current-state.md#t0021-approved-activation-2026-10-19) separates protected checks from stable URL verification.
 
 ### Repository records
 
@@ -134,7 +137,7 @@ PR #42 merged at `104d9d1`. T0021 includes the accepted connector and its final 
 - [Documentation release plan](docs/documentation-release-plan.md) — public-reader requirements, specific gaps, and completion criteria.
 - [Development tickets](docs/tickets.md) — ticket scope, status, and acceptance criteria.
 - [Current state](docs/current-state.md) — implementation details, verification records, and limitations.
-- [Cloud onboarding](docs/cloud-onboarding.md) — provider setup, costs, accounts, and deployment.
+- [Supabase cloud onboarding](docs/cloud-onboarding.md) covers the retained provider, account administration, and isolated verification.
 - [Jury worklist specification](docs/jury-worklist.md) records T0009 behavior and verified acceptance.
 - [Manual verification](docs/manual-verification.md) — workflow and interface checks.
 - [Code quality](docs/code-quality.md) — CI checks and review requirements.
@@ -144,7 +147,7 @@ PR #42 merged at `104d9d1`. T0021 includes the accepted connector and its final 
 - [Add a backend provider](docs/add-provider.md) gives contributor interfaces, registration points, installation, cleanup, and required shared verification.
 - [Activate Cloudflare development](docs/activate-cloudflare-development.md) gives the fresh-installation approval, deployment, verification, and recovery gates.
 - [Cloudflare backend design](docs/cloudflare-backend-design.md) explains the implemented server boundaries.
-- [Cloudflare authentication reference](docs/cloudflare-authentication.md) defines the experimental API, browser sessions, and account rules.
+- [Cloudflare authentication reference](docs/cloudflare-authentication.md) defines the API, browser sessions, and account rules.
 - [Authentication choice](docs/cloudflare-authentication-choice.md) records Better Auth, maintained crypto, resource measurements, and costs.
 - [Verify Cloudflare authentication](docs/verify-cloudflare-authentication.md) gives local, hosted, and protected CI procedures.
 - [Cloudflare installation](site/src/content/docs/operators/installation.md) gives the complete development installation procedure and owner recovery.

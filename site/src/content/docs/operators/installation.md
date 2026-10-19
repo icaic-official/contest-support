@@ -5,14 +5,14 @@ description: Install the complete Cloudflare application with its own accounts, 
 
 This guide installs Minsky into new Cloudflare resources from a reviewed checkout.
 It covers configuration, deployment, the first owner, verification, and recovery.
-Supabase remains the project's active development backend.
+Cloudflare serves the project's active development installation. Supabase remains a separate provider option.
 This is a fresh installation. Existing Supabase accounts, passwords, records, images, and IDs do not appear in it.
 Create a new administrator through the bootstrap step below.
 Leave existing Supabase resources and accounts intact. Do not export or reset them.
 Preserve the application's workflow and authorization rules when configuring the new instance.
 
 For the project's development URL, use the separate [activation procedure](https://github.com/GiftedNovaHD/minsky/blob/main/docs/activate-cloudflare-development.md).
-Preparation PR merge does not approve switching `minsky-dev`.
+The owner approved its switch separately from PR #43. A future backend switch also requires explicit approval.
 
 :::note[Development installation]
 Fresh development and separate installation-verification trials passed on 18 October 2026 at source `f6864f6`.

@@ -5,16 +5,15 @@ For another installation, use [Install Cloudflare](../site/src/content/docs/oper
 That guide owns resource creation, migrations, bootstrap, and trusted owner recovery.
 This guide owns the development switch, verification, and repair.
 
-## Review the prepared targets
+## Review the installation targets
 
-PR #42 merged at `104d9d1` on 18 October 2026. T0021 includes that main revision.
-The earlier restriction to local preparation ended at that merge.
-[PR #43](https://github.com/GiftedNovaHD/minsky/pull/43) contains this preparation.
-The owner reviews and merges. PR merge does not approve activation.
+[PR #43](https://github.com/GiftedNovaHD/minsky/pull/43) merged at `4e43739ac2ce56cca7e7739e4db189aa2854d4a9` on 19 October 2026.
+It includes PR #42, merged at `104d9d1` on 18 October.
+The owner separately approved activation and repeat-deployment verification. A preparation PR merge alone does not approve a backend switch.
 
 These targets exist in account `458ad6a930b0fb717796dfa19ca6a2b1`:
 
-| Target | Prepared value |
+| Target | Recorded value |
 | --- | --- |
 | Stable Worker and URL | `minsky-dev`, `https://minsky-dev.icaic-minsky.workers.dev` |
 | Stable version before preparation | `71b610bd-7f43-450d-b9c7-e85057c31da4` |
@@ -28,18 +27,23 @@ These targets exist in account `458ad6a930b0fb717796dfa19ca6a2b1`:
 | CPU cap | `1000` ms |
 | Scheduled recovery | `* * * * *` |
 | Stable public origin | `AUTH_ORIGIN=https://minsky-dev.icaic-minsky.workers.dev` |
-| Private Worker secret | `AUTH_SECRET`, absent on the stable Worker before activation. |
+| Private Worker secret | `AUTH_SECRET`, created privately during activation and preserved on later deployments. |
 | Private publishing credential | Existing repository secret `CLOUDFLARE_API_TOKEN`. |
 | Public settings | `src/server/adapters/cloudflare/deploy/development.settings.json` |
 | Generated stable configuration | `src/server/adapters/cloudflare/deploy/development.wrangler.jsonc` |
 | Installation marker | `7867c628-36b7-4724-b0a3-83c1894b23e8` |
 | New owner | `e102228c-f5c8-4180-962f-3a8b87d99b13`, username `organizer`. |
 | Development session | `5b092d9c-e3b1-4b33-b86c-f89f6df2839d` |
-| Verified executable and first repair source | `f6864f6ea29e663e78483d0cfd28a8f4e3299c2c` |
-| Approved deployment revision | Pending owner review, merge, and the concrete activation approval. |
+| Original verified candidate source | `f6864f6ea29e663e78483d0cfd28a8f4e3299c2c` |
+| Approved stable source and repair revision | `4e43739ac2ce56cca7e7739e4db189aa2854d4a9` |
+| Stable live namespace | `71700338eed643d59185f4a777fcb7b2` |
+| First complete stable version | `cd704354-5ca8-483c-998b-5bfe9ccd8d86` |
+| Repeat deployment version | `9f3686bd-ffa8-46bf-977f-2d9554235d41` |
 
-The stable Worker's current metadata has no application bindings. It still uses Supabase.
-`CLOUDFLARE_DEPLOY_ENABLED=false` pauses publishing. All five Cloudflare selection variables are absent.
+The stable URL uses Cloudflare after the approved activation.
+`MINSKY_DEV_BACKEND=cloudflare` and the four exact target variables select the complete Worker.
+`CLOUDFLARE_DEPLOY_ENABLED=true` enables eligible publication. Set it to `false` before a coordinated switch or repair.
+The candidate remains stopped, with its public and preview URLs disabled and its cron list empty.
 The separate installation-verification and CI resources are listed in [current state](current-state.md#t0021-fresh-development-installation-2026-10-18).
 Do not substitute those resources for development.
 
@@ -51,7 +55,7 @@ The new owner comes from the supported bootstrap process. Its credentials stay i
 
 Before requesting activation approval, complete these checks:
 
-1. Have the owner review and merge PR #43. Update a clean checkout from `main`.
+1. Have the owner review and merge the preparation revision. Update a clean checkout from `main`.
 2. Record the exact approved main revision and its push run. Reconcile any review changes and repeat affected checks.
 3. Confirm the account and every exact target again. Reconfirm the current stable version for the recovery record.
 4. Require the final local and hosted checks. Record CLI hosted results separately from protected GitHub Actions results.
@@ -60,9 +64,9 @@ Before requesting activation approval, complete these checks:
 7. Review the configuration, secret names, deployment sequence, verification criteria, and repair commands below with the owner.
 8. Obtain explicit approval for this backend switch. Do not infer it from the preparation PR merge.
 
-The owner previously confirmed that independent Git builds were disabled.
-Current Builds API reads return `403`, so this run cannot verify that setting.
-Use the dashboard before activation. Do not create a broader token merely for this read-only check.
+On 19 October 2026, the owner confirmed that independent Git build connections were disconnected for both Workers.
+The Builds API returned `403`, so that confirmation came from the owner's dashboard check.
+For a future switch, reconfirm the setting. Do not create a broader token merely for this read-only check.
 See [Cloudflare Builds permissions](https://developers.cloudflare.com/workers/ci-cd/builds/api-reference/#1-create-an-api-token-with-the-correct-permissions).
 
 Check existing Wrangler access before requesting credentials:
@@ -79,9 +83,37 @@ Document a concrete need and cost before proposing one.
 The deployment token needs the permissions in [deployment settings](cloudflare-build-settings.md#repository-settings).
 Keep private credentials out of chat, command arguments, Git, frontend variables, logs, and ordinary artifacts.
 
+## Quiesce the candidate before stable secret preparation
+
+Pause publishing and cancel any active publication job separately.
+Stop candidate tests and close their browser contexts and live connections.
+In account `458ad6a930b0fb717796dfa19ca6a2b1`, select only `minsky-development-candidate`:
+
+1. Remove its Cron Triggers under **Settings**, then **Triggers**. Retain the recorded schedule for repair.
+2. Disable its `workers.dev` and preview URLs under **Settings**, then **Domains & Routes**.
+3. Confirm that the candidate has no custom domain or Worker route.
+4. Confirm the disabled URL no longer reaches the application and its schedule list is empty.
+5. Record a drain deadline 30 minutes after the settings read confirms shutdown.
+6. Keep tests and live connections stopped. Do not publish the stable dispatcher before that deadline.
+
+Cron removal can take 15 minutes to propagate. An already admitted scheduled invocation can run for another 15 minutes.
+The 30-minute deadline covers both intervals. Secret preparation and build checks can run during this drain.
+After the deadline, require zero pending notification records before publication.
+Do not treat an immediate URL assertion failure as proof that the acknowledged settings writes failed. Reconcile through read-only checks.
+
+The candidate and stable Workers would share saved notification records but have different live-update namespaces.
+A candidate dispatcher could mark a notification delivered without notifying stable clients.
+Keep only one dispatcher active for this installation.
+Do not delete either namespace, the database, the bucket, the administrator, or private secrets.
+
+Only the candidate URL becomes unavailable during this step.
+During the first switch, Supabase remained available at the stable URL until the complete Worker replaced it.
+This step is reversible through the candidate's recorded URL and schedule after stopping any stable dispatcher.
+
 ## Create the approved stable secret
 
-Run the following commands only after the concrete activation approval:
+Run initial secret preparation only after explicit activation approval and confirmed candidate shutdown.
+An ordinary deployment preserves the existing secret and skips this creation step:
 
 ```sh
 MINSKY_DEV_CLOUDFLARE_CONFIG=src/server/adapters/cloudflare/deploy/development.wrangler.jsonc
@@ -95,34 +127,17 @@ npm run cloudflare:install -- secret --config="$MINSKY_DEV_CLOUDFLARE_CONFIG" --
 The plan must identify the exact table values above.
 The secret command checks live account, database, migrations, and secret metadata.
 It creates `AUTH_SECRET` through private stdin and refuses an existing secret.
-If the secret already exists, stop and reconcile its ownership. Do not delete or rotate it to force installation.
+If the secret already exists, reconcile its ownership and preserve it. Do not delete or rotate it to force installation.
 The candidate secret and cookie do not establish stable-origin sessions.
 The stable application uses `__Host-minsky-session` with `Secure`, `HttpOnly`, and `SameSite=Strict`.
 
-## Quiesce the candidate before stable deployment
-
-Pause publishing and cancel any active publication job separately.
-Stop candidate tests and close their browser contexts and live connections.
-In account `458ad6a930b0fb717796dfa19ca6a2b1`, select only `minsky-development-candidate`:
-
-1. Remove its Cron Triggers under **Settings**, then **Triggers**. Retain the recorded schedule for repair.
-2. Disable its `workers.dev` and preview URLs under **Settings**, then **Domains & Routes**.
-3. Confirm that the candidate has no custom domain or Worker route.
-4. Confirm the disabled URL no longer reaches the application and its schedule list is empty.
-5. Let admitted requests and scheduled work finish. Confirm no pending notification remains.
-
-The candidate and stable Workers would share saved notification records but have different live-update namespaces.
-A candidate dispatcher could mark a notification delivered without notifying stable clients.
-Keep only one dispatcher active for this installation.
-Do not delete either namespace, the database, the bucket, the administrator, or private secrets.
-
-Only the candidate URL becomes unavailable during this step.
-Supabase remains available at the existing development URL until the complete Worker replaces it.
-This step is reversible through the candidate's recorded URL and schedule after stopping any stable dispatcher.
-
 ## Publish the complete stable Worker
 
-From the approved checkout, validate the Cloudflare build and full configuration:
+From the approved checkout, validate the Cloudflare build and full configuration.
+Before setting publication variables, require the recorded drain deadline to pass. Confirm that pending notifications are zero.
+Reconfirm paused publishing, no active publication job, candidate shutdown, exact targets, and the preserved stable secret.
+
+Run the build and dry run:
 
 ```sh
 VITE_BACKEND=cloudflare npm run build
@@ -165,13 +180,37 @@ Keep the candidate's routes and schedules disabled.
 Record code revisions, Worker versions, CLI results, protected run URLs, and outstanding manual checks in current state.
 Only then mark activation complete.
 
+## Activation record, 19 October 2026
+
+The owner merged PR #43 at `4e43739ac2ce56cca7e7739e4db189aa2854d4a9`.
+Ordinary [main CI](https://github.com/GiftedNovaHD/minsky/actions/runs/39252514749) passed on attempt 1.
+The owner then explicitly approved activation and repeat-deployment verification and confirmed both independent Git builds were disconnected.
+The candidate's cron and public routes were disabled before stable secret creation.
+A later read-only check confirmed its disabled URL returned `404`. The original immediate-check failure and recovery journal remain preserved.
+The drain deadline was 13:10:00.638 UTC. Initial stable secret creation used the supported private command during that drain.
+The build and complete Worker dry run passed on the approved source.
+[Attempt 2](https://github.com/GiftedNovaHD/minsky/actions/runs/39252514749/attempts/2) failed its docs keyboard-search wait before publication. Both upload jobs skipped.
+The unchanged focused local case passed. The complete unchanged retry passed as attempt 3.
+No assertion, timeout, or protection changed. The initial wait failure has no confirmed cause.
+
+| Evidence | Result |
+| --- | --- |
+| First automated publication | [Run 39252514749, attempt 3](https://github.com/GiftedNovaHD/minsky/actions/runs/39252514749/attempts/3), source `4e43739`. All five ordinary and publication jobs pass. |
+| First stable verification | CLI stable verification passes 14/14 at 13:42:36 UTC. No failures, skips, flaky results, infrastructure errors, or retained fixture journals. The live configuration audit passes. |
+| Subsequent automated publication | [Run 39252514749, attempt 4](https://github.com/GiftedNovaHD/minsky/actions/runs/39252514749/attempts/4), source `4e43739`. All five ordinary and publication jobs pass. |
+| Repeat verification and retained namespace | CLI stable verification passes 14/14 at 14:07:38 UTC, with clean owned-fixture removal. The live audit confirms namespace `71700338eed643d59185f4a777fcb7b2` and every binding match the first deployment. |
+
+The [current-state record](current-state.md) owns detailed verification results and remaining manual checks.
+Supabase resources and accounts remain intact. No Supabase data or identifiers transferred.
+
 ## Repair a failed activation
 
 Pause publishing with `CLOUDFLARE_DEPLOY_ENABLED=false`. Cancel active publishing jobs separately.
 Retain all new D1 records, R2 objects, owner results, journals, and private secrets.
-For first activation, use verified candidate code `f6864f6ea29e663e78483d0cfd28a8f4e3299c2c` with the stable configuration.
-There is no earlier complete stable Worker to restore.
-For a later release, select a recorded compatible complete stable revision.
+Use the latest recorded compatible complete stable revision with the retained stable configuration.
+The first verified complete stable source is `4e43739ac2ce56cca7e7739e4db189aa2854d4a9`.
+The initial activation approval allowed candidate source `f6864f6ea29e663e78483d0cfd28a8f4e3299c2c` for first repair. That repair was not needed. The verified stable source is now the recorded repair baseline.
+Do not restore the earlier assets-only Supabase version after Cloudflare writes begin.
 
 Create a separate repair checkout at the selected revision and install its locked dependencies.
 Set these public path variables in the repair shell:

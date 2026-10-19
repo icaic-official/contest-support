@@ -1,25 +1,26 @@
-# Cloud onboarding for T0003
+# Supabase cloud onboarding
 
-Supabase remains the active development backend.
-The prepared Cloudflare installation creates new accounts and records. It transfers no Supabase data.
-Use [deployment setup](cloudflare-builds.md) for automation and [activation](activate-cloudflare-development.md) for the separately approved backend switch.
+This guide covers the retained Supabase projects and their contribution and verification commands.
+Cloudflare serves the stable development application. Its fresh installation received no Supabase accounts, passwords, records, images, or IDs.
+Use [Install Cloudflare](../site/src/content/docs/operators/installation.md) for Cloudflare setup.
+Use [deployment setup](cloudflare-builds.md) for automation and [activation](activate-cloudflare-development.md) for the approved switch and recovery procedure.
 GitHub Actions publishes docs and the selected application after required `main` checks pass and publication is enabled.
 Application previews remain disabled until independent preview resources exist.
 Backend migrations, bootstrap, secrets, and activation retain their explicit steps.
 The dated setup records below describe their recorded revisions.
 
-The connected development app runs at https://minsky-dev.icaic-minsky.workers.dev.
-Supabase hosts authentication, Postgres, and Realtime.
-Cloudflare Workers Static Assets serves the frontend.
+The connected development app runs at https://minsky-dev.icaic-minsky.workers.dev on the complete Cloudflare Worker.
+The separate Supabase implementation uses managed authentication, Postgres, Realtime, and private Storage.
+Its projects, accounts, and data remain intact.
 Docker is optional.
 The user permits full authorized cloud credential access for contributors.
 
-## Experimental Cloudflare authentication
+## Separate Cloudflare authentication checks
 
 T0018 uses separate local development databases and the isolated hosted `minsky-auth-ci` database and Worker.
 Follow [the authentication verification guide](verify-cloudflare-authentication.md) for explicit targets, credentials, checks, and recovery.
 The [identity choice](cloudflare-authentication-choice.md) records measured Worker CPU and the Standard plan need and cost.
-These resources contain fictional fixtures. They do not replace the Supabase projects described below.
+These resources contain fictional fixtures. They are separate from both the Cloudflare development installation and the Supabase projects below.
 
 ## Authentication decision (2026-10-02)
 
@@ -32,7 +33,7 @@ Staff have individual accounts.
 Supabase manages passwords and sessions through internal identifiers with email format.
 These identifiers are not mailboxes and must not receive mail.
 
-### Create and recover accounts
+### Create and recover Supabase accounts
 
 To assign a username to an existing account:
 
@@ -40,7 +41,7 @@ To assign a username to an existing account:
 2. Under **Session accounts**, expand the account.
 3. Select **Assign username → Set username**.
 
-Existing development accounts can use their original email and password until an admin assigns a username.
+Existing Supabase trial accounts can use their original email and password until an admin assigns a username.
 Usernames contain 3–32 letters, digits, underscores, or hyphens.
 The app stores them in lowercase.
 Username assignment preserves the password, Auth UUID, memberships, and history.
@@ -140,7 +141,7 @@ On 2026-10-03, the user moved these scope notes from T0004.
 They stay deferred.
 They are not part of the T0005 issue-image ticket.
 The guidance below still applies before any paid upgrade.
-No paid upgrade is selected.
+Workers Paid and R2 are active for Cloudflare development. No further paid upgrade is selected.
 
 Use individual provider logins and membership controls for Supabase and Cloudflare.
 Provider access and Minsky app membership are separate.
@@ -155,8 +156,10 @@ Record these non-secret details in the completion record:
 - The location of the usage dashboard.
 - Receipt and reimbursement procedures.
 
-Start with Supabase Free and Workers Free.
-This ticket does not require an SMTP provider, image bucket, custom application domain, R2, or AWS account.
+The original T0003 pilot selected Supabase Free and Workers Free.
+That ticket required no SMTP provider, image bucket, custom application domain, R2, or AWS account.
+Later Cloudflare work activated Workers Paid and R2 after recording the password-hashing requirement and cost.
+The owner limits current verification to the existing US$5 monthly plan. No further upgrade is approved.
 Static assets served without Worker code invocation are free and unlimited.
 Supabase Free limits and inactivity pausing still apply.
 Review usage before a pilot.
@@ -203,23 +206,19 @@ This does not add a deletion job.
 New removal requests stop after archival.
 File cleanup for a removal already approved before archival can still finish.
 
-### Manual Worker previews
+### Historical T0005 Worker preview
 
-From the reviewed ticket branch, run `npm run deploy:preview -- --preview-alias t0005`.
-This builds the frontend and runs `wrangler versions upload`.
-It updates `https://t0005-minsky-dev.icaic-minsky.workers.dev` and leaves the main Worker deployment unchanged.
-No permanent `preview` Git branch is needed.
-This command is the older manual preview path. After setup, repository branch pushes publish through [the CI workflow](cloudflare-builds.md).
-See [Cloudflare version URLs](https://developers.cloudflare.com/workers/versions-and-deployments/version-urls/).
-
-The frontend uses its build-time Supabase settings.
-The approved T0005 preview shares `Minsky` accounts, database, and Storage.
-The functions' `ALLOWED_ORIGINS` includes the exact preview origin alongside the existing main and local origins.
-A frontend preview does not isolate backend changes or data.
-Confirm the backend target before applying migrations or functions.
+The approved T0005 preview used `https://t0005-minsky-dev.icaic-minsky.workers.dev` with the `Minsky` Supabase accounts, database, and Storage.
+Its functions allowed that exact origin alongside the main and local origins.
+That frontend preview did not isolate backend changes or data.
+The old `deploy:preview` script was removed. Do not use an assets-only preview upload against the complete application Worker.
+Current app previews remain disabled until independent resources exist. Follow [deployment setup](cloudflare-builds.md).
 The attachment migration checks that Supabase already enabled Storage RLS rather than altering its managed table.
 
 ## Contributor setup
+
+These commands select the retained Supabase development project. They do not configure the active Cloudflare deployment.
+For Cloudflare work, use the isolated installation and provider verification guides.
 
 Use Node.js 22.13 or later within 22.x, or Node.js 24 or later.
 Use npm.
@@ -251,8 +250,7 @@ npm run cloud:migrate
 npm run cloud:bootstrap -- --admin-user EXISTING_AUTH_UUID
 npm run cloud:functions
 npx supabase secrets set ALLOWED_ORIGINS=http://127.0.0.1:5173,http://127.0.0.1:4174,https://minsky-dev.icaic-minsky.workers.dev --project-ref ovymmobupzowotvrywek
-npm run cloud:hosting-login
-npm run deploy
+npm run build
 ```
 
 Before first setup, review `scripts/bootstrap.sql`.
@@ -261,6 +259,8 @@ Do not run it again against the development project, which already has an admin.
 Initial intake is closed until an admin opens it.
 `cloud:functions` bundles remotely with `--use-api`.
 Docker is not required.
+These Supabase setup commands do not publish to the stable Cloudflare URL.
+The guarded deployment path refuses to replace its complete Worker with static Supabase assets.
 
 Supabase supplies the function's service credentials.
 Only `ALLOWED_ORIGINS` requires custom function configuration.
@@ -270,7 +270,7 @@ The previous `APP_URL` setting is unused.
 
 | Environment | Supabase project | Use |
 | --- | --- | --- |
-| Development | `Minsky` — `ovymmobupzowotvrywek` | Shared development app, contributor work, and user trial accounts. |
+| Retained development | `Minsky` — `ovymmobupzowotvrywek` | Supabase contributor work and existing trial accounts. The stable URL uses Cloudflare. |
 | CI | `Minsky CI` — `ghtztmovdkhuketcbjmq` | Temporary automated accounts and workflow and authorization fixtures scoped by UUID. |
 | Production | Not provisioned | Future real contest accounts and data. Use a separate database, credentials, and frontend. |
 
@@ -283,7 +283,7 @@ For each ticket, use this sequence:
 5. Prepare the PR.
 6. Run cloud integration checks against the reviewed revision.
 7. Let the user review and merge.
-8. After automation setup, let GitHub Actions deploy both static frontends when the `main` CI checks pass. Coordinate backend deployment separately.
+8. Let GitHub Actions publish docs and the selected complete application after the required `main` checks pass. Coordinate migrations, bootstrap, and secrets separately.
 
 Automatic frontend deployment requires GitHub deployment settings and passing `checks`, `secrets`, and `dependencies` jobs.
 Until setup is verified, record merge and deployment separately.
@@ -350,7 +350,11 @@ It tests revoked access, invalid login sessions, failed file deletion, and retri
 `npm run test:e2e` checks login, team search, workspace refresh, and image previews with fictional API responses and no cloud credentials.
 The old demo and its tests are removed.
 `npm run test:cloud` tests managed Auth, database, and Realtime behavior against a local frontend.
-`npm run test:hosted` repeats the suite with real accounts against the deployed app.
+`npm run test:hosted` is a legacy Supabase wrapper that fixes its frontend target to `minsky-dev`.
+Do not use it after Cloudflare activation. Its Supabase fixtures cannot verify that frontend.
+Use [the Cloudflare provider and UI checks](run-provider-tests.md) against their dedicated CI targets.
+Use [the activation procedure](activate-cloudflare-development.md#verify-activation-and-subsequent-deployment) to verify the stable installation. Keep its records separate from CI fixtures.
+`npm run test:cloud` retains the separate Supabase verification path through its local frontend.
 The protected cloud job also runs the [shared provider suite](provider-test-contracts.md) through the Supabase adapter.
 See [Run the shared provider tests](run-provider-tests.md) for its explicit target settings and separate recovery journal.
 
@@ -437,7 +441,10 @@ Delete only records and accounts from that test run.
 Remove the recovery file and its directory after cleanup succeeds.
 The file is local to the machine that ran the tests.
 
-## Completion record
+## Initial completion record (2026-10-02)
+
+These notes describe the initial setup. Later verification records supersede their pending status claims.
+Use [current state](current-state.md) for current CI and deployment evidence.
 
 - Supabase project: `Minsky`, URL `https://ovymmobupzowotvrywek.supabase.co`, reference `ovymmobupzowotvrywek`, organization `gayymsuhfqsboksikzwx`, Singapore region `ap-southeast-1`, PostgreSQL 17. Provider access and CLI login/link were independently verified in the initial implementation.
 - Separate CI project: `Minsky CI`, URL `https://ghtztmovdkhuketcbjmq.supabase.co`, reference `ghtztmovdkhuketcbjmq`, organization `gayymsuhfqsboksikzwx`, Tokyo region `ap-northeast-1`, PostgreSQL 17. CLI verified `ACTIVE_HEALTHY`. All five migrations were applied without seeds; the admin function was deployed with server-side bundling and `ALLOWED_ORIGINS=http://127.0.0.1:4174`. Repository-owned Auth configuration was applied. No trial accounts or shared development records were copied.

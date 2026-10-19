@@ -2,10 +2,10 @@
 
 These tickets describe development work, not contestant issues.
 
-The active preparation ticket is [T0021 fresh Cloudflare development installation](#t0021-fresh-cloudflare-development-installation).
+[T0021 fresh Cloudflare development installation](#t0021-fresh-cloudflare-development-installation) is complete, including approved activation and repeat deployment.
 It includes [T0020](#t0020-complete-cloudflare-connector), merged in [PR #42](https://github.com/GiftedNovaHD/minsky/pull/42) at `104d9d1`.
-The owner authorized parallel local preparation and resumed hosted work after that merge. Supabase remains active until separately approved activation.
-Existing Supabase trial data will not transfer. Leave its resources and accounts intact.
+The owner merged PR #43 at `4e43739` and separately approved stable activation and a repeat automated deployment.
+No Supabase trial data transfers. Its resources and accounts remain intact.
 
 T0016 Cloudflare backend design merged in [PR #36](https://github.com/GiftedNovaHD/minsky/pull/36) at `b68ef72` on 2026-10-17.
 [T0015 shared provider tests](#t0015-shared-provider-tests) merged in [PR #37](https://github.com/GiftedNovaHD/minsky/pull/37).
@@ -58,49 +58,44 @@ T0008 fuzzy team search merged into `main` in [PR #22](https://github.com/notbow
 ## T0021 Fresh Cloudflare development installation
 
 Branch: `feature/t0021-cloudflare-development-install`, from PR #42 head `2b6f6f0` in a separate worktree.
-Status: [PR #43](https://github.com/GiftedNovaHD/minsky/pull/43) includes merged main at `104d9d1`. Fresh development and separate installation verification pass. The owner approved its exact protected branch entry. Its current final verification result is recorded in the PR. Activation still requires separate approval.
-Summary: Prepare a fresh Cloudflare development installation and guarded deployment automation. Keep Supabase intact and active until the owner approves the concrete URL switch.
+Status: [PR #43](https://github.com/GiftedNovaHD/minsky/pull/43) merged at `4e43739ac2ce56cca7e7739e4db189aa2854d4a9` on 2026-10-19. Complete. Approved activation and the subsequent automated deployment each pass 14 stable cases and scoped cleanup. Exact resource bindings and the stable namespace persist.
+Summary: Prepare and activate the fresh Cloudflare development installation through the existing guarded publication path. Preserve Supabase resources and accounts.
 
-The owner requests a maintainability review follow-up on 2026-10-19, after verification of `0254f60`.
-PR #43 is draft while this follow-up runs. Earlier passes verify their recorded revision.
-Clarify authorization and transaction stages, strengthen provider boundaries, and complete shared account, image-limit, and reconnect assertions.
-Keep existing behavior and atomic execution. Add only abstractions required by current callers.
-The owner limits Cloudflare spending to the existing $5 plan. Billing access returns `403`. The owner reports no extra charges on 2026-10-19; use bounded required verification and no optional stress tests.
-
-The owner authorizes this ticket before PR #42 merges.
-Before that merge, perform implementation, documentation, and local checks only.
-After the merge, update from main, reconcile review changes, and repeat verification.
-Do not transfer Supabase accounts, passwords, issues, history, images, or IDs.
-Bootstrap a new administrator through the existing provider tool.
-Preserve the shared contracts, workflow decisions, database rules, and jury worklist.
-Keep development, CI, and installation-verification resources separate.
-Use account `458ad6a930b0fb717796dfa19ca6a2b1` and confirm each exact target before mutation.
-The owner separately approved this exact branch entry on 2026-10-18. Entry `63467138` preserves all six earlier entries and protection rule `69128862`.
-Do not merge either PR or activate the development URL without owner approval.
+The review follow-up preserves shared workflow decisions, atomic D1 commits, both providers, and all 11 shared behavior scenarios.
+Final protected checks cover the fixture-cleanup correction at `2125875`. The merged main tree is identical.
+The owner approved the exact backend switch and its repeat deployment separately from the PR merge.
+The owner confirmed that independent Cloudflare Git builds are disconnected for both application and docs Workers.
+Keep development, CI, and installation-verification resources separate in account `458ad6a930b0fb717796dfa19ca6a2b1`.
+Transfer no Supabase accounts, passwords, records, images, or IDs. Leave its resources and accounts intact.
+The budget is the existing $5 plan. Billing access returns `403`; the owner reports no extra charges on 2026-10-19.
+Run bounded required verification. Add no paid services or optional stress tests.
+Protected branch entry `63467138` preserves all six earlier entries and protection rule `69128862`.
+This ticket authorizes no broader allowlist or protection change.
+The [current activation record](current-state.md#t0021-approved-activation-2026-10-19) records actual operational results.
 
 ### Acceptance criteria
 
 - [x] Review follow-up preserves workflow behavior and transaction boundaries while reducing reader load.
 - [x] UI provider restrictions cover both implementations, and shared tests cover account creation, image limits, and reconnect recovery. Hosted results are recorded separately in PR #43.
 - [x] Deployment preparation preserves Supabase mode until approved activation and tests both backend selections.
-- [ ] Activated deployments retain the full Worker, selected frontend, bindings, migration tags, origin, private secret, cron, and CPU cap.
+- [x] Activated deployments retain the full Worker, selected frontend, bindings, migration tags, origin, private secret, cron, and CPU cap.
 - [x] Static deployment cannot overwrite an activated application Worker. Docs deployment remains independent.
 - [x] App previews cannot use stable development resources.
 - [x] One installation procedure provides exact creation, migration, bootstrap, password-change, recovery, and verification commands.
 - [x] Contributor documentation identifies provider interfaces, registration, configuration, migrations, bootstrap, cleanup, shared scenarios, and provider checks.
 - [x] After PR #42 merges, current main is integrated and local required checks pass on the reconciled revision.
 - [x] A fresh dedicated development installation passes authentication, authorization, workflow, jury, private image, and live-update checks with fictional records.
-- [ ] Local hosted checks and protected GitHub Actions checks are recorded separately on the final revision.
-- [ ] A concrete activation record lists exact identifiers, approved revision, settings, commands, checks, and recovery.
-- [ ] The owner approves the backend switch. The development URL then passes application checks.
-- [ ] A subsequent automated deployment retains Cloudflare mode and the exact resource bindings.
-- [ ] The owner reviews and merges the preparation PR. Supabase resources remain intact.
+- [x] Local hosted checks and protected GitHub Actions checks are recorded separately on the final revision.
+- [x] A concrete activation record lists exact identifiers, approved revision, settings, commands, checks, and recovery.
+- [x] The owner approves the backend switch. The development URL then passes application checks.
+- [x] A subsequent automated deployment retains Cloudflare mode and the exact resource bindings.
+- [x] The owner reviews and merges the preparation PR. Supabase resources remain intact.
 
 ### Verification
 
-See [the run report](t0021-run-report.md) for this preparation run.
-PR #42 merged at `104d9d1` on 2026-10-18. T0021 includes that revision.
-Activation requires a later, concrete owner approval.
+See [the current activation record](current-state.md#t0021-approved-activation-2026-10-19) for tested revisions and separate verification sources.
+See [the run report](t0021-run-report.md#owner-merge-and-approved-activation-2026-10-19) for the final operational report.
+The owner merged PR #43 and separately approved the concrete activation. No activation or repeat-deployment gate remains. The final operational documentation follows normal owner review and merge.
 
 ## T0020 Complete Cloudflare connector
 
@@ -109,7 +104,7 @@ Status: merged in [PR #42](https://github.com/GiftedNovaHD/minsky/pull/42) at `1
 Summary: Complete every Cloudflare backend operation and verify the application with isolated resources. Verify installation into an empty Cloudflare environment.
 
 The owner authorized the complete connector after PR #41 merged.
-Supabase remains the active development backend.
+Supabase was active throughout T0020. The later T0021 activation has its own approval and record.
 Use the existing Cloudflare account, `458ad6a930b0fb717796dfa19ca6a2b1`.
 Keep new development, CI, and installation resources separate from existing verification resources.
 Bounded subagent work is authorized.
@@ -178,7 +173,7 @@ T0019 preserves the merged authentication behavior.
 The initial protected authentication HTTP check failed with a Workers Free resource limit.
 The owner activated Workers Paid during PR #41 review. The local hosted HTTP suite now passes.
 
-Supabase remains active. The legacy browser workflow and protective SQL remain available during replacement verification.
+Supabase was active during T0019 verification. Its legacy browser workflow and protective SQL remain available for Supabase builds.
 The new Supabase path is opt-in and uses the approved CI project, `ghtztmovdkhuketcbjmq`.
 No active development backend deployment or backend switch is part of this ticket.
 Full D1 workflow support, R2, notification delivery, migration tooling, AWS, and Terraform remain outside this scope.
@@ -762,9 +757,9 @@ The user accepted the design by merging PR #36. This did not authorize Cloudflar
 
 The [design](cloudflare-backend-design.md) explains the decisions.
 The [historical implementation plan](https://github.com/GiftedNovaHD/minsky/blob/88ea5020a0f9dfc34a32ed7fbd84dfea07423297/docs/cloudflare-implementation-plan.md) records the accepted implementation phases.
-Remaining [migration gates](product-direction.md#migration-and-cutover-gates) stay deferred.
+T0021 later completes the fresh installation and separately approved development switch. Real-data migration tooling remains deferred. See [the current gates](product-direction.md#migration-and-cutover-gates).
 The [verification record](current-state.md#t0016-cloudflare-backend-design-2026-10-17) identifies this documentation-only change.
-Supabase remains active. This ticket creates no credentials, provider resources, or data migration.
+Supabase was active during T0016. That design ticket created no credentials, provider resources, or data migration.
 
 ## T0014 backend adapters
 

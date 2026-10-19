@@ -1,18 +1,16 @@
 # T0009 — Jury worklist
 
-Status: implemented on 2026-10-15. Current-main maintenance started on 2026-10-18.
+Status: merged in [PR #23](https://github.com/GiftedNovaHD/minsky/pull/23) at `c144a2a` on 2026-10-18.
 Branch: `feature/t0009-jury-worklist`, originally from `main` at `1ed603a`.
-Integration baseline: current `main` at `7d19b00`, including PR #41.
-Review: [PR #23](https://github.com/GiftedNovaHD/minsky/pull/23), prepared for owner review.
-Current local checks, hosted jury acceptance, protected CI, and scoped cleanup pass on runtime source `f45d03f`.
-The final follow-up changes documentation only.
-Historical results do not establish current compatibility.
+The maintenance run used integration baseline `7d19b00`, including PR #41.
+Its local checks, hosted jury acceptance, protected CI, and scoped cleanup passed on runtime source `f45d03f`.
+The final follow-up changed documentation only.
+Later combined application verification belongs to its recorded source and provider.
 See [current state](current-state.md#t0009-parallel-maintenance-2026-10-18).
 
-The owner authorized T0009 maintenance in parallel with the separate T0020 connector goal.
-Use a separate worktree. Preserve the connector checkout, scope, and active ticket.
-Supabase remains active. The owner reviews and merges.
-This task does not authorize application deployment, backend changes, or data migration.
+The owner authorized the 2026-10-18 maintenance in a separate worktree alongside T0020.
+Supabase was active during that run. Its authorization excluded deployment, backend changes, and data migration.
+The current worklist uses the shared provider contracts in the active Cloudflare application.
 
 ## Outcome and scope
 
@@ -130,7 +128,7 @@ does not erase an award, undo its application, or create another award decision.
   Keep permission and transition decisions at the server.
   Preserve current database constraints, atomic commits, revision checks, request IDs, and duplicate-award protection.
   Add no schema, backend feature, provider implementation, or runtime dependency.
-  The active Supabase adapter retains its guarded SQL path during shared-service replacement verification.
+  The Supabase adapter retains its guarded SQL path. The Cloudflare adapter uses the shared service and atomic D1 commits.
 - Merge current `main` into the existing PR branch without rewriting commits.
   Preserve current authentication, backend contracts, shared workflow integration, images, and refresh handling.
   Keep changes to `ConnectedApp.tsx` and shared styles focused on worklist integration.
@@ -182,7 +180,7 @@ This maintenance does not authorize deployment. Existing automatic frontend depl
 - [x] Required checks, current workflow regressions, and hosted jury acceptance pass.
   Fixture cleanup is verified. Evidence distinguishes simulations, hosted CLI, and protected GitHub runs.
 - [x] Documentation and PR #23 describe current results.
-  Required runtime verification passes. The owner reviews and merges.
+  Required runtime verification passed. The owner merged PR #23.
 
 ## Exclusions
 

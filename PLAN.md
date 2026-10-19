@@ -1,5 +1,18 @@
 # Minsky planning record
 
+**T0021 owner merge and approved activation, 2026-10-19.** The owner merged PR #43 at `4e43739ac2ce56cca7e7739e4db189aa2854d4a9`.
+Its tree matches final protected source `2125875653db9157f686c5f46cdddf8519c290d1`.
+The main push checks pass in [run 39252514749, attempt 1](https://github.com/GiftedNovaHD/minsky/actions/runs/39252514749/attempts/1).
+The owner separately approved the concrete stable Cloudflare switch and a repeat automated deployment of this reviewed revision.
+The owner confirmed that independent Cloudflare Git builds are disconnected for both `minsky-dev` and `minsky-docs`.
+This approval reuses the fresh development installation. It authorizes no Supabase transfer, reset, or resource deletion.
+Stop the candidate before stable publication. Preserve the development D1 records, private R2 objects, and stable authentication secret during recovery.
+Keep docs independent, app previews isolated, and the existing protected-environment rules intact.
+Use only bounded required checks within the existing $5 plan. Add no service, upgrade, or optional stress test.
+The stable URL now uses Cloudflare. Automated publication attempts 3 and 4 pass on the same approved `4e43739` source. Each deployment passes all 14 stable application cases and scoped cleanup. The repeat retains the exact namespace, resource bindings, authentication configuration, cron, and CPU cap.
+The [current activation record](docs/current-state.md#t0021-approved-activation-2026-10-19) owns deployment revisions, Worker versions, verification results, and remaining checks.
+Earlier dated decisions below retain their original scope and evidence.
+
 **T0021 maintainability review follow-up, 2026-10-19.** The owner requests small changes in open PR #43 after verification of `0254f60`.
 Clarify workflow authorization and D1 transaction stages without changing behavior or atomic execution.
 Extend UI provider boundaries and shared account, image-limit, and reconnect assertions.

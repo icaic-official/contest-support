@@ -6,11 +6,18 @@ description: Install the complete Cloudflare application with its own accounts, 
 This guide installs Minsky into new Cloudflare resources from a reviewed checkout.
 It covers configuration, deployment, the first owner, verification, and recovery.
 Supabase remains the project's active development backend.
+This is a fresh installation. Existing Supabase accounts, passwords, records, images, and IDs do not appear in it.
+Create a new administrator through the bootstrap step below.
+Leave existing Supabase resources and accounts intact. Do not export or reset them.
+Preserve the application's workflow and authorization rules when configuring the new instance.
+
+For the project's development URL, use the separate [activation procedure](https://github.com/GiftedNovaHD/minsky/blob/main/docs/activate-cloudflare-development.md).
+Preparation PR merge does not approve switching `minsky-dev`.
 
 :::note[Development installation]
-The empty-installation procedure passed on 18 October 2026 at source `2b6f6f0`.
-The trial checked the complete React workflow, first-owner password gates, trusted owner recovery, and scoped cleanup.
-See the [dated evidence](https://github.com/GiftedNovaHD/minsky/blob/main/docs/current-state.md#fresh-installation-after-review-fixes) for the tested source, resources, and results.
+Fresh development and separate installation-verification trials passed on 18 October 2026 at source `f6864f6`.
+Both checked the complete React workflow, all eight shared provider scenarios, first-owner password gates, expiry, trusted recovery, and scoped cleanup.
+See the [dated evidence](https://github.com/GiftedNovaHD/minsky/blob/main/docs/current-state.md#t0021-fresh-development-installation-2026-10-18) for the tested source, resources, and results.
 This procedure does not establish production capacity or real-data migration.
 :::
 
@@ -294,10 +301,14 @@ Then complete these checks:
 2. Claim the issue, request a specialist handoff, and confirm the owner remains until another specialist accepts.
 3. Add a public reply and an internal note. Confirm the contestant sees only the public reply.
 4. Upload a team-visible image and a staff-only image. Confirm the contestant can download only the team-visible image.
-5. Resolve the issue, record an award, and separately confirm its external application. Reopen the issue and verify its retained owner and award.
+5. Resolve the issue and review it through the jury worklist. Record an award and separately confirm its external application. Reopen the issue and verify its retained owner, history, accumulated unresolved time, and award.
 6. Disconnect and reconnect a browser. Confirm its view refreshes after another account changes the issue.
 7. Revoke an account's access. Confirm that account cannot read, write, download images, or retain authorized live access.
 8. Exercise trusted owner recovery below. Confirm old sessions fail and the replacement password requires another change.
+
+Verify that expired sessions cannot read or write. Revoke credentials and memberships separately and repeat authorization checks.
+Combine staff roles and confirm that their capabilities form one person's access.
+Keep account expiry, transaction races, image failure recovery, and live audience checks in the provider-specific suites too.
 
 Record the reviewed revision, deployed Worker version, target IDs, results, and any failures.
 A landing-page response or database-only check does not verify the complete connector.

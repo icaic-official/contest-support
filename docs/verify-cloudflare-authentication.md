@@ -64,7 +64,8 @@ Development uses local databases. Neither the active Supabase projects nor the e
 
 The committed Worker configuration requests a 1,000 ms CPU cap per request.
 Cloudflare requires Workers Paid for that setting.
-The protected D1 cases pass, but a protected password-change request exceeded runtime resources.
+An earlier protected password-change request exceeded runtime resources.
+That result describes its recorded configuration. See [current state](current-state.md) for later Paid activation and hosted results.
 Before deploying the Worker, confirm that an authorized account owner activated Workers Paid for the configured account.
 On Free, deployment fails with error `100328`. Do not reduce password cost to bypass that requirement.
 
@@ -75,7 +76,8 @@ npx wrangler d1 migrations apply minsky-auth-ci --remote --config wrangler.auth-
 npx wrangler deploy --config wrangler.auth-ci.jsonc
 ```
 
-Expect four migrations on an empty target, or `No migrations to apply` on the current target.
+Expect all nine repository migrations, `0001` through `0009`, on an empty target.
+Expect `No migrations to apply` on an up-to-date target.
 Expect deployment only to `https://minsky-auth-ci.icaic-minsky.workers.dev`.
 The Worker requires the existing `AUTH_SECRET`. Preserve that secret on ordinary deployments.
 For an empty authorized installation, create a random secret of at least 32 characters in a password manager.

@@ -9,6 +9,7 @@ import type { Command } from '../../src/connected/model';
 export interface BrowserProvider {
   backend: Backend;
   discardNextWorkflowResponse(): void;
+  discardNextAccountResponse(): void;
   close(): Promise<void>;
 }
 
@@ -26,6 +27,7 @@ export type Request =
       | 'signOut'
       | 'accountStatus'
       | 'discardNextWorkflowResponse'
+      | 'discardNextAccountResponse'
       | 'close';
   }
   | { type: 'signIn'; username: string; password: string }

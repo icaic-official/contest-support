@@ -38,7 +38,7 @@ Record observed results in [current state](current-state.md).
    ```
 
 Expect every command to exit with code zero.
-Local tests include shared decisions, orchestration, Supabase commit guards, and the bounded D1 path.
+Local tests include shared decisions, orchestration, Supabase commit guards, and the complete D1 workflow.
 Two regression cases expire a login during a commit statement, before its final access check.
 Both new writes and receipt replays must fail without changing workflow records.
 Embedded PostgreSQL uses isolated in-process data.

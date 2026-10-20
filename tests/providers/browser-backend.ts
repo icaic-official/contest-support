@@ -1,4 +1,4 @@
-import type { Browser, BrowserContext, Request as BrowserRequest } from '@playwright/test';
+import type { Browser, BrowserContext, Request as BrowserRequest, WebSocketRoute } from '@playwright/test';
 import type { Backend, Unsubscribe } from '../../src/backend/contracts';
 import {
   ImageRequestError,
@@ -9,6 +9,8 @@ import type { BrowserEvent, Request, Response } from './browser-protocol';
 export interface BrowserBackend {
   backend: Backend;
   discardNextWorkflowResponse(): void;
+  discardNextAccountResponse(): void;
+  setLiveUpdatesPaused(paused: boolean): Promise<void>;
   close(): Promise<void>;
 }
 
@@ -59,6 +61,25 @@ export async function createBrowserBackend(
     page.on('requestfailed', (request) => { observe(request, 0); });
   }
   const assetOrigin = options.assetOrigin ?? options.origin;
+  let livePaused = false;
+  const sockets = new Map<WebSocketRoute, WebSocketRoute>();
+  // Exclude Vite's root socket. Provider sockets still use the real network.
+  await context.routeWebSocket((url) => url.host !== new URL(assetOrigin).host || url.pathname !== '/', (socket) => {
+    if (livePaused) {
+      void socket.close({ code: 1013, reason: 'Fixture connection paused' });
+      return;
+    }
+    const server = socket.connectToServer();
+    sockets.set(socket, server);
+    // A close listener replaces Playwright's automatic close forwarding.
+    const closed = (peer: WebSocketRoute, code: number | undefined, reason: string | undefined) => {
+      sockets.delete(socket);
+      // Native browser sockets accept only 1000 or application close codes.
+      track(peer.close({ code: code === 1000 || (code !== undefined && code >= 3000 && code <= 4999) ? code : 4000, reason }));
+    };
+    socket.onClose((code, reason) => closed(server, code, reason));
+    server.onClose((code, reason) => closed(socket, code, reason));
+  });
   if (new URL(assetOrigin).origin !== new URL(options.origin).origin) {
     // Only test and source assets come from Vite. API requests, WebSockets,
     // cookies, and request-forgery protection retain the hosted browser origin.
@@ -256,6 +277,20 @@ export async function createBrowserBackend(
         send<void>({ type: 'discardNextWorkflowResponse' })
       );
       track(preparation);
+    },
+    discardNextAccountResponse() {
+      preparation = preparation.then(() => send<void>({ type: 'discardNextAccountResponse' }));
+      track(preparation);
+    },
+    async setLiveUpdatesPaused(paused) {
+      livePaused = paused;
+      if (paused) {
+        await Promise.all([...sockets].map(async ([socket, server]) => {
+          await server.close({ code: 4000, reason: 'Fixture connection interrupted' });
+          await socket.close({ code: 4000, reason: 'Fixture connection interrupted' });
+        }));
+        sockets.clear();
+      }
     },
     async close() {
       if (closed) return;

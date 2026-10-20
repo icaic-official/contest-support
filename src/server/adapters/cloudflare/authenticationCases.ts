@@ -1,7 +1,8 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { readFileSync, readdirSync } from 'node:fs';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { getPlatformProxy, unstable_splitSqlQuery as splitSqlQuery } from 'wrangler';
+import { unstable_splitSqlQuery as splitSqlQuery } from 'wrangler';
+import { openStoreDatabase } from './tooling/store-database.mjs';
 import type { D1Connection, D1Statement } from '../d1/connection';
 import { D1Fixture } from '../d1/testFixture';
 import { measureD1 } from '../d1/testMetrics';
@@ -44,13 +45,11 @@ export function registerAuthenticationCases(group: AuthenticationCases) {
     let fullApplication = false;
 
     beforeAll(async () => {
-      const platform = await getPlatformProxy<{ DB: D1Connection }>({
-        configPath, persist: false, remoteBindings: remote, envFiles: [],
-      });
+      const platform = await openStoreDatabase({ configPath, remoteBindings: remote });
       const metrics = process.env.MINSKY_D1_METRICS === '1'
-        ? measureD1(platform.env.DB, (line) => process.stdout.write(line + '\n'),
+        ? measureD1(platform.db, (line) => process.stdout.write(line + '\n'),
           { sessions: 1, recovery: 2, initiation: 3, completion: 4 }[group]) : undefined;
-      db = metrics?.db ?? platform.env.DB;
+      db = metrics?.db ?? platform.db;
       dispose = async () => { metrics?.flush(); await platform.dispose(); };
       if (!remote) {
         const dir = 'src/server/adapters/d1/migrations';

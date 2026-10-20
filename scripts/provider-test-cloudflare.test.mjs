@@ -9,10 +9,13 @@ import { getPlatformProxy, unstable_splitSqlQuery as splitSqlQuery } from 'wrang
 import { renderWranglerConfiguration } from '../src/server/adapters/cloudflare/tooling/configuration.mjs';
 import { maintainFixtureSessions, SessionLiveCoordinator } from '../src/server/adapters/cloudflare/live';
 import { passwordHasher } from '../src/server/adapters/cloudflare/password';
+import { D1AuthenticationService } from '../src/server/adapters/cloudflare/authentication';
+import { createBetterAuthIdentity } from '../src/server/adapters/cloudflare/identity';
 import { checkFixtureSchema, cleanupFixture, createFixture, inspectFixtureAuthentication } from '../tests/providers/cloudflare/fixture';
 import { checkCloudflareBackend, connectorTarget, readFixtureTarget } from '../tests/providers/cloudflare/target.mjs';
 import { createBrowserBackend } from '../tests/providers/browser-backend';
 import { createBrowserProvider } from '../tests/providers/cloudflare/browser';
+import { createResponseFaults } from '../tests/providers/support/response-fault';
 import { providerTestOptions } from './provider-test-options.mjs';
 
 vi.setConfig({ testTimeout: 120_000, hookTimeout: 120_000 });
@@ -31,6 +34,28 @@ afterEach(async () => {
 });
 
 describe('hosted-origin browser bridge boundaries', () => {
+  test('shared response faults consume only the selected successful response and never expose its body', async () => {
+    for (const paths of [{ workflow: '/api/workflow', account: '/api/accounts' },
+      { workflow: '/rest/v1/rpc/workflow', account: '/functions/v1/admin' }]) {
+      const responses = [];
+      const request = vi.fn(async (input) => {
+        const reply = globalThis.Response.json({ temporaryPassword: 'private-one-time-body' },
+          { status: new URL(input).pathname === '/unrelated' ? 401 : 200 });
+        responses.push(reply);
+        return reply;
+      });
+      vi.stubGlobal('fetch', request);
+      const faults = createResponseFaults(paths);
+      faults.discard('account');
+      await faults.fetch('https://fictional.invalid/unrelated');
+      await faults.fetch(`https://fictional.invalid${paths.workflow}`);
+      await expect(faults.fetch(`https://fictional.invalid${paths.account}`)).rejects.toThrow('discarded the committed account response');
+      expect(responses.map((reply) => reply.bodyUsed)).toEqual([false, false, true]);
+      expect(await (await faults.fetch(`https://fictional.invalid${paths.account}`)).json()).toEqual({ temporaryPassword: 'private-one-time-body' });
+      expect(request).toHaveBeenCalledTimes(4);
+    }
+  });
+
   test('records cookie presence without its value and finishes diagnostics before browser logout', async () => {
     const handlers = new Map();
     const order = [];
@@ -54,7 +79,7 @@ describe('hosted-origin browser bridge boundaries', () => {
         return { ok: true, value: undefined };
       },
     };
-    const context = { newPage: async () => page, close: async () => { order.push('context-close'); } };
+    const context = { newPage: async () => page, routeWebSocket: async () => {}, close: async () => { order.push('context-close'); } };
     const output = vi.spyOn(globalThis.console, 'log').mockImplementation(() => {});
     try {
       const connection = await createBrowserBackend({ newContext: async () => context }, {
@@ -83,7 +108,7 @@ describe('hosted-origin browser bridge boundaries', () => {
     let predicate;
     let handler;
     const page = { exposeBinding: async () => {}, goto: vi.fn(async () => {}), evaluate: async () => ({ ok: true, value: undefined }) };
-    const context = { newPage: async () => page, route: async (matches, callback) => { predicate = matches; handler = callback; }, close: async () => {} };
+    const context = { newPage: async () => page, routeWebSocket: async () => {}, route: async (matches, callback) => { predicate = matches; handler = callback; }, close: async () => {} };
     const browser = { newContext: vi.fn(async () => context) };
     const request = vi.fn(async () => new globalThis.Response('<script type="module" src="/@vite/client"></script><p>Bridge</p>', { headers: { 'Content-Type': 'text/html' } }));
     vi.stubGlobal('fetch', request);
@@ -121,6 +146,27 @@ describe('hosted-origin browser bridge boundaries', () => {
     provider.discardNextWorkflowResponse();
     await expect(provider.backend.workflows.execute(sessionId, requestId, command)).rejects.toThrow('discarded the committed workflow response');
     expect(await provider.backend.workflows.execute(sessionId, requestId, command)).toBe(issueId);
+    await provider.close();
+  });
+
+  test('discards a successful account HTTP response once without replaying creation or leaking the password', async () => {
+    let creations = 0;
+    const userId = randomUUID();
+    vi.stubGlobal('fetch', vi.fn(async (input) => {
+      const path = new URL(input).pathname;
+      if (path === '/api/auth/session') return globalThis.Response.json({ user: { id: userId },
+        status: { username: 'fictional', must_change: false, session_valid: true }, csrf: 'fictional-csrf' });
+      if (path === '/api/accounts') { creations++; return globalThis.Response.json({ temporaryPassword: 'private-fixture-password' }); }
+      return globalThis.Response.json({});
+    }));
+    const provider = createBrowserProvider({ origin: connectorTarget.origin });
+    const command = { action: 'create_account', username: 'fictional-created', name: 'Fictional created',
+      teamId: randomUUID(), roles: [], isAdmin: false };
+    provider.discardNextAccountResponse();
+    await expect(provider.backend.admin.account(randomUUID(), command)).rejects.toThrow('discarded the committed account response');
+    expect(creations).toBe(1);
+    await expect(provider.backend.admin.account(randomUUID(), command)).resolves.toEqual({ temporaryPassword: 'private-fixture-password' });
+    expect(creations).toBe(2);
     await provider.close();
   });
 });
@@ -287,6 +333,75 @@ describe('Cloudflare fixture setup and exact cleanup with real local D1/R2', () 
     }
   });
 
+  test('preserves a foreign account and authentication counter that share an uncreated planned username', async () => {
+    environment();
+    const path = journalPath();
+    const fixture = await createFixture(path, dependencies());
+    const marker = fixture.createdAccounts.staff;
+    const foreign = randomUUID();
+    const counterKey = `username:${marker.username}`;
+    await platform.env.DB.batch([
+      statement('INSERT INTO accounts(id,name,username) VALUES (?,?,?)', foreign, 'Unrelated control account', marker.username),
+      statement('INSERT INTO authentication_limits(key,window_start,attempts) VALUES (?,123,7)', counterKey),
+    ]);
+    try {
+      expect(JSON.parse(await readFile(path, 'utf8')).createdAccounts.every((account) => !account.id)).toBe(true);
+      await cleanupFixture(path, dependencies());
+      expect(await statement('SELECT id,name,username FROM accounts WHERE id=?', foreign).first())
+        .toEqual({ id: foreign, name: 'Unrelated control account', username: marker.username });
+      expect(await statement('SELECT key,window_start,attempts FROM authentication_limits WHERE key=?', counterKey).first())
+        .toEqual({ key: counterKey, window_start: 123, attempts: 7 });
+    } finally {
+      if (existsSync(path)) await cleanupFixture(path, dependencies());
+      await platform.env.DB.batch([
+        statement('DELETE FROM authentication_limits WHERE key=?', counterKey),
+        statement('DELETE FROM accounts WHERE id=?', foreign),
+      ]);
+    }
+  });
+
+  test('discovers an application-created account from its pre-recorded marker and cleans its exact UUID', async () => {
+    environment();
+    const path = journalPath();
+    const fixture = await createFixture(path, dependencies());
+    const marker = fixture.createdAccounts.staff;
+    const identity = createBetterAuthIdentity(platform.env.DB, {
+      origin: 'http://127.0.0.1:8788', secret: randomUUID() + randomUUID(), secureCookies: false,
+    });
+    const auth = new D1AuthenticationService(platform.env.DB, identity, passwordHasher);
+    const login = await auth.signIn(fixture.accounts.admin.username, fixture.accounts.admin.password);
+    const headers = new globalThis.Headers({ cookie: login.cookie.split(';')[0] });
+    const foreign = randomUUID();
+    await statement('INSERT INTO accounts(id,name) VALUES (?,?)', foreign, 'Unrelated control account').run();
+    try {
+      // Ignore the credential response, as a browser with a lost create response would.
+      await auth.account(headers, fixture.sessionId, { action: 'create_account', ...marker,
+        teamId: null, roles: ['volunteer', 'jury'], isAdmin: false });
+      const created = await statement('SELECT id FROM accounts WHERE name=? AND username=?', marker.name, marker.username).first();
+      expect(created?.id).toBeTypeOf('string');
+      expect(JSON.parse(await readFile(path, 'utf8')).createdAccounts.every((account) => !account.id)).toBe(true);
+      await statement('INSERT INTO authentication_limits(key,window_start,attempts) VALUES (?,unixepoch(),1)', `username:${marker.username}`).run();
+      let failFinish = true;
+      const interrupted = dependencies({ openPlatform: async () => ({ env: { ...platform.env, MAINTENANCE: {
+        fetch: async (input, init) => {
+          if (init?.body && JSON.parse(init.body).phase === 'finish' && failFinish) { failFinish = false; throw new Error('Interrupted final fixture confirmation'); }
+          return maintenance.fetch(input, init);
+        },
+      } }, dispose: async () => {} }) });
+      await expect(cleanupFixture(path, interrupted)).rejects.toThrow('Interrupted final fixture confirmation');
+      const retained = JSON.parse(await readFile(path, 'utf8'));
+      expect(retained.createdAccounts.find((account) => account.username === marker.username)).toEqual({ ...marker, id: created.id });
+      expect(await statement('SELECT id FROM accounts WHERE id=?', created.id).first()).toBeNull();
+      await cleanupFixture(path, dependencies());
+      expect(await statement('SELECT id FROM ba_user WHERE id=?', created.id).first()).toBeNull();
+      expect(await statement('SELECT key FROM authentication_limits WHERE key=?', `username:${marker.username}`).first()).toBeNull();
+      expect(await statement('SELECT id FROM accounts WHERE id=?', foreign).first()).toEqual({ id: foreign });
+    } finally {
+      if (existsSync(path)) await cleanupFixture(path, dependencies());
+      await statement('DELETE FROM accounts WHERE id=?', foreign).run();
+    }
+  });
+
   test('removes exact fixture Durable Object cursors while preserving another session object', async () => {
     environment();
     const path = journalPath();
@@ -326,7 +441,7 @@ describe('Cloudflare fixture setup and exact cleanup with real local D1/R2', () 
     const contents = await readFile(path, 'utf8');
     expect(Object.keys(fixture.accounts)).toHaveLength(10);
     for (const account of Object.values(fixture.accounts)) expect(contents).not.toContain(account.password);
-    expect(Object.keys(journal).sort()).toEqual(['accountIds', 'eventId', 'images', 'provider', 'runId', 'sessionIds', 'target', 'teamIds', 'version']);
+    expect(Object.keys(journal).sort()).toEqual(['accountIds', 'createdAccounts', 'eventId', 'images', 'provider', 'runId', 'sessionIds', 'target', 'teamIds', 'version']);
     const hash = await statement('SELECT password FROM ba_account WHERE userId = ?', fixture.accounts.admin.id).first();
     expect(await passwordHasher.verify(fixture.accounts.admin.password, hash.password)).toBe(true);
     expect(contents).not.toContain(hash.password);

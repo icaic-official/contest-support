@@ -22,10 +22,16 @@
 
 ## Current scope
 
-Continue **T0020 complete Cloudflare connector** on `feature/t0020-cloudflare-connector` and [PR #42](https://github.com/GiftedNovaHD/minsky/pull/42).
-The branch started from merged PR #41 at `7d19b00` and includes the jury worklist merge at `c144a2a`.
-Preserve both features and verify the combined application.
-The [ticket](docs/tickets.md#t0020-complete-cloudflare-connector) records acceptance criteria and the remaining review checks.
+Continue **T0021 fresh Cloudflare development installation** on `feature/t0021-cloudflare-development-install`.
+The owner authorized parallel preparation from PR #42's head, `2b6f6f0`, in `/tmp/minsky-t0021`.
+Keep PR #42's branch and checkout untouched.
+The owner merged PR #42 at `104d9d1` on 2026-10-18. T0021 now includes that main revision.
+The earlier restriction to local preparation ended at that merge. Reconcile review changes and run fresh checks before marking T0021 ready.
+The [ticket](docs/tickets.md#t0021-fresh-cloudflare-development-installation) records the acceptance gates.
+The owner requests a maintainability review follow-up in open PR #43 after verification of `0254f60`.
+Clarify existing workflow and transaction code, strengthen provider boundaries, and complete shared behavior assertions.
+Keep changes small. Reduce reader load without new speculative layers, interfaces, or synchronized state.
+The Cloudflare budget is the existing $5 monthly plan. Billing reads return `403`. The owner reports no extra charges on 2026-10-19 and permits bounded required verification. Do not run optional stress tests or add paid services.
 
 The owner requested all review fixes, cleanup, and fresh verification before the PR is ready.
 Remove obsolete proof paths, duplicate helpers, stale instructions, and repeated evidence summaries.
@@ -36,12 +42,17 @@ Record PR #21 reuse and recommend its disposition. The owner decides whether to 
 Isolated Cloudflare development, CI, and installation resources are authorized in account `458ad6a930b0fb717796dfa19ca6a2b1`.
 Confirm that account and the exact target before provider changes.
 Keep development, CI, and installation resources separate.
-Only this ticket branch may be added to the protected `cloud-test` allowlist. Preserve all other entries and protection rules.
+On 2026-10-18, the owner approved only `feature/t0021-cloudflare-development-install` as one additional `cloud-test` branch entry. Preserve all six earlier entries and protection rule `69128862`. This approval does not authorize another branch, protection changes, or activation.
 Workers Paid and R2 are active. Document the concrete need and cost before any further paid upgrade.
 Bounded subagent work is authorized.
 
-Supabase remains active. Docker packaging, AWS, Terraform, real-data exports, migration, account resets, and backend cutover remain deferred.
-The owner reviews and merges T0020.
+Existing Supabase trial data is disposable. Transfer no accounts, passwords, records, images, or IDs.
+Preserve application behavior and database rules. Bootstrap a new administrator through the existing installation tool.
+Leave Supabase intact. Do not export data, reset its accounts, or delete its resources.
+Supabase remains active until the owner approves the concrete development URL switch.
+Preparation PR merge does not authorize activation. Follow [the activation procedure](docs/activate-cloudflare-development.md).
+Docker packaging, AWS, GCP, Azure, Terraform, and data migration tooling remain deferred.
+The owner reviews and merges both PRs.
 Earlier ticket decisions and authorization limits remain in [PLAN.md](PLAN.md) and their dated verification records.
 
 ## Code and documentation cleanup
@@ -51,6 +62,8 @@ Earlier ticket decisions and authorization limits remain in [PLAN.md](PLAN.md) a
 - Keep one authoritative procedure or reference for each task. Update incoming links when you remove a duplicate page.
 - Preserve unique decisions and evidence in dated records. Do not present historical probes as current instructions.
 - Add an abstraction only when current callers need it.
+- Measure reader load by layers to trace and mutable context to remember. Remove pass-through wrappers that hide no meaningful decision.
+- Prefer local derived values. Before adding a layer or state, check that it reduces reader load elsewhere.
 - State which bounded behavior may temporarily break during a change and how the change remains reversible.
 - Run focused checks for touched behavior during implementation. Keep checks that detect material failures.
 - At completion, run the full static checks and required runtime suites before calling the PR ready.
@@ -133,7 +146,7 @@ For each ticket, use this sequence:
 5. Prepare the PR.
 6. Run cloud integration checks on the reviewed revision.
 7. Let the user review and merge.
-8. After automation setup, let GitHub Actions deploy both static frontends when the `main` CI checks pass. Coordinate backend deployment separately.
+8. After automation setup, let GitHub Actions deploy docs and the selected application when the `main` CI checks pass. A Cloudflare application deployment includes the complete Worker. Coordinate migrations, bootstrap, secrets, and activation separately.
 
 Automatic frontend deployment requires GitHub deployment settings and passing `checks`, `secrets`, and `dependencies` jobs.
 Before setup is verified, report deployment separately from merge.

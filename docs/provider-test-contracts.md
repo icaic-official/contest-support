@@ -2,8 +2,11 @@
 
 The shared suite checks Minsky behavior through the browser `Backend` interface.
 Supabase and Cloudflare supply browser adapters and fixture drivers.
-The same eight scenarios apply to both providers without weaker Cloudflare assertions.
-AWS has no implementation.
+The same 11 scenarios apply to both providers without weaker assertions.
+The three new cases cover account creation, image-limit boundaries, and reconnect recovery.
+See [current state](current-state.md) and [PR #43](https://github.com/GiftedNovaHD/minsky/pull/43) for source-specific hosted results.
+Earlier eight-case results verify the recorded revisions only.
+AWS, GCP, and Azure have no implementation.
 
 The complete D1 suite checks `WorkflowPersistence` directly.
 Direct persistence and account suites use a D1-only database. Their records cannot enter the application's live delivery process.
@@ -30,7 +33,7 @@ It does not replace provider-specific policy tests or prove capacity, installati
 
 | Component | Responsibility |
 | --- | --- |
-| `tests/providers/contracts.ts` | Fixture accounts, session identifiers, authenticated connections, and the required fault control. |
+| `tests/providers/contracts.ts` | Fixture accounts, session identifiers, authenticated connections, planned account markers, and transport fault controls. |
 | `tests/providers/scenarios/` | Shared assertions against `Backend`, with no provider SDK or database calls. |
 | `tests/providers/drivers.ts` | Explicit selection of an implemented fixture driver. |
 | `tests/providers/browser-backend.ts` | A separate browser context for each connection and a typed Node proxy for `Backend`. |
@@ -50,8 +53,11 @@ Separate contexts permit both bearer-token providers and cookie-based providers 
 The Supabase driver disables persisted browser sessions and uses each account's real login.
 The service key stays in Node fixture setup and cleanup.
 The browser receives only the public key and temporary fixture credentials.
-The fault control discards one successful workflow response after the server commits it.
-This tests the adapter's uncertain-outcome behavior without replacing the workflow operation.
+The response fault control discards one successful workflow or account response after the server commits it.
+Both providers reuse `tests/providers/support/response-fault.ts` with their actual endpoint paths.
+This tests uncertain outcomes without replacing the operation.
+The browser bridge can also close real provider WebSockets and reject reconnects until the scenario resumes them.
+It leaves HTTP requests available so another connection can commit changes during the interruption.
 
 The Cloudflare driver keeps generated passwords and hashes in memory during setup.
 It creates fictional application and Better Auth records in its dedicated D1 database.
@@ -71,14 +77,18 @@ The scenario registry is the source for the current case names.
 The suite checks these behaviors:
 
 - Login, logout, temporary-password restrictions, password changes, and authentication callback cleanup.
+- Organizer account creation, rejected creation, combined staff roles, lost create responses, and organizer recovery.
 - Submission, assignment, handoff, resolution, awards, external application, reopening, and persisted history.
 - Team and session access, staff-note separation, and forbidden workflow transitions.
 - Lost responses, request-ID reuse, conflicting request content, and concurrent claims.
 - Image reservation retries, incomplete uploads, visibility, removal, abandonment, and revoked access.
+- File-size, image-count, and combined-size boundaries; released reservations; removed images; and limits lowered before completion.
 - Live invalidation, independent subscribers, immediate resubscription, authorized reads after notification, and callback cleanup.
+- Transport interruption, reconnecting the existing subscription, reading missed changes, and receiving later invalidations.
 - Membership removal and account password resets.
 
-The shared suite does not yet cover account creation through `Backend.admin.account`, every image-limit edge, reconnect recovery, or every authorization race.
+The shared suite does not cover every authorization race or storage failure.
+It checks reconnect recovery through an authorized refresh, not replay of missed notifications.
 The private-note notification check observes a bounded interval after a positive staff notification.
 It does not prove delivery latency or the absence of arbitrarily delayed messages.
 
@@ -89,7 +99,7 @@ See [current state](current-state.md) for exact case counts and revisions.
 
 The existing SQL and function suites retain lower-level permission and failure cases.
 The hosted UI suite still checks the app's account journey and provider-specific integration.
-Passing shared scenarios on Supabase does not establish Cloudflare or AWS conformance.
+Passing shared scenarios on one provider does not establish another provider's conformance.
 The focused T0019 suite adds direct plan rejection and captured-state race checks for the shared Supabase execution path.
 Local embedded PostgreSQL covers additional commit guards and rollback cases.
 Record local, hosted Supabase, hosted D1, and protected GitHub Actions results separately.
@@ -97,7 +107,10 @@ Record local, hosted Supabase, hosted D1, and protected GitHub Actions results s
 ## Fixture ownership and recovery
 
 Each run generates UUID identifiers for its event, sessions, and teams.
-Each created account carries the exact run UUID in its fixture metadata.
+Initial accounts carry the exact run UUID in their fixture metadata.
+Accounts created through the application use exact name and username markers saved before the create request.
+The name includes the full run UUID. Cleanup discovers their IDs after a lost create response and checks their memberships before deletion.
+Cloudflare removes a created-account username counter only after that account ID is proved and retained. A planned username alone is not ownership evidence.
 Cleanup checks those ownership records before deletion.
 The Supabase account scan also finds a creation whose response was lost before the runner saved its account ID.
 Cloudflare records its generated account IDs before its first fixture write.
@@ -126,13 +139,32 @@ It skips the migration prerequisite check so a changed backend does not prevent 
 A provider driver supplies the same account roles, session relationships, temporary-password state, and disposable records.
 Its browser factory returns the real application adapter.
 Its cleanup owns provider-specific tables, accounts, objects, and test resources.
-The lost-response control must discard a committed response, not fake a successful write.
+The lost-response controls must discard committed workflow and account responses. They must not fake a successful write.
+The reconnect control must interrupt the real subscription transport, hold reconnect attempts, then permit recovery.
 
-Cloudflare passes the current complete scenario registry through its guarded hosted CLI runner.
-A future AWS driver must pass the same registry.
+Cloudflare passed the earlier eight-case registry through its guarded hosted CLI runner.
+The expanded 11-case registry requires fresh hosted verification on both implementations.
+Every new provider must pass the same registry.
 A driver cannot skip a failing behavior because its database or identity provider differs.
 A missing operation means that the provider implementation is incomplete.
-Provider-specific consistency, storage recovery, and migration tests remain additional requirements.
+The [provider implementation guide](add-provider.md) lists interfaces, registration points, and commands.
+
+Shared scenarios do not replace these provider-specific checks:
+
+| Area | Additional required checks |
+| --- | --- |
+| Authentication and authorization | Test exact origins, request protection, expiry, revocation, temporary-password gates, credential races, and rejected attempts to forge a caller. Test direct database or storage access where the provider exposes it. |
+| Atomic persistence | Race ownership, membership, role, archive, intake, and credential changes against commits and receipt replay. Verify rollback and no partial state, history, award, receipt, or notification writes. |
+| Account administration | Test account creation, cross-session reset permissions, last-admin protection, interrupted credential changes, and superseded recovery operations. |
+| Private storage | Race reservations and completion against limits and revocation. Test interrupted transfers, late writes, deletion failures, exact-object cleanup, and current authorization on downloads. |
+| Live delivery | Test reconnect refresh, expired connections, revoked access, audience isolation, duplicate hints, failed delivery retries, and cleanup of persisted coordinator state. |
+| Installation and recovery | Apply repository migrations to an empty isolated target. Bootstrap a new administrator, complete the mandatory password change, and recover that owner. Test wrong targets and partial failures without a shared reset. |
+| Tooling and fixtures | Reject target substitutions. Keep credentials private. Recover interrupted setup and cleanup, and prove that unrelated records and objects remain intact. |
+
+Use the actual provider's transaction and identity boundaries for these tests.
+A browser adapter with mocked responses cannot establish those guarantees.
+List the exact local and hosted commands with expected results in the provider's verification guide.
+Report unsupported upgrade, backup, restoration, or capacity behavior explicitly.
 
 No generic database API or infrastructure provisioning layer is part of this test boundary.
 Terraform can later create resources. It cannot establish the behavior that these scenarios verify.

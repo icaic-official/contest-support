@@ -199,3 +199,61 @@ export async function imageRevocation(context: ScenarioContext): Promise<void> {
   await staff.images.remove(context.sessionId, ready.id);
   await staff.images.abandon(context.sessionId, pending.id);
 }
+
+export async function imageLimits(context: ScenarioContext): Promise<void> {
+  const admin = await context.connect('admin');
+  const staff = await context.connect('volunteer');
+  const session = (await admin.workflows.snapshot(context.sessionId)).session;
+  check(session, 'The image-limit fixture session must exist.');
+  const original = { fileMegabytes: session.max_image_bytes / 1_048_576,
+    count: session.max_images_per_issue, totalMegabytes: session.max_image_bytes_per_issue / 1_048_576 };
+  const issueId = await submit(staff, context.sessionId, context.teamId);
+  const body = png();
+  const begin = (bytes: number) => staff.images.begin({ sessionId: context.sessionId, issueId,
+    requestId: crypto.randomUUID(), visibility: 'internal', name: 'limits.png', bytes });
+  const validation = async (operation: () => Promise<unknown>) => {
+    const error = await rejects(operation);
+    check(error instanceof ImageRequestError && error.validation, 'An image-limit rejection must identify invalid input or limits.');
+  };
+  try {
+    await rejects(() => staff.admin.setImageLimits(context.sessionId, { fileMegabytes: 1, count: 1, totalMegabytes: 1 }));
+    for (const limits of [{ fileMegabytes: 0, count: 1, totalMegabytes: 1 },
+      { fileMegabytes: 1, count: 0, totalMegabytes: 1 }, { fileMegabytes: 2, count: 1, totalMegabytes: 1 }]) {
+      await rejects(() => admin.admin.setImageLimits(context.sessionId, limits));
+    }
+    await admin.admin.setImageLimits(context.sessionId, { fileMegabytes: 1, count: 1, totalMegabytes: 1 });
+    const configured = (await staff.workflows.snapshot(context.sessionId)).session;
+    check(configured?.max_image_bytes === 1_048_576 && configured.max_images_per_issue === 1 && configured.max_image_bytes_per_issue === 1_048_576,
+      'The authorized snapshot must retain all configured image limits.');
+    await validation(() => begin(0));
+    await validation(() => begin(1_048_577));
+    const reserved = await begin(1_048_576);
+    await validation(() => begin(body.size));
+    await staff.images.abandon(context.sessionId, reserved.id);
+    const ready = await begin(1_048_576);
+    await upload(staff, ready.original_path, body);
+    await upload(staff, ready.thumbnail_path, body);
+    await staff.images.finish(context.sessionId, ready.id);
+    await validation(() => begin(body.size));
+    await admin.admin.setImageLimits(context.sessionId, { fileMegabytes: 2, count: 3, totalMegabytes: 2 });
+    const remaining = await begin(2_097_152 - body.size);
+    await validation(() => begin(1));
+    await staff.images.abandon(context.sessionId, remaining.id);
+    await validation(() => begin(2_097_153 - body.size));
+    await staff.images.remove(context.sessionId, ready.id);
+    const reclaimed = await begin(2_097_152);
+    await staff.images.abandon(context.sessionId, reclaimed.id);
+
+    const large = new Blob([await body.arrayBuffer(), new Uint8Array(1_048_577 - body.size)], { type: body.type });
+    const changing = await begin(large.size);
+    await upload(staff, changing.original_path, large);
+    await upload(staff, changing.thumbnail_path, body);
+    await admin.admin.setImageLimits(context.sessionId, { fileMegabytes: 1, count: 3, totalMegabytes: 1 });
+    await validation(() => staff.images.finish(context.sessionId, changing.id));
+    check(!(await staff.workflows.snapshot(context.sessionId)).attachments.some((image) => image.id === changing.id),
+      'A lowered limit must prevent publication of an uploaded image that is now too large.');
+    await staff.images.abandon(context.sessionId, changing.id);
+  } finally {
+    await admin.admin.setImageLimits(context.sessionId, original);
+  }
+}

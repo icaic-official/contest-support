@@ -102,8 +102,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
-      VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
-      VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}
       VITE_ENVIRONMENT: development
       CLOUDFLARE_ACCOUNT_ID: 458ad6a930b0fb717796dfa19ca6a2b1
       WRANGLER_SEND_METRICS: "false"
@@ -119,22 +117,70 @@ jobs:
           cache-dependency-path: |
             package-lock.json
             site/package-lock.json
-      - name: Check deployment settings
+      - run: npm ci
+      - run: npm ci --prefix site
+      - name: Check documentation deployment settings
         env:
           HAS_CLOUDFLARE_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN != '' }}
         run: |
           test "$HAS_CLOUDFLARE_TOKEN" = true
-          node scripts/deploy-workers.mjs --check
-      - run: npm ci
-      - run: npm ci --prefix site
-      - run: npm run build
-      - run: npm run docs:build
-      - name: Publish both Workers and verify the source revision
+          node scripts/deploy-workers.mjs --check --site=docs
+      - name: Build the selected documentation without provider credentials
+        run: node scripts/deploy-workers.mjs --build --site=docs
+      - name: Publish the documentation Worker and verify the source revision
         # Only this step receives provider credentials. PR jobs never receive them.
         env:
           GH_TOKEN: ${{ github.token }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-        run: node scripts/deploy-workers.mjs
+        run: node scripts/deploy-workers.mjs --site=docs
+  deploy-app:
+    needs: [checks, secrets, dependencies]
+    if: >-
+      github.event_name == 'push' &&
+      github.repository == 'GiftedNovaHD/minsky' &&
+      github.actor != 'dependabot[bot]' &&
+      github.event.deleted == false &&
+      vars.CLOUDFLARE_DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      VITE_ENVIRONMENT: development
+      CLOUDFLARE_ACCOUNT_ID: 458ad6a930b0fb717796dfa19ca6a2b1
+      WRANGLER_SEND_METRICS: "false"
+      MINSKY_DEV_BACKEND: ${{ vars.MINSKY_DEV_BACKEND }}
+      MINSKY_DEV_CLOUDFLARE_CONFIG: ${{ vars.MINSKY_DEV_CLOUDFLARE_CONFIG }}
+      MINSKY_DEV_DATABASE_ID: ${{ vars.MINSKY_DEV_DATABASE_ID }}
+      MINSKY_DEV_DATABASE_NAME: ${{ vars.MINSKY_DEV_DATABASE_NAME }}
+      MINSKY_DEV_BUCKET_NAME: ${{ vars.MINSKY_DEV_BUCKET_NAME }}
+      VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+      VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v4.3.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            site/package-lock.json
+      - run: npm ci
+      - name: Check application deployment settings
+        env:
+          HAS_CLOUDFLARE_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN != '' }}
+        run: |
+          test "$HAS_CLOUDFLARE_TOKEN" = true
+          node scripts/deploy-workers.mjs --check --site=app
+      - name: Build the selected application without provider credentials
+        run: node scripts/deploy-workers.mjs --build --site=app
+      - name: Publish the application Worker and verify the source revision
+        # Only this step receives provider credentials. PR jobs never receive them.
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: node scripts/deploy-workers.mjs --site=app
   cloud:
     if: github.event_name == 'workflow_dispatch' && !inputs.cloudflare_auth && !inputs.cloudflare_connector
     needs: [checks, secrets, dependencies]

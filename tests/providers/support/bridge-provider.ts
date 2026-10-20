@@ -125,6 +125,7 @@ export function createBrowserProvider(configuration: unknown): BrowserProvider {
     discardNextWorkflowResponse() {
       discardResponse = true;
     },
+    discardNextAccountResponse() { unsupported(); },
     async close() {
       statistics.closes++;
       if (options.failClose) throw new Error('Fixture close failure.');

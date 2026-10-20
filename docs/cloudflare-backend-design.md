@@ -6,8 +6,11 @@ Issue decisions use one `WorkflowService`. Provider adapters supply persistence,
 Supabase remains the active development backend.
 
 The user selected Workers, D1 with a SQLite rewrite, private R2, and Durable Objects.
-A later migration must preserve accounts, IDs, permissions, issue history, timestamps, awards, and image contents.
-See [migration gates](product-direction.md#migration-and-cutover-gates) for the deferred cutover requirements.
+On 2026-10-18, the owner selected a fresh development installation instead of transferring existing trial data.
+Preserve application behavior and database rules. Create new accounts, IDs, and records through supported installation paths.
+Do not transfer Supabase accounts, passwords, issues, history, images, or IDs.
+Leave Supabase intact, including its existing trial data and resources.
+See [activation preparation](activate-cloudflare-development.md) for the separate approval required before switching the development URL.
 See [backend contracts](backend-contracts.md) for the browser interface and [current state](current-state.md) for dated evidence.
 
 ## Two different adapter boundaries
@@ -20,7 +23,8 @@ The server needs a separate boundary.
 Moving browser calls behind `Backend` does not make PostgreSQL functions portable.
 The [shared workflow service](server-workflow.md) applies the existing issue decisions.
 The Cloudflare server reuses those decisions and enforces their commit conditions through its SQLite adapter.
-A later AWS server can reuse the same service without importing Cloudflare bindings.
+A future AWS, GCP, or Azure server can reuse the same service without importing Cloudflare bindings.
+These providers have no implementation. See [Add a backend provider](add-provider.md) for contributor requirements.
 
 ```mermaid
 flowchart TD
@@ -97,7 +101,7 @@ Timeouts, unexpected statuses, and malformed responses preserve the unknown outc
 The response contains no raw SQL, provider error objects, or identity credentials.
 An HTTP status alone does not prove that a command failed before commit.
 
-AWS compatibility means implementing these semantics with another provider and passing the same tests.
+Provider compatibility means implementing these semantics and passing the same tests.
 It does not mean every provider has the same transaction or storage API.
 Terraform can later provision selected resources. Terraform does not replace application adapters or behavior tests.
 
@@ -109,16 +113,15 @@ The same database contains account access state and all memberships.
 This permits password-reset authorization across every session assigned to an account.
 Splitting databases by contest session would require a separate consistency design for that rule.
 
-The SQLite schema retains UUIDs as stable identifiers and retains current issue numbers.
+The SQLite schema uses UUIDs as stable identifiers within its own installation.
 Submission allocates a number above the current session's existing issue numbers inside its commit.
 Foreign keys retain session boundaries between teams, issues, resolutions, awards, and images.
 Unique constraints retain one award per issue and one current resolution per issue.
 Roles use explicit membership-role records and retain combined staff capabilities.
 
 New D1 commits obtain ISO 8601 timestamps from the database.
-Data import remains deferred.
-A later migration must preserve imported timestamp precision and order and verify its encoding against PostgreSQL values.
-The current timestamp format alone does not prove a lossless import.
+Fresh installation starts without imported records or timestamps.
+There is no verified data import procedure.
 Saved resolution intervals remain the basis of elapsed-time calculations.
 
 The browser accesses D1 through the authenticated Worker API.
@@ -179,13 +182,13 @@ Administration methods currently lack workflow-style request IDs.
 The browser does not automatically retry those administration calls with a workflow-style guarantee.
 An uncertain credential result requires checking account state or issuing a later authorized reset.
 
-## Authentication uses replacement temporary passwords
+## Authentication uses organizer-issued temporary passwords
 
-Account preservation and password preservation are different requirements.
-The owner selected organizer-issued replacement temporary passwords on 2026-10-17.
-Users must change these passwords before contest access.
-Preserve account IDs, memberships, permissions, and history.
-Existing passwords do not need to survive. Password-hash import is no longer required.
+The owner selected a new administrator through the supported bootstrap process on 2026-10-18.
+This decision replaces the earlier account-preservation requirement.
+The new installation creates its own identities and memberships.
+Users must change organizer-issued temporary passwords before contest access.
+No account, password, password hash, or account ID transfers from Supabase.
 
 The Cloudflare identity adapter uses maintained Better Auth.
 See [the implementation reference](cloudflare-authentication.md) and [choice with costs](cloudflare-authentication-choice.md).
@@ -293,7 +296,7 @@ Closing a subscription stops callbacks immediately and releases the socket and t
 The healthy-connection target remains live updates within three seconds.
 Immediate delivery is the normal path. Recovery scans and polling handle missed messages but do not establish that latency target.
 
-## Separate deployment and data migration
+## Separate installation and activation
 
 The documentation Worker remains a static site with no application data bindings.
 The application Worker serves static assets and backend requests under one origin.
@@ -305,6 +308,9 @@ The installation procedure requires an empty isolated database and explicit prov
 Use [Install an isolated Cloudflare instance](../site/src/content/docs/operators/installation.md) for configuration, bootstrap, and recovery.
 The [PR #21 component record](pr21-installation-disposition.md) preserves reuse decisions and the owner's closure decision.
 
-Data exports, migration tooling, and backend cutover remain deferred.
-The [migration gates](product-direction.md#migration-and-cutover-gates) require one writable backend, comparison of preserved data, and a tested rollback procedure.
+Data exports and migration tooling are outside the fresh-installation scope.
+The development URL continues to use Supabase until the owner approves the concrete backend switch.
+Merging preparation code does not authorize activation.
+Use the [activation procedure](activate-cloudflare-development.md) for exact targets, the reviewed revision, deployment commands, verification, and recovery.
+The separate documentation Worker retains its independent deployment.
 Each installation must establish its own capacity and latency evidence before live-contest use.

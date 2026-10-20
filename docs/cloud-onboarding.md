@@ -1,13 +1,12 @@
 # Cloud onboarding for T0003
 
-Supabase remains the active backend during [T0014 backend adapters](tickets.md#t0014-backend-adapters).
-The adapter extraction keeps the public environment variables and provider commands below unchanged.
-The selected future migration to Workers, D1, R2, and Durable Objects is recorded in [product direction](product-direction.md#backend-migration-direction).
-
-**Workflow update (2026-10-17):** the user selected automatic frontend previews and deployment from `main` for both Workers.
-GitHub Actions publishes both sites only after all required CI jobs pass.
-Follow [deployment setup](cloudflare-builds.md). Credentials, activation, and the first automatic deployments remain unverified.
-Backend migrations, functions, and provider settings retain their explicit deployment steps.
+Supabase remains the active development backend.
+The prepared Cloudflare installation creates new accounts and records. It transfers no Supabase data.
+Use [deployment setup](cloudflare-builds.md) for automation and [activation](activate-cloudflare-development.md) for the separately approved backend switch.
+GitHub Actions publishes docs and the selected application after required `main` checks pass and publication is enabled.
+Application previews remain disabled until independent preview resources exist.
+Backend migrations, bootstrap, secrets, and activation retain their explicit steps.
+The dated setup records below describe their recorded revisions.
 
 The connected development app runs at https://minsky-dev.icaic-minsky.workers.dev.
 Supabase hosts authentication, Postgres, and Realtime.
@@ -405,9 +404,9 @@ Keep the default mode for changes to migrations, functions, or backend configura
 If the migration history differs, resolve that difference before an installation check.
 Do not remove a migration record while its database objects remain.
 
-Automatic frontend deployment is selected but its setup remains unverified.
-An app preview can write to its configured development backend through the authenticated app.
-It does not isolate data. See [preview backend limits](cloudflare-preview-behavior.md).
+Use [deployment setup](cloudflare-builds.md) for current publication settings and verification gates.
+Application previews currently skip. They must use independent resources before they can be enabled.
+See [preview behavior](cloudflare-preview-behavior.md).
 
 See [GitHub environment documentation](https://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/manage-environments).
 Initial inspection on 2026-10-02 found no GitHub environments and no separate Supabase test project.

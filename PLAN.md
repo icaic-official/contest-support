@@ -1,5 +1,48 @@
 # Minsky planning record
 
+**T0021 maintainability review follow-up, 2026-10-19.** The owner requests small changes in open PR #43 after verification of `0254f60`.
+Clarify workflow authorization and D1 transaction stages without changing behavior or atomic execution.
+Extend UI provider boundaries and shared account, image-limit, and reconnect assertions.
+Assess remaining cleanup after merged PR #42. Preserve unique historical evidence and the existing provider guide.
+Reduce the layers and mutable state a reader must understand. Add no speculative interfaces or provider implementations.
+PR #43 is draft during this follow-up. The owner reviews and merges. Activation still requires separate approval.
+The owner limits Cloudflare spending to the existing $5 monthly plan.
+Existing billing API access returns `403`. The owner then checks the dashboard and reports no extra charges on 2026-10-19. Continue bounded required verification within the existing plan. Do not run optional stress tests or add paid services.
+
+**T0021 resumed after PR #42 merged, 2026-10-18.** The owner merged PR #42 at `104d9d1e3d6c9e58d55121ea07196f066192ec86`, then requested continuation.
+The separate T0021 worktree now includes that main revision and the final T0020 verification records.
+The accepted executable connector remains `2b6f6f0`; PR #42's final `b984e67` adds documentation and evidence.
+The pre-merge local-only limit ended. Dedicated development and separate installation-verification resources are now authorized.
+Supabase remains active and intact. The development URL switch still requires approval of exact resources, revision, commands, checks, and recovery.
+The owner later approved adding only `feature/t0021-cloudflare-development-install` to `cloud-test`. Entry `63467138` preserves all six earlier entries and protection rule `69128862`. No other branch, protection change, or backend activation is authorized.
+Earlier preparation and pause records retain their original scope.
+
+**Fresh Cloudflare development installation, 2026-10-18.** The owner authorized T0021 before PR #42 merges.
+Use `feature/t0021-cloudflare-development-install` in a separate worktree from PR #42's latest head, `2b6f6f0`.
+PR #42 was open at the start of this run. Keep its checkout and branch untouched.
+Before its merge, limit work to implementation, documentation, and local verification.
+After its merge, update from main and reconcile review changes before fresh local and hosted verification.
+The owner reviews and merges. Do not merge either PR.
+
+Existing Supabase data, including the administrator, is disposable trial data.
+Transfer no accounts, passwords, issues, history, images, or IDs. This replaces earlier data-preservation requirements.
+Preserve shared application behavior and database rules. Create a new administrator with the supported bootstrap tool.
+Leave Supabase intact. Do not export records, reset accounts, or delete resources.
+Prepare the complete Cloudflare Worker and guard deployment automation against assets-only replacement and backend regression.
+Keep docs independent and previews separate from stable development data.
+Keep Cloudflare configuration and installation inside its provider implementation.
+Document contributor provider interfaces and require the same shared behavior scenarios for every provider.
+Implement no speculative provider abstractions. AWS, GCP, Azure, Terraform, Docker packaging, and migration tools remain out of scope.
+
+After PR #42 merges, dedicated development resources are authorized in account `458ad6a930b0fb717796dfa19ca6a2b1`.
+Confirm existing Wrangler access and each exact target before mutation. Keep development, CI, and installation-verification resources separate.
+Workers Paid and R2 are active. Identify need and cost before proposing another paid upgrade.
+The separate T0021 allowlist approval covers only its exact branch. Preserve the earlier entries and protection rules.
+Before changing the development URL, present exact resources, approved revision, configuration and secret names, commands, checks, and recovery.
+Obtain owner approval for that concrete switch. Preparation PR merge is not activation approval.
+See [T0021](docs/tickets.md#t0021-fresh-cloudflare-development-installation) and [activation](docs/activate-cloudflare-development.md).
+Earlier dated records below retain their original scope and evidence.
+
 **PR #42 review fixes and cleanup, 2026-10-18.** The owner requested all review fixes, cleanup, and tests before the existing T0020 PR is ready.
 Continue on `feature/t0020-cloudflare-connector`. Preserve Supabase as the active backend and preserve the merged jury worklist.
 Subtract before adding. Remove obsolete proof modes, duplicate helpers, stale instructions, and redundant references or stubs.

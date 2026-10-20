@@ -51,13 +51,22 @@ Never use the CI fixture scripts against real competition data.
 ## Prepare the review
 
 Implement the ticket, verify it, update its documentation, and prepare a pull request.
-The user reviews and merges.
-After account setup, GitHub Actions publishes branch previews and stable sites from `main` only when all required CI jobs pass.
+The owner reviews and merges.
+After account setup, GitHub Actions publishes docs previews and stable sites from `main` only when all required CI jobs pass.
 Pull request checks do not receive deployment credentials.
 The repository setup guide is `docs/cloudflare-builds.md`.
-The first automatic deployments remain unverified.
-Backend deployment remains a separate step.
+Application previews remain disabled until they have independent provider resources.
+Cloudflare application deployment includes its API code and bindings. Migrations and administrator bootstrap remain separate steps.
+Switching the development URL to Cloudflare requires the owner's separate activation approval.
 Include the required co-author trailer in each Codex-created commit for this repository.
 Follow the Google TypeScript Style Guide for TypeScript changes, with documented project exceptions.
 
 For this site, use the separate [documentation workflow](/contributing/documentation/).
+
+## Add a provider
+
+Use the repository's [provider contribution guide](https://github.com/GiftedNovaHD/minsky/blob/main/docs/add-provider.md).
+It identifies the shared interfaces, registration points, installation responsibilities, fixture cleanup, and required verification.
+Providers must preserve the same application behavior and pass the unchanged shared scenarios.
+Servers with the same HTTP protocol can reuse the existing browser transport.
+Supabase and Cloudflare have implementations. AWS, GCP, and Azure remain future contributions.

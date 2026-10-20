@@ -60,15 +60,18 @@ export function useSessionAdmin(
   const guard = useRef(false);
   const sessionId = state.session?.id ?? "";
 
-  async function run(work: () => Promise<void>): Promise<boolean> {
+  async function run(
+    work: () => Promise<Credentials | void>,
+  ): Promise<boolean> {
     if (guard.current) return false;
     guard.current = true;
     setBusy(true);
     setError("");
     setNotice("");
     setCredentials(undefined);
+    let revealed: Credentials | undefined;
     try {
-      await work();
+      revealed = (await work()) ?? undefined;
       await refresh();
       setNotice("Administration action completed.");
       return true;
@@ -76,6 +79,10 @@ export function useSessionAdmin(
       setError(errorMessage(cause));
       return false;
     } finally {
+      // The credentials appear only when the request ends. Otherwise the
+      // pages reopen the dialog after the admin has already closed it.
+      // A failed refresh still shows them, because they are shown only once.
+      setCredentials(revealed);
       setBusy(false);
       guard.current = false;
     }
@@ -88,11 +95,11 @@ export function useSessionAdmin(
   async function account(
     command: AccountCommand,
     username: string,
-  ): Promise<void> {
+  ): Promise<Credentials | undefined> {
     const result = await requireBackend().admin.account(sessionId, command);
-    if (result.temporaryPassword) {
-      setCredentials({ username, password: result.temporaryPassword });
-    }
+    return result.temporaryPassword
+      ? { username, password: result.temporaryPassword }
+      : undefined;
   }
 
   function usernameOf(userId: string): string {

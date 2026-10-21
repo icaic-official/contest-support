@@ -80,8 +80,16 @@ export function wranglerArguments(worker, plan) {
 }
 
 export function previewAddress(output) {
-  const urls = JSON.parse(output).preview?.urls;
-  const address = urls?.find((value) => {
+  let urls;
+  try {
+    // Wrangler's asset helper can print progress before its --json response.
+    const start = output.search(/^\s*\{/m);
+    if (start < 0) throw new Error();
+    urls = JSON.parse(output.slice(start)).preview?.urls;
+  } catch {
+    throw new Error("Cloudflare did not return valid preview JSON.");
+  }
+  const address = Array.isArray(urls) && urls.find((value) => {
     try {
       const url = new URL(value);
       return url.protocol === "https:" && url.hostname.endsWith(".icaic-minsky.workers.dev") &&

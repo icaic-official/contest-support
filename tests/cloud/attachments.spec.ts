@@ -1,16 +1,17 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import { account, fixture, service } from "./fixture";
+import {
+  byId,
+  choose,
+  desktop,
+  fitsWidth,
+  login,
+  openDialog,
+  phone,
+  signOut,
+} from "./ui";
 
-async function login(page: Page, name: string) {
-  const details = fixture().accounts[name];
-  await page.goto("/");
-  await page.getByLabel("Username", { exact: true }).fill(details.username);
-  await page.getByLabel("Password", { exact: true }).fill(details.password);
-  await page.getByRole("button", { name: "Sign in", exact: true }).click();
-  await expect(page.locator("#workspace-heading")).toBeVisible();
-}
-
-test("hosted staff images upload, download, respect visibility, and can be removed", async ({ page }) => {
+test("hosted staff images upload on a phone, download, respect visibility, and can be removed", async ({ page }) => {
   const state = fixture();
   const volunteer = await account("volunteer");
   const description = `Image verification ${crypto.randomUUID()}`;
@@ -22,27 +23,35 @@ test("hosted staff images upload, download, respect visibility, and can be remov
     },
   });
   expect(submitted.error).toBeNull();
-  await login(page, "volunteer");
-  await page.locator(".issue-card").filter({ hasText: description }).click();
-  await page.setViewportSize({ width: 390, height: 844 });
+  await page.setViewportSize(phone);
+  await login(page, "volunteer", "organiser-phone");
+  const card = byId(page, `issue-card-${submitted.data}`);
+  await card.click();
   const png = await page.screenshot();
-  const images = page.locator(".images");
-  for (const visibility of ["internal", "public"]) {
-    await images.getByLabel("Who can see this image").selectOption(visibility);
-    await images.getByLabel("Image file").setInputFiles({
+  const images = page.getByRole("region", { name: /^Images · / });
+  const thumbs = images.getByRole("button", { name: /^View image uploaded by / });
+  await images.getByRole("button", { name: "Add an image", exact: true }).click();
+  const upload = openDialog(page);
+  await expect(upload).toHaveAccessibleName("Add an image");
+  for (const [visibility, label] of [
+    ["internal", /^Staff only/],
+    ["public", /^Visible to the team/],
+  ] as const) {
+    await choose(upload.getByRole("radio", { name: label }));
+    await upload.getByLabel("Image file").setInputFiles({
       name: `${visibility}.png`, mimeType: "image/png", buffer: png,
     });
-    await images.getByRole("button", { name: "Add image", exact: true }).click();
+    await upload.getByRole("button", { name: "Add image", exact: true }).click();
     // Hosted function startup and two Storage transfers can exceed five seconds.
-    await expect(images.getByRole("status")).toHaveText("Image added.", { timeout: 30000 });
+    await expect(upload.getByRole("status")).toHaveText("Image added.", { timeout: 30000 });
   }
-  await expect(images.locator(".image-thumb")).toHaveCount(2);
+  await upload.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(upload).toBeHidden();
+  await expect(thumbs).toHaveCount(2);
   await page.reload();
-  await page.locator(".issue-card").filter({ hasText: description }).click();
-  await expect(images.locator(".image-thumb")).toHaveCount(2);
-  expect(await page.evaluate(() =>
-    document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1,
-  )).toBe(true);
+  await card.click();
+  await expect(thumbs).toHaveCount(2);
+  expect(await fitsWidth(page)).toBe(true);
 
   const rows = await volunteer.from("attachments")
     .select("id,visibility").eq("issue_id", submitted.data);
@@ -65,30 +74,49 @@ test("hosted staff images upload, download, respect visibility, and can be remov
   expect((await otherTeam.storage.from("issue-attachments").download(publicPath)).error)
     .not.toBeNull();
 
-  await images.locator(".image-thumb").filter({ hasText: "Staff only" }).click();
-  const dialog = page.getByRole("dialog");
-  await expect(dialog.getByRole("img")).toBeVisible();
+  // Each thumbnail shows a Staff or Team badge.
+  await thumbs.filter({ hasText: "Staff" }).click();
+  const preview = openDialog(page);
+  await expect(preview).toContainText("Staff only");
+  await expect(preview.getByRole("img")).toBeVisible();
   const downloaded = page.waitForEvent("download");
-  await dialog.getByRole("link", { name: "Download image" }).click();
+  await preview.getByRole("link", { name: "Download image" }).click();
   expect((await downloaded).suggestedFilename()).toBe("internal.png");
-  await dialog.getByRole("button", { name: "Remove image" }).click();
-  await expect(dialog).toBeHidden();
-  await expect(images.locator(".image-thumb")).toHaveCount(1);
+  await preview.getByRole("button", { name: "Remove image" }).click();
+  await expect(preview).toBeHidden();
+  await expect(thumbs).toHaveCount(1);
+  await expect(images.getByRole("status")).toHaveText("Image removed.");
   expect((await volunteer.storage.from("issue-attachments").download(privatePath)).error)
     .not.toBeNull();
   // The service role can read stored files regardless of application RLS.
   // This establishes physical deletion, not merely loss of download access.
   expect((await service().storage.from("issue-attachments").download(privatePath)).error)
     .not.toBeNull();
-  await page.setViewportSize({ width: 1280, height: 900 });
-  await page.getByRole("button", { name: "Sign out", exact: true }).click();
-  await login(page, "contestant");
-  await page.locator(".issue-card").filter({ hasText: description }).click();
-  await expect(images.locator(".image-thumb")).toHaveCount(1);
-  await expect(images.getByLabel("Image file")).toHaveCount(0);
-  await images.locator(".image-thumb").click();
-  await expect(dialog.getByRole("img")).toBeVisible();
-  await expect(dialog.getByRole("button", { name: "Remove image" })).toHaveCount(0);
+
+  // The desktop console keeps the open issue and lists the image on its tab.
+  await page.setViewportSize(desktop);
+  const sheet = openDialog(page);
+  await sheet.getByRole("tab", { name: /^Images/ }).click();
+  await expect(
+    sheet.getByRole("button", { name: /^View image uploaded by / }),
+  ).toHaveCount(1);
+  await sheet.getByRole("button", { name: "Close issue", exact: true }).click();
+  await expect(sheet).toBeHidden();
+  await signOut(page);
+  await login(page, "contestant", "contestant");
+  await page
+    .getByRole("navigation", { name: "Reports" })
+    .getByRole("button")
+    .filter({ hasText: description })
+    .click();
+  const teamImages = page.getByRole("region", { name: /^Images/ });
+  const teamThumbs = teamImages.getByRole("button", { name: /^View image uploaded by / });
+  await expect(teamThumbs).toHaveCount(1);
+  await expect(teamImages.getByLabel("Image file")).toHaveCount(0);
+  await teamThumbs.click();
+  const teamPreview = openDialog(page);
+  await expect(teamPreview.getByRole("img")).toBeVisible();
+  await expect(teamPreview.getByRole("button", { name: "Remove image" })).toHaveCount(0);
 });
 
 test("removing membership blocks unfinished Storage access and image completion", async () => {

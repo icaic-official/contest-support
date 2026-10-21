@@ -6,6 +6,12 @@ export interface UiFixture extends Pick<ScenarioData, 'sessionId' | 'otherSessio
 
 interface Probe { ready: number; changes: number; closed: number; invalid: boolean }
 interface Workspace { page: Page; context: BrowserContext; probe: Probe }
+type Ui = 'contestant' | 'organiser-phone' | 'organiser-desktop';
+
+/** Both provider fixtures give the journey session this name. */
+const sessionName = 'Provider primary';
+const phone = { width: 390, height: 844 };
+const desktop = { width: 1280, height: 900 };
 
 async function privateFill(locator: Locator, value: string) {
   try { await locator.fill(value); }
@@ -21,30 +27,94 @@ async function redact(page: Page) {
   try {
     await page.evaluate(() => {
       for (const input of document.querySelectorAll('input')) input.value = '';
-      for (const section of document.querySelectorAll('.credential-result')) section.remove();
+      for (const section of document.querySelectorAll('section[aria-label="Temporary account credentials"]')) section.remove();
     });
   } catch { /* A closed page has no DOM left to capture. */ }
 }
 
-function elapsed(value: string): number {
-  const match = /^(\d+):(\d{2})$/.exec(value.trim());
+/** Reads a clock such as "04:07" or "1:02:03" as seconds. */
+function seconds(clock: string): number {
+  const match = /\d+(?::\d{2})+/.exec(clock);
   if (!match) throw new Error('The issue timer did not have the expected minutes and seconds.');
-  return Number(match[1]) * 60 + Number(match[2]);
+  return match[0].split(':').reduce((total, part) => total * 60 + Number(part), 0);
 }
 
-async function chooseIssue(page: Page, description: string) {
-  const row = page.locator('.issue-card').filter({ hasText: description });
-  await expect(row).toBeVisible();
-  await row.click();
-  await expect(page.locator('#issue-heading')).toHaveText(description);
+function uiRoot(page: Page, ui?: Ui): Locator {
+  return page.locator(ui ? `[data-ui="${ui}"]` : '[data-ui]');
 }
 
-function owner(page: Page) {
-  return page.locator('.detail .facts > div').filter({ hasText: 'Current owner' }).locator('dd');
+/** The Live or Reconnecting badge of the selected UI. */
+function liveBadge(page: Page): Locator {
+  return uiRoot(page).getByRole('status').filter({ hasText: /^Live$/ });
 }
 
-async function upload(page: Page, visibility: 'public' | 'internal') {
-  const base64 = await page.evaluate((visibility) => {
+/**
+ * Checks a radio button or checkbox that is visually hidden inside a styled
+ * label. Space on the focused input is what a keyboard user does.
+ */
+async function choose(control: Locator, checked = true) {
+  await expect(control).toBeEnabled();
+  if (await control.isChecked() !== checked) await control.press('Space');
+  if (checked) await expect(control).toBeChecked();
+  else await expect(control).not.toBeChecked();
+}
+
+function phoneTabs(page: Page): Locator {
+  return page.getByRole('navigation', { name: 'Organiser sections' });
+}
+
+async function phoneTab(page: Page, label: string) {
+  await phoneTabs(page).getByRole('button', { name: label, exact: true }).click();
+  await expect(page.getByRole('heading', { level: 1, name: label, exact: true })).toBeFocused();
+}
+
+/** A sidebar link of the desktop console. Its name can end with a count. */
+function consoleLink(page: Page, label: string): Locator {
+  return page.getByRole('navigation', { name: 'Console pages' })
+    .getByRole('button', { name: new RegExp(`^${label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?: \\d+)?$`) });
+}
+
+async function consolePage(page: Page, label: string) {
+  await consoleLink(page, label).click();
+  await expect(page.getByRole('heading', { level: 1, name: label, exact: true })).toBeVisible();
+}
+
+/** The queue card button of an issue on the organiser phone. */
+function phoneCard(page: Page, description: string): Locator {
+  return page.getByRole('listitem').filter({ hasText: description }).getByRole('button', { name: /^Open ISS-\d+, / });
+}
+
+/** The current owner on an organiser issue view. */
+function owner(scope: Locator): Locator {
+  return scope.getByText('Owner', { exact: true }).locator('xpath=following-sibling::div[1]');
+}
+
+/** The time to first assignment on an organiser issue view. */
+function firstAssignment(scope: Locator): Locator {
+  return scope.locator('dl > div').filter({ has: scope.page().getByText('First assignment', { exact: true }) }).locator('dd').first();
+}
+
+/** The contestant's large unresolved timer. */
+function contestantTimer(page: Page): Locator {
+  return page.getByRole('region', { name: 'Your report', exact: true }).locator('p.font-mono');
+}
+
+async function chooseReport(page: Page, description: string) {
+  await page.getByRole('navigation', { name: 'Reports' }).getByRole('button').filter({ hasText: description }).click();
+  await expect(page.getByRole('region', { name: 'Your report', exact: true })).toContainText(description);
+}
+
+function contestantThumbs(page: Page): Locator {
+  return page.getByRole('region', { name: 'Images', exact: true }).getByRole('button', { name: /^View image uploaded by / });
+}
+
+async function fitsWidth(page: Page): Promise<boolean> {
+  return page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1);
+}
+
+/** Uploads one fictional image from the open "Add an image" dialog. */
+async function upload(dialog: Locator, visibility: 'public' | 'internal') {
+  const base64 = await dialog.page().evaluate((visibility) => {
     const canvas = document.createElement('canvas');
     canvas.width = 8;
     canvas.height = 8;
@@ -54,13 +124,12 @@ async function upload(page: Page, visibility: 'public' | 'internal') {
     context.fillRect(0, 0, 8, 8);
     return canvas.toDataURL('image/png').split(',')[1];
   }, visibility);
-  const images = page.locator('.images');
-  await images.getByLabel('Who can see this image').selectOption(visibility);
-  await images.getByLabel('Image file').setInputFiles({
+  await choose(dialog.getByRole('radio', { name: visibility === 'public' ? /^Visible to the team/ : /^Staff only/ }));
+  await dialog.getByLabel('Image file').setInputFiles({
     name: `fictional-${visibility}.png`, mimeType: 'image/png', buffer: Buffer.from(base64, 'base64'),
   });
-  await images.getByRole('button', { name: 'Add image', exact: true }).click();
-  await expect(images.getByRole('status')).toHaveText('Image added.', { timeout: 45_000 });
+  await dialog.getByRole('button', { name: 'Add image', exact: true }).click();
+  await expect(dialog.getByRole('status')).toHaveText('Image added.', { timeout: 45_000 });
 }
 
 /** Actual React pages and server responses. Provider fixtures stay in the wrappers. */
@@ -71,7 +140,11 @@ export async function runUiJourney(browser: Browser, fixture: UiFixture, options
   let phase = 'fixture setup';
 
   async function login(actor: Actor, password?: string): Promise<Workspace> {
-    const context = await browser.newContext({ viewport: { width: 1280, height: 900 }, ignoreHTTPSErrors: options.ignoreHTTPSErrors ?? false });
+    const contestant = ['contestant', 'otherTeam', 'temporary'].includes(actor);
+    // Organisers in the hall use phones. The console and contestants use a desktop.
+    const onPhone = actor === 'volunteer' || actor === 'jury';
+    const ui: Ui = contestant ? 'contestant' : onPhone ? 'organiser-phone' : 'organiser-desktop';
+    const context = await browser.newContext({ viewport: onPhone ? phone : desktop, ignoreHTTPSErrors: options.ignoreHTTPSErrors ?? false });
     const page = await context.newPage();
     const probe: Probe = { ready: 0, changes: 0, closed: 0, invalid: false };
     const workspace = { page, context, probe };
@@ -106,7 +179,7 @@ export async function runUiJourney(browser: Browser, fixture: UiFixture, options
     await page.getByRole('button', { name: 'Sign in', exact: true }).click();
     if (actor === 'temporary') {
       await expect(page.getByRole('heading', { name: 'Change your temporary password', exact: true })).toBeVisible();
-      await expect(page.getByRole('navigation', { name: 'Workspace navigation' })).toHaveCount(0);
+      await expect(uiRoot(page)).toHaveCount(0);
       const replacement = crypto.randomUUID() + 'A9!';
       await privateFill(page.getByLabel('Current password', { exact: true }), password ?? fixture.accounts[actor].password);
       await privateFill(page.getByLabel('New password', { exact: true }), replacement);
@@ -114,31 +187,42 @@ export async function runUiJourney(browser: Browser, fixture: UiFixture, options
       await page.getByRole('button', { name: 'Save password', exact: true }).click();
       fixture.accounts[actor].password = replacement;
     }
-    const title = ['contestant', 'otherTeam', 'temporary'].includes(actor) ? 'My team’s issues' : actor === 'jury' ? 'Award review' : 'Issue Queue';
-    await expect(page.getByRole('heading', { name: title, exact: true })).toBeVisible({ timeout: 45_000 });
-    const selector = page.getByRole('combobox', { name: 'Contest session', exact: true });
-    if (await selector.count()) await selector.selectOption(fixture.sessionId);
-    await expect(page.locator('.connection-status')).toContainText('Live', { timeout: 30_000 });
+    await expect(uiRoot(page, ui)).toBeVisible({ timeout: 45_000 });
+    // A member of several sessions changes the session from a menu.
+    const switcher = uiRoot(page).getByRole('button', { name: /^Contest session: / });
+    if (await switcher.count() && !(await switcher.getAttribute('aria-label'))?.includes(sessionName)) {
+      await switcher.click();
+      await page.getByRole('menuitemradio', { name: sessionName, exact: true }).click();
+    }
+    await expect(uiRoot(page)).toContainText(sessionName);
+    await expect(liveBadge(page)).toBeVisible({ timeout: 30_000 });
     await expect.poll(() => probe.ready).toBeGreaterThan(0);
     return workspace;
   }
 
-  async function administration(workspace: Workspace) {
-    await workspace.page.getByRole('navigation', { name: 'Workspace navigation' })
-      .getByRole('button', { name: 'Administration', exact: true }).click();
-    await expect(workspace.page.getByRole('heading', { name: 'Session administration', exact: true })).toBeVisible();
-  }
-
-  async function completed(page: Page) {
-    await expect(page.locator('.admin-panel').getByRole('status')).toHaveText('Administration action completed.');
-  }
-
-  async function adminAction(page: Page, button: Locator) {
-    const response = page.waitForResponse((response) => response.url() === `${fixture.origin}/api/admin`
+  async function adminRequest(page: Page, button: Locator, path: string) {
+    const response = page.waitForResponse((response) => response.url() === `${fixture.origin}${path}`
       && response.request().method() === 'POST');
     await button.click();
     expect((await response).status()).toBe(200);
-    await completed(page);
+  }
+
+  async function adminAction(page: Page, button: Locator) {
+    await adminRequest(page, button, '/api/admin');
+    await expect(page.getByRole('status').filter({ hasText: 'Administration action completed.' })).toBeVisible();
+  }
+
+  /** Opens the Manage dialog of the account with this username. */
+  async function manage(page: Page, actor: Actor): Promise<Locator> {
+    await page.getByRole('row').filter({ hasText: fixture.accounts[actor].username })
+      .getByRole('button', { name: /^Manage / }).click();
+    const dialog = page.getByRole('dialog').filter({ hasText: fixture.accounts[actor].username });
+    await expect(dialog).toBeVisible();
+    return dialog;
+  }
+
+  function accountRow(page: Page, actor: Actor): Locator {
+    return page.getByRole('row').filter({ hasText: fixture.accounts[actor].username });
   }
 
   try {
@@ -151,199 +235,259 @@ export async function runUiJourney(browser: Browser, fixture: UiFixture, options
     const jury = await login('jury');
     const admin = await login('admin');
     phase = 'administration settings';
-    await administration(admin);
-    await adminAction(admin.page, admin.page.getByRole('button', { name: 'Close contestant intake', exact: true }));
-    await expect(contestant.page.getByRole('button', { name: 'Report an issue', exact: true })).toBeDisabled();
-    await adminAction(admin.page, admin.page.getByRole('button', { name: 'Open contestant intake', exact: true }));
-    await expect(contestant.page.getByRole('button', { name: 'Report an issue', exact: true })).toBeEnabled();
-    await admin.page.getByLabel('Maximum size of one image (MB)', { exact: true }).fill('1');
-    await admin.page.getByLabel('Maximum images on one issue', { exact: true }).fill('3');
-    await admin.page.getByLabel('Maximum combined size on one issue (MB)', { exact: true }).fill('3');
+    const reportButton = contestant.page.getByRole('complementary', { name: 'Your reports' })
+      .getByRole('button', { name: 'Report an issue', exact: true });
+    await consolePage(admin.page, 'Session settings');
+    // The settings page switch. The console header has a second, shorter one.
+    const intake = admin.page.getByRole('switch', { name: /^Contestant intake (?:Open|Closed)\./ });
+    await expect(intake).toBeChecked();
+    await adminAction(admin.page, intake);
+    await expect(intake).not.toBeChecked();
+    await expect(reportButton).toBeDisabled();
+    await expect(volunteer.page.getByText('Contestant intake closed', { exact: true })).toBeVisible();
+    await adminAction(admin.page, intake);
+    await expect(intake).toBeChecked();
+    await expect(reportButton).toBeEnabled();
+    await admin.page.getByLabel('Largest image (MB)', { exact: true }).fill('1');
+    await admin.page.getByLabel('Images per issue', { exact: true }).fill('3');
+    await admin.page.getByLabel('Total per issue (MB)', { exact: true }).fill('3');
     await adminAction(admin.page, admin.page.getByRole('button', { name: 'Save image limits', exact: true }));
-    const member = admin.page.locator('.account-entry').filter({ hasText: fixture.accounts.volunteer.username });
-    await member.locator('summary').click();
-    await member.getByRole('checkbox', { name: 'jury', exact: true }).check();
+    await consolePage(admin.page, 'Accounts');
+    let member = await manage(admin.page, 'volunteer');
+    await choose(member.getByRole('checkbox', { name: 'Jury', exact: true }));
     await adminAction(admin.page, member.getByRole('button', { name: 'Save membership', exact: true }));
-    await expect(member.locator('.account-role')).toContainText('jury');
-    await expect(member.locator('.account-role')).toContainText('volunteer');
-    await member.getByRole('checkbox', { name: 'jury', exact: true }).uncheck();
+    await expect(member).toBeHidden();
+    await expect(accountRow(admin.page, 'volunteer').getByText('Jury', { exact: true })).toBeVisible();
+    await expect(accountRow(admin.page, 'volunteer').getByText('Volunteer', { exact: true })).toBeVisible();
+    // Combined roles reach the member's open phone app.
+    await expect(phoneTabs(volunteer.page).getByRole('button', { name: 'Awards', exact: true })).toBeVisible();
+    member = await manage(admin.page, 'volunteer');
+    await choose(member.getByRole('checkbox', { name: 'Jury', exact: true }), false);
     await adminAction(admin.page, member.getByRole('button', { name: 'Save membership', exact: true }));
-    await expect(member.locator('.account-role')).not.toContainText('jury');
+    await expect(member).toBeHidden();
+    await expect(accountRow(admin.page, 'volunteer').getByText('Jury', { exact: true })).toHaveCount(0);
+    await expect(phoneTabs(volunteer.page).getByRole('button', { name: 'Awards', exact: true })).toHaveCount(0);
     phase = 'phone and keyboard navigation';
     await volunteer.page.setViewportSize({ width: 320, height: 740 });
-    const navigation = volunteer.page.getByRole('navigation', { name: 'Workspace navigation' });
-    const menu = volunteer.page.getByRole('button', { name: 'Menu', exact: true });
-    await menu.focus();
+    await expect(uiRoot(volunteer.page, 'organiser-phone')).toBeVisible();
+    await phoneTabs(volunteer.page).getByRole('button', { name: 'Me', exact: true }).focus();
     await volunteer.page.keyboard.press('Enter');
-    await expect(navigation).toBeVisible();
-    await navigation.getByRole('button', { name: 'My account', exact: true }).focus();
+    await expect(volunteer.page.getByRole('heading', { level: 1, name: 'Me', exact: true })).toBeFocused();
+    await phoneTabs(volunteer.page).getByRole('button', { name: 'Queue', exact: true }).focus();
     await volunteer.page.keyboard.press('Enter');
-    await expect(volunteer.page.getByRole('heading', { name: 'My account', exact: true })).toBeFocused();
-    await menu.click();
-    await navigation.getByRole('button', { name: 'Issues', exact: true }).focus();
-    await volunteer.page.keyboard.press('Enter');
-    await expect(volunteer.page.locator('#workspace-heading')).toBeFocused();
-    expect(await volunteer.page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+    await expect(volunteer.page.getByRole('heading', { level: 1, name: 'Queue', exact: true })).toBeFocused();
+    expect(await fitsWidth(volunteer.page)).toBe(true);
+    await volunteer.page.setViewportSize(phone);
     phase = 'contestant submission and first assignment';
     const description = `UI fictional device ${crypto.randomUUID()}`;
     let teamChanges = contestant.probe.changes;
-    await contestant.page.getByRole('button', { name: 'Report an issue', exact: true }).click();
-    await contestant.page.getByRole('combobox', { name: 'Category', exact: true }).selectOption('Devices');
-    await contestant.page.getByLabel('What’s happening?', { exact: true }).fill(description);
-    await contestant.page.getByRole('button', { name: 'Submit issue', exact: true }).click();
-    await chooseIssue(contestant.page, description);
+    await reportButton.click();
+    await expect(contestant.page.getByRole('heading', { name: 'Report an issue', exact: true })).toBeFocused();
+    await contestant.page.getByText('Devices', { exact: true }).click();
+    await contestant.page.getByLabel('What is happening?', { exact: true }).fill(description);
+    await contestant.page.getByRole('button', { name: 'Send report', exact: true }).click();
+    await expect(contestant.page.getByRole('region', { name: 'Your report', exact: true })).toContainText(description);
+    await expect(contestantTimer(contestant.page)).toContainText('running');
     await expect.poll(() => contestant.probe.changes).toBeGreaterThan(teamChanges);
-    await chooseIssue(volunteer.page, description);
-    await volunteer.page.locator('.issue-card').filter({ hasText: description }).focus();
+    const card = phoneCard(volunteer.page, description);
+    await expect(card).toBeVisible();
+    const issueReference = /^Open (ISS-\d+), /.exec((await card.textContent()) ?? '')?.[1] ?? '';
+    expect(issueReference).toMatch(/^ISS-\d+$/);
+    await card.focus();
     await volunteer.page.keyboard.press('Enter');
-    await expect(volunteer.page.locator('#issue-heading')).toBeFocused();
+    const volunteerView = uiRoot(volunteer.page);
+    await expect(volunteer.page.getByRole('heading', { level: 1, name: new RegExp(`^${issueReference},`) })).toBeFocused();
     teamChanges = contestant.probe.changes;
-    await volunteer.page.getByRole('button', { name: 'Claim issue', exact: true }).click();
+    await volunteer.page.getByRole('button', { name: 'Claim', exact: true }).click();
     await expect.poll(() => contestant.probe.changes).toBeGreaterThan(teamChanges);
-    const volunteerName = (await volunteer.page.locator('.sidebar-person strong').textContent())!;
-    await expect(owner(contestant.page)).toHaveText(volunteerName);
+    await expect(owner(volunteerView)).toHaveText(/^You \(.+\)$/);
+    const volunteerName = /^You \((.+)\)$/.exec((await owner(volunteerView).textContent()) ?? '')![1];
+    await expect(contestant.page.getByRole('region', { name: 'Your report', exact: true })).toContainText(description);
     phase = 'specialist handoff';
     teamChanges = contestant.probe.changes;
-    await volunteer.page.getByRole('button', { name: 'Escalate to specialist', exact: true }).click();
+    await volunteer.page.getByRole('button', { name: 'More actions', exact: true }).click();
+    await volunteer.page.getByRole('dialog', { name: 'More actions' }).getByRole('button', { name: /Escalate to a specialist/ }).click();
+    const escalate = volunteer.page.getByRole('dialog', { name: 'Escalate to a specialist?' });
+    await escalate.getByRole('button', { name: 'Escalate to specialist', exact: true }).click();
+    await expect(escalate).toHaveCount(0);
     await expect.poll(() => contestant.probe.changes).toBeGreaterThan(teamChanges);
-    await expect(volunteer.page.locator('.handoff')).toContainText(`${volunteerName} remains responsible until acceptance.`);
-    await expect(owner(contestant.page)).toHaveText(volunteerName);
-    await chooseIssue(specialist.page, description);
+    await expect(volunteerView.getByRole('note')).toContainText(`${volunteerName} stays responsible until a specialist accepts.`);
+    await expect(owner(volunteerView)).toHaveText(`You (${volunteerName})`);
+    await expect(contestant.page.getByText(`${volunteerName} stays responsible until a specialist takes over.`, { exact: true })).toBeVisible();
+    await consolePage(specialist.page, 'Handoffs');
     teamChanges = contestant.probe.changes;
-    await specialist.page.getByRole('button', { name: 'Accept handoff', exact: true }).click();
+    await specialist.page.getByRole('button', { name: `Accept handoff for ${issueReference}`, exact: true }).click();
+    await expect(specialist.page.getByRole('button', { name: `Accept handoff for ${issueReference}`, exact: true })).toHaveCount(0);
     await expect.poll(() => contestant.probe.changes).toBeGreaterThan(teamChanges);
-    const specialistName = (await specialist.page.locator('.sidebar-person strong').textContent())!;
-    await expect(owner(contestant.page)).toHaveText(specialistName);
+    await consolePage(specialist.page, 'Assigned to me');
+    await specialist.page.getByRole('button', { name: `Open ${issueReference}`, exact: true }).click();
+    const sheet = specialist.page.getByRole('dialog', { name: `${issueReference}: ${description}` });
+    await expect(sheet).toBeVisible();
+    await expect(owner(sheet)).toHaveText(/^You \(.+\)$/);
+    const specialistName = /^You \((.+)\)$/.exec((await owner(sheet).textContent()) ?? '')![1];
+    await expect(owner(volunteerView)).toHaveText(specialistName);
+    const firstAssigned = (await firstAssignment(sheet).textContent())!;
     phase = 'private and public conversation';
     const privateText = `Private fictional diagnosis ${crypto.randomUUID()}`;
     const publicText = `Public fictional response ${crypto.randomUUID()}`;
     const teamBeforePrivate = contestant.probe.changes;
     const otherBeforePrivate = other.probe.changes;
     const staffBeforePrivate = volunteer.probe.changes;
-    await specialist.page.getByRole('combobox', { name: 'Audience', exact: true }).selectOption('internal');
-    await specialist.page.getByLabel('Message', { exact: true }).fill(privateText);
-    await specialist.page.getByRole('button', { name: 'Send reply', exact: true }).click();
+    await choose(sheet.getByRole('radio', { name: 'Internal note', exact: true }));
+    await sheet.getByRole('textbox', { name: 'Internal note', exact: true }).fill(privateText);
+    await sheet.getByRole('button', { name: 'Add note', exact: true }).click();
     await expect(volunteer.page.getByText(privateText, { exact: true })).toBeVisible();
     await expect.poll(() => volunteer.probe.changes).toBeGreaterThan(staffBeforePrivate);
     expect(contestant.probe.changes).toBe(teamBeforePrivate);
     expect(other.probe.changes).toBe(otherBeforePrivate);
     await expect(contestant.page.getByText(privateText, { exact: true })).toHaveCount(0);
-    await specialist.page.getByRole('combobox', { name: 'Audience', exact: true }).selectOption('public');
-    await specialist.page.getByLabel('Message', { exact: true }).fill(publicText);
-    await specialist.page.getByRole('button', { name: 'Send reply', exact: true }).click();
+    await choose(sheet.getByRole('radio', { name: 'Public reply', exact: true }));
+    await sheet.getByRole('textbox', { name: 'Message', exact: true }).fill(publicText);
+    await sheet.getByRole('button', { name: 'Send', exact: true }).click();
     await expect(contestant.page.getByText(publicText, { exact: true })).toBeVisible();
     await expect.poll(() => contestant.probe.changes).toBeGreaterThan(teamBeforePrivate);
-    await expect(other.page.locator('.issue-card').filter({ hasText: description })).toHaveCount(0);
+    await expect(other.page.getByText(description)).toHaveCount(0);
     phase = 'private and team images';
     const teamBeforeImage = contestant.probe.changes;
-    await expect(specialist.page.locator('.images')).toContainText('Up to 1 MB each, 3 images, and 3 MB per issue.');
-    await upload(specialist.page, 'internal');
-    await expect(volunteer.page.locator('.images .image-thumb')).toHaveCount(1);
+    await sheet.getByRole('tab', { name: /^Images/ }).click();
+    await expect(sheet.getByRole('region', { name: /^Images · / })).toHaveAccessibleName('Images · 0 of 3');
+    await sheet.getByRole('button', { name: 'Add image', exact: true }).click();
+    const uploadDialog = specialist.page.getByRole('dialog', { name: 'Add an image' });
+    await expect(uploadDialog).toContainText('Up to 1 MB each, 3 images, and 3 MB per issue.');
+    await upload(uploadDialog, 'internal');
+    const volunteerThumbs = volunteerView.getByRole('region', { name: /^Images · / }).getByRole('button', { name: /^View image uploaded by / });
+    await expect(volunteerThumbs).toHaveCount(1);
     expect(contestant.probe.changes).toBe(teamBeforeImage);
-    await expect(contestant.page.locator('.images .image-thumb')).toHaveCount(0);
-    await upload(specialist.page, 'public');
-    await expect(contestant.page.locator('.images .image-thumb')).toHaveCount(1);
-    await expect(specialist.page.locator('.images .image-thumb')).toHaveCount(2);
-    await expect(contestant.page.locator('.images').getByText('Staff only', { exact: true })).toHaveCount(0);
-    await contestant.page.locator('.images .image-thumb').click();
+    await expect(contestantThumbs(contestant.page)).toHaveCount(0);
+    await upload(uploadDialog, 'public');
+    await uploadDialog.getByRole('button', { name: 'Cancel', exact: true }).click();
+    await expect(uploadDialog).toBeHidden();
+    await expect(contestantThumbs(contestant.page)).toHaveCount(1);
+    await expect(volunteerThumbs).toHaveCount(2);
+    const specialistThumbs = sheet.getByRole('region', { name: /^Images · / }).getByRole('button', { name: /^View image uploaded by / });
+    await expect(specialistThumbs).toHaveCount(2);
+    await expect(contestant.page.getByRole('region', { name: 'Images', exact: true }).getByText('Staff only')).toHaveCount(0);
+    await contestantThumbs(contestant.page).click();
     const teamDialog = contestant.page.getByRole('dialog');
     await expect(teamDialog.getByRole('img')).toBeVisible();
     await expect.poll(() => teamDialog.getByRole('img').evaluate((image) => (image as HTMLImageElement).complete && (image as HTMLImageElement).naturalWidth > 0)).toBe(true);
     await expect(teamDialog.getByRole('button', { name: 'Remove image', exact: true })).toHaveCount(0);
     await teamDialog.getByRole('button', { name: 'Close', exact: true }).click();
-    await specialist.page.locator('.images .image-thumb').filter({ hasText: 'Staff only' }).click();
-    await expect(specialist.page.getByRole('dialog').getByRole('img')).toBeVisible();
-    await specialist.page.getByRole('dialog').getByRole('button', { name: 'Remove image', exact: true }).click();
-    await expect(specialist.page.getByRole('dialog')).toBeHidden();
-    await expect(specialist.page.locator('.images .image-thumb')).toHaveCount(1);
+    await expect(teamDialog).toBeHidden();
+    await specialistThumbs.filter({ hasText: 'Staff' }).click();
+    const preview = specialist.page.getByRole('dialog', { name: /^Image uploaded by / });
+    await expect(preview).toContainText('Staff only');
+    await expect(preview.getByRole('img')).toBeVisible();
+    await preview.getByRole('button', { name: 'Remove image', exact: true }).click();
+    await expect(preview).toBeHidden();
+    await expect(specialistThumbs).toHaveCount(1);
+    await expect(volunteerThumbs).toHaveCount(1);
     phase = 'resolution award and external confirmation';
-    await specialist.page.getByRole('combobox', { name: 'Resolution summary · visible to the team', exact: true }).selectOption('Service restored');
-    await specialist.page.getByRole('button', { name: 'Resolve issue', exact: true }).click();
-    await expect(contestant.page.getByText('Service restored', { exact: true })).toBeVisible();
-    await expect(contestant.page.locator('.detail .timer-state')).toContainText('Stopped');
-    const stoppedTimer = (await contestant.page.locator('.detail .elapsed-time').textContent())!;
-    const firstAssignment = (await contestant.page.locator('.detail .facts > div').filter({ hasText: 'First assignment' }).locator('dd').textContent())!;
-    const issueReference = (await contestant.page.locator('.detail-heading > strong').textContent())!.trim();
-    expect(issueReference).toMatch(/^ISS-\d+$/);
-    await jury.page.getByRole('navigation', { name: 'Workspace navigation' })
-      .getByRole('button', { name: 'Jury worklist', exact: true }).click();
-    await expect(jury.page.getByRole('heading', { name: 'Jury worklist', exact: true })).toBeVisible();
-    const decisionRow = jury.page.locator('#jury-decision').getByRole('article', { name: `Issue ${issueReference}`, exact: true });
-    const applicationRow = jury.page.locator('#jury-application').getByRole('article', { name: `Issue ${issueReference}`, exact: true });
-    await expect(decisionRow).toBeVisible();
-    await expect(applicationRow).toHaveCount(0);
-    await decisionRow.getByRole('button', { name: `View issue ${issueReference}`, exact: true }).click();
-    await expect(jury.page.locator('#issue-heading')).toHaveText(description);
-    await expect(jury.page.locator('#issue-heading')).toBeFocused();
-    await jury.page.getByRole('combobox', { name: 'Award minutes', exact: true }).selectOption('5');
-    await jury.page.getByLabel('Public award explanation', { exact: true }).fill('Fictional device delay');
-    await jury.page.getByRole('button', { name: 'Record award', exact: true }).click();
-    await expect(contestant.page.getByRole('heading', { name: '5 minutes awarded', exact: true })).toBeVisible();
-    await jury.page.getByRole('button', { name: 'Back to jury worklist', exact: true }).click();
-    await expect(decisionRow).toHaveCount(0);
-    await expect(applicationRow).toBeVisible();
-    await applicationRow.getByRole('button', { name: `View issue ${issueReference}`, exact: true }).click();
-    await expect(jury.page.locator('#issue-heading')).toHaveText(description);
-    await expect(jury.page.locator('#issue-heading')).toBeFocused();
-    await jury.page.getByRole('checkbox', { name: /I confirm this award was applied/ }).check();
-    await jury.page.getByRole('button', { name: 'Confirm applied externally', exact: true }).click();
-    await expect(contestant.page.getByText('Applied externally', { exact: true })).toBeVisible();
-    await expect(decisionRow).toHaveCount(0);
-    await expect(applicationRow).toHaveCount(0);
-    await expect(jury.page.locator('.jury-worklist').getByRole('status'))
-      .toHaveText(`${issueReference} is no longer in the worklist. Its current status has been refreshed.`);
-    await expect(jury.page.locator('#jury-application-heading')).toBeFocused();
-    await expect(contestant.page.locator('.detail .elapsed-time')).toHaveText(stoppedTimer);
+    await sheet.getByRole('button', { name: 'Resolve', exact: true }).click();
+    const resolve = specialist.page.getByRole('dialog', { name: 'Resolve issue' });
+    await resolve.getByRole('radio', { name: 'Service restored', exact: true }).check();
+    await resolve.getByRole('button', { name: 'Resolve issue', exact: true }).click();
+    await expect(resolve).toHaveCount(0);
+    await expect(contestant.page.getByRole('region', { name: 'Resolution', exact: true })).toContainText('Service restored');
+    await expect(contestantTimer(contestant.page)).toContainText('stopped');
+    const stoppedTimer = (await contestantTimer(contestant.page).textContent())!;
+    await phoneTab(jury.page, 'Awards');
+    const juryRow = (list: string) => jury.page.getByRole('list', { name: list, exact: true }).getByRole('listitem')
+      .filter({ has: jury.page.getByText(issueReference, { exact: true }) });
+    await expect(juryRow('To decide')).toContainText('Resolution: Service restored');
+    await juryRow('To decide').getByRole('button', { name: 'Decide award', exact: true }).click();
+    const award = jury.page.getByRole('dialog', { name: 'Decide award' });
+    await award.locator('label').filter({ hasText: /^5 min$/ }).click();
+    await award.getByLabel('Public award explanation', { exact: true }).fill('Fictional device delay');
+    await award.getByRole('button', { name: 'Record 5 minutes', exact: true }).click();
+    await expect(award).toHaveCount(0);
+    const timeAward = contestant.page.getByRole('region', { name: /^Time award\s*, 5 minutes$/ });
+    await expect(timeAward).toContainText('Decided by the jury');
+    await expect(timeAward).toContainText('Not yet applied to your contest time');
+    // A recorded award opens its issue. Back returns to the lists.
+    await expect(jury.page.getByRole('region', { name: 'Time award' })).toContainText('+5 min');
+    await jury.page.getByRole('button', { name: 'Back', exact: true }).click();
+    await expect(jury.page.getByRole('heading', { level: 1, name: 'Awards', exact: true })).toBeFocused();
+    await expect(juryRow('To decide')).toHaveCount(0);
+    await jury.page.getByRole('group', { name: 'Award lists' }).getByRole('button', { name: /^To apply/ }).click();
+    await juryRow('To apply').locator('[id^="issue-card-"]').click();
+    await expect(jury.page.getByRole('heading', { level: 1, name: new RegExp(`^${issueReference},`) })).toBeFocused();
+    await jury.page.getByRole('button', { name: 'Confirm applied', exact: true }).click();
+    const apply = jury.page.getByRole('dialog', { name: 'Confirm external application' });
+    await apply.getByRole('checkbox', { name: /I confirm this award was applied/ }).check();
+    await apply.getByRole('button', { name: 'Confirm applied externally', exact: true }).click();
+    await expect(apply).toHaveCount(0);
+    await expect(timeAward).toContainText('Applied to your contest time');
+    await expect(timeAward).not.toContainText('Not yet applied');
+    await jury.page.getByRole('button', { name: 'Back', exact: true }).click();
+    await expect(jury.page.getByRole('heading', { level: 1, name: 'Awards', exact: true })).toBeFocused();
+    await jury.page.getByRole('group', { name: 'Award lists' }).getByRole('button', { name: /^To apply/ }).click();
+    await expect(juryRow('To apply')).toHaveCount(0);
+    await jury.page.getByRole('group', { name: 'Award lists' }).getByRole('button', { name: /^Applied/ }).click();
+    await expect(juryRow('Applied')).toHaveCount(1);
+    await expect(contestantTimer(contestant.page)).toHaveText(stoppedTimer);
     phase = 'reopening and persisted refresh';
-    await contestant.page.getByLabel('Public reopening reason', { exact: true }).fill('Fictional device failure returned');
+    await contestant.page.getByRole('button', { name: 'The problem is back? Reopen this issue', exact: true }).click();
+    await contestant.page.getByLabel(/What is still wrong\?/).fill('Fictional device failure returned');
     await contestant.page.getByRole('button', { name: 'Reopen issue', exact: true }).click();
-    await expect(owner(contestant.page)).toHaveText(specialistName);
-    await expect(contestant.page.getByRole('heading', { name: 'Previous resolution', exact: true })).toBeVisible();
-    await expect(contestant.page.getByRole('heading', { name: '5 minutes awarded', exact: true })).toBeVisible();
-    await expect(contestant.page.getByText('Applied externally', { exact: true })).toBeVisible();
-    await expect(contestant.page.locator('.detail .timer-state')).toContainText('Running');
+    await expect(contestantTimer(contestant.page)).toContainText('running');
+    await expect(contestant.page.getByRole('region', { name: 'Earlier resolutions' })).toContainText('Service restored');
+    await expect(timeAward).toContainText('Applied to your contest time');
+    await expect(owner(sheet)).toHaveText(`You (${specialistName})`);
+    await expect(firstAssignment(sheet)).toHaveText(firstAssigned);
     await contestant.page.reload();
-    await chooseIssue(contestant.page, description);
-    await expect(owner(contestant.page)).toHaveText(specialistName);
+    await expect(uiRoot(contestant.page, 'contestant')).toBeVisible({ timeout: 30_000 });
+    await chooseReport(contestant.page, description);
     await expect(contestant.page.getByText(publicText, { exact: true })).toBeVisible();
     await expect(contestant.page.getByText(privateText, { exact: true })).toHaveCount(0);
-    await expect(contestant.page.getByRole('heading', { name: 'Previous resolution', exact: true })).toBeVisible();
-    await expect(contestant.page.getByText('Applied externally', { exact: true })).toBeVisible();
-    await expect(contestant.page.locator('.detail .facts > div').filter({ hasText: 'First assignment' }).locator('dd')).toHaveText(firstAssignment);
-    expect(elapsed((await contestant.page.locator('.detail .elapsed-time').textContent())!)).toBeGreaterThanOrEqual(elapsed(stoppedTimer));
-    await expect(contestant.page.locator('.images .image-thumb')).toHaveCount(1);
+    await expect(contestant.page.getByRole('region', { name: 'Earlier resolutions' })).toContainText('Service restored');
+    await expect(timeAward).toContainText('Applied to your contest time');
+    await expect(contestantTimer(contestant.page)).toContainText('running');
+    expect(seconds((await contestantTimer(contestant.page).textContent())!)).toBeGreaterThanOrEqual(seconds(stoppedTimer));
+    await expect(contestantThumbs(contestant.page)).toHaveCount(1);
     await expect.poll(() => contestant.probe.ready).toBeGreaterThan(1);
-    await expect(contestant.page.locator('.connection-status')).toContainText('Live');
+    await expect(liveBadge(contestant.page)).toBeVisible();
+    await specialist.page.reload();
+    await expect(uiRoot(specialist.page, 'organiser-desktop')).toBeVisible({ timeout: 30_000 });
+    await consolePage(specialist.page, 'Assigned to me');
+    await specialist.page.getByRole('button', { name: `Open ${issueReference}`, exact: true }).click();
+    await expect(owner(sheet)).toHaveText(`You (${specialistName})`);
+    await expect(firstAssignment(sheet)).toHaveText(firstAssigned);
     phase = 'membership revocation and restoration';
-    const otherMember = admin.page.locator('.account-entry').filter({ hasText: fixture.accounts.otherTeam.username });
-    await otherMember.locator('summary').click();
-    admin.page.once('dialog', (dialog) => { void dialog.accept(); });
-    await adminAction(admin.page, otherMember.getByRole('button', { name: 'Revoke session access', exact: true }));
+    member = await manage(admin.page, 'otherTeam');
+    await member.getByRole('button', { name: 'Revoke session access', exact: true }).click();
+    await adminAction(admin.page, admin.page.getByRole('dialog', { name: /^Revoke .* access to this session\?$/ })
+      .getByRole('button', { name: 'Revoke access', exact: true }));
     await expect.poll(() => other.probe.closed).toBeGreaterThan(0);
     await expect(other.page.getByRole('heading', { name: 'Session access', exact: true })).toBeVisible({ timeout: 30_000 });
-    const assign = admin.page.locator('.admin-advanced').filter({ hasText: 'Assign an existing account by ID' });
-    await assign.locator('summary').click();
+    await expect(accountRow(admin.page, 'otherTeam')).toHaveCount(0);
+    await admin.page.getByText('Assign an existing account by ID', { exact: true }).click();
+    const assign = admin.page.locator('form').filter({ has: admin.page.getByLabel('Auth user UUID', { exact: true }) });
     await assign.getByLabel('Auth user UUID', { exact: true }).fill(fixture.accounts.otherTeam.id);
-    await assign.getByRole('combobox', { name: 'Contestant team', exact: true }).selectOption({ label: 'Provider team 1' });
+    await choose(assign.getByRole('radio', { name: /^Team/ }));
+    await assign.getByLabel('Contestant team', { exact: true }).selectOption({ label: 'Provider team 1 · Fixture desk 1' });
     await adminAction(admin.page, assign.getByRole('button', { name: 'Assign membership', exact: true }));
+    await expect(accountRow(admin.page, 'otherTeam')).toContainText('Provider team 1');
     await other.page.reload();
-    await expect(other.page.getByRole('heading', { name: 'My team’s issues', exact: true })).toBeVisible();
-    await expect(other.page.locator('.issue-card').filter({ hasText: description })).toHaveCount(0);
+    await expect(uiRoot(other.page, 'contestant')).toBeVisible({ timeout: 30_000 });
+    await expect(other.page.getByText(description)).toHaveCount(0);
     phase = 'organizer assisted account recovery';
-    const temporaryMember = admin.page.locator('.account-entry').filter({ hasText: fixture.accounts.temporary.username });
-    await temporaryMember.locator('summary').click();
-    admin.page.once('dialog', (dialog) => { void dialog.accept(); });
-    await temporaryMember.getByRole('button', { name: 'Reset password', exact: true }).click();
+    member = await manage(admin.page, 'temporary');
+    await member.getByRole('button', { name: 'Reset password', exact: true }).click();
+    // The one-time credentials replace the page notice in the account dialog.
+    await adminRequest(admin.page, admin.page.getByRole('dialog', { name: /^Reset .*'s password\?$/ })
+      .getByRole('button', { name: 'Reset password', exact: true }), '/api/accounts');
     const credentials = admin.page.getByRole('region', { name: 'Temporary account credentials', exact: true });
     await expect(credentials).toBeVisible({ timeout: 45_000 });
     const recoveredPassword = await privateValue(credentials.getByLabel('Temporary password', { exact: true }));
-    await credentials.getByRole('button', { name: 'Dismiss credentials', exact: true }).click();
+    await credentials.getByRole('button', { name: 'Done', exact: true }).click();
+    await expect(credentials).toBeHidden();
     expect(recoveredPassword.length > 0).toBe(true);
     await temporary.page.reload();
     await expect(temporary.page.getByRole('heading', { name: /Sign in/ })).toBeVisible({ timeout: 30_000 });
     const recovered = await login('temporary', recoveredPassword);
-    await chooseIssue(recovered.page, description);
-    await expect(recovered.page.getByText('Applied externally', { exact: true })).toBeVisible();
+    await chooseReport(recovered.page, description);
+    await expect(recovered.page.getByRole('region', { name: /^Time award\s*, 5 minutes$/ })).toContainText('Applied to your contest time');
     phase = 'final provider and notification assertions';
     expect(externalBackend).toBe(false);
     expect(requests.has('POST /api/auth/sign-in')).toBe(true);

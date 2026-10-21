@@ -4,6 +4,15 @@ This document preserves the agreed direction from [PLAN.md](../PLAN.md).
 Only requirements listed in [current-state.md](current-state.md) describe implemented behavior.
 The user selects later scope after demo feedback.
 
+Interface decision (2026-10-17): organisers and contestants get different UIs. This is not one layout with parts hidden.
+Organisers mainly use phones, so they get a phone-first app. At 1024 px and wider, they get a separate desktop console.
+Contestants use computers and get a desktop app. There is no contestant phone layout.
+The membership selects the UI after sign-in. A membership with a team gets the contestant app.
+All UIs share one design system, shadcn/ui with Tailwind CSS, and the same data hooks.
+[T0015](tickets.md#t0015--organiser-and-contestant-frontend-redesign) implements this decision. It replaces the sidebar workspace from the 2026-10-02 decision below.
+The T0015 jury award lists replace the separate T0009 worklist screen.
+Mockup items that need new data stay out of scope: helper zones, quick replies, a floor map, configurable aging thresholds, and category icons.
+
 Jury worklist maintenance (2026-10-18): [T0009](jury-worklist.md) remains on its existing PR #23 branch.
 It uses authorized `Backend` snapshots and existing workflow actions for decisions and external confirmations.
 The owner authorized current-main integration and verification in a separate worktree alongside T0020 connector work.

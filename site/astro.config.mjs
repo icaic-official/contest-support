@@ -1,27 +1,29 @@
 import {defineConfig} from 'astro/config';
 import starlight from '@astrojs/starlight';
-import {fileURLToPath, URL} from 'node:url';
 
 export default defineConfig({
   site: 'https://minsky-docs.icaic-minsky.workers.dev',
   output: 'static',
   trailingSlash: 'always',
-  vite: {
-    server: {
-      fs: {
-        // Share the app's font without exposing the rest of its checkout.
-        allow: [
-          fileURLToPath(new URL('.', import.meta.url)),
-          fileURLToPath(new URL('../public/fonts', import.meta.url)),
-        ],
-      },
-    },
-  },
   integrations: [starlight({
-    title: 'Minsky docs',
+    title: 'Minsky',
     description: 'Guides for contest teams, support staff, and Minsky operators.',
     favicon: '/favicon.svg',
-    customCss: ['./src/styles/custom.css'],
+    logo: {light: './src/assets/logo-light.svg', dark: './src/assets/logo-dark.svg'},
+    customCss: [
+      '@fontsource-variable/inter',
+      '@fontsource-variable/jetbrains-mono',
+      './src/styles/custom.css',
+    ],
+    expressiveCode: {
+      themes: ['github-dark-default', 'github-light-default'],
+      styleOverrides: {
+        borderRadius: '0.5rem',
+        borderColor: 'var(--sl-color-hairline)',
+        codeFontFamily: 'var(--sl-font-mono)',
+        frames: {shadowColor: 'transparent'},
+      },
+    },
     social: [{
       icon: 'github',
       label: 'Minsky source',
@@ -30,25 +32,28 @@ export default defineConfig({
     sidebar: [
       {label: 'Start here', items: [
         {label: 'Overview', slug: ''},
-        {label: 'Sign in and get access', slug: 'guides/getting-started'},
+        {label: 'Sign in', slug: 'guides/getting-started'},
         {label: 'Feature status', slug: 'reference/status'},
       ]},
       {label: 'Use Minsky', items: [
         {label: 'Contestants', slug: 'guides/contestants'},
         {label: 'Volunteers and specialists', slug: 'guides/staff'},
-        {label: 'Jury and time awards', slug: 'guides/jury'},
-        {label: 'Accounts and sessions', slug: 'guides/administration'},
+        {label: 'Jury', slug: 'guides/jury'},
+        {label: 'Session admins', slug: 'guides/administration'},
       ]},
-      {label: 'Operate an installation', items: [
+      {label: 'Operate', items: [
         {label: 'Install Cloudflare', slug: 'operators/installation'},
-        {label: 'Verify and maintain', slug: 'operators/verification'},
+        {label: 'Verify and upgrade', slug: 'operators/verification'},
         {label: 'Troubleshooting', slug: 'operators/troubleshooting'},
       ]},
       {label: 'Contribute', items: [
         {label: 'Local development', slug: 'contributing/development'},
-        {label: 'Write and deploy these docs', slug: 'contributing/documentation'},
+        {label: 'Write these docs', slug: 'contributing/documentation'},
       ]},
     ],
-    head: [{tag: 'meta', attrs: {name: 'theme-color', content: '#143b36'}}],
+    head: [
+      {tag: 'meta', attrs: {name: 'theme-color', content: '#ffffff', media: '(prefers-color-scheme: light)'}},
+      {tag: 'meta', attrs: {name: 'theme-color', content: '#09090b', media: '(prefers-color-scheme: dark)'}},
+    ],
   })],
 });

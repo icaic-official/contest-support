@@ -10,3 +10,7 @@ test-results/
 supabase/.temp/
 supabase/.branches/
 .vitest/
+
+# Lapiz preview deployment (local only)
+.lapiz/
+lapiz.deploy.json

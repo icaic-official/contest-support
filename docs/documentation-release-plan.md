@@ -58,6 +58,7 @@ The npm `private: true` fields prevent package publication. They do not need rem
 **Observed:** [feature status](../site/src/content/docs/reference/status.md) mixes merged commits, open PRs, and a dated development deployment.
 There is no published release to which the guides can refer.
 The deployed app's exact revision was not established by the earlier HTTP check.
+**T0023 (2026-10-22):** the page now separates work in `main`, work not in `main`, environments, and unverified conditions. No release exists yet.
 
 **Complete when:** each published guide clearly belongs to a named release or a development revision.
 State supported installation paths and their verification limits for that revision.
@@ -189,6 +190,7 @@ Track reply retry behavior under its application work. Do not promise a fix from
 **Observed:** [docs contribution](../site/src/content/docs/contributing/documentation.mdx) mixes writing instructions with the project's account ID and deployment exception.
 [local development](../site/src/content/docs/contributing/development.md) refers to "the user" and agent-specific commit rules.
 The homepage links to the shared development app.
+**T0023 (2026-10-22):** both contribution pages now address an outside contributor. They contain no account ID, agent rules, or deployment exception. The homepage no longer links to the development app.
 
 **Complete when:** public contribution instructions address an outside contributor directly.
 Keep project deployment targets, historical exceptions, and agent rules in linked maintainer records.
@@ -199,6 +201,7 @@ Do not present it as the destination for an unrelated competition.
 ### 13. Add a concise explanation of the system
 
 **Observed:** public pages explain tasks but provide no architecture page, shared glossary, or lifecycle diagram.
+**T0023 (2026-10-22):** Excalidraw diagrams now show the issue lifecycle with timer behavior, the award flow, and the Cloudflare architecture. A glossary and a Supabase architecture view remain open.
 
 **Complete when:** show how the browser, static host, Auth, database, Realtime, Storage, and privileged functions relate.
 Explain event, session, team, issue, owner, handoff, resolution, award, and external application.

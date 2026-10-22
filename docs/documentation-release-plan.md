@@ -79,7 +79,7 @@ Keep isolated fixtures and preserve the decision to retire the local demo.
 
 ### 4. Verify one complete installation path
 
-**Observed:** [installation](../site/src/content/docs/operators/installation.md) requires the unmerged T0007 branch.
+**Observed:** [installation](../site/src/content/docs/operators/installation.mdx) requires the unmerged T0007 branch.
 The guide correctly labels container startup and a fresh independent backend as unverified.
 Its three hosting options do not have equivalent verification evidence.
 This was the 2026-10-17 observation. The current guide links to T0020's verified Cloudflare development procedure.
@@ -97,7 +97,7 @@ T0020 owns the independent Cloudflare installation evidence. Container packaging
 **Observed:** [the historical backend setup](https://github.com/GiftedNovaHD/minsky/blob/88ea5020a0f9dfc34a32ed7fbd84dfea07423297/site/src/content/docs/operators/backend.md) says to create and confirm an account through trusted administration.
 It then tells the reader to apply generated SQL through trusted database access.
 Neither task had a complete procedure or an expected result in that earlier guide.
-The current [Cloudflare installation procedure](../site/src/content/docs/operators/installation.md) supplies bootstrap, expected results, target checks, and trusted recovery.
+The current [Cloudflare installation procedure](../site/src/content/docs/operators/installation.mdx) supplies bootstrap, expected results, target checks, and trusted recovery.
 See the [dated verification record](current-state.md) for the exact tested revision and installation results.
 
 **Complete when:** specify the supported account-creation method, confirmation setting, UUID lookup, SQL execution method, and target check.
@@ -120,7 +120,7 @@ Document T0007 configuration only for a revision that contains those files.
 
 ### 7. State exact workflow permissions
 
-**Observed:** [staff](../site/src/content/docs/guides/staff.md), [contestant](../site/src/content/docs/guides/contestants.md), and [jury](../site/src/content/docs/guides/jury.md) guides omit important action restrictions.
+**Observed:** [staff](../site/src/content/docs/guides/staff.md), [contestant](../site/src/content/docs/guides/contestants.md), and [jury](../site/src/content/docs/guides/jury.mdx) guides omit important action restrictions.
 The workflow implementation in `supabase/migrations/202610020003_private_signals.sql` requires the following:
 
 - Only the current support owner can request a handoff or resolve the issue.
@@ -186,7 +186,7 @@ Track reply retry behavior under its application work. Do not promise a fix from
 
 ### 12. Separate public guidance from project operations
 
-**Observed:** [docs contribution](../site/src/content/docs/contributing/documentation.md) mixes writing instructions with the project's account ID and deployment exception.
+**Observed:** [docs contribution](../site/src/content/docs/contributing/documentation.mdx) mixes writing instructions with the project's account ID and deployment exception.
 [local development](../site/src/content/docs/contributing/development.md) refers to "the user" and agent-specific commit rules.
 The homepage links to the shared development app.
 

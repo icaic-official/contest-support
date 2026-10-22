@@ -1,0 +1,38 @@
+---
+title: Contest support, explained.
+description: Use Minsky, support your teams, and run your own installation.
+template: splash
+hero:
+  tagline: Contest teams report technical problems. Staff resolve them in one shared queue. The jury records time awards.
+  actions:
+    - text: Start using Minsky
+      link: /guides/getting-started/
+      icon: right-arrow
+    - text: Install Minsky
+      link: /operators/installation/
+      variant: minimal
+---
+
+import {CardGrid, LinkCard} from '@astrojs/starlight/components';
+import Diagram from '../../components/Diagram.astro';
+
+## Choose your guide
+
+<CardGrid>
+  <LinkCard title="Contestants" description="Report a problem and follow it." href="/guides/contestants/" />
+  <LinkCard title="Volunteers and specialists" description="Claim, hand off, and resolve issues." href="/guides/staff/" />
+  <LinkCard title="Jury" description="Record time awards." href="/guides/jury/" />
+  <LinkCard title="Session admins" description="Manage accounts, intake, and image limits." href="/guides/administration/" />
+  <LinkCard title="Operators" description="Install Minsky on Cloudflare." href="/operators/installation/" />
+  <LinkCard title="Contributors" description="Run the code and edit these docs." href="/contributing/development/" />
+</CardGrid>
+
+## How an issue moves
+
+<Diagram name="issue-lifecycle" alt="Issue lifecycle. Open becomes In progress when staff claim it. In progress can go to Awaiting specialist and back when a specialist accepts. The owner resolves the issue. Reopening returns it to In progress with the same owner." />
+
+:::note[Development stage]
+Minsky needs a network connection.
+Live-contest readiness and capacity for 800 simultaneous users are not verified.
+See [feature status](/reference/status/).
+:::

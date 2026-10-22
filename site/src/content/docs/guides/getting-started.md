@@ -1,62 +1,47 @@
 ---
-title: Sign in and get access
-description: Obtain your account, change a temporary password, and select a contest session.
+title: Sign in
+description: Get your account, change your temporary password, and choose a session.
 ---
 
-## Get your account
+## Sign in the first time
 
-Your organizer gives you the installation address, username, and temporary password.
-Minsky has no public account registration.
-Group contestants share a team account.
-Each staff member uses an individual account so the activity history identifies the person who acted.
+Your organizer gives you the address, a username, and a temporary password.
+There is no public registration.
 
-1. Open the address supplied by your organizer.
-2. Enter your username and temporary password.
-3. Select **Sign in**.
-4. Set a new password when Minsky asks you to change it.
+1. Open the address and sign in.
+2. Set a new password. You cannot see contest data until you do.
 
-You must change a temporary password before you can access contest data.
-Refreshing the page does not bypass this requirement.
+Teams share one account. Each staff member has a personal account, so the history shows who acted.
 
-## Select the session
+## Choose a session
 
-If you belong to several sessions, choose the correct contest session.
-Contestants use the session menu in the top bar.
-Staff use the session switcher at the top of the desktop sidebar, or the **Me** tab on a phone.
 Each session has its own teams, issues, and awards.
-Your assigned roles determine which controls you can use.
-Staff with several roles receive the combined permissions of those roles.
+If you belong to more than one, select the session:
 
-An account without session membership cannot read contest data.
-Ask an organizer to check your membership if the workspace reports that you have no access.
+- **Contestants:** the session menu in the top bar.
+- **Staff:** the switcher at the top of the sidebar, or the **Me** tab on a phone.
+
+An account with no session membership sees no data. Ask your organizer to add you.
 
 ## Find your screens
 
-Minsky shows a different interface to contestants and to staff:
+| You are | Screen |
+| --- | --- |
+| Contestant | Desktop layout. Use a window at least 1024 px wide. |
+| Staff, window under 1024 px | Phone app with tabs at the bottom. |
+| Staff, window 1024 px or wider | Console with a sidebar. |
 
-- Contestants get a desktop layout. Use a computer with a window at least 1024 px wide. The left column shows **Report an issue** and your team's reports.
-- Staff on a phone, or in a window narrower than 1024 px, get tabs at the bottom of the screen.
-- Staff in a window 1024 px wide or wider get a console with a sidebar.
+Your roles decide the tabs and pages. Several roles combine.
 
-Your roles select the staff tabs and pages:
-
-| Role | Phone tabs | Desktop pages |
+| Role | Phone tabs | Console pages |
 | --- | --- | --- |
 | Volunteer or specialist | **Queue**, **Mine**, **Find**, **Me** | **Queue**, **Assigned to me**, **Handoffs**, **Teams & tables** |
-| Jury member | **Awards**, **Find**, **Me** | **Award review**, **Teams & tables** |
-| Session admin | Also **Session** | Also **Overview**, **Accounts**, **Session settings** |
+| Jury | **Awards**, **Find**, **Me** | **Award review**, **Teams & tables** |
+| Session admin | adds **Session** | adds **Overview**, **Accounts**, **Session settings** |
 
-Staff with several roles get all the tabs and pages of those roles.
-Contestants change their password and sign out through the account menu in the top bar.
-Staff use the **Me** tab on a phone, or the account menu at the bottom of the desktop sidebar.
-Use **Sign out** when you finish on a shared device.
+Sign out from the account menu (contestants, console) or the **Me** tab (phone).
 
-## Recover access
+## Forgot your password
 
-Contact your organizer if you forget your password.
-The organizer checks your identity and supplies a replacement temporary password.
-Minsky does not send recovery email.
-After a reset, sign in again and change the replacement password.
-Existing account history remains linked to the same person or team.
-
-Continue with the [contestant guide](/guides/contestants/) or the [staff guide](/guides/staff/).
+Ask your organizer. They check your identity and give you a new temporary password.
+Minsky sends no email. Your history stays linked to your account.

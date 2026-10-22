@@ -1,72 +1,45 @@
 ---
-title: Develop Minsky locally
-description: Prepare a contributor checkout and run the repository checks.
+title: Develop locally
+description: Set up a checkout, run the app, and run the checks.
 ---
 
-## Prepare your checkout
+## Set up
 
-Read `PLAN.md`, `README.md`, `AGENTS.md`, and the active development ticket before changing code.
-Start a ticket branch from updated `main`.
-Use the `feature/tNNNN-description` naming convention.
-Preserve unrelated changes in the working tree.
-
-The application supports Node.js 22.13 or later within 22.x, or Node.js 24 or later.
-The documentation package requires Node.js 22.22 or later.
-Use a current Node.js 22 release or Node.js 24 to work on both.
+Use Node.js 22.13+ (22.x) or 24+. The docs need 22.22+.
 
 ```sh
 npm ci
-cp .env.example .env.local
+cp .env.example .env.local   # set the development Supabase URL and publishable key
+npm run dev                  # http://127.0.0.1:5173
 ```
 
-Set the development project's public Supabase URL and publishable key in `.env.local`.
-An organizer must also give your account session membership.
-Start the frontend with:
-
-```sh
-npm run dev
-```
-
-The local app runs at `http://127.0.0.1:5173`.
-It uses the configured backend.
-Docker is optional for connected development.
+Never put a service key in a `VITE_` variable. An admin must add your account to a session.
+`VITE_BACKEND` defaults to `supabase`. A Cloudflare build sets `VITE_BACKEND=cloudflare` and needs its Worker for the API.
 
 ## Run the checks
 
-| Command | Purpose |
+| Command | Checks |
 | --- | --- |
-| `npm run typecheck` | Check the application's TypeScript. |
-| `npm run lint` | Check source rules. |
-| `npm test` | Run unit, script, and embedded database tests. |
-| `npm run check:functions` | Check the account and attachment functions. |
-| `npm run test:functions` | Run attachment function tests with fake clients. |
-| `npm run build` | Build the application. |
-| `npm run test:e2e` | Check the browser UI with fictional cloud responses. |
+| `npm run typecheck` | TypeScript |
+| `npm run lint` | ESLint |
+| `npm test` | Unit, script, and embedded database tests |
+| `npm run test:d1` | D1 workflow on local emulation |
+| `npm run test:connector:runtime` | Cloudflare connector on a local Worker |
+| `npm run check:functions` | Supabase functions (Deno) |
+| `npm run test:functions` | Attachment function with fake clients |
+| `npm run build` | Production build |
+| `npm run test:e2e` | Browser UI with mocked responses |
 
-Install the browser once with `npx playwright install chromium`.
-Keep development and CI databases and credentials separate.
-Inspect cloud-test targets before running integration tests.
-Never use the CI fixture scripts against real competition data.
+Run `npx playwright install chromium` once before browser tests.
+Hosted test commands need isolated CI resources. Check their targets first, and never point them at real data. See [README.md](https://github.com/GiftedNovaHD/minsky#checks-and-common-commands) for the full list.
 
-## Prepare the review
+## Submit a change
 
-Implement the ticket, verify it, update its documentation, and prepare a pull request.
-The owner reviews and merges.
-After account setup, GitHub Actions publishes docs previews and stable sites from `main` only when all required CI jobs pass.
-Pull request checks do not receive deployment credentials.
-The repository setup guide is `docs/cloudflare-builds.md`.
-Application previews remain disabled until they have independent provider resources.
-Cloudflare application deployment includes its API code and bindings. Migrations and administrator bootstrap remain separate steps.
-Switching the development URL to Cloudflare requires the owner's separate activation approval.
-Include the required co-author trailer in each Codex-created commit for this repository.
-Follow the Google TypeScript Style Guide for TypeScript changes, with documented project exceptions.
+1. Branch from updated `main` as `feature/tNNNN-description`.
+2. Implement, verify, and update the docs in the same change.
+3. Open a pull request. The owner reviews and merges.
 
-For this site, use the separate [documentation workflow](/contributing/documentation/).
+When deployment is enabled, CI publishes the docs and the app from `main` after `checks`, `secrets`, and `dependencies` pass.
+Migrations, bootstrap, and secrets are separate steps.
 
-## Add a provider
-
-Use the repository's [provider contribution guide](https://github.com/GiftedNovaHD/minsky/blob/main/docs/add-provider.md).
-It identifies the shared interfaces, registration points, installation responsibilities, fixture cleanup, and required verification.
-Providers must preserve the same application behavior and pass the unchanged shared scenarios.
-Servers with the same HTTP protocol can reuse the existing browser transport.
-Supabase and Cloudflare have implementations. AWS, GCP, and Azure remain future contributions.
+To add a backend, follow the [provider guide](https://github.com/GiftedNovaHD/minsky/blob/main/docs/add-provider.md). New providers must pass the shared scenarios unchanged.

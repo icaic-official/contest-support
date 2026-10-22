@@ -13,7 +13,7 @@ The Cloudflare installation serves the frontend and API through Workers, with D1
 Both providers use the same workflow decisions. The active Supabase browser path retains its guarded SQL workflow during replacement verification.
 
 [Read the user and operator guides](https://minsky-docs.icaic-minsky.workers.dev).
-Use [the installation guide](site/src/content/docs/operators/installation.md) for an isolated Cloudflare instance.
+Use [the installation guide](site/src/content/docs/operators/installation.mdx) for an isolated Cloudflare instance.
 T0021 prepares a fresh Cloudflare development installation after PR #42 merged at `104d9d1`.
 It transfers no existing Supabase records or accounts. Supabase stays intact and active until the owner approves the concrete backend switch.
 See [current state](docs/current-state.md) for source-specific checks and [activation](docs/activate-cloudflare-development.md) for the remaining gates.
@@ -21,8 +21,7 @@ These are development installations that require connectivity. Live-contest read
 
 ## User interfaces
 
-T0015 redesigns the frontend on `feature/t0015-frontend-redesign`. It is not merged yet.
-After sign-in, the membership selects one of three UIs:
+T0015 ([PR #44](https://github.com/GiftedNovaHD/minsky/pull/44), merged) gives three UIs. After sign-in, the membership selects one:
 
 - **Contestant desktop app.** A membership with a team gets this app. It shows the team's reports, a live timer, a progress tracker, public messages, team-visible images and the report form. It has no phone layout and needs a window at least 1024 px wide.
 - **Organiser phone app.** Staff in a window narrower than 1024 px get bottom tabs by role: Queue, Mine, Find, Awards, Session and Me. Issues open in a full-screen view with an action bar and bottom sheets.
@@ -80,7 +79,7 @@ See [cloud onboarding](docs/cloud-onboarding.md#contributor-setup) for provider 
 | `npm run test:connector:ui -- --config=… --account=… --database=… --origin=…` | Run the complete React journey against the confirmed hosted Cloudflare CI application. |
 | `npm run test:connector:workflow:hosted -- --config=… --account=… --database=…` | Run every workflow case on the confirmed D1-only store CI target. |
 | `npm run test:connector:accounts:hosted -- --config=… --account=… --database=…` | Check account guards on the same D1-only store CI target. |
-| `npm run cloudflare:install -- plan --settings=… --config=…` | Inspect an independent Cloudflare installation plan without provider changes. See the [installation guide](site/src/content/docs/operators/installation.md). |
+| `npm run cloudflare:install -- plan --settings=… --config=…` | Inspect an independent Cloudflare installation plan without provider changes. See the [installation guide](site/src/content/docs/operators/installation.mdx). |
 | `npm run test:workflow:hosted` | Verify the shared server through the deployed Supabase function on approved Minsky CI. See the [verification guide](docs/verify-server-workflow.md). |
 | `npm run test:auth` | Run experimental Cloudflare account and permission tests on local D1. |
 | `npm run test:auth:browser` | Check cookies, origins, and request protection with a local HTTPS Worker and Chromium. |
@@ -115,7 +114,6 @@ These commands connect to provider accounts. Several of them change hosted data 
 | `npm run cloud:recover-admin` | Reset the password of an existing admin when the only admin cannot sign in. |
 | `npm run cloud:hosting-login` | Sign in to Cloudflare with Wrangler. |
 | `npm run deploy` | Build and deploy the frontend Worker. Deploy only after an explicit request. |
-| `npm run deploy:preview` | Build and upload a preview version of the frontend Worker. |
 
 See [cloud onboarding](docs/cloud-onboarding.md) for the exact arguments.
 
@@ -150,7 +148,7 @@ npm run docs:dev
 | `npm run docs:deploy` | Build and publish only the `minsky-docs` Worker during an approved manual recovery. |
 
 The deployment configuration is `wrangler.docs.jsonc`.
-See [the writing and deployment guide](site/src/content/docs/contributing/documentation.md).
+See [the writing and deployment guide](site/src/content/docs/contributing/documentation.mdx).
 The initial docs deployment is explicitly authorized in T0011 before merge.
 The user selected CI-controlled deployment from `main`.
 Docs branch previews remain available. App branch previews are disabled until independent preview resources exist.
@@ -183,7 +181,7 @@ PR #42 merged at `104d9d1`. T0021 includes the accepted connector and its final 
 - [Cloudflare authentication reference](docs/cloudflare-authentication.md) defines the experimental API, browser sessions, and account rules.
 - [Authentication choice](docs/cloudflare-authentication-choice.md) records Better Auth, maintained crypto, resource measurements, and costs.
 - [Verify Cloudflare authentication](docs/verify-cloudflare-authentication.md) gives local, hosted, and protected CI procedures.
-- [Cloudflare installation](site/src/content/docs/operators/installation.md) gives the complete development installation procedure and owner recovery.
+- [Cloudflare installation](site/src/content/docs/operators/installation.mdx) gives the complete development installation procedure and owner recovery.
 - [PR #21 component record](docs/pr21-installation-disposition.md) records reused safeguards and replaced or deferred scaffolding.
 - [Shared provider test contracts](docs/provider-test-contracts.md) describe reusable assertions, fixture ownership, and provider requirements.
 - [Product direction](docs/product-direction.md) — agreed requirements and open decisions.

@@ -131,7 +131,7 @@ The user authorized the initial documentation deployment before merge on 2026-10
 This is a T0011 exception for the docs Worker only.
 After automation setup, later stable updates use review, merge, passing CI, and automatic frontend deployment.
 The app's `npm run deploy` command is separate.
-See [the complete guide](../site/src/content/docs/contributing/documentation.md).
+See [the complete guide](../site/src/content/docs/contributing/documentation.mdx).
 
 ### Existing provider records
 

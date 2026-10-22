@@ -1,0 +1,174 @@
+---
+title: Install on Cloudflare
+description: Install a new, isolated Minsky with its own accounts, database, images, and live updates.
+---
+
+import Diagram from '../../../components/Diagram.astro';
+
+This creates a fresh installation from a reviewed checkout. It imports no data from other installations.
+
+<Diagram name="cloudflare-architecture" alt="Cloudflare architecture. The browser talks to one Worker on the same origin. The Worker serves the frontend and API, runs a cron every minute, and uses D1 for records and accounts, a private R2 bucket for images, and a Durable Object for live updates." />
+
+<Diagram name="install-steps" alt="Installation steps: 1 create D1, 2 plan and configure, 3 create R2, 4 migrate, 5 build and deploy, 6 bootstrap the owner, 7 create the secret, 8 verify." />
+
+:::note[Verified for development]
+Two fresh installations passed on 18 October 2026 at source `f6864f6` ([evidence](https://github.com/GiftedNovaHD/minsky/blob/main/docs/current-state.md#t0021-fresh-development-installation-2026-10-18)).
+This does not prove production capacity.
+:::
+
+## Prepare
+
+You need:
+
+- Node.js 22.22+ (22.x) or 24+, npm, and Bash.
+- A Cloudflare account with **Workers Paid** (from US$5/month) and **R2** active. Password hashing exceeds the Free plan's CPU limit. Check [Workers](https://developers.cloudflare.com/workers/platform/pricing/), [D1](https://developers.cloudflare.com/d1/platform/pricing/), [R2](https://developers.cloudflare.com/r2/pricing/), and [Durable Objects](https://developers.cloudflare.com/durable-objects/platform/pricing/) pricing.
+- A password manager for the generated credentials.
+
+From the checkout root, in one shell for all steps:
+
+```sh
+npm ci
+unset CLOUDFLARE_ENV
+export WRANGLER_LOG_SANITIZE=true WRANGLER_WRITE_LOGS=false WRANGLER_SEND_METRICS=false
+npx wrangler login     # only if whoami shows no login
+npx wrangler whoami    # must list the intended account
+```
+
+Never put provider tokens in arguments, files, or bug reports.
+
+Copy the example settings and set your values. Use new names that no other deployment uses.
+
+```sh
+mkdir -p .wrangler/installation
+cp src/server/adapters/cloudflare/tooling/provision.example.jsonc .wrangler/installation/provision.jsonc
+cp src/server/adapters/cloudflare/tooling/provider.example.json .wrangler/installation/provider.json
+cp src/server/adapters/cloudflare/tooling/competition.example.json .wrangler/installation/competition.json
+
+MINSKY_INSTALL_ACCOUNT_ID='REPLACE_WITH_ACCOUNT_ID'
+MINSKY_INSTALL_DATABASE='my-contest-database'
+MINSKY_INSTALL_BUCKET='my-contest-images'
+MINSKY_INSTALL_ORIGIN='https://my-contest-app.ACCOUNT_SUBDOMAIN.workers.dev'
+MINSKY_INSTALL_CONFIG="$PWD/.wrangler/installation/wrangler.jsonc"
+```
+
+Set `account_id` in `provision.jsonc`. The account subdomain is in the dashboard's Workers settings.
+
+## 1. Create the database
+
+```sh
+npx wrangler d1 create "$MINSKY_INSTALL_DATABASE" --config=.wrangler/installation/provision.jsonc --update-config=false
+MINSKY_INSTALL_DATABASE_ID='REPLACE_WITH_NEW_DATABASE_UUID'
+npx wrangler d1 info "$MINSKY_INSTALL_DATABASE" --config=.wrangler/installation/provision.jsonc --json
+```
+
+Add `--location=apac` (or another [location hint](https://developers.cloudflare.com/d1/configuration/data-location/#provide-a-location-hint)) to choose a region. A hint is not a guarantee.
+
+## 2. Plan and configure
+
+Fill in `provider.json`. It holds public values only.
+
+| Field | Value |
+| --- | --- |
+| `accountId` | Your account ID |
+| `workerName` | The new Worker name in the origin, for example `my-contest-app` |
+| `databaseName`, `databaseId` | From step 1 |
+| `bucketName` | `$MINSKY_INSTALL_BUCKET` |
+| `origin` | `$MINSKY_INSTALL_ORIGIN`, no trailing slash |
+| `placementRegion` | Optional. A [placement region](https://developers.cloudflare.com/workers/configuration/placement/#specify-a-cloud-region) near D1, for example `aws:ap-southeast-1`. Omit it to use Smart Placement. |
+
+```sh
+npm run cloudflare:install -- plan --settings=.wrangler/installation/provider.json --config="$MINSKY_INSTALL_CONFIG"
+npm run cloudflare:install -- configure --settings=.wrangler/installation/provider.json --config="$MINSKY_INSTALL_CONFIG"
+```
+
+`plan` prints `"status": "plan_only"` and the target. Check it.
+`configure` writes the Wrangler configuration and never overwrites a file.
+Do not edit the generated file. To change settings, generate a new one at a new path.
+
+## 3. Create the image bucket
+
+```sh
+npx wrangler r2 bucket create "$MINSKY_INSTALL_BUCKET" --config="$MINSKY_INSTALL_CONFIG" --update-config=false
+```
+
+Keep the bucket private: no `r2.dev` URL and no public domain. The Worker serves images to authorized users.
+
+## 4. Migrate
+
+```sh
+npm run cloudflare:install -- migrate --config="$MINSKY_INSTALL_CONFIG" --account="$MINSKY_INSTALL_ACCOUNT_ID" --database="$MINSKY_INSTALL_DATABASE_ID"
+```
+
+## 5. Build and deploy
+
+```sh
+VITE_BACKEND=cloudflare npm run build
+npx wrangler deploy --config="$MINSKY_INSTALL_CONFIG" --dry-run
+npx wrangler deploy --config="$MINSKY_INSTALL_CONFIG"
+```
+
+Before the real deploy, check in **Workers & Pages** that no Worker has your `workerName`. Never replace an existing Worker.
+
+## 6. Create the first owner
+
+Edit `competition.json`: event, session, categories, teams, owner name, and `adminUsername`.
+Usernames are 3–32 lowercase letters, digits, `_`, or `-`, starting with a letter or digit. There is no roster editor yet, so add teams here.
+
+```sh
+MINSKY_INSTALL_PRIVATE_DIR="$(mktemp -d)" && chmod 700 "$MINSKY_INSTALL_PRIVATE_DIR"
+npm run cloudflare:install -- bootstrap --config="$MINSKY_INSTALL_CONFIG" --account="$MINSKY_INSTALL_ACCOUNT_ID" --database="$MINSKY_INSTALL_DATABASE_ID" --competition=.wrangler/installation/competition.json --credentials="$MINSKY_INSTALL_PRIVATE_DIR/owner.json"
+```
+
+`owner.json` (mode `0600`) holds the owner's temporary password and the installation IDs. Move it to your password manager. Never commit or share it.
+Bootstrap is atomic, leaves intake closed, and refuses a database that already has data.
+
+## 7. Enable sign-in
+
+```sh
+npm run cloudflare:install -- secret --config="$MINSKY_INSTALL_CONFIG" --account="$MINSKY_INSTALL_ACCOUNT_ID" --database="$MINSKY_INSTALL_DATABASE_ID"
+```
+
+This sets a random `AUTH_SECRET` without printing it. It refuses to replace an existing secret.
+
+## 8. Verify
+
+1. Sign in as the owner and change the password.
+2. Check the event, session, categories, teams, and closed intake.
+3. Check that private paths return `404`:
+   ```sh
+   curl -s -o /dev/null -w '%{http_code}\n' "$MINSKY_INSTALL_ORIGIN/.env"
+   ```
+4. Run the [full workflow check](/operators/verification/).
+
+Record the source revision, Worker version, resource IDs, and results.
+
+## If something fails
+
+The installer prints a fixed message and hides provider output. It never deletes resources.
+
+| Problem | Do this |
+| --- | --- |
+| Settings or target rejected | Fix `provider.json` or the login. Configure again at a new path. |
+| R2 error `10042` | Activate R2. Check whether the bucket exists before you retry. |
+| Migration fails | Inspect the applied migrations. Do not reset the database or rerun bootstrap. |
+| Secret fails | Check that the Worker exists. The command never rotates an existing `AUTH_SECRET`. |
+| Bootstrap fails or its output is lost | Keep any result file. Check the marker (below). If it exists, use owner recovery. |
+| Output file exists | Keep it. Choose a new path. Files are never overwritten. |
+
+Check whether bootstrap committed. The query shows IDs only:
+
+```sh
+npx wrangler d1 execute "$MINSKY_INSTALL_DATABASE" --remote --config="$MINSKY_INSTALL_CONFIG" --command='SELECT id, owner_account_id, event_id, session_id FROM installation'
+```
+
+## Recover the owner
+
+If the only owner loses access, use the marker's IDs:
+
+```sh
+MINSKY_RECOVERY_PRIVATE_DIR="$(mktemp -d)" && chmod 700 "$MINSKY_RECOVERY_PRIVATE_DIR"
+npm run cloudflare:install -- recover --config="$MINSKY_INSTALL_CONFIG" --account="$MINSKY_INSTALL_ACCOUNT_ID" --database="$MINSKY_INSTALL_DATABASE_ID" --installation='INSTALLATION_UUID' --owner='OWNER_ACCOUNT_UUID' --credentials="$MINSKY_RECOVERY_PRIVATE_DIR/owner-recovery.json"
+```
+
+Recovery keeps the owner's ID, history, and memberships, signs out old sessions, and issues a new temporary password.
+It does not re-enable a disabled owner or restore removed admin rights, and the first session must still be active. If it stops midway, run it again with a new output file.

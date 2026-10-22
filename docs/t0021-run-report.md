@@ -60,7 +60,7 @@ Only the two TypeScript test integration files change. No production rule, workf
 - `scripts/deploy-workers.mjs`
 - `scripts/deploy-workers.test.mjs`
 - `site/src/content/docs/contributing/development.md`
-- `site/src/content/docs/operators/installation.md`
+- `site/src/content/docs/operators/installation.mdx`
 - `src/server/adapters/cloudflare/deploy/development.settings.json`
 - `src/server/adapters/cloudflare/deploy/development.wrangler.jsonc`
 - `src/server/adapters/cloudflare/authenticationCases.ts`

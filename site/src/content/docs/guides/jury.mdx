@@ -1,0 +1,36 @@
+---
+title: Record time awards
+description: Decide an award and track its application to the contest clock.
+---
+
+import Diagram from '../../../components/Diagram.astro';
+
+<Diagram name="award-flow" alt="Award flow. A resolved issue gets an award decision from the jury, then staff confirm that they applied it externally." />
+
+## Find issues to review
+
+Open **Awards** (phone) or **Award review** (console). It has three lists for the whole session:
+
+| List | Contains | Order |
+| --- | --- | --- |
+| **To decide** | Resolved issues without an award | Oldest resolution first |
+| **To apply** | Awards not yet applied, including 0 minutes and reopened issues | Oldest decision first |
+| **Applied** | Resolved issues with an applied award | Latest first |
+
+A pending award on a reopened issue shows **Reopened**.
+Jury-only members see resolved issues only and cannot claim, resolve, or reopen.
+
+## Decide
+
+Read the description, unresolved time, resolutions, and staff notes.
+Enter whole minutes and a public explanation for the team.
+Zero minutes is a valid decision. Each issue gets one award; repeated submissions do not duplicate it.
+
+On a phone, open the issue and select **Decide award**. In the console, use the form on the card.
+
+## Confirm application
+
+Apply the award in the external contest system first.
+Then select **Confirm applied externally**. Minsky records the confirmation only.
+
+Reopening keeps the award and its status and does not allow a second award.

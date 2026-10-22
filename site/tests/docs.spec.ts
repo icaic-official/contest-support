@@ -11,9 +11,11 @@ test('documentation navigation and direct page reload work', async ({page}, test
   await page.getByRole('link', {name: 'Start using Minsky'}).click();
   await expect(page).toHaveURL(/\/guides\/getting-started\/$/);
   await page.reload();
-  await expect(page.getByRole('heading', {level: 1})).toHaveText('Sign in and get access');
-  await page.getByRole('link', {name: 'Write and deploy these docs', exact: true}).click();
-  await expect(page.getByRole('heading', {level: 1})).toHaveText('Write and deploy these docs');
+  await expect(page.getByRole('heading', {level: 1})).toHaveText('Sign in');
+  await page.getByRole('link', {name: 'Write these docs', exact: true}).click();
+  await expect(page.getByRole('heading', {level: 1})).toHaveText('Write these docs');
+  // Excalidraw diagrams render at build time as labelled inline SVG.
+  await expect(page.getByRole('img', {name: /^Award flow\./})).toBeVisible();
   expect(errors).toEqual([]);
 });
 
@@ -66,7 +68,7 @@ test('phone navigation and a missing page remain usable', async ({page}, testInf
   await page.keyboard.press('Enter');
   await page.getByRole('button', {name: 'Menu', exact: true}).click();
   await page.getByRole('link', {name: 'Install Cloudflare', exact: true}).click();
-  await expect(page.getByRole('heading', {level: 1})).toHaveText('Install an isolated Cloudflare instance');
+  await expect(page.getByRole('heading', {level: 1})).toHaveText('Install on Cloudflare');
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   await page.screenshot({path: testInfo.outputPath('docs-phone.png')});
   const response = await page.goto('/this-page-does-not-exist/');

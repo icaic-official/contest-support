@@ -305,7 +305,7 @@ Development, CI, and future production use separate databases, buckets, object n
 Untrusted branch previews receive no shared database write access or privileged credentials.
 
 The installation procedure requires an empty isolated database and explicit provider targets.
-Use [Install an isolated Cloudflare instance](../site/src/content/docs/operators/installation.md) for configuration, bootstrap, and recovery.
+Use [Install an isolated Cloudflare instance](../site/src/content/docs/operators/installation.mdx) for configuration, bootstrap, and recovery.
 The [PR #21 component record](pr21-installation-disposition.md) preserves reuse decisions and the owner's closure decision.
 
 Data exports and migration tooling are outside the fresh-installation scope.

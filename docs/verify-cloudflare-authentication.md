@@ -187,6 +187,6 @@ Do not reset the database or delete another run's records.
 
 For an interrupted account operation in an authorized fixture, use organizer-assisted reset after checking current permissions.
 The organizer must administer every assigned session. Archived memberships block recovery through the account API.
-T0020 adds trusted, provider-owned [installation-owner recovery](../site/src/content/docs/operators/installation.md#recover-the-installation-owner).
+T0020 adds trusted, provider-owned [installation-owner recovery](../site/src/content/docs/operators/installation.mdx#recover-the-owner).
 The empty hosted installation must pass before that path is supported.
 The current Supabase owner-recovery command does not operate on Cloudflare.

@@ -11,6 +11,9 @@ supabase/.temp/
 supabase/.branches/
 .vitest/
 
-# Lapiz preview deployment (local only)
-.lapiz/
-lapiz.deploy.json
+# Lapiz preview build output and local state
+.lapiz/build/
+.lapiz/dist/
+.lapiz/state/
+.lapiz/.dev.vars
+.lapiz/wrangler.preview.json

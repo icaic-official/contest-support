@@ -85,10 +85,10 @@ Those historical approvals do not authorize a new activation or deployment.
 
 ## Ticket and Git workflow
 
-- Include `Co-authored-by: PuR3Luck <aidan.ong822@gmail.com>` in every new commit Codex creates and pushes for this repository.
+- Include `Co-authored-by: PuR3Luck <aidan.ong822@gmail.com>` and `Co-authored-by: notbowen <contact@hubowen.dev>` in every new commit you create and pushes for this repository.
 - Separate the co-author trailer from the commit body with a blank line.
 - Preserve the primary author and any other co-author trailers.
-- Before each push, check that every new Codex-created commit contains the required trailer exactly once.
+- Before each push, check that every new created commit contains the required trailer exactly once.
 - Distinguish development tickets from contestant issues in code, documentation, and communication.
 - Start each development ticket from updated `main`.
 - Use `feature/tNNNN-description` for ticket branches.
@@ -223,7 +223,7 @@ The future healthy-connection targets remain 800 simultaneous users, 95% of ordi
 
 ## Required end-of-run report
 
-At the end of every Codex run, report all eight fields below.
+At the end of every run, report all eight fields below.
 Keep them concise.
 Use **None**, **Not run**, or **Not applicable** when appropriate.
 Distinguish completed checks from suggested manual steps.

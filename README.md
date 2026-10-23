@@ -57,6 +57,17 @@ Sign-in on that Vite server fails because the API is absent.
 Use `npm run test:connector:ui:local` for a temporary local Cloudflare application.
 Use the hosted development app for the shared development data.
 
+### Lapiz preview
+
+[`lapiz.deploy.json`](lapiz.deploy.json) and [`.lapiz/`](.lapiz) run a preview of the Cloudflare application on a Lapiz host.
+The preview uses only local emulation of D1, R2, and Durable Objects in `.lapiz/state/`. It never connects to hosted Cloudflare or Supabase resources.
+On the first start, `.lapiz/bootstrap.ts` bootstraps the installation from `src/server/adapters/cloudflare/tooling/competition.example.json`.
+
+The preview prints the first admin's username and temporary password in its start log on each start. This is deliberate, for debugging.
+Anyone who can read that log can sign in as that admin. Use only fictional data in the preview.
+
+`npm run typecheck` does not check `.lapiz/bootstrap.ts`. The preview setup bundles it with esbuild, which does not check types.
+
 ### Supabase provider
 
 Set `VITE_BACKEND=supabase` to select the Supabase provider.

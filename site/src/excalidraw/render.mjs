@@ -12,6 +12,9 @@ const fonts = {
   mono: "'JetBrains Mono Variable', ui-monospace, monospace",
 };
 const supported = new Set(['rectangle', 'diamond', 'ellipse', 'line', 'arrow', 'freedraw', 'text']);
+const arrowheads = new Set(['arrow', 'triangle']);
+// Excalidraw's Code fonts: Cascadia (3, older scenes) and Comic Shanns (8).
+const monoFamilies = new Set([3, 8]);
 
 const round = (value) => Math.round(value * 100) / 100;
 const escape = (text) => String(text)
@@ -120,7 +123,7 @@ function textMarkup(element) {
   const anchor = {left: 'start', center: 'middle', right: 'end'}[element.textAlign ?? 'left'];
   const tx = element.textAlign === 'center' ? element.x + element.width / 2
     : element.textAlign === 'right' ? element.x + element.width : element.x;
-  const family = element.fontFamily === 3 ? fonts.mono : fonts.sans;
+  const family = monoFamilies.has(element.fontFamily) ? fonts.mono : fonts.sans;
   return `<text font-family="${escape(family)}" font-size="${size}" fill="${escape(element.strokeColor ?? '#1e1e1e')}" ` +
     `text-anchor="${anchor}" dominant-baseline="central">` +
     lines.map((line, index) =>
@@ -134,7 +137,9 @@ function freedrawMarkup(element) {
     `stroke-width="${element.strokeWidth ?? 2}" stroke-linecap="round" stroke-linejoin="round"/>`;
 }
 
-function bounds(element) {
+// Unrotated box. For lines and arrows it surrounds the points, which can lie
+// left of or above element.x and element.y.
+function box(element) {
   if (element.points?.length) {
     const xs = element.points.map(([px]) => element.x + px);
     const ys = element.points.map(([, py]) => element.y + py);
@@ -143,10 +148,29 @@ function bounds(element) {
   return [element.x, element.y, element.x + element.width, element.y + element.height];
 }
 
+// Excalidraw rotates each element around the centre of its unrotated box.
+function center(element) {
+  const [x1, y1, x2, y2] = box(element);
+  return [(x1 + x2) / 2, (y1 + y2) / 2];
+}
+
+function bounds(element) {
+  const [x1, y1, x2, y2] = box(element);
+  if (!element.angle) return [x1, y1, x2, y2];
+  const [cx, cy] = center(element);
+  const [cos, sin] = [Math.cos(element.angle), Math.sin(element.angle)];
+  const corners = [[x1, y1], [x2, y1], [x2, y2], [x1, y2]].map(([px, py]) =>
+    [cx + (px - cx) * cos - (py - cy) * sin, cy + (px - cx) * sin + (py - cy) * cos]);
+  const xs = corners.map(([px]) => px);
+  const ys = corners.map(([, py]) => py);
+  return [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)];
+}
+
 /**
  * Returns an SVG string for the scene. `title` labels the image for assistive
- * technology. Unsupported element types, such as images and frames, throw so
- * that a diagram never renders with silently missing parts.
+ * technology. Unsupported element types, such as images and frames, and
+ * unsupported arrowheads throw so that a diagram never renders with silently
+ * missing or changed parts.
  */
 export function renderExcalidraw(scene, {title}) {
   if (scene?.type !== 'excalidraw' || !Array.isArray(scene.elements)) {
@@ -155,12 +179,15 @@ export function renderExcalidraw(scene, {title}) {
   const elements = scene.elements.filter((element) => !element.isDeleted);
   const unknown = elements.find((element) => !supported.has(element.type));
   if (unknown) throw new Error(`Excalidraw element type "${unknown.type}" is not supported.`);
+  const head = elements.flatMap((element) => [element.startArrowhead, element.endArrowhead])
+    .find((kind) => kind && !arrowheads.has(kind));
+  if (head) throw new Error(`Excalidraw arrowhead "${head}" is not supported.`);
   if (!elements.length) throw new Error('The Excalidraw scene has no elements.');
 
-  const box = elements.map(bounds).reduce((a, b) =>
+  const extent = elements.map(bounds).reduce((a, b) =>
     [Math.min(a[0], b[0]), Math.min(a[1], b[1]), Math.max(a[2], b[2]), Math.max(a[3], b[3])]);
-  const [minX, minY] = [box[0] - padding, box[1] - padding];
-  const [width, height] = [box[2] - box[0] + padding * 2, box[3] - box[1] + padding * 2];
+  const [minX, minY] = [extent[0] - padding, extent[1] - padding];
+  const [width, height] = [extent[2] - extent[0] + padding * 2, extent[3] - extent[1] + padding * 2];
 
   const body = elements.map((element) => {
     const markup = element.type === 'text' ? textMarkup(element)
@@ -169,7 +196,7 @@ export function renderExcalidraw(scene, {title}) {
     const attributes = [];
     if ((element.opacity ?? 100) < 100) attributes.push(`opacity="${element.opacity / 100}"`);
     if (element.angle) {
-      const [cx, cy] = [element.x + element.width / 2, element.y + element.height / 2];
+      const [cx, cy] = center(element);
       attributes.push(`transform="rotate(${round(element.angle * 180 / Math.PI)} ${round(cx)} ${round(cy)})"`);
     }
     return attributes.length ? `<g ${attributes.join(' ')}>${markup}</g>` : markup;

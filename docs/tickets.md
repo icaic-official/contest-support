@@ -1090,7 +1090,7 @@ If the T0006 and T0007 PRs are still open, they can change `src/connected/`. Whi
 
 ## T0023 — Documentation site redesign and accuracy
 
-Branch: `feature/t0023-improving-docs`, from `main` at `97337f6`.
+Branch: `feature/t0023-improving-docs`, from `main` at `a25f9f1`.
 Status: implemented and verified locally. The user opens the PR, reviews, and merges.
 
 The user requested a modern, minimal, easy-to-read docs site on 2026-10-22.
@@ -1105,6 +1105,9 @@ Excalidraw diagrams are allowed, with rendering support in the site.
 - [x] The public pages shrink from about 7,700 to about 4,100 words.
 - [x] `npm run docs:build`, `npm run docs:test`, and `npm run lint` pass.
 
+The branch also adds a [Lapiz preview](../README.md#lapiz-preview) of the Cloudflare application.
+It runs with local emulation only. It prints the first admin's credentials in its start log, by the owner's choice for debugging.
+
 ### Outside this ticket
 
-Application behavior, the `docs/` maintainer records beyond link updates, and deployment.
+Application behavior, the `docs/` maintainer records beyond link updates, and deployment to hosted resources.

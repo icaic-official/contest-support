@@ -57,7 +57,7 @@ Framework entry points retain required default exports.
 - `site/astro.config.mjs`
 - `site/src/content/docs/index.md`
 - `site/src/content/docs/operators/backend.md` (deleted)
-- `site/src/content/docs/operators/installation.mdx`
+- `site/src/content/docs/operators/installation.md`
 - `site/src/content/docs/reference/status.md`
 - `site/tests/docs.spec.ts`
 - `src/backend/contracts.ts`

@@ -197,6 +197,10 @@
         {
           "type": "arrow",
           "id": "a-reopen"
+        },
+        {
+          "type": "arrow",
+          "id": "a-resolve-handoff"
         }
       ],
       "updated": 1792635600000,
@@ -275,6 +279,10 @@
         {
           "type": "arrow",
           "id": "a-accept"
+        },
+        {
+          "type": "arrow",
+          "id": "a-resolve-handoff"
         }
       ],
       "updated": 1792635600000,
@@ -489,6 +497,97 @@
       "type": "text",
       "x": 494.64,
       "y": -26,
+      "width": 70.72,
+      "height": 20,
+      "text": "resolve",
+      "originalText": "resolve",
+      "fontSize": 16,
+      "fontFamily": 5,
+      "textAlign": "center",
+      "verticalAlign": "middle",
+      "containerId": null,
+      "lineHeight": 1.25,
+      "autoResize": true
+    },
+    {
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 2,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 1019,
+      "version": 1,
+      "versionNonce": 7134,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1792635600000,
+      "link": null,
+      "locked": false,
+      "id": "a-resolve-handoff",
+      "type": "arrow",
+      "x": 476,
+      "y": 212,
+      "width": 204,
+      "height": 142,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          204,
+          0
+        ],
+        [
+          204,
+          -142
+        ]
+      ],
+      "startBinding": {
+        "elementId": "escalated",
+        "focus": 0,
+        "gap": 6
+      },
+      "endBinding": {
+        "elementId": "resolved",
+        "focus": 0,
+        "gap": 6
+      },
+      "startArrowhead": null,
+      "endArrowhead": "arrow",
+      "elbowed": false,
+      "lastCommittedPoint": null
+    },
+    {
+      "angle": 0,
+      "strokeColor": "#495057",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 2,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 1020,
+      "version": 1,
+      "versionNonce": 7135,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1792635600000,
+      "link": null,
+      "locked": false,
+      "id": "a-resolve-handoff-label",
+      "type": "text",
+      "x": 542.64,
+      "y": 186,
       "width": 70.72,
       "height": 20,
       "text": "resolve",

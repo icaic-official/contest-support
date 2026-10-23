@@ -44,6 +44,7 @@
     "test:cloud": "node scripts/cloud-test.mjs",
     "test:hosted": "node scripts/cloud-smoke.mjs",
     "cloud:recover-admin": "node scripts/recover-admin.mjs",
+    "cloudflare:recover-admin": "node scripts/recover-cloudflare-admin.mjs",
     "test:workflow:hosted": "node scripts/workflow-proof.mjs",
     "test:auth": "vitest run --config vitest.auth.config.ts",
     "test:auth:browser": "playwright test --config playwright.auth.config.ts",

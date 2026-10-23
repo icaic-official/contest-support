@@ -3,6 +3,7 @@ import type { AccountCommand, AccountResult, SessionSummary } from '../../../bac
 import { AuthenticationError, type AuthenticationService, type AuthenticationSession } from '../../authentication';
 import type { D1Connection, D1Statement } from '../d1/connection';
 import type { IdentityProvider } from './identity';
+import { beginCredentialReset, completeCredentialReset } from './credentialReset';
 import { randomSecret, type PasswordHasher } from './password';
 
 const usernameSchema = z.string().trim().toLowerCase().regex(/^[a-z0-9][a-z0-9_-]{2,31}$/);
@@ -227,7 +228,7 @@ export class D1AuthenticationService implements AuthenticationService {
       );
     } else {
       // Superseding a failed operation is safe: its final batch checks this ID.
-      gate.statements.push(...this.beginOperation(target, operationId));
+      gate.statements.push(...beginCredentialReset(this.db, target, operationId));
     }
     gate.statements.push(
       this.statement(`INSERT INTO account_operations (id, account_id, actor, session_id, action, state) VALUES (?, ?, ?, ?, ?, 'pending')`, operationId, target, gate.current.user.id, sessionId, command.action),
@@ -238,16 +239,6 @@ export class D1AuthenticationService implements AuthenticationService {
     const password = randomSecret() + 'A9!';
     await this.completeCredentials(headers, target, operationId, password, true, sessionId);
     return { temporaryPassword: password };
-  }
-
-  private beginOperation(target: string, operationId: string): D1Statement[] {
-    return [
-      this.statement(`UPDATE account_operations SET state = 'superseded' WHERE account_id = ? AND state = 'pending'`, target),
-      this.statement(`UPDATE accounts SET must_change = 1, credential_state = 'pending', credential_operation = ?,
-        credential_generation = credential_generation + 1 WHERE id = ?`, operationId, target),
-      this.statement('UPDATE logins SET revoked = 1 WHERE account_id = ?', target),
-      this.statement('DELETE FROM ba_session WHERE userId = ?', target),
-    ];
   }
 
   private async completeCredentials(headers: Headers, target: string, operationId: string, password: string, temporary: boolean, sessionId?: string, prepared?: { hash: string; statements: D1Statement[]; finalCheck: SqlCheck }): Promise<void> {
@@ -271,17 +262,7 @@ export class D1AuthenticationService implements AuthenticationService {
     assertions.push(
       this.assertion(assertionId, `SELECT 1 FROM accounts WHERE id = ? AND credential_operation = ?
         AND credential_generation = ? AND credential_state = 'pending' AND disabled = 0`, target, operationId, generation),
-      this.statement(`INSERT INTO ba_user (id, name, email, emailVerified, createdAt, updatedAt, username)
-        VALUES (?, ?, ?, 1, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), ?)
-        ON CONFLICT(id) DO UPDATE SET username = excluded.username, email = excluded.email, updatedAt = excluded.updatedAt`,
-      target, account.name, `${account.username}@accounts.minsky.invalid`, account.username),
-      this.statement(`INSERT INTO ba_account (id, accountId, providerId, userId, password, createdAt, updatedAt)
-        VALUES (?, ?, 'credential', ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
-        ON CONFLICT(providerId, accountId) DO UPDATE SET password = excluded.password, updatedAt = excluded.updatedAt`, crypto.randomUUID(), target, target, hash),
-      this.statement('DELETE FROM ba_session WHERE userId = ?', target),
-      this.statement('UPDATE logins SET revoked = 1 WHERE account_id = ?', target),
-      this.statement(`UPDATE accounts SET credential_state = 'ready', credential_operation = NULL, must_change = ? WHERE id = ?`, Number(temporary), target),
-      this.statement(`UPDATE account_operations SET state = 'completed', completed_at = unixepoch() WHERE id = ?`, operationId),
+      ...completeCredentialReset(this.db, { id: target, name: account.name, username: account.username }, operationId, hash, temporary),
       this.statement('DELETE FROM command_assertions WHERE id = ?', assertionId),
     );
     if (adminAssertion) assertions.push(this.cleanupAssertions(adminAssertion));
@@ -325,7 +306,7 @@ export class D1AuthenticationService implements AuthenticationService {
         before.credential_generation, before.login_expires_at, before.identity_expires_at],
     }, statements: [
       this.assertion(assertionId, `SELECT 1 FROM (${currentLoginSql}) WHERE login_id = ? AND credential_generation = ?`, identity.identitySessionId, identity.accountId, current.caller.loginId, before.credential_generation),
-      ...this.beginOperation(current.user.id, operationId),
+      ...beginCredentialReset(this.db, current.user.id, operationId),
       this.statement(`INSERT INTO account_operations (id, account_id, actor, action, state) VALUES (?, ?, ?, 'change_password', 'pending')`, operationId, current.user.id, current.user.id),
       this.statement('DELETE FROM command_assertions WHERE id = ?', assertionId),
     ] });

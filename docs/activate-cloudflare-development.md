@@ -204,6 +204,20 @@ No assertion, timeout, or protection changed. The initial wait failure has no co
 The [current-state record](current-state.md) owns detailed verification results and remaining manual checks.
 Supabase resources and accounts remain intact. No Supabase data or identifiers transferred.
 
+## Recover the development admin password
+
+The development admin is `organizer`.
+When that admin cannot sign in, follow [Recover a Cloudflare admin password](cloud-onboarding.md#recover-a-cloudflare-admin-password).
+Run this command in a private terminal:
+
+```sh
+npm run cloudflare:recover-admin -- --config src/server/adapters/cloudflare/deploy/development.wrangler.jsonc --username organizer
+```
+
+The command uses remote D1 database `minsky-development`.
+It prints the temporary password once in that terminal.
+It does not write the password to a file.
+
 ## Repair a failed activation
 
 Pause publishing with `CLOUDFLARE_DEPLOY_ENABLED=false`. Cancel active publishing jobs separately.

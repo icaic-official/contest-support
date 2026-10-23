@@ -121,7 +121,8 @@ These commands connect to provider accounts. Several of them change hosted data 
 | `npm run cloud:migrate` | Apply migrations to the linked project. |
 | `npm run cloud:functions` | Deploy the `admin` and `attachments` functions to the development project. |
 | `npm run cloud:bootstrap` | Make the first session admin. |
-| `npm run cloud:recover-admin` | Reset the password of an existing admin when the only admin cannot sign in. |
+| `npm run cloud:recover-admin` | Reset the password of an existing Supabase admin when the only admin cannot sign in. |
+| `npm run cloudflare:recover-admin` | Reset the password of an existing Cloudflare admin. Prints the temporary password once in that terminal. |
 | `npm run cloud:hosting-login` | Sign in to Cloudflare with Wrangler. |
 | `npm run deploy` | Build and deploy the frontend Worker. Deploy only after an explicit request. |
 | `npm run deploy:preview` | Build and upload a preview version of the frontend Worker. |

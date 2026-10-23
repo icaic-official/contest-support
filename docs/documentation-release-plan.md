@@ -58,6 +58,7 @@ The npm `private: true` fields prevent package publication. They do not need rem
 **Observed:** [feature status](../site/src/content/docs/reference/status.md) mixes merged commits, open PRs, and a dated development deployment.
 There is no published release to which the guides can refer.
 The deployed app's exact revision was not established by the earlier HTTP check.
+**T0023 (2026-10-22):** the page now separates work in `main`, work not in `main`, environments, and unverified conditions. No release exists yet.
 
 **Complete when:** each published guide clearly belongs to a named release or a development revision.
 State supported installation paths and their verification limits for that revision.
@@ -79,7 +80,7 @@ Keep isolated fixtures and preserve the decision to retire the local demo.
 
 ### 4. Verify one complete installation path
 
-**Observed:** [installation](../site/src/content/docs/operators/installation.md) requires the unmerged T0007 branch.
+**Observed:** [installation](../site/src/content/docs/operators/installation.mdx) requires the unmerged T0007 branch.
 The guide correctly labels container startup and a fresh independent backend as unverified.
 Its three hosting options do not have equivalent verification evidence.
 This was the 2026-10-17 observation. The current guide links to T0020's verified Cloudflare development procedure.
@@ -97,7 +98,7 @@ T0020 owns the independent Cloudflare installation evidence. Container packaging
 **Observed:** [the historical backend setup](https://github.com/GiftedNovaHD/minsky/blob/88ea5020a0f9dfc34a32ed7fbd84dfea07423297/site/src/content/docs/operators/backend.md) says to create and confirm an account through trusted administration.
 It then tells the reader to apply generated SQL through trusted database access.
 Neither task had a complete procedure or an expected result in that earlier guide.
-The current [Cloudflare installation procedure](../site/src/content/docs/operators/installation.md) supplies bootstrap, expected results, target checks, and trusted recovery.
+The current [Cloudflare installation procedure](../site/src/content/docs/operators/installation.mdx) supplies bootstrap, expected results, target checks, and trusted recovery.
 See the [dated verification record](current-state.md) for the exact tested revision and installation results.
 
 **Complete when:** specify the supported account-creation method, confirmation setting, UUID lookup, SQL execution method, and target check.
@@ -120,7 +121,7 @@ Document T0007 configuration only for a revision that contains those files.
 
 ### 7. State exact workflow permissions
 
-**Observed:** [staff](../site/src/content/docs/guides/staff.md), [contestant](../site/src/content/docs/guides/contestants.md), and [jury](../site/src/content/docs/guides/jury.md) guides omit important action restrictions.
+**Observed:** [staff](../site/src/content/docs/guides/staff.md), [contestant](../site/src/content/docs/guides/contestants.md), and [jury](../site/src/content/docs/guides/jury.mdx) guides omit important action restrictions.
 The workflow implementation in `supabase/migrations/202610020003_private_signals.sql` requires the following:
 
 - Only the current support owner can request a handoff or resolve the issue.
@@ -186,9 +187,10 @@ Track reply retry behavior under its application work. Do not promise a fix from
 
 ### 12. Separate public guidance from project operations
 
-**Observed:** [docs contribution](../site/src/content/docs/contributing/documentation.md) mixes writing instructions with the project's account ID and deployment exception.
+**Observed:** [docs contribution](../site/src/content/docs/contributing/documentation.mdx) mixes writing instructions with the project's account ID and deployment exception.
 [local development](../site/src/content/docs/contributing/development.md) refers to "the user" and agent-specific commit rules.
 The homepage links to the shared development app.
+**T0023 (2026-10-22):** both contribution pages now address an outside contributor. They contain no account ID, agent rules, or deployment exception. The homepage no longer links to the development app.
 
 **Complete when:** public contribution instructions address an outside contributor directly.
 Keep project deployment targets, historical exceptions, and agent rules in linked maintainer records.
@@ -199,6 +201,7 @@ Do not present it as the destination for an unrelated competition.
 ### 13. Add a concise explanation of the system
 
 **Observed:** public pages explain tasks but provide no architecture page, shared glossary, or lifecycle diagram.
+**T0023 (2026-10-22):** Excalidraw diagrams now show the issue lifecycle with timer behavior, the award flow, and the Cloudflare architecture. A glossary and a Supabase architecture view remain open.
 
 **Complete when:** show how the browser, static host, Auth, database, Realtime, Storage, and privileged functions relate.
 Explain event, session, team, issue, owner, handoff, resolution, award, and external application.

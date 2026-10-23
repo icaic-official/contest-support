@@ -1086,3 +1086,28 @@ If the T0006 and T0007 PRs are still open, they can change `src/connected/`. Whi
 - Remove the legacy rules in `src/styles.css` that the image preview page does not use, or restyle the preview page with Tailwind.
 - Split the main JavaScript chunk to remove the build warning.
 - Move the console sidebar out of the `main` landmark, so the skip link skips it. The local and cloud specs expect focus on `#main`, so they change too.
+
+
+## T0023 — Documentation site redesign and accuracy
+
+Branch: `feature/t0023-improving-docs`, from `main` at `a25f9f1`.
+Status: implemented and verified locally. The user opens the PR, reviews, and merges.
+
+The user requested a modern, minimal, easy-to-read docs site on 2026-10-22.
+The pages must match the code, with the code as the source of truth, and use as few words as possible.
+Excalidraw diagrams are allowed, with rendering support in the site.
+
+### Acceptance criteria
+
+- [x] The site uses the app's zinc palette and Inter font, in light and dark mode and at phone width.
+- [x] `.excalidraw` files in `site/src/diagrams/` render to inline SVG at build time with `<Diagram>`.
+- [x] Every public page is checked against the code. Wrong labels and stale status are corrected.
+- [x] The public pages shrink from about 7,700 to about 4,100 words.
+- [x] `npm run docs:build`, `npm run docs:test`, and `npm run lint` pass.
+
+The branch also adds a [Lapiz preview](../README.md#lapiz-preview) of the Cloudflare application.
+It runs with local emulation only. It prints the first admin's credentials in its start log, by the owner's choice for debugging.
+
+### Outside this ticket
+
+Application behavior, the `docs/` maintainer records beyond link updates, and deployment to hosted resources.

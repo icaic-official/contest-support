@@ -472,7 +472,7 @@ Protected CI retains the hosted React recovery journal and the consolidated runn
 Authentication and application HTTP routes share the bounded JSON reader.
 Node.js supplies exact configuration comparison in place of duplicate sorting functions.
 
-The complete installation procedure now lives in [the public installation source](../site/src/content/docs/operators/installation.md).
+The complete installation procedure now lives in [the public installation source](../site/src/content/docs/operators/installation.mdx).
 Completed proof and implementation instructions link to their frozen historical source.
 The [review run report](t0020-run-report.md) lists changes, commands, checks, and remaining verification.
 

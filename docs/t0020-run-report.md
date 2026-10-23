@@ -18,7 +18,7 @@ Cleared inherited Wrangler environment selection before trusted CLI and API oper
 Included hosted UI recovery journals in protected CI artifacts.
 Shared the bounded JSON reader and replaced custom configuration comparators with the Node.js implementation.
 
-Published one complete [installation procedure](../site/src/content/docs/operators/installation.md).
+Published one complete [installation procedure](../site/src/content/docs/operators/installation.mdx).
 Its shell setup now explicitly clears inherited Wrangler environment selection and disables debug log files. The fresh trial used the same settings.
 Removed superseded proof and implementation walkthroughs, obsolete installer navigation, repeated status summaries, and old ticket instructions from agent guidance.
 Historical records link to their frozen source revision.

@@ -1,70 +1,40 @@
 ---
-title: Verify and maintain an installation
-description: Check the complete workflow, preserve data, and record the revision you operate.
+title: Verify and upgrade
+description: Check the complete workflow on an installation and upgrade it safely.
 ---
-
-## Record the installation
-
-Record the source commit, frontend address, backend project, migration state, and deployed function revisions.
-Keep credentials in your approved credential store.
-Use a development or test session with fictional accounts for verification.
-Delete only data created for those checks.
-Never reset a shared project to make a test pass.
 
 ## Check the complete journey
 
-Use separate browser profiles for a contestant, volunteer, specialist, jury member, and administrator.
+Use fictional accounts in separate browser profiles: contestant, volunteer, specialist, jury, and admin.
+Delete only the data you create for the check. Never reset a shared database.
 
-1. Sign in with a temporary password.
-2. Check that contest access requires a password change.
-3. Submit an issue as the contestant.
-4. Claim it as the volunteer.
-5. Send a public reply and an internal note.
-6. Check that the contestant sees only the public reply.
-7. Request a specialist handoff.
-8. Check that the volunteer remains the owner until the specialist accepts.
-9. Accept the handoff and resolve the issue as the specialist.
-10. Record an award as the jury member.
-11. Confirm external application as staff after completing the external action.
-12. Reopen the issue and check its owner, accumulated time, resolution history, and award.
+1. Sign in with a temporary password. Contest data stays hidden until the password changes.
+2. Open intake. Submit an issue as the contestant. Refresh: the timer continues.
+3. Claim it as the volunteer. Send a public reply and an internal note. The contestant sees only the reply.
+4. Upload a team-visible and a staff-only image. The contestant sees only the first. Another team sees neither.
+   Only the uploader can remove an image. Uploads over the file size, image count, or combined size limit fail.
+5. Request a handoff. The volunteer stays the owner until the specialist accepts.
+6. Resolve as the specialist. Record an award as jury. Confirm it as applied.
+7. Reopen. The owner, resolution history, award, and earlier time remain.
+8. Change the issue in one browser while another is offline. After reconnect, the other browser updates.
+9. Remove a membership. That account loses reads, writes, image downloads, and live updates.
+10. On Cloudflare, recover the owner. Old sessions fail and the new password must change.
+11. Use an expired sign-in session. It can no longer read or write.
+12. Give one person two staff roles. They have the capabilities of both roles.
+13. Archive the event. Its members can still read it, but changes and uploads fail. Other accounts cannot read it.
 
-Refresh each browser during the journey.
-Check the saved state and shared updates.
-Repeat relevant controls with the keyboard and at phone widths.
+Repeat key controls with the keyboard and at phone width.
+The browser alone does not prove authorization. The repository's policy and provider suites test it.
 
-## Check images and access
+## Upgrade
 
-- Upload a staff-only image and a team-visible image.
-- Check that the contestant sees only the team-visible image.
-- Check that another team cannot read either image or the issue.
-- Check that only the uploader can remove an image.
-- Check file size, image count, and combined size limits.
-- Revoke membership and check that the former member loses access.
-- Check archived records with authorized and unauthorized accounts.
+1. Read the changes and migrations for the new revision.
+2. Verify that revision on development and isolated CI resources.
+3. Back up the database and the image bucket together.
+4. Apply migrations, then deploy:
+   - **Cloudflare:** the complete Worker and assets with your generated configuration. Keep `AUTH_SECRET`, R2 objects, and the Durable Object migration history.
+   - **Supabase:** the `admin` and `attachments` functions, then the frontend.
+5. Run the journey above.
 
-Browser appearance alone does not establish backend authorization.
-Use the repository's policy tests and isolated cloud suite when verifying an installation.
-The repository's hosted-test shortcuts target its recorded development and CI environments.
-Inspect their target checks before adapting them for another installation.
-
-## Upgrade in a controlled order
-
-Read the changes and migration instructions for the selected revision.
-Validate that revision in development and an isolated CI project first.
-For Cloudflare, apply reviewed D1 migrations, then deploy the complete Worker and its assets with the selected configuration.
-For the Supabase provider, apply migrations, deploy account and attachment functions and configuration, then deploy the frontend.
-Preserve its authentication secret, R2 objects, and Durable Object migration history.
-Verify the complete installation afterward.
-Merging a pull request does not deploy the app.
-
-Back up database records and private image files together.
-Record and rehearse restoration on an isolated installation before relying on it.
-Replacing the frontend must not delete backend data.
-Do not reverse database migrations simply to restore an older frontend.
-
-## Understand the remaining checks
-
-Passing ordinary CI does not verify a hosted Cloudflare Worker or a hosted Supabase project.
-A local cloud run does not replace a protected GitHub cloud run.
-Neither establishes 800-user capacity or live-contest readiness.
-See [feature status](/reference/status/) for the current limits.
+Merging a pull request does not deploy an installation.
+Do not reverse migrations to run an older frontend.

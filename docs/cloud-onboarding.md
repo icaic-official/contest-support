@@ -4,7 +4,7 @@ Use this guide when you choose the Supabase provider.
 Cloudflare is the live development backend.
 Its Worker is `minsky-dev` and its D1 database is `minsky-development`.
 The development app is https://minsky-dev.icaic-minsky.workers.dev.
-Use [Install Cloudflare](../site/src/content/docs/operators/installation.md) for that installation.
+Use [Install Cloudflare](../site/src/content/docs/operators/installation.mdx) for that installation.
 Use [deployment setup](cloudflare-builds.md) for automation and [activation](activate-cloudflare-development.md) for the approved switch and recovery procedure.
 Workers Builds runs ordinary checks and does not publish the application. Publication stays an explicit guarded command.
 Application previews remain disabled until independent preview resources exist.
@@ -189,7 +189,7 @@ The user authorized the initial documentation deployment before merge on 2026-10
 This is a T0011 exception for the docs Worker only.
 After automation setup, later stable updates use review, merge, passing CI, and automatic frontend deployment.
 The app's `npm run deploy` command is separate.
-See [the complete guide](../site/src/content/docs/contributing/documentation.md).
+See [the complete guide](../site/src/content/docs/contributing/documentation.mdx).
 
 ### Existing provider records
 

@@ -143,7 +143,7 @@ beforeAll(async () => {
 beforeEach(async () => {
   await db.exec("reset role");
   await db.exec(
-    "truncate public.attachments,public.admin_audit,public.history,public.awards,public.resolutions,public.issues,public.changes,public.staff_changes,app_private.receipts,public.memberships,storage.objects cascade",
+    "truncate public.attachments,public.admin_audit,public.history,public.awards,public.resolutions,public.issues,public.changes,public.staff_changes,app_private.receipts,public.announcements,public.memberships,storage.objects cascade",
   );
   await db.exec("truncate app_private.account_credentials,auth.sessions");
   await db.query("update public.people set username=null");
@@ -1096,5 +1096,223 @@ describe("issue image authorization and limits", () => {
     await actor(volunteer);
     expect(await pendingRemovals()).toEqual([]);
     expect((await db.query("select * from public.history where text='Image removed.'")).rows).toHaveLength(1);
+  });
+});
+
+describe("session announcements", () => {
+  const digest = "a".repeat(64);
+  const publishAction = (extra = {}) => ({
+    type: "publish",
+    title: " Fictional title ",
+    details: " Plain details. ",
+    expires_at: null,
+    ...extra,
+  });
+  async function announce(
+    action: Record<string, unknown>,
+    requestId = id(++request + 2000),
+    s = session,
+  ): Promise<string> {
+    return (await db.query<{ id: string }>(
+      "select public.announcement_command($1,$2,$3::jsonb) as id",
+      [s, requestId, JSON.stringify(action)],
+    )).rows[0].id;
+  }
+  async function snapshot(s = session) {
+    return (await db.query<{
+      state: {
+        announcements: Array<Record<string, unknown>>;
+        images: Array<Record<string, unknown>>;
+      };
+    }>("select public.announcement_snapshot($1) as state", [s])).rows[0].state;
+  }
+  async function reserve(
+    announcementId: string,
+    bytes = 12,
+    requestId = id(++request + 2000),
+  ) {
+    const result = await db.query<{
+      started: { id: string; status: string; expired_paths: string[] };
+    }>(
+      "select public.begin_announcement_image($1,$2,$3,'board.png',$4,'image/png',$5) as started",
+      [session, announcementId, requestId, bytes, digest],
+    );
+    return result.rows[0].started;
+  }
+  async function store(announcementId: string, imageId: string, size = 12) {
+    await db.exec("reset role");
+    await db.query(
+      "insert into storage.objects(bucket_id,name,metadata) values('announcement-images',$1,$2::jsonb)",
+      [
+        [session, announcementId, imageId].join("/"),
+        JSON.stringify({ size, mimetype: "image/png" }),
+      ],
+    );
+  }
+  async function readyImage(announcementId: string) {
+    await actor(admin);
+    const started = await reserve(announcementId);
+    await store(announcementId, started.id);
+    await actor(admin);
+    await db.query("select public.complete_announcement_image($1,$2)", [
+      session,
+      started.id,
+    ]);
+    return started.id;
+  }
+
+  it("lets admins and jury publish while every member reads only active records", async () => {
+    for (const manager of [admin, jury, combined]) {
+      await actor(manager);
+      await announce(publishAction());
+    }
+    for (const denied of [contestant, volunteer, specialist]) {
+      await actor(denied);
+      await expect(announce(publishAction())).rejects.toThrow(
+        "Only session admins and jury",
+      );
+      expect((await snapshot()).announcements).toHaveLength(3);
+    }
+    await actor(id(8));
+    expect((await snapshot()).announcements).toEqual([]);
+    await expect(announce(publishAction(), id(3000))).rejects.toThrow();
+    await actor(admin);
+    const [first] = (await snapshot()).announcements;
+    expect(first).toMatchObject({
+      title: "Fictional title",
+      details: "Plain details.",
+      author: expect.any(String),
+      revision: 0,
+    });
+    await expect(db.query("insert into public.announcements(session_id,title,details,author,author_name) values($1,'x','y',$2,'x')", [session, admin])).rejects.toThrow("permission denied");
+    await expect(db.query("update public.announcements set title='x'")).rejects.toThrow("permission denied");
+  });
+
+  it("uses the signed-in publisher, validates input, and applies server expiry", async () => {
+    await actor(admin);
+    const forged = await announce(publishAction({ author: contestant }));
+    expect((await snapshot()).announcements[0]).toMatchObject({ id: forged, author: admin, author_name: "Person 1" });
+    for (const bad of [{ title: " " }, { title: "x".repeat(161) }, { details: "" }, { details: "x".repeat(10001) }, { expires_at: "2000-01-01T00:00:00Z" }]) {
+      await expect(announce(publishAction(bad))).rejects.toThrow();
+    }
+    const expiring = await announce(publishAction({ expires_at: new Date(Date.now() + 60000).toISOString() }));
+    const removed = await announce(publishAction());
+    await announce({ type: "remove", id: removed, revision: 0 });
+    await db.exec("reset role");
+    await db.query("update public.announcements set expires_at=published_at+interval '1 millisecond' where id=$1", [expiring]);
+    await actor(contestant);
+    expect((await snapshot()).announcements.map((a) => a.id)).toEqual([forged]);
+    await actor(jury);
+    expect((await snapshot()).announcements).toHaveLength(3);
+    await announce({ type: "edit", id: expiring, revision: 0, title: "Back", details: "Active.", expires_at: null });
+    await actor(contestant);
+    expect((await snapshot()).announcements).toHaveLength(2);
+    await actor(admin);
+    await expect(announce({ type: "edit", id: removed, revision: 1, title: "x", details: "y", expires_at: null })).rejects.toThrow("Announcement unavailable");
+  });
+
+  it("repeats a request once and reports stale edits with the conflict code", async () => {
+    await actor(admin);
+    const requestId = id(4000);
+    const first = await announce(publishAction(), requestId);
+    expect(await announce(publishAction(), requestId)).toBe(first);
+    await expect(announce(publishAction({ title: "Other" }), requestId)).rejects.toThrow("Request ID already used");
+    expect((await snapshot()).announcements).toHaveLength(1);
+    await announce({ type: "edit", id: first, revision: 0, title: "Edited", details: "Edited.", expires_at: null });
+    await actor(jury);
+    await expect(announce({ type: "edit", id: first, revision: 0, title: "Stale", details: "Stale.", expires_at: null })).rejects.toMatchObject({ code: "MN409" });
+    await announce({ type: "edit", id: first, revision: 1, title: "Latest", details: "Latest.", expires_at: null });
+    await actor(contestant);
+    expect((await snapshot()).announcements[0]).toMatchObject({ title: "Latest", revision: 2, author: admin, edited_by: jury });
+  });
+
+  it("signals the existing session channel and blocks temporary or archived access", async () => {
+    await actor(admin);
+    const before = (await db.query<{ revision: number }>("select revision from public.sessions where id=$1", [session])).rows[0].revision;
+    const created = await announce(publishAction());
+    expect((await db.query<{ revision: number }>("select revision from public.sessions where id=$1", [session])).rows[0].revision).toBe(Number(before) + 1);
+    await db.exec("reset role");
+    await db.query("update public.events set archived=true");
+    await actor(admin);
+    await expect(announce(publishAction())).rejects.toThrow("archived");
+    await expect(announce({ type: "remove", id: created, revision: 0 })).rejects.toThrow("archived");
+    await expect(reserve(created)).rejects.toThrow("archived");
+    await actor(contestant);
+    expect((await snapshot()).announcements).toHaveLength(1);
+    await db.exec("reset role");
+    await db.query("update public.events set archived=false");
+    await db.query("select public.initialize_account($1,'temporary')", [admin]);
+    await actor(admin);
+    await expect(announce(publishAction())).rejects.toThrow();
+    expect((await snapshot()).announcements).toEqual([]);
+  });
+
+  it("publishes private images only after the stored object matches its reservation", async () => {
+    await actor(admin);
+    const parent = await announce(publishAction());
+    const started = await reserve(parent);
+    expect(started.status).toBe("pending");
+    await expect(db.query("select public.complete_announcement_image($1,$2)", [session, started.id])).rejects.toThrow("Upload the image before finishing");
+    await store(parent, started.id, 99);
+    await actor(admin);
+    await expect(db.query("select public.complete_announcement_image($1,$2)", [session, started.id])).rejects.toThrow("Upload the image before finishing");
+    await db.exec("reset role");
+    await db.query("update storage.objects set metadata='{\"size\":12,\"mimetype\":\"image/png\"}'");
+    await actor(contestant);
+    expect((await db.query("select * from storage.objects where bucket_id='announcement-images'")).rows).toHaveLength(0);
+    await actor(jury);
+    await expect(db.query("select public.complete_announcement_image($1,$2)", [session, started.id])).rejects.toThrow("Image unavailable");
+    await actor(admin);
+    await db.query("select public.complete_announcement_image($1,$2)", [session, started.id]);
+    await db.query("select public.complete_announcement_image($1,$2)", [session, started.id]);
+    await actor(contestant);
+    expect((await snapshot()).images).toHaveLength(1);
+    expect((await db.query("select * from storage.objects where bucket_id='announcement-images'")).rows).toHaveLength(1);
+    expect((await snapshot()).announcements[0].revision).toBe(1);
+    await actor(id(8));
+    expect((await db.query("select * from storage.objects where bucket_id='announcement-images'")).rows).toHaveLength(0);
+  });
+
+  it("limits an announcement to four images and reclaims expired reservations", async () => {
+    await actor(admin);
+    const parent = await announce(publishAction());
+    for (let n = 0; n < 3; n++) await readyImage(parent);
+    await actor(admin);
+    const pending = await reserve(parent);
+    await expect(reserve(parent)).rejects.toThrow("up to four images");
+    await expect(db.query("select public.begin_announcement_image($1,$2,$3,'a.png',10485761,'image/png',$4)", [session, parent, id(5000), digest])).rejects.toThrow();
+    await db.exec("reset role");
+    await db.query("update public.announcement_images set created_at=created_at-interval '16 minutes' where id=$1", [pending.id]);
+    await actor(admin);
+    const replacement = await reserve(parent);
+    expect(replacement.expired_paths).toEqual([[session, parent, pending.id].join("/")]);
+    await expect(db.query("select public.complete_announcement_image($1,$2)", [session, pending.id])).rejects.toThrow("expired");
+    await actor(contestant);
+    await expect(reserve(parent)).rejects.toThrow("Only session admins and jury");
+  });
+
+  it("removes images for any manager, hides them from readers, and keeps parent removal separate", async () => {
+    await actor(admin);
+    const parent = await announce(publishAction());
+    const imageId = await readyImage(parent);
+    await actor(contestant);
+    await expect(db.query("select public.remove_announcement_image($1,$2)", [session, imageId])).rejects.toThrow("Only session admins and jury");
+    await actor(jury);
+    const path = (await db.query<{ path: string }>("select public.remove_announcement_image($1,$2) as path", [session, imageId])).rows[0].path;
+    expect(path).toBe([session, parent, imageId].join("/"));
+    expect((await db.query<{ path: string }>("select public.remove_announcement_image($1,$2) as path", [session, imageId])).rows[0].path).toBe(path);
+    await actor(contestant);
+    expect((await snapshot()).images).toEqual([]);
+    expect((await db.query("select * from storage.objects where bucket_id='announcement-images'")).rows).toHaveLength(0);
+    await actor(admin);
+    const second = await readyImage(parent);
+    const current = (await snapshot()).announcements[0].revision;
+    await announce({ type: "remove", id: parent, revision: current });
+    await actor(contestant);
+    expect((await snapshot()).announcements).toEqual([]);
+    expect((await db.query("select * from storage.objects where bucket_id='announcement-images'")).rows).toHaveLength(0);
+    await actor(jury);
+    expect((await snapshot()).images.map((i) => i.id)).toEqual([second]);
+    await expect(reserve(parent)).rejects.toThrow("Announcement unavailable");
   });
 });

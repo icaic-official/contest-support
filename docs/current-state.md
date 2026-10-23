@@ -14,7 +14,21 @@ Fresh local checks pass: `npm run typecheck`, `npm run lint`, `npm run build`, `
 All 730 unit, database, and tooling tests and all 12 function tests pass. The docs build checks 13 pages and 530 local links and assets.
 The first unit run and route validator hit sandbox restrictions. Both pass with the required local-process permissions.
 The application build retains its large-chunk warning. The docs build retains its duplicate `/404` route warning.
-No manual application UI or hosted cloud suite ran during this review. Fresh GitHub runtime results belong to this merged branch revision.
+Local `npm run test:d1` passes all 70 cases.
+`npm run test:connector:runtime` and `npm run test:connector:ui:local` pass with fixture cleanup verified.
+`npm run test:auth:browser` and `npm run docs:test` each pass all three cases.
+The first `npm run test:e2e -- --workers=4` run passes 58 cases and fails four during trace cleanup.
+Concurrent Playwright suites deleted their shared output files. This was a verification error during this run.
+The repeat, `npm run test:e2e -- --workers=4 --output=/tmp/minsky-pr46-e2e`, passes all 62 cases.
+No application source, assertion, or timeout changes.
+Both `npm audit --package-lock-only --audit-level=high` commands pass, including the `--prefix site` audit.
+Checksum-verified Gitleaks 8.30.1 reports no leaks with `gitleaks git --redact --log-opts=--all .`.
+
+The [push run on `a46ba19`](https://github.com/GiftedNovaHD/minsky/actions/runs/39879473822) cannot start its three ordinary jobs.
+Each annotation cites failed account payments or a spending limit. No job step runs. Deployment jobs skip.
+The [PR run](https://github.com/GiftedNovaHD/minsky/actions/runs/39879476863) skips all eight jobs as intended.
+GitHub reports the PR as mergeable. Required GitHub execution and fresh preview publication remain unverified.
+No manual application UI or hosted cloud suite ran during this review.
 Remote merge enforcement remains unverified. The earlier protection lookup and verification limits remain in the dated record below.
 
 ## T0022 CI routing verification, 2026-10-20

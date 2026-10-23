@@ -1,5 +1,38 @@
 # Current state
 
+## T0006 announcement port, 2026-10-24
+
+This run ports T0006 session announcements from [PR #20](https://github.com/GiftedNovaHD/minsky/pull/20) to current `main` at `ecc75e2`.
+It supersedes PR #20, which targeted an older `main` and only Supabase. The owner closes PR #20 after the new PR passes.
+The branch is `feature/t0006-session-announcements-port`. See [session announcements](session-announcements.md) and the [T0006 ticket](tickets.md#t0006--session-announcements).
+Nothing is deployed. No migration, function, secret, or hosted resource changed.
+
+### Local verification
+
+| Check | Result |
+| --- | --- |
+| `npm run typecheck`, `npm run lint`, `npm run build` | Pass. The build keeps its large-chunk warning. |
+| `npm run check:functions` | Pass for the new `announcement-images` function and the workflow function. |
+| `npm run test:functions` | 19 Deno cases pass. 7 are new. They cover retained files after failed and overlapping completion. |
+| `npm test` | 782 unit, embedded-database, and tooling cases pass in five consecutive runs. New cases cover both D1 and R2 services, the HTTP routes, the Supabase migration and policies in embedded PostgreSQL, both browser adapters, and draft and expiry rules. |
+| `npm run test:d1` | 70 cases pass. |
+| `npx playwright test --workers=2` | 92 cases pass. 5 are new. They cover live titles, keyboard disclosure, a report draft during a live change, a slow read during reporting, removal, competing edits with both review choices, and a 390 px layout. |
+| `npm run docs:build`, both `npm audit` runs, Gitleaks | Pass. No vulnerabilities and no leaks. |
+
+I ran each step of `npm run ci` separately to avoid reinstalling dependencies.
+The browser cases use embedded PostgreSQL with simulated Auth, HTTP, and Realtime. They do not transfer images.
+
+Two existing tests had a 5-second default timeout and failed under load.
+`testMetrics.test.ts` and `provider-boundaries.test.mjs` now use longer limits.
+They failed intermittently under parallel load once this branch added more suites. I did not measure `main`.
+
+### Not verified
+
+- Hosted Supabase and hosted Cloudflare behavior, including R2 transfers and Durable Object delivery.
+- Image upload in a browser. Service, database, function, and adapter tests cover it.
+- The shared provider test bridge. It reports that it does not cover announcements.
+- Other browsers, screen readers, 200% zoom, and physical devices. [Manual checks](manual-verification.md#15-session-announcements-t0006) list them.
+
 ## PR #45 update from main, 2026-10-23
 
 The owner requests current `main` and conflict resolution for the existing draft PR.

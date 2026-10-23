@@ -85,10 +85,10 @@ Those historical approvals do not authorize a new activation or deployment.
 
 ## Ticket and Git workflow
 
-- Include `Co-authored-by: PuR3Luck <aidan.ong822@gmail.com>` and `Co-authored-by: notbowen <contact@hubowen.dev>` in every new commit you create and pushes for this repository.
+- Include `Co-authored-by: PuR3Luck <aidan.ong822@gmail.com>` and `Co-authored-by: notbowen <contact@hubowen.dev>` in every new commit you create and push for this repository.
 - Separate the co-author trailer from the commit body with a blank line.
 - Preserve the primary author and any other co-author trailers.
-- Before each push, check that every new created commit contains the required trailer exactly once.
+- Before each push, check that every new commit you created contains each required trailer exactly once.
 - Distinguish development tickets from contestant issues in code, documentation, and communication.
 - Start each development ticket from updated `main`.
 - Use `feature/tNNNN-description` for ticket branches.

@@ -637,9 +637,33 @@ for (const [layout, viewport] of viewports) {
       const held = await holdClaim(page, state);
       await claimButton(page).click();
       await held.inFlight;
+      await page.evaluate((desktop) => {
+        const opened = () =>
+          desktop
+            ? document.querySelector('[role="dialog"]') !== null
+            : [...document.querySelectorAll('button')].some(
+                (button) => button.textContent?.trim() === 'Back',
+              );
+        const record = () => {
+          if (opened()) {
+            (window as unknown as { issueOpened: boolean }).issueOpened = true;
+          }
+        };
+        (window as unknown as { issueOpened: boolean }).issueOpened = false;
+        record();
+        const observer = new MutationObserver(record);
+        observer.observe(document.body, {
+          subtree: true,
+          childList: true,
+          attributes: true,
+        });
+      }, isDesktop(page));
       held.release();
       await expect(claimButton(page)).toHaveCount(0);
       await expect(openIssueVisible(page)).toHaveCount(0);
+      expect(await page.evaluate(() =>
+        (window as unknown as { issueOpened: boolean }).issueOpened,
+      )).toBe(false);
       const opener = isDesktop(page)
         ? page.getByRole('button', { name: 'Open ISS-1', exact: true })
         : page.locator(`#issue-card-${ISSUE_ID}`);

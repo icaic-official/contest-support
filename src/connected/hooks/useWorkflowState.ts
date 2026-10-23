@@ -41,11 +41,11 @@ export function useWorkflowState(data: SessionData): WorkflowState {
     onStart: () => {
       selectionsAtStart.current = selections.current;
     },
-    onRecorded: (issueId, recorded) => {
+    onRecorded: (issueId, recorded, options) => {
       if (selections.current !== selectionsAtStart.current) return;
-      // Do not count this as a choice the person made. An inline action can
-      // clear it. A choice made while the command ran stays.
-      setSelectedIssueId(issueId);
+      // An inline queue action stays on the list. Selecting here would open
+      // the issue and close it again after this function returns.
+      if (!options.stayOnPage) setSelectedIssueId(issueId);
       // Show a reopened issue even when the filter was "resolved".
       if (recorded.type === "reopen") setStatusFilter("claimed");
     },

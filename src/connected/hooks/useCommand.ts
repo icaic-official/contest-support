@@ -13,6 +13,11 @@ export interface ActionOptions {
    * original request.
    */
   onSuccess?: () => void;
+  /**
+   * When true, a recorded command does not select its issue. Use it for a
+   * queue action that stays on the list.
+   */
+  stayOnPage?: boolean;
 }
 
 /** Sends a workflow command. Resolves to true when the server records it. */
@@ -42,6 +47,7 @@ interface PendingRequest {
   request: string;
   command: Command;
   onSuccess?: () => void;
+  stayOnPage: boolean;
 }
 
 /**
@@ -60,7 +66,11 @@ export function useCommand({
   /** Runs when a command or a retry starts. */
   onStart?: () => void;
   /** Runs after the refresh that follows a recorded command. */
-  onRecorded?: (issueId: string, command: Command) => void;
+  onRecorded?: (
+    issueId: string,
+    command: Command,
+    options: { stayOnPage: boolean },
+  ) => void;
 }): CommandRunner {
   const [busy, setBusy] = useState(false);
   const [pending, setPending] = useState<Command>();
@@ -74,7 +84,7 @@ export function useCommand({
   }
   async function act(
     command: Command,
-    { retry = false, onSuccess }: ActionOptions = {},
+    { retry = false, onSuccess, stayOnPage = false }: ActionOptions = {},
   ): Promise<boolean> {
     if (inFlight.current || (!retry && pendingRequest.current)) return false;
     inFlight.current = true;
@@ -85,7 +95,7 @@ export function useCommand({
     const request =
       retry && pendingRequest.current
         ? pendingRequest.current
-        : { request: crypto.randomUUID(), command, onSuccess };
+        : { request: crypto.randomUUID(), command, onSuccess, stayOnPage };
     remember(request);
     try {
       const id = await requireBackend().workflows.execute(
@@ -97,7 +107,7 @@ export function useCommand({
       // A retry must complete the original form's cleanup before enabling edits.
       request.onSuccess?.();
       await refresh();
-      onRecorded?.(id, command);
+      onRecorded?.(id, request.command, { stayOnPage: request.stayOnPage });
       setNotice("Action recorded in shared history.");
       return true;
     } catch (cause) {

@@ -274,10 +274,13 @@ export function OrganiserDesktopConsole({
   function runRowAction(issue: Issue, action: RowAction) {
     const mark = workflow.selectionMark();
     void command
-      .act({ type: action, issue_id: issue.id, revision: issue.revision })
+      .act(
+        { type: action, issue_id: issue.id, revision: issue.revision },
+        { stayOnPage: true },
+      )
       .then((recorded) => {
-        // A recorded command selects its issue. A row action stays on the
-        // page. An issue the person opened while it ran stays open.
+        // The command does not open the issue. An issue the person opened
+        // while it ran stays open. Otherwise focus returns to the row.
         if (!inlineActionReturnsToList(recorded, mark, workflow.selectionMark())) {
           return;
         }

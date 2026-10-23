@@ -130,10 +130,13 @@ export function OrganiserPhoneApp({
   function runCardAction(issue: Issue, action: CardAction) {
     const mark = workflow.selectionMark();
     void command
-      .act({ type: action, issue_id: issue.id, revision: issue.revision })
+      .act(
+        { type: action, issue_id: issue.id, revision: issue.revision },
+        { stayOnPage: true },
+      )
       .then((recorded) => {
-        // A recorded command selects its issue. An inline action returns to
-        // the list. An issue the person opened while it ran stays open.
+        // The command does not open the issue. An issue the person opened
+        // while it ran stays open. Otherwise focus returns to the card.
         if (!inlineActionReturnsToList(recorded, mark, workflow.selectionMark())) {
           return;
         }

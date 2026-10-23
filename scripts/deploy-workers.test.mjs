@@ -58,17 +58,23 @@ describe("frontend settings", () => {
     return `fixture.${Buffer.from(JSON.stringify(payload)).toString("base64url")}.fixture`;
   }
   it("accepts public keys and rejects privileged or wrong-project configuration", () => {
+    const supabase = { ...env, MINSKY_DEV_BACKEND: "supabase" };
     expect(() => validateBuildSettings(env)).not.toThrow();
-    expect(() => validateBuildSettings({ ...env, VITE_SUPABASE_PUBLISHABLE_KEY:
+    expect(() => validateBuildSettings({ ...env, VITE_SUPABASE_PUBLISHABLE_KEY: "" })).not.toThrow();
+    expect(() => validateBuildSettings({ ...env, VITE_SUPABASE_URL: "https://ghtztmovdkhuketcbjmq.supabase.co" })).not.toThrow();
+    expect(() => validateBuildSettings(supabase)).not.toThrow();
+    expect(() => validateBuildSettings({ ...supabase, VITE_SUPABASE_PUBLISHABLE_KEY:
       jwt({ role: "anon", ref: "ovymmobupzowotvrywek" }) })).not.toThrow();
     for (const key of ["", "sb_secret_fixture", "malformed", jwt({ role: "service_role",
       ref: "ovymmobupzowotvrywek" }), jwt({ role: "anon", ref: "another-project" })]) {
-      expect(() => validateBuildSettings({ ...env, VITE_SUPABASE_PUBLISHABLE_KEY: key })).toThrow(/key/);
+      expect(() => validateBuildSettings({ ...supabase, VITE_SUPABASE_PUBLISHABLE_KEY: key })).toThrow(/key/);
     }
-    for (const change of [{ CLOUDFLARE_ACCOUNT_ID: "another-account" },
-      { VITE_SUPABASE_URL: "https://ghtztmovdkhuketcbjmq.supabase.co" }, { VITE_ENVIRONMENT: "production" }]) {
+    for (const change of [{ CLOUDFLARE_ACCOUNT_ID: "another-account" }, { VITE_ENVIRONMENT: "production" }]) {
       expect(() => validateBuildSettings({ ...env, ...change })).toThrow(/development/);
     }
+    expect(() => validateBuildSettings({
+      ...supabase, VITE_SUPABASE_URL: "https://ghtztmovdkhuketcbjmq.supabase.co",
+    })).toThrow(/development/);
   });
 });
 

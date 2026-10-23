@@ -8,7 +8,9 @@ The frontend deployment job waits for all three required checks.
 
 ## Automated checks
 
-Pull requests and all branch pushes run these checks:
+Repository branch pushes and fork pull requests run these checks.
+Same-repository PRs use branch-push results and skip the duplicate jobs.
+The [event reference](cloudflare-build-settings.md#events-and-prerequisites) records names and merge-commit coverage.
 
 | Check | Required behavior |
 | --- | --- |

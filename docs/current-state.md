@@ -1,5 +1,92 @@
 # Current state
 
+## PR #46 conflict resolution and review, 2026-10-23
+
+T0022 now includes `origin/main` at `a25f9f1`, after the owner merged PR #44.
+The conflict was in the ticket index. The resolution retains T0022 and records the frontend redesign merge.
+Main already contains the same docs-preview parser correction and its tests. Those files match main after this merge.
+The review found no code defect in the remaining workflow change.
+Only the three ordinary job conditions and names differ from main. Job steps, permissions, deployment prerequisites, and concurrency match main.
+Checksum-verified `actionlint` 1.7.12 passes. A temporary validator uses `@actions/expressions` 0.3.61 against the actual YAML.
+All 12 event scenarios pass, including same-repository and fork PRs, Dependabot, schedule, protected dispatch selections, and deletion.
+
+Fresh local checks pass: `npm run typecheck`, `npm run lint`, `npm run build`, `npm run docs:build`, `npm run check:functions`, `npm run test:functions`, `npm test`, and `npm run test:providers:list`.
+All 730 unit, database, and tooling tests and all 12 function tests pass. The docs build checks 13 pages and 530 local links and assets.
+The first unit run and route validator hit sandbox restrictions. Both pass with the required local-process permissions.
+The application build retains its large-chunk warning. The docs build retains its duplicate `/404` route warning.
+Local `npm run test:d1` passes all 70 cases.
+`npm run test:connector:runtime` and `npm run test:connector:ui:local` pass with fixture cleanup verified.
+`npm run test:auth:browser` and `npm run docs:test` each pass all three cases.
+The first `npm run test:e2e -- --workers=4` run passes 58 cases and fails four during trace cleanup.
+Concurrent Playwright suites deleted their shared output files. This was a verification error during this run.
+The repeat, `npm run test:e2e -- --workers=4 --output=/tmp/minsky-pr46-e2e`, passes all 62 cases.
+No application source, assertion, or timeout changes.
+Both `npm audit --package-lock-only --audit-level=high` commands pass, including the `--prefix site` audit.
+Checksum-verified Gitleaks 8.30.1 reports no leaks with `gitleaks git --redact --log-opts=--all .`.
+
+The [push run on `a46ba19`](https://github.com/GiftedNovaHD/minsky/actions/runs/39879473822) cannot start its three ordinary jobs.
+Each annotation cites failed account payments or a spending limit. No job step runs. Deployment jobs skip.
+The [PR run](https://github.com/GiftedNovaHD/minsky/actions/runs/39879476863) skips all eight jobs as intended.
+GitHub reports the PR as mergeable. Required GitHub execution and fresh preview publication remain unverified.
+No manual application UI or hosted cloud suite ran during this review.
+Remote merge enforcement remains unverified. The earlier protection lookup and verification limits remain in the dated record below.
+
+## T0022 CI routing verification, 2026-10-20
+
+The owner merged PR #43 at `4e43739` on 2026-10-19 at 12:29:54 UTC, then requested removal of duplicate CI checks.
+The isolated `feature/t0022-ci-run-deduplication` branch starts from that main revision.
+See [event routing](cloudflare-build-settings.md#events-and-prerequisites) for the implemented behavior and branch-head coverage.
+Reverting the workflow change restores both executions.
+
+### Initial local verification
+
+These application runs precede the parser-only follow-up below. The PR records final source-specific GitHub results.
+Checksum-verified `actionlint` 1.7.12 passes for `.github/workflows/checks.yml`.
+A temporary validator parses the actual YAML and evaluates its expressions with GitHub's `@actions/expressions` 0.3.61.
+All 11 scenarios pass. These cover main, feature, and Dependabot pushes, same-repository and fork PRs, the weekly schedule, and three protected dispatch selections.
+Structural comparison with `4e43739` confirms that only the three ordinary job conditions and display names changed.
+Deployment prerequisites, commands, credentials, targets, and concurrency are unchanged. Validation packages remain under `/tmp`.
+No repository dependency or application test was added.
+
+Types, lint, function checks, application build, and docs build pass. The docs check covers 13 pages and 531 local links and assets.
+All 657 unit/database/tooling tests, 70 local D1 tests, 12 function tests, 46 ordinary browser cases, and three authentication browser cases pass.
+The complete local connector runtime and React journeys pass. Fixture cleanup is verified and unrelated controls survive.
+All three docs browser cases pass.
+The initial sandboxed `npm ci` and validator child-process call hit sandbox restrictions. The locked installation and corrected validation harness pass afterward.
+The validator's first expected app-job route was incorrect. The existing deployment script handles the branch decision. No deployment behavior changed.
+Changed Markdown paths and `git diff --check` pass.
+
+### Docs preview follow-up
+
+The [push run on `96503c2`](https://github.com/GiftedNovaHD/minsky/actions/runs/39335199415) passes `checks`, `secrets`, and `dependencies`.
+Its app job correctly skips branch publication. Its docs job fails while parsing Wrangler stdout after publication.
+The first stdout line is asset-progress text, even with `--json`. The unchanged parser expected JSON from the first byte.
+This failure is separate from the duplicate-job routing. The parser now reads the JSON object after leading progress lines.
+Malformed JSON, trailing output, invalid URL lists, and unrelated domains remain rejected. Revision verification remains mandatory.
+All 31 focused deployment tests pass, including the progress-prefixed publication path and rejection cases.
+Types, lint, and both builds pass after the parser correction.
+The first full repeat passes 657 cases but hits the existing provider-boundary test's 5,000 ms timeout during concurrent lint/build work.
+That unchanged file then passes all five cases in isolation. The full suite passes all 658 cases without concurrent builds. No timeout or assertion changed.
+Fresh final verification follows in the PR. This change adds no resource, credential, dependency, or provider setting.
+
+### GitHub verification boundary
+
+[PR #46](https://github.com/GiftedNovaHD/minsky/pull/46) records the final push and PR runs separately from local verification.
+Its [first PR run](https://github.com/GiftedNovaHD/minsky/actions/runs/39335043678) skips every job on `57763aa`. No duplicate runner starts.
+GitHub displays the ordinary jobs' name expressions without evaluating them. Those labels differ from the required ordinary names.
+The first push check is superseded before deployment to record this observed display behavior. Its cancellation is not a test failure.
+No fork PR, schedule, or protected dispatch is created for this change. Their routes pass local expression evaluation only.
+The main-protection lookup returns `403` with a GitHub plan requirement. This run does not claim remote merge enforcement or change protection rules.
+No provider configuration, paid service, backend activation, or account setting changes.
+
+### Linked Supabase job investigation
+
+[Run 39332397673, job 118336975655](https://github.com/GiftedNovaHD/minsky/actions/runs/39332397673/job/118336975655) is a manually dispatched T0021 Supabase run on `4cf6405`.
+Its ordinary jobs passed. Its `test:cloud` step passed 15 of 16 cases and failed the authenticated journey's skip-link focus assertion.
+At `tests/cloud/journey.spec.ts:535`, `#main` remained inactive after Enter on the focused skip link.
+The later provider and workflow steps skipped after that failure. This was a test failure, not an exhausted-minute refusal.
+Logs do not establish the cause. Diagnosis and correction remain candidate work. This investigation does not rerun hosted tests or change fixtures.
+
 ## T0021 maintainability follow-up, 2026-10-19
 
 The owner requests a review follow-up in open [PR #43](https://github.com/GiftedNovaHD/minsky/pull/43).

@@ -26,8 +26,13 @@ concurrency:
   # Finish a running push deployment before another run can publish that branch.
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
+  # Branch pushes own same-repository checks and deployment prerequisites.
+  # Give skipped PR jobs distinct names so they cannot satisfy required checks.
   checks:
-    if: github.event_name != 'schedule'
+    name: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && 'checks-covered-by-push' || 'checks' }}
+    if: >-
+      github.event_name != 'schedule' &&
+      (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository)
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -58,6 +63,8 @@ jobs:
       - run: npm run test:connector:ui:local
       - run: npm run docs:test
   secrets:
+    name: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && 'secrets-covered-by-push' || 'secrets' }}
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -78,6 +85,8 @@ jobs:
       - name: Scan fetched Git history with redacted output
         run: '"$RUNNER_TEMP/gitleaks" git --redact --verbose --log-opts=--all .'
   dependencies:
+    name: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && 'dependencies-covered-by-push' || 'dependencies' }}
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

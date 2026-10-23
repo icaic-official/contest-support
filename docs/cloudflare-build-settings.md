@@ -10,10 +10,19 @@ The [activation guide](activate-cloudflare-development.md) owns the backend swit
 | --- | --- |
 | Push to `main` | Stable docs and selected development application, in independent jobs. |
 | Trusted repository branch push | Docs preview only. The workflow skips application previews. |
-| Pull request, fork, or Dependabot push | None. |
+| Same-repository pull request | None. Ordinary jobs skip. Branch-push checks own the result. |
+| Fork pull request or Dependabot push | None. Ordinary checks run without deployment. |
 | Weekly schedule | None. Security jobs only. |
 | Manual workflow dispatch | None. Separate protected cloud checks can run. |
 | Tag push or branch deletion | None. |
+
+Repository branch pushes run `checks`, `secrets`, and `dependencies`, including when a PR is open.
+Fork PRs run those same jobs against GitHub's synthetic merge commit without provider credentials.
+Same-repository PRs use the branch-head results. They do not run a second synthetic-merge suite.
+Their job-name expressions select `checks-covered-by-push`, `secrets-covered-by-push`, and `dependencies-covered-by-push`.
+GitHub can display the expression text when it skips a job before evaluation. Both forms differ from the ordinary required check names.
+The skipped names are informational. Required branch checks use the ordinary names.
+A same-repository PR needs a passing push run for its head revision. A new commit triggers a fresh push run.
 
 Both `deploy` and `deploy-app` require `checks`, `secrets`, and `dependencies`.
 Both require `CLOUDFLARE_DEPLOY_ENABLED=true`.
@@ -109,6 +118,7 @@ These checks verify publication, selection, bindings, and an anonymous denial.
 Authenticated authorization, private images, recovery, and live updates require the separate application checks.
 
 Docs previews use a normalized branch name with a 12-character SHA-256 suffix.
+The preview parser accepts asset-progress lines before the JSON response. Malformed JSON and URLs outside the permitted Worker domain remain rejected.
 The script runs `wrangler preview` with `--ignore-base-config`, the revision tag, and JSON output.
 Stable publication uses `wrangler deploy` with the reviewed configuration.
 Docs deployment never reads app backend variables or configuration.

@@ -38,8 +38,9 @@ export function deploymentPlan(env) {
 }
 
 export function applicationBackend(env) {
-  const backend = env.MINSKY_DEV_BACKEND || "supabase";
-  if (!["supabase", "cloudflare"].includes(backend)) throw new Error("Select supabase or cloudflare for MINSKY_DEV_BACKEND.");
+  // Cloudflare is the live development backend. Select supabase explicitly.
+  const backend = env.MINSKY_DEV_BACKEND || "cloudflare";
+  if (!["supabase", "cloudflare"].includes(backend)) throw new Error("Select cloudflare or supabase for MINSKY_DEV_BACKEND.");
   return backend;
 }
 

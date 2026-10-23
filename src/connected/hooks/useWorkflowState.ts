@@ -8,6 +8,11 @@ export interface WorkflowState {
   /** The issue that the person looks at, or "" for the first visible issue. */
   selectedIssueId: string;
   selectIssue: (issueId: string) => void;
+  /**
+   * How many times the person has chosen an issue. A recorded command does
+   * not move this mark.
+   */
+  selectionMark: () => number;
   /** "all" or an issue status. */
   statusFilter: string;
   setStatusFilter: (filter: string) => void;
@@ -36,17 +41,21 @@ export function useWorkflowState(data: SessionData): WorkflowState {
     onStart: () => {
       selectionsAtStart.current = selections.current;
     },
-    onRecorded: (issueId, recorded) => {
+    onRecorded: (issueId, recorded, options) => {
       if (selections.current !== selectionsAtStart.current) return;
-      selectIssue(issueId);
+      // An inline queue action stays on the list. Selecting here would open
+      // the issue and close it again after this function returns.
+      if (!options.stayOnPage) setSelectedIssueId(issueId);
       // Show a reopened issue even when the filter was "resolved".
       if (recorded.type === "reopen") setStatusFilter("claimed");
     },
   });
+  const selectionMark = useCallback(() => selections.current, []);
   return {
     command,
     selectedIssueId,
     selectIssue,
+    selectionMark,
     statusFilter,
     setStatusFilter,
   };

@@ -1,17 +1,21 @@
-# Supabase cloud onboarding
+# Supabase provider
 
-This guide covers the retained Supabase projects and their contribution and verification commands.
-Cloudflare serves the stable development application. Its fresh installation received no Supabase accounts, passwords, records, images, or IDs.
-Use [Install Cloudflare](../site/src/content/docs/operators/installation.mdx) for Cloudflare setup.
+Use this guide when you choose the Supabase provider.
+Cloudflare is the live development backend.
+Its Worker is `minsky-dev` and its D1 database is `minsky-development`.
+The development app is https://minsky-dev.icaic-minsky.workers.dev.
+Use [Install Cloudflare](../site/src/content/docs/operators/installation.mdx) for that installation.
 Use [deployment setup](cloudflare-builds.md) for automation and [activation](activate-cloudflare-development.md) for the approved switch and recovery procedure.
 Workers Builds runs ordinary checks and does not publish the application. Publication stays an explicit guarded command.
 Application previews remain disabled until independent preview resources exist.
 Backend migrations, bootstrap, secrets, and activation retain their explicit steps.
 The dated setup records below describe their recorded revisions.
 
-The connected development app runs at https://minsky-dev.icaic-minsky.workers.dev on the complete Cloudflare Worker.
-The separate Supabase implementation uses managed authentication, Postgres, Realtime, and private Storage.
+This page covers the retained Supabase projects, their commands, and isolated Supabase checks.
+Supabase uses managed authentication, Postgres, Realtime, and private Storage.
 Its projects, accounts, and data remain intact.
+The fresh Cloudflare installation received no Supabase accounts, passwords, records, images, or IDs.
+This provider does not serve the development URL.
 Docker is optional.
 The user permits full authorized cloud credential access for contributors.
 
@@ -78,6 +82,7 @@ These operations reject archived memberships.
 Ordinary session permission changes remain scoped to that session.
 
 If the sole admin loses their password, a trusted provider maintainer can use the recovery command below.
+`npm run cloud:recover-admin` is this provider's recovery command. It does not change the Cloudflare installation.
 First, link the intended project.
 Run the command in a **private terminal**:
 
@@ -103,6 +108,58 @@ The trusted creation function explicitly confirms internal accounts.
 This creates the account without verifying a mailbox.
 Previously configured redirect URLs may remain.
 T0003 does not require a sender, domain, or SMTP setup.
+
+### Recover a Cloudflare admin password
+
+`npm run cloud:recover-admin` changes a Supabase account only.
+Use `npm run cloudflare:recover-admin` when a Cloudflare admin cannot sign in.
+Run it in a private terminal on your computer.
+The command refuses CI.
+It also refuses a terminal whose output is redirected, because the temporary password must stay on that screen.
+
+The command reads the `DB` binding from a Wrangler configuration.
+The default file is `wrangler.jsonc`.
+That file does not name the development database.
+The development Worker binding is in `src/server/adapters/cloudflare/deploy/development.wrangler.jsonc`.
+Its database name is `minsky-development`.
+The command uses the remote database named by the selected file.
+It does not use a local database.
+
+Confirm the database name in the command output before you share the password.
+From the repository root, run:
+
+```sh
+npm run cloudflare:recover-admin -- --config src/server/adapters/cloudflare/deploy/development.wrangler.jsonc --username organizer
+```
+
+Pass `--user ACCOUNT_ID` instead of `--username` when you know the account ID.
+Pass exactly one of those selectors.
+You can pass `--config` with another Wrangler file when the account is in a different remote `DB` binding.
+The binding must set `"remote": true`.
+The file must not define Wrangler environment overrides.
+
+The command checks that the account exists and is not disabled.
+The account must be an admin of an active event, or the installation owner.
+It then writes the same credential rows as **Reset password** in the application.
+It sets `must_change`, increases `credential_generation`, and database triggers increase `access_version`.
+It revokes every login and Better Auth session for that account.
+It records a completed `reset_password` row in `account_operations`.
+The actor on that row is the recovered account, because the maintainer has no Minsky account.
+All of those writes commit in one database batch.
+If the batch fails, the account keeps its previous password.
+
+The command prints the temporary password once on the terminal.
+It does not write the password to a file or a log.
+Copy the password from the terminal and share it through a secure channel.
+The admin must change the password at the next sign-in.
+
+Do not run this command in CI.
+Do not paste its output into chat or commit it.
+Do not run it against a database other than the one named in your selected configuration.
+
+The installation guide has a separate owner recovery command.
+That command requires the installation ID and writes a private result file.
+Use it when you are recovering a new installation and already have those IDs.
 
 ## Ownership and costs
 
@@ -217,8 +274,11 @@ The attachment migration checks that Supabase already enabled Storage RLS rather
 
 ## Contributor setup
 
-These commands select the retained Supabase development project. They do not configure the active Cloudflare deployment.
+These commands select the retained Supabase development project.
+They do not configure the live Cloudflare deployment.
 For Cloudflare work, use the isolated installation and provider verification guides.
+When `VITE_BACKEND=supabase`, set `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` in `.env.local`.
+`.env.example` selects Cloudflare and does not contain those values.
 
 Use Node.js 22.13 or later within 22.x, or Node.js 24 or later.
 Use npm.
@@ -274,10 +334,10 @@ The previous `APP_URL` setting is unused.
 | CI | `Minsky CI` — `ghtztmovdkhuketcbjmq` | Temporary automated accounts and workflow and authorization fixtures scoped by UUID. |
 | Production | Not provisioned | Future real contest accounts and data. Use a separate database, credentials, and frontend. |
 
-For each ticket, use this sequence:
+For a Supabase provider change, use this sequence:
 
 1. Create its branch from updated `main`.
-2. Develop against the development project.
+2. Develop against the retained Supabase project `Minsky`, reference `ovymmobupzowotvrywek`.
 3. Add versioned migrations.
 4. Run the fast README checks.
 5. Prepare the PR.

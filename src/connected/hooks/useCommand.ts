@@ -14,6 +14,11 @@ export interface ActionOptions {
    * original request.
    */
   onSuccess?: () => void;
+  /**
+   * When true, a recorded command does not select its issue. Use it for a
+   * queue action that stays on the list.
+   */
+  stayOnPage?: boolean;
 }
 
 /** Resolves to true when the command is recorded in the current workspace. */
@@ -55,7 +60,11 @@ export function useCommand({
   /** Runs when a command or a retry starts. */
   onStart?: () => void;
   /** Runs after the refresh that follows a recorded command. */
-  onRecorded?: (issueId: string, command: Command) => void;
+  onRecorded?: (
+    issueId: string,
+    command: Command,
+    options: { stayOnPage: boolean },
+  ) => void;
 }): CommandRunner {
   const { actorId, pending: pendingRequest } = useWorkflowRetry();
   const [busy, setBusy] = useState(false);
@@ -83,7 +92,7 @@ export function useCommand({
   }, [actorId, pendingRequest]);
   async function act(
     command: Command,
-    { retry = false, onSuccess }: ActionOptions = {},
+    { retry = false, onSuccess, stayOnPage = false }: ActionOptions = {},
   ): Promise<boolean> {
     if (
       !mounted.current ||
@@ -107,6 +116,7 @@ export function useCommand({
             request: crypto.randomUUID(),
             command,
             onSuccess,
+            stayOnPage,
           };
     pendingRequest.current = request;
     setPending(request.command);
@@ -124,7 +134,7 @@ export function useCommand({
       await refresh();
       if (!mounted.current || request.sessionId !== currentSessionId.current)
         return false;
-      onRecorded?.(id, request.command);
+      onRecorded?.(id, request.command, { stayOnPage: request.stayOnPage });
       setNotice("Action recorded in shared history.");
       return true;
     } catch (cause) {

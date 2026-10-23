@@ -3,7 +3,7 @@ title: Feature status
 description: What is merged, what is pending, and what is not verified.
 ---
 
-Checked on **23 October 2026** against `main` at `c5bc940`. This is a dated record, not a live dashboard.
+Checked on **23 October 2026** against `main` at `03105ab`. This is a dated record, not a live dashboard.
 
 ## In main
 
@@ -13,7 +13,7 @@ Checked on **23 October 2026** against `main` at `c5bc940`. This is a dated reco
 - Staff image uploads with fixed visibility and session limits.
 - Team search, jury award lists, and session admin tools.
 - Three interfaces: contestant desktop, staff phone app, and staff console (T0015, [PR #44](https://github.com/GiftedNovaHD/minsky/pull/44)).
-- Two backends behind one contract: Supabase and Cloudflare (T0020, [PR #42](https://github.com/GiftedNovaHD/minsky/pull/42)).
+- Two backends behind one contract: Supabase and Cloudflare (T0020, [PR #42](https://github.com/GiftedNovaHD/minsky/pull/42)). Cloudflare is the live backend. Supabase stays a supported second provider ([PR #57](https://github.com/GiftedNovaHD/minsky/pull/57)).
 - A verified fresh Cloudflare development installation (T0021, [PR #43](https://github.com/GiftedNovaHD/minsky/pull/43)). The owner approved the development switch and a repeat deployment. No Supabase accounts, passwords, records, images, or IDs moved.
 - T0022 CI run deduplication ([PR #46](https://github.com/GiftedNovaHD/minsky/pull/46), merged).
 - Workers Builds runs `npm run ci` for branches in this repository ([PR #45](https://github.com/GiftedNovaHD/minsky/pull/45)). It does not publish the app or the docs. GitHub Actions checks are removed.

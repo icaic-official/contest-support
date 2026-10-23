@@ -9,12 +9,16 @@ Use Node.js 22.13+ (22.x) or 24+. The docs need 22.22+.
 
 ```sh
 npm ci
-cp .env.example .env.local   # set the development Supabase URL and publishable key
+cp .env.example .env.local
 npm run dev                  # http://127.0.0.1:5173
 ```
 
+`VITE_BACKEND` defaults to `cloudflare`. A plain Vite server has no Cloudflare API, so sign-in fails there.
+Use `npm run test:connector:ui:local` for a temporary local Cloudflare app, or the [development app](https://minsky-dev.icaic-minsky.workers.dev). Its Worker is `minsky-dev` and its D1 database is `minsky-development`.
+
+To use the Supabase provider, set `VITE_BACKEND=supabase`, `VITE_SUPABASE_URL`, and `VITE_SUPABASE_PUBLISHABLE_KEY` in `.env.local`.
 Never put a service key in a `VITE_` variable. An admin must add your account to a session.
-`VITE_BACKEND` defaults to `supabase`. A Cloudflare build sets `VITE_BACKEND=cloudflare` and needs its Worker for the API.
+`npm run cloud:recover-admin` recovers a Supabase admin. Use `npm run cloudflare:recover-admin` for Cloudflare.
 
 ## Find application code
 
@@ -37,7 +41,7 @@ See the repository's [frontend architecture](https://github.com/GiftedNovaHD/min
 | `npm run check:functions` | Supabase functions (Deno) |
 | `npm run test:functions` | Attachment function with fake clients |
 | `npm run build` | Production build |
-| `npm run test:e2e` | Browser UI with mocked responses |
+| `npm run test:e2e` | Browser UI with mocked Supabase responses. The suite sets `VITE_BACKEND=supabase`. |
 
 Run `npx playwright install chromium` once before browser tests.
 Hosted test commands need isolated CI resources. Check their targets first, and never point them at real data. See [README.md](https://github.com/GiftedNovaHD/minsky#checks-and-common-commands) for the full list.

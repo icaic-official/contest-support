@@ -19,9 +19,9 @@ The raw Better Auth router is not exposed.
 `createCloudflareAuthentication()` implements the existing browser `Authentication` contract.
 Its additional `account()` and `sessions()` methods support account administration and session reads.
 The complete `createCloudflareBackend()` factory wraps this authentication adapter and supplies the remaining operation groups.
-The backend entry point defaults to Supabase when `VITE_BACKEND` is absent.
-The development deployment explicitly selects `VITE_BACKEND=cloudflare`.
-Local Supabase builds retain their own public settings. No automatic provider fallback occurs.
+The backend entry point defaults to Cloudflare when `VITE_BACKEND` is absent.
+Set `VITE_BACKEND=supabase` to select the Supabase provider.
+That provider keeps its own public settings. No automatic provider fallback occurs.
 
 ## HTTP endpoints
 

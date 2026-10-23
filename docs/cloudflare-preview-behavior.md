@@ -20,12 +20,14 @@ A later docs preview still has to target `minsky-docs` and stay independent of t
 ## Why backend selection needs a deployment guard
 
 The browser selects its backend at build time through `VITE_BACKEND`.
-The app deployment command sets that value from the explicit deployment setting.
+The app deployment command sets that value from `MINSKY_DEV_BACKEND`.
+An absent deployment setting selects Cloudflare.
 A Cloudflare app also needs its API code, database, private image bucket, and live coordinator.
 An assets-only upload would remove that application code and its bindings.
 
-The Supabase upload path therefore inspects the deployed Worker before changing it.
-If application bindings exist, it refuses the upload even when a repository variable is absent or changed.
+The Supabase upload path runs only when `MINSKY_DEV_BACKEND=supabase`.
+It inspects the deployed Worker before changing it.
+If application bindings exist, it refuses the upload.
 The Cloudflare path validates the provider-generated config and exact hosted targets before publishing.
 The same command checks the built revision and backend before upload.
 After upload, it checks the published targets, live bindings, and anonymous rejection at the authentication API.

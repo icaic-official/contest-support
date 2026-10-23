@@ -22,22 +22,28 @@
 
 ## Current scope
 
-The owner requests [PR #45](https://github.com/GiftedNovaHD/minsky/pull/45) on `feature/t0021-cloudflare-development-install`.
-The branch already contains `origin/main` at `a938e6a`.
-Preserve the merged T0015 interfaces, browser routes, workflow retry protections, and docs-preview parser guards.
-Move automatic CI to Cloudflare Workers Builds and remove the GitHub Actions workflow.
-GitHub stays on the free plan. Do not add an Actions job or budget Actions minutes.
-Browser suites and hosted provider checks stay on-demand commands.
+On 2026-10-23 the owner selected Cloudflare as the live backend.
+The development Worker is `minsky-dev`. The development D1 database is `minsky-development`.
+Supabase remains a supported second provider behind the shared backend interfaces.
+Keep its adapter, migrations, functions, and provider tests.
+Do not describe it as the live backend, the default setup, or the development URL's backend.
+Do not change hosted Supabase or Cloudflare resources, secrets, or repository settings.
+
+This work starts from `feature/t0021-cloudflare-development-install` in draft [PR #45](https://github.com/GiftedNovaHD/minsky/pull/45).
+Open the result as a separate draft pull request into that branch.
+Preserve the Workers Builds move and the removed GitHub Actions workflow.
+Do not add an Actions job.
+Browser suites and hosted provider checks stay manual commands.
+`npm run ci` lists provider scenarios. It does not run the hosted Supabase provider suite.
 Do not connect `minsky-dev` or `minsky-docs` to Workers Builds.
-Do not deploy, change secrets, change repository settings, or mark the PR ready.
-The separate Supabase skip-link failure stays outside this change unless a local smoke run reproduces it.
-The owner reviews and merges. Do not start another development ticket.
-Bounded subagent work remains authorized for the existing PR follow-up.
+Do not deploy.
+The owner reviews and merges.
 
 T0021's separately approved Cloudflare activation and repeat deployment retain their dated evidence in [current state](docs/current-state.md#t0021-approved-activation-2026-10-19).
 Supabase resources and accounts remain intact. Development, CI, and installation-verification resources remain separate.
 Earlier provider permissions and exact protected branch limits remain in [PLAN.md](PLAN.md) and dated run records.
 Those historical approvals do not authorize a new activation or deployment.
+Statements in those records that Supabase is the active backend are superseded by the 2026-10-23 decision.
 
 ## Code and documentation cleanup
 
@@ -85,10 +91,10 @@ Those historical approvals do not authorize a new activation or deployment.
 
 ## Ticket and Git workflow
 
-- Include `Co-authored-by: PuR3Luck <aidan.ong822@gmail.com>` in every new commit Codex creates and pushes for this repository.
+- Include `Co-authored-by: PuR3Luck <aidan.ong822@gmail.com>` and `Co-authored-by: notbowen <contact@hubowen.dev>` in every new commit you create and pushes for this repository.
 - Separate the co-author trailer from the commit body with a blank line.
 - Preserve the primary author and any other co-author trailers.
-- Before each push, check that every new Codex-created commit contains the required trailer exactly once.
+- Before each push, check that every new created commit contains the required trailer exactly once.
 - Distinguish development tickets from contestant issues in code, documentation, and communication.
 - Start each development ticket from updated `main`.
 - Use `feature/tNNNN-description` for ticket branches.
@@ -126,8 +132,8 @@ No production project exists.
 For each ticket, use this sequence:
 
 1. Create the ticket branch from updated `main`.
-2. Develop against the development project.
-3. Add repository-owned migrations.
+2. Develop against the Cloudflare development installation. Its Worker is `minsky-dev` and its D1 database is `minsky-development`.
+3. Add repository-owned migrations for the provider you change.
 4. Run fast checks.
 5. Prepare the PR.
 6. Run cloud integration checks on the reviewed revision.
@@ -151,14 +157,14 @@ Never reset a shared project.
 Confirm the target before you apply migrations or deploy functions.
 
 After production is selected and provisioned, validate the approved revision on development and CI.
-Then apply its migrations to production.
-Deploy its account and attachment functions and configuration.
-Deploy its frontend.
+Then apply its D1 migrations to production.
+Deploy the complete Worker, its bindings, and its static assets.
 Verify the production deployment afterward.
+The Supabase provider keeps its own migration, function, and frontend order in the [Supabase provider guide](docs/cloud-onboarding.md).
 Production setup remains future work.
 
 This future production work does not authorize provider resource creation or upgrades now.
-Use [cloud-onboarding.md](docs/cloud-onboarding.md) for project references, commands, environment protection requirements, and observed setup results.
+Use [the Supabase provider guide](docs/cloud-onboarding.md) for that provider's project references, commands, and observed setup results.
 T0003 retains protected cloud CI.
 These operational items stay deferred.
 They are not part of the T0005 issue-image ticket:
@@ -223,7 +229,7 @@ The future healthy-connection targets remain 800 simultaneous users, 95% of ordi
 
 ## Required end-of-run report
 
-At the end of every Codex run, report all eight fields below.
+At the end of every run, report all eight fields below.
 Keep them concise.
 Use **None**, **Not run**, or **Not applicable** when appropriate.
 Distinguish completed checks from suggested manual steps.

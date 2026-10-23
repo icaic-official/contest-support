@@ -104,6 +104,58 @@ This creates the account without verifying a mailbox.
 Previously configured redirect URLs may remain.
 T0003 does not require a sender, domain, or SMTP setup.
 
+### Recover a Cloudflare admin password
+
+`npm run cloud:recover-admin` changes a Supabase account only.
+Use `npm run cloudflare:recover-admin` when a Cloudflare admin cannot sign in.
+Run it in a private terminal on your computer.
+The command refuses CI.
+It also refuses a terminal whose output is redirected, because the temporary password must stay on that screen.
+
+The command reads the `DB` binding from a Wrangler configuration.
+The default file is `wrangler.jsonc`.
+That file does not name the development database.
+The development Worker binding is in `src/server/adapters/cloudflare/deploy/development.wrangler.jsonc`.
+Its database name is `minsky-development`.
+The command uses the remote database named by the selected file.
+It does not use a local database.
+
+Confirm the database name in the command output before you share the password.
+From the repository root, run:
+
+```sh
+npm run cloudflare:recover-admin -- --config src/server/adapters/cloudflare/deploy/development.wrangler.jsonc --username organizer
+```
+
+Pass `--user ACCOUNT_ID` instead of `--username` when you know the account ID.
+Pass exactly one of those selectors.
+You can pass `--config` with another Wrangler file when the account is in a different remote `DB` binding.
+The binding must set `"remote": true`.
+The file must not define Wrangler environment overrides.
+
+The command checks that the account exists and is not disabled.
+The account must be an admin of an active event, or the installation owner.
+It then writes the same credential rows as **Reset password** in the application.
+It sets `must_change`, increases `credential_generation`, and database triggers increase `access_version`.
+It revokes every login and Better Auth session for that account.
+It records a completed `reset_password` row in `account_operations`.
+The actor on that row is the recovered account, because the maintainer has no Minsky account.
+All of those writes commit in one database batch.
+If the batch fails, the account keeps its previous password.
+
+The command prints the temporary password once on the terminal.
+It does not write the password to a file or a log.
+Copy the password from the terminal and share it through a secure channel.
+The admin must change the password at the next sign-in.
+
+Do not run this command in CI.
+Do not paste its output into chat or commit it.
+Do not run it against a database other than the one named in your selected configuration.
+
+The installation guide has a separate owner recovery command.
+That command requires the installation ID and writes a private result file.
+Use it when you are recovering a new installation and already have those IDs.
+
 ## Ownership and costs
 
 ### Documentation hosting (T0011)

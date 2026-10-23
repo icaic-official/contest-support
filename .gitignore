@@ -1,5 +1,6 @@
 node_modules/
 dist/
+.verify-minsky/
 site/.astro/
 .wrangler/
 *.tsbuildinfo

@@ -1,9 +1,9 @@
 # Frontend architecture
 
-This page describes how the T0015 frontend is organized.
-It records the foundation (step 1 of T0015) and the three layouts that replaced the placeholders: the organiser phone app, the organiser desktop console and the contestant app.
-It also records the step 5 integration with `main` on 2026-10-18: the backend contracts and the T0009 jury rules.
-See [T0015](tickets.md#t0015--organiser-and-contestant-frontend-redesign) for scope and decisions.
+This reference describes the shared frontend, its three layouts, and its browser routes.
+T0015 provides the contestant desktop app, organiser phone app, and organiser desktop console.
+PR #45 retains its routes and workflow retry protections when it integrates that redesign.
+See [T0015](tickets.md#t0015--organiser-and-contestant-frontend-redesign) and [T0021](tickets.md#t0021-fresh-cloudflare-development-installation) for the recorded scope.
 
 ## Stack
 
@@ -62,14 +62,14 @@ The removal is a follow-up. Before you remove a rule, check the preview page in 
 The frontend does not call Supabase directly.
 Hooks, `SignIn`, `PasswordForm`, `useSessionAdmin` and `useIssueImages` call `requireBackend()` from `src/backend/index.ts`.
 That function returns the `Backend` from `src/backend/contracts.ts`, or it throws the setup message when `.env.local` has no public connection settings.
-The current implementation is in `src/backend/supabase/`. See [backend contracts](backend-contracts.md).
+The implementations are in `src/backend/supabase/` and `src/backend/cloudflare/`. See [backend contracts](backend-contracts.md).
 The old `src/connected/client.ts` was removed on `main` and is not part of T0015.
 
 ## From sign-in to a UI
 
 These steps occur in sequence:
 
-1. `ConnectedApp` (`src/connected/ConnectedApp.tsx`) restores the session with `useAuthSession`.
+1. `src/main.tsx` wraps `ConnectedApp` in `BrowserRouter`. `ConnectedApp` restores the session with `useAuthSession`.
 2. Without a user, it shows `SignIn` (`src/screens/SignIn.tsx`).
 3. `useAccountStatus` checks the account every 10 seconds and on window focus.
    If the password is temporary, `PasswordForm` (`src/screens/PasswordForm.tsx`) shows. The database also enforces this change.
@@ -84,6 +84,53 @@ That screen shows a loading state, refresh errors, a **Refresh access** button a
 After a UI is selected, `Workspace` keeps that UI mounted when the snapshot disappears.
 A refresh error or a session change can remove the snapshot. The shell then shows `NoSessionAccess` itself.
 Its selection, filters and form drafts stay in memory. A shell must not unmount its state when `data.snapshot` is undefined.
+
+## Browser routes
+
+`src/connected/navigation.ts` maps browser paths to the existing pages and phone tabs.
+The same authorized snapshot selects the interface and checks route access.
+
+| Path | Screen and access |
+| --- | --- |
+| `/` | Opens `/issues` after account and session checks. |
+| `/issues` | The current membership's issue queue or team reports. |
+| `/issues/mine` | Assigned issues for support staff. |
+| `/issues/handoffs` | Handoff issues for support staff. |
+| `/issues/teams` | Team search, shown in the phone **Find** tab or desktop **Teams & tables** page. |
+| `/jury` | Phone **Awards** or desktop **Award review** for a current jury member. |
+| `/administration` | Phone **Session** or desktop **Overview** for a current session administrator. |
+| `/administration/accounts` | Account administration for a current session administrator. |
+| `/administration/settings` | Session settings for a current session administrator. |
+| `/account` | Phone **Me**, desktop **My account**, or the contestant's account details. |
+
+Navigation controls update the address and browser history.
+Direct paths remain through sign-in and required password changes.
+Reload retains the section and reads current session data.
+A full reload discards unsent drafts, queue filters, and uncertain requests.
+Browser Back and Forward restore the section.
+A voluntary password change opens from `/account`. Completion and cancellation retain that path.
+
+Route checks wait for a loaded snapshot with current membership.
+An unavailable section returns to `/issues`.
+The backend independently checks every read and write. A URL grants no permission.
+Both deployment configurations serve the application entry for browser routes.
+API paths keep their existing handler and source-file exclusions.
+The routes require no binding, migration, secret, or provider setting change.
+
+## Workflow request lifetime
+
+`WorkflowRetryProvider` in `src/connected/WorkflowRetry.tsx` retains uncertain requests above the account-check gate.
+Each request records the authenticated actor, original contest session, request ID, and command.
+A transient account-check failure hides protected content and retains that metadata.
+Recovery does not automatically repeat a write. The person must select **Retry last request**.
+An explicit retry uses the original session even if access removal selects another session.
+The server checks access to that original session and can reject the retry.
+
+A successful command or definitive server rejection clears the pending request.
+Signing out or changing the actor also clears it.
+A transport failure retains the request ID, so the server can reject a duplicate write.
+The metadata stays in memory. A full page reload discards it.
+Late responses from an unmounted workspace cannot complete another request or run callbacks into old forms.
 
 ## Shell contract
 
@@ -103,15 +150,15 @@ Thus a pending request and the selected issue stay the same when the viewport ch
 ## Data hooks
 
 All hooks are in `src/connected/hooks/`.
-They contain the data behavior that existed in `ConnectedApp.tsx` before T0015. The behavior did not change.
-Since the step 5 merge, they call the `Backend` contracts through `requireBackend()`.
+They share session data and workflow requests across the layouts.
+They call the `Backend` contracts through `requireBackend()`.
 
 | Hook | Responsibility |
 | --- | --- |
 | `useAuthSession()` | Uses `requireBackend().auth`. Restores the stored session and follows sign-in and sign-out. Returns `user`, `loading`, `error` and `signOut`. |
 | `useAccountStatus(userId)` | Reads `account_status` every 10 seconds and on focus. Returns `account`, `error` and `recheck()`. |
 | `useSessionSnapshot(userId)` | Loads memberships, the session list and the selected snapshot. Reads run in sequence. A generation counter discards responses for an earlier session. It refreshes on Realtime changes, every 10 seconds, on focus and when the browser is online again. It clears the snapshot after an error. It records the server clock offset. |
-| `useCommand({ sessionId, refresh, onRecorded })` | Runs workflow commands one at a time. A second click while a command runs does nothing. After a transport failure, the command keeps its request UUID until `retry()`. A server rejection clears it. `onSuccess` clears the form before the refresh, including after a retry (T0012). |
+| `useCommand({ sessionId, refresh, onRecorded })` | Runs one workflow command at a time. It uses the actor-bound request from `WorkflowRetryProvider`. An explicit retry retains the original session, request ID, and command. `onSuccess` clears the originating form before refresh while that form remains mounted. |
 | `useWorkflowState(data)` | Combines `useCommand` with the selected issue and the status filter. A recorded command selects its issue when the person did not choose an issue while it ran. An inline queue action does not select its issue. A reopened issue sets the filter to `claimed`. |
 | `useTeamSelection(sessionId, snapshot)` | Holds the team-search choice. A session change clears it. A snapshot without that team, or without staff access, also clears it. |
 | `useNow(clockOffset)` | Returns the server-adjusted time every second for live timers. |

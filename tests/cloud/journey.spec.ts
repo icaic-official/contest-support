@@ -116,6 +116,7 @@ test("organiser navigation follows combined roles on phones and the desktop cons
   await expect(
     page.getByRole("heading", { level: 1, name: "Me", exact: true }),
   ).toBeFocused();
+  await expect(page).toHaveURL("/account");
   await expect(me).toHaveAttribute("aria-current", "page");
   await expect(
     page.getByText(fixture().accounts.volunteer.username, { exact: true }),
@@ -133,6 +134,7 @@ test("organiser navigation follows combined roles on phones and the desktop cons
     await expect(
       page.getByRole("heading", { level: 1, name: "Queue", exact: true }),
     ).toBeFocused();
+    await expect(page).toHaveURL("/issues");
     await expect(queue).toHaveAttribute("aria-current", "page");
     await page.getByRole("button", { name: "Report", exact: true }).click();
     const report = page.getByRole("dialog", { name: "Report for a team" });
@@ -175,6 +177,7 @@ test("organiser navigation follows combined roles on phones and the desktop cons
   await expect(
     page.getByRole("heading", { level: 1, name: "Accounts", exact: true }),
   ).toBeFocused();
+  await expect(page).toHaveURL("/administration/accounts");
   await expect(consoleLink(page, "Accounts")).toHaveAttribute(
     "aria-current",
     "page",
@@ -196,6 +199,7 @@ test("organiser navigation follows combined roles on phones and the desktop cons
     "page",
     { timeout: 15000 },
   );
+  await expect(page).toHaveURL("/issues");
   await page.setViewportSize(phone);
   await expect(tabs.getByRole("button")).toHaveText([
     "Queue",
@@ -688,11 +692,14 @@ test("real accounts share the journey on phones and desktop, internal notes stay
     await staff.goto("/");
     await expect(
       staff.getByRole("heading", { level: 1, name: "Queue", exact: true }),
-    ).toBeVisible({ timeout: 15000 });
-    await staff.keyboard.press("Tab");
-    await expect(
-      staff.getByRole("link", { name: "Skip to main content" }),
-    ).toBeFocused();
+    ).toBeFocused({ timeout: 15000 });
+    const skipLink = staff.getByRole("link", { name: "Skip to main content" });
+    // Route navigation focuses the heading. Reach the skip link by keyboard.
+    for (let step = 0; step < 8; step++) {
+      await staff.keyboard.press("Shift+Tab");
+      if (await skipLink.evaluate((link) => link === document.activeElement)) break;
+    }
+    await expect(skipLink).toBeFocused();
     await staff.keyboard.press("Enter");
     await expect(staff.locator("#main")).toBeFocused();
     await expect(staff.getByRole("button", { name: "Reset demo" })).toHaveCount(
@@ -941,18 +948,28 @@ test("admin assigns combined roles on the desktop console; password change, refr
   await page
     .getByRole("button", { name: "Save password", exact: true })
     .click();
-  const queue = page.getByRole("heading", {
+  const me = page.getByRole("heading", {
     level: 1,
-    name: "Queue",
+    name: "Me",
     exact: true,
   });
-  await expect(queue).toBeVisible({ timeout: 15000 });
+  await expect(me).toBeVisible({ timeout: 15000 });
+  await expect(page).toHaveURL("/account");
   // Later cloud tests sign in through the same UUID-scoped fixture accounts.
   const state = fixture();
   state.accounts.volunteer.password = password;
   save(state);
   await page.reload();
-  await expect(queue).toBeVisible({ timeout: 15000 });
+  await expect(me).toBeVisible({ timeout: 15000 });
+  await expect(page).toHaveURL("/account");
+  await phoneTab(page, "Queue");
+  await expect(page).toHaveURL("/issues");
+  const queue = page.getByRole("heading", {
+    level: 1,
+    name: "Queue",
+    exact: true,
+  });
+  await expect(queue).toBeVisible();
   await signOut(page);
   await expect(queue).toHaveCount(0);
   await submitSignIn(page, fixture().accounts.volunteer.username, password);

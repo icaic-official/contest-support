@@ -1,5 +1,61 @@
 # Current state
 
+## PR #45 update from main, 2026-10-23
+
+The owner requests current `main` and conflict resolution for the existing draft PR.
+The merge includes `origin/main` at `a938e6a`, which contains PR #44's redesigned frontend and PR #46's CI change.
+The integration retains browser routes and binds workflow retries to their original actor, session, request ID, and command.
+The [frontend architecture](frontend-architecture.md) is the current reference. Earlier records below describe their recorded source.
+PR #45 remains draft. The local checks below verify the combined source before the merge commit.
+No hosted verification, deployment, provider change, or separate Supabase skip-link fix is part of this request.
+
+T0022 merged in [PR #46](https://github.com/GiftedNovaHD/minsky/pull/46) at `a938e6a` on 2026-10-23.
+Its local checks pass on their recorded source. The GitHub runner restriction prevented fresh required job execution.
+The merged CI routing and docs-preview URL, output, and revision checks remain in place.
+The latest publication recorded before this integration is [manual source `adff06c`](t0021-run-report.md#owner-requested-manual-frontend-publication-2026-10-20).
+This run does not read or change the live deployment.
+Earlier activation and manual-publication results below do not verify this combined frontend.
+
+
+### Integration verification
+
+The merge retains the redesigned contestant, organiser phone, and organiser desktop interfaces.
+PR #45's older `src/app/` and `src/features/` screens are removed. Their routes use the current shells and data hooks.
+The retry context retains each request above transient account checks and preserves its original actor and contest session.
+A late success cannot clear a form or select an issue in another session.
+The session-access screen also exposes a retained retry after every membership is removed.
+Menu closure preserves focus on the selected account page.
+The CI workflow and deployment parser match `a938e6a` exactly.
+
+`npm run typecheck`, `npm run lint`, `npm run build`, `npm run docs:build`, `npm run check:functions`, and `npm run test:functions` pass.
+`npm test -- --maxWorkers=2` passes all 730 unit, database, and tooling cases.
+`npm run test:d1` passes all 70 local D1 cases. Both complete local connector journeys pass with fixture cleanup verified.
+All three authentication browser cases and all three docs browser cases pass.
+The docs build checks 13 pages and 533 local links and assets. Both lockfile audits report no vulnerabilities.
+All 11 shared provider scenarios remain discoverable.
+Existing `actionlint` 1.7.12 validates the unchanged workflow. Gitleaks 8.30.1 reports no leaks in the worktree.
+All 347 relative Markdown targets pass. The built-site check covers site-root URLs.
+The first ad hoc checker misclassified three site-root URLs as filesystem paths. Its corrected check passes.
+The app retains its large-chunk warning. The docs retain their duplicate `/404` route warning.
+Authentication tests pass despite local certificate-rejection diagnostics from the HTTPS security fixture.
+
+The first full browser run passes 78 cases.
+A separate walkthrough then finds that the desktop account menu restores trigger focus after route navigation.
+The new regression reproduces that failure. Preventing that menu restoration fixes it.
+The route suite then passes all 12 cases. The final complete browser run passes all 79 cases without skips or retries.
+Its command is `npm run test:e2e -- --workers=2 --output=/tmp/minsky-pr45-final-e2e`.
+Earlier focused retry runs correct two test selectors for the redesigned header.
+The jury permission test now expects the route guard to return to `/issues` after permission removal.
+Its old **Back** control no longer exists after that redirect.
+
+A fictional volunteer walkthrough passes at 1280, 390, and 320 pixels on `http://127.0.0.1:4175`.
+Keyboard account navigation, HTTP 200 after authenticated reload, meaningful content, and the page title pass.
+No framework overlay, page error, console error, or horizontal overflow is observed.
+Screenshots confirm that account controls fit all three widths. The scripts and screenshots remain under `/tmp`.
+The Browser plugin is unavailable, so these checks use the repository's Playwright dependency.
+Physical devices and live-provider acceptance are not checked.
+Existing double-quoted imports and React component names remain style exceptions for consistency with the redesigned code.
+
 ## PR #46 conflict resolution and review, 2026-10-23
 
 T0022 now includes `origin/main` at `a25f9f1`, after the owner merged PR #44.
@@ -35,7 +91,7 @@ Remote merge enforcement remains unverified. The earlier protection lookup and v
 
 The owner merged PR #43 at `4e43739` on 2026-10-19 at 12:29:54 UTC, then requested removal of duplicate CI checks.
 The isolated `feature/t0022-ci-run-deduplication` branch starts from that main revision.
-See [event routing](cloudflare-build-settings.md#events-and-prerequisites) for the implemented behavior and branch-head coverage.
+See [Run checks on Workers Builds](cloudflare-builds.md) for the current check behavior and branch coverage.
 Reverting the workflow change restores both executions.
 
 ### Initial local verification
@@ -86,6 +142,159 @@ Its ordinary jobs passed. Its `test:cloud` step passed 15 of 16 cases and failed
 At `tests/cloud/journey.spec.ts:535`, `#main` remained inactive after Enter on the focused skip link.
 The later provider and workflow steps skipped after that failure. This was a test failure, not an exhausted-minute refusal.
 Logs do not establish the cause. Diagnosis and correction remain candidate work. This investigation does not rerun hosted tests or change fixtures.
+
+## PR #45 retry review fixes, 2026-10-20
+
+The owner requests the backend and frontend retry fixes from the PR #45 review.
+Pending workflow metadata now records the authenticated actor and original contest session above the account-check gate.
+A failed account check still hides protected content. Recovery retains the original request ID and command for an explicit retry.
+Access removal can select another session, but the retry still reaches the original session's server access check.
+Signing out or changing the actor clears the pending metadata.
+Late responses from an unmounted workspace cannot complete a different request or run stale form callbacks.
+These fixes change neither server authorization nor provider configuration.
+
+The earlier protected Supabase run [39326130328](https://github.com/GiftedNovaHD/minsky/actions/runs/39326130328) fails two of 16 hosted cases on `adff06c`.
+One keyboard assertion assumes initial document focus after route navigation. One jury assertion reads rows before the route loads.
+The updated checks require heading focus, keyboard access to the skip link, and both jury rows before checking order.
+Fixture cleanup completes in that failed run. It remains failed evidence.
+
+The owner previously requested manual publication of application source `adff06c` before merge.
+This retry follow-up does not publish the stable application.
+PR #45 is draft during fresh verification. The [run report](t0021-run-report.md#retry-review-fixes-2026-10-20) records the checks and remaining limits.
+The cached staff-image preview concern remains separate follow-up work.
+
+## T0021 frontend routes and feature modules, 2026-10-20
+
+The owner extends existing [PR #45](https://github.com/GiftedNovaHD/minsky/pull/45) with frontend organization and browser routing.
+The original `ConnectedApp.tsx` mixed authentication, the workspace, issue screens, administration, and account settings in 2,101 lines.
+`src/app/` now owns the account gate and shared workspace.
+`src/features/` separates issues, administration, account settings, authentication, and jury worklists.
+The [frontend reference](frontend-architecture.md) records each responsibility and route.
+
+The sidebar uses links to `/issues`, `/administration`, `/account`, and `/jury`.
+Direct paths survive sign-in and reload. Browser history restores the section.
+The workspace retains issue filters, selection, and uncertain workflow requests across section changes.
+Membership checks guard administration and jury routes after the current snapshot loads.
+Server authorization, atomic workflow commands, provider implementations, deployment settings, and fixture cleanup remain unchanged.
+The original activation uses source `4e43739`. The owner later requests [manual publication of `adff06c`](t0021-run-report.md#owner-requested-manual-frontend-publication-2026-10-20) before merge.
+Earlier activation and protected results do not verify this expanded frontend diff.
+Final source revisions and fresh GitHub checks belong in PR #45, separately from the local results below.
+
+Local verification passes 658 unit/database/tooling cases, 57 ordinary browser cases, 12 function cases, three authentication browser cases, three docs browser cases, and both complete local runtime journeys.
+Type checking, lint, application build, docs build, and shared scenario discovery pass.
+The docs build checks 13 HTML pages and 534 local links and assets.
+Codex inspects fictional jury screens at 320px and 390px. Text and controls fit both widths.
+Keyboard, same-route phone navigation, current membership changes, refresh, and CSS zoom checks pass in Chromium.
+Physical devices and native browser zoom remain unverified.
+
+The first complete local UI journey fails when `/issues` reloads because its temporary asset setup omits the deployment's existing single-page fallback.
+The local setup now uses that same fallback. The journey also asserts HTTP 200 and the retained `/issues` path after reload.
+The complete rerun passes with scoped D1, R2, and live-connection cleanup. Unrelated fixture controls survive.
+The first ordinary unit run passes 656/658; two unchanged five-second checks time out during concurrent work.
+The complete run with two workers passes 658/658. No timeout or assertion changes.
+The first full browser run passes 54/56 and fails two artifact closures because concurrent browser commands share an output directory.
+An unchanged rerun with its own output directory passes 56/56.
+New browser-test locator mistakes are corrected before these final runs.
+A review finding about the current phone link leaving Menu open is corrected and receives a keyboard regression check.
+A later hosted-test review finds one old expectation that optional password change resets the section to Issues.
+The hosted test now requires `/account` after the change and reload, then explicitly opens Issues before checking sign-out and sign-in.
+A new fictional-response browser case covers cancellation, save, completion, and reload at `/account`.
+Superseded protected runs `39324916481` and `39324966455` are stopped before any hosted fixture job starts.
+Final checks use the later test revision. The application source and deployment configuration remain unchanged from `5ca804f`.
+
+The [run report](t0021-run-report.md#frontend-organization-and-routing-2026-10-20) records this follow-up.
+
+## T0021 approved activation, 2026-10-19
+
+The [stable development URL](https://minsky-dev.icaic-minsky.workers.dev) uses Cloudflare from approved source `4e43739ac2ce56cca7e7739e4db189aa2854d4a9`. Activation and a subsequent automated deployment pass their application and live configuration checks.
+The owner merged [PR #43](https://github.com/GiftedNovaHD/minsky/pull/43) at `4e43739ac2ce56cca7e7739e4db189aa2854d4a9`.
+The merged tree matches final protected source `2125875653db9157f686c5f46cdddf8519c290d1`, including the cleanup ownership correction.
+The owner separately approved the exact backend switch and a repeat automated deployment.
+The owner confirmed in the dashboard that independent Cloudflare Git builds are disconnected for `minsky-dev` and `minsky-docs`.
+API permissions still cannot confirm that setting. Credentials were not broadened for the read.
+No Supabase account, password, record, image, or ID transfers. Its resources and accounts remain intact.
+
+### Final pre-merge and merged-main checks
+
+| Evidence | Source | Observed result |
+| --- | --- | --- |
+| [Final push CI](https://github.com/GiftedNovaHD/minsky/actions/runs/39151111031) and [PR CI](https://github.com/GiftedNovaHD/minsky/actions/runs/39151114561) | `2125875` | All ordinary checks pass on the final PR head. |
+| [Protected Cloudflare run 39151128560](https://github.com/GiftedNovaHD/minsky/actions/runs/39151128560) | `2125875` | 70 workflow, 82 account, 11 shared scenarios, and one UI case pass. |
+| [Protected Supabase run 39151393804, attempt 2](https://github.com/GiftedNovaHD/minsky/actions/runs/39151393804/attempts/2) | `2125875` | 16 hosted, 11 shared scenarios, and five workflow cases pass. |
+| [Main push run 39252514749, attempt 1](https://github.com/GiftedNovaHD/minsky/actions/runs/39252514749/attempts/1) | `4e43739` | Ordinary checks pass. Publication remains disabled for this attempt. |
+
+The first Supabase attempt fails three browser waits. It remains a failed attempt.
+The unchanged second attempt passes. No assertion, timeout, target guard, or environment protection was weakened.
+Protected GitHub results remain separate from the earlier local hosted results recorded below and in [the run report](t0021-run-report.md).
+
+### Activation sequence and exact installation
+
+The confirmed Cloudflare account is `458ad6a930b0fb717796dfa19ca6a2b1`.
+The public settings are `src/server/adapters/cloudflare/deploy/development.settings.json`.
+The committed stable configuration is `src/server/adapters/cloudflare/deploy/development.wrangler.jsonc`.
+
+| Resource or setting | Approved value |
+| --- | --- |
+| Stable Worker and origin | `minsky-dev`, `https://minsky-dev.icaic-minsky.workers.dev` |
+| Stopped candidate | `minsky-development-candidate`, `https://minsky-development-candidate.icaic-minsky.workers.dev`, version `c15b6ab7-bba0-4e9f-9292-2c2bd345e9a3` |
+| Independent docs | `minsky-docs`, `https://minsky-docs.icaic-minsky.workers.dev` |
+| Development D1 | `minsky-development`, `a1832f97-4d4c-45c2-a848-8d3dfd0b74f5` |
+| Private R2 bucket | `minsky-development-images` |
+| Durable Object | `SessionLiveCoordinator`, binding `LIVE_UPDATES`, migration tag `v1` |
+| Stable Durable Object namespace | `71700338eed643d59185f4a777fcb7b2` |
+| Authentication | `AUTH_ORIGIN` equals the stable origin; private secret name `AUTH_SECRET` |
+| Schedule and CPU cap | `* * * * *`, 1,000 ms |
+
+Candidate traffic and scheduled dispatch stop at 12:40:00.638 UTC.
+The immediate candidate URL assertion fails after the provider changes. The operator retains the operation journal and does not repeat the mutation.
+A read-only reconciliation at 12:41:31 UTC confirms an HTTP `404`, disabled traffic, and no cron.
+The approved 30-minute drain ends at 13:10:00.638 UTC. The final prepublication check passes at 13:10:32 UTC, after the deadline, with zero pending notifications. Both later candidate checks retain disabled public and preview URLs and no cron.
+The supported private installation command creates stable `AUTH_SECRET` at 12:42 UTC.
+The secret-only intermediate stable version is `92edebbc-4e5f-4786-8708-4e06a79edbcc`. It still serves Supabase before publication.
+The Cloudflare frontend build and complete Worker dry run pass before publication.
+The six approved repository variables select Cloudflare, the committed stable configuration, the exact D1 UUID and name, the private bucket, and enabled publication. Existing publishing credentials remain unchanged.
+
+### Automated publication and stable verification
+
+[Publication attempt 2](https://github.com/GiftedNovaHD/minsky/actions/runs/39252514749/attempts/2) stops before either upload.
+The docs keyboard-search case times out at its existing 30-second index-response wait. Both publication jobs skip.
+The same case passes locally without source changes. Attempt 3 repeats the complete workflow and passes all ordinary and publication jobs.
+The cause of the first wait failure remains unconfirmed. No assertion, timeout, target guard, or protection rule changes.
+
+| Deployment | Workflow attempt and source | Stable Worker version | Verification |
+| --- | --- | --- | --- |
+| Initial activation | [Run 39252514749, attempt 3](https://github.com/GiftedNovaHD/minsky/actions/runs/39252514749/attempts/3), `4e43739` | `cd704354-5ca8-483c-998b-5bfe9ccd8d86` | All five required workflow jobs pass. CLI stable verification passes 14/14 at 13:42:36 UTC, with zero failures, skips, flaky results, infrastructure errors, or retained fixture journals. |
+| Subsequent deployment | [Run 39252514749, attempt 4](https://github.com/GiftedNovaHD/minsky/actions/runs/39252514749/attempts/4), `4e43739` | `9f3686bd-ffa8-46bf-977f-2d9554235d41` | All five required workflow jobs pass. CLI stable verification passes 14/14 at 14:07:38 UTC, with zero failures, skips, flaky results, infrastructure errors, or retained fixture journals. The namespace and all bindings match the first deployment. |
+
+The independent docs versions are `15908735-73c9-4b47-995a-3bef9adff37b` after first publication and `30632b99-25d9-42d3-9bed-49adc467ce51` after repeat publication.
+Both docs revision markers identify `4e43739`. Docs have no application bindings or cron.
+
+The bounded stable harness requires the exact merged HEAD and Cloudflare revision marker before fixture creation.
+It imports all 11 shared scenarios and the complete React journey unchanged.
+Separate checks cover installed-owner sign-in, anonymous rejection, private source paths, and independent documentation.
+Owner verification preserves the existing password and exact administrator account and session. It signs out its test login afterward.
+Fictional accounts verify the temporary-password requirement. No owner password reset or replacement is part of this verification.
+The final read-only audit passes at 14:11:54 UTC. It confirms the complete Worker, private R2, all six bindings, migration tag `v1`, one-minute cron, 1,000 ms CPU cap, disabled app previews, and the same stable namespace. The installation and existing owner remain. The owner completed its temporary-password change during the earlier installation trial; current sign-in preserves that state. Fixture cleanup removes only its proved records and R2 keys. Final counts are one account, zero issues, zero image records, and zero pending notifications. No fixture recovery journal remains.
+
+The first post-walkthrough read-only audit stops during public HTTP checks. Its cause is unconfirmed. Independent direct reads then return every expected marker and status. One unchanged repeat passes. The failed read record remains retained; no provider mutation or repair occurs.
+The stable phone walkthrough passes at 320 × 740 and 390 × 844. Codex visually inspects both fictional volunteer captures. Text and controls remain within each width. Keyboard menu and issue opening pass; refresh preserves the issue, owner, first assignment, elapsed time, and live connection. Its scoped cleanup passes. Physical devices and native browser zoom remain unverified. Owner review of this operational documentation remains separate from the completed activation.
+
+The existing $5 monthly plan remains the limit. This work adds no paid service or optional stress test.
+The procedure preserves Cloudflare records, private objects, and secrets during repair. It authorizes no automatic return to Supabase.
+Earlier dated sections below retain their original state, failed attempts, and source-specific evidence.
+
+### Documentation preview follow-up
+
+The operational records PR uses source `6cfe1d2`. Its [PR CI](https://github.com/GiftedNovaHD/minsky/actions/runs/39267388899) passes all ordinary checks.
+Its [push run](https://github.com/GiftedNovaHD/minsky/actions/runs/39267328994) also passes `checks`, `secrets`, and `dependencies`. The app job skips its preview as required.
+The docs preview upload succeeds, but the publisher then fails to parse Wrangler output. Pinned Wrangler prints asset progress before its final JSON result.
+The existing parser expects JSON at the start of stdout. The stable app and independent stable docs remain on the verified versions above.
+
+[PR #45](https://github.com/GiftedNovaHD/minsky/pull/45) adds a bounded parser correction and one regression case.
+The parser reads the final preview JSON document and retains every URL guard. Malformed output returns the existing fixed error without printing provider output.
+All 31 deployment cases and lint pass locally. Fresh ordinary CI and the actual docs preview result belong in that PR.
+This follow-up changes no application runtime, generated config, protected fixture, or workflow. It does not redeploy the stable app.
+Owner review and merge of this operational follow-up remain pending.
 
 ## T0021 maintainability follow-up, 2026-10-19
 

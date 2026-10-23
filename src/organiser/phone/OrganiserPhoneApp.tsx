@@ -1,5 +1,12 @@
 import { useCallback, useState } from "react";
 import { Plus } from "lucide-react";
+import { useLocation, useNavigate } from "react-router";
+import {
+  pageForPath,
+  useRouteFocus,
+  workspacePaths,
+  type WorkspacePage,
+} from "@/connected/navigation";
 import { Button } from "@/components/ui/button";
 import { inlineActionReturnsToList } from "@/connected/hooks/inlineAction";
 import { useNow } from "@/connected/hooks/useNow";
@@ -40,6 +47,27 @@ import { SessionTab } from "./PhoneSessionTab";
 
 const headingId = "organiser-tab-heading";
 
+const tabPaths = {
+  queue: workspacePaths.queue,
+  mine: workspacePaths.mine,
+  awards: workspacePaths.awards,
+  find: workspacePaths.teams,
+  session: workspacePaths.overview,
+  me: workspacePaths.account,
+} as const;
+
+const pageTabs: Record<WorkspacePage, OrganiserTab> = {
+  queue: "queue",
+  mine: "mine",
+  handoffs: "queue",
+  teams: "find",
+  awards: "awards",
+  overview: "session",
+  accounts: "session",
+  settings: "session",
+  account: "me",
+};
+
 function focusLater(id: string, fallback?: string) {
   window.requestAnimationFrame(() => {
     const target =
@@ -67,7 +95,11 @@ export function OrganiserPhoneApp({
   const member = state?.membership;
   const { command } = workflow;
   const now = useNow(data.clockOffset);
-  const [tab, setTab] = useState<OrganiserTab>("queue");
+  const { pathname } = useLocation();
+  const navigate = useNavigate();
+  const page = pageForPath(pathname);
+  const tab = page ? pageTabs[page] : "queue";
+  useRouteFocus(headingId, Boolean(member));
   const [pushSheet, setPushSheet] = useState<IssueSheet>();
   const [reportOpen, setReportOpen] = useState(false);
   const [reportTeam, setReportTeam] = useTeamSelection(data.sessionId, state);
@@ -221,7 +253,7 @@ export function OrganiserPhoneApp({
             tabs={tabs}
             current={currentTab}
             onSelect={(next) => {
-              setTab(next);
+              void navigate(tabPaths[next]);
               focusLater(headingId);
             }}
           />

@@ -1,7 +1,8 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { requireBackend } from "@/backend";
 import { errorMessage, WorkflowRejectedError } from "@/backend/errors";
 import type { Command } from "../model";
+import { useWorkflowRetry } from "../WorkflowRetry";
 
 /** Options for one workflow command. */
 export interface ActionOptions {
@@ -20,7 +21,7 @@ export interface ActionOptions {
   stayOnPage?: boolean;
 }
 
-/** Sends a workflow command. Resolves to true when the server records it. */
+/** Resolves to true when the command is recorded in the current workspace. */
 export type Act = (
   command: Command,
   options?: ActionOptions,
@@ -41,13 +42,6 @@ export interface CommandRunner {
   notice: string;
   /** The error of the last command. */
   error: string;
-}
-
-interface PendingRequest {
-  request: string;
-  command: Command;
-  onSuccess?: () => void;
-  stayOnPage: boolean;
 }
 
 /**
@@ -72,21 +66,42 @@ export function useCommand({
     options: { stayOnPage: boolean },
   ) => void;
 }): CommandRunner {
+  const { actorId, pending: pendingRequest } = useWorkflowRetry();
   const [busy, setBusy] = useState(false);
-  const [pending, setPending] = useState<Command>();
+  const [pending, setPending] = useState(pendingRequest.current?.command);
   const [notice, setNotice] = useState("");
-  const [error, setError] = useState("");
+  const [error, setError] = useState(
+    pendingRequest.current
+      ? "The request result is unknown. Retry the last request."
+      : "",
+  );
   const inFlight = useRef(false);
-  const pendingRequest = useRef<PendingRequest | undefined>(undefined);
-  function remember(request: PendingRequest | undefined) {
-    pendingRequest.current = request;
-    setPending(request?.command);
-  }
+  const mounted = useRef(false);
+  const currentSessionId = useRef(sessionId);
+  // A late response must check the current session, not its starting closure.
+  currentSessionId.current = sessionId;
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      // A retry can survive the account gate. A callback into an old form cannot.
+      if (pendingRequest.current?.actorId === actorId) {
+        pendingRequest.current.onSuccess = undefined;
+      }
+    };
+  }, [actorId, pendingRequest]);
   async function act(
     command: Command,
     { retry = false, onSuccess, stayOnPage = false }: ActionOptions = {},
   ): Promise<boolean> {
-    if (inFlight.current || (!retry && pendingRequest.current)) return false;
+    if (
+      !mounted.current ||
+      inFlight.current ||
+      (!retry && pendingRequest.current)
+    ) {
+      return false;
+    }
+    if (retry && pendingRequest.current?.actorId !== actorId) return false;
     inFlight.current = true;
     onStart?.();
     setBusy(true);
@@ -95,33 +110,48 @@ export function useCommand({
     const request =
       retry && pendingRequest.current
         ? pendingRequest.current
-        : { request: crypto.randomUUID(), command, onSuccess, stayOnPage };
-    remember(request);
+        : {
+            actorId,
+            sessionId,
+            request: crypto.randomUUID(),
+            command,
+            onSuccess,
+            stayOnPage,
+          };
+    pendingRequest.current = request;
+    setPending(request.command);
     try {
       const id = await requireBackend().workflows.execute(
-        sessionId,
+        request.sessionId,
         request.request,
         request.command,
       );
-      remember(undefined);
+      if (pendingRequest.current !== request || !mounted.current) return false;
+      pendingRequest.current = undefined;
+      setPending(undefined);
       // A retry must complete the original form's cleanup before enabling edits.
-      request.onSuccess?.();
+      if (request.sessionId === currentSessionId.current) request.onSuccess?.();
       await refresh();
+      if (!mounted.current || request.sessionId !== currentSessionId.current)
+        return false;
       onRecorded?.(id, request.command, { stayOnPage: request.stayOnPage });
       setNotice("Action recorded in shared history.");
       return true;
     } catch (cause) {
+      if (pendingRequest.current !== request || !mounted.current) return false;
       // Known server rejections are definitive. Transport failures retain the same
       // request UUID for an explicit retry, including submissions and messages.
       if (cause instanceof WorkflowRejectedError) {
-        remember(undefined);
+        pendingRequest.current = undefined;
+        setPending(undefined);
       }
       await refresh();
+      if (!mounted.current) return false;
       setError(errorMessage(cause));
       return false;
     } finally {
       inFlight.current = false;
-      setBusy(false);
+      if (mounted.current) setBusy(false);
     }
   }
   return {

@@ -145,9 +145,9 @@ The runner reports the exact journal path.
 The journal contains fixture identifiers, not passwords or provider keys.
 
 This command is a local runner against hosted Supabase.
-It is separate from protected GitHub Actions checks and hosted D1 verification.
-Protected execution also requires the reviewed branch in the `cloud-test` environment's branch allowlist.
-This ticket does not change that allowlist or its protection rules.
+It is separate from hosted D1 verification.
+The GitHub Actions job that used the `cloud-test` allowlist is removed.
+This command does not change that allowlist or its protection rules.
 T0017's recorded hosted D1 result does not verify a changed adapter.
 Run current D1 checks through [the full provider guide](run-provider-tests.md). Record new results separately from the historical proof.
 

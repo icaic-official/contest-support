@@ -120,6 +120,20 @@ Check reply retries with isolated accounts and controlled request failures:
 
 The retry cases in `tests/workspace-refresh.spec.ts` automate these checks with mocked responses.
 
+Check submission retries through account-check failures:
+
+1. Lose a submission response after the server records the issue.
+2. Fail the next account check. Check that contest data disappears.
+3. Restore the account check. Check that **Retry last request** returns without an automatic write.
+4. Select **Retry last request**. Check that one issue exists and the request ID stays the same.
+5. Repeat with a response delayed until after account-check recovery. Check that focus stays on the current page.
+6. Sign out with an uncertain request. Sign in again and check that the old retry is absent.
+
+With isolated contestant memberships in two sessions, lose a submission response and remove the original session membership.
+Let the page select the remaining session. Retry the request and check that the server rejects access to the original session.
+Check that the remaining session contains no copy of the submitted issue.
+The cases in `tests/workflow-session-retry.spec.ts` exercise these session checks through the embedded PostgreSQL fixture.
+
 ## 5. Resolution and award
 
 1. Resolve the issue with a preset or **Custom** summary.
@@ -439,3 +453,25 @@ Do not apply unrelated remote migrations or change provider configuration for th
 If cleanup retains a recovery file, follow [fixture recovery](cloud-onboarding.md#fixture-recovery).
 Record local simulations, hosted-service CLI results, and protected GitHub Actions results separately.
 A skipped protected job is not a pass. The owner approved the exact T0009 branch-only environment policy addition on 2026-10-18.
+
+
+## 14. Browser routes and workflow retry recovery
+
+Use isolated fictional accounts for these checks. These steps do not authorize hosted fixture creation.
+The [frontend architecture](frontend-architecture.md#browser-routes) lists paths and required roles.
+
+1. Open `/jury` while signed out. Sign in as a jury member. Check that the award screen opens.
+2. Refresh the page. Check that the address remains `/jury` and current session data loads.
+3. Open the queue, award screen, and account screen. Use browser Back and Forward. Check each address and screen.
+4. Open **Change password**. Check cancellation and completion. Both must retain `/account`.
+5. As support staff, open `/administration`. Check that the app returns to `/issues` without administration data.
+6. Remove a jury or administrator role in another isolated client. Refresh access. Check that the restricted section closes.
+7. Repeat navigation in the organiser phone layout. Check keyboard focus after a tab change and after a return from an issue.
+8. Use the existing fictional-response retry cases to interrupt a workflow response and account check.
+   Check that protected content hides while the account check fails.
+   After recovery, select **Retry last request**. Check that it reuses the original actor, session, request ID, and command.
+9. Repeat with access to the original session removed. Check that the retry reaches that session's server access check.
+10. Sign out while a response is pending. Sign in with another account. Check that no old request or protected record remains.
+
+A full reload discards in-memory drafts, filters, and retry metadata.
+Record observed results separately from these instructions. Historical runs do not verify the combined frontend.

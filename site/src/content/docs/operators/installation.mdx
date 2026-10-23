@@ -56,6 +56,14 @@ Set `account_id` in `provision.jsonc`. The account subdomain is in the dashboard
 
 ## 1. Create the database
 
+Confirm the account first. The output must show the account whose ID you set in `provision.jsonc`. If it does not, stop and correct `account_id`.
+
+```sh
+npx wrangler whoami --config=.wrangler/installation/provision.jsonc
+```
+
+Then create the database:
+
 ```sh
 npx wrangler d1 create "$MINSKY_INSTALL_DATABASE" --config=.wrangler/installation/provision.jsonc --update-config=false
 MINSKY_INSTALL_DATABASE_ID='REPLACE_WITH_NEW_DATABASE_UUID'

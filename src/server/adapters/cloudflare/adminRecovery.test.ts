@@ -120,8 +120,10 @@ describe('Cloudflare admin password recovery', () => {
     });
     const after = await stmt('SELECT access_version FROM accounts WHERE id = ?', installed.accountId).first<{ access_version: number }>();
     expect(after!.access_version).toBeGreaterThan(before!.access_version);
+    // created_at stores unixepoch() seconds. Bootstrap and recovery can share one second.
+    // rowid selects the later insert when those timestamps tie.
     expect(await stmt(`SELECT action, state, actor, session_id FROM account_operations
-      WHERE account_id = ? AND state = 'completed' ORDER BY created_at DESC LIMIT 1`, installed.accountId).first()).toEqual({
+      WHERE account_id = ? AND state = 'completed' ORDER BY created_at DESC, rowid DESC LIMIT 1`, installed.accountId).first()).toEqual({
       action: 'reset_password', state: 'completed', actor: installed.accountId, session_id: installed.sessionId,
     });
     expect(await count('command_assertions')).toBe(0);

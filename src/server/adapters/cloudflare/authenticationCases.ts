@@ -30,7 +30,10 @@ export type AuthenticationCases = 'sessions' | 'recovery' | 'initiation' | 'comp
 
 /** Each file owns its fixtures. Hosted files can run concurrently. */
 export function registerAuthenticationCases(group: AuthenticationCases) {
-  describe('Cloudflare account authentication', () => {
+  // Maintained scrypt is slower than Vitest's 5 second default on Workers Builds.
+  // Recorded account cases there took 1.5 to 8.3 seconds. Allow 30 seconds locally.
+  // Hosted runs keep the 120 second limit from their Vitest configuration.
+  describe('Cloudflare account authentication', remote ? {} : { timeout: 30_000 }, () => {
     let db: D1Connection;
     let dispose: () => Promise<void>;
     let fixture: D1Fixture;
@@ -358,31 +361,56 @@ export function registerAuthenticationCases(group: AuthenticationCases) {
 
       // Register this clock probe only for local SQLite. Hosted cases above inject
       // expiry in the actual batch without depending on request latency.
+      // The previous probe ran an 18 million row query so SQLite's clock would pass
+      // a 1.5 second deadline. Workers Builds reported 10029 ms and failed the 5 second
+      // default. This probe moves a test clock inside the same batch.
       if (!remote) {
         describe('local SQLite expiry clock', () => {
           it('rejects a self change whose original identity expires after its row is deliberately deleted', async () => {
             const replacement = randomSecret();
             const hash = await passwordHasher.hash(replacement);
-            const deadline = new Date(Date.now() + 1500).toISOString();
+            const clock = 'minsky_auth_test_clock';
+            // Keep this text identical to the production strftime('now') expression.
+            const sqliteNow = "strftime('%Y-%m-%dT%H:%M:%fZ', 'now')";
+            const now = Date.now();
+            const started = new Date(now).toISOString();
+            const deadline = new Date(now + 60 * 60 * 1000).toISOString();
+            const expiredAt = new Date(now + 2 * 60 * 60 * 1000).toISOString();
+            await stmt(`CREATE TABLE ${clock} (now TEXT NOT NULL)`).run();
+            await stmt(`INSERT INTO ${clock} (now) VALUES (?)`, started).run();
             await stmt('UPDATE ba_session SET expiresAt = ? WHERE userId = ?', deadline, fixture.staff.accountId).run();
             const before = await credentialEffects();
             let checkedBeforeExpiry = false;
-            const racing = new D1AuthenticationService({ prepare: (sql) => db.prepare(sql), batch: async (statements) => {
-              const live = await stmt("SELECT expiresAt > strftime('%Y-%m-%dT%H:%M:%fZ', 'now') AS valid FROM ba_session WHERE userId = ?", fixture.staff.accountId).first<{ valid: number }>();
-              checkedBeforeExpiry = live?.valid === 1;
-              const finalGuard = statements.length - 2;
-              // This SELECT consumes real SQLite time after the credential writes.
-              // It does not modify the captured deadline or restore the old row.
-              const delay = db.prepare(`WITH RECURSIVE work(n) AS (
-                VALUES(0) UNION ALL SELECT n + 1 FROM work WHERE n < 18000000
-              ) SELECT sum(n) FROM work`);
-              return db.batch([...statements.slice(0, finalGuard), delay, ...statements.slice(finalGuard)]);
-            } }, identity, { ...passwordHasher, hash: async () => hash });
-            await expectFailure(racing.changePassword(adminHeaders, password, replacement)).toMatchObject({ status: 409 });
-            expect(checkedBeforeExpiry).toBe(true);
-            expect(new Date().toISOString() > deadline).toBe(true);
-            expect(await credentialEffects()).toBe(before);
-            expect((await stmt('SELECT id FROM ba_session WHERE userId = ?', fixture.staff.accountId).all()).results).toHaveLength(1);
+            let rewrites = 0;
+            const racing = new D1AuthenticationService({
+              prepare: (sql) => {
+                const rewritten = sql.replaceAll(sqliteNow, `(SELECT now FROM ${clock})`);
+                if (rewritten !== sql) rewrites += 1;
+                return db.prepare(rewritten);
+              },
+              batch: async (statements) => {
+                const live = await stmt(`SELECT expiresAt > ${sqliteNow} AS valid FROM ba_session WHERE userId = ?`, fixture.staff.accountId).first<{ valid: number }>();
+                checkedBeforeExpiry = live?.valid === 1;
+                const finalGuard = statements.length - 2;
+                // The session row is already deleted in this transaction. Move the test
+                // clock past the captured deadline before the final guard reads it.
+                const advance = stmt(`UPDATE ${clock} SET now = ?`, expiredAt);
+                return db.batch([...statements.slice(0, finalGuard), advance, ...statements.slice(finalGuard)]);
+              },
+            }, identity, { ...passwordHasher, hash: async () => hash });
+            try {
+              await expectFailure(racing.changePassword(adminHeaders, password, replacement)).toMatchObject({
+                status: 409,
+                message: 'Account changed. Check its status before retrying.',
+              });
+              expect(checkedBeforeExpiry).toBe(true);
+              expect(rewrites).toBeGreaterThan(0);
+              expect(new Date().toISOString() < deadline).toBe(true);
+              expect(await credentialEffects()).toBe(before);
+              expect((await stmt('SELECT id FROM ba_session WHERE userId = ?', fixture.staff.accountId).all()).results).toHaveLength(1);
+            } finally {
+              await stmt(`DROP TABLE IF EXISTS ${clock}`).run();
+            }
           });
         });
       }

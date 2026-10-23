@@ -35,6 +35,7 @@ Also set `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` in `.env.local`
 Use that project's public URL and publishable key.
 An organizer must also give your account session membership.
 `npm run cloud:recover-admin` recovers an administrator for this provider only.
+Use `npm run cloudflare:recover-admin` for the Cloudflare development admin.
 The repository guide is `docs/cloud-onboarding.md`.
 
 ## Find application code

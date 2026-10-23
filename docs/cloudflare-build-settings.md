@@ -24,7 +24,11 @@ See [Workers pricing](https://developers.cloudflare.com/workers/platform/pricing
 | Deploy command | `npm run ci:worker` |
 | Preview command | `npm run ci:worker` |
 | Build variable | `SKIP_DEPENDENCY_INSTALL=1` |
-| Node.js | `.nvmrc` selects `22` |
+| Node.js | `NODE_VERSION=22.23.2` on both `minsky-ci` triggers. `.nvmrc` contains `22`. |
+
+Both `minsky-ci` triggers set the build variable `NODE_VERSION` to `22.23.2`.
+That value is already set in Cloudflare.
+It keeps CI on Node.js 22.23.2 when the build image's default Node.js changes.
 
 `npm run ci` installs both lockfiles, then runs type checking, ESLint, Deno function checks, function tests, unit tests, the provider scenario list, both production builds, both `npm audit` checks, and a checksum-verified Gitleaks scan.
 `npm run ci:worker` runs `wrangler versions upload --config wrangler.ci.jsonc --dry-run`.
@@ -113,9 +117,23 @@ Run them only against the documented CI database names.
 
 ## Publication commands
 
-`CLOUDFLARE_DEPLOY_ENABLED` no longer starts a publisher.
 The GitHub Actions jobs `checks`, `secrets`, `dependencies`, `deploy`, and `deploy-app` are removed.
 Protected `cloud-test` rules stay in GitHub. No workflow uses them.
+
+`scripts/deploy-workers.mjs` accepts a branch push only when these shell variables match:
+
+- `GITHUB_EVENT_NAME` is `push`.
+- `GITHUB_REPOSITORY` is `GiftedNovaHD/minsky`.
+- `GITHUB_REF` is `refs/heads/` followed by the branch name.
+- `GITHUB_SHA` is 40 lowercase hexadecimal characters and is not all zeros.
+
+Publication also requires `GH_TOKEN`, `CLOUDFLARE_API_TOKEN`, and `CLOUDFLARE_ACCOUNT_ID`.
+`GH_TOKEN` is the token for the branch revision check.
+`CLOUDFLARE_API_TOKEN` is the token for the upload.
+`CLOUDFLARE_ACCOUNT_ID` must be `458ad6a930b0fb717796dfa19ca6a2b1`.
+`--check` and `--build` do not read `GH_TOKEN` or `CLOUDFLARE_API_TOKEN`.
+A stable app publication also reads the backend values in [Repository settings](#repository-settings).
+The script rejects `GITHUB_ACTOR` when the value is `dependabot[bot]`.
 
 ## Repository settings
 
@@ -157,7 +175,7 @@ Install the locked dependencies before these commands:
 | Validate, build, or publish docs | Use the same options with `--site=docs`. |
 | Guarded app build and publication | `npm run deploy` |
 
-These commands require a valid repository branch-push context, including its exact Git revision.
+These commands require the branch-push shell variables under [Publication commands](#publication-commands).
 They are deployment commands, not substitutes for local `npm run build`.
 The removed `deploy:preview` command cannot upload an assets-only app version.
 

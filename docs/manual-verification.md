@@ -24,6 +24,7 @@ Docker and persona switching are not required.
 For a separate Cloudflare installation, create the first admin through its bootstrap step.
 For the Supabase provider, follow [Supabase provider](cloud-onboarding.md).
 `npm run cloud:recover-admin` is that provider's administrator recovery.
+Use `npm run cloudflare:recover-admin` when the Cloudflare development admin cannot sign in.
 Use a separate browser or profile for each account: contestant, volunteer, specialist, jury, and admin.
 Work only in a clearly identified development or test session.
 

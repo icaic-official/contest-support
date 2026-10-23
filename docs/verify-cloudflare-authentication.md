@@ -189,3 +189,4 @@ The organizer must administer every assigned session. Archived memberships block
 T0020 adds trusted, provider-owned [installation-owner recovery](../site/src/content/docs/operators/installation.md#recover-the-installation-owner).
 That procedure passed the recorded empty-installation checks. Confirm the exact installation and owner before recovery.
 `npm run cloud:recover-admin` is the Supabase provider's recovery command. It does not operate on Cloudflare.
+Use `npm run cloudflare:recover-admin` to reset a Cloudflare admin password.

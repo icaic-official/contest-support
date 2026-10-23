@@ -76,6 +76,7 @@ Open [http://127.0.0.1:5173](http://127.0.0.1:5173).
 Provider access and app membership are separate. An administrator must grant your account session access.
 Sign in with your organizer-provided username and password, then change any temporary password.
 `npm run cloud:recover-admin` is this provider's administrator recovery. It does not change the Cloudflare installation.
+Use `npm run cloudflare:recover-admin` to reset a Cloudflare admin password.
 See [Supabase provider](docs/cloud-onboarding.md#contributor-setup) for access, setup, migrations, and recovery.
 
 ## Checks and common commands
@@ -107,7 +108,7 @@ See [Supabase provider](docs/cloud-onboarding.md#contributor-setup) for access, 
 | `npm run test:auth:hosted -- --account=… --database=…` | Run account cases on the explicit isolated hosted authentication D1 target. |
 | `npm run test:auth:http -- --account=… --database=… --origin=…` | Check the isolated deployed authentication Worker. |
 | `npm run test:auth:hash` | Measure password cost in a temporary local Worker. |
-| `npm run test:e2e:smoke` | Run the critical-path browser files `tests/landing.spec.ts` and `tests/journey.spec.ts`. | |
+| `npm run test:e2e:smoke` | Run the critical-path browser files `tests/landing.spec.ts` and `tests/journey.spec.ts`. |
 | `npm run test:e2e` | Run every mocked browser test, including the smoke files. |
 | `npm run test:cloud` | Run the browser and workflow suite with isolated fixtures on the CI project. Needs cloud credentials. |
 | `npm run test:hosted` | Repeat the suite with real accounts against the deployed app. Needs cloud credentials. |
@@ -135,9 +136,9 @@ These commands connect to provider accounts. Several of them change hosted data 
 | `npm run cloud:functions` | Deploy the `admin` and `attachments` functions to the development project. |
 | `npm run cloud:bootstrap` | Make the first session admin. |
 | `npm run cloud:recover-admin` | Reset a Supabase provider administrator when that provider's only admin cannot sign in. |
+| `npm run cloudflare:recover-admin` | Reset the password of an existing Cloudflare admin. Prints the temporary password once in that terminal. |
 | `npm run cloud:hosting-login` | Sign in to Cloudflare with Wrangler. |
 | `npm run deploy` | Build and deploy the frontend Worker. Deploy only after an explicit request. |
-| `npm run deploy:preview` | Build and upload a preview version of the frontend Worker. |
 
 See [cloud onboarding](docs/cloud-onboarding.md) for the exact arguments.
 

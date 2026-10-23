@@ -52,8 +52,9 @@ That command reads `wrangler.jsonc` and would publish `minsky-dev`.
     Ordinary checks do not use those values.
 12. Leave **Settings > Build > Build watch paths** at the default, which includes every file.
 
-The repository file `.nvmrc` contains `22`.
-Workers Builds uses that file instead of its default Node.js version.
+Both `minsky-ci` triggers pin the build variable `NODE_VERSION` to `22.23.2`.
+That value is set in Cloudflare, and a read-back confirmed it.
+`.nvmrc` contains `22` and stays for local tools.
 See [the build image](https://developers.cloudflare.com/workers/ci-cd/builds/build-image/) and [build configuration](https://developers.cloudflare.com/workers/ci-cd/builds/configuration/).
 
 ## Confirm the first build

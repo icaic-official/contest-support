@@ -6,7 +6,11 @@ const SESSION_ID = "00000000-0000-4000-8000-000000000100";
 const TEAM_ID = "00000000-0000-4000-8000-000000000200";
 
 /** Signs in with isolated Auth and database responses for one membership. */
-async function signIn(page: Page, membership: Membership | null) {
+async function signIn(
+  page: Page,
+  membership: Membership | null,
+  startPath = "/",
+) {
   const state: Snapshot = {
     session: {
       id: SESSION_ID,
@@ -26,7 +30,12 @@ async function signIn(page: Page, membership: Membership | null) {
     },
     membership,
     teams: [
-      { id: TEAM_ID, session_id: SESSION_ID, name: "Aurora", location: "Desk 12" },
+      {
+        id: TEAM_ID,
+        session_id: SESSION_ID,
+        name: "Aurora",
+        location: "Desk 12",
+      },
     ],
     issues: [],
     resolutions: [],
@@ -72,6 +81,7 @@ async function signIn(page: Page, membership: Membership | null) {
         must_change: false,
         session_valid: true,
       },
+      "/rest/v1/rpc/complete_password_change": null,
       "/rest/v1/memberships": membership ? [membership] : [],
       "/rest/v1/sessions": membership
         ? [{ id: SESSION_ID, name: "Selection session" }]
@@ -85,7 +95,8 @@ async function signIn(page: Page, membership: Membership | null) {
       body: JSON.stringify(responses[path]),
     });
   });
-  await page.goto("/");
+  await page.goto(startPath);
+  await expect(page).toHaveURL(startPath);
   await page.getByLabel("Username", { exact: true }).fill("selection");
   await page.getByLabel("Password", { exact: true }).fill("fixture-password");
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
@@ -124,4 +135,184 @@ test("an account without a membership sees the session access screen", async ({
   await expect(
     page.getByRole("button", { name: "Refresh access", exact: true }),
   ).toBeVisible();
+});
+
+test("the desktop account menu moves focus to the account heading", async ({
+  page,
+}) => {
+  await signIn(page, { ...staff, roles: ["volunteer"] });
+  await page.getByRole("button", { name: /^Account menu/ }).click();
+  await page.getByRole("menuitem", { name: "My account", exact: true }).click();
+  await expect(page).toHaveURL("/account");
+  await expect(
+    page.getByRole("heading", { name: "My account", exact: true }),
+  ).toBeFocused();
+});
+
+for (const [path, heading, membership] of [
+  ["/administration", "Overview", { ...staff, is_admin: true }],
+  ["/administration/accounts", "Accounts", { ...staff, is_admin: true }],
+  [
+    "/administration/settings",
+    "Session settings",
+    { ...staff, is_admin: true },
+  ],
+  ["/jury", "Award review", staff],
+] as const) {
+  test(`a direct ${path} link survives sign-in and reload`, async ({
+    page,
+  }) => {
+    await signIn(page, membership, path);
+    await expect(
+      page.getByRole("heading", { level: 1, name: heading, exact: true }),
+    ).toBeVisible();
+    await expect(page).toHaveURL(path);
+    const response = await page.reload();
+    expect(response?.status()).toBe(200);
+    await expect(
+      page.getByRole("heading", { level: 1, name: heading, exact: true }),
+    ).toBeVisible();
+    await expect(page).toHaveURL(path);
+  });
+}
+
+test("browser history restores the section and heading focus", async ({
+  page,
+}) => {
+  await signIn(page, {
+    ...staff,
+    roles: ["volunteer", "jury"],
+    is_admin: true,
+  });
+  const pages = page.getByRole("navigation", { name: "Console pages" });
+  await pages.getByRole("button", { name: /^Award review/ }).click();
+  await expect(page).toHaveURL("/jury");
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Award review", exact: true }),
+  ).toBeFocused();
+  await pages.getByRole("button", { name: "Accounts", exact: true }).click();
+  await expect(page).toHaveURL("/administration/accounts");
+  await page.goBack();
+  await expect(page).toHaveURL("/jury");
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Award review", exact: true }),
+  ).toBeFocused();
+  await page.goBack();
+  await expect(page).toHaveURL("/issues");
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Issue queue", exact: true }),
+  ).toBeFocused();
+  await page.goForward();
+  await expect(page).toHaveURL("/jury");
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Award review", exact: true }),
+  ).toBeFocused();
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Awards", exact: true }),
+  ).toBeVisible();
+  await expect(page).toHaveURL("/jury");
+  await page
+    .getByRole("navigation", { name: "Organiser sections" })
+    .getByRole("button", { name: "Me", exact: true })
+    .click();
+  await expect(page).toHaveURL("/account");
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Me", exact: true }),
+  ).toBeFocused();
+  await page.goBack();
+  await expect(page).toHaveURL("/jury");
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Awards", exact: true }),
+  ).toBeFocused();
+});
+
+test("protected links return an unauthorized member to their issue queue", async ({
+  page,
+}) => {
+  await signIn(page, { ...staff, roles: ["volunteer"] }, "/administration");
+  await expect(page).toHaveURL("/issues");
+  const queue = page.getByRole("heading", {
+    level: 1,
+    name: "Issue queue",
+    exact: true,
+  });
+  await expect(queue).toBeVisible();
+  for (const path of [
+    "/administration/accounts",
+    "/administration/settings",
+    "/jury",
+  ]) {
+    await page.goto(path);
+    await expect(page).toHaveURL("/issues");
+    await expect(queue).toBeVisible();
+  }
+  await expect(
+    page
+      .getByRole("navigation", { name: "Console pages" })
+      .getByRole("button", {
+        name: /^(Award review|Overview|Accounts|Session settings)$/,
+      }),
+  ).toHaveCount(0);
+});
+
+test("an unknown route retains its address and offers a route back to issues", async ({
+  page,
+}) => {
+  await signIn(page, { ...staff, roles: ["volunteer"] }, "/unknown-page");
+  await expect(
+    page.getByRole("heading", { name: "Page not found", exact: true }),
+  ).toBeVisible();
+  await expect(page).toHaveURL("/unknown-page");
+  await page.getByRole("link", { name: "Issues", exact: true }).click();
+  await expect(page).toHaveURL("/issues");
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Issue queue", exact: true }),
+  ).toBeVisible();
+});
+
+test("optional password changes and cancellation retain the account route", async ({
+  page,
+}) => {
+  await signIn(page, staff, "/account");
+  const account = page.getByRole("heading", {
+    level: 1,
+    name: "My account",
+    exact: true,
+  });
+  await expect(account).toBeVisible();
+  await page
+    .getByRole("button", { name: "Change password", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Change your password", exact: true }),
+  ).toBeVisible();
+  await expect(page).toHaveURL("/account");
+  await page
+    .getByRole("button", { name: "Return to dashboard", exact: true })
+    .click();
+  await expect(account).toBeVisible();
+  await expect(page).toHaveURL("/account");
+
+  await page
+    .getByRole("button", { name: "Change password", exact: true })
+    .click();
+  await page
+    .getByLabel("Current password", { exact: true })
+    .fill("fixture-password");
+  await page
+    .getByLabel("New password", { exact: true })
+    .fill("replacement-password");
+  await page
+    .getByLabel("Confirm password", { exact: true })
+    .fill("replacement-password");
+  await page
+    .getByRole("button", { name: "Save password", exact: true })
+    .click();
+  await expect(account).toBeVisible();
+  await expect(page).toHaveURL("/account");
+  await page.reload();
+  await expect(account).toBeVisible();
+  await expect(page).toHaveURL("/account");
 });

@@ -6,6 +6,13 @@ import {
   useState,
 } from "react";
 import { Archive } from "lucide-react";
+import { useLocation, useNavigate } from "react-router";
+import { AccountPage } from "@/connected/AccountPage";
+import {
+  pageForPath,
+  useRouteFocus,
+  workspacePaths,
+} from "@/connected/navigation";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useNow } from "@/connected/hooks/useNow";
@@ -29,11 +36,7 @@ import {
 import { useLeftIssueNotice } from "../useLeftIssueNotice";
 import { AccountsPage, OverviewPage, SettingsPage } from "./AdminPages";
 import { AwardReviewPage } from "./AwardReviewPage";
-import {
-  CommandPalette,
-  ConsoleSidebar,
-  ConsoleTopBar,
-} from "./ConsoleChrome";
+import { CommandPalette, ConsoleSidebar, ConsoleTopBar } from "./ConsoleChrome";
 import {
   type ConsolePageProps,
   consoleHeadingId,
@@ -118,7 +121,11 @@ export function OrganiserDesktopConsole({
   const member = state?.membership;
   const { command } = workflow;
   const now = useNow(data.clockOffset);
-  const [page, setPage] = useState<ConsolePage>("queue");
+  const { pathname } = useLocation();
+  const navigateTo = useNavigate();
+  const page = pageForPath(pathname);
+  const accountPage = page === "account";
+  useRouteFocus(consoleHeadingId, Boolean(member));
   const [collapsed, setCollapsed] = useState(storedCollapsed);
   const [sheetTab, setSheetTab] = useState<SheetTab>("activity");
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -196,7 +203,8 @@ export function OrganiserDesktopConsole({
 
   const groups = consoleNavGroups(member);
   const pages = groups.flatMap((group) => group.pages);
-  const currentPage = pages.includes(page) ? page : pages[0];
+  const currentPage =
+    page && page !== "account" && pages.includes(page) ? page : pages[0];
   const issues = visibleIssues(state.issues, member);
   const archived = Boolean(state.event?.archived);
   const canReport = isSupport(member);
@@ -211,7 +219,7 @@ export function OrganiserDesktopConsole({
   );
 
   function navigate(next: ConsolePage) {
-    setPage(next);
+    void navigateTo(workspacePaths[next]);
     if (next === "teams") setTeamPageTeam(undefined);
     focusLater(consoleHeadingId);
   }
@@ -320,7 +328,7 @@ export function OrganiserDesktopConsole({
               account={username ?? user.email ?? ""}
               groups={groups}
               counts={counts}
-              page={currentPage}
+              page={accountPage ? undefined : currentPage}
               onPage={navigate}
               collapsed={collapsed}
               locked={command.locked}
@@ -337,12 +345,15 @@ export function OrganiserDesktopConsole({
                   : undefined
               }
               onChangePassword={shell.changePassword}
+              onAccount={() => void navigateTo("/account")}
               onSignOut={signOut}
             />
             <div className="flex min-w-0 flex-1 flex-col">
               <ConsoleTopBar
                 sessionName={state.session!.name}
-                pageLabel={consolePageLabels[currentPage]}
+                pageLabel={
+                  accountPage ? "My account" : consolePageLabels[currentPage]
+                }
                 connected={data.connected}
                 collapsed={collapsed}
                 onToggleSidebar={toggleSidebar}
@@ -369,53 +380,72 @@ export function OrganiserDesktopConsole({
                     )}
                     <CommandFeedback command={command} />
                     {leftNotice && (
-                      <p role="status" className="text-sm text-muted-foreground">
+                      <p
+                        role="status"
+                        className="text-sm text-muted-foreground"
+                      >
                         {leftNotice}
                       </p>
                     )}
                     {command.notice && (
-                      <p role="status" className="text-xs text-muted-foreground">
+                      <p
+                        role="status"
+                        className="text-xs text-muted-foreground"
+                      >
                         {command.notice}
                       </p>
                     )}
                     {member.is_admin && (admin.error || admin.notice) && (
-                      <AdminFeedback error={admin.error} notice={admin.notice} />
+                      <AdminFeedback
+                        error={admin.error}
+                        notice={admin.notice}
+                      />
                     )}
                   </div>
-                  {currentPage === "queue" && (
-                    <QueuePage
-                      props={pageProps}
-                      teamSelection={queueTeam}
-                      onTeamSelection={setQueueTeam}
-                      onReport={canReport ? () => openReport() : undefined}
+                  {accountPage ? (
+                    <AccountPage
+                      shell={shell}
+                      member={member}
+                      headingId={consoleHeadingId}
                     />
-                  )}
-                  {currentPage === "mine" && <MinePage props={pageProps} />}
-                  {currentPage === "handoffs" && (
-                    <HandoffsPage props={pageProps} />
-                  )}
-                  {currentPage === "teams" && (
-                    <TeamsPage
-                      props={pageProps}
-                      teamId={teamPageTeam}
-                      onTeam={(teamId) => {
-                        setTeamPageTeam(teamId);
-                        focusLater(consoleHeadingId);
-                      }}
-                      onReport={canReport ? openReport : undefined}
-                    />
-                  )}
-                  {currentPage === "awards" && (
-                    <AwardReviewPage props={pageProps} />
-                  )}
-                  {currentPage === "overview" && (
-                    <OverviewPage props={pageProps} />
-                  )}
-                  {currentPage === "accounts" && (
-                    <AccountsPage props={pageProps} admin={admin} />
-                  )}
-                  {currentPage === "settings" && (
-                    <SettingsPage props={pageProps} admin={admin} />
+                  ) : (
+                    <>
+                      {currentPage === "queue" && (
+                        <QueuePage
+                          props={pageProps}
+                          teamSelection={queueTeam}
+                          onTeamSelection={setQueueTeam}
+                          onReport={canReport ? () => openReport() : undefined}
+                        />
+                      )}
+                      {currentPage === "mine" && <MinePage props={pageProps} />}
+                      {currentPage === "handoffs" && (
+                        <HandoffsPage props={pageProps} />
+                      )}
+                      {currentPage === "teams" && (
+                        <TeamsPage
+                          props={pageProps}
+                          teamId={teamPageTeam}
+                          onTeam={(teamId) => {
+                            setTeamPageTeam(teamId);
+                            focusLater(consoleHeadingId);
+                          }}
+                          onReport={canReport ? openReport : undefined}
+                        />
+                      )}
+                      {currentPage === "awards" && (
+                        <AwardReviewPage props={pageProps} />
+                      )}
+                      {currentPage === "overview" && (
+                        <OverviewPage props={pageProps} />
+                      )}
+                      {currentPage === "accounts" && (
+                        <AccountsPage props={pageProps} admin={admin} />
+                      )}
+                      {currentPage === "settings" && (
+                        <SettingsPage props={pageProps} admin={admin} />
+                      )}
+                    </>
                   )}
                 </div>
               </div>

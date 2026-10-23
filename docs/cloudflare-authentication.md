@@ -1,7 +1,7 @@
 # Cloudflare authentication reference
 
 The Cloudflare application uses maintained Better Auth identity operations and guarded D1 account records.
-Supabase remains the active development backend.
+Cloudflare serves the development application. Supabase remains available as a separate provider implementation.
 This reference describes the authentication API and its access rules.
 Use the [installation guide](../site/src/content/docs/operators/installation.mdx) for setup and [current state](current-state.md) for dated verification evidence.
 
@@ -19,7 +19,9 @@ The raw Better Auth router is not exposed.
 `createCloudflareAuthentication()` implements the existing browser `Authentication` contract.
 Its additional `account()` and `sessions()` methods support account administration and session reads.
 The complete `createCloudflareBackend()` factory wraps this authentication adapter and supplies the remaining operation groups.
-The application's backend entry point defaults to Supabase. Isolated Cloudflare builds explicitly select `VITE_BACKEND=cloudflare`.
+The backend entry point defaults to Supabase when `VITE_BACKEND` is absent.
+The development deployment explicitly selects `VITE_BACKEND=cloudflare`.
+Local Supabase builds retain their own public settings. No automatic provider fallback occurs.
 
 ## HTTP endpoints
 

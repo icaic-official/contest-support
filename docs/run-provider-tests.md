@@ -296,47 +296,34 @@ The journey checks all nine commands, jury worklist transitions, images, live up
 Follow [the installation guide](../site/src/content/docs/operators/installation.mdx) for the separate empty-installation procedure.
 Record the tested source revision and installation result in the current-state record.
 
-## Run protected GitHub checks
+## Run hosted checks on demand
 
-1. Configure the existing `cloud-test` environment as described in [cloud onboarding](cloud-onboarding.md#verification-and-protected-cloud-ci).
-2. Check that the environment permits the reviewed branch. Preserve the existing entries and protection rules.
-3. Select the branch that contains the reviewed revision. The example below selects merged `main`:
+GitHub Actions no longer runs these checks.
+A coding agent runs them against the isolated targets below.
+Preserve the `cloud-test` allowlist. Do not change it for this command.
 
-   ```sh
-   MINSKY_REVIEW_REF='main'
-   gh workflow run checks.yml --repo GiftedNovaHD/minsky --ref "$MINSKY_REVIEW_REF" -f existing_backend=true
-   ```
+1. Confirm the target in [cloud onboarding](cloud-onboarding.md#verification-and-protected-cloud-ci).
+2. Check out the reviewed revision.
+3. For Supabase, run the commands in [CI settings](cloudflare-build-settings.md#on-demand-checks).
+4. Record the revision, backend versions, results, and cleanup outcome.
 
-4. Check both the existing hosted suite and the shared provider suite in the `cloud` job.
-5. Record the revision, backend versions, results, and cleanup outcome.
-
-`existing_backend=true` skips backend preparation.
-It does not skip fixture creation or cleanup and does not check a fresh installation.
-Use the default preparation mode only when the remote migration history matches the intended backend revision.
+Skip Supabase backend preparation when the change does not include migrations, functions, or configuration.
+The tests still create and delete fixtures. They do not check a fresh installation.
+Prepare the CI backend only when the remote migration history matches the intended revision.
 The [earlier CI preparation record](current-state.md#t0014-existing-backend-verification-2026-10-17) includes an extra announcement migration.
 Inspect the live migration history before preparation rather than assuming it matches a clean checkout.
-For an unmerged ticket, set `MINSKY_REVIEW_REF` to its reviewed branch.
-Check that the protected environment permits that exact branch before dispatch.
-If it does not, obtain authorization before changing an allowlist entry or protection rule.
+Do not change the `cloud-test` allowlist for an on-demand run.
 
-For the complete Cloudflare connector, select its separate input:
-
-```sh
-gh workflow run checks.yml --repo GiftedNovaHD/minsky --ref "$MINSKY_REVIEW_REF" -f cloudflare_connector=true
-```
-
-Use only the connector mode for that dispatch.
-The reviewed revision and workflow definition must exist on that remote branch.
-The protected job waits for ordinary checks, secret scanning, and dependency checks.
-It checks and migrates the dedicated store CI database for the complete workflow and account suites.
-It prepares the separate full connector database before it builds and deploys the isolated application Worker.
-It runs the shared contracts and React journey against that full connector.
-The private bucket, service activation, and initial Worker secret must exist before this job can pass.
-The workflow does not activate a paid service or create the bucket.
-Record the protected result and tested revision in [current state](current-state.md), separately from hosted CLI results.
+For the complete Cloudflare connector, run the hosted commands in this guide on the reviewed revision.
+Do not point them at the development database.
+The commands migrate the dedicated store CI database, then the separate full connector database.
+They deploy the isolated application Worker, then run the shared contracts and React journey.
+The private bucket, service activation, and initial Worker secret must exist before those commands can pass.
+The commands do not activate a paid service or create the bucket.
+Record the result and tested revision in [current state](current-state.md), separately from other hosted CLI results.
 Preserve unrelated allowlist entries and protection rules.
-Earlier protected authentication runs do not check this complete connector job.
-Record protected Supabase verification separately from Cloudflare CLI runs and the protected connector job.
+Earlier authentication runs do not check this connector path.
+Record Supabase verification separately from Cloudflare CLI runs.
 
 ## Recover an incomplete fixture
 
@@ -375,7 +362,7 @@ Recovery skips scenario execution and normal backend prerequisites, but retains 
 There is no automatic recovery command for the direct workflow or account suites.
 The historical transaction-proof DELETE commands omit modern identity and account records. Do not use those commands for these journals.
 
-In GitHub Actions, journals are under `$RUNNER_TEMP/minsky-connector-store-*/minsky-d1-proof-*/fixture.json`.
+Past GitHub Actions runs stored journals under `$RUNNER_TEMP/minsky-connector-store-*/minsky-d1-proof-*/fixture.json`.
 Local runs use the same nested directory names under the system temporary directory.
 Current runs use the original reviewed repository configuration. They create no temporary Wrangler configuration copy.
 

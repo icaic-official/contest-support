@@ -2,15 +2,17 @@
 
 The browser uses `Backend` in [contracts.ts](../src/backend/contracts.ts) for accounts, workflows, administration, images, and live updates.
 An adapter implements those operations for a provider.
-Supabase remains the active implementation.
-The Cloudflare adapter implements the same contract for isolated installations.
-See [current state](current-state.md#t0020-connector-implementation-2026-10-18) for source-specific verification and limits.
+Cloudflare is the active development implementation.
+The Supabase adapter remains available for Supabase builds and isolated provider verification.
+Both implementations use the same contract.
+See [current state](current-state.md) for source-specific verification and deployment limits.
 
 The contracts describe Minsky operations.
 They do not expose database queries, access tokens, provider clients, or channel objects.
 The server still checks permissions and applies each workflow command as a transaction.
 A transaction commits all changes for a command together, or commits none.
 For implementation and registration steps, use [Add a backend provider](add-provider.md).
+The [frontend architecture](frontend-architecture.md) describes the application shell, feature modules, and browser routes that use these contracts.
 
 ## Shared server workflow
 
@@ -27,9 +29,9 @@ PostgreSQL rechecks current access and captured dependencies before committing s
 Private versions detect concurrent changes without exposing private activity through public revisions.
 
 [createServerWorkflowExecutor()](../src/backend/supabase/workflow.ts) preserves the `Backend.workflows.execute` signature for replacement verification.
-The active application adapter still calls the legacy `public.workflow` RPC.
-The old SQL rules remain protective during this transition.
-Administration, snapshots, images, and live updates also retain their existing Supabase paths.
+The Supabase browser adapter calls the guarded `public.workflow` RPC.
+Its administration, snapshots, images, and live updates retain their existing Supabase paths.
+The active Cloudflare application executes workflow commands through the shared service and guarded D1 batches.
 Issue decisions use one shared service. Other operations remain inside their provider implementations.
 Use [the verification guide](verify-server-workflow.md) for the isolated execution path and separate evidence categories.
 

@@ -1,7 +1,8 @@
 # Verify Cloudflare authentication
 
 Use this guide for T0018's fictional authentication fixtures.
-Supabase remains active. These procedures do not migrate accounts or deploy the application.
+These procedures test the separate authentication CI target. They do not migrate accounts or deploy the development application.
+Cloudflare serves the development application through its complete connector.
 See the [API reference](cloudflare-authentication.md) and [identity choice](cloudflare-authentication-choice.md) for behavior and resource limits.
 For T0020's complete connector, use the separate [direct store procedure](run-provider-tests.md#run-direct-cloudflare-store-checks).
 That procedure requires the D1-only `minsky-connector-store-ci` target and all 82 hosted account cases.
@@ -60,7 +61,8 @@ npx wrangler d1 info minsky-auth-ci --config wrangler.auth-ci.jsonc --json
 
 Expect account `458ad6a930b0fb717796dfa19ca6a2b1` and database `5d746d29-0a66-4346-96a6-4974126685d7`.
 The database name must be `minsky-auth-ci`. Stop if any value differs.
-Development uses local databases. Neither the active Supabase projects nor the earlier D1 proof database is this target.
+The local authentication tests use temporary local databases.
+The Cloudflare development database, retained Supabase projects, and earlier D1 proof database are separate targets.
 
 The committed Worker configuration requests a 1,000 ms CPU cap per request.
 Cloudflare requires Workers Paid for that setting.
@@ -145,14 +147,11 @@ Local elapsed time and hosted client time are not hosted CPU measurements.
 
 ## Run protected CI
 
-The `Checks` workflow has a `cloudflare_auth` dispatch option.
-Select the reviewed branch revision and enable that option.
-The protected `cloud-test` environment controls the hosted job.
-Its deployment branch policy must permit the exact reviewed ticket branch.
-An authorized owner must approve that allowlist change before the job can start.
-The current allowlist includes `main` and the exact T0018 branch with owner approval.
-To repeat the merged T0018 check, dispatch `cloudflare_auth=true` on `main`.
-The T0019 branch remains outside that allowlist. Its local hosted results do not replace protected execution on that revision.
+The GitHub `cloudflare_auth` job is removed.
+Repeat the hosted authentication checks with the commands in [CI settings](cloudflare-build-settings.md#on-demand-checks).
+Run them on the reviewed revision. They deploy only `minsky-auth-ci`.
+The historical `cloud-test` allowlist included `main` and the exact T0018 branch.
+The T0019 branch remained outside that allowlist. Its local hosted results do not replace a later hosted run on that revision.
 See [the run record](current-state.md#t0018-cloudflare-authentication-2026-10-18) for the initial rejection and later hosted resource limit.
 The [PR #41 follow-up](current-state.md#pr-41-review-corrections-and-paid-authentication-2026-10-18) records the passing protected run on Workers Paid.
 The existing `CLOUDFLARE_API_TOKEN` needs D1 access and deployment access to the isolated authentication Worker.
@@ -188,5 +187,5 @@ Do not reset the database or delete another run's records.
 For an interrupted account operation in an authorized fixture, use organizer-assisted reset after checking current permissions.
 The organizer must administer every assigned session. Archived memberships block recovery through the account API.
 T0020 adds trusted, provider-owned [installation-owner recovery](../site/src/content/docs/operators/installation.mdx#recover-the-owner).
-The empty hosted installation must pass before that path is supported.
-The current Supabase owner-recovery command does not operate on Cloudflare.
+That procedure passed the recorded empty-installation checks. Confirm the exact installation and owner before recovery.
+The Supabase owner-recovery command does not operate on Cloudflare.

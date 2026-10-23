@@ -1,7 +1,7 @@
 # Why deployment separates docs and application previews
 
-GitHub Actions publishes reviewed revisions only after `checks`, `secrets`, and `dependencies` pass.
-Independent Cloudflare Git builds could publish before those jobs finish or replace a full application with static assets.
+Workers Builds runs checks and does not publish `minsky-dev` or `minsky-docs`.
+A Git build on either Worker could publish before checks finish or replace a full application with static assets.
 Keep those builds disabled.
 
 ## Why app previews are disabled
@@ -14,7 +14,8 @@ A future preview implementation needs its own resources, credentials, fixture ow
 That implementation is outside T0021.
 
 Docs contain no authenticated application data.
-Their branch previews remain independent and continue to use `minsky-docs`.
+Automatic docs branch previews are removed with the GitHub Actions publisher.
+A later docs preview still has to target `minsky-docs` and stay independent of the application.
 
 ## Why backend selection needs a deployment guard
 
@@ -32,8 +33,8 @@ After upload, it checks the published targets, live bindings, and anonymous reje
 ## Why docs and application jobs are independent
 
 A broken app target must not block documentation publication.
-Separate jobs share the same required CI checks but validate only their own settings.
-One site can publish while the other fails. Each job reports its own revision and URL.
+The guarded script validates each site separately.
+One site can publish while the other fails. Each run reports its own revision and URL.
 
 Neither publication result verifies authenticated behavior.
 The installation and activation procedures require full application checks.

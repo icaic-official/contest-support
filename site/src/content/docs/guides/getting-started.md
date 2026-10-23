@@ -41,6 +41,11 @@ Your roles decide the tabs and pages. Several roles combine.
 
 Sign out from the account menu (contestants, console) or the **Me** tab (phone).
 
+The queue is `/issues`, award review is `/jury`, administration is `/administration`, and account details are `/account`.
+You can bookmark a section or use Back and Forward.
+Opening a section asks you to sign in when needed and checks your permissions.
+A refresh keeps the section and loads current session data.
+
 ## Forgot your password
 
 Ask your organizer. They check your identity and give you a new temporary password.

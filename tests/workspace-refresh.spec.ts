@@ -114,14 +114,15 @@ async function openWorkspace(
   page: Page,
   viewport: Viewport = desktop,
   firstWrite?: 'uncertain' | 'rejected',
+  options: { teamId?: string } = {},
 ) {
   await page.setViewportSize(viewport);
   const membership: Membership = {
     session_id: SESSION_ID,
     user_id: USER_ID,
-    team_id: null,
-    roles: ['volunteer'],
-    is_admin: true,
+    team_id: options.teamId ?? null,
+    roles: options.teamId ? [] : ['volunteer'],
+    is_admin: !options.teamId,
   };
   const state: Snapshot = {
     session: {
@@ -188,7 +189,7 @@ async function openWorkspace(
     server_time: '2026-10-15T00:00:00Z',
   };
   const writes: Array<{ path: string; body: unknown }> = [];
-  const workflowRequests: Array<{ p_request: string; p_action: Command }> = [];
+  const workflowRequests: WorkflowRequest[] = [];
   const user = {
     id: USER_ID,
     aud: 'authenticated',
@@ -209,7 +210,7 @@ async function openWorkspace(
           JSON.stringify({ alg: 'HS256', typ: 'JWT' }),
         ).toString('base64url');
         const payload = Buffer.from(
-          JSON.stringify({ sub: USER_ID, exp: expires, role: 'authenticated' }),
+          JSON.stringify({ sub: user.id, exp: expires, role: 'authenticated' }),
         ).toString('base64url');
         result = {
           access_token: `${header}.${payload}.fixture`,
@@ -221,6 +222,9 @@ async function openWorkspace(
         };
         break;
       }
+      case '/auth/v1/logout':
+        result = {};
+        break;
       case '/auth/v1/user':
         result = user;
         break;
@@ -277,10 +281,10 @@ async function openWorkspace(
   await page.getByLabel('Password', { exact: true }).fill('fixture-password');
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
   await expect(
-    page.locator(isDesktop(page) ? '[data-ui="organiser-desktop"]' : '[data-ui="organiser-phone"]'),
+    page.locator(options.teamId ? '[data-ui="contestant"]' : isDesktop(page) ? '[data-ui="organiser-desktop"]' : '[data-ui="organiser-phone"]'),
   ).toBeVisible();
-  await expect(issueOpeners(page)).toHaveCount(1);
-  return { state, writes, workflowRequests };
+  if (!options.teamId) await expect(issueOpeners(page)).toHaveCount(1);
+  return { state, user, writes, workflowRequests };
 }
 
 test('waits for a selected session before subscribing to live updates', async ({ page }) => {
@@ -591,6 +595,112 @@ for (const [layout, viewport] of viewports) {
             p_remove: false,
           },
         });
+    });
+  });
+}
+
+test('a committed submission retains its retry through an account-check failure', async ({ page }) => {
+  const { state } = await openWorkspace(page, desktop, undefined, {
+    teamId: TEAM_ID,
+  });
+  const requests: WorkflowRequest[] = [];
+  const receipts = new Map<string, string>();
+  const description = 'The contest network disconnected.';
+  await page.route('https://example.supabase.co/rest/v1/rpc/workflow', async (route) => {
+    const request: WorkflowRequest = route.request().postDataJSON();
+    requests.push(request);
+    if (request.p_action.type !== 'submit') throw new Error('Expected a submission.');
+    let issueId = receipts.get(request.p_request);
+    if (!issueId) {
+      issueId = '00000000-0000-4000-8000-000000000301';
+      receipts.set(request.p_request, issueId);
+      state.issues.push({
+        ...state.issues[0],
+        id: issueId,
+        number: 2,
+        category: request.p_action.category,
+        description: request.p_action.description,
+      });
+    }
+    if (requests.length === 1) {
+      await route.abort('failed');
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(issueId),
+    });
+  });
+  await page.getByRole('button', { name: 'Report an issue', exact: true }).click();
+  await page.getByRole('textbox', { name: 'What is happening?', exact: true }).fill(description);
+  await page.getByRole('button', { name: 'Send report', exact: true }).click();
+  const retry = page.getByRole('button', { name: 'Retry last request', exact: true });
+  await expect(retry).toBeEnabled();
+  expect(requests).toHaveLength(1);
+  expect(receipts.size).toBe(1);
+
+  const accountStatusUrl = 'https://example.supabase.co/rest/v1/rpc/account_status';
+  await page.route(accountStatusUrl, (route) => route.fulfill({
+    status: 503,
+    contentType: 'application/json',
+    body: JSON.stringify({ message: 'Account check unavailable.' }),
+  }));
+  await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+  await expect(page.getByRole('button', { name: 'Retry account check', exact: true })).toBeVisible();
+  await expect(page.locator('[data-ui="contestant"]')).toHaveCount(0);
+  await expect(page.getByRole('region', { name: 'Your report' })).toHaveCount(0);
+  await expect(retry).toHaveCount(0);
+
+  await page.unroute(accountStatusUrl);
+  await page.getByRole('button', { name: 'Retry account check', exact: true }).click();
+  await expect(retry).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Report an issue', exact: true })).toBeDisabled();
+  expect(requests).toHaveLength(1);
+  await retry.click();
+  await expect(retry).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Report an issue', exact: true })).toBeEnabled();
+  await expect(page.getByRole('region', { name: 'Your report' })).toContainText(description);
+  expect(requests).toEqual([requests[0], requests[0]]);
+  expect(requests[0]).toEqual({
+    p_session: SESSION_ID,
+    p_request: expect.any(String),
+    p_action: { type: 'submit', category: 'Network', description },
+  });
+  expect(receipts.size).toBe(1);
+  expect(state.issues.filter((issue) => issue.description === description)).toHaveLength(1);
+});
+
+for (const nextUserId of [USER_ID, MEMBER_ID]) {
+  test(`signout clears an uncertain request before ${nextUserId === USER_ID ? 'the same' : 'another'} actor signs in`, async ({ page }) => {
+    const { state, user, workflowRequests } = await openWorkspace(page, desktop, 'uncertain');
+    let form = await openReply(page);
+    let message = form.message;
+    await message.fill('The prior actor’s uncertain reply.');
+    await form.send.click();
+    await expect(page.getByRole('button', { name: 'Retry last request', exact: true })).toBeEnabled();
+    await form.scope.getByRole('button', { name: 'Close issue', exact: true }).click();
+    await page.getByRole('button', { name: /^Account menu for/ }).click();
+    await page.getByRole('menuitem', { name: 'Sign out', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Sign in', exact: true })).toBeVisible();
+
+    user.id = nextUserId;
+    if (!state.membership) throw new Error('The fixture membership is missing.');
+    state.membership.user_id = nextUserId;
+    await page.getByLabel('Username', { exact: true }).fill('reviewer');
+    await page.getByLabel('Password', { exact: true }).fill('fixture-password');
+    await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+    form = await openReply(page);
+    message = form.message;
+    await expect(page.getByRole('button', { name: 'Retry last request', exact: true })).toHaveCount(0);
+    await expect(message).toHaveValue('');
+    await message.fill('A reply from the current actor.');
+    await form.send.click();
+    await expect.poll(() => workflowRequests.length).toBe(2);
+    expect(workflowRequests[1].p_request).not.toBe(workflowRequests[0].p_request);
+    expect(workflowRequests[1].p_action).toMatchObject({
+      type: 'message',
+      text: 'A reply from the current actor.',
     });
   });
 }

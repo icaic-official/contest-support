@@ -16,6 +16,15 @@ npm run dev                  # http://127.0.0.1:5173
 Never put a service key in a `VITE_` variable. An admin must add your account to a session.
 `VITE_BACKEND` defaults to `supabase`. A Cloudflare build sets `VITE_BACKEND=cloudflare` and needs its Worker for the API.
 
+## Find application code
+
+`src/connected/` owns authentication checks, browser routes, session data, and workflow retry protection.
+`src/contestant/` contains the contestant desktop app.
+`src/organiser/` contains the organiser phone app, desktop console, and shared forms.
+`src/screens/` contains sign-in, password change, and session-access screens.
+Features use the selected backend contracts. Provider SDKs stay inside provider implementations.
+See the repository's [frontend architecture](https://github.com/GiftedNovaHD/minsky/blob/main/docs/frontend-architecture.md) for the module and route reference.
+
 ## Run the checks
 
 | Command | Checks |
@@ -39,7 +48,7 @@ Hosted test commands need isolated CI resources. Check their targets first, and 
 2. Implement, verify, and update the docs in the same change.
 3. Open a pull request. The owner reviews and merges.
 
-When deployment is enabled, CI publishes the docs and the app from `main` after `checks`, `secrets`, and `dependencies` pass.
+Workers Builds runs `npm run ci` for branches in this repository. It does not publish the docs or the app.
 Migrations, bootstrap, and secrets are separate steps.
 
 To add a backend, follow the [provider guide](https://github.com/GiftedNovaHD/minsky/blob/main/docs/add-provider.md). New providers must pass the shared scenarios unchanged.

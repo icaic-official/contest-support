@@ -184,6 +184,11 @@ export async function createBrowserBackend(
     throw error;
   }
 
+  // The shared verification protocol does not cover announcements yet.
+  const unsupported = async (): Promise<never> => {
+    throw new Error('The provider verification bridge does not cover announcements.');
+  };
+
   const backend: Backend = {
     auth: {
       currentUser: () => call({ type: 'currentUser' }),
@@ -253,6 +258,13 @@ export async function createBrowserBackend(
           type: result.contentType,
         });
       },
+    },
+    announcements: {
+      snapshot: unsupported,
+      execute: unsupported,
+      uploadImage: unsupported,
+      removeImage: unsupported,
+      downloadImage: unsupported,
     },
     updates: {
       subscribe: (input) =>

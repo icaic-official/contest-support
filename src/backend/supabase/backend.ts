@@ -7,6 +7,7 @@ import { z } from 'zod';
 import { membershipSchema, snapshotSchema } from '../../connected/model';
 import type { AccountIdentity, Backend } from '../contracts';
 import { errorMessage, WorkflowRejectedError } from '../errors';
+import { createAnnouncements } from './announcements';
 import { createImageTransport } from './images';
 
 const accountStatusSchema = z.object({
@@ -211,6 +212,7 @@ export function createSupabaseBackend(
       },
     },
     images: createImageTransport(client, url, key),
+    announcements: createAnnouncements(client, url, key),
     updates: {
       subscribe({ sessionId, userId, onChange, onConnection }) {
         let active = true;

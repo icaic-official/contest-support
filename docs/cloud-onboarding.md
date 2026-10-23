@@ -397,8 +397,8 @@ npm run build
 
 Embedded PostgreSQL executes the actual migrations and policies with stubs for Auth context, sessions, and password hashes.
 It does not establish managed Auth behavior.
-`npm run test:functions` checks the attachment HTTP handler with fake Auth, database, and Storage clients.
-It tests revoked access, invalid login sessions, failed file deletion, and retries.
+`npm run test:functions` checks the attachment and announcement-images HTTP handlers with fake Auth, database, and Storage clients.
+It tests revoked access, invalid login sessions, failed file deletion, retained files after failed completion, and retries.
 `npm run test:e2e` checks login, team search, workspace refresh, and image previews with fictional API responses and no cloud credentials.
 The old demo and its tests are removed.
 `npm run test:cloud` tests managed Auth, database, and Realtime behavior against a local frontend.

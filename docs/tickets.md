@@ -707,6 +707,32 @@ Resilience and event-capacity work remain deferred.
 - [x] Embedded database tests cover roles, storage access, visibility, limits, resolved issues, and archival. Phone-width browser checks cover preview, validation, retry, contestant hiding, and archived read-only controls.
 - [x] Documentation matches this behavior. A pull request is prepared for review. Development and CI stay unchanged until an explicit deployment.
 
+## T0006 — Session announcements
+
+Branch: `feature/t0006-session-announcements-port`, from updated `main` at `ecc75e2`.
+Status: implemented and verified locally on both providers. [PR #20](https://github.com/GiftedNovaHD/minsky/pull/20) is superseded by this port. The owner closes PR #20 after this PR passes. Not deployed.
+
+This ticket ports the T0006 scope from PR #20 to the current provider architecture.
+PR #20 added a Supabase-only implementation on an older `main`.
+This port adds `Backend.announcements`, a Cloudflare D1 and R2 implementation, the Supabase adapter, and the redesigned interface.
+The specification and both implementations are in [session announcements](session-announcements.md).
+
+Three corrections from the PR #20 review stay:
+
+- A failed upload completion keeps its stored file for a retry. Pending files are unreadable. A failed request cannot delete a file that another request finishes publishing.
+- Issue loading, refresh, and submission do not wait for announcement reads. A new read cancels an older one. A session or access change drops cached announcements.
+- A competing edit shows the latest text beside the draft. **Keep my draft** and **Load latest text** are explicit choices. Another change before saving needs another review.
+
+### Progress
+
+- [x] Shared contract, model, and typed rejection error.
+- [x] D1 migration, services, routes, and local D1 and R2 tests.
+- [x] Supabase migration, `announcement-images` function, and embedded database and Deno tests.
+- [x] Cloudflare and Supabase browser adapters with tests.
+- [x] Interface for the contestant, organiser phone, and organiser desktop shells.
+- [x] Local browser tests and documentation.
+- [ ] Owner review and merge. Hosted provider checks and deployment need separate approval.
+
 ## T0008 — Fuzzy team search
 
 Branch: `feature/t0008-team-search`, from updated `main` at `1ed603a`.

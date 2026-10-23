@@ -84,7 +84,7 @@ npx wrangler d1 migrations apply minsky-auth-ci --remote --config wrangler.auth-
 npx wrangler deploy --config wrangler.auth-ci.jsonc
 ```
 
-Expect all nine repository migrations, `0001` through `0009`, on an empty target.
+Expect all ten repository migrations, `0001` through `0010`, on an empty target.
 Expect `No migrations to apply` on an up-to-date target.
 Expect deployment only to `https://minsky-auth-ci.icaic-minsky.workers.dev`.
 The Worker requires the existing `AUTH_SECRET`. Preserve that secret on ordinary deployments.

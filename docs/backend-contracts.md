@@ -41,13 +41,13 @@ Use [the verification guide](verify-server-workflow.md) for the isolated executi
 [applicationWorker.ts](../src/server/adapters/cloudflare/applicationWorker.ts) serves the application and its API.
 The Worker obtains `Caller` from the maintained identity service. Request bodies cannot supply that identity.
 Mutation routes check the exact origin, current session, and request-protection token.
-JSON bodies are limited to 16 KiB. Image transfers require an exact length and an R2-verified SHA-256 checksum.
+JSON bodies are limited to 16 KiB, except announcement text, which allows 64 KiB. Image transfers require an exact length and an R2-verified SHA-256 checksum.
 
 The [D1 store](../src/server/adapters/d1/store.ts) persists all nine `WorkflowService` commands.
 Its batches recheck credentials, generation, identity-session expiry, application-login expiry, current permissions, and captured state.
 One database timestamp supplies each workflow commit's ledger and history records.
 State, receipts, history, resolutions, awards, and audience notifications commit together.
-The complete schema adds migrations `0005` through `0009` to the authentication foundation.
+The complete schema adds migrations `0005` through `0010` to the authentication foundation.
 
 [D1ApplicationService](../src/server/adapters/cloudflare/application.ts) returns each authorized snapshot in one database statement.
 Snapshots preserve names, timestamps, history, awards, image metadata, limits, and administrator records.
@@ -73,14 +73,17 @@ See [installation](../site/src/content/docs/operators/installation.md), [provide
 | Module | Responsibility |
 | --- | --- |
 | [contracts.ts](../src/backend/contracts.ts) | Defines `Backend` and each group of operations. |
-| [errors.ts](../src/backend/errors.ts) | Defines workflow rejection and image retry errors. |
+| [errors.ts](../src/backend/errors.ts) | Defines workflow rejection, announcement rejection, and image retry errors. |
 | [index.ts](../src/backend/index.ts) | Creates the selected implementation from public configuration. |
 | [supabase/backend.ts](../src/backend/supabase/backend.ts) | Calls Supabase Auth, database functions, account administration, and Realtime. |
 | [supabase/images.ts](../src/backend/supabase/images.ts) | Calls the attachment function and private Storage bucket. |
 | [supabase/workflow.ts](../src/backend/supabase/workflow.ts) | Provides the opt-in Edge Function executor for shared workflow verification. |
+| [supabase/announcements.ts](../src/backend/supabase/announcements.ts) | Calls the announcement database functions, the announcement-images function, and the private bucket. |
 | [cloudflare/backend.ts](../src/backend/cloudflare/backend.ts) | Calls the same-origin API and manages independent live connections. |
 | [server/adapters/cloudflare/applicationWorker.ts](../src/server/adapters/cloudflare/applicationWorker.ts) | Constructs Cloudflare services and handles application and maintenance requests. |
 | [server/adapters/cloudflare/application.ts](../src/server/adapters/cloudflare/application.ts) | Reads authorized snapshots and commits guarded administration changes. |
+| [server/adapters/cloudflare/announcements.ts](../src/server/adapters/cloudflare/announcements.ts) | Reads announcement snapshots and commits guarded announcement commands. |
+| [server/adapters/cloudflare/announcementImages.ts](../src/server/adapters/cloudflare/announcementImages.ts) | Manages private announcement image reservations, transfers, publication, and cleanup. |
 | [server/adapters/cloudflare/images.ts](../src/server/adapters/cloudflare/images.ts) | Manages private image reservations, transfers, publication, and cleanup. |
 | [server/adapters/cloudflare/live.ts](../src/server/adapters/cloudflare/live.ts) | Delivers audience-specific invalidations and manages current connection access. |
 | [server/workflow.ts](../src/server/workflow.ts) | Defines shared decisions, orchestration, and the operation-level persistence interface. |
@@ -178,6 +181,23 @@ The size inputs use the existing UI convention of 1,048,576 bytes per MB.
 Supabase database functions and the account function retain their current authorization rules.
 Account resets and username changes require admin access to every affected session.
 The browser adapter does not implement those checks.
+
+## Announcements
+
+`Backend.announcements` reads and writes session announcements. It is separate from the issue snapshot, so a slow or failed read cannot delay issue work.
+
+| Operation | Result |
+| --- | --- |
+| `snapshot(sessionId, signal?)` | Returns the announcements and ready images that the caller can read, with server time. Members read active records. Admins and jury also read expired and removed records. A newer read can abort an older one. |
+| `execute(sessionId, requestId, command)` | Publishes, edits, or removes one announcement and returns its ID. A repeated request ID with the same command does not repeat the write. |
+| `uploadImage(input)` | Reserves, transfers, and publishes one image. A repeated request ID does not add a second image. |
+| `removeImage(sessionId, imageId)` | Removes the image through the authorized server operation. A failed file deletion stays retryable. |
+| `downloadImage(image)` | Returns a `Blob` after the provider checks current access. |
+
+`AnnouncementRejectedError` extends `WorkflowRejectedError`. It confirms that the server rejected the command.
+Its `conflict` field is true when the announcement changed after the caller read it.
+Other failures leave the write outcome unknown, and the caller keeps the request ID for a retry.
+Image failures use `ImageRequestError`.
 
 ## Images
 

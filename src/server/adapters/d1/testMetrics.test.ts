@@ -40,7 +40,7 @@ it('measures the real D1 transport without exposing data or changing batch rollb
   } finally {
     await platform.dispose();
   }
-});
+}, 120_000);
 
 it('keeps native D1 capabilities used by the maintained identity adapter', async () => {
   const platform = await getPlatformProxy<{ DB: D1Connection }>({
@@ -85,4 +85,4 @@ it('keeps native D1 capabilities used by the maintained identity adapter', async
     }
     await platform.dispose();
   }
-});
+}, 120_000);

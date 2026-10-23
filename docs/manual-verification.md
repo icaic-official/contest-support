@@ -475,3 +475,28 @@ The [frontend architecture](frontend-architecture.md#browser-routes) lists paths
 
 A full reload discards in-memory drafts, filters, and retry metadata.
 Record observed results separately from these instructions. Historical runs do not verify the combined frontend.
+
+## 15. Session announcements (T0006)
+
+Use an active event with an admin, a jury member, a volunteer, and a contestant.
+Use two browser windows for the live checks. Run these checks after a reviewed deployment.
+
+1. As the admin, publish an announcement with a title, details, and no expiry.
+   Check that the contestant and volunteer see the title above the workspace without a refresh.
+2. As the contestant, start a report and leave it unsent. Publish another announcement. Check that the report text stays.
+3. Use only the keyboard. Open and close the details with Enter and Space. Check that the focus ring is visible.
+4. Check that the contestant and volunteer have no **New announcement**, **Edit**, or **Remove** controls.
+5. As the jury member, edit the announcement. Check that the original publisher and time remain, and the editor and time appear.
+6. Open the same edit in two manager windows. Save in the first window. In the second, check the review panel.
+   Choose **Keep my draft**, change the text again in the first window, and check that the second window asks for another review.
+   Choose **Load latest text** and save.
+7. Add a JPEG, PNG, and WebP image. Check progress, the inline image, and download.
+   Try a text file renamed to `.png`, an image above 10 MB, and a fifth image. Each must fail with a clear message and leave the text available.
+8. Remove one image. Check that readers lose it and the manager list shows one fewer.
+9. Set an expiry about one minute ahead. After it passes, check that readers lose the announcement within 15 seconds and the manager still sees **Expired**.
+   Clear the expiry and check that readers see it again.
+10. Remove an announcement. Check that readers lose it, the manager sees **Removed** with the remover, and it has no **Edit** control.
+11. Reload each window. Check that the state is unchanged and the reporting form never waited for announcements.
+12. At 320 px and 390 px wide, check that the announcement strip wraps, scrolls inside its area, and causes no horizontal page scroll.
+13. Archive the event. Check that announcements stay readable and every management control disappears.
+14. Repeat the checks on the Supabase build and on the Cloudflare build when both are deployed.

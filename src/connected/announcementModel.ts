@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { Membership } from "./model";
+import type { Membership } from "./model.ts";
 
 const uuid = z.string().uuid();
 const time = z.string().datetime({ offset: true });

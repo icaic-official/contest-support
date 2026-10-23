@@ -1,17 +1,21 @@
-# Supabase cloud onboarding
+# Supabase provider
 
-This guide covers the retained Supabase projects and their contribution and verification commands.
-Cloudflare serves the stable development application. Its fresh installation received no Supabase accounts, passwords, records, images, or IDs.
-Use [Install Cloudflare](../site/src/content/docs/operators/installation.md) for Cloudflare setup.
+Use this guide when you choose the Supabase provider.
+Cloudflare is the live development backend.
+Its Worker is `minsky-dev` and its D1 database is `minsky-development`.
+The development app is https://minsky-dev.icaic-minsky.workers.dev.
+Use [Install Cloudflare](../site/src/content/docs/operators/installation.md) for that installation.
 Use [deployment setup](cloudflare-builds.md) for automation and [activation](activate-cloudflare-development.md) for the approved switch and recovery procedure.
 Workers Builds runs ordinary checks and does not publish the application. Publication stays an explicit guarded command.
 Application previews remain disabled until independent preview resources exist.
 Backend migrations, bootstrap, secrets, and activation retain their explicit steps.
 The dated setup records below describe their recorded revisions.
 
-The connected development app runs at https://minsky-dev.icaic-minsky.workers.dev on the complete Cloudflare Worker.
-The separate Supabase implementation uses managed authentication, Postgres, Realtime, and private Storage.
+This page covers the retained Supabase projects, their commands, and isolated Supabase checks.
+Supabase uses managed authentication, Postgres, Realtime, and private Storage.
 Its projects, accounts, and data remain intact.
+The fresh Cloudflare installation received no Supabase accounts, passwords, records, images, or IDs.
+This provider does not serve the development URL.
 Docker is optional.
 The user permits full authorized cloud credential access for contributors.
 
@@ -78,6 +82,7 @@ These operations reject archived memberships.
 Ordinary session permission changes remain scoped to that session.
 
 If the sole admin loses their password, a trusted provider maintainer can use the recovery command below.
+`npm run cloud:recover-admin` is this provider's recovery command. It does not change the Cloudflare installation.
 First, link the intended project.
 Run the command in a **private terminal**:
 
@@ -269,8 +274,11 @@ The attachment migration checks that Supabase already enabled Storage RLS rather
 
 ## Contributor setup
 
-These commands select the retained Supabase development project. They do not configure the active Cloudflare deployment.
+These commands select the retained Supabase development project.
+They do not configure the live Cloudflare deployment.
 For Cloudflare work, use the isolated installation and provider verification guides.
+When `VITE_BACKEND=supabase`, set `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` in `.env.local`.
+`.env.example` selects Cloudflare and does not contain those values.
 
 Use Node.js 22.13 or later within 22.x, or Node.js 24 or later.
 Use npm.
@@ -326,10 +334,10 @@ The previous `APP_URL` setting is unused.
 | CI | `Minsky CI` — `ghtztmovdkhuketcbjmq` | Temporary automated accounts and workflow and authorization fixtures scoped by UUID. |
 | Production | Not provisioned | Future real contest accounts and data. Use a separate database, credentials, and frontend. |
 
-For each ticket, use this sequence:
+For a Supabase provider change, use this sequence:
 
 1. Create its branch from updated `main`.
-2. Develop against the development project.
+2. Develop against the retained Supabase project `Minsky`, reference `ovymmobupzowotvrywek`.
 3. Add versioned migrations.
 4. Run the fast README checks.
 5. Prepare the PR.

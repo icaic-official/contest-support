@@ -194,4 +194,5 @@ For an interrupted account operation in an authorized fixture, use organizer-ass
 The organizer must administer every assigned session. Archived memberships block recovery through the account API.
 T0020 adds trusted, provider-owned [installation-owner recovery](../site/src/content/docs/operators/installation.md#recover-the-installation-owner).
 That procedure passed the recorded empty-installation checks. Confirm the exact installation and owner before recovery.
-The Supabase owner-recovery command does not operate on Cloudflare.
+`npm run cloud:recover-admin` is the Supabase provider's recovery command. It does not operate on Cloudflare.
+Use `npm run cloudflare:recover-admin` to reset a Cloudflare admin password.

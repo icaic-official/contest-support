@@ -1,6 +1,8 @@
-# Verify the shared server workflow
+# Verify the Supabase provider workflow
 
-Use this guide to check the shared service and its Supabase execution path.
+Use this guide to check the shared service through the Supabase provider.
+Cloudflare is the live backend. Its checks are in the Cloudflare verification guides.
+This Supabase run is a manual command. It is not part of `npm run ci`.
 Use fictional fixtures in the approved Minsky CI project, `ghtztmovdkhuketcbjmq`.
 The [workflow reference](server-workflow.md) defines the boundaries and compatibility rules.
 Record observed results in [current state](current-state.md).

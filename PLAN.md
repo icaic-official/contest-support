@@ -1,5 +1,18 @@
 # Minsky planning record
 
+**Cloudflare is the live backend, 2026-10-23.** The owner selected Cloudflare as the live backend.
+The development Worker is `minsky-dev`. The development D1 database is `minsky-development`.
+Keep the Supabase adapter, its migrations, its functions, and its provider tests.
+Supabase is a supported second provider behind the shared backend interfaces.
+It shows that another provider can implement the same behavior. AWS, GCP, Azure, and a possible Docker adapter remain later work.
+Absent `VITE_BACKEND` and absent `MINSKY_DEV_BACKEND` select Cloudflare.
+Set either value to `supabase` to select the Supabase provider.
+Hosted Supabase provider tests stay manual commands. They are not part of `npm run ci`.
+Do not add GitHub Actions. Do not change hosted resources, secrets, or repository settings.
+This decision supersedes earlier statements below that Supabase remains the active backend.
+Those statements stay in this log with a superseded mark.
+The owner reviews and merges.
+
 **Workers Builds CI, 2026-10-23.** The owner keeps GitHub on the free plan.
 The Actions minute cap stopped hosted checks. It is not a failed payment.
 Move every automatic check to Workers Builds on the existing Workers Paid plan.
@@ -69,7 +82,7 @@ Existing billing API access returns `403`. The owner then checks the dashboard a
 The separate T0021 worktree now includes that main revision and the final T0020 verification records.
 The accepted executable connector remains `2b6f6f0`; PR #42's final `b984e67` adds documentation and evidence.
 The pre-merge local-only limit ended. Dedicated development and separate installation-verification resources are now authorized.
-Supabase remains active and intact. The development URL switch still requires approval of exact resources, revision, commands, checks, and recovery.
+Supabase remains active and intact. The development URL switch still requires approval of exact resources, revision, commands, checks, and recovery. Superseded on 2026-10-23.
 The owner later approved adding only `feature/t0021-cloudflare-development-install` to `cloud-test`. Entry `63467138` preserves all six earlier entries and protection rule `69128862`. No other branch, protection change, or backend activation is authorized.
 Earlier preparation and pause records retain their original scope.
 
@@ -100,7 +113,7 @@ See [T0021](docs/tickets.md#t0021-fresh-cloudflare-development-installation) and
 Earlier dated records below retain their original scope and evidence.
 
 **PR #42 review fixes and cleanup, 2026-10-18.** The owner requested all review fixes, cleanup, and tests before the existing T0020 PR is ready.
-Continue on `feature/t0020-cloudflare-connector`. Preserve Supabase as the active backend and preserve the merged jury worklist.
+Continue on `feature/t0020-cloudflare-connector`. Preserve Supabase as the active backend and preserve the merged jury worklist. Superseded on 2026-10-23.
 Subtract before adding. Remove obsolete proof modes, duplicate helpers, stale instructions, and redundant references or stubs.
 Converge on the current `Backend` and `WorkflowPersistence` architecture.
 Keep one installation procedure and one current reference for each responsibility.
@@ -116,7 +129,7 @@ Use its existing `feature/t0009-jury-worklist` branch in a separate worktree.
 Merge current `main` at `7d19b00` and verify current behavior before owner review.
 Preserve the separate T0020 connector checkout and scope.
 Use the existing `Backend` contracts, authorized snapshots, and shared server workflow rules.
-Keep Supabase active. Add no schema, backend feature, provider implementation, or runtime dependency.
+Keep Supabase active. Superseded on 2026-10-23. Add no schema, backend feature, provider implementation, or runtime dependency.
 Use only UUID-owned fictional fixtures in Minsky CI, `ghtztmovdkhuketcbjmq`, for hosted acceptance.
 The owner approved the exact T0009 `cloud-test` branch addition on 2026-10-18. Preserve all other entries and protection rules.
 Do not deploy the application, merge the PR, or migrate data.
@@ -131,7 +144,7 @@ Keep provider configuration and bootstrap inside provider implementations.
 Document reuse decisions and recommend a PR #21 disposition. The owner decides whether to close it.
 Isolated Cloudflare development, CI, and installation resources are authorized in the confirmed account.
 Only T0020's branch may be added to the protected cloud-test allowlist. Preserve other entries and rules.
-Supabase remains active. Docker packaging, AWS, Terraform, real-data migration, and backend cutover remain deferred.
+Supabase remains active. Superseded on 2026-10-23. Docker packaging, AWS, Terraform, real-data migration, and backend cutover remain deferred.
 The owner reviews and merges. Bounded subagent work is authorized.
 The owner merged T0009's jury worklist in PR #23 at `c144a2a` during T0020 verification.
 T0020 now includes that main revision and verifies the combined application before owner review.
@@ -143,7 +156,7 @@ The owner confirmed Workers Paid activation. The isolated authentication Worker 
 Its local hosted HTTP suite and protected authentication on merged `main` pass.
 Record that protected result separately from the PR #41 hosted runs.
 Retain the maintained password parameters and the 1,000 ms CPU cap.
-Supabase remains active. The owner reviews and merges.
+Supabase remains active. Superseded on 2026-10-23. The owner reviews and merges.
 
 **Shared server workflow, 2026-10-18.** T0019 extracts the existing issue rules before further Cloudflare workflow implementation.
 Use `feature/t0019-shared-server-workflow` from updated `main` at `0c797ad`.
@@ -160,7 +173,7 @@ Align D1's existing `claim` and `message` proof with those same decisions.
 Do not design a separate Cloudflare workflow.
 See [the workflow reference](docs/server-workflow.md) and [verification guide](docs/verify-server-workflow.md).
 
-Supabase remains active. The legacy browser workflow stays available during replacement verification.
+Supabase remains active. Superseded on 2026-10-23. The legacy browser workflow stays available during replacement verification.
 Development backend deployment requires separate authorization.
 The owner reviews and merges. Bounded subagent work is authorized.
 PR #40's initial protected HTTP verification hit the Workers Free resource limit.
@@ -181,7 +194,7 @@ The measured hash requires more CPU than Workers Free permits. The identity choi
 The initial protected run passed all 28 hosted D1 account cases, then hit a Worker resource limit during HTTP password change.
 The owner initially deferred the subscription on 2026-10-18, then activated it during PR #41 review.
 Record the later paid verification separately from that failed run.
-Supabase remains active. The remaining connector, real-data exports, migration, and backend switch remain later work.
+Supabase remains active. Superseded on 2026-10-23. The remaining connector, real-data exports, migration, and backend switch remain later work.
 The owner reviews and merges.
 
 **D1 proof and migration decisions, 2026-10-17.** The next focused ticket is T0017 on `feature/t0017-d1-transaction-proof`.
@@ -193,7 +206,7 @@ See [the historical proof guide](https://github.com/GiftedNovaHD/minsky/blob/88e
 
 Authentication and the remaining Cloudflare operations follow the proof.
 Full migration tooling follows connector verification.
-Real-data exports and the backend switch remain later phases. Keep Supabase active.
+Real-data exports and the backend switch remain later phases. Keep Supabase active. Superseded on 2026-10-23.
 AWS adapters and Terraform remain deferred.
 
 The owner selected organizer-issued replacement temporary passwords for migration.
@@ -229,7 +242,7 @@ See [T0015](docs/tickets.md#t0015-shared-provider-tests) for the merged test sco
 T0016 records provider boundaries and the proposed Cloudflare architecture.
 It does not implement a connector, provision resources, export credentials, or migrate data.
 AWS implementation and Terraform remain deferred.
-Supabase remains active until Cloudflare verification and a data-preserving migration rehearsal pass.
+Supabase remains active until Cloudflare verification and a data-preserving migration rehearsal pass. Superseded on 2026-10-23.
 
 **Backend adapter decision, 2026-10-17.** The user authorized step 1 as T0014 on `feature/t0014-backend-adapters`.
 The branch starts from updated `main` at `de92d54` while the earlier pull requests remain open.
@@ -238,7 +251,7 @@ Preserve account access, workflow rules, image behavior, and live refresh.
 See [T0014](docs/tickets.md#t0014-backend-adapters) and the [backend contracts](docs/backend-contracts.md).
 
 The selected migration target is Cloudflare Workers, D1 with a SQLite rewrite, private R2 storage, and Durable Objects for live updates.
-Supabase remains the active backend during this first step.
+Supabase remains the active backend during this first step. Superseded on 2026-10-23.
 The migration must preserve existing accounts, IDs, history, awards, permissions, and images.
 The Cloudflare implementation, authentication choice, migration tools, other providers, and Terraform remain later work.
 This decision supersedes the older long-term Supabase direction below.
@@ -246,7 +259,7 @@ This decision supersedes the older long-term Supabase direction below.
 The user confirmed the migration order after PR #29 merged on 2026-10-17.
 First implement the shared interfaces and Supabase adapter.
 Verify that adapter against hosted Supabase before implementing the Cloudflare adapter.
-Test the Cloudflare implementation and rehearse a data-preserving migration before switching the active backend.
+Test the Cloudflare implementation and rehearse a data-preserving migration before switching the active backend. Superseded on 2026-10-23.
 Frontend deployment automation is separate from these acceptance steps.
 
 **Documentation writing rules, 2026-10-17.** The user supplied `unslop` and `technical-writing` principles.

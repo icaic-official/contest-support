@@ -9,6 +9,8 @@ export default defineConfig({
     url: "http://127.0.0.1:4173",
     reuseExistingServer: !process.env.CI,
     env: {
+      // This suite mocks the Supabase browser client. Select that provider explicitly.
+      VITE_BACKEND: "supabase",
       VITE_SUPABASE_URL: "https://example.supabase.co",
       VITE_SUPABASE_PUBLISHABLE_KEY: "public-test-key",
     },

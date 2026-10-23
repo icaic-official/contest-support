@@ -11,8 +11,9 @@ Create a new administrator through the bootstrap step below.
 Leave existing Supabase resources and accounts intact. Do not export or reset them.
 Preserve the application's workflow and authorization rules when configuring the new instance.
 
-For the project's development URL, use the separate [activation procedure](https://github.com/GiftedNovaHD/minsky/blob/main/docs/activate-cloudflare-development.md).
-The owner approved its switch separately from PR #43. A future backend switch also requires explicit approval.
+The development URL already uses Cloudflare.
+The [activation procedure](https://github.com/GiftedNovaHD/minsky/blob/main/docs/activate-cloudflare-development.md) records that approved switch.
+A later switch of that URL needs a separate owner approval.
 
 :::note[Development installation]
 Fresh development and separate installation-verification trials passed on 18 October 2026 at source `f6864f6`.

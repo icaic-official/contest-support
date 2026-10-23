@@ -17,19 +17,26 @@ Use a current Node.js 22 release or Node.js 24 to work on both.
 ```sh
 npm ci
 cp .env.example .env.local
-```
-
-Set the development project's public Supabase URL and publishable key in `.env.local`.
-An organizer must also give your account session membership.
-Start the frontend with:
-
-```sh
 npm run dev
 ```
 
-The local app runs at `http://127.0.0.1:5173`.
-It uses the configured backend.
-Docker is optional for connected development.
+`.env.example` sets `VITE_BACKEND=cloudflare`.
+The local page runs at `http://127.0.0.1:5173`.
+A plain Vite server does not provide the Cloudflare API, so sign-in on that page fails.
+The live development app is [minsky-dev.icaic-minsky.workers.dev](https://minsky-dev.icaic-minsky.workers.dev).
+Its Worker is `minsky-dev` and its D1 database is `minsky-development`.
+Use `npm run test:connector:ui:local` for a temporary local Cloudflare application.
+Docker is optional.
+
+## Supabase provider
+
+Set `VITE_BACKEND=supabase` to select the Supabase provider.
+Also set `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` in `.env.local`.
+Use that project's public URL and publishable key.
+An organizer must also give your account session membership.
+`npm run cloud:recover-admin` recovers an administrator for this provider only.
+Use `npm run cloudflare:recover-admin` for the Cloudflare development admin.
+The repository guide is `docs/cloud-onboarding.md`.
 
 ## Find application code
 
@@ -50,7 +57,7 @@ See the repository's [frontend architecture](https://github.com/GiftedNovaHD/min
 | `npm run check:functions` | Check the account and attachment functions. |
 | `npm run test:functions` | Run attachment function tests with fake clients. |
 | `npm run build` | Build the application. |
-| `npm run test:e2e` | Check the browser UI with fictional cloud responses. |
+| `npm run test:e2e` | Check the browser UI with fictional Supabase responses. The suite sets `VITE_BACKEND=supabase`. |
 
 Install the browser once with `npx playwright install chromium`.
 Keep development and CI databases and credentials separate.
@@ -66,7 +73,7 @@ Pull request checks do not receive deployment credentials.
 The repository setup guide is `docs/cloudflare-builds.md`.
 Application previews remain disabled until they have independent provider resources.
 Cloudflare application deployment includes its API code and bindings. Migrations and administrator bootstrap remain separate steps.
-Switching the development URL to Cloudflare requires the owner's separate activation approval.
+The development URL already uses Cloudflare. A later switch of that URL needs a separate owner approval.
 Include the required co-author trailer in each Codex-created commit for this repository.
 Follow the Google TypeScript Style Guide for TypeScript changes, with documented project exceptions.
 

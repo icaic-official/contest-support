@@ -1,9 +1,10 @@
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, expect, it } from "vitest";
 import {
   assertMaintainerTerminal,
+  loadRecoveryLibrary,
   parseRecoveryArguments,
   publicError,
   readRecoveryTarget,
@@ -119,4 +120,38 @@ it("does not print a password when recovery refuses the account", async () => {
     }),
   })).rejects.toThrow("not an admin");
   expect(lines).toEqual(["Recovering an admin in remote D1 database minsky-development."]);
+});
+
+it("loads the recovery library without a database or a password", async () => {
+  const prepared = await loadRecoveryLibrary();
+  try {
+    expect(typeof prepared.library.recoverCloudflareAdmin).toBe("function");
+    expect(typeof prepared.library.writeTemporaryPassword).toBe("function");
+  } finally {
+    await prepared.dispose();
+  }
+  const names = await readdir("node_modules/.cache");
+  expect(names.some((name) => name.startsWith("minsky-admin-recovery-"))).toBe(false);
+});
+
+it("adds an error code or class and omits messages, stacks, and secrets", () => {
+  const missing = new Error("Cannot find package 'better-auth' imported from /tmp/minsky-admin-recovery/admin-recovery.mjs");
+  missing.code = "ERR_MODULE_NOT_FOUND";
+  missing.stack = "Error: hunter2\n    at load (/tmp/secret-token)";
+  const text = publicError(missing);
+  expect(text).toBe("Admin recovery failed. The temporary password was not shown. The error code is ERR_MODULE_NOT_FOUND.");
+  expect(text.includes("hunter2")).toBe(false);
+  expect(text.includes("better-auth")).toBe(false);
+  expect(text.includes("/tmp")).toBe(false);
+
+  const named = new TypeError("session token sk-live");
+  const namedText = publicError(named);
+  expect(namedText).toBe("Admin recovery failed. The temporary password was not shown. The error class is TypeError.");
+  expect(namedText.includes("sk-live")).toBe(false);
+
+  const unsafe = new Error("hunter2");
+  unsafe.code = "hunter2";
+  expect(publicError(unsafe).includes("hunter2")).toBe(false);
+  expect(publicError(new Error("The username is invalid. Recovery did not start.")))
+    .toBe("The username is invalid. Recovery did not start.");
 });

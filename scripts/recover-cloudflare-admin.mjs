@@ -1,5 +1,4 @@
-import { mkdtemp, readFile, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
 import { resolve } from "node:path";
 import process from "node:process";
 import { URL, fileURLToPath, pathToFileURL } from "node:url";
@@ -70,6 +69,20 @@ export function readRecoveryTarget(configText) {
   return { databaseName: name };
 }
 
+const hiddenFailure = "Admin recovery failed. The temporary password was not shown.";
+
+function publicFailureHint(error) {
+  const code = error && typeof error === "object" ? error.code : undefined;
+  if (typeof code === "string" && /^ERR_[A-Z0-9_]{1,48}$/.test(code)) {
+    return `The error code is ${code}.`;
+  }
+  const name = error instanceof Error ? error.name : "";
+  if (name.length <= 48 && (name === "Error" || /^[A-Z][A-Za-z0-9]*Error$/.test(name))) {
+    return `The error class is ${name}.`;
+  }
+  return "";
+}
+
 function publicError(error) {
   const message = error instanceof Error ? error.message : "";
   if (
@@ -79,12 +92,16 @@ function publicError(error) {
     || message.startsWith("Admin recovery runs only")
     || message.startsWith("Admin recovery prints")
   ) return message;
-  return "Admin recovery failed. The temporary password was not shown.";
+  const hint = publicFailureHint(error);
+  return hint ? `${hiddenFailure} ${hint}` : hiddenFailure;
 }
 
-async function loadRecoveryLibrary() {
+/** Bundle inside the repository. Node then finds packages in the repository node_modules. */
+export async function loadRecoveryLibrary() {
   const { build } = await import("esbuild");
-  const directory = await mkdtemp(resolve(tmpdir(), "minsky-admin-recovery-"));
+  const cacheRoot = resolve(repositoryRoot, "node_modules/.cache");
+  await mkdir(cacheRoot, { recursive: true });
+  const directory = await mkdtemp(resolve(cacheRoot, "minsky-admin-recovery-"));
   const output = resolve(directory, "admin-recovery.mjs");
   try {
     await build({

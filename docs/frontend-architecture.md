@@ -159,7 +159,7 @@ They call the `Backend` contracts through `requireBackend()`.
 | `useAccountStatus(userId)` | Reads `account_status` every 10 seconds and on focus. Returns `account`, `error` and `recheck()`. |
 | `useSessionSnapshot(userId)` | Loads memberships, the session list and the selected snapshot. Reads run in sequence. A generation counter discards responses for an earlier session. It refreshes on Realtime changes, every 10 seconds, on focus and when the browser is online again. It clears the snapshot after an error. It records the server clock offset. |
 | `useCommand({ sessionId, refresh, onRecorded })` | Runs one workflow command at a time. It uses the actor-bound request from `WorkflowRetryProvider`. An explicit retry retains the original session, request ID, and command. `onSuccess` clears the originating form before refresh while that form remains mounted. |
-| `useWorkflowState(data)` | Combines `useCommand` with the selected issue and the status filter. A recorded command selects its issue. A reopened issue sets the filter to `claimed`. |
+| `useWorkflowState(data)` | Combines `useCommand` with the selected issue and the status filter. A recorded command selects its issue when the person did not choose an issue while it ran. An inline queue action does not select its issue. A reopened issue sets the filter to `claimed`. |
 | `useTeamSelection(sessionId, snapshot)` | Holds the team-search choice. A session change clears it. A snapshot without that team, or without staff access, also clears it. |
 | `useNow(clockOffset)` | Returns the server-adjusted time every second for live timers. |
 | `useMediaQuery(query)` | Returns whether a CSS media query matches. |
@@ -233,7 +233,7 @@ These rules apply:
 - Cards are sorted by unresolved time, longest first. The timer is neutral below 10 minutes, amber below 20 minutes and rose after that. A resolved issue stays neutral.
 - A recorded command selects its issue, so the issue view opens. An inline **Claim** or **Accept** on a card returns to the list. **Claim and go** opens the issue.
 - **Back** returns focus to the card of the issue. A tab change moves focus to the tab heading. Sheets trap focus and have a **Cancel** button, so no action needs a swipe. Buttons are at least 44 px high.
-- A recorded command selects its issue only when the person did not change the selection while the command ran. Thus **Back** during the refresh after a command is not undone.
+- A recorded command selects its issue only when the person did not change the selection while the command ran. Thus **Back** during the refresh after a command is not undone. An inline **Claim** or **Accept** does not select its issue, so the issue view does not open and close. When the person opens an issue while that command runs, the action does not close it.
 - When the open issue leaves the person's lists, for example after a live reopen, the issue view closes. The status message "ISS-N is no longer in your lists." appears and focus moves to the page heading (`useLeftIssueNotice`, `issueThatLeft()`).
 - An open sheet closes when its action is no longer allowed, for example after the person loses the jury role (`sheetAllowed()`).
 - The Find tab keeps its query when the person goes back from a team.
@@ -276,7 +276,7 @@ These rules apply:
 - The queue tabs use the shared status filter of `useWorkflowState`. Active is `all`, All is `everything` and the other tabs are statuses. The phone app shows All active for `everything`. A reopened issue sets `claimed`, so In progress shows it.
 - Rows are sorted by unresolved time, longest first. The timer colors are the same as in the phone app.
 - The issue number in each row is a button. Tab reaches it and Enter opens the sheet. A click on the row also opens it. J and K move focus between rows when no field or dialog has focus.
-- **Claim** or **Accept** in a row stays on the page. **Claim** or **Accept handoff** in the sheet keeps the sheet open. A recorded report opens its issue in the sheet.
+- **Claim** or **Accept** in a row stays on the page and does not open the sheet. When the person opens an issue while that command runs, the row action does not close it. **Claim** or **Accept handoff** in the sheet keeps the sheet open. A recorded report opens its issue in the sheet.
 - When the sheet closes, focus goes back to the control that opened it, then to the issue row, then to the page heading. Radix returns focus only to a `Dialog.Trigger`, so the console moves focus itself. The sheet keeps the last issue on screen while it slides out.
 - When the open issue leaves the person's lists, the sheet closes with the same status message as the phone app.
 - The queue team filter and the **Report for a team** dialog keep separate team choices. The UI before T0015 shared one choice.

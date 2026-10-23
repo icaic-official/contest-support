@@ -212,7 +212,7 @@ The runner includes four fixed authentication files:
 Cases run serially within each file. Up to four files run concurrently.
 Each case creates its own UUID-scoped fixture. Each file owns its identity service and database proxy.
 Fixture setup, credential snapshots, and cleanup checks use D1 batches with the same row assertions.
-The local `npm run test:auth` suite includes one additional execution-clock probe and must pass all 83 cases.
+The local `npm run test:auth` suite includes one additional expiry-clock probe and must pass all 83 cases.
 Record that local result separately from the 82 hosted cases.
 Both connector runners reject test filters, count overrides, and configuration overrides beyond the documented target and transport options.
 Both direct D1 runners retain their own fixture journals if cleanup fails. They use the original reviewed repository configuration.

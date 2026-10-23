@@ -1,4 +1,4 @@
-import { type ReactNode, useState } from "react";
+import { type MouseEvent, type ReactNode, useState } from "react";
 import { useNavigate } from "react-router";
 import { BrandMark } from "@/components/brand";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -22,6 +22,32 @@ import { Workspace } from "./Workspace";
 import { WorkflowRetryProvider } from "./WorkflowRetry";
 
 const documentationUrl = "https://minsky-docs.icaic-minsky.workers.dev";
+
+/**
+ * Moves keyboard focus to the main landmark.
+ *
+ * A native link to `#main` fires popstate. The hosted staff check then
+ * focused the page heading, so `#main` stayed inactive. Record the fragment
+ * without that event.
+ */
+function skipToMain(event: MouseEvent<HTMLAnchorElement>): void {
+  if (
+    event.button !== 0 ||
+    event.metaKey ||
+    event.altKey ||
+    event.ctrlKey ||
+    event.shiftKey
+  ) {
+    return;
+  }
+  const main = document.getElementById("main");
+  if (!(main instanceof HTMLElement)) return;
+  event.preventDefault();
+  main.focus();
+  if (window.location.hash !== "#main") {
+    window.history.pushState(null, "", "#main");
+  }
+}
 
 /**
  * The application root. It restores the sign-in, enforces the password
@@ -114,6 +140,7 @@ export function ConnectedApp() {
         <a
           href="#main"
           className="sr-only z-50 rounded-md bg-background text-sm font-medium shadow-md focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:px-4 focus:py-3"
+          onClick={skipToMain}
         >
           Skip to main content
         </a>

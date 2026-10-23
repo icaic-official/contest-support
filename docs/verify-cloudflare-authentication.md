@@ -32,10 +32,16 @@ Cases run serially within each file. Up to four files run concurrently.
 Each file owns a temporary local D1 database and identity service.
 Each case creates new UUID-scoped records. Fixture setup, credential snapshots, and cleanup checks use D1 batches.
 These batches retain the row assertions, maintained password hashing, and exact fixture ownership checks.
+Local runs of these four files use a 30 second case limit.
+Maintained scrypt can take longer than Vitest's 5 second default on a slow builder.
+Hosted runs keep their separate 120 second limit.
 The browser suite creates a separate temporary D1 database and a local HTTPS Worker on port 8788.
 It uses Chromium with a self-signed local certificate.
 Expect all 83 account cases and three browser cases to pass.
-The short SQLite execution-clock probe runs locally. It checks expiry after a password change deletes the original identity session.
+The local expiry probe checks a self password change after that change deletes the original identity session.
+For that case only, the test double replaces `strftime('now')` with a read of a one-row test clock.
+It moves the clock inside the same batch, after the session delete.
+It does not spend processor time to advance the wall clock.
 Hosted account cases inject expiry inside the actual batch instead, so transport latency does not determine that assertion.
 Record the local and hosted case counts separately.
 No provider credentials are needed. Local socket access is required.

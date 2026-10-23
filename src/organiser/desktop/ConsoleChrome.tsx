@@ -221,7 +221,7 @@ export function ConsoleSidebar({
     <aside
       aria-label="Console"
       className={cn(
-        "flex h-dvh shrink-0 flex-col border-r bg-sidebar text-sidebar-foreground transition-[width]",
+        "flex h-full shrink-0 flex-col border-r bg-sidebar text-sidebar-foreground transition-[width]",
         collapsed ? "w-16" : "w-64",
       )}
     >

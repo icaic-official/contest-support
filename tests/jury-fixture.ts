@@ -33,6 +33,7 @@ export async function createJuryFixture({ seedIssues = true } = {}) {
   }> = [];
   const channels = new Map<WebSocketRoute, Map<string, boolean>>();
   let loseResponse = false;
+  let announcementDelay = 0;
   await db.exec(`
     create role anon; create role authenticated; create role service_role bypassrls;
     create schema auth;
@@ -359,6 +360,36 @@ export async function createJuryFixture({ seedIssues = true } = {}) {
             );
           } else if (path === "/rest/v1/rpc/session_snapshot") {
             result = await snapshot(user, String(body?.p_session));
+          } else if (path === "/rest/v1/rpc/announcement_snapshot") {
+            if (announcementDelay) {
+              await new Promise((resolve) => setTimeout(resolve, announcementDelay));
+            }
+            result = await run(
+              user,
+              async (tx) =>
+                (
+                  await tx.query<{ result: unknown }>(
+                    "select public.announcement_snapshot($1) as result",
+                    [String(body?.p_session)],
+                  )
+                ).rows[0].result,
+            );
+          } else if (path === "/rest/v1/rpc/announcement_command") {
+            result = await run(
+              user,
+              async (tx) =>
+                (
+                  await tx.query<{ result: string }>(
+                    "select public.announcement_command($1,$2,$3::jsonb) as result",
+                    [
+                      String(body?.p_session),
+                      String(body?.p_request),
+                      JSON.stringify(body?.p_action),
+                    ],
+                  )
+                ).rows[0].result,
+            );
+            broadcast();
           } else if (path === "/rest/v1/rpc/workflow") {
             result = await act(
               user,
@@ -398,6 +429,10 @@ export async function createJuryFixture({ seedIssues = true } = {}) {
     snapshot,
     act,
     broadcast,
+    /** Delays announcement reads, to show that reporting does not wait for them. */
+    delayAnnouncements: (milliseconds: number) => {
+      announcementDelay = milliseconds;
+    },
     loseNextResponse: () => {
       loseResponse = true;
     },

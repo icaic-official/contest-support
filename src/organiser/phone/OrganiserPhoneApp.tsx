@@ -190,7 +190,7 @@ export function OrganiserPhoneApp({
 
   // The report sheet stays mounted when a recorded report opens its issue.
   return (
-    <div data-ui="organiser-phone" className="bg-background">
+    <div data-ui="organiser-phone" className="h-full bg-background">
       {openedIssue ? (
         <PhoneIssueView
           key={openedIssue.id}
@@ -204,7 +204,7 @@ export function OrganiserPhoneApp({
           }
         />
       ) : (
-        <div className="flex h-dvh flex-col">
+        <div className="flex h-full flex-col">
           <PhoneHeader
             title={tabLabel(currentTab)}
             headingId={headingId}

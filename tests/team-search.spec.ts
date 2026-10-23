@@ -1,3 +1,4 @@
+import { emptyAnnouncementSnapshot } from './support/announcementSnapshot';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import type { Command, Issue, Membership, Snapshot } from '../src/connected/model';
 
@@ -153,6 +154,8 @@ async function signIn(page: Page, viewport: Viewport) {
         server_time: new Date().toISOString(),
       };
       result = snapshot;
+    } else if (path === '/rest/v1/rpc/announcement_snapshot') {
+      result = emptyAnnouncementSnapshot();
     } else if (path === '/rest/v1/rpc/workflow') {
       commands.push(route.request().postDataJSON().p_action);
       result = ISSUE_IDS[0];

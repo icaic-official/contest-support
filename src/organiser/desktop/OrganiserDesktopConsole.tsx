@@ -324,7 +324,7 @@ export function OrganiserDesktopConsole({
         {(admin) => (
           <div
             data-ui="organiser-desktop"
-            className="flex h-dvh overflow-hidden bg-background text-foreground"
+            className="flex h-full overflow-hidden bg-background text-foreground"
           >
             <ConsoleSidebar
               state={state}

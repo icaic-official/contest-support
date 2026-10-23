@@ -100,7 +100,7 @@ export function ContestantApp(props: ShellProps) {
   return (
     <div
       data-ui="contestant"
-      className="flex h-dvh min-w-[1024px] flex-col bg-background text-foreground"
+      className="flex h-full min-w-[1024px] flex-col bg-background text-foreground"
     >
       <a
         href="#contestant-main"

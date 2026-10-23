@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { emptyAnnouncementSnapshot } from "./support/announcementSnapshot";
 import type { Membership, Snapshot } from "../src/connected/model";
 
 const USER_ID = "00000000-0000-4000-8000-000000000001";
@@ -80,6 +81,7 @@ async function signIn(page: Page, membership: Membership): Promise<void> {
       "/rest/v1/memberships": [membership],
       "/rest/v1/sessions": [{ id: SESSION_ID, name: "Selection session" }],
       "/rest/v1/rpc/session_snapshot": state,
+      "/rest/v1/rpc/announcement_snapshot": emptyAnnouncementSnapshot(),
     };
     if (!(path in responses)) {
       throw new Error(`Unexpected request: ${path}`);

@@ -6,6 +6,17 @@ export class WorkflowRejectedError extends Error {
   }
 }
 
+/** `conflict` means the announcement changed after the caller read it. */
+export class AnnouncementRejectedError extends WorkflowRejectedError {
+  readonly conflict: boolean;
+
+  constructor(message: string, conflict = false) {
+    super(message);
+    this.name = 'AnnouncementRejectedError';
+    this.conflict = conflict;
+  }
+}
+
 export class ImageRequestError extends Error {
   readonly validation: boolean;
   readonly restart: boolean;

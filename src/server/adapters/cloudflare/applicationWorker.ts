@@ -7,6 +7,8 @@ import { createBetterAuthIdentity } from './identity';
 import { passwordHasher } from './password';
 import { D1ApplicationService } from './application';
 import { R2ImageService, type PrivateBucket } from './images';
+import { D1AnnouncementService } from './announcements';
+import { R2AnnouncementImageService } from './announcementImages';
 import { createApplicationHandler, privateJson } from './http';
 import { connectLive, dispatchNotifications, maintainFixtureSessions, type LiveEnvironment } from './live';
 
@@ -64,6 +66,8 @@ export default {
         const images = new R2ImageService(env.DB, env.IMAGES);
         response = await createApplicationHandler({
           auth: authentication(env), application, images,
+          announcements: new D1AnnouncementService(env.DB),
+          announcementImages: new R2AnnouncementImageService(env.DB, env.IMAGES),
           workflow: new WorkflowService(new D1ApplicationStore(env.DB)),
           connect: (input, caller, sessionId) => connectLive(input, env, caller, sessionId),
         }, env.AUTH_ORIGIN)(request);
@@ -79,6 +83,7 @@ export default {
   async scheduled(event: unknown, env: ApplicationEnvironment): Promise<void> {
     const results = await Promise.allSettled([
       new R2ImageService(env.DB, env.IMAGES).recover(),
+      new R2AnnouncementImageService(env.DB, env.IMAGES).recover(),
       deliver(env),
       authenticationWorker.scheduled(event, env),
     ]);

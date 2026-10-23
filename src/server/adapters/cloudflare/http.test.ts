@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { createApplicationHandler, type ApplicationHttpServices } from './http';
 import type { AuthenticationSession } from '../../authentication';
 import { ImageRequestError } from '../../../backend/errors';
+import { AnnouncementCommandError } from './announcements';
 
 const origin = 'https://connector.example';
 const sessionId = '0fb97157-9f3f-45ed-b036-5d0fa2cdb278';
@@ -30,6 +31,17 @@ function services() {
       finish: vi.fn<ApplicationHttpServices['images']['finish']>(),
       remove: vi.fn<ApplicationHttpServices['images']['remove']>(),
       download: vi.fn<ApplicationHttpServices['images']['download']>(),
+    },
+    announcements: {
+      snapshot: vi.fn<ApplicationHttpServices['announcements']['snapshot']>(),
+      execute: vi.fn<ApplicationHttpServices['announcements']['execute']>().mockResolvedValue(requestId),
+    },
+    announcementImages: {
+      begin: vi.fn<ApplicationHttpServices['announcementImages']['begin']>(),
+      upload: vi.fn<ApplicationHttpServices['announcementImages']['upload']>(),
+      finish: vi.fn<ApplicationHttpServices['announcementImages']['finish']>(),
+      remove: vi.fn<ApplicationHttpServices['announcementImages']['remove']>(),
+      download: vi.fn<ApplicationHttpServices['announcementImages']['download']>(),
     },
     connect: vi.fn<ApplicationHttpServices['connect']>().mockResolvedValue(new Response(null)),
   } satisfies ApplicationHttpServices;
@@ -111,5 +123,42 @@ describe('Cloudflare application HTTP boundary', () => {
     const headers = { Origin: origin, 'X-Minsky-Request': '1', 'X-CSRF-Token': identity.csrf };
     expect((await handle(new Request(`${origin}/api/image/path`, { method: 'PUT', headers }))).status).toBe(411);
     expect(deps.images.upload).not.toHaveBeenCalled();
+  });
+
+  it('keeps announcement outcomes typed and accepts long multi-byte text within its own bound', async () => {
+    const deps = services();
+    const handle = createApplicationHandler(deps, origin);
+    const command = { type: 'publish', title: 'Fictional', details: '字'.repeat(10_000), expires_at: null };
+    const committed = await handle(post('/api/announcements', { sessionId, requestId, command }));
+    expect(await committed.json()).toEqual({ outcome: 'committed', id: requestId });
+    expect(deps.announcements.execute).toHaveBeenCalledWith(identity.caller, sessionId, requestId, command);
+    deps.announcements.execute.mockRejectedValueOnce(new AnnouncementCommandError('conflict', 'Announcement changed.'));
+    const conflict = await handle(post('/api/announcements', { sessionId, requestId, command }));
+    expect(conflict.status).toBe(409);
+    expect(await conflict.json()).toMatchObject({ outcome: 'rejected', reason: 'conflict' });
+    deps.announcements.execute.mockRejectedValueOnce(new Error('Private SQL bound values.'));
+    expect(await (await handle(post('/api/announcements', { sessionId, requestId, command }))).text()).not.toContain('Private SQL');
+    const forged = await handle(post('/api/announcements', { sessionId, requestId, command, caller: { accountId: requestId } }));
+    expect(await forged.json()).toEqual({ outcome: 'rejected', reason: 'input' });
+    const oversized = await handle(post('/api/announcements', { sessionId, requestId, command: { ...command, details: 'x'.repeat(70_000) } }));
+    expect(oversized.status).toBe(400);
+    expect(deps.announcements.execute).toHaveBeenCalledTimes(3);
+  });
+
+  it('routes announcement image transfers to their own service and requires an exact length', async () => {
+    const deps = services();
+    const handle = createApplicationHandler(deps, origin);
+    const headers = { Origin: origin, 'X-Minsky-Request': '1', 'X-CSRF-Token': identity.csrf, 'Content-Length': '3',
+      'Content-Type': 'image/png', 'X-Minsky-Digest': 'a'.repeat(64) };
+    const request = (extra?: Record<string, string>) => new Request(`${origin}/api/announcement-image/${sessionId}/announcements/a/b`,
+      { method: 'PUT', headers: { ...headers, ...extra }, body: new Uint8Array([1, 2, 3]) });
+    expect((await handle(request())).status).toBe(200);
+    expect(deps.announcementImages.upload).toHaveBeenCalledTimes(1);
+    expect(deps.images.upload).not.toHaveBeenCalled();
+    const { 'Content-Length': _omitted, ...withoutLength } = headers;
+    expect((await handle(new Request(`${origin}/api/announcement-image/path`, { method: 'PUT', headers: withoutLength }))).status).toBe(411);
+    deps.announcementImages.finish.mockRejectedValueOnce(new ImageRequestError('Upload the image before finishing.', { incomplete: true }));
+    const finish = await handle(post('/api/announcement-images', { action: 'finish', sessionId, imageId: requestId }));
+    expect(await finish.json()).toMatchObject({ incomplete: true });
   });
 });

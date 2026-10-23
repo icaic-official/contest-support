@@ -31,6 +31,15 @@ The local app runs at `http://127.0.0.1:5173`.
 It uses the configured backend.
 Docker is optional for connected development.
 
+## Find application code
+
+`src/connected/` owns authentication checks, browser routes, session data, and workflow retry protection.
+`src/contestant/` contains the contestant desktop app.
+`src/organiser/` contains the organiser phone app, desktop console, and shared forms.
+`src/screens/` contains sign-in, password change, and session-access screens.
+Features use the selected backend contracts. Provider SDKs stay inside provider implementations.
+See the repository's [frontend architecture](https://github.com/GiftedNovaHD/minsky/blob/main/docs/frontend-architecture.md) for the module and route reference.
+
 ## Run the checks
 
 | Command | Purpose |
@@ -52,7 +61,7 @@ Never use the CI fixture scripts against real competition data.
 
 Implement the ticket, verify it, update its documentation, and prepare a pull request.
 The owner reviews and merges.
-After account setup, GitHub Actions publishes docs previews and stable sites from `main` only when all required CI jobs pass.
+Workers Builds runs `npm run ci` for branches in this repository. It does not publish docs or the application.
 Pull request checks do not receive deployment credentials.
 The repository setup guide is `docs/cloudflare-builds.md`.
 Application previews remain disabled until they have independent provider resources.

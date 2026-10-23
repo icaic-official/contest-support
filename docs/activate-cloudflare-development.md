@@ -157,11 +157,12 @@ gh variable set MINSKY_DEV_BUCKET_NAME --body "$MINSKY_DEV_BUCKET_NAME"
 gh variable set CLOUDFLARE_DEPLOY_ENABLED --body true
 ```
 
-Rerun the latest approved `main` push's **Checks** run.
-Confirm that the run's revision matches the recorded approval before rerunning it.
-The app job selects `VITE_BACKEND=cloudflare`, validates the exact hosted targets, and deploys the complete Worker.
+`CLOUDFLARE_DEPLOY_ENABLED` no longer starts a publisher. The Actions jobs are removed.
+Publish the approved revision with the guarded script in [deployment settings](cloudflare-build-settings.md#publication-commands).
+Confirm the script's revision matches the recorded approval before it uploads.
+The app command selects `VITE_BACKEND=cloudflare`, validates the exact hosted targets, and deploys the complete Worker.
 It does not migrate D1, bootstrap accounts, or rotate secrets.
-Docs publish through their independent job.
+Publish docs with the same script and `--site=docs`. Do not use Workers Builds for either site.
 
 ## Verify activation and subsequent deployment
 

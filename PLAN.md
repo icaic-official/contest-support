@@ -1,5 +1,15 @@
 # Minsky planning record
 
+**Workers Builds CI, 2026-10-23.** The owner keeps GitHub on the free plan.
+The Actions minute cap stopped hosted checks. It is not a failed payment.
+Move every automatic check to Workers Builds on the existing Workers Paid plan.
+Remove the GitHub Actions workflow so pushes do not start jobs.
+Do not add a GitHub Actions fallback.
+Browser tests and hosted Supabase or Cloudflare suites stay on-demand commands.
+The Workers Builds image does not provide Chromium, and the hosted jobs exceed the 20 minute build limit.
+The CI Worker is `minsky-ci`. Its deploy command is a dry run. It does not publish `minsky-dev` or `minsky-docs`.
+The owner connects the repository. This change does not deploy or edit secrets.
+
 **PR #45 update from main, 2026-10-23.** The owner requests current `main` and conflict resolution for the existing PR.
 Merge `origin/main` at `a938e6a`, which includes the merged T0015 frontend and T0022 CI change.
 Port PR #45 browser routes and retry protections to the redesigned shells and shared data hooks.

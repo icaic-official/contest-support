@@ -123,7 +123,7 @@ Update these registration points:
 | [`scripts/provider-test.mjs`](../scripts/provider-test.mjs) | Add provider prerequisite checks and private environment forwarding. Preserve journal retention and nonzero cleanup failure status. |
 | [`playwright.providers.config.ts`](../playwright.providers.config.ts) | Configure the required browser origin if needed. Retain one worker, zero retries, and disabled credential-bearing captures. |
 | [`eslint.config.js`](../eslint.config.js) | Extend provider import restrictions for shared scenarios, contracts, browser bridge, and server rules. |
-| [`.github/workflows/checks.yml`](../.github/workflows/checks.yml) | Add authorized hosted verification with isolated credentials. Keep ordinary PR checks credential-free. |
+| [`docs/cloudflare-build-settings.md`](cloudflare-build-settings.md) | Document any new hosted command as on-demand. Keep `npm run ci` credential-free. |
 
 The browser bridge already supports cookies, separate contexts, image bytes, typed errors, subscription callbacks, and real WebSocket interruption.
 Reuse `tests/providers/support/response-fault.ts` when the provider exposes HTTP workflow and account endpoints. Supply the endpoint paths.

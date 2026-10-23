@@ -4,7 +4,7 @@ This guide covers the retained Supabase projects and their contribution and veri
 Cloudflare serves the stable development application. Its fresh installation received no Supabase accounts, passwords, records, images, or IDs.
 Use [Install Cloudflare](../site/src/content/docs/operators/installation.md) for Cloudflare setup.
 Use [deployment setup](cloudflare-builds.md) for automation and [activation](activate-cloudflare-development.md) for the approved switch and recovery procedure.
-GitHub Actions publishes docs and the selected application after required `main` checks pass and publication is enabled.
+Workers Builds runs ordinary checks and does not publish the application. Publication stays an explicit guarded command.
 Application previews remain disabled until independent preview resources exist.
 Backend migrations, bootstrap, secrets, and activation retain their explicit steps.
 The dated setup records below describe their recorded revisions.
@@ -283,10 +283,10 @@ For each ticket, use this sequence:
 5. Prepare the PR.
 6. Run cloud integration checks against the reviewed revision.
 7. Let the user review and merge.
-8. Let GitHub Actions publish docs and the selected complete application after the required `main` checks pass. Coordinate migrations, bootstrap, and secrets separately.
+8. Workers Builds runs ordinary checks and does not publish the application. Coordinate migrations, bootstrap, and secrets separately.
 
-Automatic frontend deployment requires GitHub deployment settings and passing `checks`, `secrets`, and `dependencies` jobs.
-Until setup is verified, record merge and deployment separately.
+Automatic GitHub Actions publication is removed.
+Record any later publication separately from merge.
 Prepare compatible backend changes before a dependent frontend merges, or pause frontend deployment for that release.
 When production exists, validate changes on development and CI before you apply them to production.
 See [AGENTS.md](../AGENTS.md#cloud-development-and-deployment-workflow).
@@ -355,7 +355,7 @@ Do not use it after Cloudflare activation. Its Supabase fixtures cannot verify t
 Use [the Cloudflare provider and UI checks](run-provider-tests.md) against their dedicated CI targets.
 Use [the activation procedure](activate-cloudflare-development.md#verify-activation-and-subsequent-deployment) to verify the stable installation. Keep its records separate from CI fixtures.
 `npm run test:cloud` retains the separate Supabase verification path through its local frontend.
-The protected cloud job also runs the [shared provider suite](provider-test-contracts.md) through the Supabase adapter.
+Run the [shared provider suite](provider-test-contracts.md) through the Supabase adapter with the on-demand command in [CI settings](cloudflare-build-settings.md#on-demand-checks).
 See [Run the shared provider tests](run-provider-tests.md) for its explicit target settings and separate recovery journal.
 
 Install Chromium with `npx playwright install chromium`.
@@ -369,9 +369,10 @@ Do not interrupt fixture deletion.
 Do not capture live temporary credentials in screenshots.
 Tests dismiss the credentials before capture.
 
-PR CI runs checks without hosted secrets.
-The manually dispatched cloud job uses a protected GitHub environment named **cloud-test** and a **separate Supabase test project**.
-CI refuses the shared development reference `ovymmobupzowotvrywek`.
+Workers Builds runs checks without hosted secrets.
+The retired GitHub `cloud` job used a protected environment named **cloud-test** and a **separate Supabase test project**.
+That workflow is removed. Run the same checks with the commands in [CI settings](cloudflare-build-settings.md#on-demand-checks).
+Those commands refuse the shared development reference `ovymmobupzowotvrywek`.
 
 Configure `MINSKY_TEST_PROJECT_REF` as an environment variable.
 Configure these environment secrets:
@@ -382,24 +383,23 @@ Configure these environment secrets:
 - `SUPABASE_SERVICE_ROLE_KEY`
 
 Restrict execution to trusted revisions.
-Configure required reviewers where the repository's GitHub plan supports them.
-Verify plan availability before you treat protection as enabled.
-Then manually dispatch **Checks** for the reviewed branch.
-Record the cloud job result.
-By default, the cloud job applies configuration and migrations, deploys both `admin` and `attachments`, and sets the test origin before the tests.
-The job records the remote migration versions and function versions in its log.
+The GitHub `cloud-test` environment remains. No workflow dispatches it.
+Run the hosted commands from [CI settings](cloudflare-build-settings.md#on-demand-checks) on a reviewed revision.
+Record the revision and the result.
+When the change includes migrations, functions, or configuration, apply those to the isolated CI project before the tests.
+The retired job applied configuration and migrations, deployed `admin` and `attachments`, and set the test origin before the tests.
 
-To test a frontend change against the existing CI backend, select `existing_backend` when you dispatch the workflow.
+To test a frontend change against the existing CI backend, skip that preparation.
 Use this mode only when the change needs no new backend migration, function, or configuration.
 The existing backend must already allow the test origin `http://127.0.0.1:4174`.
-For T0014, the command is:
+T0014 used this dispatch, which no longer starts a job:
 
 ```sh
 gh workflow run checks.yml --repo GiftedNovaHD/minsky \
 	--ref feature/t0014-backend-adapters -f existing_backend=true
 ```
 
-This mode skips backend preparation. The tests still create and delete isolated fixtures.
+Skipping preparation still creates and deletes isolated fixtures.
 Before fixture creation, `scripts/check-cloud-backend.mjs` requires every local migration version and active `admin` and `attachments` functions.
 The check reads provider metadata and reports additional remote migration versions.
 It stops when prerequisites are missing. It does not compare deployed function source or prove that database objects match migration history.

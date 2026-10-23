@@ -33,7 +33,7 @@ This page is a dated record, not a live deployment dashboard.
 
 | Work | Status |
 | --- | --- |
-| [T0021 follow-up](https://github.com/GiftedNovaHD/minsky/pull/45) | Draft follow-up. Activation records, browser routes, and workflow retry protections. The owner requests integration with current main. The owner reviews and merges. |
+| [T0021 follow-up](https://github.com/GiftedNovaHD/minsky/pull/45) | Draft follow-up. Browser routes, workflow retry protections, and Workers Builds CI. GitHub Actions checks are removed. The owner reviews and merges. |
 | [T0006 announcements](https://github.com/GiftedNovaHD/minsky/pull/20) | Open pull request. |
 | [T0007 independent installations](https://github.com/GiftedNovaHD/minsky/pull/21) | Open pull request. Packaging exists on its branch. Container operation remains unverified. |
 
@@ -43,7 +43,7 @@ No Supabase accounts, passwords, records, images, or IDs transferred.
 
 T0011 adds this documentation site.
 The initial docs deployment did not deploy the Minsky application or apply database migrations.
-GitHub Actions publishes the independent docs Worker and the selected complete application after required checks pass.
+The approved activation used GitHub Actions publication. That publisher is removed. Workers Builds does not publish the docs Worker or the application.
 Cloudflare app publication includes its API, bindings, schedule, and static assets.
 Migrations, bootstrap, secret creation, and a future backend switch remain separate approved operations.
 

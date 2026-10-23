@@ -61,7 +61,7 @@ Never use the CI fixture scripts against real competition data.
 
 Implement the ticket, verify it, update its documentation, and prepare a pull request.
 The owner reviews and merges.
-After account setup, GitHub Actions publishes docs previews and stable sites from `main` only when all required CI jobs pass.
+Workers Builds runs `npm run ci` for branches in this repository. It does not publish docs or the application.
 Pull request checks do not receive deployment credentials.
 The repository setup guide is `docs/cloudflare-builds.md`.
 Application previews remain disabled until they have independent provider resources.

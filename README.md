@@ -78,6 +78,7 @@ See [cloud onboarding](docs/cloud-onboarding.md#contributor-setup) for provider 
 | `npm run preview` | Serve built assets locally. |
 | `npm run typecheck` | Check TypeScript. |
 | `npm run lint` | Run ESLint. |
+| `npm run ci` | Run the Workers Builds check: installs, type checking, lint, unit tests, both builds, audits, and the Gitleaks scan. |
 | `npm run check:functions` | Check the account, attachment, and workflow functions with Deno. |
 | `npm run test:functions` | Test attachment authorization and file removal with fake clients. |
 | `npm test` | Run unit, script, and embedded database tests without cloud credentials. |
@@ -94,7 +95,8 @@ See [cloud onboarding](docs/cloud-onboarding.md#contributor-setup) for provider 
 | `npm run test:auth:hosted -- --account=… --database=…` | Run account cases on the explicit isolated hosted authentication D1 target. |
 | `npm run test:auth:http -- --account=… --database=… --origin=…` | Check the isolated deployed authentication Worker. |
 | `npm run test:auth:hash` | Measure password cost in a temporary local Worker. |
-| `npm run test:e2e` | Run browser tests with mocked cloud responses. |
+| `npm run test:e2e:smoke` | Run the critical-path browser files `tests/landing.spec.ts` and `tests/journey.spec.ts`. | |
+| `npm run test:e2e` | Run every mocked browser test, including the smoke files. |
 | `npm run test:cloud` | Run the browser and workflow suite with isolated fixtures on the CI project. Needs cloud credentials. |
 | `npm run test:hosted` | Repeat the suite with real accounts against the deployed app. Needs cloud credentials. |
 | `npm run test:providers:list` | List the shared provider scenarios without hosted credentials. |
@@ -159,20 +161,17 @@ npm run docs:dev
 The deployment configuration is `wrangler.docs.jsonc`.
 See [the writing and deployment guide](site/src/content/docs/contributing/documentation.md).
 The initial docs deployment is explicitly authorized in T0011 before merge.
-The user selected CI-controlled deployment from `main`.
-Docs branch previews remain available. App branch previews are disabled until independent preview resources exist.
-GitHub Actions runs CI for all repository branch pushes and fork pull requests.
-Same-repository PRs use their branch-push results. See [event routing](docs/cloudflare-build-settings.md#events-and-prerequisites).
-Independent docs and app deployment jobs wait for `checks`, `secrets`, and `dependencies`.
-See [deployment setup](docs/cloudflare-builds.md) for credentials, activation, and backend limits.
+Workers Builds runs `npm run ci` for branches in this repository. It does not publish the application or the docs.
+See [Workers Builds setup](docs/cloudflare-builds.md) for the dashboard steps and [CI settings](docs/cloudflare-build-settings.md) for on-demand browser and hosted commands.
+Automatic GitHub Actions publication is removed. App and docs publication stay explicit guarded commands.
 The fresh Cloudflare development candidate and a separate empty installation pass the complete application checks.
-GitHub Actions publishes the complete Cloudflare application and independent docs after required main checks pass. The approved activation and a subsequent automated deployment both pass their recorded application checks.
+The approved activation and a later automated deployment passed their recorded application checks. Those runs used the retired Actions publisher.
 The [T0021 activation record](docs/current-state.md#t0021-approved-activation-2026-10-19) separates protected checks from stable URL verification.
 
 ### Repository records
 
 - [Writing guide](docs/writing-guide.md) gives the documentation structure and sentence rules.
-- [Deployment setup](docs/cloudflare-builds.md) explains branch previews, deployment after CI passes, and first-run verification.
+- [Workers Builds setup](docs/cloudflare-builds.md) explains the CI Worker, the owner checklist, and why application Workers stay disconnected.
 - [Documentation release plan](docs/documentation-release-plan.md) — public-reader requirements, specific gaps, and completion criteria.
 - [Development tickets](docs/tickets.md) — ticket scope, status, and acceptance criteria.
 - [Frontend architecture](docs/frontend-architecture.md) — UI selection, shells, data hooks, the jury award lists, and the Tailwind and shadcn/ui setup.

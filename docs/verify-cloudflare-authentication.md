@@ -147,14 +147,11 @@ Local elapsed time and hosted client time are not hosted CPU measurements.
 
 ## Run protected CI
 
-The `Checks` workflow has a `cloudflare_auth` dispatch option.
-Select the reviewed branch revision and enable that option.
-The protected `cloud-test` environment controls the hosted job.
-Its deployment branch policy must permit the exact reviewed ticket branch.
-An authorized owner must approve that allowlist change before the job can start.
-The current allowlist includes `main` and the exact T0018 branch with owner approval.
-To repeat the merged T0018 check, dispatch `cloudflare_auth=true` on `main`.
-The T0019 branch remains outside that allowlist. Its local hosted results do not replace protected execution on that revision.
+The GitHub `cloudflare_auth` job is removed.
+Repeat the hosted authentication checks with the commands in [CI settings](cloudflare-build-settings.md#on-demand-checks).
+Run them on the reviewed revision. They deploy only `minsky-auth-ci`.
+The historical `cloud-test` allowlist included `main` and the exact T0018 branch.
+The T0019 branch remained outside that allowlist. Its local hosted results do not replace a later hosted run on that revision.
 See [the run record](current-state.md#t0018-cloudflare-authentication-2026-10-18) for the initial rejection and later hosted resource limit.
 The [PR #41 follow-up](current-state.md#pr-41-review-corrections-and-paid-authentication-2026-10-18) records the passing protected run on Workers Paid.
 The existing `CLOUDFLARE_API_TOKEN` needs D1 access and deployment access to the isolated authentication Worker.

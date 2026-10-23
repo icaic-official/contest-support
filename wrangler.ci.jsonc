@@ -1,0 +1,9 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "minsky-ci",
+  "account_id": "458ad6a930b0fb717796dfa19ca6a2b1",
+  "compatibility_date": "2026-10-02",
+  "main": "ci/worker.js",
+  "workers_dev": false,
+  "preview_urls": false
+}

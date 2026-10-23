@@ -22,13 +22,15 @@
 
 ## Current scope
 
-The owner requests an update of [PR #45](https://github.com/GiftedNovaHD/minsky/pull/45) from current `main` and conflict resolution.
-Merge `origin/main` at `a938e6a` into the existing `feature/t0021-cloudflare-development-install` branch.
-Preserve the merged T0015 interfaces, T0022 CI routing, and docs-preview parser guards.
-Retain PR #45 browser routes and workflow retry protections in the redesigned frontend.
-Preserve both providers, server rules, deployment prerequisites, and protected environment rules.
-Keep the PR draft. Fresh verification must identify the combined revision.
-This request does not authorize hosted verification, deployment, provider changes, or a fix for the separate Supabase skip-link failure.
+The owner requests [PR #45](https://github.com/GiftedNovaHD/minsky/pull/45) on `feature/t0021-cloudflare-development-install`.
+The branch already contains `origin/main` at `a938e6a`.
+Preserve the merged T0015 interfaces, browser routes, workflow retry protections, and docs-preview parser guards.
+Move automatic CI to Cloudflare Workers Builds and remove the GitHub Actions workflow.
+GitHub stays on the free plan. Do not add an Actions job or budget Actions minutes.
+Browser suites and hosted provider checks stay on-demand commands.
+Do not connect `minsky-dev` or `minsky-docs` to Workers Builds.
+Do not deploy, change secrets, change repository settings, or mark the PR ready.
+The separate Supabase skip-link failure stays outside this change unless a local smoke run reproduces it.
 The owner reviews and merges. Do not start another development ticket.
 Bounded subagent work remains authorized for the existing PR follow-up.
 
@@ -130,15 +132,16 @@ For each ticket, use this sequence:
 5. Prepare the PR.
 6. Run cloud integration checks on the reviewed revision.
 7. Let the user review and merge.
-8. After automation setup, let GitHub Actions deploy docs and the selected application when the `main` CI checks pass. A Cloudflare application deployment includes the complete Worker. Coordinate migrations, bootstrap, secrets, and activation separately.
+8. Workers Builds runs ordinary checks. It does not publish the application.
+   A Cloudflare application deployment includes the complete Worker. Coordinate migrations, bootstrap, secrets, and activation separately.
 
-Automatic frontend deployment requires GitHub deployment settings and passing `checks`, `secrets`, and `dependencies` jobs.
-Report deployment separately from merge. Record its exact source revision and workflow attempt.
+Automatic GitHub Actions publication is removed.
+Report any later publication separately from merge. Record its exact source revision.
 Prepare compatible backend changes before a dependent frontend merges, or pause frontend deployment for that release.
-Privileged GitHub cloud checks use the protected `cloud-test` environment and the separate CI project.
-Ordinary PR checks run without cloud credentials.
-Record local cloud runs separately from protected GitHub Actions runs.
-Neither replaces the other.
+Hosted Supabase and Cloudflare checks are on-demand commands against isolated CI targets.
+Ordinary Workers Builds checks run without cloud credentials.
+Record local cloud runs separately from earlier protected GitHub Actions runs.
+Neither replaces the other. GitHub Actions no longer runs those checks.
 
 CI fixtures create temporary accounts and records scoped by UUID.
 They delete only their own data.
@@ -175,7 +178,7 @@ They are not part of the T0005 issue-image ticket:
 - Manually check keyboard navigation, persistence after refresh, and separation of public replies from internal notes.
 - Before you present an implementation PR as ready, build, lint, type checking, and required tests must pass.
 - If a check cannot run, report the reason. Leave the result unverified.
-- Dependabot may open weekly npm and GitHub Actions update pull requests.
+- Dependabot may open weekly npm update pull requests. The repository does not use GitHub Actions.
 - Review Dependabot updates with the same checks as other changes.
 - Do not adopt TypeScript major updates while `.github/dependabot.yml` ignores them. The installed `typescript-eslint` release cannot install TypeScript 7.
 - For documentation-only changes, check content, paths, and whitespace.

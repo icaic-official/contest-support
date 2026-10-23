@@ -22,7 +22,7 @@ Checked on **23 October 2026** against `main` at `21bfd6e`. This is a dated reco
 
 | Work | State |
 | --- | --- |
-| T0006 session announcements | Open, [PR #20](https://github.com/GiftedNovaHD/minsky/pull/20) |
+| T0006 session announcements | Open, [PR #62](https://github.com/GiftedNovaHD/minsky/pull/62). It replaces PR #20, which is closed. |
 | T0007 container packaging | Open, [PR #21](https://github.com/GiftedNovaHD/minsky/pull/21). Deferred. |
 
 ## Environments

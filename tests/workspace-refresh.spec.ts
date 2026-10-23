@@ -592,5 +592,70 @@ for (const [layout, viewport] of viewports) {
           },
         });
     });
+
+    /** Records the open issue as claimed when the held workflow call returns. */
+    async function holdClaim(page: Page, state: Snapshot) {
+      let release: () => void = () => {};
+      const gate = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      let started: () => void = () => {};
+      const inFlight = new Promise<void>((resolve) => {
+        started = resolve;
+      });
+      await page.route('https://example.supabase.co/rest/v1/rpc/workflow', async (route) => {
+        started();
+        const body = route.request().postDataJSON();
+        const issue = state.issues[0];
+        issue.status = 'claimed';
+        issue.owner = USER_ID;
+        issue.owner_name = 'Review administrator';
+        issue.first_assigned_at = state.server_time;
+        issue.revision += 1;
+        await gate;
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(body.p_action.issue_id),
+        });
+      });
+      return { release, inFlight };
+    }
+
+    function claimButton(page: Page): Locator {
+      return page.getByRole('button', { name: 'Claim ISS-1', exact: true });
+    }
+
+    function openIssueVisible(page: Page): Locator {
+      return isDesktop(page)
+        ? page.getByRole('dialog', { name: /ISS-1: Original issue/ })
+        : page.getByRole('heading', { name: 'ISS-1, Aurora', exact: true });
+    }
+
+    test('a queue claim stays on the list', async ({ page }) => {
+      const { state } = await openWorkspace(page, viewport);
+      const held = await holdClaim(page, state);
+      await claimButton(page).click();
+      await held.inFlight;
+      held.release();
+      await expect(claimButton(page)).toHaveCount(0);
+      await expect(openIssueVisible(page)).toHaveCount(0);
+      const opener = isDesktop(page)
+        ? page.getByRole('button', { name: 'Open ISS-1', exact: true })
+        : page.locator(`#issue-card-${ISSUE_ID}`);
+      await expect(opener).toBeFocused();
+    });
+
+    test('an issue opened during a queue claim stays open', async ({ page }) => {
+      const { state } = await openWorkspace(page, viewport);
+      const held = await holdClaim(page, state);
+      await claimButton(page).click();
+      await held.inFlight;
+      await issueOpeners(page).first().click();
+      await expect(openIssueVisible(page)).toBeVisible();
+      held.release();
+      await expect(claimButton(page)).toHaveCount(0);
+      await expect(openIssueVisible(page)).toBeVisible();
+    });
   });
 }

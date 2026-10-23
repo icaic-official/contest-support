@@ -8,6 +8,7 @@ import {
 import { Archive } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { inlineActionReturnsToList } from "@/connected/hooks/inlineAction";
 import { useNow } from "@/connected/hooks/useNow";
 import { useTeamSelection } from "@/connected/hooks/useTeamSelection";
 import type { WorkflowState } from "@/connected/hooks/useWorkflowState";
@@ -271,15 +272,17 @@ export function OrganiserDesktopConsole({
   }
 
   function runRowAction(issue: Issue, action: RowAction) {
+    const mark = workflow.selectionMark();
     void command
       .act({ type: action, issue_id: issue.id, revision: issue.revision })
       .then((recorded) => {
         // A recorded command selects its issue. A row action stays on the
-        // page, so close the sheet again and keep focus on the row.
-        if (recorded) {
-          workflow.selectIssue("");
-          focusLater(issueRowId(issue.id), consoleHeadingId);
+        // page. An issue the person opened while it ran stays open.
+        if (!inlineActionReturnsToList(recorded, mark, workflow.selectionMark())) {
+          return;
         }
+        workflow.selectIssue("");
+        focusLater(issueRowId(issue.id), consoleHeadingId);
       });
   }
 

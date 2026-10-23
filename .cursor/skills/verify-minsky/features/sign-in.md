@@ -33,8 +33,8 @@ Preconditions:
 
 ## Gotchas
 
-- `reject-wrong-password` is a separate attempt after sign-out. Enter `contestant` and `wrong-password`, choose **Sign in**, and expect an alert with the **Sign in** heading still visible. This local session accepts any password, so the workspace opens instead. Report that sub-feature as unverified. Do not treat the opened workspace as a passed password check.
-- The password `verification-only` is the recipe value. It is not an organizer password.
+- `reject-wrong-password` is a separate attempt after sign-out. Enter `contestant` and `wrong-password`, choose **Sign in**, and expect an alert with the **Sign in** heading still visible. The local Worker checks the password. A wrong password does not open the workspace.
+- The password `verification-only` is the local verification password. It is not an organizer password.
 - The **Live** badge has role `status` and no accessible name. Wait for the visible text with `wait-text --text Live --exact`.
 - A contestant window narrower than 1024 px is not a supported contestant layout. Keep `1280x800` for this journey.
 - Staff sign-in uses the same form and a different account menu name. Do not look for **Account menu for Aurora** after signing in as `volunteer`.

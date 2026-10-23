@@ -33,7 +33,7 @@ Preconditions:
 
 ## Gotchas
 
-- This local session cannot finish account creation. After **Create account**, the credential region does not appear and the command fails. Report that failure. Do not stop before the click, and do not add the account through another path so the region appears.
+- Account creation runs through the local account API. The password hash can take several seconds. Wait for **Temporary account credentials**. Do not insert the account by hand.
 - The phone entry is **New account** on the **Session** tab. The desktop recipe does not verify it.
 - The page and the dialog both have a **Create account** button. The submit click must use `--within-role dialog`. Without that scope the click is ambiguous and fails.
 - The team option text is `Aurora · A12`, including the middle dot. A hyphen or a different team fails the select.

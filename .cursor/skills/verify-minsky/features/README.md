@@ -8,8 +8,8 @@ Keep this map aligned with the app by running `/maintain-verification-skill`.
 
 - The repository root is the current directory.
 - `npm ci` and `npx playwright install chromium` have completed.
-- No `.env.local` is required. Do not log in to Supabase for these journeys.
-- One `serve` process is running and has printed `ready http://127.0.0.1:5199`.
+- No `.env.local` is required. Do not log in to Cloudflare or Supabase for these journeys. The helper uses a fresh local D1 database.
+- One `serve` process is running and has printed `ready https://127.0.0.1:5199`.
 - `doctor` prints `"ok": true` for that same origin.
 - The viewport is `1280x800` unless the feature asks for the phone width.
 - The seed is `empty` unless the feature asks for `jury`.

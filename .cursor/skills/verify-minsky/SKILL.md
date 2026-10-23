@@ -7,6 +7,8 @@ description: Drive the Minsky contest-support web app in a local browser and cap
 
 Minsky's primary surface is the web app. Contestants report issues. Staff claim and reply. Jury members record time awards. Administrators manage accounts. After sign-in, the membership and the window width select one of three layouts: the contestant desktop, the organiser phone layout below 1024 px, or the organiser desktop console at 1024 px and wider.
 
+This skill drives the local Cloudflare backend. D1 stores the rows. R2 is the local image bucket. A Durable Object serves live updates. Supabase remains a supported second provider. This skill does not start it.
+
 This skill does not drive the documentation site, maintainer npm scripts, or a deployed Worker. Those are separate surfaces.
 
 ## Launch
@@ -18,7 +20,7 @@ npm ci
 npx playwright install chromium
 ```
 
-Use Node.js 22.13 or later within 22.x, or Node.js 24 or later. If the shell sets `NODE_ENV=production`, the helper still starts Vite with `NODE_ENV=development`. A production value makes the page blank.
+Use Node.js 22.13 or later within 22.x, or Node.js 24 or later.
 
 Leave the serve process running in its own terminal. On a machine that uses tmux, use a session named `verify-minsky`.
 
@@ -31,37 +33,38 @@ Use `--seed jury` when the journey needs the six existing issues. The default vi
 Stdout prints this line only after the **Sign in** heading is visible:
 
 ```text
-ready http://127.0.0.1:5199
+ready https://127.0.0.1:5199
 ```
 
-That line means the page can accept a username and a password. An HTTP response alone is not ready.
+That line means the page can accept a username and a password. An HTTP response alone is not ready. The first start builds the frontend and hashes passwords, so it can take a few minutes.
 
-The helper binds `127.0.0.1:5199` for Vite, `127.0.0.1:5198` for its own commands, and `127.0.0.1:9223` for Chromium. It creates an empty in-memory database, applies every file in `supabase/migrations` in filename order, and inserts the seed below.
+The helper binds `127.0.0.1:5199` for the local Worker, `127.0.0.1:5198` for its own commands, and `127.0.0.1:9223` for Chromium. Each `serve` deletes `.verify-minsky/state` and creates `.verify-minsky/state/persist`. Wrangler receives that directory as `--persist-to`. The helper applies every file in `src/server/adapters/d1/migrations` with `wrangler d1 migrations apply --local`. It then bootstraps the installation and creates the other accounts through the account API.
 
-The empty seed has no issues. The event is **Jury verification**. The sessions are **Primary** and **Secondary**. Intake is open. The teams are **Aurora** at A12, **Cedar** at A18, and **Isolated** at B01 on the secondary session. The accounts are `contestant` on Aurora, `volunteer`, `specialist`, `jury`, `admin`, and `combined`. The combined account has volunteer, specialist, and jury roles. The jury account also has a volunteer role on the secondary session.
+The empty seed has no issues. The event is **Jury verification**. The session is **Primary**. Intake is open. The teams are **Aurora** at A12 and **Cedar** at A18. The accounts are `contestant` on Aurora, `volunteer`, `specialist`, `jury`, `admin`, and `combined`. The combined account has volunteer, specialist, and jury roles. Bootstrap creates one session. The account API does not add a second session, so this seed has no Secondary session and no Isolated team.
 
-The jury seed adds six issues. None of them are open. Award review uses that seed.
+The jury seed adds six issues through the workflow API. None of them are open. Award review uses that seed.
 
-The feature files type the password `verification-only`. This local session accepts any password for the six usernames. The value is not a real credential.
+The feature files type the password `verification-only`. The local Worker stores it with Better Auth. The value is a local verification password. It is not an organizer password.
 
 ### Isolation
 
-One verification session owns the three ports above. A second `serve` exits with an error when a recorded process is still alive or when any of those ports is taken. It does not kill the other process, and it does not attach a second browser to the same Chromium.
+One verification session owns the ports above. A second `serve` exits with an error when a recorded process is still alive or when any of those ports is taken. It does not kill the other process, and it does not attach a second browser to the same Chromium.
 
-Do not start `npm run dev` for this skill. That command uses port 5173 and the linked Supabase development project. That project is shared by every developer. This skill does not read `.env.local`, and it does not run `npm run cloud:login`, `npm run cloud:link`, or `npm run cloud:migrate`.
+Do not start `npm run dev` for this skill. That command uses port 5173. This skill does not read `.env.local`. It does not call `wrangler login`, `npm run cloud:hosting-login`, or any remote Wrangler command. The generated config has no account id, and its D1 and R2 bindings are local. The database name is `minsky-verify-local-only`. It is not `minsky-development`.
 
-### Local stand-in
+### Local Worker
 
-The product's documented dev command is `npm run dev`, which opens `http://127.0.0.1:5173` and uses the linked Supabase project. This skill does not run that command. A passing local journey does not verify the linked project or a deployed Worker. These setup steps happen only inside `serve`:
+`serve` performs these steps inside the session directory:
 
-- Vite receives `VITE_SUPABASE_URL=https://example.supabase.co`, `VITE_SUPABASE_PUBLISHABLE_KEY=public-test-key`, and `VITE_BACKEND=supabase`. The helper answers that host inside the session process. The requests do not leave the machine.
-- The database is a new in-memory PGlite database. It is not hosted Postgres.
-- The helper applies `supabase/migrations` and inserts the fictional event, sessions, teams, and accounts.
-- Sign-in does not check the password. No account is marked for a temporary-password change, so that screen does not appear.
-- The helper builds the session token and sets the database role itself.
-- The **Live** badge is fed by a websocket answered in the session process. Hosted Realtime is not used.
-- Account creation and image upload call services the helper does not provide. Those actions fail in the UI.
+- Vite builds the frontend with `VITE_BACKEND=cloudflare`. The build reads environment files from the empty session directory, so it does not load `.env.local`.
+- Wrangler applies `src/server/adapters/d1/migrations` to a new local D1 database.
+- `bootstrapInstallation` creates the event, the Primary session, the two teams, and the admin account. The password hash is Better Auth's hash. The operations log records the bootstrap.
+- The helper signs in as admin, changes the temporary password, opens intake, and creates the other accounts with `POST /api/accounts`. Each account then changes its temporary password through `POST /api/auth/change-password`.
+- `--seed jury` submits, claims, resolves, awards, applies, and reopens through `POST /api/workflow`. The helper does not insert auth rows or issue rows by hand.
+- `wrangler dev --local` serves the built app and the API on `https://127.0.0.1:5199`. The browser accepts the local certificate. Requests stay on the machine.
 - Chromium is headless. The helper sets the viewport and a light color scheme.
+
+A passing local journey does not verify the hosted `minsky-development` database or a deployed Worker.
 
 Tear the session down with Cleanup. Run Cleanup after a failed launch too, so the ports do not stay occupied.
 
@@ -75,13 +78,13 @@ node .cursor/skills/verify-minsky/scripts/minsky-verify.ts doctor
 
 Exit code 0 and `"ok": true` mean all of the following:
 
-- The recorded `serve` process, Vite process, and Chromium process are alive.
-- Their command lines still match this checkout's helper, `vite.js` on port 5199, and Chromium's debugging port 9223.
+- The recorded `serve` process, Wrangler process, Worker listener, and Chromium process are alive.
+- Their command lines still match this checkout's helper, `wrangler.js` with this session's config, the Worker listener, and Chromium's debugging port 9223.
 - `lsof` shows each of those processes as the only listener on its port.
 - The page shows the **Sign in** heading, or a signed-in layout whose root has `data-ui` of `contestant`, `organiser-phone`, or `organiser-desktop`.
-- A read of the admin account returns session **Primary** and event **Jury verification**.
+- A read of the admin account through the local API returns session **Primary** and event **Jury verification**.
 
-Any other result means the session is not worth driving. Run Cleanup and start `serve` again. Do not reuse a Vite process you did not start.
+Any other result means the session is not worth driving. Run Cleanup and start `serve` again. Do not reuse a Worker you did not start.
 
 ## Drive
 
@@ -130,7 +133,7 @@ The screenshot must show the action and the later state. The database file must 
 
 A failed action also writes `.verify-minsky/evidence/last-failure.png`. Keep it until you understand the failure. Cleanup leaves it in place.
 
-Mocks in this session exist only at the hosted Auth, HTTP, and Realtime boundary. The issue rules and the migrations run in the local database. Do not add a mock that skips those rules.
+The browser talks to the local Worker. Authentication, the issue rules, and the migrations run in local D1. Do not add a mock that skips those rules.
 
 ## Cleanup
 
@@ -140,7 +143,7 @@ Stop only the processes recorded in `.verify-minsky/session.json`.
 node .cursor/skills/verify-minsky/scripts/minsky-verify.ts cleanup
 ```
 
-Cleanup sends shutdown to the session. It then signals the recorded `serve` pid, the recorded Chromium pid, and the recorded Vite pid, and only when `/proc/<pid>/cmdline` still matches that process. It does not kill by process name. It removes `.verify-minsky/session.json`. It leaves `.verify-minsky/evidence/` and `.verify-minsky/vite.log`.
+Cleanup sends shutdown to the session. It then signals the recorded `serve` pid, the recorded Chromium pid, the recorded Wrangler pid, and the recorded Worker pid, and only when `/proc/<pid>/cmdline` still matches that process. It does not kill by process name. It removes `.verify-minsky/session.json` and `.verify-minsky/state/`, including the local D1 directory. It leaves `.verify-minsky/evidence/` and `.verify-minsky/worker.log`.
 
 If the session file is missing and ports 5198, 5199, or 9223 are in use, cleanup exits with an error and does not signal those pids.
 

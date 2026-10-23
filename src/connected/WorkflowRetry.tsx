@@ -14,6 +14,8 @@ interface PendingWorkflowRequest {
   request: string;
   command: Command;
   onSuccess?: () => void;
+  /** A queue action stays on the list instead of selecting its issue. */
+  stayOnPage: boolean;
 }
 
 interface WorkflowRetryState {

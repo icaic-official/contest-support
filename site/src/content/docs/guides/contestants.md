@@ -1,58 +1,38 @@
 ---
 title: Report and follow an issue
-description: Submit a report, read replies, and understand resolution and time awards.
+description: Submit a report, read replies, and understand time awards.
 ---
 
-## Submit a report
+## Report a problem
 
-1. Check that the correct contest session is selected.
-2. Select **Report an issue**.
-3. Choose the category that best describes the problem.
-4. Describe what happened and what help your team needs.
-5. Submit the report.
+1. Select **Report an issue**.
+2. Choose a category and describe what happened.
+3. Submit.
 
-Minsky obtains your team and location from the session roster.
-You cannot submit a report for another team.
-An organizer must open contestant intake before you can submit a new report.
-If intake is closed, contact the contest staff through the channel your organizer provides.
-
-The issue timer starts when the report is submitted.
-It does not wait for a volunteer to claim the issue.
+Minsky fills in your team and location. The timer starts when you submit.
+If you cannot submit, intake is closed. Contact staff through the channel your organizer gives you.
 
 ## Follow progress
 
 | Status | Meaning |
 | --- | --- |
-| Open | The issue awaits a staff owner. |
+| Open | Waiting for staff. |
 | In progress | A staff member owns the issue. |
-| Awaiting specialist | The owner requested a handoff. The current owner stays responsible until acceptance. |
-| Resolved | A staff member recorded a resolution summary. The timer is stopped. |
+| Awaiting specialist | The owner asked for a specialist. The owner stays responsible until one accepts. |
+| Resolved | Staff recorded a resolution. The timer stopped. |
 
-Open an issue to read its public replies, resolution history, and award status.
-Add a reply when staff need more information.
-Resolved issues do not accept replies. Reopen the issue first if the problem needs more attention.
-You can see only your own team's issues.
-Staff-only notes and images are hidden from contestant accounts.
+Open an issue to see replies, images that staff shared with your team, resolutions, and awards.
+You can reply while the issue is unresolved. You see only your team's issues.
+Staff notes and staff-only images stay hidden. You cannot upload images.
 
-## View images
+## Reopen
 
-Staff can attach an image and make it visible to your team.
-Open its thumbnail to preview it, or use its download control.
-Contestants cannot upload images.
-Ask a staff member if an image would help explain the problem.
+If the problem returns, select **Reopen issue** and give a reason.
+The owner, history, and any award stay. The timer resumes from its earlier total.
+Reopening works even when intake is closed.
 
-## Reopen a resolved issue
+## Time awards
 
-Reopen the issue if the same problem still needs attention.
-Enter a reason for reopening it.
-The prior owner and resolution history remain.
-The timer resumes accumulated unresolved time and excludes the period when the issue was resolved.
-Any existing award and external application status remain unchanged.
-Closing contestant intake does not prevent reopening an existing issue.
-
-## Understand a time award
-
-A jury member can record an award with a public explanation.
-The award is separate from confirmation that someone applied it externally.
-Minsky never changes the external contest clock itself.
-Ask staff if an award remains pending application.
+The jury can award time with a public explanation.
+Staff then apply it to the contest clock and confirm that in Minsky.
+Minsky never changes the contest clock itself.

@@ -2,7 +2,9 @@
   "required_status_checks": {
     "strict": true,
     "contexts": [],
-    "checks": []
+    "checks": [
+      {"context": "Workers Builds: minsky-ci"}
+    ]
   },
   "enforce_admins": true,
   "required_pull_request_reviews": {

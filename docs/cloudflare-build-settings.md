@@ -144,7 +144,7 @@ An explicit publication command needs the same values in its environment.
 | --- | --- | --- |
 | Environment secret | `CLOUDFLARE_API_TOKEN` | Private account-scoped deployment token. |
 | Retired variable | `CLOUDFLARE_DEPLOY_ENABLED` | No workflow reads it. |
-| Actions variable | `MINSKY_DEV_BACKEND` | `cloudflare` is the approved development selection. Missing or `supabase` selects static Supabase mode; the binding guard refuses that replacement after activation. |
+| Actions variable | `MINSKY_DEV_BACKEND` | `cloudflare` is the live development selection and the default when the variable is absent. `supabase` selects static Supabase mode. The binding guard refuses that replacement after activation. |
 | Actions variable | `VITE_SUPABASE_URL` | `https://ovymmobupzowotvrywek.supabase.co`, required in Supabase mode. |
 | Actions variable | `VITE_SUPABASE_PUBLISHABLE_KEY` | Development public publishable key or legacy `anon` key, required in Supabase mode. |
 | Actions variable | `MINSKY_DEV_CLOUDFLARE_CONFIG` | Repository-relative generated Wrangler path, required in Cloudflare mode. |

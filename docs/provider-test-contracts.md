@@ -19,7 +19,7 @@ Commands pass through the deployed `workflow` Edge Function, the shared service,
 Reads and other operations retain their existing Supabase adapters.
 Scenario assertions remain provider-neutral and unchanged for the replacement path.
 This focused suite does not constitute a second complete `Backend` implementation.
-Use [Verify the shared server workflow](verify-server-workflow.md) to run it.
+Use [Verify the Supabase provider workflow](verify-server-workflow.md) to run it.
 The focused workflow run shares one owned fixture across cases with distinct request and issue IDs.
 Its organizer setup uses a fresh privileged Auth password update, then completes the actual mandatory-change database gate.
 That setup avoids password-change rate limits. It is not evidence for the account password-change endpoint.

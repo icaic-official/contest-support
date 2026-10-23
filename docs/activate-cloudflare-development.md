@@ -1,7 +1,7 @@
 # Activate the fresh Cloudflare development installation
 
 Use this maintainer procedure to switch the existing development URL after owner approval.
-For another installation, use [Install Cloudflare](../site/src/content/docs/operators/installation.md).
+For another installation, use [Install Cloudflare](../site/src/content/docs/operators/installation.mdx).
 That guide owns resource creation, migrations, bootstrap, and trusted owner recovery.
 This guide owns the development switch, verification, and repair.
 
@@ -200,6 +200,20 @@ No assertion, timeout, or protection changed. The initial wait failure has no co
 
 The [current-state record](current-state.md) owns detailed verification results and remaining manual checks.
 Supabase resources and accounts remain intact. No Supabase data or identifiers transferred.
+
+## Recover the development admin password
+
+The development admin is `organizer`.
+When that admin cannot sign in, follow [Recover a Cloudflare admin password](cloud-onboarding.md#recover-a-cloudflare-admin-password).
+Run this command in a private terminal:
+
+```sh
+npm run cloudflare:recover-admin -- --config src/server/adapters/cloudflare/deploy/development.wrangler.jsonc --username organizer
+```
+
+The command uses remote D1 database `minsky-development`.
+It prints the temporary password once in that terminal.
+It does not write the password to a file.
 
 ## Repair a failed activation
 

@@ -33,7 +33,7 @@ The Supabase browser adapter calls the guarded `public.workflow` RPC.
 Its administration, snapshots, images, and live updates retain their existing Supabase paths.
 The active Cloudflare application executes workflow commands through the shared service and guarded D1 batches.
 Issue decisions use one shared service. Other operations remain inside their provider implementations.
-Use [the verification guide](verify-server-workflow.md) for the isolated execution path and separate evidence categories.
+Use [the Supabase provider verification guide](verify-server-workflow.md) for that provider's isolated execution path and separate evidence categories.
 
 ## Complete Cloudflare implementation
 
@@ -66,7 +66,7 @@ Persisted audience cursors suppress old duplicate delivery. A reconnect signals 
 The outbox remains pending until the coordinator accepts delivery. Minutely maintenance retries delivery and image cleanup.
 
 Provider-owned [installation tooling](../src/server/adapters/cloudflare/tooling/install.mjs) checks exact targets and protects returned credentials.
-See [installation](../site/src/content/docs/operators/installation.md), [provider verification](run-provider-tests.md), and [current evidence](current-state.md).
+See [installation](../site/src/content/docs/operators/installation.mdx), [provider verification](run-provider-tests.md), and [current evidence](current-state.md).
 
 ## Module boundaries
 
@@ -106,7 +106,8 @@ AWS, GCP, and Azure have no implementation or verified installation path.
 Supabase builds use `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY`.
 For a Supabase build, `backend` is `undefined` when either value is missing.
 `requireBackend()` then throws the setup message shown on the login page.
-`VITE_BACKEND` defaults to `supabase`. The explicit `cloudflare` value selects the same-origin Cloudflare adapter.
+`VITE_BACKEND` defaults to `cloudflare`. Set `supabase` to select the Supabase provider.
+The Cloudflare adapter calls the same origin.
 Other values fail configuration. There is no automatic fallback between providers.
 
 ## Authentication

@@ -32,10 +32,16 @@ Cases run serially within each file. Up to four files run concurrently.
 Each file owns a temporary local D1 database and identity service.
 Each case creates new UUID-scoped records. Fixture setup, credential snapshots, and cleanup checks use D1 batches.
 These batches retain the row assertions, maintained password hashing, and exact fixture ownership checks.
+Local runs of these four files use a 30 second case limit.
+Maintained scrypt can take longer than Vitest's 5 second default on a slow builder.
+Hosted runs keep their separate 120 second limit.
 The browser suite creates a separate temporary D1 database and a local HTTPS Worker on port 8788.
 It uses Chromium with a self-signed local certificate.
 Expect all 83 account cases and three browser cases to pass.
-The short SQLite execution-clock probe runs locally. It checks expiry after a password change deletes the original identity session.
+The local expiry probe checks a self password change after that change deletes the original identity session.
+For that case only, the test double replaces `strftime('now')` with a read of a one-row test clock.
+It moves the clock inside the same batch, after the session delete.
+It does not spend processor time to advance the wall clock.
 Hosted account cases inject expiry inside the actual batch instead, so transport latency does not determine that assertion.
 Record the local and hosted case counts separately.
 No provider credentials are needed. Local socket access is required.
@@ -186,6 +192,7 @@ Do not reset the database or delete another run's records.
 
 For an interrupted account operation in an authorized fixture, use organizer-assisted reset after checking current permissions.
 The organizer must administer every assigned session. Archived memberships block recovery through the account API.
-T0020 adds trusted, provider-owned [installation-owner recovery](../site/src/content/docs/operators/installation.md#recover-the-installation-owner).
+T0020 adds trusted, provider-owned [installation-owner recovery](../site/src/content/docs/operators/installation.mdx#recover-the-owner).
 That procedure passed the recorded empty-installation checks. Confirm the exact installation and owner before recovery.
-The Supabase owner-recovery command does not operate on Cloudflare.
+`npm run cloud:recover-admin` is the Supabase provider's recovery command. It does not operate on Cloudflare.
+Use `npm run cloudflare:recover-admin` to reset a Cloudflare admin password.

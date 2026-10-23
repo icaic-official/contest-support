@@ -14,7 +14,7 @@ const providerImportPattern = [
 const providerImportMessage = "Keep provider SDKs and implementations inside provider modules. Use the shared contracts.";
 
 export default tseslint.config(
-  { ignores: ["dist", "node_modules", "playwright-report", "test-results", "site/dist", "site/.astro", "site/node_modules", "**/.wrangler/**"] },
+  { ignores: ["dist", "design", "node_modules", "playwright-report", "test-results", "site/dist", "site/.astro", "site/node_modules", "**/.wrangler/**"] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {

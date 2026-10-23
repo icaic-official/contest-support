@@ -12,7 +12,7 @@ They do not expose database queries, access tokens, provider clients, or channel
 The server still checks permissions and applies each workflow command as a transaction.
 A transaction commits all changes for a command together, or commits none.
 For implementation and registration steps, use [Add a backend provider](add-provider.md).
-The [frontend structure](frontend-structure.md) describes the application shell, feature modules, and browser routes that use these contracts.
+The [frontend architecture](frontend-architecture.md) describes the application shell, feature modules, and browser routes that use these contracts.
 
 ## Shared server workflow
 

@@ -1,5 +1,26 @@
 # Minsky planning record
 
+**PR #45 update from main, 2026-10-23.** The owner requests current `main` and conflict resolution for the existing PR.
+Merge `origin/main` at `a938e6a`, which includes the merged T0015 frontend and T0022 CI change.
+Port PR #45 browser routes and retry protections to the redesigned shells and shared data hooks.
+Preserve the activation, manual-publication, and source-specific verification records.
+Keep both providers, server authorization, deployment prerequisites, and protected environment rules.
+The request covers the merge and its local verification. Keep PR #45 draft for owner review.
+Hosted verification, deployment, provider changes, and the separate Supabase skip-link failure remain outside this request.
+The owner reviews and merges. Earlier approvals below retain their original scope.
+
+**Reduce duplicate CI checks, 2026-10-20.** The owner requested removal of duplicate GitHub runs before considering a CI provider migration.
+T0022 starts from updated `main` at `4e43739`, after the owner merged PR #43.
+Use `feature/t0022-ci-run-deduplication` in a separate worktree.
+Repository branch pushes own ordinary checks and existing deployment prerequisites. Fork pull requests retain unprivileged checks.
+Same-repository pull request jobs skip without allocating runners. Their distinct names cannot satisfy the required ordinary check names.
+Keep scheduled security checks, manual protected suites, deployment guards, and existing environment rules.
+Required checks on `96503c2` pass, but the existing docs preview parser fails on Wrangler asset progress before its JSON response.
+Correct that parser within T0022 so previews remain usable. Keep URL restrictions and revision verification. Add focused rejection coverage.
+Same-repository PRs use branch-head evidence instead of a second test of GitHub's synthetic merge commit.
+Revert the workflow change to restore both executions. Cloudflare CI migration remains candidate work.
+The owner reviews and merges. No provider configuration, paid service, backend activation, or cloud-test allowlist change is authorized.
+
 **PR #45 retry review fixes, 2026-10-20.** The owner requests backend and frontend fixes through separate subagents.
 Bind uncertain workflow requests to their authenticated actor and original contest session.
 Retain each request ID through transient account-check failures. Continue to hide protected content while the check fails.

@@ -1,20 +1,18 @@
 import { expect, test, type Page } from "@playwright/test";
 import { account, fixture } from "./fixture";
 import { snapshotSchema } from "../../src/connected/model";
-
-async function login(page: Page, name = "jury") {
-  const details = fixture().accounts[name];
-  await page.goto("/");
-  await page.getByLabel("Username", { exact: true }).fill(details.username);
-  await page.getByLabel("Password", { exact: true }).fill(details.password);
-  await page.getByRole("button", { name: "Sign in", exact: true }).click();
-  await expect(page.locator(".connection-status")).toContainText("Live");
-  await page.getByRole("navigation").getByRole("link", { name: "Jury worklist", exact: true }).click();
-}
-
-function viewIssue(page: Page, number: number) {
-  return page.getByRole("button", { name: `View issue ISS-${number}`, exact: true });
-}
+import {
+  byId,
+  choose,
+  consoleLink,
+  desktop,
+  fitsWidth,
+  login,
+  openDialog,
+  phone,
+  phoneTab,
+  uiRoot,
+} from "./ui";
 
 async function resolvedIssue(description: string) {
   const support = await account("volunteer");
@@ -69,35 +67,66 @@ async function loseNextResponse(page: Page, type: string) {
   return requests;
 }
 
-test("hosted jury worklist preserves zero-minute decisions and retries through reopening and confirmation", async ({ page }) => {
+/** The heading of an open phone issue view: "ISS-<number>, <team>". */
+function issueHeading(page: Page) {
+  return page.getByRole("heading", { level: 1, name: /^ISS-\d+, / });
+}
+
+test("hosted jury Awards tab preserves zero-minute decisions and retries through reopening and confirmation", async ({ page }) => {
   const issue = await resolvedIssue("Jury worklist hosted retry verification");
   const jury = await account("jury");
-  await login(page);
-  await viewIssue(page, issue.number).click();
-  await expect(page.getByRole("button", { name: /Claim issue|Resolve issue|Reopen issue/ })).toHaveCount(0);
-  await page.getByLabel("Award minutes").selectOption("0");
-  await page.getByLabel("Public award explanation").fill("No adjustment required after jury review");
+  await page.setViewportSize(phone);
+  await login(page, "jury", "organiser-phone");
+  const awardsHeading = page.getByRole("heading", { level: 1, name: "Awards", exact: true });
+  await expect(awardsHeading).toBeVisible();
+  await expect(page).toHaveURL("/jury");
+  const card = byId(page, `issue-card-${issue.id}`);
+  await card.click();
+  await expect(issueHeading(page)).toBeFocused();
+  await expect(page.getByRole("button", { name: /^(Claim|Resolve|Reopen|Reply)/ })).toHaveCount(0);
+  await page.getByRole("button", { name: "Decide award", exact: true }).click();
+  const sheet = openDialog(page);
+  await choose(sheet.getByRole("radio", { name: "0 min", exact: true }));
+  await sheet.getByLabel("Public award explanation").fill("No adjustment required after jury review");
   const awardRequests = await loseNextResponse(page, "award");
-  await page.getByRole("button", { name: "Record award", exact: true }).click();
+  await sheet.getByRole("button", { name: "Record 0 minutes", exact: true }).click();
+  // The refresh after the lost response already shows the award, so the
+  // award sheet closes and the retry button is in the issue view.
+  await expect(sheet).toBeHidden();
   await page.getByRole("button", { name: "Retry last request", exact: true }).click();
   await expect(page.getByRole("button", { name: "Retry last request", exact: true })).toHaveCount(0);
   expect(awardRequests).toHaveLength(2);
   expect(awardRequests[1]).toEqual(awardRequests[0]);
   await page.unroute("**/rpc/workflow");
-  await expect(page.getByText("0 minutes awarded", { exact: true })).toBeVisible();
+  await expect(page.getByText(/^0 minutes awarded:/)).toBeVisible();
+  await expect(page.getByText("Pending external application")).toBeVisible();
   await issue.action("reopen", { reason: "The connection failed again" });
+  // A jury-only member keeps the reopened issue open while its award waits.
   await expect(page.getByText("This decision relates to an earlier resolution. One award is allowed per issue.")).toBeVisible();
-  await page.getByRole("button", { name: "Back to jury worklist" }).click();
-  await expect(page.getByRole("article", { name: `Issue ISS-${issue.number}`, exact: true })).toContainText("Reopened");
-  await viewIssue(page, issue.number).click();
-  await page.getByRole("checkbox").check();
+  await expect(page.getByRole("button", { name: "Confirm applied", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Back", exact: true }).click();
+  await expect(awardsHeading).toBeVisible();
+  const lists = page.getByRole("group", { name: "Award lists" });
+  await lists.getByRole("button", { name: /^To apply/ }).click();
+  const pending = page.getByRole("listitem").filter({ has: card });
+  await expect(pending).toContainText("Reopened · In progress");
+  await expect(pending).toContainText("This award relates to an earlier resolution.");
+  await pending.getByRole("button", { name: "Confirm applied externally", exact: true }).click();
+  await sheet.getByRole("checkbox", { name: /I confirm this award was applied/ }).check();
   const applyRequests = await loseNextResponse(page, "apply");
-  await page.getByRole("button", { name: "Confirm applied externally" }).click();
+  await sheet.getByRole("button", { name: "Confirm applied externally", exact: true }).click();
+  // The refresh after the lost response already shows the applied award, so
+  // the reopened issue closes and the retry button is on the Awards tab.
   await page.getByRole("button", { name: "Retry last request", exact: true }).click();
   await expect(page.getByRole("button", { name: "Retry last request", exact: true })).toHaveCount(0);
   expect(applyRequests).toHaveLength(2);
   expect(applyRequests[1]).toEqual(applyRequests[0]);
-  await expect(viewIssue(page, issue.number)).toHaveCount(0);
+  await page.unroute("**/rpc/workflow");
+  // The applied award leaves the jury lists, so the reopened issue closes.
+  await expect(awardsHeading).toBeVisible();
+  await expect(page.getByRole("status").filter({ hasText: /^ISS-\d+ is no longer in your lists\.$/ })).toBeVisible();
+  await lists.getByRole("button", { name: /^To apply/ }).click();
+  await expect(card).toHaveCount(0);
   await issue.action("resolve", { summary: "Connection restored again" });
   const repeated = await jury.rpc("workflow", {
     p_session: fixture().sessions[0],
@@ -116,65 +145,85 @@ test("hosted jury worklist preserves zero-minute decisions and retries through r
   expect(history.data.filter((entry) => entry.text.startsWith("External application confirmed."))).toHaveLength(1);
 });
 
-test("two hosted clients update the ordered worklist while preserving drafts, focus and queue filters", async ({ page, browser }, testInfo) => {
+test("two hosted clients update the award lists while preserving drafts, focus and queue filters", async ({ page, browser }, testInfo) => {
   const first = await resolvedIssue("Earlier hosted jury review");
   const second = await resolvedIssue("Later hosted jury review");
-  const context = await browser.newContext();
+  const context = await browser.newContext({ viewport: phone });
   const other = await context.newPage();
   try {
-    await login(page, "combined");
-    await page.getByRole("navigation").getByRole("link", { name: "Issues", exact: true }).click();
-    await page.getByRole("combobox", { name: "Status", exact: true }).selectOption("open");
-    const queue = await page.locator(".issue-card .issue-cell strong").allTextContents();
-    const selected = await page.locator(".issue-card[aria-pressed=true] .issue-cell strong").allTextContents();
-    await page.getByRole("navigation").getByRole("link", { name: "Jury worklist", exact: true }).click();
-    const decisions = page.getByRole("region", { name: /^Needs decision/ });
-    await expect(decisions.getByRole("article", { name: `Issue ISS-${first.number}`, exact: true })).toBeVisible();
-    await expect(decisions.getByRole("article", { name: `Issue ISS-${second.number}`, exact: true })).toBeVisible();
-    const order = await decisions.getByRole("article").evaluateAll((rows) => rows.map((row) => row.getAttribute("aria-label")));
-    expect(order.indexOf(`Issue ISS-${first.number}`)).toBeGreaterThanOrEqual(0);
-    expect(order.indexOf(`Issue ISS-${first.number}`)).toBeLessThan(order.indexOf(`Issue ISS-${second.number}`));
-    await login(other);
-    await viewIssue(page, first.number).focus();
+    await page.setViewportSize(desktop);
+    await login(page, "combined", "organiser-desktop");
+    const open = page.getByRole("group", { name: "Filter by status" }).getByRole("button", { name: /^Open \d+$/ });
+    await open.click();
+    await expect(open).toHaveAttribute("aria-pressed", "true");
+    const rows = page.locator("[data-issue-row]");
+    const queue = await rows.allTextContents();
+    await consoleLink(page, "Award review").click();
+    await expect(page.getByRole("heading", { level: 1, name: "Award review" })).toBeFocused();
+    await expect(page).toHaveURL("/jury");
+    await expect(byId(page, `award-issue-${first.id}`)).toBeVisible();
+    await expect(byId(page, `award-issue-${second.id}`)).toBeVisible();
+    const order = await page.locator('[id^="award-issue-"]').evaluateAll((buttons) => buttons.map((button) => button.id));
+    expect(order.indexOf(`award-issue-${first.id}`)).toBeGreaterThanOrEqual(0);
+    expect(order.indexOf(`award-issue-${first.id}`)).toBeLessThan(order.indexOf(`award-issue-${second.id}`));
+    await login(other, "jury", "organiser-phone");
+    await byId(page, `award-issue-${first.id}`).focus();
     await page.keyboard.press("Enter");
-    await expect(page.locator("#issue-heading")).toBeFocused();
-    const draft = page.getByLabel("Public award explanation");
+    const sheet = openDialog(page);
+    await expect(sheet.getByRole("tab", { name: "Outcome & award" })).toHaveAttribute("aria-selected", "true");
+    const draft = sheet.getByLabel("Public award explanation");
     await draft.fill("Draft retained during hosted updates");
     await draft.focus();
-    await viewIssue(other, second.number).click();
-    await other.getByLabel("Award minutes").selectOption("5");
-    await other.getByLabel("Public award explanation").fill("Five minutes approved");
+    await byId(other, `issue-card-${second.id}`).click();
+    await other.getByRole("button", { name: "Decide award", exact: true }).click();
+    const otherSheet = openDialog(other);
+    await choose(otherSheet.getByRole("radio", { name: "5 min", exact: true }));
+    await otherSheet.getByLabel("Public award explanation").fill("Five minutes approved");
     const updated = page.waitForResponse(async (response) => {
       if (!response.url().endsWith("/rpc/session_snapshot") || !response.ok()) return false;
       const state = snapshotSchema.parse(await response.json());
       return state.awards.some((award) => award.issue_id === second.id);
     });
-    await other.getByRole("button", { name: "Record award", exact: true }).click();
-    await expect(other.getByText("5 minutes awarded", { exact: true })).toBeVisible();
+    await otherSheet.getByRole("button", { name: "Record 5 minutes", exact: true }).click();
+    await expect(otherSheet).toBeHidden();
+    await expect(other.getByText("+5 min", { exact: true })).toBeVisible();
     await (await updated).finished();
     await expect(draft).toHaveValue("Draft retained during hosted updates");
     await expect(draft).toBeFocused();
-    await page.getByRole("button", { name: "Back to jury worklist" }).click();
-    await expect(viewIssue(page, first.number)).toBeFocused();
-    await expect(page.getByRole("region", { name: /^Pending external application/ }).getByRole("article", { name: `Issue ISS-${second.number}`, exact: true })).toBeVisible();
-    await other.getByRole("checkbox").check();
-    await other.getByRole("button", { name: "Confirm applied externally" }).click();
-    await expect(viewIssue(page, second.number)).toHaveCount(0);
+    await page.keyboard.press("Escape");
+    await expect(sheet).toBeHidden();
+    await expect(byId(page, `award-issue-${first.id}`)).toBeFocused();
+    const lists = page.getByRole("group", { name: "Award lists" });
+    await lists.getByRole("button", { name: /^To apply/ }).click();
+    await expect(byId(page, `award-issue-${second.id}`)).toBeVisible();
+    await other.getByRole("button", { name: "Confirm applied", exact: true }).click();
+    await otherSheet.getByRole("checkbox", { name: /I confirm this award was applied/ }).check();
+    await otherSheet.getByRole("button", { name: "Confirm applied externally", exact: true }).click();
+    await expect(byId(page, `award-issue-${second.id}`)).toHaveCount(0);
+    await lists.getByRole("button", { name: /^Applied/ }).click();
+    await expect(byId(page, `award-issue-${second.id}`)).toBeVisible();
     await page.screenshot({ path: testInfo.outputPath("jury-hosted-desktop.png"), fullPage: true });
     for (const width of [390, 320]) {
       await page.setViewportSize({ width, height: 844 });
-      expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
-      await viewIssue(page, first.number).click();
-      await expect(page.locator("#issue-heading")).toBeFocused();
-      await page.getByRole("button", { name: "Back to jury worklist" }).click();
-      await expect(viewIssue(page, first.number)).toBeFocused();
+      await expect(uiRoot(page, "organiser-phone")).toBeVisible();
+      expect(await fitsWidth(page)).toBe(true);
+      await phoneTab(page, "Awards");
+      const card = byId(page, `issue-card-${first.id}`);
+      await card.focus();
+      await page.keyboard.press("Enter");
+      await expect(issueHeading(page)).toBeFocused();
+      await expect(page.getByRole("button", { name: "Decide award", exact: true })).toBeVisible();
+      await page.getByRole("button", { name: "Back", exact: true }).click();
+      await expect(card).toBeFocused();
       await page.screenshot({ path: testInfo.outputPath(`jury-hosted-${width}.png`), fullPage: true });
     }
-    await page.setViewportSize({ width: 1280, height: 900 });
-    await page.getByRole("navigation").getByRole("link", { name: "Issues", exact: true }).click();
-    await expect(page.getByRole("combobox", { name: "Status", exact: true })).toHaveValue("open");
-    expect(await page.locator(".issue-card .issue-cell strong").allTextContents()).toEqual(queue);
-    expect(await page.locator(".issue-card[aria-pressed=true] .issue-cell strong").allTextContents()).toEqual(selected);
+    // The shared status filter survives the change between layouts.
+    await page.setViewportSize(desktop);
+    await expect(uiRoot(page, "organiser-desktop")).toBeVisible();
+    await consoleLink(page, "Queue").click();
+    await expect(page).toHaveURL("/issues");
+    await expect(open).toHaveAttribute("aria-pressed", "true");
+    expect(await rows.allTextContents()).toEqual(queue);
   } finally {
     await context.close();
   }

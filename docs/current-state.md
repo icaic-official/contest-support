@@ -1,5 +1,148 @@
 # Current state
 
+## PR #45 update from main, 2026-10-23
+
+The owner requests current `main` and conflict resolution for the existing draft PR.
+The merge includes `origin/main` at `a938e6a`, which contains PR #44's redesigned frontend and PR #46's CI change.
+The integration retains browser routes and binds workflow retries to their original actor, session, request ID, and command.
+The [frontend architecture](frontend-architecture.md) is the current reference. Earlier records below describe their recorded source.
+PR #45 remains draft. The local checks below verify the combined source before the merge commit.
+No hosted verification, deployment, provider change, or separate Supabase skip-link fix is part of this request.
+
+T0022 merged in [PR #46](https://github.com/GiftedNovaHD/minsky/pull/46) at `a938e6a` on 2026-10-23.
+Its local checks pass on their recorded source. The GitHub runner restriction prevented fresh required job execution.
+The merged CI routing and docs-preview URL, output, and revision checks remain in place.
+The latest publication recorded before this integration is [manual source `adff06c`](t0021-run-report.md#owner-requested-manual-frontend-publication-2026-10-20).
+This run does not read or change the live deployment.
+Earlier activation and manual-publication results below do not verify this combined frontend.
+
+
+### Integration verification
+
+The merge retains the redesigned contestant, organiser phone, and organiser desktop interfaces.
+PR #45's older `src/app/` and `src/features/` screens are removed. Their routes use the current shells and data hooks.
+The retry context retains each request above transient account checks and preserves its original actor and contest session.
+A late success cannot clear a form or select an issue in another session.
+The session-access screen also exposes a retained retry after every membership is removed.
+Menu closure preserves focus on the selected account page.
+The CI workflow and deployment parser match `a938e6a` exactly.
+
+`npm run typecheck`, `npm run lint`, `npm run build`, `npm run docs:build`, `npm run check:functions`, and `npm run test:functions` pass.
+`npm test -- --maxWorkers=2` passes all 730 unit, database, and tooling cases.
+`npm run test:d1` passes all 70 local D1 cases. Both complete local connector journeys pass with fixture cleanup verified.
+All three authentication browser cases and all three docs browser cases pass.
+The docs build checks 13 pages and 533 local links and assets. Both lockfile audits report no vulnerabilities.
+All 11 shared provider scenarios remain discoverable.
+Existing `actionlint` 1.7.12 validates the unchanged workflow. Gitleaks 8.30.1 reports no leaks in the worktree.
+All 347 relative Markdown targets pass. The built-site check covers site-root URLs.
+The first ad hoc checker misclassified three site-root URLs as filesystem paths. Its corrected check passes.
+The app retains its large-chunk warning. The docs retain their duplicate `/404` route warning.
+Authentication tests pass despite local certificate-rejection diagnostics from the HTTPS security fixture.
+
+The first full browser run passes 78 cases.
+A separate walkthrough then finds that the desktop account menu restores trigger focus after route navigation.
+The new regression reproduces that failure. Preventing that menu restoration fixes it.
+The route suite then passes all 12 cases. The final complete browser run passes all 79 cases without skips or retries.
+Its command is `npm run test:e2e -- --workers=2 --output=/tmp/minsky-pr45-final-e2e`.
+Earlier focused retry runs correct two test selectors for the redesigned header.
+The jury permission test now expects the route guard to return to `/issues` after permission removal.
+Its old **Back** control no longer exists after that redirect.
+
+A fictional volunteer walkthrough passes at 1280, 390, and 320 pixels on `http://127.0.0.1:4175`.
+Keyboard account navigation, HTTP 200 after authenticated reload, meaningful content, and the page title pass.
+No framework overlay, page error, console error, or horizontal overflow is observed.
+Screenshots confirm that account controls fit all three widths. The scripts and screenshots remain under `/tmp`.
+The Browser plugin is unavailable, so these checks use the repository's Playwright dependency.
+Physical devices and live-provider acceptance are not checked.
+Existing double-quoted imports and React component names remain style exceptions for consistency with the redesigned code.
+
+## PR #46 conflict resolution and review, 2026-10-23
+
+T0022 now includes `origin/main` at `a25f9f1`, after the owner merged PR #44.
+The conflict was in the ticket index. The resolution retains T0022 and records the frontend redesign merge.
+Main already contains the same docs-preview parser correction and its tests. Those files match main after this merge.
+The review found no code defect in the remaining workflow change.
+Only the three ordinary job conditions and names differ from main. Job steps, permissions, deployment prerequisites, and concurrency match main.
+Checksum-verified `actionlint` 1.7.12 passes. A temporary validator uses `@actions/expressions` 0.3.61 against the actual YAML.
+All 12 event scenarios pass, including same-repository and fork PRs, Dependabot, schedule, protected dispatch selections, and deletion.
+
+Fresh local checks pass: `npm run typecheck`, `npm run lint`, `npm run build`, `npm run docs:build`, `npm run check:functions`, `npm run test:functions`, `npm test`, and `npm run test:providers:list`.
+All 730 unit, database, and tooling tests and all 12 function tests pass. The docs build checks 13 pages and 530 local links and assets.
+The first unit run and route validator hit sandbox restrictions. Both pass with the required local-process permissions.
+The application build retains its large-chunk warning. The docs build retains its duplicate `/404` route warning.
+Local `npm run test:d1` passes all 70 cases.
+`npm run test:connector:runtime` and `npm run test:connector:ui:local` pass with fixture cleanup verified.
+`npm run test:auth:browser` and `npm run docs:test` each pass all three cases.
+The first `npm run test:e2e -- --workers=4` run passes 58 cases and fails four during trace cleanup.
+Concurrent Playwright suites deleted their shared output files. This was a verification error during this run.
+The repeat, `npm run test:e2e -- --workers=4 --output=/tmp/minsky-pr46-e2e`, passes all 62 cases.
+No application source, assertion, or timeout changes.
+Both `npm audit --package-lock-only --audit-level=high` commands pass, including the `--prefix site` audit.
+Checksum-verified Gitleaks 8.30.1 reports no leaks with `gitleaks git --redact --log-opts=--all .`.
+
+The [push run on `a46ba19`](https://github.com/GiftedNovaHD/minsky/actions/runs/39879473822) cannot start its three ordinary jobs.
+Each annotation cites failed account payments or a spending limit. No job step runs. Deployment jobs skip.
+The [PR run](https://github.com/GiftedNovaHD/minsky/actions/runs/39879476863) skips all eight jobs as intended.
+GitHub reports the PR as mergeable. Required GitHub execution and fresh preview publication remain unverified.
+No manual application UI or hosted cloud suite ran during this review.
+Remote merge enforcement remains unverified. The earlier protection lookup and verification limits remain in the dated record below.
+
+## T0022 CI routing verification, 2026-10-20
+
+The owner merged PR #43 at `4e43739` on 2026-10-19 at 12:29:54 UTC, then requested removal of duplicate CI checks.
+The isolated `feature/t0022-ci-run-deduplication` branch starts from that main revision.
+See [event routing](cloudflare-build-settings.md#events-and-prerequisites) for the implemented behavior and branch-head coverage.
+Reverting the workflow change restores both executions.
+
+### Initial local verification
+
+These application runs precede the parser-only follow-up below. The PR records final source-specific GitHub results.
+Checksum-verified `actionlint` 1.7.12 passes for `.github/workflows/checks.yml`.
+A temporary validator parses the actual YAML and evaluates its expressions with GitHub's `@actions/expressions` 0.3.61.
+All 11 scenarios pass. These cover main, feature, and Dependabot pushes, same-repository and fork PRs, the weekly schedule, and three protected dispatch selections.
+Structural comparison with `4e43739` confirms that only the three ordinary job conditions and display names changed.
+Deployment prerequisites, commands, credentials, targets, and concurrency are unchanged. Validation packages remain under `/tmp`.
+No repository dependency or application test was added.
+
+Types, lint, function checks, application build, and docs build pass. The docs check covers 13 pages and 531 local links and assets.
+All 657 unit/database/tooling tests, 70 local D1 tests, 12 function tests, 46 ordinary browser cases, and three authentication browser cases pass.
+The complete local connector runtime and React journeys pass. Fixture cleanup is verified and unrelated controls survive.
+All three docs browser cases pass.
+The initial sandboxed `npm ci` and validator child-process call hit sandbox restrictions. The locked installation and corrected validation harness pass afterward.
+The validator's first expected app-job route was incorrect. The existing deployment script handles the branch decision. No deployment behavior changed.
+Changed Markdown paths and `git diff --check` pass.
+
+### Docs preview follow-up
+
+The [push run on `96503c2`](https://github.com/GiftedNovaHD/minsky/actions/runs/39335199415) passes `checks`, `secrets`, and `dependencies`.
+Its app job correctly skips branch publication. Its docs job fails while parsing Wrangler stdout after publication.
+The first stdout line is asset-progress text, even with `--json`. The unchanged parser expected JSON from the first byte.
+This failure is separate from the duplicate-job routing. The parser now reads the JSON object after leading progress lines.
+Malformed JSON, trailing output, invalid URL lists, and unrelated domains remain rejected. Revision verification remains mandatory.
+All 31 focused deployment tests pass, including the progress-prefixed publication path and rejection cases.
+Types, lint, and both builds pass after the parser correction.
+The first full repeat passes 657 cases but hits the existing provider-boundary test's 5,000 ms timeout during concurrent lint/build work.
+That unchanged file then passes all five cases in isolation. The full suite passes all 658 cases without concurrent builds. No timeout or assertion changed.
+Fresh final verification follows in the PR. This change adds no resource, credential, dependency, or provider setting.
+
+### GitHub verification boundary
+
+[PR #46](https://github.com/GiftedNovaHD/minsky/pull/46) records the final push and PR runs separately from local verification.
+Its [first PR run](https://github.com/GiftedNovaHD/minsky/actions/runs/39335043678) skips every job on `57763aa`. No duplicate runner starts.
+GitHub displays the ordinary jobs' name expressions without evaluating them. Those labels differ from the required ordinary names.
+The first push check is superseded before deployment to record this observed display behavior. Its cancellation is not a test failure.
+No fork PR, schedule, or protected dispatch is created for this change. Their routes pass local expression evaluation only.
+The main-protection lookup returns `403` with a GitHub plan requirement. This run does not claim remote merge enforcement or change protection rules.
+No provider configuration, paid service, backend activation, or account setting changes.
+
+### Linked Supabase job investigation
+
+[Run 39332397673, job 118336975655](https://github.com/GiftedNovaHD/minsky/actions/runs/39332397673/job/118336975655) is a manually dispatched T0021 Supabase run on `4cf6405`.
+Its ordinary jobs passed. Its `test:cloud` step passed 15 of 16 cases and failed the authenticated journey's skip-link focus assertion.
+At `tests/cloud/journey.spec.ts:535`, `#main` remained inactive after Enter on the focused skip link.
+The later provider and workflow steps skipped after that failure. This was a test failure, not an exhausted-minute refusal.
+Logs do not establish the cause. Diagnosis and correction remain candidate work. This investigation does not rerun hosted tests or change fixtures.
+
 ## PR #45 retry review fixes, 2026-10-20
 
 The owner requests the backend and frontend retry fixes from the PR #45 review.
@@ -26,7 +169,7 @@ The owner extends existing [PR #45](https://github.com/GiftedNovaHD/minsky/pull/
 The original `ConnectedApp.tsx` mixed authentication, the workspace, issue screens, administration, and account settings in 2,101 lines.
 `src/app/` now owns the account gate and shared workspace.
 `src/features/` separates issues, administration, account settings, authentication, and jury worklists.
-The [frontend reference](frontend-structure.md) records each responsibility and route.
+The [frontend reference](frontend-architecture.md) records each responsibility and route.
 
 The sidebar uses links to `/issues`, `/administration`, `/account`, and `/jury`.
 Direct paths survive sign-in and reload. Browser history restores the section.
@@ -846,6 +989,159 @@ Workers Paid is already active. No further Workers plan upgrade is proposed.
 The owner confirmed R2 activation during this run. No further subscription upgrade was required.
 
 The newest record appears first. Older sections describe their own revisions and targets.
+
+## T0015 frontend redesign integration (2026-10-18)
+
+Step 5 of T0015 is on `feature/t0015-frontend-redesign` in [PR #44](https://github.com/GiftedNovaHD/minsky/pull/44), which is ready for review. It is not merged or deployed.
+The user reviews and merges the PR. Deployment is a separate explicit step.
+See [T0015](tickets.md#t0015--organiser-and-contestant-frontend-redesign) and [frontend architecture](frontend-architecture.md).
+
+This ticket is the frontend redesign. It is a different record from [T0015 shared provider tests](tickets.md#t0015-shared-provider-tests) from PR #37.
+The two records share the ticket number. Their anchors stay separate.
+
+### Implemented capabilities
+
+After sign-in, the membership selects the UI:
+
+- A team membership gets the **contestant desktop app**. It has the team's reports, an issue page with a live unresolved timer and a four-step tracker, resolution cards, an inline reopen form, an award card, chat messages, team-visible images and a report form with category tiles.
+- Other memberships below 1024 px get the **organiser phone app**. It has bottom tabs by role: Queue, Mine, Find, Awards, Session for admins, and Me. Issues open in a full-screen view with a bottom action bar and sheets.
+- Other memberships at 1024 px and wider get the **organiser desktop console**. It has a collapsible sidebar, a ⌘K command palette, a queue table with status cards and tabs, an issue side sheet with a public or internal composer, Award review, Teams & tables, Overview, Accounts and Session settings.
+
+All three UIs use shadcn/ui, Tailwind CSS v4, the same data hooks and light and dark themes.
+The organiser layouts share the action forms, the admin forms and the rules in `src/organiser/organiserModel.ts`.
+
+### Merge of `main`
+
+The integration merged `origin/main` into the branch. The merge commit is `069b249`.
+That merge brought T0009 jury worklist (PR #23), the T0014 backend contracts in `src/backend/`, the T0016 to T0019 Cloudflare work and Playwright 1.64.
+
+- The hooks, sign-in, password change, `useSessionAdmin` and `useIssueImages` use `requireBackend()` and the `Backend` contracts. `src/connected/client.ts` was removed on `main`.
+- `ShellProps.user` is an `AccountIdentity`.
+- The admin model builds `AccountCommand` and `MembershipInput` values.
+- The T0009 rules are in the phone Awards tab and the desktop Award review page, through `awardLists()`, `openableIssues()` and `AwardEvidence`. The legacy `src/connected/JuryWorklist.tsx` was removed.
+- `deno.lock` workspace dependencies were synced with the new frontend packages.
+
+### Local checks recorded by the integration chat
+
+The integration chat recorded these results at the merge revision:
+
+- `npm run lint`, `npm run typecheck` and `npm run check:functions` passed.
+- `npm run build` passed with one warning: the main JavaScript chunk is about 511 kB, above the 500 kB warning limit.
+- `npm test` passed 346 tests.
+- `npm run test:e2e` passed 27 tests and failed 20 tests. The failures use selectors of the old UI. Parallel step 5 chats update them.
+- `npm run test:cloud` was not run. No cloud credentials exist in the Lapiz environment.
+
+### Selector updates and final step
+
+The parallel step 5 chats rewrote the jury specs and added a local full journey (`7ec7f79`). They updated the team search and refresh specs (`e160cf6`) and the cloud specs (`23ccfa7`, `0d304bd`).
+`00119f3` closes an organiser issue view when its issue leaves the person's lists, with the status message "ISS-N is no longer in your lists.". It also closes a phone sheet when its action is no longer allowed and returns desktop sheet focus to the control that opened it.
+
+The final step reviewed `git diff origin/main...HEAD` against the AGENTS.md "Behavior to preserve" rules. It compared the command runner, the issue abilities, the contestant filters and the image preview requests with the code on `main`. It made these fixes:
+
+- `5507bc7`: a recorded command selects its issue only when the selection did not change while the command ran. Before, **Back** during the refresh after a command was undone.
+- `52f1ea1`: the two-client jury spec uses `test.slow()`.
+- `1c9d0c6`: the skip link has padding when it gets focus. The desktop issue sheet keeps the last issue on screen while it slides out. A sign-in clears an earlier sign-out or session restore error.
+- `7996f9c`: the contestant app moves focus to the heading after the commit that shows it. Before, pending effects of an earlier refresh could focus the old heading with the same ID. The journey spec failed on this in 1 to 3 of 8 runs, also before this step.
+- `13e6034`: Tailwind scans only `src/` for class names. The CSS fell from 137.6 kB to 116.2 kB. An edit to a document no longer reloads the page in the dev server.
+
+### Verification (2026-10-18)
+
+Local checks at `13e6034`:
+
+- `npm run lint`, `npm run typecheck` and `npm run check:functions` passed.
+- `npm run build` passed with the chunk-size warning (about 511 kB).
+- `npm test` passed 348 tests in 26 files.
+- `npm run test:e2e` passed 60 of 60 tests in two full runs in a 4 vCPU job VM. The journey and UI selection specs then passed 32 of 32 runs with `--repeat-each=8`.
+- `npm run test:cloud` was not run. No cloud credentials exist in the Lapiz environment.
+
+After these checks, `main` moved to `104d9d1` (PR #42, T0020 Cloudflare connector). The merge commit is `002a7a2`. At `002a7a2`:
+
+- `npm run lint`, `npm run typecheck`, `npm run build` and `npm run check:functions` passed.
+- `npm test` passed 684 tests in 44 files.
+- `npm run test:e2e` passed 61 of 61 tests.
+- `npm run test:connector:runtime` passed.
+- `npm run test:connector:ui:local` failed. PR #42 added this check to the ordinary PR workflow. Its shared journey `tests/connector/ui-journey.ts` used the selectors of the UI before T0015.
+
+`1df20d8` ports the shared journey to the T0015 UIs. It uses the contestant UI, the organiser phone app for the volunteer and the jury member, and the desktop console for the specialist and the admin. It keeps all earlier checks, including admin intake, image limits, role changes, revocation and account recovery. At `1df20d8`, lint, type checking, the build, `npm run check:functions`, 684 unit and database tests, 61 of 61 browser tests and `npm run test:connector:runtime` passed. `npm run test:connector:ui:local` passed in three runs, with verified fixture cleanup. `npm run test:cloud` and the hosted connector UI check were not run, because no cloud credentials exist here.
+
+Visual checks used the browser tool, the Vite dev server and a temporary server that wrapped the PGlite jury fixture. That server is not committed. The checks covered the organiser phone app at 390 × 844 with touch, the organiser desktop console at 1280 × 800 and the contestant desktop app at 1280 × 800. Each UI was checked in light and dark themes. Keyboard checks covered Tab, the skip link, J, Ctrl+K, Escape and sheet **Cancel**. A reload kept the session, the internal note and the running timer. The contestant saw the public reply and not the internal note.
+The [T0015 ticket](tickets.md#verification-2026-10-18) has the details.
+
+### Limitations
+
+- The contestant app has no phone layout. It needs a window at least 1024 px wide.
+- The organiser desktop console needs a window at least 1024 px wide. Narrower windows get the phone app.
+- Mockup items that need new data are out of scope: "Near me" and helper zones, quick replies, a floor map, configurable aging thresholds, and category icons and descriptions. Category tiles use one generic icon.
+- `npm run build` reports the chunk-size warning above. Code splitting is not done.
+- `src/styles.css` still holds all legacy styles (1,748 lines), with the Public Sans font. Only the image preview page uses them, inside `.legacy-ui`. Step 5 did not remove the unused rules. This is follow-up work.
+- The T0015 design differs from [the T0009 specification](jury-worklist.md) in two ways. The desktop award and confirmation forms stay on the Award review cards. There is no separate **Jury worklist** sidebar entry and no **Back to jury worklist** button.
+- The ticket number T0015 is also used by the earlier shared provider tests record.
+- The `main` landmark holds the desktop console sidebar, so the skip link moves focus to the start of the sidebar, not to the page content.
+- The updated cloud specs have not run against a cloud project.
+- The hosted connector UI check uses the ported journey. It has not run against the hosted Cloudflare CI application.
+- The final visual pass did not check the account dialogs or the image upload against a backend. The local connector UI journey operates them against emulated Cloudflare bindings, but that is an automated check, not a visual one.
+
+## T0015 organiser desktop console (2026-10-18)
+
+Step 4 (step 2b) of T0015 is on `feature/t0015-frontend-redesign` at `4bad47d`. It is not merged or deployed.
+At 1024 px and wider, organisers get the console from `a-console.html` instead of the legacy workspace.
+It reuses the phone app forms, `useSessionAdmin` and the shared rules. `consoleModel.ts` holds the page, tab, count and search rules and has unit tests.
+`src/connected/legacy/` was deleted.
+See [frontend architecture](frontend-architecture.md#organiser-desktop-console).
+
+After this step, 11 mocked browser tests failed because they used the old desktop selectors: all 6 tests in `team-search.spec.ts` and all 5 tests in `workspace-refresh.spec.ts`.
+The cloud specs `journey.spec.ts` and `attachments.spec.ts` also used the old desktop selectors. Step 5 updates them.
+Protected cloud tests and hosted checks were not run.
+
+## T0015 contestant desktop app (2026-10-17)
+
+Step 3 of T0015 is on `feature/t0015-frontend-redesign`. It is not merged or deployed.
+Team accounts get the contestant app from `f-contestant-desktop.html` instead of the legacy workspace.
+It shows only public history and team-visible images. `contestantView.ts` holds the pure view rules and has unit tests.
+See [frontend architecture](frontend-architecture.md#contestant-app).
+
+After this step, one mocked browser test in `team-search.spec.ts` and the cloud specs `journey.spec.ts` and `attachments.spec.ts` still used the old contestant selectors. Step 5 updates them.
+
+## T0015 Session tab (2026-10-18)
+
+The step 2a follow-up of T0015 is on `feature/t0015-frontend-redesign`. It is not merged or deployed.
+The admin Session tab of the phone app now uses shadcn/ui instead of the administration page from before T0015.
+It keeps every admin action of that page. New accounts and password resets show the credentials once.
+The request logic and the forms are in `src/organiser/admin/`, so the desktop console can use them.
+See [frontend architecture](frontend-architecture.md#organiser-phone-app).
+
+Local type checking, lint, build and 118 unit and database tests passed.
+26 of 28 mocked browser tests passed. The two failures are the same two tests as in step 2a. Step 5 updates their selectors.
+A manual check at 390 × 844 used a local mock of the Supabase endpoints with fictional data.
+It covered the intake switch, image limits, a new staff account with the credential screen, the copy fallback, a username for an account without one, a membership change, a password reset with confirmation, access removal with confirmation, the collapsible sections, an error from an unknown user ID, the Team account form and an archived event.
+No development account was available. Protected cloud tests and hosted checks were not run.
+
+## T0015 organiser phone app (2026-10-17)
+
+Step 2a of T0015 is on `feature/t0015-frontend-redesign`. It is not merged or deployed.
+Below 1024 px, organisers get the phone app from `e-organiser-phone.html` instead of the legacy workspace.
+The Session tab showed the administration page from before T0015. The follow-up above replaces it.
+See [frontend architecture](frontend-architecture.md#organiser-phone-app).
+
+Local type checking, lint, build and 100 unit and database tests passed.
+26 of 28 mocked browser tests passed. Two tests still use old selectors: one runs at 320 px and now gets the phone app, and one uses the contestant UI from step 3. Step 5 updates them.
+A manual check at 390 × 844 used a local mock of the Supabase endpoints with fictional data. It covered the queue, the issue view, reply with an internal note, accept handoff, resolve, report for a team with team search, Find, Me, the Session tab and an award decision.
+No development account was available. Protected cloud tests and hosted checks were not run.
+
+## T0015 frontend foundation (2026-10-17)
+
+Step 1 of T0015 is on `feature/t0015-frontend-redesign`. It is not merged or deployed.
+It adds Tailwind CSS v4, shadcn/ui components and the zinc design tokens.
+It moves the session, command and timer logic from `ConnectedApp.tsx` into hooks without a change in behavior.
+Sign-in, password change and session access screens use shadcn/ui, with light and dark themes.
+After sign-in, a team membership gets `ContestantApp`. Every other membership gets `OrganiserApp`.
+`OrganiserApp` shows a phone layout below 1024 px and a desktop console at 1024 px and wider.
+All three layouts still render the workflow UI from before T0015 as placeholders.
+See [frontend architecture](frontend-architecture.md).
+
+Local type checking, lint, build, 70 unit and database tests and 28 mocked browser tests passed.
+The browser tests ran in a job VM without `NODE_ENV=production`.
+Protected cloud tests and hosted checks were not run.
 
 ## T0009 parallel maintenance, 2026-10-18
 

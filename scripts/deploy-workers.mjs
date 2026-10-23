@@ -82,10 +82,13 @@ export function wranglerArguments(worker, plan) {
 export function previewAddress(output) {
   let urls;
   try {
-    // Wrangler can print asset progress before its final JSON preview result.
-    const start = [...output.matchAll(/^\s*\{\s*"preview"\s*:/gm)].at(-1)?.index;
-    if (start !== undefined) urls = JSON.parse(output.slice(start)).preview?.urls;
-  } catch { /* Report a fixed error without exposing provider output. */ }
+    // Wrangler's asset helper can print progress before its --json response.
+    const start = output.search(/^\s*\{/m);
+    if (start < 0) throw new Error();
+    urls = JSON.parse(output.slice(start)).preview?.urls;
+  } catch {
+    throw new Error("Cloudflare did not return valid preview JSON.");
+  }
   const address = Array.isArray(urls) && urls.find((value) => {
     try {
       const url = new URL(value);

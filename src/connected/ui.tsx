@@ -63,22 +63,3 @@ export function clockDuration(ms: number): string {
   const minutes = Math.floor(seconds / 60);
   return `${String(minutes).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
 }
-
-export function PageHeading({
-  title,
-  description,
-}: {
-  title: string;
-  description: string;
-}) {
-  return (
-    <div className="page-heading settings-heading">
-      <div>
-        <h1 id="workspace-heading" tabIndex={-1}>
-          {title}
-        </h1>
-        <p>{description}</p>
-      </div>
-    </div>
-  );
-}

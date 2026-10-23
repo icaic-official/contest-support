@@ -50,13 +50,13 @@ Do not distribute the old email as future login instructions.
 
 To create an account:
 
-1. Under **Create an account**, enter a display name.
+1. Open the **Session** tab in the organiser phone app and select **New account**. In the desktop console, open **Accounts** and select **Create account**. Enter a display name.
 2. Enter a unique username.
 3. Select a roster team for a contestant, or staff permissions for an individual.
 4. Select **Create account**.
 5. Share the displayed username and generated temporary password through an agreed secure channel.
 6. Record the credentials privately.
-7. Dismiss the displayed credentials.
+7. Select **Done** to dismiss the displayed credentials.
 
 The app does not retain a recoverable password copy.
 If you lose the response, reset the password.
@@ -66,8 +66,8 @@ Refresh and direct API calls cannot bypass this requirement.
 To recover an account:
 
 1. Verify the requester's identity outside the app.
-2. Expand the account.
-3. Select **Reset password**.
+2. Open the account in the **Session** tab, or select **Manage** on **Accounts** in the desktop console.
+3. Select **Reset password** and confirm it.
 4. Share the replacement temporary password securely.
 
 Existing sessions and refresh tokens lose access.

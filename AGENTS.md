@@ -22,37 +22,20 @@
 
 ## Current scope
 
-**T0021 fresh Cloudflare development installation is complete.** Its approved stable activation and subsequent automated deployment pass their recorded checks.
-The follow-up in [PR #45](https://github.com/GiftedNovaHD/minsky/pull/45) records those results and fixes docs-preview output parsing.
-On 2026-10-20, the owner adds frontend feature modules and URL routing to that existing PR.
-Preserve shared session state, access checks, workflow behavior, both providers, and deployment guards.
-The PR remains draft until its fresh required checks pass. The owner reviews and merges it.
-The owner merged [PR #43](https://github.com/GiftedNovaHD/minsky/pull/43) at `4e43739ac2ce56cca7e7739e4db189aa2854d4a9` on 2026-10-19.
-Its tree matches the final protected source, `2125875653db9157f686c5f46cdddf8519c290d1`.
-The owner separately approved the concrete Cloudflare activation and a repeat automated deployment.
-The owner confirmed that independent Cloudflare Git builds are disconnected for `minsky-dev` and `minsky-docs`.
-Use [the current record](docs/current-state.md#t0021-approved-activation-2026-10-19), [ticket](docs/tickets.md#t0021-fresh-cloudflare-development-installation), and [activation procedure](docs/activate-cloudflare-development.md).
-Keep the candidate's traffic and schedules disabled. Preserve the development D1 data, R2 objects, and existing `AUTH_SECRET`.
-Use the existing GitHub Actions publication path. App previews require independent resources. Docs publish independently.
+The owner requests an update of [PR #45](https://github.com/GiftedNovaHD/minsky/pull/45) from current `main` and conflict resolution.
+Merge `origin/main` at `a938e6a` into the existing `feature/t0021-cloudflare-development-install` branch.
+Preserve the merged T0015 interfaces, T0022 CI routing, and docs-preview parser guards.
+Retain PR #45 browser routes and workflow retry protections in the redesigned frontend.
+Preserve both providers, server rules, deployment prerequisites, and protected environment rules.
+Keep the PR draft. Fresh verification must identify the combined revision.
+This request does not authorize hosted verification, deployment, provider changes, or a fix for the separate Supabase skip-link failure.
+The owner reviews and merges. Do not start another development ticket.
+Bounded subagent work remains authorized for the existing PR follow-up.
 
-The Cloudflare account is `458ad6a930b0fb717796dfa19ca6a2b1`.
-Confirm that account and each exact target before provider changes.
-Keep development, CI, and installation-verification resources separate.
-Only `feature/t0021-cloudflare-development-install` received the additional `cloud-test` branch entry, `63467138`.
-Preserve the six earlier entries and protection rule `69128862`. Do not add branches or weaken protection.
-The budget remains the existing $5 monthly plan. Billing reads return `403`.
-The owner reports no extra charges on 2026-10-19. Run bounded required checks. Add no paid service or optional stress test.
-Bounded subagent work is authorized.
-
-Existing Supabase trial data is disposable. Transfer no accounts, passwords, records, images, or IDs.
-Leave Supabase resources and accounts intact. Do not export data, reset accounts, or delete resources.
-Preserve both provider implementations, shared behavior, database rules, and scoped fixture cleanup.
-Keep provider configuration and bootstrap inside the provider implementation.
-Preserve unique historical evidence in planning and run records.
-[The PR #21 record](docs/pr21-installation-disposition.md) identifies reused safeguards and its recommended disposition. The owner decides whether to close it.
-Docker packaging, AWS, GCP, Azure, Terraform, and data migration tooling remain deferred.
-Do not start the next development ticket without the owner's instruction.
-Earlier ticket decisions and authorization limits remain in [PLAN.md](PLAN.md) and their dated records.
+T0021's separately approved Cloudflare activation and repeat deployment retain their dated evidence in [current state](docs/current-state.md#t0021-approved-activation-2026-10-19).
+Supabase resources and accounts remain intact. Development, CI, and installation-verification resources remain separate.
+Earlier provider permissions and exact protected branch limits remain in [PLAN.md](PLAN.md) and dated run records.
+Those historical approvals do not authorize a new activation or deployment.
 
 ## Code and documentation cleanup
 
@@ -229,7 +212,7 @@ Only the uploader can remove a ready image during that time.
 Session admins set the file size, image count, and combined size limits. There is no upload-disable control.
 Contestants can view only team-visible images on their own team's issues.
 
-Keep hosted Supabase active and use embedded PostgreSQL for fast policy and transaction checks.
+Keep both provider implementations available. Use embedded PostgreSQL for fast Supabase policy and transaction checks.
 Docker is optional. Privileged credentials stay outside Git and frontend builds.
 Cloud CI uses isolated fictional fixtures. Provider access does not grant application membership.
 A free-tier pilot does not establish production capacity.

@@ -6,6 +6,7 @@ import {
   isSupport,
   type Membership,
   type Resolution,
+  uiKindFor,
   unresolvedTime,
 } from "./model";
 
@@ -68,5 +69,17 @@ describe("connected presentation", () => {
     expect(isStaff(admin)).toBe(true);
     expect(isSupport(admin)).toBe(false);
     expect(isSupport({ ...admin, roles: ["specialist", "jury"] })).toBe(true);
+  });
+  it("gives team accounts the contestant UI and every other membership the organiser UI", () => {
+    const staff: Membership = {
+      session_id: "s",
+      user_id: "u",
+      team_id: null,
+      roles: ["jury"],
+      is_admin: false,
+    };
+    expect(uiKindFor(staff)).toBe("organiser");
+    expect(uiKindFor({ ...staff, roles: [], is_admin: true })).toBe("organiser");
+    expect(uiKindFor({ ...staff, roles: [], team_id: "team" })).toBe("contestant");
   });
 });

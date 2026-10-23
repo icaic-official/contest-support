@@ -6,15 +6,15 @@ Jury members record time awards, and staff confirm their application to the exte
 Administrators manage accounts, roles, and contestant intake.
 Staff can attach images to issues and choose staff-only or team visibility.
 
-The app uses React, TypeScript, and Vite.
+The app uses React, TypeScript, Vite, Tailwind CSS, and shadcn/ui.
 Its shared [backend contract](docs/backend-contracts.md) has Supabase and Cloudflare implementations.
 The [development application](https://minsky-dev.icaic-minsky.workers.dev) runs Cloudflare. See [current state](docs/current-state.md) for its deployed source.
 The Cloudflare installation serves the frontend and API through Workers, with D1, private R2 images, and Durable Object live updates.
 Both providers retain the shared workflow behavior. Supabase resources and accounts remain intact.
 
-The frontend has separate feature modules for issues, administration, account settings, sign-in, and jury worklists.
-`src/app/` owns the shared workspace and URL routing.
-See [frontend structure](docs/frontend-structure.md) for module responsibilities, browser paths, and access checks.
+The frontend separates contestant screens, organiser screens, and shared session hooks.
+`src/connected/` owns account checks, workspace state, browser routes, and workflow retry protection.
+See [frontend architecture](docs/frontend-architecture.md) for module responsibilities, browser paths, and access checks.
 
 [Read the user and operator guides](https://minsky-docs.icaic-minsky.workers.dev).
 Use [the installation guide](site/src/content/docs/operators/installation.md) for an isolated Cloudflare instance.
@@ -23,6 +23,19 @@ The owner separately approved the concrete Cloudflare switch and repeat automate
 The installation transfers no Supabase accounts, passwords, records, images, or IDs.
 See [current state](docs/current-state.md#t0021-approved-activation-2026-10-19) for the observed deployment results and [activation](docs/activate-cloudflare-development.md) for the procedure.
 These are development installations that require connectivity. Live-contest readiness and capacity for 800 simultaneous users remain unverified.
+
+## User interfaces
+
+The owner merged the T0015 frontend redesign in [PR #44](https://github.com/GiftedNovaHD/minsky/pull/44) at `a25f9f1` on 2026-10-21.
+After sign-in, the membership selects one of three UIs:
+
+- **Contestant desktop app.** A membership with a team gets this app. It shows the team's reports, a live timer, a progress tracker, public messages, team-visible images and the report form. It has no phone layout and needs a window at least 1024 px wide.
+- **Organiser phone app.** Staff in a window narrower than 1024 px get bottom tabs by role: Queue, Mine, Find, Awards, Session and Me. Issues open in a full-screen view with an action bar and bottom sheets.
+- **Organiser desktop console.** Staff in a window 1024 px wide or wider get a sidebar, a queue table, an issue side sheet, a ⌘K command palette, Award review and the admin pages.
+
+The jury award lists from T0009 are in the phone **Awards** tab and the desktop **Award review** page.
+All UIs use shadcn/ui, Tailwind CSS and the same data hooks, with light and dark themes.
+See [frontend architecture](docs/frontend-architecture.md) and the [design record](design/redesign/README.md).
 
 ## Local development
 
@@ -82,15 +95,36 @@ See [cloud onboarding](docs/cloud-onboarding.md#contributor-setup) for provider 
 | `npm run test:auth:http -- --account=… --database=… --origin=…` | Check the isolated deployed authentication Worker. |
 | `npm run test:auth:hash` | Measure password cost in a temporary local Worker. |
 | `npm run test:e2e` | Run browser tests with mocked cloud responses. |
+| `npm run test:cloud` | Run the browser and workflow suite with isolated fixtures on the CI project. Needs cloud credentials. |
+| `npm run test:hosted` | Repeat the suite with real accounts against the deployed app. Needs cloud credentials. |
 | `npm run test:providers:list` | List the shared provider scenarios without hosted credentials. |
 | `npm run test:providers -- --provider=supabase` | Run the shared contracts against an explicitly configured isolated Supabase project. |
 | `npm run test:providers -- --provider=cloudflare --config=… --account=… --database=… --origin=…` | Run the same contracts through the isolated Cloudflare browser adapter. |
 
-Install Chromium once before browser tests:
+Install the Chromium build that matches the installed Playwright (1.64) before browser tests:
 
 ```sh
 npx playwright install chromium
 ```
+
+If the default browser folder is not writable, set `PLAYWRIGHT_BROWSERS_PATH` to a writable folder before the install and before each test run.
+If your shell sets `NODE_ENV=production`, unset it before `npm run dev` or `npm run test:e2e`. Otherwise the page stays blank.
+
+These commands connect to provider accounts. Several of them change hosted data or deployments. Confirm the target before you run them:
+
+| Command | Purpose |
+| --- | --- |
+| `npm run cloud:login` and `npm run cloud:link` | Sign in to Supabase and link the development project. |
+| `npm run cloud:plan` | Show the migrations that `cloud:migrate` would apply. |
+| `npm run cloud:migrate` | Apply migrations to the linked project. |
+| `npm run cloud:functions` | Deploy the `admin` and `attachments` functions to the development project. |
+| `npm run cloud:bootstrap` | Make the first session admin. |
+| `npm run cloud:recover-admin` | Reset the password of an existing admin when the only admin cannot sign in. |
+| `npm run cloud:hosting-login` | Sign in to Cloudflare with Wrangler. |
+| `npm run deploy` | Build and deploy the frontend Worker. Deploy only after an explicit request. |
+| `npm run deploy:preview` | Build and upload a preview version of the frontend Worker. |
+
+See [cloud onboarding](docs/cloud-onboarding.md) for the exact arguments.
 
 Deno and the provider CLIs are pinned npm dependencies.
 For `npm run test:cloud` and `npm run test:hosted`, follow [cloud verification](docs/cloud-onboarding.md#verification-and-protected-cloud-ci).
@@ -127,7 +161,8 @@ See [the writing and deployment guide](site/src/content/docs/contributing/docume
 The initial docs deployment is explicitly authorized in T0011 before merge.
 The user selected CI-controlled deployment from `main`.
 Docs branch previews remain available. App branch previews are disabled until independent preview resources exist.
-GitHub Actions runs CI for pull requests and all branch pushes.
+GitHub Actions runs CI for all repository branch pushes and fork pull requests.
+Same-repository PRs use their branch-push results. See [event routing](docs/cloudflare-build-settings.md#events-and-prerequisites).
 Independent docs and app deployment jobs wait for `checks`, `secrets`, and `dependencies`.
 See [deployment setup](docs/cloudflare-builds.md) for credentials, activation, and backend limits.
 The fresh Cloudflare development candidate and a separate empty installation pass the complete application checks.
@@ -140,6 +175,8 @@ The [T0021 activation record](docs/current-state.md#t0021-approved-activation-20
 - [Deployment setup](docs/cloudflare-builds.md) explains branch previews, deployment after CI passes, and first-run verification.
 - [Documentation release plan](docs/documentation-release-plan.md) — public-reader requirements, specific gaps, and completion criteria.
 - [Development tickets](docs/tickets.md) — ticket scope, status, and acceptance criteria.
+- [Frontend architecture](docs/frontend-architecture.md) — UI selection, shells, data hooks, the jury award lists, and the Tailwind and shadcn/ui setup.
+- [Frontend redesign record](design/redesign/README.md) — the mockups, the chosen direction, and how its open decisions were resolved.
 - [Current state](docs/current-state.md) — implementation details, verification records, and limitations.
 - [Supabase cloud onboarding](docs/cloud-onboarding.md) covers the retained provider, account administration, and isolated verification.
 - [Jury worklist specification](docs/jury-worklist.md) records T0009 behavior and verified acceptance.

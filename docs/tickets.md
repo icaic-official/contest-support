@@ -2,10 +2,17 @@
 
 These tickets describe development work, not contestant issues.
 
+[PR #45](https://github.com/GiftedNovaHD/minsky/pull/45) remains the draft T0021 follow-up.
+The owner requests an update from current `main` and conflict resolution on 2026-10-23.
+Preserve its browser routes and retry protections alongside the merged frontend redesign and CI change.
+The owner reviews and merges.
+
 [T0021 fresh Cloudflare development installation](#t0021-fresh-cloudflare-development-installation) is complete, including approved activation and repeat deployment.
-It includes [T0020](#t0020-complete-cloudflare-connector), merged in [PR #42](https://github.com/GiftedNovaHD/minsky/pull/42) at `104d9d1`.
-The owner merged PR #43 at `4e43739` and separately approved stable activation and a repeat automated deployment.
-No Supabase trial data transfers. Its resources and accounts remain intact.
+The owner merged PR #43 at `4e43739` and separately approved those operations.
+[T0020](#t0020-complete-cloudflare-connector) merged in [PR #42](https://github.com/GiftedNovaHD/minsky/pull/42) at `104d9d1`.
+The [frontend redesign](#t0015--organiser-and-contestant-frontend-redesign) merged in [PR #44](https://github.com/GiftedNovaHD/minsky/pull/44) at `a25f9f1` on 2026-10-21.
+[T0022](#t0022-reduce-duplicate-ci-checks) merged in [PR #46](https://github.com/GiftedNovaHD/minsky/pull/46) at `a938e6a` on 2026-10-23.
+No Supabase trial data transferred. Its resources and accounts remain intact.
 
 T0016 Cloudflare backend design merged in [PR #36](https://github.com/GiftedNovaHD/minsky/pull/36) at `b68ef72` on 2026-10-17.
 [T0015 shared provider tests](#t0015-shared-provider-tests) merged in [PR #37](https://github.com/GiftedNovaHD/minsky/pull/37).
@@ -24,6 +31,15 @@ Status: Current state, with the PR and merge revision when merged.
 Summary: One or two sentences that state the goal and result.
 
 Optional sections describe scope, behavior, decisions, and exclusions.
+
+### Integration decision for T0009 (2026-10-18)
+
+T0009 merged into `main` with a separate **Jury worklist** screen. The T0015 integration did not keep that screen.
+Its rules moved into the phone **Awards** tab and the desktop **Award review** page, through `awardLists()`, `openableIssues()` and `AwardEvidence`.
+The lists are To decide, To apply and Applied. They keep the T0009 eligibility and order rules, including zero-minute awards and pending awards on reopened issues.
+A jury-only member can open a reopened issue that has a pending award.
+The design differs from [the T0009 specification](jury-worklist.md) in two ways: the desktop award and confirmation forms stay on the Award review cards, and there is no **Jury worklist** sidebar entry or **Back to jury worklist** button.
+See [frontend architecture](frontend-architecture.md#jury-award-lists).
 
 ### Acceptance criteria
 
@@ -54,6 +70,33 @@ These items stay deferred and are not part of T0005:
 - Remaining manual acceptance checks.
 
 T0008 fuzzy team search merged into `main` in [PR #22](https://github.com/notbowen/minsky/pull/22) on 2026-10-15 (SGT).
+
+## T0022 Reduce duplicate CI checks
+
+Branch: `feature/t0022-ci-run-deduplication`, from updated `main` at `4e43739`.
+Status: merged in [PR #46](https://github.com/GiftedNovaHD/minsky/pull/46) at `a938e6a` on 2026-10-23. Local verification passes on its recorded source. GitHub runner restrictions prevented fresh required job execution.
+Summary: Run ordinary checks once per repository branch push. Retain fork PR checks and correct the observed docs-preview output parsing failure.
+
+Same-repository PR jobs skip without allocating runners and use distinct names.
+The ordinary required names remain `checks`, `secrets`, and `dependencies` on actual executions.
+These PRs use branch-head evidence. A second synthetic-merge check no longer runs.
+Wrangler can print asset progress before its JSON response. The preview parser accepts that prefix and retains URL and revision checks.
+Cloudflare CI migration remains candidate work. This ticket does not change provider configuration or protected environment rules.
+
+### Acceptance criteria
+
+- [x] Repository branch updates run the ordinary suites once, including when a PR is open.
+- [x] Fork PRs retain all ordinary checks without provider credentials or deployment.
+- [x] Skipped PR jobs cannot satisfy required ordinary check names.
+- [x] Main and branch deployments retain their current prerequisites and cancellation rules.
+- [x] Scheduled security checks and manual protected suites retain their current routing.
+- [x] Workflow validation, local required checks, and PR push routing are recorded separately.
+- [x] The docs parser accepts progress-prefixed Wrangler output and rejects malformed responses.
+
+### Verification
+
+The [dated record](current-state.md#t0022-ci-routing-verification-2026-10-20) separates local expression validation from GitHub evidence in the PR.
+Fork, schedule, and protected-dispatch behavior use local routing assertions. No live run of those events is part of this ticket.
 
 ## T0021 Fresh Cloudflare development installation
 
@@ -101,7 +144,7 @@ On 2026-10-20, the owner adds separate frontend feature modules and browser rout
 The follow-up preserves shared session state, workflow rules, both providers, configuration, and all target guards.
 Fresh verification and owner review cover the expanded diff. The owner merges it.
 The owner's later review requests session-bound retries and retention of uncertain request IDs through transient account-check failures.
-Those fixes require fresh verification. See [the frontend reference](frontend-structure.md) for the request lifetime and retry behavior.
+Those fixes require fresh verification. See [the frontend reference](frontend-architecture.md) for the request lifetime and retry behavior.
 
 ## T0020 Complete Cloudflare connector
 
@@ -937,3 +980,103 @@ No schema, backend feature, provider implementation, or runtime dependency is pa
 - [x] Hosted jury acceptance on Minsky CI and protected CI pass. Fixture cleanup is verified.
 - [x] Remaining physical-device and assistive-technology limits are recorded without implying completed checks.
 - [x] PR #23 reflects passing required verification and is prepared for owner review. The owner reviews and merges.
+
+## T0015 — Organiser and contestant frontend redesign
+
+Branch: `feature/t0015-frontend-redesign`, from updated `main` at `aaa6bbc`.
+Status: merged in [PR #44](https://github.com/GiftedNovaHD/minsky/pull/44) at `a25f9f1` on 2026-10-21. Its local checks pass on their recorded source. Deployment is separate from merge.
+This ticket is different from [T0015 shared provider tests](#t0015-shared-provider-tests) from PR #37. The two records share the ticket number. Keep their anchors separate.
+
+### Progress
+
+- [x] **Step 1, foundation (2026-10-17).** Tailwind CSS v4, shadcn/ui components and zinc tokens. The data layer moved from `ConnectedApp.tsx` into hooks. Sign-in, password change and session access screens use shadcn/ui. The membership selects `ContestantApp` or `OrganiserApp`. `OrganiserApp` selects the phone or desktop layout by viewport. All three layouts render the existing workflow UI as placeholders. See [frontend architecture](frontend-architecture.md).
+- [x] **Step 2a, organiser phone app (2026-10-17).** `OrganiserPhoneApp` no longer uses the legacy workspace. It has bottom tabs by role, the queue with **Claim and go**, chips and aging timers, a full-screen issue view with a bottom action bar and sheets, Find, Awards and Me with the session switcher. The action forms are reusable for the desktop console. See [frontend architecture](frontend-architecture.md#organiser-phone-app). The Playwright test `team-search.spec.ts` "Clear team with Space" uses a 320 px viewport and still expects the old selectors. Step 5 updates it.
+- [x] **Step 2a follow-up, redesigned Session tab (2026-10-18).** The admin Session tab uses shadcn/ui. It has status counts, the intake switch, image limits with steppers, the account list, a new account sheet with the one-time credential screen, and an account sheet for the username, membership, password reset and access removal. Reset and removal need confirmation. The request logic is in `useSessionAdmin` and the forms are in `src/organiser/admin/`, so the desktop console can use them. See [frontend architecture](frontend-architecture.md#organiser-phone-app).
+- [x] **Step 3, contestant desktop app (2026-10-17).** `ContestantApp` no longer uses the legacy workspace. It has a top bar, the team's reports, an issue page with a live timer and a four-step tracker, an inline reopen form, an award card, chat messages, team-visible images and a report form with category tiles. See [frontend architecture](frontend-architecture.md#contestant-app). The Playwright test `team-search.spec.ts` "a refreshed contestant membership drops the hidden staff team filter" and the cloud specs `journey.spec.ts` and `attachments.spec.ts` still use the old contestant selectors. Step 5 updates them.
+- [x] **Step 4 (step 2b), organiser desktop console (2026-10-18).** `OrganiserDesktopConsole` no longer uses the legacy workspace. It has a collapsible sidebar with the session switcher, pages by role, the intake switch and the person menu. The top bar has the breadcrumb, the ⌘K command palette, **Live** or **Reconnecting** and the theme menu. It has the queue with status cards, tabs, the team filter and a data table, an issue side sheet with a two-mode composer, Award review, Overview, Accounts and Session settings. `src/connected/legacy/` is deleted. See [frontend architecture](frontend-architecture.md#organiser-desktop-console). With this step, 11 local Playwright tests fail because they use the old desktop selectors (`.issue-list .issue-card`, the old reply and membership forms): all 6 tests in `team-search.spec.ts` and all 5 tests in `workspace-refresh.spec.ts`. The cloud specs `journey.spec.ts` and `attachments.spec.ts` use the old desktop selectors too. Step 5 updates them.
+- [x] **Step 5, integration (2026-10-18).** Parallel chats shared the ticket branch:
+  - [x] Merge of `main` at `069b249`. The UI uses `requireBackend()` and the `Backend` contracts. `src/connected/client.ts` was removed on `main`. The T0009 rules are in the phone Awards tab and the desktop Award review page. Local lint, type checking, build, `npm run check:functions` and 346 unit and database tests passed. 27 mocked browser tests passed and 20 failed on old selectors. See [current state](current-state.md#t0015-frontend-redesign-integration-2026-10-18).
+  - [x] Documentation for the redesigned UIs (2026-10-18): README, frontend architecture, current state, manual verification, product direction, the design record and the T0009 note.
+  - [x] Organiser issue views close with "ISS-N is no longer in your lists." when the open issue leaves the person's lists. Phone sheets close when their action is no longer allowed. The desktop sheet returns focus to the control that opened it (`00119f3`).
+  - [x] Playwright selector updates: the jury specs and a new local full journey (`7ec7f79`), the team search and refresh specs (`e160cf6`), and the cloud specs (`23ccfa7`, `0d304bd`). The cloud specs are updated but not run.
+  - [x] Final review, visual pass and the PR (2026-10-18). A recorded command no longer opens its issue again after the person pressed **Back** during the refresh (`5507bc7`). The two-client jury spec uses the slow test timeout (`52f1ea1`). The visual pass fixed the skip link padding, a blank issue sheet during its close animation and a sign-out error that stayed after the next sign-in (`1c9d0c6`). The contestant heading now gets focus after the commit that shows it (`7996f9c`). Tailwind scans only `src/` (`13e6034`).
+  - [x] Connector UI journey port (2026-10-18). `tests/connector/ui-journey.ts` drives the T0015 UIs (`1df20d8`). The UI needed no change.
+
+The user requested a complete frontend redesign on 2026-10-17.
+They reviewed four mockup directions in [`design/redesign/`](../design/redesign/README.md).
+They chose direction A (shadcn/ui console) combined with direction D (phone-first field mode).
+
+### Decisions (2026-10-17)
+
+- Organisers and contestants get **different UIs**. This is not one layout with parts hidden.
+- After sign-in, the membership selects the UI. A membership with `team_id` gets the contestant UI. Every other membership gets the organiser UI.
+- **Organisers** (volunteers, specialists, jury members, session admins) mainly use phones in a browser.
+  - On phones they get the phone-first app from [`e-organiser-phone.html`](../design/redesign/e-organiser-phone.html).
+  - On laptops and tablets they get a **separate desktop console** in the style of [`a-console.html`](../design/redesign/a-console.html), with a sidebar, a queue table, an issue side sheet and admin pages.
+  - Both organiser layouts use the same data hooks and action components.
+- **Contestants** use computers in a browser and get the desktop app from [`f-contestant-desktop.html`](../design/redesign/f-contestant-desktop.html). There is **no phone layout** for contestants.
+- Contestant category tiles show the category name and one generic icon. No category data changes.
+- The UI uses Tailwind CSS v4 and shadcn/ui components copied into the repository, with Radix primitives and lucide icons.
+- These items stay out of scope because the schema has no data for them: "Near me" or helper zones, quick replies, a floor map, configurable aging thresholds, and category icons or descriptions.
+
+### Acceptance criteria
+
+- [ ] All current behavior stays available, and the AGENTS.md "Behavior to preserve" rules still hold. Local evidence passes: the final review, 348 unit and database tests and 60 mocked browser tests. The updated cloud specs have not run yet, so this item stays open.
+- [x] Contestant views never contain internal notes or staff-only images. Evidence: `contestantView.test.ts`, the local journey, the jury separation spec and the visual pass.
+- [x] The organiser phone app works at 390 px wide with keyboard and touch. Every gesture has a button alternative. Evidence: the phone specs at 390 × 844 and 320 px and the visual pass with touch emulation. Every sheet has **Cancel**.
+- [x] The organiser desktop console and the contestant desktop app work at 1280 px wide. Evidence: the desktop specs and the visual pass at 1280 × 800.
+- [x] Build, lint, type checking, unit tests and the Playwright journey pass. Selectors are updated for the new UI.
+- [x] README and `docs/` describe the new UI. `docs/manual-verification.md` covers both UIs. Documentation updated on 2026-10-18.
+- [ ] The user reviews and merges the pull request. Deployment remains a separate step.
+
+### Verification (2026-10-18)
+
+Local checks at `13e6034`, recorded separately from protected GitHub Actions runs:
+
+- `npm run lint`, `npm run typecheck` and `npm run check:functions` passed.
+- `npm run build` passed. It warns that the main JavaScript chunk is about 511 kB. The CSS is 116.2 kB.
+- `npm test` passed 348 tests in 26 files.
+- `npm run test:e2e` passed 60 of 60 tests in two full runs in a 4 vCPU job VM. The journey and UI selection specs then passed 32 of 32 runs with `--repeat-each=8`.
+- `npm run test:cloud` was not run. The Lapiz environment has no cloud credentials. The protected `cloud-test` job is where the updated cloud specs first run.
+
+After these checks, `main` moved to `104d9d1` (PR #42, T0020 Cloudflare connector). The merge commit is `002a7a2`. At `002a7a2`:
+
+- `npm run lint`, `npm run typecheck`, `npm run build` and `npm run check:functions` passed.
+- `npm test` passed 684 tests in 44 files.
+- `npm run test:e2e` passed 61 of 61 tests.
+- `npm run test:connector:runtime` passed.
+- `npm run test:connector:ui:local` failed. PR #42 added this check to the ordinary PR workflow. Its shared journey `tests/connector/ui-journey.ts` used the selectors of the UI before T0015. It stopped after the temporary password change, at `ui-journey.ts:118`.
+
+`1df20d8` ports the shared journey to the T0015 UIs. Contestants use the desktop contestant UI. The volunteer and the jury member use the organiser phone app. The specialist and the admin use the desktop console. The journey keeps all earlier checks: the temporary password change, the session and **Live** status, intake close and open with its effect on **Report an issue**, image limits, role changes, keyboard focus, the report, claim, handoff, public and internal messages, team-visible and staff-only images, resolution, award, external application, reopening, refresh, revocation, account recovery and fixture cleanup. At `1df20d8`, in a 4 vCPU job VM:
+
+- `npm run lint`, `npm run typecheck`, `npm run build` and `npm run check:functions` passed.
+- `npm test` passed 684 tests in 44 files.
+- `npm run test:e2e` passed 61 of 61 tests in two full runs.
+- `npm run test:connector:runtime` passed.
+- `npm run test:connector:ui:local` passed in three runs: 1 passed, 0 failed, 0 skipped, 0 flaky. Fixture D1, R2 and Durable Object cleanup was verified each time.
+- `npm run test:cloud` and the hosted connector UI check were not run. The Lapiz environment has no cloud credentials.
+
+Before the fixes, two jury specs failed. The jury retry spec failed 3 of 8 runs because **Back** during the refresh after a command was undone. It then passed 10 of 10. The two-client jury spec timed out at 30 seconds on its last step during a full parallel run.
+
+The journey spec failed in 1 to 3 of 8 runs on the step that expects focus on the **Report an issue** heading. It failed the same way at `e160cf6`, before this step. Pending effects of an earlier refresh focused the old heading with the same ID. `7996f9c` fixes this.
+One full run failed 4 tests because the page reloaded during them. Edits to tracked documents during the run made the dev server reload the page, because Tailwind scanned the whole repository. `13e6034` limits the scan to `src/`.
+
+The final visual pass used the browser tool, the Vite dev server and a temporary local server. That server wrapped the PGlite jury fixture over HTTP and WebSocket. It is not committed. These checks were done:
+
+- Organiser phone app at 390 × 844 with touch, in light and dark themes: queue, issue view, Reply sheet with **Staff only**, **Cancel**, Me and Awards.
+- Organiser desktop console at 1280 × 800 in dark and light themes: queue, skip link, J row focus, Ctrl+K palette, Escape, Award review, **Report for a team**, **Claim**, a public reply and an internal note in the side sheet.
+- Refresh: after a reload, the session, the internal note and the running timer stayed. The timer continued from the saved timestamps.
+- Contestant desktop app at 1280 × 800 in light and dark themes: the report showed the public reply. It did not show the internal note. Resolved reports showed the award and the external application as separate steps.
+
+The user should still check the admin Accounts and image upload screens against a real backend, and run the remaining steps of [manual verification](manual-verification.md).
+
+### Risk
+
+T0009 and T0014 merged into `main`, and step 5 resolved their conflicts.
+If the T0006 and T0007 PRs are still open, they can change `src/connected/`. Whichever merges second needs conflict resolution.
+
+### Follow-up candidates
+
+- Remove the legacy rules in `src/styles.css` that the image preview page does not use, or restyle the preview page with Tailwind.
+- Split the main JavaScript chunk to remove the build warning.
+- Move the console sidebar out of the `main` landmark, so the skip link skips it. The local and cloud specs expect focus on `#main`, so they change too.

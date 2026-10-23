@@ -12,6 +12,15 @@ The owner authorized the 2026-10-18 maintenance in a separate worktree alongside
 Supabase was active during that run. Its authorization excluded deployment, backend changes, and data migration.
 The current worklist uses the shared provider contracts in the active Cloudflare application.
 
+T0015 note (2026-10-18): the T0015 frontend redesign moved this worklist into the organiser screens.
+The phone **Awards** tab and the desktop **Award review** page show To decide, To apply and Applied lists from `awardLists()`.
+These lists use the eligibility and order rules below.
+There is no separate **Jury worklist** sidebar entry and no **Back to jury worklist** button.
+The award and confirmation forms stay on the desktop Award review cards.
+The legacy `src/connected/JuryWorklist.tsx` was removed.
+The sections below record the T0009 specification as accepted.
+See [frontend architecture](frontend-architecture.md#jury-award-lists).
+
 ## Outcome and scope
 
 Give jury members a separate screen that identifies resolved issues needing an
@@ -131,7 +140,7 @@ does not erase an award, undo its application, or create another award decision.
   The Supabase adapter retains its guarded SQL path. The Cloudflare adapter uses the shared service and atomic D1 commits.
 - Merge current `main` into the existing PR branch without rewriting commits.
   Preserve current authentication, backend contracts, shared workflow integration, images, and refresh handling.
-  Keep changes to `src/app/Workspace.tsx`, `src/features/jury/`, and shared styles focused on worklist integration.
+  Keep shared workspace, organiser award-list, and style changes focused on worklist integration.
 - Follow the existing dark green theme. Use readable desktop lists and stacked
   phone rows, named controls, keyboard navigation, visible focus, and text labels
   for statuses. Check 320/390px widths and 200% zoom without horizontal overflow.

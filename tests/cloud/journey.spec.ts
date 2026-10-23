@@ -1,5 +1,21 @@
 import { test, expect, type Page } from "@playwright/test";
 import { account, fixture, anonKey, url, service, save } from "./fixture";
+import {
+  byId,
+  choose,
+  consoleLink,
+  desktop,
+  fitsWidth,
+  issueRow,
+  liveBadge,
+  login,
+  openDialog,
+  phone,
+  phoneTab,
+  signOut,
+  submitSignIn,
+  uiRoot,
+} from "./ui";
 import { createClient } from "@supabase/supabase-js";
 import { execFileSync } from "node:child_process";
 import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
@@ -25,25 +41,6 @@ test("public signup is disabled while organizer-created accounts can log in", as
   const signedOut = await contestant.auth.signOut();
   expect(signedOut.error).toBeNull();
 });
-
-async function login(page: Page, name: string) {
-  const details = fixture().accounts[name];
-  await page.goto("/");
-  await page.getByLabel("Username", { exact: true }).fill(details.username);
-  await page.getByLabel("Password", { exact: true }).fill(details.password);
-  await page.getByRole("button", { name: "Sign in", exact: true }).click();
-  await expect(
-    page.getByRole("heading", {
-      name: name === "contestant" ? "My team’s issues" : "Issue Queue",
-    }),
-  ).toBeVisible();
-  if (name === "admin") {
-    await page
-      .getByRole("navigation", { name: "Workspace navigation" })
-      .getByRole("link", { name: "Administration", exact: true })
-      .click();
-  }
-}
 
 test("sign-in stays usable on phones and exposes recovery help by keyboard", async ({
   page,
@@ -89,96 +86,130 @@ test("sign-in stays usable on phones and exposes recovery help by keyboard", asy
   });
 });
 
-test("sidebar navigation respects roles and remains usable by keyboard on phones", async ({
-  page,
-}, testInfo) => {
-  await login(page, "volunteer");
-  const navigation = page.getByRole("navigation", {
-    name: "Workspace navigation",
-  });
-  await expect(
-    navigation.getByRole("link", { name: "Administration", exact: true }),
-  ).toHaveCount(0);
-  await navigation
-    .getByRole("link", { name: "My account", exact: true })
+/** Opens a contestant report from the report list by its description. */
+async function openReport(page: Page, description: string) {
+  await page
+    .getByRole("navigation", { name: "Reports" })
+    .getByRole("button")
+    .filter({ hasText: description })
     .click();
   await expect(
-    page.getByRole("heading", { name: "My account", exact: true }),
+    page.getByRole("region", { name: "Your report" }),
+  ).toContainText(description);
+}
+
+test("organiser navigation follows combined roles on phones and the desktop console", async ({
+  page,
+}, testInfo) => {
+  await page.setViewportSize(phone);
+  await login(page, "volunteer", "organiser-phone");
+  const tabs = page.getByRole("navigation", { name: "Organiser sections" });
+  await expect(tabs.getByRole("button")).toHaveText([
+    "Queue",
+    "Mine",
+    "Find",
+    "Me",
+  ]);
+  const me = tabs.getByRole("button", { name: "Me", exact: true });
+  await me.focus();
+  await page.keyboard.press("Enter");
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Me", exact: true }),
   ).toBeFocused();
-  await expect(page.locator(".account-details")).toContainText(
-    fixture().accounts.volunteer.username,
-  );
+  await expect(page).toHaveURL("/account");
+  await expect(me).toHaveAttribute("aria-current", "page");
   await expect(
-    navigation.getByRole("link", { name: "My account", exact: true }),
-  ).toHaveAttribute("aria-current", "page");
-  await expect(
-    page.getByRole("heading", { name: "Report an issue" }),
-  ).toHaveCount(0);
+    page.getByText(fixture().accounts.volunteer.username, { exact: true }),
+  ).toBeVisible();
+  await expect(page.getByText("Volunteer", { exact: true })).toBeVisible();
   await page.screenshot({
-    path: testInfo.outputPath("sidebar-account-desktop.png"),
+    path: testInfo.outputPath("organiser-me-390.png"),
     fullPage: true,
   });
   for (const width of [390, 320]) {
     await page.setViewportSize({ width, height: 844 });
-    const menu = page.getByRole("button", { name: "Menu", exact: true });
-    await expect(menu).toHaveAttribute("aria-expanded", "false");
-    await expect(navigation).toBeHidden();
-    await menu.focus();
-    await page.keyboard.press("Enter");
-    await expect(menu).toHaveAttribute("aria-expanded", "true");
-    const issues = navigation.getByRole("link", {
-      name: "Issues",
-      exact: true,
-    });
-    await issues.focus();
+    const queue = tabs.getByRole("button", { name: "Queue", exact: true });
+    await queue.focus();
     await page.keyboard.press("Enter");
     await expect(
-      page.getByRole("heading", { name: "Issue Queue" }),
+      page.getByRole("heading", { level: 1, name: "Queue", exact: true }),
     ).toBeFocused();
-    await expect(menu).toHaveAttribute("aria-expanded", "false");
-    await page
-      .getByRole("button", { name: "Report for team", exact: true })
-      .click();
+    await expect(page).toHaveURL("/issues");
+    await expect(queue).toHaveAttribute("aria-current", "page");
+    await page.getByRole("button", { name: "Report", exact: true }).click();
+    const report = page.getByRole("dialog", { name: "Report for a team" });
+    await expect(report).toBeVisible();
     await expect(
-      page.getByRole("heading", { name: "Report an issue" }),
-    ).toBeFocused();
-    await page
-      .getByRole("button", { name: "Cancel report", exact: true })
-      .click();
-    expect(
-      await page.evaluate(
-        () => document.documentElement.scrollWidth <= window.innerWidth,
-      ),
-    ).toBe(true);
+      report.getByRole("combobox", { name: "Affected team" }),
+    ).toBeVisible();
+    await report.getByRole("button", { name: "Cancel", exact: true }).click();
+    await expect(report).toBeHidden();
+    expect(await fitsWidth(page)).toBe(true);
   }
   await page.screenshot({
-    path: testInfo.outputPath("sidebar-support-320.png"),
+    path: testInfo.outputPath("organiser-queue-320.png"),
     fullPage: true,
   });
-  await page.setViewportSize({ width: 1280, height: 900 });
-  await page.getByRole("button", { name: "Sign out", exact: true }).click();
-  await expect(navigation).toHaveCount(0);
-  await login(page, "admin");
+  await page.setViewportSize(desktop);
+  await expect(uiRoot(page, "organiser-desktop")).toBeVisible();
+  for (const label of ["Queue", "Assigned to me", "Handoffs", "Teams & tables"])
+    await expect(consoleLink(page, label)).toBeVisible();
+  for (const label of ["Award review", "Overview", "Accounts", "Session settings"])
+    await expect(consoleLink(page, label)).toHaveCount(0);
+  await expect(consoleLink(page, "Queue")).toHaveAttribute(
+    "aria-current",
+    "page",
+  );
   await expect(
-    navigation.getByRole("link", { name: "Administration", exact: true }),
-  ).toHaveAttribute("aria-current", "page");
-  await expect(
-    page.getByRole("heading", { name: "Session administration" }),
+    page.getByRole("heading", { level: 1, name: "Issue queue" }),
   ).toBeVisible();
-  await navigation.getByRole("link", { name: "Issues", exact: true }).click();
+  await page.keyboard.press("Control+k");
+  const palette = page.getByRole("dialog", { name: "Command palette" });
+  await expect(palette).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(palette).toBeHidden();
+  await signOut(page);
+  await expect(uiRoot(page)).toHaveCount(0);
+  await login(page, "admin", "organiser-desktop");
+  for (const label of ["Queue", "Overview", "Accounts", "Session settings"])
+    await expect(consoleLink(page, label)).toBeVisible();
+  await consoleLink(page, "Accounts").click();
   await expect(
-    page.getByRole("heading", { name: "Session administration" }),
+    page.getByRole("heading", { level: 1, name: "Accounts", exact: true }),
+  ).toBeFocused();
+  await expect(page).toHaveURL("/administration/accounts");
+  await expect(consoleLink(page, "Accounts")).toHaveAttribute(
+    "aria-current",
+    "page",
+  );
+  await page.screenshot({
+    path: testInfo.outputPath("console-accounts-desktop.png"),
+    fullPage: true,
+  });
+  await consoleLink(page, "Queue").click();
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Accounts", exact: true }),
   ).toHaveCount(0);
   await expect(
-    page.getByRole("heading", { name: "Issue Queue" }),
+    page.getByRole("heading", { level: 1, name: "Issue queue" }),
   ).toBeVisible();
   await page.reload();
-  await expect(
-    navigation.getByRole("link", { name: "Issues", exact: true }),
-  ).toHaveAttribute("aria-current", "page");
+  await expect(consoleLink(page, "Queue")).toHaveAttribute(
+    "aria-current",
+    "page",
+    { timeout: 15000 },
+  );
+  await expect(page).toHaveURL("/issues");
+  await page.setViewportSize(phone);
+  await expect(tabs.getByRole("button")).toHaveText([
+    "Queue",
+    "Find",
+    "Session",
+    "Me",
+  ]);
 });
 
-test("queue and activity match the reference layout and adapt to phone widths", async ({
+test("queue and issue views show timers, handoffs and internal notes on desktop and phones", async ({
   page,
 }, testInfo) => {
   const api = await account("volunteer");
@@ -260,113 +291,157 @@ test("queue and activity match the reference layout and adapt to phone widths", 
     expect(result.error).toBeNull();
   }
   await page.setViewportSize({ width: 1505, height: 1045 });
-  await login(page, "specialist");
-  await page
-    .locator(".issue-card")
-    .filter({ hasText: descriptions[2] })
-    .click();
+  await login(page, "specialist", "organiser-desktop");
+  await expect(issueRow(page, descriptions[2])).toBeVisible();
+  await byId(page, `issue-row-${selected}`).click();
+  const sheet = openDialog(page);
   await expect(
-    page.getByRole("button", { name: "Accept handoff", exact: true }),
+    sheet.getByRole("button", { name: "Accept handoff", exact: true }),
   ).toBeVisible();
-  await expect(page.locator(".internal-event")).toContainText(
-    "Gateway reachable",
-  );
-  await expect(page.getByRole("button", {name: "Send reply", exact: true})).toBeDisabled();
-  await expect(page.locator(".connection-status")).toContainText("Live");
+  await expect(
+    sheet.getByText(
+      "Test volunteer stays responsible until a specialist accepts.",
+    ),
+  ).toBeVisible();
+  await expect(sheet.getByText("after submission")).toBeVisible();
+  await expect(
+    sheet.getByRole("listitem").filter({ hasText: "Gateway reachable" }),
+  ).toContainText("Internal note · staff only");
+  await expect(
+    sheet.getByRole("button", { name: "Send", exact: true }),
+  ).toBeDisabled();
   await page.evaluate(() => document.fonts.ready);
-  const queue = await page.locator(".queue").boundingBox();
-  const detail = await page.locator(".detail").boundingBox();
-  expect(queue!.x + queue!.width).toBeLessThanOrEqual(detail!.x);
+  // The sheet slides in over the right side, so the queue stays in view.
+  await expect
+    .poll(async () => {
+      const box = await sheet.boundingBox();
+      return box ? Math.round(box.x + box.width) : 0;
+    })
+    .toBe(1505);
+  expect((await sheet.boundingBox())!.x).toBeGreaterThan(0);
   await page.screenshot({
-    path: testInfo.outputPath("workspace-desktop.png"),
+    path: testInfo.outputPath("console-sheet-desktop.png"),
     fullPage: true,
   });
+  await sheet.getByRole("button", { name: "Close issue", exact: true }).click();
+  await expect(sheet).toBeHidden();
+  await expect(byId(page, `issue-row-${selected}`)).toBeFocused();
   await page.setViewportSize({ width: 1280, height: 900 });
-  expect(
-    await page.evaluate(
-      () => document.documentElement.scrollWidth <= window.innerWidth,
-    ),
-  ).toBe(true);
+  expect(await fitsWidth(page)).toBe(true);
   await page.screenshot({
-    path: testInfo.outputPath("workspace-laptop.png"),
+    path: testInfo.outputPath("console-queue-laptop.png"),
     fullPage: true,
   });
   for (const width of [390, 320]) {
     await page.setViewportSize({ width, height: 844 });
-    expect(
-      await page.evaluate(
-        () => document.documentElement.scrollWidth <= window.innerWidth,
-      ),
-    ).toBe(true);
-    const row = page
-      .locator(".issue-card")
-      .filter({ hasText: descriptions[2] });
-    await row.focus();
+    await expect(uiRoot(page, "organiser-phone")).toBeVisible();
+    expect(await fitsWidth(page)).toBe(true);
+    const card = byId(page, `issue-card-${selected}`);
+    await card.focus();
     await page.keyboard.press("Enter");
-    await expect(row).toHaveAttribute("aria-pressed", "true");
-    await expect(page.locator("#issue-heading")).toBeFocused();
-    await page.getByRole("button", {name: "Back to queue", exact: true}).click();
-    await expect(page.locator("#workspace-heading")).toBeFocused();
-    await row.click();
+    await expect(
+      page.getByRole("heading", { level: 1, name: /^ISS-\d+, / }),
+    ).toBeFocused();
     await expect(
       page.getByRole("button", { name: "Accept handoff", exact: true }),
     ).toBeVisible();
+    await expect(page.getByText("Internal note · staff only")).toBeVisible();
     await page.screenshot({
-      path: testInfo.outputPath(`workspace-${width}.png`),
+      path: testInfo.outputPath(`organiser-issue-${width}.png`),
       fullPage: true,
     });
+    await page.getByRole("button", { name: "Back", exact: true }).click();
+    await expect(card).toBeFocused();
   }
 });
 
-test("real accounts share the journey, private notes stay private, and phone/refresh/keyboard work", async ({
+test("real accounts share the journey on phones and desktop, internal notes stay private, and refresh keeps timers", async ({
   browser,
 }, testInfo) => {
-  const contestantContext = await browser.newContext();
-  const staffContext = await browser.newContext({
-    viewport: { width: 390, height: 844 },
-  });
-  const specialistContext = await browser.newContext();
+  const contestantContext = await browser.newContext({ viewport: desktop });
+  const staffContext = await browser.newContext({ viewport: phone });
+  const specialistContext = await browser.newContext({ viewport: phone });
+  const juryContext = await browser.newContext({ viewport: desktop });
   const contestant = await contestantContext.newPage();
   const staff = await staffContext.newPage();
   const specialist = await specialistContext.newPage();
+  const jury = await juryContext.newPage();
+  const ids = fixture().accounts;
   try {
-    await login(contestant, "contestant");
-    await login(staff, "volunteer");
-    await login(specialist, "specialist");
+    await login(contestant, "contestant", "contestant");
+    await login(staff, "volunteer", "organiser-phone");
+    await login(specialist, "specialist", "organiser-phone");
     const description = `Browser journey ${crypto.randomUUID()}`;
     await contestant
       .getByRole("button", { name: "Report an issue", exact: true })
+      .first()
       .click();
-    await contestant.getByLabel("What’s happening?").fill(description);
+    await expect(
+      contestant.getByRole("heading", { level: 1, name: "Report an issue" }),
+    ).toBeFocused();
+    await choose(
+      contestant.getByRole("radio", { name: "Network", exact: true }),
+    );
+    await contestant.getByLabel("What is happening?").fill(description);
     await contestant
-      .getByRole("button", { name: "Submit issue", exact: true })
+      .getByRole("button", { name: "Send report", exact: true })
       .click();
     await expect(
-      staff.getByRole("button").filter({ hasText: description }),
-    ).toBeVisible({ timeout: 7000 });
-    await staff.getByRole("button").filter({ hasText: description }).click();
+      contestant.getByRole("region", { name: "Your report" }),
+    ).toContainText(description);
+    const teamClient = await account("contestant");
+    const submitted = await teamClient
+      .from("issues")
+      .select("id")
+      .eq("description", description)
+      .single();
+    expect(submitted.error).toBeNull();
+    const issueId = submitted.data!.id as string;
+    const issueState = async () => {
+      const result = await service()
+        .from("issues")
+        .select("status,owner,first_assigned_at")
+        .eq("id", issueId)
+        .single();
+      if (result.error) throw result.error;
+      return result.data;
+    };
+
+    // Volunteers and specialists in the hall open the report on phones.
+    const staffCard = byId(staff, `issue-card-${issueId}`);
+    await expect(staffCard).toBeVisible({ timeout: 7000 });
+    await staffCard.click();
     await expect(
-      specialist.getByRole("button").filter({ hasText: description }),
-    ).toBeVisible({ timeout: 7000 });
-    await specialist
-      .getByRole("button")
-      .filter({ hasText: description })
-      .click();
-    await staff
-      .getByRole("button", { name: "Claim issue", exact: true })
-      .click();
-    await staff.getByLabel("Audience").selectOption("internal");
-    await staff
-      .getByLabel("Message", { exact: true })
+      staff.getByRole("heading", { level: 1, name: /^ISS-\d+, Aurora$/ }),
+    ).toBeVisible();
+    const specialistCard = byId(specialist, `issue-card-${issueId}`);
+    await expect(specialistCard).toBeVisible({ timeout: 7000 });
+    await specialistCard.click();
+    await staff.getByRole("button", { name: "Claim", exact: true }).click();
+    await expect(staff.getByText("You (Test volunteer)")).toBeVisible();
+    await expect(staff.getByText("after submission")).toBeVisible();
+    const claimed = await issueState();
+    expect(claimed.owner).toBe(ids.volunteer.id);
+    expect(claimed.first_assigned_at).not.toBeNull();
+
+    const staffSheet = openDialog(staff);
+    await staff.getByRole("button", { name: "Reply", exact: true }).click();
+    await choose(
+      staffSheet.getByRole("radio", { name: "Staff only", exact: true }),
+    );
+    await staffSheet
+      .getByLabel("Internal note", { exact: true })
       .fill("Private diagnostic");
-    await staff.getByRole("button", { name: "Send reply" }).click();
+    await staffSheet
+      .getByRole("button", { name: "Add internal note", exact: true })
+      .click();
+    await expect(staffSheet).toBeHidden();
     await expect(
       staff.getByText("Private diagnostic", { exact: true }),
     ).toBeVisible();
     await expect(
       specialist.getByText("Private diagnostic", { exact: true }),
     ).toBeVisible({ timeout: 7000 });
-    const teamClient = await account("contestant");
     const ownIssue = await teamClient
       .from("issues")
       .select("id,revision")
@@ -386,144 +461,238 @@ test("real accounts share the journey, private notes stay private, and phone/ref
       [],
     );
 
-    await staff.getByLabel("Audience").selectOption("public");
-    await staff.getByLabel("Message", { exact: true }).fill("Public update");
-    await staff.getByRole("button", { name: "Send reply" }).click();
+    await staff.getByRole("button", { name: "Reply", exact: true }).click();
+    await choose(
+      staffSheet.getByRole("radio", { name: "To the team", exact: true }),
+    );
+    await staffSheet
+      .getByLabel("Message", { exact: true })
+      .fill("Public update");
+    await staffSheet
+      .getByRole("button", { name: "Send to team", exact: true })
+      .click();
+    await expect(staffSheet).toBeHidden();
     await expect(
       contestant.getByText("Public update", { exact: true }),
     ).toBeVisible({ timeout: 7000 });
     await expect(
       contestant.getByText("Private diagnostic", { exact: true }),
     ).toHaveCount(0);
-    const queue = await contestant.locator(".queue").boundingBox();
-    const detail = await contestant.locator(".detail").boundingBox();
-    expect(queue).not.toBeNull();
-    expect(detail).not.toBeNull();
-    expect(queue!.x + queue!.width).toBeLessThanOrEqual(detail!.x);
+    const reports = await contestant
+      .getByRole("complementary", { name: "Your reports" })
+      .boundingBox();
+    const details = await contestant
+      .getByRole("region", { name: "Report details" })
+      .boundingBox();
+    expect(reports).not.toBeNull();
+    expect(details).not.toBeNull();
+    expect(reports!.x + reports!.width).toBeLessThanOrEqual(details!.x);
+    // Enter sends a contestant reply. Shift+Enter would add a new line.
+    const reply = contestant.getByLabel("Reply to staff", { exact: true });
+    await reply.fill("The network light is off");
+    await reply.press("Enter");
+    await expect(reply).toHaveValue("");
+    await expect(
+      staff.getByText("The network light is off", { exact: true }),
+    ).toBeVisible({ timeout: 7000 });
     await staff.screenshot({
       path: testInfo.outputPath("support-390.png"),
       fullPage: true,
     });
-    await staff.getByRole("button", { name: "Escalate to specialist" }).click();
-    await expect(
-      staff.getByText(/Test volunteer remains responsible/),
-    ).toBeVisible();
-    await specialist
-      .getByRole("button")
-      .filter({ hasText: description })
+
+    await staff
+      .getByRole("button", { name: "More actions", exact: true })
       .click();
-    await specialist.getByRole("button", { name: "Accept handoff" }).click();
+    await staffSheet
+      .getByRole("button", { name: /^Escalate to a specialist/ })
+      .click();
+    await staffSheet
+      .getByRole("button", { name: "Escalate to specialist", exact: true })
+      .click();
+    await expect(staffSheet).toBeHidden();
+    await expect(
+      staff.getByText(
+        "Test volunteer stays responsible until a specialist accepts.",
+      ),
+    ).toBeVisible();
+    await expect(
+      contestant.getByText(
+        "Test volunteer stays responsible until a specialist takes over.",
+      ),
+    ).toBeVisible({ timeout: 7000 });
+    // The owner stays responsible during the handoff.
+    expect(await issueState()).toEqual({
+      status: "escalated",
+      owner: ids.volunteer.id,
+      first_assigned_at: claimed.first_assigned_at,
+    });
     await specialist
-      .getByLabel("Resolution summary · visible to the team")
-      .selectOption("Service restored");
+      .getByRole("button", { name: "Accept handoff", exact: true })
+      .click();
+    await expect(specialist.getByText("You (Test specialist)")).toBeVisible();
+    // Acceptance changes the owner, not the first assignment.
+    expect(await issueState()).toEqual({
+      status: "claimed",
+      owner: ids.specialist.id,
+      first_assigned_at: claimed.first_assigned_at,
+    });
+    const specialistSheet = openDialog(specialist);
     await specialist
+      .getByRole("button", { name: "Resolve", exact: true })
+      .click();
+    await specialistSheet
+      .getByRole("radio", { name: "Service restored", exact: true })
+      .check();
+    await specialistSheet
       .getByRole("button", { name: "Resolve issue", exact: true })
       .click();
+    await expect(specialistSheet).toBeHidden();
     await expect(
       contestant.getByText("Service restored", { exact: true }),
     ).toBeVisible({ timeout: 7000 });
-    await specialist
-      .getByRole("button", { name: "Sign out", exact: true })
-      .click();
-    const details = fixture().accounts.jury;
-    await specialist
-      .getByLabel("Username", { exact: true })
-      .fill(details.username);
-    await specialist
-      .getByLabel("Password", { exact: true })
-      .fill(details.password);
-    await specialist
-      .getByRole("button", { name: "Sign in", exact: true })
-      .click();
+    // The stopped timer comes from persisted timestamps, so a refresh
+    // shows the same value.
+    const stopped = contestant.getByText(/^\d{2,}:\d{2}, stopped$/);
+    const before = await stopped.textContent();
+    expect(before).not.toBe("00:00, stopped");
+    await contestant.reload();
+    await expect(uiRoot(contestant, "contestant")).toBeVisible({
+      timeout: 15000,
+    });
+    await openReport(contestant, description);
+    await expect(stopped).toHaveText(before!);
+
+    // The jury decides on the desktop console.
+    await login(jury, "jury", "organiser-desktop");
     await expect(
-      specialist.getByRole("heading", { name: "Award review" }),
+      jury.getByRole("heading", { level: 1, name: "Award review" }),
     ).toBeVisible();
-    await specialist
-      .getByRole("combobox", { name: "Award minutes", exact: true })
-      .selectOption("0");
-    await specialist
+    const decision = jury
+      .getByRole("listitem")
+      .filter({ has: byId(jury, `award-issue-${issueId}`) });
+    await expect(decision).toContainText("Resolution: Service restored");
+    await expect(
+      decision.getByRole("button", { name: /^(Claim|Resolve|Reopen)/ }),
+    ).toHaveCount(0);
+    await choose(decision.getByRole("radio", { name: "0 min", exact: true }));
+    await decision
       .getByLabel("Public award explanation")
       .fill("No extra time needed");
-    await specialist.getByRole("button", { name: "Record award" }).click();
+    await decision
+      .getByRole("button", { name: "Record 0 minutes", exact: true })
+      .click();
     await expect(
-      contestant.getByText("0 minutes awarded", { exact: true }),
+      contestant.getByRole("heading", { name: /^Time award ?, 0 minutes$/ }),
     ).toBeVisible({ timeout: 7000 });
-    await contestant.getByLabel("Public reopening reason").fill("Still broken");
+    await expect(
+      contestant.getByText("Not yet applied to your contest time"),
+    ).toBeVisible();
+    await jury.screenshot({
+      path: testInfo.outputPath("award-review-desktop.png"),
+      fullPage: true,
+    });
+
+    await contestant
+      .getByRole("button", { name: "The problem is back? Reopen this issue" })
+      .click();
+    await contestant.getByLabel("What is still wrong?").fill("Still broken");
     await contestant
       .getByRole("button", { name: "Reopen issue", exact: true })
       .click();
+    await expect(staff.getByText(/^Previous resolution ·/)).toBeVisible({
+      timeout: 7000,
+    });
+    // Reopening keeps the prior owner and the pending award.
+    expect((await issueState()).owner).toBe(ids.specialist.id);
     await expect(
-      staff.getByRole("heading", { name: "Previous resolution", exact: true }),
-    ).toBeVisible({ timeout: 7000 });
-    await staff.getByRole("checkbox").check();
+      staff.getByText(
+        "This decision relates to an earlier resolution. One award is allowed per issue.",
+      ),
+    ).toBeVisible();
     await staff
-      .getByRole("button", { name: "Confirm applied externally" })
+      .getByRole("button", { name: "Confirm applied", exact: true })
       .click();
+    await staffSheet
+      .getByRole("checkbox", { name: /I confirm this award was applied/ })
+      .check();
+    await staffSheet
+      .getByRole("button", { name: "Confirm applied externally", exact: true })
+      .click();
+    await expect(staffSheet).toBeHidden();
     await expect(
-      contestant.getByText("Applied externally", { exact: true }),
+      contestant.getByText(/^Applied to your contest time ·/),
     ).toBeVisible({ timeout: 7000 });
     await contestant.reload();
+    await expect(uiRoot(contestant, "contestant")).toBeVisible({
+      timeout: 15000,
+    });
+    await openReport(contestant, description);
     await expect(
-      contestant.getByText("0 minutes awarded", { exact: true }),
+      contestant.getByRole("heading", { name: /^Time award ?, 0 minutes$/ }),
     ).toBeVisible();
     await expect(
-      contestant.getByText("Previous resolution", { exact: true }),
+      contestant.getByRole("heading", { name: "Earlier resolutions" }),
     ).toBeVisible();
+    await expect(
+      contestant.getByText(
+        "The jury decided this award for an earlier resolution.",
+      ),
+    ).toBeVisible();
+
     await specialist
-      .getByRole("button", { name: "Sign out", exact: true })
+      .getByRole("button", { name: "Resolve", exact: true })
       .click();
-    await login(specialist, "specialist");
-    await specialist
-      .getByRole("button")
-      .filter({ hasText: description })
-      .click();
-    await specialist
-      .getByLabel("Resolution summary · visible to the team")
-      .selectOption("Device issue resolved");
-    await specialist
+    await specialistSheet
+      .getByRole("radio", { name: "Device issue resolved", exact: true })
+      .check();
+    await specialistSheet
       .getByRole("button", { name: "Resolve issue", exact: true })
       .click();
-    await staff
+    await expect(specialistSheet).toBeHidden();
+    await staff.getByRole("button", { name: "Reopen", exact: true }).click();
+    await staffSheet
       .getByLabel("Public reopening reason")
       .fill("Helper found another failure");
-    await staff
+    await staffSheet
       .getByRole("button", { name: "Reopen issue", exact: true })
       .click();
-    await expect(
-      specialist.getByRole("heading", {
-        name: "Previous resolution",
-        exact: true,
-      }),
-    ).toHaveCount(2, { timeout: 7000 });
+    await expect(staffSheet).toBeHidden();
+    await expect(specialist.getByText(/^Previous resolution ·/)).toHaveCount(
+      2,
+      { timeout: 7000 },
+    );
     await specialist
-      .getByLabel("Resolution summary · visible to the team")
-      .selectOption("Problem statement clarified");
-    await specialist
+      .getByRole("button", { name: "Resolve", exact: true })
+      .click();
+    await specialistSheet
+      .getByRole("radio", { name: "Problem statement clarified", exact: true })
+      .check();
+    await specialistSheet
       .getByRole("button", { name: "Resolve issue", exact: true })
       .click();
     await expect(
       contestant.getByText("Problem statement clarified", { exact: true }),
     ).toBeVisible({ timeout: 7000 });
     await contestant.reload();
+    await expect(uiRoot(contestant, "contestant")).toBeVisible({
+      timeout: 15000,
+    });
+    await openReport(contestant, description);
     await expect(
-      contestant.getByRole("heading", {
-        name: "Previous resolution",
-        exact: true,
-      }),
+      contestant
+        .getByRole("region", { name: "Earlier resolutions" })
+        .getByRole("listitem"),
     ).toHaveCount(2);
     await expect(
-      contestant.getByText("Applied externally", { exact: true }),
+      contestant.getByText(/^Applied to your contest time ·/),
     ).toBeVisible();
+
     await staff.setViewportSize({ width: 320, height: 740 });
-    expect(
-      await staff.evaluate(
-        () => document.documentElement.scrollWidth <= window.innerWidth,
-      ),
-    ).toBe(true);
+    expect(await fitsWidth(staff)).toBe(true);
     await staff.goto("/");
     await expect(
-      staff.getByRole("heading", { name: "Issue Queue" }),
-    ).toBeFocused();
+      staff.getByRole("heading", { level: 1, name: "Queue", exact: true }),
+    ).toBeFocused({ timeout: 15000 });
     const skipLink = staff.getByRole("link", { name: "Skip to main content" });
     // Route navigation focuses the heading. Reach the skip link by keyboard.
     for (let step = 0; step < 8; step++) {
@@ -550,6 +719,7 @@ test("real accounts share the journey, private notes stay private, and phone/ref
       ["contestant", contestant],
       ["staff", staff],
       ["specialist", specialist],
+      ["jury", jury],
     ] as const) {
       console.log(
         name,
@@ -562,6 +732,7 @@ test("real accounts share the journey, private notes stay private, and phone/ref
     await contestantContext.close();
     await staffContext.close();
     await specialistContext.close();
+    await juryContext.close();
   }
 });
 
@@ -733,12 +904,14 @@ test("admin intake and current membership revocation apply to existing sessions"
   ).toContain("last admin");
 });
 
-test("admin UI assigns combined roles; password change, refresh and logout work", async ({
+test("admin assigns combined roles on the desktop console; password change, refresh and sign-out work on a phone", async ({
   page,
 }, testInfo) => {
-  await login(page, "admin");
+  await page.setViewportSize(desktop);
+  await login(page, "admin", "organiser-desktop");
+  await consoleLink(page, "Accounts").click();
   await expect(
-    page.getByRole("heading", { name: "Session administration" }),
+    page.getByRole("heading", { level: 1, name: "Accounts", exact: true }),
   ).toBeVisible();
   await page
     .getByText("Assign an existing account by ID", { exact: true })
@@ -747,24 +920,25 @@ test("admin UI assigns combined roles; password change, refresh and logout work"
   const form = page
     .locator("form")
     .filter({ has: page.getByLabel("Auth user UUID") });
-  for (const role of ["volunteer", "specialist", "jury"])
-    await form.getByRole("checkbox", { name: role, exact: true }).check();
+  for (const role of ["Volunteer", "Specialist", "Jury"])
+    await choose(form.getByRole("checkbox", { name: role, exact: true }));
   await form
     .getByRole("button", { name: "Assign membership", exact: true })
     .click();
-  await expect(
-    page.locator("summary").filter({ hasText: "Test combined" }),
-  ).toBeVisible();
+  const combined = page.getByRole("row").filter({ hasText: "Test combined" });
+  for (const role of ["Volunteer", "Specialist", "Jury"])
+    await expect(combined.getByText(role, { exact: true })).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath("admin-desktop.png") });
-  await page.getByRole("button", { name: "Sign out", exact: true }).click();
-  await login(page, "volunteer");
-  await page
-    .getByRole("navigation", { name: "Workspace navigation" })
-    .getByRole("link", { name: "My account", exact: true })
-    .click();
+  await signOut(page);
+  await page.setViewportSize(phone);
+  await login(page, "volunteer", "organiser-phone");
+  await phoneTab(page, "Me");
   await page
     .getByRole("button", { name: "Change password", exact: true })
     .click();
+  await expect(
+    page.getByRole("heading", { name: "Change your password" }),
+  ).toBeVisible();
   const password = crypto.randomUUID() + "A9!";
   await page
     .getByLabel("Current password", { exact: true })
@@ -774,59 +948,55 @@ test("admin UI assigns combined roles; password change, refresh and logout work"
   await page
     .getByRole("button", { name: "Save password", exact: true })
     .click();
-  await expect(
-    page.getByRole("heading", { name: "My account", exact: true }),
-  ).toBeVisible();
+  const me = page.getByRole("heading", {
+    level: 1,
+    name: "Me",
+    exact: true,
+  });
+  await expect(me).toBeVisible({ timeout: 15000 });
   await expect(page).toHaveURL("/account");
   // Later cloud tests sign in through the same UUID-scoped fixture accounts.
   const state = fixture();
   state.accounts.volunteer.password = password;
   save(state);
   await page.reload();
-  await expect(
-    page.getByRole("heading", { name: "My account", exact: true }),
-  ).toBeVisible();
+  await expect(me).toBeVisible({ timeout: 15000 });
   await expect(page).toHaveURL("/account");
-  await page
-    .getByRole("navigation", { name: "Workspace navigation" })
-    .getByRole("link", { name: "Issues", exact: true })
-    .click();
-  await expect(
-    page.getByRole("heading", { name: "Issue Queue" }),
-  ).toBeVisible();
-  await page.getByRole("button", { name: "Sign out", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Issue Queue" })).toHaveCount(
-    0,
-  );
-  await page
-    .getByLabel("Username", { exact: true })
-    .fill(fixture().accounts.volunteer.username);
-  await page.getByLabel("Password", { exact: true }).fill(password);
-  await page.getByRole("button", { name: "Sign in", exact: true }).click();
-  await expect(
-    page.getByRole("heading", { name: "Issue Queue" }),
-  ).toBeVisible();
+  await phoneTab(page, "Queue");
+  await expect(page).toHaveURL("/issues");
+  const queue = page.getByRole("heading", {
+    level: 1,
+    name: "Queue",
+    exact: true,
+  });
+  await expect(queue).toBeVisible();
+  await signOut(page);
+  await expect(queue).toHaveCount(0);
+  await submitSignIn(page, fixture().accounts.volunteer.username, password);
+  await expect(queue).toBeVisible({ timeout: 15000 });
 });
 
 test("organizer creates username accounts, mandatory changes and reset invalidate old access", async ({
   browser,
 }, testInfo) => {
-  const adminContext = await browser.newContext();
-  const teamContext = await browser.newContext();
+  const adminContext = await browser.newContext({ viewport: desktop });
+  const teamContext = await browser.newContext({ viewport: desktop });
   const page = await adminContext.newPage();
   const team = await teamContext.newPage();
   try {
-    await login(page, "admin");
-    const form = page.locator("form").filter({
-      has: page.getByRole("button", { name: "Create account", exact: true }),
-    });
+    await login(page, "admin", "organiser-desktop");
+    await consoleLink(page, "Accounts").click();
+    await page
+      .getByRole("button", { name: "Create account", exact: true })
+      .click();
+    const form = page.getByRole("dialog", { name: "Create account" });
     const username = `new-${crypto.randomUUID().slice(0, 12)}`;
+    await choose(form.getByRole("radio", { name: /^Team/ }));
+    await form.getByLabel("Contestant team").selectOption(fixture().teams[0]);
     await form
       .getByLabel("Display name", { exact: true })
       .fill("Provisioned team");
     await form.getByLabel("Username", { exact: true }).fill(username);
-    await form.getByLabel("Contestant team").selectOption(fixture().teams[0]);
     await form
       .getByRole("button", { name: "Create account", exact: true })
       .click();
@@ -865,11 +1035,7 @@ test("organizer creates username accounts, mandatory changes and reset invalidat
     expect((await api.from("sessions").select("*")).data).toEqual([]);
     expect((await api.rpc("complete_password_change")).error).not.toBeNull();
     await team.goto("/");
-    await team
-      .getByLabel("Username", { exact: true })
-      .fill(username.toUpperCase());
-    await team.getByLabel("Password", { exact: true }).fill(temporary);
-    await team.getByRole("button", { name: "Sign in", exact: true }).click();
+    await submitSignIn(team, username.toUpperCase(), temporary);
     await expect(
       team.getByRole("heading", { name: "Change your temporary password" }),
     ).toBeVisible();
@@ -887,9 +1053,7 @@ test("organizer creates username accounts, mandatory changes and reset invalidat
     await team
       .getByRole("button", { name: "Save password", exact: true })
       .click();
-    await expect(
-      team.getByRole("heading", { name: "My team’s issues" }),
-    ).toBeVisible();
+    await expect(uiRoot(team, "contestant")).toBeVisible({ timeout: 15000 });
     const old = createClient(url, anonKey, {
       auth: { persistSession: false, autoRefreshToken: false },
     });
@@ -898,13 +1062,18 @@ test("organizer creates username accounts, mandatory changes and reset invalidat
       password: personal,
     });
     expect(oldLogin.error).toBeNull();
-    await page.getByRole("button", { name: "Dismiss credentials" }).click();
-    const member = page.locator("details").filter({
-      has: page.locator("summary").filter({ hasText: "Provisioned team" }),
-    });
-    await member.locator("summary").click();
-    page.once("dialog", (dialog) => dialog.accept());
-    await member
+    await credentials.getByRole("button", { name: "Done", exact: true }).click();
+    await expect(credentials).toBeHidden();
+    await page
+      .getByRole("button", { name: "Manage Provisioned team", exact: true })
+      .click();
+    await page
+      .getByRole("dialog", { name: "Provisioned team" })
+      .getByRole("button", { name: "Reset password", exact: true })
+      .click();
+    // A confirmation dialog replaces the browser confirm prompt.
+    await page
+      .getByRole("dialog", { name: "Reset Provisioned team's password?" })
       .getByRole("button", { name: "Reset password", exact: true })
       .click();
     await expect(credentials).toBeVisible();
@@ -927,9 +1096,7 @@ test("organizer creates username accounts, mandatory changes and reset invalidat
     ) {
       await team.getByRole("button", { name: "Sign out", exact: true }).click();
     }
-    await team.getByLabel("Username", { exact: true }).fill(username);
-    await team.getByLabel("Password", { exact: true }).fill(replacement);
-    await team.getByRole("button", { name: "Sign in", exact: true }).click();
+    await submitSignIn(team, username, replacement);
     await expect(
       team.getByRole("heading", { name: "Change your temporary password" }),
     ).toBeVisible();
@@ -942,30 +1109,26 @@ test("organizer creates username accounts, mandatory changes and reset invalidat
     await team
       .getByRole("button", { name: "Save password", exact: true })
       .click();
-    await expect(
-      team.getByRole("heading", { name: "My team’s issues" }),
-    ).toBeVisible();
-    await page.getByRole("button", { name: "Dismiss credentials" }).click();
+    await expect(uiRoot(team, "contestant")).toBeVisible({ timeout: 15000 });
+    await credentials.getByRole("button", { name: "Done", exact: true }).click();
+    await expect(credentials).toBeHidden();
     await page.screenshot({
       path: testInfo.outputPath("admin-redesign-desktop.png"),
       fullPage: true,
     });
-    await page.setViewportSize({ width: 390, height: 844 });
-    expect(
-      await page.evaluate(
-        () => document.documentElement.scrollWidth <= window.innerWidth,
-      ),
-    ).toBe(true);
+    await page.setViewportSize(phone);
+    await expect(uiRoot(page, "organiser-phone")).toBeVisible();
+    await phoneTab(page, "Session");
+    await expect(
+      page.getByRole("button").filter({ hasText: "Provisioned team" }),
+    ).toBeVisible();
+    expect(await fitsWidth(page)).toBe(true);
     await page.screenshot({
       path: testInfo.outputPath("admin-redesign-phone.png"),
       fullPage: true,
     });
     await page.setViewportSize({ width: 320, height: 740 });
-    expect(
-      await page.evaluate(
-        () => document.documentElement.scrollWidth <= window.innerWidth,
-      ),
-    ).toBe(true);
+    expect(await fitsWidth(page)).toBe(true);
   } finally {
     await adminContext.close();
     await teamContext.close();
@@ -983,12 +1146,15 @@ test("existing email accounts adopt a username without losing identity or passwo
   state.accounts.legacy = {id,email,password,username:""}; save(state);
   const assigned = await service().from("memberships").insert({session_id:state.sessions[0],user_id:id,roles:["volunteer"]});
   expect(assigned.error).toBeNull();
-  await login(page,"admin");
-  const member = page.locator("details").filter({has:page.locator("summary").filter({hasText:"Legacy staff"})});
-  await member.locator("summary").click();
+  await page.setViewportSize(desktop);
+  await login(page,"admin","organiser-desktop");
+  await consoleLink(page,"Accounts").click();
+  await page.getByRole("button",{name:"Manage Legacy staff",exact:true}).click();
+  const member = page.getByRole("dialog",{name:"Legacy staff"});
   await member.getByLabel("Assign username",{exact:true}).fill(username);
   await member.getByRole("button",{name:"Set username",exact:true}).click();
-  await expect(member.getByText(username,{exact:true})).toBeVisible();
+  await expect(member).toBeHidden();
+  await expect(page.getByRole("row").filter({hasText:"Legacy staff"}).getByText(username,{exact:true})).toBeVisible();
   const updated = await service().from("people").select("id,username").eq("id",id).single();
   expect(updated.data).toEqual({id,username});
   const api = createClient(url,anonKey,{auth:{persistSession:false,autoRefreshToken:false}});
@@ -1069,40 +1235,64 @@ test("archived records allow queue navigation and disable writes", async ({
     .eq("id", event)
     .single();
   if (readError) throw readError;
+  const { data: bypass, error: issueError } = await admin
+    .from("issues")
+    .select("id")
+    .eq("session_id", fixture().sessions[0])
+    .eq("description", "Staff bypass intake")
+    .single();
+  if (issueError) throw issueError;
   try {
     const { error } = await admin
       .from("events")
       .update({ archived: true })
       .eq("id", event);
     if (error) throw error;
-    await login(page, "specialist");
+    await page.setViewportSize(desktop);
+    await login(page, "specialist", "organiser-desktop");
     await expect(
       page.getByText("This event is archived. Records are read only."),
     ).toBeVisible();
-    const filter = page.getByRole("combobox", {
-      name: "Status",
-      exact: true,
-    });
-    await expect(filter).toBeEnabled();
-    await filter.selectOption("open");
-    await page
-      .getByRole("button")
-      .filter({ hasText: "Staff bypass intake" })
-      .click();
     await expect(
-      page.getByRole("heading", { name: "Staff bypass intake", exact: true }),
+      page.getByRole("button", { name: "Report for a team", exact: true }),
+    ).toBeDisabled();
+    const open = page
+      .getByRole("group", { name: "Filter by status" })
+      .getByRole("button", { name: /^Open \d+$/ });
+    await expect(open).toBeEnabled();
+    await open.click();
+    await expect(open).toHaveAttribute("aria-pressed", "true");
+    await byId(page, `issue-row-${bypass.id}`).click();
+    const sheet = openDialog(page);
+    await expect(
+      sheet.getByRole("heading", { name: /Staff bypass intake$/ }),
     ).toBeVisible();
     await expect(
-      page.getByRole("button", { name: "Claim issue", exact: true }),
-    ).toBeDisabled();
+      sheet.getByText("This event is archived. Records are read only."),
+    ).toBeVisible();
     await expect(
-      page.getByRole("button", { name: "Report for team", exact: true }),
-    ).toBeDisabled();
-    await page.setViewportSize({width: 320, height: 740});
-    const back = page.getByRole("button", {name: "Back to queue", exact: true});
+      sheet.getByRole("button", {
+        name: /^(Claim|Accept handoff|Resolve|Reopen|Add image)$/,
+      }),
+    ).toHaveCount(0);
+    await expect(sheet.getByRole("textbox")).toHaveCount(0);
+    // The phone app keeps the open issue from the shared workflow state.
+    await page.setViewportSize({ width: 320, height: 740 });
+    await expect(uiRoot(page, "organiser-phone")).toBeVisible();
+    await expect(
+      page.getByText("This event is archived.", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: /^(Claim|Reply|More actions)$/ }),
+    ).toHaveCount(0);
+    const back = page.getByRole("button", { name: "Back", exact: true });
     await expect(back).toBeEnabled();
     await back.click();
-    await expect(page.locator("#workspace-heading")).toBeFocused();
+    await expect(byId(page, `issue-card-${bypass.id}`)).toBeFocused();
+    await expect(
+      page.getByRole("button", { name: "Report", exact: true }),
+    ).toBeDisabled();
+    await expect(liveBadge(page)).toBeVisible();
   } finally {
     // Do not leave later tests with a read-only fixture, even on assertion failure.
     const { error } = await admin

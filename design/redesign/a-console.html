@@ -1,0 +1,474 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Minsky · A · Console (shadcn/ui)</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet" />
+<script>
+tailwind.config = {
+  darkMode: "class",
+  theme: { extend: {
+    fontFamily: { sans: ["Inter", "sans-serif"], mono: ["JetBrains Mono", "monospace"] },
+    colors: {
+      border: "hsl(var(--border))", input: "hsl(var(--input))", ring: "hsl(var(--ring))",
+      background: "hsl(var(--background))", foreground: "hsl(var(--foreground))",
+      primary: { DEFAULT: "hsl(var(--primary))", foreground: "hsl(var(--primary-foreground))" },
+      muted: { DEFAULT: "hsl(var(--muted))", foreground: "hsl(var(--muted-foreground))" },
+      accent: { DEFAULT: "hsl(var(--accent))", foreground: "hsl(var(--accent-foreground))" },
+      card: "hsl(var(--card))", sidebar: "hsl(var(--sidebar))",
+    },
+  } },
+};
+</script>
+<style>
+  :root { --background: 0 0% 100%; --foreground: 240 10% 3.9%; --card: 0 0% 100%; --sidebar: 0 0% 98%; --muted: 240 4.8% 95.9%; --muted-foreground: 240 3.8% 46.1%; --accent: 240 4.8% 95.9%; --accent-foreground: 240 5.9% 10%; --primary: 240 5.9% 10%; --primary-foreground: 0 0% 98%; --border: 240 5.9% 90%; --input: 240 5.9% 90%; --ring: 240 5% 64.9%; }
+  .dark { --background: 240 10% 3.9%; --foreground: 0 0% 98%; --card: 240 10% 5.5%; --sidebar: 240 6% 7%; --muted: 240 3.7% 15.9%; --muted-foreground: 240 5% 64.9%; --accent: 240 3.7% 15.9%; --accent-foreground: 0 0% 98%; --primary: 0 0% 98%; --primary-foreground: 240 5.9% 10%; --border: 240 3.7% 15.9%; --input: 240 3.7% 15.9%; --ring: 240 4.9% 83.9%; }
+  body { font-feature-settings: "cv11", "ss01"; }
+  [data-lucide] { width: 16px; height: 16px; stroke-width: 2; }
+  .btn { display:inline-flex; align-items:center; gap:.5rem; height:2.25rem; padding:0 .875rem; border-radius:.5rem; font-size:.875rem; font-weight:500; transition: background .15s, opacity .15s; white-space:nowrap; }
+  .btn-primary { background:hsl(var(--primary)); color:hsl(var(--primary-foreground)); } .btn-primary:hover { opacity:.9; }
+  .btn-outline { border:1px solid hsl(var(--border)); background:hsl(var(--background)); } .btn-outline:hover, .btn-ghost:hover { background:hsl(var(--accent)); }
+  .btn-sm { height:2rem; padding:0 .625rem; font-size:.8125rem; }
+  .badge { display:inline-flex; align-items:center; gap:.3rem; border-radius:9999px; padding:.125rem .55rem; font-size:.75rem; font-weight:500; border:1px solid hsl(var(--border)); white-space:nowrap; }
+  .s-open { color:#60a5fa; } .s-claimed { color:#a78bfa; } .s-escalated { color:#fbbf24; } .s-resolved { color:#34d399; }
+  html:not(.dark) .s-open { color:#2563eb; } html:not(.dark) .s-claimed { color:#7c3aed; } html:not(.dark) .s-escalated { color:#b45309; } html:not(.dark) .s-resolved { color:#047857; }
+  .age-fresh { color:hsl(var(--muted-foreground)); } .age-warn { color:#f59e0b; } .age-crit { color:#f43f5e; } .age-done { color:hsl(var(--muted-foreground)); opacity:.7; }
+  .tabs-trigger[aria-selected="true"] { background:hsl(var(--background)); color:hsl(var(--foreground)); box-shadow:0 1px 2px rgb(0 0 0 / .2); }
+  .row:hover { background:hsl(var(--muted) / .5); } .row.sel { background:hsl(var(--muted)); }
+  .sheet { transition: transform .25s cubic-bezier(.32,.72,0,1); }
+  .kbd { font-family: "JetBrains Mono", monospace; font-size:.6875rem; border:1px solid hsl(var(--border)); border-radius:.25rem; padding:0 .3rem; color:hsl(var(--muted-foreground)); }
+  .internal { background: repeating-linear-gradient(135deg, rgb(245 158 11 / .07) 0 8px, transparent 8px 16px); border-color: rgb(245 158 11 / .35) !important; }
+  input[type=range] { accent-color: hsl(var(--primary)); }
+  .switch { width:2.25rem; height:1.25rem; border-radius:9999px; background:hsl(var(--input)); position:relative; transition:background .2s; }
+  .switch::after { content:""; position:absolute; top:2px; left:2px; width:1rem; height:1rem; border-radius:9999px; background:hsl(var(--background)); transition: transform .2s; }
+  .switch[aria-checked="true"] { background:#10b981; } .switch[aria-checked="true"]::after { transform: translateX(1rem); }
+  ::-webkit-scrollbar { width: 10px; } ::-webkit-scrollbar-thumb { background: hsl(var(--border)); border-radius: 9999px; border: 3px solid transparent; background-clip: padding-box; }
+</style>
+</head>
+<body class="bg-background text-foreground font-sans antialiased">
+<div class="flex h-screen overflow-hidden">
+  <!-- Sidebar -->
+  <aside class="hidden md:flex w-64 shrink-0 flex-col border-r border-border bg-sidebar">
+    <div class="p-3">
+      <button class="w-full flex items-center gap-3 rounded-lg p-2 hover:bg-accent text-left" id="session-switch">
+        <div class="size-8 rounded-lg bg-primary text-primary-foreground grid place-items-center font-bold">M</div>
+        <div class="min-w-0 flex-1"><div class="text-sm font-semibold truncate">Northern Informatics Open</div><div class="text-xs text-muted-foreground truncate" id="session-name"></div></div>
+        <i data-lucide="chevrons-up-down" class="text-muted-foreground"></i>
+      </button>
+    </div>
+    <nav class="px-3 flex-1 overflow-y-auto" id="nav"></nav>
+    <div class="p-3 border-t border-border">
+      <div class="rounded-lg border border-border p-3 mb-3 text-xs">
+        <div class="flex items-center justify-between"><span class="font-medium">Contestant intake</span><button class="switch" role="switch" aria-checked="true" id="intake-switch" aria-label="Contestant intake"></button></div>
+        <p class="text-muted-foreground mt-1" id="intake-text">Teams can submit new reports.</p>
+      </div>
+      <div class="flex items-center gap-3 rounded-lg p-2 hover:bg-accent">
+        <div class="size-8 rounded-full bg-muted grid place-items-center text-xs font-semibold" id="me-avatar"></div>
+        <div class="min-w-0 flex-1"><div class="text-sm font-medium truncate" id="me-name"></div><div class="text-xs text-muted-foreground truncate" id="me-roles"></div></div>
+        <i data-lucide="ellipsis-vertical" class="text-muted-foreground"></i>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <div class="flex-1 flex flex-col min-w-0">
+    <header class="h-14 shrink-0 border-b border-border flex items-center gap-3 px-4">
+      <i data-lucide="panel-left" class="text-muted-foreground"></i>
+      <div class="h-4 w-px bg-border"></div>
+      <nav class="text-sm text-muted-foreground flex items-center gap-1.5" id="crumbs"></nav>
+      <div class="flex-1"></div>
+      <button class="btn btn-outline btn-sm w-64 justify-start text-muted-foreground" id="open-cmd"><i data-lucide="search"></i>Search teams, issues…<span class="ml-auto kbd">⌘K</span></button>
+      <span class="badge"><span class="relative flex size-2"><span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60"></span><span class="relative inline-flex size-2 rounded-full bg-emerald-500"></span></span>Live</span>
+      <div class="flex items-center rounded-lg bg-muted p-1 text-xs" id="persona" title="Mockup only: preview another role"></div>
+      <button class="btn btn-ghost btn-sm" id="theme" aria-label="Toggle theme"><i data-lucide="sun-moon"></i></button>
+    </header>
+    <main class="flex-1 overflow-y-auto" id="page"></main>
+  </div>
+</div>
+
+<!-- Issue sheet -->
+<div id="overlay" class="fixed inset-0 bg-black/50 hidden z-40"></div>
+<aside id="sheet" class="sheet fixed right-0 top-0 h-full w-full max-w-[640px] bg-background border-l border-border z-50 translate-x-full flex flex-col"></aside>
+
+<!-- Command palette -->
+<div id="cmd" class="fixed inset-0 z-[60] hidden">
+  <div class="absolute inset-0 bg-black/50" data-close></div>
+  <div class="relative mx-auto mt-[12vh] w-full max-w-xl rounded-xl border border-border bg-background shadow-2xl overflow-hidden">
+    <div class="flex items-center gap-2 px-3 border-b border-border"><i data-lucide="search" class="text-muted-foreground"></i><input id="cmd-input" class="h-12 flex-1 bg-transparent outline-none text-sm" placeholder="Type a team, table, issue number or action…" /><span class="kbd">esc</span></div>
+    <div id="cmd-list" class="max-h-[360px] overflow-y-auto p-2 text-sm"></div>
+  </div>
+</div>
+
+<!-- Dialog -->
+<div id="dialog" class="fixed inset-0 z-[70] hidden grid place-items-center">
+  <div class="absolute inset-0 bg-black/60" data-close></div>
+  <div class="relative w-full max-w-md rounded-xl border border-border bg-background p-6 shadow-2xl" id="dialog-body"></div>
+</div>
+
+<script>
+// Fictional sample data shared by every mockup. Times are relative to page load.
+const NOW0 = Date.now();
+const ago = (m) => new Date(NOW0 - m * 60000).toISOString();
+const DATA = {
+  event: { name: "Northern Informatics Open 2026", archived: false },
+  sessions: ["Finals · Contest day", "Finals · Practice round"],
+  session: { name: "Finals · Contest day", intake_open: true, categories: ["Workstation", "Network", "Judge system", "Problem statement", "Printing", "Other"], max_image_mb: 8, max_images: 6, max_total_mb: 30 },
+  me: { name: "Priya Raman", initials: "PR", roles: ["volunteer", "specialist"], admin: true },
+  teams: [
+    { id: "t1", name: "Team Aurora", location: "Hall A · Table 4", x: 1, y: 1 },
+    { id: "t2", name: "Byte Bandits", location: "Hall A · Table 7", x: 4, y: 1 },
+    { id: "t3", name: "Null Pointers", location: "Hall A · Table 12", x: 3, y: 3 },
+    { id: "t4", name: "Segfault Society", location: "Hall B · Table 2", x: 7, y: 1 },
+    { id: "t5", name: "Off By One", location: "Hall B · Table 9", x: 8, y: 3 },
+    { id: "t6", name: "Café Lambda", location: "Hall B · Table 15", x: 6, y: 4 },
+    { id: "t7", name: "Greedy Goblins", location: "Hall A · Table 18", x: 1, y: 4 },
+    { id: "t8", name: "Heap Heroes", location: "Hall B · Table 21", x: 9, y: 5 },
+    { id: "t9", name: "Recursive Rabbits", location: "Hall A · Table 22", x: 4, y: 5 },
+  ],
+  people: { "Priya Raman": "PR", "Marcus Lee": "ML", "Sofia Ortega": "SO", "Dev Patel": "DP", "Hana Kim": "HK" },
+  issues: [
+    { id: "i31", number: 31, team: "t3", category: "Workstation", description: "Keyboard stopped responding after the IDE froze. Mouse still works.", status: "open", created: 2.2, first: null, owner: null, reporter: "Null Pointers" },
+    { id: "i30", number: 30, team: "t5", category: "Judge system", description: "Submission stuck on “Judging” for problem C for over ten minutes.", status: "escalated", created: 14.5, first: 12.9, owner: "Marcus Lee", reporter: "Off By One" },
+    { id: "i29", number: 29, team: "t1", category: "Network", description: "Cannot reach the contest site. Browser shows a connection reset.", status: "claimed", created: 9.1, first: 7.4, owner: "Priya Raman", reporter: "Team Aurora" },
+    { id: "i28", number: 28, team: "t6", category: "Printing", description: "Print request from 10:42 never arrived at our table.", status: "claimed", created: 23.8, first: 21.0, owner: "Sofia Ortega", reporter: "Café Lambda" },
+    { id: "i27", number: 27, team: "t2", category: "Problem statement", description: "Sample output for problem E contradicts the constraints in section 2.", status: "open", created: 5.6, first: null, owner: null, reporter: "Dev Patel" },
+    { id: "i26", number: 26, team: "t4", category: "Workstation", description: "Monitor flickers and goes black every few minutes.", status: "resolved", created: 48, first: 46.5, owner: "Priya Raman", reporter: "Segfault Society", resolved: 31, award: { minutes: 10, explanation: "Workstation replaced; 17 minutes lost.", by: "Hana Kim", at: 25, applied: null } },
+    { id: "i25", number: 25, team: "t7", category: "Network", description: "Intermittent packet loss when submitting large files.", status: "resolved", created: 72, first: 70, owner: "Marcus Lee", reporter: "Greedy Goblins", resolved: 52, award: { minutes: 5, explanation: "Brief outage confirmed by network team.", by: "Hana Kim", at: 44, applied: { by: "Dev Patel", at: 40 } } },
+    { id: "i24", number: 24, team: "t8", category: "Other", description: "Chair is broken and the table is wobbling.", status: "resolved", created: 95, first: 93, owner: "Sofia Ortega", reporter: "Heap Heroes", resolved: 88 },
+    { id: "i23", number: 23, team: "t9", category: "Judge system", description: "Scoreboard shows our accepted solution as wrong answer.", status: "claimed", created: 31, first: 29.5, owner: "Marcus Lee", reporter: "Recursive Rabbits", reopened: true },
+  ],
+  history: {
+    i31: [{ t: "event", text: "Submitted by Null Pointers", at: 2.2 }],
+    i30: [
+      { t: "event", text: "Submitted by Off By One", at: 14.5 },
+      { t: "event", text: "Claimed by Marcus Lee", at: 12.9 },
+      { t: "public", who: "Marcus Lee", text: "We can see the submission in the queue. Checking the judge host now.", at: 11.2 },
+      { t: "internal", who: "Marcus Lee", text: "Judge host 3 has a stuck worker. Needs a specialist to restart it safely.", at: 9.0 },
+      { t: "event", text: "Marcus Lee requested a specialist handoff", at: 8.8 },
+    ],
+    i29: [
+      { t: "event", text: "Submitted by Team Aurora", at: 9.1 },
+      { t: "event", text: "Claimed by Priya Raman", at: 7.4 },
+      { t: "public", who: "Priya Raman", text: "On my way to Table 4.", at: 7.2 },
+      { t: "internal", who: "Priya Raman", text: "Cable looks loose at the switch. Swapping the port first.", at: 3.1 },
+      { t: "public", who: "Team Aurora", text: "Thanks! It came back for a second, then dropped again.", at: 2.4 },
+    ],
+    i28: [{ t: "event", text: "Submitted by Café Lambda", at: 23.8 }, { t: "event", text: "Claimed by Sofia Ortega", at: 21.0 }, { t: "public", who: "Sofia Ortega", text: "Checking the print queue now.", at: 20.1 }],
+    i27: [{ t: "event", text: "Submitted by Dev Patel for Byte Bandits", at: 5.6 }],
+    i26: [
+      { t: "event", text: "Submitted by Segfault Society", at: 48 },
+      { t: "event", text: "Claimed by Priya Raman", at: 46.5 },
+      { t: "internal", who: "Priya Raman", text: "Spare workstation W-17 is ready. Moving the team's session over.", at: 40 },
+      { t: "resolve", who: "Priya Raman", text: "Device issue resolved", at: 31 },
+      { t: "award", who: "Hana Kim", text: "10 minutes awarded", at: 25 },
+    ],
+    i25: [{ t: "event", text: "Submitted by Greedy Goblins", at: 72 }, { t: "resolve", who: "Marcus Lee", text: "Service restored", at: 52 }, { t: "award", who: "Hana Kim", text: "5 minutes awarded", at: 44 }, { t: "event", text: "Dev Patel confirmed the award was applied externally", at: 40 }],
+    i24: [{ t: "event", text: "Submitted by Heap Heroes", at: 95 }, { t: "resolve", who: "Sofia Ortega", text: "Resolved without comment", at: 88 }],
+    i23: [
+      { t: "event", text: "Submitted by Recursive Rabbits", at: 31 },
+      { t: "resolve", who: "Marcus Lee", text: "Problem statement clarified", at: 22 },
+      { t: "reopen", who: "Recursive Rabbits", text: "Reopened: the verdict is still wrong after the rejudge.", at: 12 },
+      { t: "internal", who: "Marcus Lee", text: "Rejudge job failed silently. Asking the judge team.", at: 6 },
+    ],
+  },
+  images: {
+    i29: [{ name: "switch-port.jpg", who: "Priya Raman", vis: "internal", hue: 200 }, { name: "error-page.png", who: "Priya Raman", vis: "public", hue: 340 }],
+    i26: [{ name: "monitor.webp", who: "Priya Raman", vis: "public", hue: 30 }],
+  },
+  members: [
+    { name: "Priya Raman", username: "priya", roles: ["volunteer", "specialist"], admin: true },
+    { name: "Marcus Lee", username: "marcus", roles: ["volunteer"], admin: false },
+    { name: "Sofia Ortega", username: "sofia", roles: ["volunteer"], admin: false },
+    { name: "Dev Patel", username: "dev", roles: ["specialist"], admin: false },
+    { name: "Hana Kim", username: "hana", roles: ["jury"], admin: false },
+    { name: "Team Aurora", username: "team-aurora", team: "Team Aurora" },
+    { name: "Byte Bandits", username: "byte-bandits", team: "Byte Bandits" },
+    { name: "Null Pointers", username: "null-pointers", team: "Null Pointers" },
+  ],
+};
+const STATUS = {
+  open: { label: "Open", icon: "circle-dashed" },
+  claimed: { label: "In progress", icon: "circle-dot" },
+  escalated: { label: "Awaiting specialist", icon: "arrow-up-right" },
+  resolved: { label: "Resolved", icon: "circle-check" },
+};
+const teamOf = (issue) => DATA.teams.find((t) => t.id === issue.team);
+// Unresolved time: from creation to now, or to resolution.
+const elapsedMs = (issue) => ((issue.status === "resolved" ? issue.created - issue.resolved : issue.created) * 60000) + (issue.status === "resolved" ? 0 : Date.now() - NOW0);
+const clock = (ms) => { const s = Math.max(0, Math.floor(ms / 1000)); const h = Math.floor(s / 3600); const m = Math.floor((s % 3600) / 60); const r = s % 60; return (h ? h + ":" + String(m).padStart(2, "0") : String(m)) + ":" + String(r).padStart(2, "0"); };
+const relTime = (m) => m < 1 ? "just now" : m < 60 ? Math.round(m) + "m ago" : Math.floor(m / 60) + "h " + Math.round(m % 60) + "m ago";
+const wallTime = (m) => new Date(NOW0 - m * 60000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
+const initials = (n) => n.split(/\s+/).slice(0, 2).map((p) => p[0]).join("").toUpperCase();
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+// Aging tier for live timers: fresh < 10 min, warning < 20 min, critical after.
+const age = (issue) => issue.status === "resolved" ? "done" : elapsedMs(issue) < 600000 ? "fresh" : elapsedMs(issue) < 1200000 ? "warn" : "crit";
+// Small fuzzy match: every query token must prefix-match a word in name or location.
+const fuzzy = (q, s) => { const words = s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").split(/[^a-z0-9]+/); return q.toLowerCase().split(/\s+/).filter(Boolean).every((tok) => words.some((w) => w.startsWith(tok))); };
+
+let persona = "support";
+let route = "queue";
+let tab = "active";
+let selected = null;
+let sheetTab = "activity";
+let composer = "public";
+
+const PERSONAS = { support: "Support", contestant: "Contestant", jury: "Jury", admin: "Admin" };
+const icons = () => lucide.createIcons();
+const $ = (s) => document.querySelector(s);
+
+function statusBadge(s) { return `<span class="badge s-${s}"><i data-lucide="${STATUS[s].icon}" style="width:12px;height:12px"></i>${STATUS[s].label}</span>`; }
+function avatar(n, size = "size-6") { return n ? `<span class="${size} rounded-full bg-muted grid place-items-center text-[10px] font-semibold shrink-0" title="${esc(n)}">${initials(n)}</span>` : `<span class="${size} rounded-full border border-dashed border-border shrink-0"></span>`; }
+
+function renderChrome() {
+  $("#session-name").textContent = DATA.session.name;
+  $("#me-avatar").textContent = persona === "contestant" ? "TA" : DATA.me.initials;
+  $("#me-name").textContent = persona === "contestant" ? "Team Aurora" : persona === "jury" ? "Hana Kim" : DATA.me.name;
+  $("#me-roles").textContent = { support: "Volunteer · Specialist", contestant: "Contestant · Hall A · Table 4", jury: "Jury", admin: "Volunteer · Specialist · Admin" }[persona];
+  const navItems = {
+    support: [["queue", "inbox", "Queue", DATA.issues.filter((i) => i.status !== "resolved").length], ["mine", "user-round-check", "Assigned to me", DATA.issues.filter((i) => i.owner === "Priya Raman" && i.status !== "resolved").length], ["handoffs", "arrow-up-right", "Handoffs", DATA.issues.filter((i) => i.status === "escalated").length], ["teams", "map-pin", "Teams & tables"]],
+    contestant: [["help", "life-buoy", "Get help"], ["queue", "inbox", "Our reports", 2]],
+    jury: [["awards", "scale", "Award review", DATA.issues.filter((i) => i.status === "resolved" && !i.award).length], ["ledger", "receipt", "Award ledger"]],
+    admin: [["queue", "inbox", "Queue"], ["insights", "chart-no-axes-column", "Overview"], ["admin", "users", "Accounts"], ["settings", "settings-2", "Session settings"]],
+  }[persona];
+  $("#nav").innerHTML = `<div class="text-xs font-medium text-muted-foreground px-2 py-2">Workspace</div>` + navItems.map(([r, ic, label, n]) => `<a href="#" data-route="${r}" class="flex items-center gap-2 rounded-md px-2 h-8 text-sm ${route === r ? "bg-accent font-medium" : "text-muted-foreground hover:bg-accent hover:text-foreground"}"><i data-lucide="${ic}"></i>${label}${n ? `<span class="ml-auto text-xs tabular-nums text-muted-foreground">${n}</span>` : ""}</a>`).join("") +
+    `<div class="text-xs font-medium text-muted-foreground px-2 pt-5 pb-2">Personal</div><a href="#" class="flex items-center gap-2 rounded-md px-2 h-8 text-sm text-muted-foreground hover:bg-accent"><i data-lucide="key-round"></i>Account & password</a>`;
+  $("#persona").innerHTML = Object.entries(PERSONAS).map(([k, v]) => `<button data-persona="${k}" class="px-2.5 h-6 rounded-md ${persona === k ? "bg-background text-foreground shadow" : "text-muted-foreground"}">${v}</button>`).join("");
+  const labels = { queue: "Queue", mine: "Assigned to me", handoffs: "Handoffs", teams: "Teams & tables", help: "Get help", awards: "Award review", ledger: "Award ledger", admin: "Accounts", settings: "Session settings", insights: "Overview" };
+  $("#crumbs").innerHTML = `<span>${DATA.session.name}</span><i data-lucide="chevron-right" style="width:14px"></i><span class="text-foreground font-medium">${labels[route] ?? ""}</span>`;
+}
+
+function statCards() {
+  const cards = [
+    ["open", "Waiting for a helper", DATA.issues.filter((i) => i.status === "open").length, "Oldest 5:36"],
+    ["claimed", "Being worked on", DATA.issues.filter((i) => i.status === "claimed").length, "3 helpers active"],
+    ["escalated", "Awaiting specialist", DATA.issues.filter((i) => i.status === "escalated").length, "Owner keeps it until accepted"],
+    ["resolved", "Resolved today", DATA.issues.filter((i) => i.status === "resolved").length, "Median 17m to resolve"],
+  ];
+  return `<div class="grid grid-cols-2 xl:grid-cols-4 gap-4">${cards.map(([s, l, n, sub]) => `<div class="rounded-xl border border-border bg-card p-4"><div class="flex items-center justify-between text-sm text-muted-foreground">${l}<i data-lucide="${STATUS[s].icon}" class="s-${s}"></i></div><div class="text-3xl font-semibold mt-2 tabular-nums">${n}</div><div class="text-xs text-muted-foreground mt-1">${sub}</div></div>`).join("")}</div>`;
+}
+
+function issueRows(list) {
+  if (!list.length) return `<div class="py-16 text-center text-sm text-muted-foreground"><i data-lucide="inbox" class="mx-auto mb-2" style="width:24px;height:24px"></i>No issues in this view.</div>`;
+  return list.map((i) => { const t = teamOf(i); return `<tr class="row border-b border-border cursor-pointer ${selected === i.id ? "sel" : ""}" data-issue="${i.id}">
+    <td class="px-4 py-3 font-mono text-xs text-muted-foreground whitespace-nowrap">ISS-${i.number}</td>
+    <td class="py-3">${statusBadge(i.status)}${i.reopened ? ` <span class="badge text-muted-foreground"><i data-lucide="rotate-ccw" style="width:12px;height:12px"></i>Reopened</span>` : ""}</td>
+    <td class="py-3 pr-4 max-w-[420px]"><div class="truncate font-medium">${esc(i.description)}</div><div class="text-xs text-muted-foreground">${i.category}</div></td>
+    <td class="py-3 pr-4 whitespace-nowrap"><div class="font-medium">${t.name}</div><div class="text-xs text-muted-foreground">${t.location}</div></td>
+    <td class="py-3 pr-4 whitespace-nowrap"><div class="flex items-center gap-2">${avatar(i.owner)}<span class="${i.owner ? "" : "text-muted-foreground"}">${i.owner ?? "Unassigned"}</span></div></td>
+    <td class="py-3 pr-4 text-right font-mono tabular-nums age-${age(i)}" data-timer="${i.id}">${clock(elapsedMs(i))}</td></tr>`; }).join("");
+}
+
+function queuePage(scope) {
+  let list = DATA.issues;
+  if (scope === "mine") list = list.filter((i) => i.owner === "Priya Raman");
+  if (scope === "handoffs") list = list.filter((i) => i.status === "escalated");
+  if (persona === "contestant") list = list.filter((i) => i.team === "t1" || i.team === "t4");
+  const tabs = [["active", "Active", (i) => i.status !== "resolved"], ["open", "Open", (i) => i.status === "open"], ["claimed", "In progress", (i) => i.status === "claimed"], ["escalated", "Awaiting specialist", (i) => i.status === "escalated"], ["resolved", "Resolved", (i) => i.status === "resolved"], ["all", "All", () => true]];
+  const fn = tabs.find((t) => t[0] === tab)[2];
+  const shown = list.filter(fn);
+  return `<div class="p-6 space-y-6 max-w-[1400px]">
+    <div class="flex items-end justify-between gap-4"><div><h1 class="text-2xl font-semibold tracking-tight">${scope === "mine" ? "Assigned to me" : scope === "handoffs" ? "Specialist handoffs" : "Issue queue"}</h1><p class="text-sm text-muted-foreground mt-1">Live view of every report in ${DATA.session.name}. Timers come from saved timestamps.</p></div>
+    <button class="btn btn-primary" data-action="report"><i data-lucide="plus"></i>Report for a team</button></div>
+    ${scope === "queue" ? statCards() : ""}
+    <div class="flex items-center gap-3 flex-wrap">
+      <div class="inline-flex rounded-lg bg-muted p-1 text-sm text-muted-foreground">${tabs.map(([k, l, f]) => `<button class="tabs-trigger rounded-md px-3 h-7 font-medium" data-tab="${k}" aria-selected="${tab === k}">${l} <span class="ml-1 text-xs opacity-70 tabular-nums">${list.filter(f).length}</span></button>`).join("")}</div>
+      <button class="btn btn-outline btn-sm border-dashed"><i data-lucide="circle-plus"></i>Category</button>
+      <button class="btn btn-outline btn-sm border-dashed" data-action="cmd"><i data-lucide="map-pin"></i>Team or table</button>
+      <div class="flex-1"></div><button class="btn btn-outline btn-sm"><i data-lucide="settings-2"></i>View</button>
+    </div>
+    <div class="rounded-xl border border-border overflow-hidden"><table class="w-full text-sm"><thead class="text-muted-foreground text-xs"><tr class="border-b border-border"><th class="px-4 h-10 text-left font-medium w-24">Issue</th><th class="text-left font-medium w-44">Status</th><th class="text-left font-medium">Report</th><th class="text-left font-medium">Team</th><th class="text-left font-medium">Owner</th><th class="text-right font-medium pr-4">Unresolved</th></tr></thead><tbody>${issueRows(shown)}</tbody></table></div>
+    <p class="text-xs text-muted-foreground">Timer colours: grey under 10 min · <span class="age-warn">amber</span> under 20 min · <span class="age-crit">rose</span> after 20 min. Press <span class="kbd">J</span>/<span class="kbd">K</span> to move, <span class="kbd">C</span> to claim.</p>
+  </div>`;
+}
+
+function contestantHelp() {
+  const mine = DATA.issues.filter((i) => i.team === "t1" || i.team === "t4").slice(0, 2);
+  return `<div class="p-6 max-w-3xl mx-auto space-y-8">
+    <div class="rounded-2xl border border-border bg-card p-8"><div class="flex items-center gap-2 text-sm text-muted-foreground"><i data-lucide="map-pin"></i>Team Aurora · Hall A · Table 4</div><h1 class="text-3xl font-semibold tracking-tight mt-3">Need help? A helper will come to your table.</h1><p class="text-muted-foreground mt-2">Your timer starts when you submit. You can follow every step here.</p>
+      <div class="grid grid-cols-3 gap-2 mt-6">${DATA.session.categories.map((c, n) => `<button class="rounded-lg border border-border p-3 text-left hover:bg-accent ${n === 0 ? "ring-2 ring-ring" : ""}"><i data-lucide="${["monitor", "wifi", "gavel", "file-text", "printer", "circle-help"][n]}"></i><div class="text-sm font-medium mt-2">${c}</div></button>`).join("")}</div>
+      <textarea class="mt-4 w-full min-h-24 rounded-lg border border-input bg-transparent p-3 text-sm outline-none focus:ring-2 focus:ring-ring" placeholder="What’s happening? For example: the keyboard stopped working after the IDE froze."></textarea>
+      <div class="flex items-center justify-between mt-3"><span class="text-xs text-muted-foreground flex items-center gap-1.5"><span class="size-2 rounded-full bg-emerald-500"></span>Intake is open</span><button class="btn btn-primary"><i data-lucide="send"></i>Submit issue</button></div></div>
+    <div><h2 class="text-sm font-medium text-muted-foreground mb-3">Your reports</h2><div class="space-y-3">${mine.map((i) => `<button data-issue="${i.id}" class="w-full text-left rounded-xl border border-border bg-card p-4 hover:bg-accent/50"><div class="flex items-center gap-2">${statusBadge(i.status)}<span class="font-mono text-xs text-muted-foreground">ISS-${i.number}</span><span class="ml-auto font-mono text-sm age-${age(i)}" data-timer="${i.id}">${clock(elapsedMs(i))}</span></div><div class="mt-2 font-medium">${esc(i.description)}</div>${tracker(i)}</button>`).join("")}</div></div></div>`;
+}
+
+function tracker(i) {
+  const steps = [["Submitted", true], ["Helper assigned", !!i.owner], ["Resolved", i.status === "resolved"], ["Time award", !!i.award]];
+  return `<ol class="flex items-center gap-2 mt-4 text-xs">${steps.map(([l, d], n) => `<li class="flex items-center gap-2 ${d ? "" : "text-muted-foreground"}"><span class="size-5 rounded-full grid place-items-center ${d ? "bg-primary text-primary-foreground" : "border border-border"}">${d ? `<i data-lucide="check" style="width:12px;height:12px"></i>` : n + 1}</span>${l}</li>${n < steps.length - 1 ? `<li class="flex-1 h-px ${d ? "bg-primary" : "bg-border"}"></li>` : ""}`).join("")}</ol>`;
+}
+
+function juryPage() {
+  const list = DATA.issues.filter((i) => i.status === "resolved");
+  return `<div class="p-6 max-w-5xl space-y-6"><div><h1 class="text-2xl font-semibold tracking-tight">Award review</h1><p class="text-sm text-muted-foreground mt-1">Decide on resolved issues. Recording an award does not change the contest clock. Staff confirm external application separately.</p></div>
+  <div class="grid gap-4">${list.map((i) => { const t = teamOf(i); const a = i.award; return `<div class="rounded-xl border border-border bg-card p-5 grid md:grid-cols-[1fr_280px] gap-6">
+    <div><div class="flex items-center gap-2 text-xs text-muted-foreground"><span class="font-mono">ISS-${i.number}</span>·${t.name}·${t.location}</div><div class="font-medium mt-1.5">${esc(i.description)}</div>
+    <dl class="grid grid-cols-3 gap-3 mt-4 text-sm"><div><dt class="text-xs text-muted-foreground">Unresolved</dt><dd class="font-mono">${clock(elapsedMs(i))}</dd></div><div><dt class="text-xs text-muted-foreground">First assignment</dt><dd class="font-mono">${clock((i.created - i.first) * 60000)}</dd></div><div><dt class="text-xs text-muted-foreground">Resolved by</dt><dd>${i.owner}</dd></div></dl></div>
+    <div class="rounded-lg border border-border p-4">${a ? ledgerCard(a) : `<div class="text-sm font-medium">Record a decision</div><div class="flex flex-wrap gap-1.5 mt-3">${[0, 5, 10, 15, 30].map((m) => `<button class="btn btn-outline btn-sm">${m} min</button>`).join("")}<button class="btn btn-outline btn-sm">Custom…</button></div><textarea class="mt-3 w-full rounded-md border border-input bg-transparent p-2 text-sm" rows="2" placeholder="Public explanation for the team"></textarea><button class="btn btn-primary btn-sm w-full justify-center mt-2">Record award</button>`}</div></div>`; }).join("")}</div></div>`;
+}
+
+function ledgerCard(a) {
+  return `<div class="flex items-baseline justify-between"><div class="text-2xl font-semibold">+${a.minutes} min</div><span class="badge ${a.applied ? "s-resolved" : "s-escalated"}">${a.applied ? "Applied externally" : "Pending application"}</span></div><p class="text-sm text-muted-foreground mt-1">“${esc(a.explanation)}”</p>
+  <ol class="mt-3 space-y-2 text-xs"><li class="flex gap-2"><i data-lucide="circle-check" class="s-resolved" style="width:14px"></i>Decided by ${a.by} · ${wallTime(a.at)}</li><li class="flex gap-2 ${a.applied ? "" : "text-muted-foreground"}"><i data-lucide="${a.applied ? "circle-check" : "circle-dashed"}" class="${a.applied ? "s-resolved" : ""}" style="width:14px"></i>${a.applied ? `Applied by ${a.applied.by} · ${wallTime(a.applied.at)}` : "Waiting for staff to apply it in the contest system"}</li></ol>
+  ${a.applied ? "" : `<button class="btn btn-outline btn-sm w-full justify-center mt-3" data-action="apply"><i data-lucide="check-check"></i>Confirm applied externally</button>`}`;
+}
+
+function adminPage() {
+  return `<div class="p-6 max-w-5xl space-y-6"><div class="flex items-end justify-between"><div><h1 class="text-2xl font-semibold tracking-tight">Accounts</h1><p class="text-sm text-muted-foreground mt-1">Team accounts are shared. Staff accounts belong to one person and combine their roles.</p></div><button class="btn btn-primary" data-action="create"><i data-lucide="user-plus"></i>Create account</button></div>
+  <div class="flex gap-2"><div class="relative flex-1 max-w-xs"><i data-lucide="search" class="absolute left-3 top-2.5 text-muted-foreground"></i><input class="w-full h-9 pl-9 rounded-md border border-input bg-transparent text-sm" placeholder="Filter accounts…"></div><button class="btn btn-outline btn-sm border-dashed"><i data-lucide="circle-plus"></i>Role</button></div>
+  <div class="rounded-xl border border-border overflow-hidden"><table class="w-full text-sm"><thead class="text-xs text-muted-foreground"><tr class="border-b border-border"><th class="px-4 h-10 text-left font-medium">Name</th><th class="text-left font-medium">Username</th><th class="text-left font-medium">Access</th><th class="w-12"></th></tr></thead><tbody>
+  ${DATA.members.map((m) => `<tr class="row border-b border-border"><td class="px-4 py-3"><div class="flex items-center gap-3">${avatar(m.name, "size-8")}<span class="font-medium">${m.name}</span></div></td><td class="font-mono text-xs text-muted-foreground">${m.username}</td><td><div class="flex gap-1.5 flex-wrap">${m.team ? `<span class="badge"><i data-lucide="users" style="width:12px"></i>Contestant team</span>` : m.roles.map((r) => `<span class="badge capitalize">${r}</span>`).join("") + (m.admin ? `<span class="badge bg-primary text-primary-foreground border-transparent">Admin</span>` : "")}</div></td><td><button class="btn btn-ghost btn-sm"><i data-lucide="ellipsis"></i></button></td></tr>`).join("")}</tbody></table></div></div>`;
+}
+
+function settingsPage() {
+  const s = DATA.session;
+  const slider = (label, val, max, unit, help) => `<div><div class="flex justify-between text-sm"><label class="font-medium">${label}</label><span class="font-mono tabular-nums">${val}${unit}</span></div><input type="range" min="1" max="${max}" value="${val}" class="w-full mt-2" oninput="this.previousElementSibling.lastElementChild.textContent=this.value+'${unit}'"><p class="text-xs text-muted-foreground">${help}</p></div>`;
+  return `<div class="p-6 max-w-3xl space-y-6"><div><h1 class="text-2xl font-semibold tracking-tight">Session settings</h1><p class="text-sm text-muted-foreground mt-1">These settings apply to ${s.name}.</p></div>
+  <section class="rounded-xl border border-border bg-card"><div class="p-5 flex items-start justify-between gap-6"><div><h2 class="font-semibold">Contestant intake</h2><p class="text-sm text-muted-foreground mt-1">When intake is closed, teams cannot submit new reports. Staff can still report for a team and reopen issues.</p></div><button class="switch mt-1" role="switch" aria-checked="true" onclick="this.setAttribute('aria-checked', this.getAttribute('aria-checked')!=='true')"></button></div></section>
+  <section class="rounded-xl border border-border bg-card"><div class="p-5 border-b border-border"><h2 class="font-semibold">Issue images</h2><p class="text-sm text-muted-foreground mt-1">JPEG, PNG and WebP. A lower limit does not remove images that are already attached.</p></div><div class="p-5 space-y-5">${slider("Largest single image", s.max_image_mb, 50, " MB", "Uploads above this size are refused.")}${slider("Images per issue", s.max_images, 24, "", "Counts team-visible and staff-only images together.")}${slider("Combined size per issue", s.max_total_mb, 120, " MB", "Total of all images on one issue.")}</div><div class="px-5 py-3 border-t border-border bg-muted/40 flex justify-end"><button class="btn btn-primary btn-sm">Save limits</button></div></section>
+  <section class="rounded-xl border border-border bg-card p-5"><h2 class="font-semibold">Categories</h2><div class="flex flex-wrap gap-2 mt-3">${s.categories.map((c) => `<span class="badge">${c}</span>`).join("")}<span class="badge border-dashed text-muted-foreground">Editor planned</span></div></section></div>`;
+}
+
+function insightsPage() {
+  const byCat = DATA.session.categories.map((c) => [c, DATA.issues.filter((i) => i.category === c).length]);
+  const max = Math.max(...byCat.map((b) => b[1]));
+  return `<div class="p-6 max-w-[1200px] space-y-6"><div><h1 class="text-2xl font-semibold tracking-tight">Overview</h1><p class="text-sm text-muted-foreground mt-1">Session health at a glance.</p></div>${statCards()}
+  <div class="grid lg:grid-cols-2 gap-4"><div class="rounded-xl border border-border bg-card p-5"><h2 class="font-semibold text-sm">Reports by category</h2><div class="mt-4 space-y-3">${byCat.map(([c, n]) => `<div class="grid grid-cols-[140px_1fr_24px] items-center gap-3 text-sm" title="${c}: ${n}"><span class="text-muted-foreground">${c}</span><div class="h-2.5 rounded-full bg-muted overflow-hidden"><div class="h-full rounded-full bg-foreground/80" style="width:${(n / max) * 100}%"></div></div><span class="tabular-nums text-right">${n}</span></div>`).join("")}</div></div>
+  <div class="rounded-xl border border-border bg-card p-5"><h2 class="font-semibold text-sm">Awards</h2><div class="grid grid-cols-3 gap-4 mt-4"><div><div class="text-3xl font-semibold">15</div><div class="text-xs text-muted-foreground">minutes decided</div></div><div><div class="text-3xl font-semibold">1</div><div class="text-xs text-muted-foreground">pending application</div></div><div><div class="text-3xl font-semibold">2</div><div class="text-xs text-muted-foreground">resolved, no decision</div></div></div></div></div></div>`;
+}
+
+function teamsPage() {
+  return `<div class="p-6 max-w-5xl space-y-6"><div><h1 class="text-2xl font-semibold tracking-tight">Teams & tables</h1><p class="text-sm text-muted-foreground mt-1">Every team in this session, with its location and open reports.</p></div><div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">${DATA.teams.map((t) => { const open = DATA.issues.filter((i) => i.team === t.id && i.status !== "resolved"); return `<div class="rounded-xl border border-border bg-card p-4"><div class="flex items-center justify-between"><span class="font-medium">${t.name}</span>${open.length ? `<span class="badge s-escalated">${open.length} unresolved</span>` : `<span class="badge text-muted-foreground">Clear</span>`}</div><div class="text-sm text-muted-foreground mt-1 flex items-center gap-1.5"><i data-lucide="map-pin" style="width:14px"></i>${t.location}</div></div>`; }).join("")}</div></div>`;
+}
+
+function render() {
+  if (persona === "contestant" && !["help", "queue"].includes(route)) route = "help";
+  if (persona === "jury" && !["awards", "ledger"].includes(route)) route = "awards";
+  if (persona === "support" && !["queue", "mine", "handoffs", "teams"].includes(route)) route = "queue";
+  if (persona === "admin" && !["queue", "admin", "settings", "insights"].includes(route)) route = "queue";
+  renderChrome();
+  const pages = { queue: () => queuePage("queue"), mine: () => queuePage("mine"), handoffs: () => queuePage("handoffs"), help: contestantHelp, awards: juryPage, ledger: juryPage, admin: adminPage, settings: settingsPage, insights: insightsPage, teams: teamsPage };
+  $("#page").innerHTML = pages[route]();
+  if (selected) renderSheet();
+  icons();
+}
+
+function timeline(i) {
+  const staff = persona !== "contestant";
+  const items = (DATA.history[i.id] ?? []).filter((h) => staff || h.t !== "internal");
+  return `<ol class="relative space-y-4 before:absolute before:left-[11px] before:top-2 before:bottom-2 before:w-px before:bg-border">${items.map((h) => {
+    if (h.t === "event" || h.t === "reopen") return `<li class="relative flex gap-3 text-sm text-muted-foreground"><span class="size-6 rounded-full bg-background border border-border grid place-items-center z-10"><i data-lucide="${h.t === "reopen" ? "rotate-ccw" : "dot"}" style="width:12px"></i></span><span class="pt-0.5">${esc(h.text)} · ${wallTime(h.at)}</span></li>`;
+    if (h.t === "resolve") return `<li class="relative flex gap-3 text-sm"><span class="size-6 rounded-full bg-emerald-500/15 text-emerald-500 grid place-items-center z-10"><i data-lucide="check" style="width:12px"></i></span><div class="flex-1 rounded-lg border border-emerald-500/30 p-3"><div class="text-xs text-muted-foreground">Resolved by ${h.who} · ${wallTime(h.at)} · visible to the team</div><div class="mt-1 font-medium">${esc(h.text)}</div></div></li>`;
+    if (h.t === "award") return `<li class="relative flex gap-3 text-sm text-muted-foreground"><span class="size-6 rounded-full bg-background border border-border grid place-items-center z-10"><i data-lucide="scale" style="width:12px"></i></span><span class="pt-0.5">${h.who}: ${esc(h.text)} · ${wallTime(h.at)}</span></li>`;
+    const internal = h.t === "internal";
+    return `<li class="relative flex gap-3">${avatar(h.who)}<div class="flex-1 rounded-lg border border-border p-3 ${internal ? "internal" : ""}"><div class="flex items-center gap-2 text-xs"><span class="font-medium">${h.who}</span><span class="text-muted-foreground">${wallTime(h.at)}</span>${internal ? `<span class="ml-auto badge text-amber-500 border-amber-500/40"><i data-lucide="lock" style="width:11px"></i>Internal note</span>` : `<span class="ml-auto text-muted-foreground">Public reply</span>`}</div><p class="text-sm mt-1.5">${esc(h.text)}</p></div></li>`;
+  }).join("")}</ol>`;
+}
+
+function lifecycle(i) {
+  const order = ["open", "claimed", "escalated", "resolved"];
+  const at = order.indexOf(i.status);
+  const steps = [["Submitted", wallTime(i.created)], ["Claimed", i.first ? wallTime(i.first) : ""], ["Specialist", i.status === "escalated" ? "Requested" : at > 2 ? "" : ""], ["Resolved", i.resolved ? wallTime(i.resolved) : ""]];
+  return `<div class="grid grid-cols-4 gap-1">${steps.map(([l, sub], n) => { const done = n <= at && !(n === 2 && i.status === "resolved" && !i.escalatedOnce); const cur = n === at; return `<div><div class="h-1.5 rounded-full ${n < at || (cur && i.status === "resolved") ? "bg-foreground" : cur ? "bg-foreground/60 animate-pulse" : "bg-muted"}"></div><div class="mt-2 text-xs ${done ? "" : "text-muted-foreground"} font-medium">${l}</div><div class="text-[11px] text-muted-foreground font-mono">${sub || "—"}</div></div>`; }).join("")}</div>`;
+}
+
+function renderSheet() {
+  const i = DATA.issues.find((x) => x.id === selected);
+  if (!i) return;
+  const t = teamOf(i);
+  const staff = persona !== "contestant";
+  const imgs = (DATA.images[i.id] ?? []).filter((m) => staff || m.vis === "public");
+  const primary = { open: `<button class="btn btn-primary" data-action="claim"><i data-lucide="hand"></i>Claim issue</button>`, claimed: `<button class="btn btn-primary" data-action="resolve"><i data-lucide="check"></i>Resolve…</button><button class="btn btn-outline" data-action="escalate"><i data-lucide="arrow-up-right"></i>Escalate</button>`, escalated: `<button class="btn btn-primary" data-action="accept"><i data-lucide="handshake"></i>Accept handoff</button>`, resolved: `<button class="btn btn-outline" data-action="reopen"><i data-lucide="rotate-ccw"></i>Reopen…</button>` }[i.status];
+  $("#sheet").innerHTML = `<div class="p-5 border-b border-border"><div class="flex items-center gap-2"><span class="font-mono text-xs text-muted-foreground">ISS-${i.number}</span>${statusBadge(i.status)}<span class="badge text-muted-foreground">${i.category}</span><div class="flex-1"></div><button class="btn btn-ghost btn-sm" data-action="close" aria-label="Close"><i data-lucide="x"></i></button></div>
+    <h2 class="text-lg font-semibold mt-3 leading-snug">${esc(i.description)}</h2>
+    <div class="flex items-center gap-4 text-sm text-muted-foreground mt-2"><span class="flex items-center gap-1.5"><i data-lucide="users" style="width:14px"></i>${t.name}</span><span class="flex items-center gap-1.5"><i data-lucide="map-pin" style="width:14px"></i>${t.location}</span></div>
+    <div class="grid grid-cols-3 gap-3 mt-5"><div class="rounded-lg border border-border p-3"><div class="text-xs text-muted-foreground flex items-center gap-1.5">${i.status !== "resolved" ? `<span class="size-1.5 rounded-full bg-emerald-500 animate-pulse"></span>Running` : "Stopped"}</div><div class="font-mono text-xl mt-1 tabular-nums age-${age(i)}" data-timer="${i.id}">${clock(elapsedMs(i))}</div><div class="text-[11px] text-muted-foreground">unresolved time</div></div>
+    <div class="rounded-lg border border-border p-3"><div class="text-xs text-muted-foreground">First assignment</div><div class="font-mono text-xl mt-1">${i.first ? clock((i.created - i.first) * 60000) : "—"}</div><div class="text-[11px] text-muted-foreground">after submission</div></div>
+    <div class="rounded-lg border border-border p-3"><div class="text-xs text-muted-foreground">Owner</div><div class="flex items-center gap-2 mt-1.5">${avatar(i.owner)}<span class="text-sm font-medium truncate">${i.owner ?? "Unassigned"}</span></div></div></div>
+    <div class="mt-5">${lifecycle(i)}</div>
+    ${i.status === "escalated" ? `<div class="mt-4 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm flex gap-3"><i data-lucide="arrow-up-right" class="text-amber-500 mt-0.5"></i><div><div class="font-medium">Specialist handoff requested</div><div class="text-muted-foreground">${i.owner} stays responsible until a specialist accepts.</div></div></div>` : ""}
+    ${staff ? `<div class="flex gap-2 mt-4">${primary}</div>` : ""}</div>
+    <div class="px-5 pt-3 border-b border-border flex gap-5 text-sm">${[["activity", "Activity", (DATA.history[i.id] ?? []).length], ["images", "Images", imgs.length], ["outcome", "Outcome & award", ""]].map(([k, l, n]) => `<button data-sheettab="${k}" class="pb-2.5 -mb-px border-b-2 ${sheetTab === k ? "border-foreground font-medium" : "border-transparent text-muted-foreground"}">${l}${n !== "" ? ` <span class="text-xs text-muted-foreground">${n}</span>` : ""}</button>`).join("")}</div>
+    <div class="flex-1 overflow-y-auto p-5">${sheetTab === "activity" ? timeline(i) : sheetTab === "images" ? imagesTab(imgs, staff) : outcomeTab(i)}</div>
+    ${sheetTab === "activity" && i.status !== "resolved" ? composerHtml(i, staff) : ""}`;
+  icons();
+}
+
+function imagesTab(imgs, staff) {
+  return `<div class="grid grid-cols-3 gap-3">${imgs.map((m) => `<figure class="rounded-lg border border-border overflow-hidden"><div class="aspect-[4/3]" style="background:linear-gradient(135deg,hsl(${m.hue} 60% 45%),hsl(${m.hue + 40} 60% 25%))"></div><figcaption class="p-2 text-xs"><div class="truncate font-medium">${m.name}</div><div class="flex items-center gap-1 text-muted-foreground mt-0.5">${m.vis === "internal" ? `<i data-lucide="lock" style="width:11px"></i>Staff only` : `<i data-lucide="eye" style="width:11px"></i>Team can see`}</div></figcaption></figure>`).join("")}
+  ${staff ? `<label class="rounded-lg border border-dashed border-border grid place-items-center aspect-[4/3] text-xs text-muted-foreground cursor-pointer hover:bg-accent"><div class="text-center"><i data-lucide="image-plus" class="mx-auto mb-1"></i>Add image<div class="text-[10px]">≤ 8 MB · 6 per issue</div></div></label>` : ""}</div>
+  ${staff ? `<p class="text-xs text-muted-foreground mt-4">You choose the audience when you upload. It cannot change later. Only the uploader can remove an image.</p>` : ""}`;
+}
+
+function outcomeTab(i) {
+  if (i.status !== "resolved") return `<div class="text-sm text-muted-foreground text-center py-10"><i data-lucide="hourglass" class="mx-auto mb-2"></i>This issue is not resolved yet. The resolution summary and any time award appear here.</div>`;
+  return `<div class="space-y-4"><div class="rounded-lg border border-border p-4"><div class="text-xs text-muted-foreground">Resolution summary · visible to the team</div><div class="font-medium mt-1">${(DATA.history[i.id] ?? []).find((h) => h.t === "resolve")?.text ?? "Resolved"}</div><div class="text-xs text-muted-foreground mt-2">By ${i.owner} · ${wallTime(i.resolved)}</div></div>
+  <div class="rounded-lg border border-border p-4">${i.award ? ledgerCard(i.award) : `<div class="text-sm text-muted-foreground">No award decision yet. Awards are discretionary and come from the jury.</div>`}</div></div>`;
+}
+
+function composerHtml(i, staff) {
+  const internal = composer === "internal";
+  return `<div class="border-t border-border p-4"><div class="rounded-xl border border-border ${internal ? "internal" : ""}">
+    <textarea class="w-full bg-transparent p-3 text-sm outline-none resize-none" rows="3" placeholder="${internal ? "Internal note. Only staff can see this." : `Reply to ${teamOf(i).name}…`}"></textarea>
+    <div class="flex items-center gap-2 p-2">${staff ? `<div class="inline-flex rounded-lg bg-muted p-0.5 text-xs"><button data-composer="public" class="px-2.5 h-7 rounded-md flex items-center gap-1.5 ${!internal ? "bg-background shadow" : "text-muted-foreground"}"><i data-lucide="eye" style="width:13px"></i>Public reply</button><button data-composer="internal" class="px-2.5 h-7 rounded-md flex items-center gap-1.5 ${internal ? "bg-background shadow text-amber-500" : "text-muted-foreground"}"><i data-lucide="lock" style="width:13px"></i>Internal note</button></div>` : ""}<button class="btn btn-ghost btn-sm" aria-label="Attach image"><i data-lucide="paperclip"></i></button><div class="flex-1"></div><span class="kbd">⌘↵</span><button class="btn btn-primary btn-sm">${internal ? "Add note" : "Send"}</button></div></div></div>`;
+}
+
+function openSheet(id) { selected = id; sheetTab = "activity"; $("#overlay").classList.remove("hidden"); $("#sheet").classList.remove("translate-x-full"); render(); }
+function closeSheet() { selected = null; $("#overlay").classList.add("hidden"); $("#sheet").classList.add("translate-x-full"); render(); }
+
+function renderCmd(q) {
+  const teams = DATA.teams.filter((t) => !q || fuzzy(q, t.name + " " + t.location)).slice(0, 5);
+  const issues = DATA.issues.filter((i) => !q || fuzzy(q, `iss ${i.number} ${i.number} ${i.description} ${i.category}`)).slice(0, 4);
+  const actions = [["plus", "Report an issue for a team"], ["hand", "Claim oldest open issue"], ["power", "Close contestant intake"]].filter(([, l]) => !q || fuzzy(q, l));
+  const group = (title, html) => html ? `<div class="px-2 pt-2 pb-1 text-xs text-muted-foreground font-medium">${title}</div>${html}` : "";
+  $("#cmd-list").innerHTML = group("Teams", teams.map((t) => { const n = DATA.issues.filter((i) => i.team === t.id && i.status !== "resolved").length; return `<button class="w-full flex items-center gap-3 rounded-md px-2 h-10 hover:bg-accent text-left"><i data-lucide="users"></i><span class="font-medium">${t.name}</span><span class="text-muted-foreground">${t.location}</span>${n ? `<span class="ml-auto badge s-escalated">${n} unresolved</span>` : ""}</button>`; }).join("")) +
+    group("Issues", issues.map((i) => `<button data-cmd-issue="${i.id}" class="w-full flex items-center gap-3 rounded-md px-2 h-10 hover:bg-accent text-left"><i data-lucide="${STATUS[i.status].icon}" class="s-${i.status}"></i><span class="font-mono text-xs text-muted-foreground">ISS-${i.number}</span><span class="truncate">${esc(i.description)}</span></button>`).join("")) +
+    group("Actions", actions.map(([ic, l]) => `<button class="w-full flex items-center gap-3 rounded-md px-2 h-10 hover:bg-accent text-left"><i data-lucide="${ic}"></i>${l}</button>`).join("")) || `<div class="py-10 text-center text-muted-foreground">No matches.</div>`;
+  icons();
+}
+function openCmd() { $("#cmd").classList.remove("hidden"); $("#cmd-input").value = ""; renderCmd(""); $("#cmd-input").focus(); }
+
+function dialog(html) { $("#dialog-body").innerHTML = html; $("#dialog").classList.remove("hidden"); icons(); }
+const DIALOGS = {
+  create: `<h2 class="text-lg font-semibold">Create account</h2><p class="text-sm text-muted-foreground mt-1">You get a temporary password to share in person. The user changes it at first sign-in.</p>
+    <div class="space-y-3 mt-5 text-sm"><label class="block"><span class="font-medium">Display name</span><input class="mt-1.5 w-full h-9 rounded-md border border-input bg-transparent px-3" placeholder="Team Aurora or Alex Morgan"></label><label class="block"><span class="font-medium">Username</span><input class="mt-1.5 w-full h-9 rounded-md border border-input bg-transparent px-3 font-mono" placeholder="team-aurora"></label>
+    <div><span class="font-medium">Account type</span><div class="grid grid-cols-2 gap-2 mt-1.5"><button class="rounded-lg border border-border p-3 text-left ring-2 ring-ring"><i data-lucide="user-round"></i><div class="font-medium mt-1">Staff member</div><div class="text-xs text-muted-foreground">One person, several roles</div></button><button class="rounded-lg border border-border p-3 text-left"><i data-lucide="users"></i><div class="font-medium mt-1">Contestant team</div><div class="text-xs text-muted-foreground">Shared by the team</div></button></div></div>
+    <div class="flex flex-wrap gap-2">${["Volunteer", "Specialist", "Jury", "Admin"].map((r, n) => `<label class="badge cursor-pointer h-7 ${n === 0 ? "bg-accent" : ""}"><input type="checkbox" ${n === 0 ? "checked" : ""} class="accent-current">${r}</label>`).join("")}</div></div>
+    <div class="flex justify-end gap-2 mt-6"><button class="btn btn-outline" data-close>Cancel</button><button class="btn btn-primary" data-action="credentials">Create account</button></div>`,
+  credentials: `<div class="size-10 rounded-full bg-emerald-500/15 text-emerald-500 grid place-items-center"><i data-lucide="key-round"></i></div><h2 class="text-lg font-semibold mt-3">Share these credentials securely</h2><p class="text-sm text-muted-foreground mt-1">This password appears only once. If it is lost, issue a new one.</p>
+    <div class="mt-4 rounded-lg border border-border divide-y divide-border font-mono text-sm"><div class="flex items-center justify-between p-3"><span class="text-muted-foreground font-sans text-xs">Username</span>alex-morgan<i data-lucide="copy" class="text-muted-foreground"></i></div><div class="flex items-center justify-between p-3"><span class="text-muted-foreground font-sans text-xs">Temporary password</span>tulip-orbit-7319<i data-lucide="copy" class="text-muted-foreground"></i></div></div>
+    <div class="flex justify-end mt-6"><button class="btn btn-primary" data-close>I have shared them</button></div>`,
+  resolve: `<h2 class="text-lg font-semibold">Resolve ISS-29</h2><p class="text-sm text-muted-foreground mt-1">The team sees this summary. The timer stops.</p><div class="space-y-2 mt-4">${["Service restored", "Device issue resolved", "Problem statement clarified", "Resolved without comment"].map((r, n) => `<label class="flex items-center gap-3 rounded-lg border border-border p-3 text-sm cursor-pointer hover:bg-accent"><input type="radio" name="r" ${n === 0 ? "checked" : ""}>${r}</label>`).join("")}<label class="flex items-center gap-3 rounded-lg border border-border p-3 text-sm"><input type="radio" name="r">Write a custom summary…</label></div><div class="flex justify-end gap-2 mt-6"><button class="btn btn-outline" data-close>Cancel</button><button class="btn btn-primary" data-close>Resolve issue</button></div>`,
+  report: `<h2 class="text-lg font-semibold">Report for a team</h2><p class="text-sm text-muted-foreground mt-1">Staff can report even when contestant intake is closed.</p><div class="space-y-3 mt-4 text-sm"><label class="block"><span class="font-medium">Affected team</span><div class="mt-1.5 h-9 rounded-md border border-input px-3 flex items-center gap-2"><i data-lucide="search" class="text-muted-foreground"></i><span class="text-muted-foreground">Search name or table — try “hall b 9”</span></div></label><label class="block"><span class="font-medium">Category</span><select class="mt-1.5 w-full h-9 rounded-md border border-input bg-transparent px-2">${DATA.session.categories.map((c) => `<option>${c}</option>`).join("")}</select></label><label class="block"><span class="font-medium">What is happening?</span><textarea class="mt-1.5 w-full rounded-md border border-input bg-transparent p-2" rows="3"></textarea></label></div><div class="flex justify-end gap-2 mt-6"><button class="btn btn-outline" data-close>Cancel</button><button class="btn btn-primary" data-close>Submit issue</button></div>`,
+};
+
+document.addEventListener("click", (e) => {
+  const el = (s) => e.target.closest(s);
+  if (el("[data-persona]")) { persona = el("[data-persona]").dataset.persona; route = ""; closeSheet(); return; }
+  if (el("[data-route]")) { e.preventDefault(); route = el("[data-route]").dataset.route; render(); return; }
+  if (el("[data-tab]")) { tab = el("[data-tab]").dataset.tab; render(); return; }
+  if (el("[data-cmd-issue]")) { $("#cmd").classList.add("hidden"); openSheet(el("[data-cmd-issue]").dataset.cmdIssue); return; }
+  if (el("[data-issue]")) { openSheet(el("[data-issue]").dataset.issue); return; }
+  if (el("[data-sheettab]")) { sheetTab = el("[data-sheettab]").dataset.sheettab; renderSheet(); return; }
+  if (el("[data-composer]")) { composer = el("[data-composer]").dataset.composer; renderSheet(); return; }
+  if (el("#overlay") || el("[data-action=close]")) { closeSheet(); return; }
+  if (el("#open-cmd") || el("[data-action=cmd]")) { openCmd(); return; }
+  if (el("#cmd [data-close]")) { $("#cmd").classList.add("hidden"); return; }
+  if (el("#dialog [data-close]")) { $("#dialog").classList.add("hidden"); return; }
+  const a = el("[data-action]")?.dataset.action;
+  if (a && DIALOGS[a]) dialog(DIALOGS[a]);
+  if (el("#theme")) document.documentElement.classList.toggle("dark");
+  if (el("#intake-switch")) { const s = $("#intake-switch"); const on = s.getAttribute("aria-checked") !== "true"; s.setAttribute("aria-checked", on); $("#intake-text").textContent = on ? "Teams can submit new reports." : "Closed. Staff can still report for a team."; }
+});
+document.addEventListener("keydown", (e) => {
+  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") { e.preventDefault(); openCmd(); }
+  if (e.key === "Escape") { $("#cmd").classList.add("hidden"); $("#dialog").classList.add("hidden"); if (selected) closeSheet(); }
+});
+$("#cmd-input").addEventListener("input", (e) => renderCmd(e.target.value));
+setInterval(() => document.querySelectorAll("[data-timer]").forEach((n) => { const i = DATA.issues.find((x) => x.id === n.dataset.timer); n.textContent = clock(elapsedMs(i)); }), 1000);
+render();
+</script>
+</body>
+</html>

@@ -1,4 +1,4 @@
-import { useId } from "react";
+import { useId, useRef } from "react";
 import {
   ChartNoAxesColumn,
   ChevronRight,
@@ -40,6 +40,7 @@ import {
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuRadioGroup,
@@ -189,6 +190,7 @@ export function ConsoleSidebar({
   onSessionChange,
   intake,
   onChangePassword,
+  onAccount,
   onSignOut,
 }: {
   state: Snapshot;
@@ -198,17 +200,23 @@ export function ConsoleSidebar({
   account: string;
   groups: readonly ConsoleNavGroup[];
   counts: Partial<Record<ConsolePage, number>>;
-  page: ConsolePage;
+  page: ConsolePage | undefined;
   onPage: (page: ConsolePage) => void;
   collapsed: boolean;
   locked: boolean;
   onSessionChange: () => void;
   /** The intake switch for admins. Omit it for other people. */
-  intake?: { open: boolean; disabled: boolean; onChange: (open: boolean) => void };
+  intake?: {
+    open: boolean;
+    disabled: boolean;
+    onChange: (open: boolean) => void;
+  };
   onChangePassword: () => void;
+  onAccount: () => void;
   onSignOut: () => void;
 }) {
   const id = useId();
+  const openingAccount = useRef(false);
   return (
     <aside
       aria-label="Console"
@@ -256,7 +264,9 @@ export function ConsoleSidebar({
                     )}
                   >
                     <Icon aria-hidden="true" className="size-4 shrink-0" />
-                    <span className={cn("flex-1 text-left", collapsed && "sr-only")}>
+                    <span
+                      className={cn("flex-1 text-left", collapsed && "sr-only")}
+                    >
                       {label}
                     </span>
                     {count !== undefined && count > 0 && (
@@ -340,7 +350,16 @@ export function ConsoleSidebar({
               />
             )}
           </DropdownMenuTrigger>
-          <DropdownMenuContent side="top" align="start" className="w-60">
+          <DropdownMenuContent
+            side="top"
+            align="start"
+            className="w-60"
+            onCloseAutoFocus={(event) => {
+              if (!openingAccount.current) return;
+              event.preventDefault();
+              openingAccount.current = false;
+            }}
+          >
             <DropdownMenuLabel className="font-normal">
               <span className="block font-medium">{personName}</span>
               <span className="block font-mono text-xs text-muted-foreground">
@@ -348,22 +367,33 @@ export function ConsoleSidebar({
               </span>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onSelect={onChangePassword}>
-              <KeyRound aria-hidden="true" />
-              Change password
-            </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <a href={docsUrl} target="_blank" rel="noopener noreferrer">
-                <ExternalLink aria-hidden="true" />
-                Documentation
-                <span className="sr-only">(opens in a new tab)</span>
-              </a>
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onSelect={onSignOut}>
-              <LogOut aria-hidden="true" />
-              Sign out
-            </DropdownMenuItem>
+            <DropdownMenuGroup>
+              <DropdownMenuItem
+                onSelect={() => {
+                  openingAccount.current = true;
+                  onAccount();
+                }}
+              >
+                <UserRoundCheck aria-hidden="true" />
+                My account
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={onChangePassword}>
+                <KeyRound aria-hidden="true" />
+                Change password
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <a href={docsUrl} target="_blank" rel="noopener noreferrer">
+                  <ExternalLink aria-hidden="true" />
+                  Documentation
+                  <span className="sr-only">(opens in a new tab)</span>
+                </a>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onSelect={onSignOut}>
+                <LogOut aria-hidden="true" />
+                Sign out
+              </DropdownMenuItem>
+            </DropdownMenuGroup>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
@@ -391,7 +421,8 @@ export function ConsoleTopBar({
   onOpenPalette: () => void;
 }) {
   const mac =
-    typeof navigator !== "undefined" && /Mac|iP(?:hone|ad)/u.test(navigator.platform);
+    typeof navigator !== "undefined" &&
+    /Mac|iP(?:hone|ad)/u.test(navigator.platform);
   return (
     <header className="flex h-14 shrink-0 items-center gap-3 border-b bg-background/95 px-4 backdrop-blur">
       <Button
@@ -411,7 +442,10 @@ export function ConsoleTopBar({
           <li aria-hidden="true">
             <ChevronRight className="size-3.5" />
           </li>
-          <li aria-current="page" className="truncate font-medium text-foreground">
+          <li
+            aria-current="page"
+            className="truncate font-medium text-foreground"
+          >
             {pageLabel}
           </li>
         </ol>
@@ -548,7 +582,9 @@ export function CommandPalette({
             {foundIssues.length > 0 && (
               <CommandGroup heading="Issues">
                 {foundIssues.map((issue) => {
-                  const team = state.teams.find((item) => item.id === issue.team_id);
+                  const team = state.teams.find(
+                    (item) => item.id === issue.team_id,
+                  );
                   return (
                     <CommandItem
                       key={issue.id}
@@ -581,10 +617,15 @@ export function CommandPalette({
                     <MapPin aria-hidden="true" />
                     <span className="min-w-0 flex-1 truncate">
                       {team.name}
-                      <span className="text-muted-foreground"> · {team.location}</span>
+                      <span className="text-muted-foreground">
+                        {" "}
+                        · {team.location}
+                      </span>
                     </span>
                     <span className="text-xs text-muted-foreground">
-                      {team.unresolved ? unresolvedLabel(team.unresolved) : "Clear"}
+                      {team.unresolved
+                        ? unresolvedLabel(team.unresolved)
+                        : "Clear"}
                     </span>
                   </CommandItem>
                 ))}

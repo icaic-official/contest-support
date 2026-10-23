@@ -1,9 +1,9 @@
 # Cloudflare authentication choice
 
 This page explains the identity choice for T0018.
-Supabase remains the active application backend.
-The complete connector and fresh isolated installations passed their [recorded checks](current-state.md).
-The development URL switch still requires [owner approval](activate-cloudflare-development.md).
+Cloudflare serves the development application through the complete connector.
+The complete connector, fresh installations, and approved stable deployment have separate [verification records](current-state.md).
+The [activation procedure](activate-cloudflare-development.md) records the separate owner approval and recovery rules.
 
 Better Auth is a free library under the [MIT licence](https://github.com/better-auth/better-auth/blob/main/LICENSE.md).
 Minsky runs it inside its own Worker with D1. This implementation requires no Better Auth subscription or hosted account.
@@ -94,7 +94,7 @@ An identity login that races a password reset cannot gain access through an olde
 See [Better Auth security settings](https://better-auth.com/docs/reference/security).
 
 Untrusted previews must use isolated fictional data and a separate authentication deployment.
-The active Supabase frontend does not receive this identity adapter or its credentials.
+Supabase frontend builds do not receive this identity adapter or its credentials.
 
 ## Resource evidence and deployment cost
 

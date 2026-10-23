@@ -3,14 +3,14 @@
 This page explains the Cloudflare connector and its provider boundaries.
 The browser uses the same `Backend` contract for Supabase and Cloudflare.
 Issue decisions use one `WorkflowService`. Provider adapters supply persistence, authentication, images, and live delivery.
-Supabase remains the active development backend.
+Cloudflare is the active development backend. Supabase remains a separate provider option.
 
 The user selected Workers, D1 with a SQLite rewrite, private R2, and Durable Objects.
 On 2026-10-18, the owner selected a fresh development installation instead of transferring existing trial data.
 Preserve application behavior and database rules. Create new accounts, IDs, and records through supported installation paths.
 Do not transfer Supabase accounts, passwords, issues, history, images, or IDs.
 Leave Supabase intact, including its existing trial data and resources.
-See [activation preparation](activate-cloudflare-development.md) for the separate approval required before switching the development URL.
+See [activation and recovery](activate-cloudflare-development.md) for the approved development switch and its operating procedure.
 See [backend contracts](backend-contracts.md) for the browser interface and [current state](current-state.md) for dated evidence.
 
 ## Two different adapter boundaries
@@ -56,7 +56,7 @@ The opt-in Supabase function executes every issue command through the shared ser
 The D1 adapter persists all nine commands from that service.
 The complete [application Worker](../src/server/adapters/cloudflare/applicationWorker.ts) combines authenticated workflow, reads, administration, images, and live connections.
 It guards current identity sessions and credential generations inside workflow commits.
-The active Supabase browser workflow still calls the legacy RPC.
+The Supabase browser workflow retains its guarded SQL RPC.
 The dotted connection identifies the opt-in executor used for replacement verification.
 
 ## Modules have explicit responsibilities
@@ -192,8 +192,8 @@ No account, password, password hash, or account ID transfers from Supabase.
 
 The Cloudflare identity adapter uses maintained Better Auth.
 See [the implementation reference](cloudflare-authentication.md) and [choice with costs](cloudflare-authentication-choice.md).
-The isolated Cloudflare application uses this identity boundary.
-The active Supabase development application retains Supabase authentication.
+The active Cloudflare development application uses this identity boundary.
+Supabase builds retain Supabase authentication.
 Minsky retains its username rules, organizer recovery, mandatory password changes, and cross-session authorization.
 
 The connector verifies current login state for each protected operation.
@@ -306,11 +306,12 @@ Untrusted branch previews receive no shared database write access or privileged 
 
 The installation procedure requires an empty isolated database and explicit provider targets.
 Use [Install an isolated Cloudflare instance](../site/src/content/docs/operators/installation.md) for configuration, bootstrap, and recovery.
-The [PR #21 component record](pr21-installation-disposition.md) preserves reuse decisions and the owner's closure decision.
+The [PR #21 component record](pr21-installation-disposition.md) preserves reuse decisions and the recommendation to close PR #21. The owner's closure decision remains pending.
 
 Data exports and migration tooling are outside the fresh-installation scope.
-The development URL continues to use Supabase until the owner approves the concrete backend switch.
-Merging preparation code does not authorize activation.
+The owner approved the concrete development switch separately from the PR #43 merge.
+Cloudflare now serves the stable development URL. Supabase resources and accounts remain intact.
+Future backend switches still require separate approval.
 Use the [activation procedure](activate-cloudflare-development.md) for exact targets, the reviewed revision, deployment commands, verification, and recovery.
 The separate documentation Worker retains its independent deployment.
 Each installation must establish its own capacity and latency evidence before live-contest use.

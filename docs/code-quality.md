@@ -3,27 +3,26 @@
 On 2026-10-02, the user selected mandatory CI, a short PR review checklist, and scans for secrets and dependencies.
 These changes extend T0003.
 The user reviews and merges.
-The frontend deployment job waits for all three required checks.
+Workers Builds does not publish the frontend.
 [Deployment activation](cloudflare-builds.md) requires separate account setup.
 
 ## Automated checks
 
-Repository branch pushes and fork pull requests run these checks.
-Same-repository PRs use branch-push results and skip the duplicate jobs.
-The [event reference](cloudflare-build-settings.md#events-and-prerequisites) records names and merge-commit coverage.
+Workers Builds runs `npm run ci` for pushes to branches in this repository.
+The [CI reference](cloudflare-build-settings.md#workers-builds) records the command and the limits.
+Fork pull requests do not push a branch here, so they do not start a build.
 
 | Check | Required behavior |
 | --- | --- |
-| `checks` | Type checking, ESLint, Deno function checks, unit and database tests, both site builds, docs links, and both browser suites must pass. |
-| `secrets` | Gitleaks scans fetched Git history, including secrets that later commits removed. It redacts findings. Any finding fails the check. |
-| `dependencies` | `npm audit --package-lock-only --audit-level=high` checks locked runtime and development dependencies. High and critical advisories fail the check. Lower severities remain visible for review. Registry failures also fail the check. |
+| `npm run ci` | Type checking, ESLint, Deno function checks, unit tests, both site builds, docs links, `npm audit` at high severity, and a Gitleaks history scan must pass. |
+| Gitleaks | The scan reads fetched Git history, including secrets that later commits removed. It redacts findings. Any finding fails the check. |
+| `npm audit` | `npm audit --package-lock-only --audit-level=high` checks the root and `site` lockfiles. High and critical advisories fail the check. Lower severities remain visible for review. Registry failures also fail the check. |
 
-The security jobs now run in `Checks`, alongside `checks`. Their required status names stay the same.
-Security checks also run weekly on the default branch.
-Manual dispatch runs all checks and the separate protected cloud job. It does not publish either frontend.
-The weekly schedule and Dependabot updates take effect after their configuration reaches `main`.
-Dependabot proposes weekly npm and GitHub Actions updates.
-It permits at most three open update PRs per ecosystem.
+Browser suites and hosted provider suites are on-demand commands.
+There is no weekly Actions run. A week with no pushes is not scanned.
+Dependabot proposes weekly npm updates for the application and the documentation site.
+It permits at most three open update PRs per directory.
+The GitHub Actions ecosystem is not monitored. The repository has no Actions workflow.
 TypeScript major updates are ignored.
 `typescript-eslint` 8.71 accepts TypeScript `>=4.8.4 <6.1.0`.
 TypeScript 7 makes `npm ci` fail.
@@ -31,15 +30,12 @@ Patch and minor TypeScript updates remain enabled.
 Updates require the same checks and review as other changes.
 
 No process automatically applies upgrades or runs `npm audit fix`.
-Workflows use repository permissions that permit reading only, pinned action commits, job timeouts, and checkout without retained credentials.
-Gitleaks uses a pinned binary with a verified checksum.
-PR security jobs do not use cloud credentials or execute package install scripts.
-The privileged cloud integration job requires manual dispatch against the separate, protected `cloud-test` project.
-It is not a routine required PR check.
-On trusted branch pushes, `deploy` waits for `checks`, `secrets`, and `dependencies` to pass.
-The workflow publishes previews for feature branches and stable sites for `main`.
-Pull requests, forks, and Dependabot do not receive deployment credentials.
-Disabling independent Cloudflare Git builds prevents a second deployment path that skips these CI prerequisites.
+Gitleaks uses pinned release 8.30.1 and a verified SHA-256 checksum.
+Ordinary builds do not receive cloud credentials.
+Hosted Supabase and Cloudflare checks are on-demand commands against isolated CI targets.
+They are not required PR checks.
+Workers Builds does not publish `minsky-dev` or `minsky-docs`.
+Keep those two Workers disconnected from Git builds so a provider build cannot skip the checks or replace the complete application.
 
 Run the usual README checks locally.
 With Gitleaks 8.30.1 installed, scan history with this command:
@@ -108,13 +104,15 @@ Then configure `main` with these requirements:
 - Require pull requests and one independent approving review.
 - Dismiss approvals when reviewable changes arrive.
 - Require resolution of review threads.
-- Require `checks`, `secrets`, and `dependencies` from GitHub Actions.
+- Do not require the retired Actions names `checks`, `secrets`, or `dependencies`.
+- After the first green Workers Builds run, require that check's exact context and app id.
 - Require the branch to be current before merge.
 - Apply protection to administrators.
 - Prohibit force pushes and branch deletion.
 
-After the new checks appear on PR #2, apply the settings in GitHub's branch-protection UI.
-An authenticated repository administrator can also use the prepared payload.
+After the Workers Builds check appears on a commit, copy its context and app id into `.github/main-protection.json`.
+The file currently requires no status checks. Do not apply it until that check name is present.
+An authenticated repository administrator can then use the prepared payload.
 Before you use it, reconcile it with existing rules.
 
 ```sh
@@ -126,8 +124,8 @@ gh api --method PUT repos/GiftedNovaHD/minsky/vulnerability-alerts
 
 The payload replaces branch protection.
 Preserve any stricter existing settings.
-Check sources use GitHub Actions app ID `15368`.
-Existing PR check runs verified this ID.
+The retired Actions contexts used GitHub Actions app ID `15368`.
+Do not put that app id back. Workers Builds uses its own GitHub app.
 See [GitHub's branch-protection API](https://docs.github.com/en/rest/branches/branch-protection#update-branch-protection).
 
 The final command enables Dependabot vulnerability alerts separately from update PRs.
@@ -135,7 +133,7 @@ The owner can also enable alerts in **Settings → Advanced Security**.
 
 Native secret scanning, push protection, and dependency review have plan requirements for private repositories.
 Do not enable paid upgrades implicitly.
-The committed Gitleaks and npm audit jobs work without those features.
+The committed Gitleaks and npm audit commands work without those features.
 CI secret scanning detects committed secrets after push.
 It does not provide GitHub push protection.
 

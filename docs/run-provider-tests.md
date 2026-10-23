@@ -28,9 +28,11 @@ The commands below verify existing implementations. They do not register a provi
    ```
 
 The command lists the cases without creating accounts, records, or a browser session.
-Ordinary pull-request CI runs this command and the credential-free checks.
+`npm run ci` runs this list. It does not run the hosted provider commands below.
 
-## Run against Supabase
+## Run against the Supabase provider
+
+This run is a manual command. It is not part of `npm run ci`.
 
 1. Use a separate test project with the repository migrations and active `admin` and `attachments` functions.
 2. Set the function origin to `http://127.0.0.1:4174`.

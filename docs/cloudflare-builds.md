@@ -15,8 +15,10 @@ Its committed configuration selects the complete Worker and the exact developmen
 Keep Workers Builds disconnected on `minsky-dev` and `minsky-docs`.
 A build on either Worker can replace the application or publish before the checks finish.
 
-`MINSKY_DEV_BACKEND` still defaults to `supabase` when absent.
-The deployed-binding guard refuses an assets-only replacement of an activated Worker.
+`MINSKY_DEV_BACKEND` defaults to `cloudflare` when absent.
+Supabase mode requires `MINSKY_DEV_BACKEND=supabase`.
+A missing Cloudflare configuration does not fall back to a static upload.
+The deployed-binding guard still refuses an assets-only replacement of an activated Worker.
 The app build sets `VITE_BACKEND` explicitly. A shell's inherited value cannot select a different backend.
 A preparation PR merge does not approve a future backend switch.
 

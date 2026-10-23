@@ -45,7 +45,8 @@ T0011 adds this documentation site.
 The initial docs deployment did not deploy the Minsky application or apply database migrations.
 The approved activation used GitHub Actions publication. That publisher is removed. Workers Builds does not publish the docs Worker or the application.
 Cloudflare app publication includes its API, bindings, schedule, and static assets.
-Migrations, bootstrap, secret creation, and a future backend switch remain separate approved operations.
+Migrations, bootstrap, and secret creation remain separate approved operations.
+A later switch of the development URL also needs a separate owner approval.
 
 ## Development and production
 

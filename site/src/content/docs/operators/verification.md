@@ -51,8 +51,8 @@ Inspect their target checks before adapting them for another installation.
 
 Read the changes and migration instructions for the selected revision.
 Validate that revision in development and an isolated CI project first.
-For Supabase, apply migrations, deploy account and attachment functions and configuration, then deploy the frontend.
 For Cloudflare, apply reviewed D1 migrations, then deploy the complete Worker and its assets with the selected configuration.
+For the Supabase provider, apply migrations, deploy account and attachment functions and configuration, then deploy the frontend.
 Preserve its authentication secret, R2 objects, and Durable Object migration history.
 Verify the complete installation afterward.
 Merging a pull request does not deploy the app.
@@ -64,7 +64,7 @@ Do not reverse database migrations simply to restore an older frontend.
 
 ## Understand the remaining checks
 
-Passing ordinary CI does not verify hosted Auth, Storage, or Realtime.
+Passing ordinary CI does not verify a hosted Cloudflare Worker or a hosted Supabase project.
 A local cloud run does not replace a protected GitHub cloud run.
 Neither establishes 800-user capacity or live-contest readiness.
 See [feature status](/reference/status/) for the current limits.

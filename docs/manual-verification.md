@@ -13,17 +13,19 @@ Those links reach the development app only after its separate frontend deploymen
 ## Experimental Cloudflare authentication
 
 Follow [Verify Cloudflare authentication](verify-cloudflare-authentication.md) for isolated HTTPS browser checks.
-These checks use fictional local accounts. They do not switch the connected application from Supabase.
+These checks use fictional local accounts.
 The account reference records current cookie, origin, recovery, and session restrictions.
 
 ## Connected application
 
-Use the linked development project and organizer-provided username and password accounts.
-Create the first admin through the explicit bootstrap process.
+The live development app is the Cloudflare Worker at https://minsky-dev.icaic-minsky.workers.dev.
+Use an organizer-provided username and password.
 Docker and persona switching are not required.
+For a separate Cloudflare installation, create the first admin through its bootstrap step.
+For the Supabase provider, follow [Supabase provider](cloud-onboarding.md).
+`npm run cloud:recover-admin` is that provider's administrator recovery.
 Use a separate browser or profile for each account: contestant, volunteer, specialist, jury, and admin.
 Work only in a clearly identified development or test session.
-See [onboarding](cloud-onboarding.md).
 
 T0015 replaced the earlier workspace with three UIs. The membership and the window width select the UI:
 
@@ -442,7 +444,7 @@ The credential-free browser harness exercises actual migrations and RLS with
 simulated hosted transport. It does not establish real Auth, Storage, Realtime,
 deployment, offline operation, or capacity results.
 
-For isolated hosted acceptance from a local CLI, follow the credential prerequisites in [cloud onboarding](cloud-onboarding.md#verification-and-protected-cloud-ci).
+For isolated hosted acceptance of the Supabase provider from a local CLI, follow the credential prerequisites in the [Supabase provider guide](cloud-onboarding.md#verification-and-protected-cloud-ci).
 Then run the current cloud suite against the explicit CI target:
 
 ```sh

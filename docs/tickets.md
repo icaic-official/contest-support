@@ -2,6 +2,12 @@
 
 These tickets describe development work, not contestant issues.
 
+On 2026-10-23 the owner selected Cloudflare as the live backend.
+The development Worker is `minsky-dev` and the development D1 database is `minsky-development`.
+Supabase stays a supported second provider.
+Older summaries that say to keep Supabase active describe that ticket's scope.
+The 2026-10-23 decision supersedes them.
+
 [PR #45](https://github.com/GiftedNovaHD/minsky/pull/45) remains the draft T0021 follow-up.
 The owner requests an update from current `main` and conflict resolution on 2026-10-23.
 Preserve its browser routes and retry protections alongside the merged frontend redesign and CI change.
@@ -259,7 +265,7 @@ Protected verification on `main` is recorded separately from the PR #41 hosted r
 
 Branch: `feature/t0018-cloudflare-authentication`, from updated `main` at `0c797ad` after PR #39 merged.
 Status: merged in [PR #40](https://github.com/GiftedNovaHD/minsky/pull/40) at `68e8642` on 2026-10-17 at 17:16:41 UTC. Local, hosted D1, and protected HTTP checks pass on Workers Paid. The PR #41 follow-up records the paid verification.
-Summary: Add Workers and D1 authentication, temporary passwords, account sessions, and organizer-assisted recovery. Keep Supabase active.
+Summary: Add Workers and D1 authentication, temporary passwords, account sessions, and organizer-assisted recovery. Keep Supabase active. Superseded on 2026-10-23.
 
 Better Auth `1.7.10` supplies username login and signed cookie sessions.
 D1 guards preserve current permissions and atomic credentials. The browser implements the existing `Authentication` interface.

@@ -6,7 +6,7 @@ description: Edit Markdown, check the generated site, and submit a documentation
 The docs use Astro Starlight to turn Markdown files into a static website.
 Cloudflare Workers Static Assets serves the generated files.
 Search runs in the browser using a generated index.
-The docs do not need a Supabase connection or account login.
+The docs do not need an application backend or account login.
 
 ## 1. Install the tools
 

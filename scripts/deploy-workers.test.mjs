@@ -146,7 +146,7 @@ function deploymentMocks() {
 
 it("publishes both exact build directories without passing GitHub credentials to Wrangler", async () => {
   const mocks = deploymentMocks();
-  await deployWorkers({ ...env, GITHUB_REF: "refs/heads/main" }, mocks);
+  await deployWorkers({ ...env, GITHUB_REF: "refs/heads/main", MINSKY_DEV_BACKEND: "supabase" }, mocks);
   expect(mocks.write.mock.calls.map(([file]) => file)).toEqual([
     "dist/minsky-revision.json", "site/dist/minsky-revision.json",
   ]);
@@ -158,11 +158,11 @@ it("publishes both exact build directories without passing GitHub credentials to
 it("does not publish a stale revision or continue after a failed upload", async () => {
   const stale = deploymentMocks();
   stale.current.mockResolvedValue(false);
-  await deployWorkers({ ...env, GITHUB_REF: "refs/heads/main" }, stale);
+  await deployWorkers({ ...env, GITHUB_REF: "refs/heads/main", MINSKY_DEV_BACKEND: "supabase" }, stale);
   expect(stale.execute).not.toHaveBeenCalled();
   const failed = deploymentMocks();
   failed.execute.mockImplementation(() => { throw new Error("Cloudflare rejected upload"); });
-  await expect(deployWorkers({ ...env, GITHUB_REF: "refs/heads/main" }, failed)).rejects.toThrow("Provider output was withheld");
+  await expect(deployWorkers({ ...env, GITHUB_REF: "refs/heads/main", MINSKY_DEV_BACKEND: "supabase" }, failed)).rejects.toThrow("Provider output was withheld");
   expect(failed.execute).toHaveBeenCalledTimes(1);
   expect(failed.verify).not.toHaveBeenCalled();
 });
@@ -170,10 +170,10 @@ it("does not publish a stale revision or continue after a failed upload", async 
 it("checks the branch again between Workers and rejects changed targets before any upload", async () => {
   const moved = deploymentMocks();
   moved.current.mockResolvedValueOnce(true).mockResolvedValue(false);
-  await deployWorkers({ ...env, GITHUB_REF: "refs/heads/main" }, moved);
+  await deployWorkers({ ...env, GITHUB_REF: "refs/heads/main", MINSKY_DEV_BACKEND: "supabase" }, moved);
   expect(moved.execute).toHaveBeenCalledTimes(1);
   const wrong = { ...deploymentMocks(), read: vi.fn().mockReturnValue('{"name":"other"}') };
-  await expect(deployWorkers({ ...env, GITHUB_REF: "refs/heads/main" }, wrong)).rejects.toThrow(/Unexpected deployment target/);
+  await expect(deployWorkers({ ...env, GITHUB_REF: "refs/heads/main", MINSKY_DEV_BACKEND: "supabase" }, wrong)).rejects.toThrow(/Unexpected deployment target/);
   expect(wrong.execute).not.toHaveBeenCalled();
 });
 
@@ -191,10 +191,12 @@ const cloudflare = {
 };
 const installation = vi.fn().mockResolvedValue(settings);
 
-it("preserves Supabase by default and requires an explicit Cloudflare selection", async () => {
-  expect(applicationBackend(development)).toBe("supabase");
+it("selects Cloudflare by default and keeps an explicit Supabase target", async () => {
+  expect(applicationBackend(development)).toBe("cloudflare");
+  expect(applicationBackend({ ...development, MINSKY_DEV_BACKEND: "supabase" })).toBe("supabase");
   expect(() => applicationBackend({ ...development, MINSKY_DEV_BACKEND: "typo" })).toThrow();
-  const target = (await deploymentTargets(development, "app"))[0];
+  await expect(deploymentTargets(development, "app")).rejects.toThrow(/provider-generated configuration/);
+  const target = (await deploymentTargets({ ...development, MINSKY_DEV_BACKEND: "supabase" }, "app"))[0];
   expect(target).toMatchObject({ backend: "supabase", config: "wrangler.jsonc" });
   expect(await deploymentTargets(cloudflare, "app", { installation })).toEqual([
     { name: "minsky-dev", assets: "dist", backend: "cloudflare", settings,
@@ -258,7 +260,7 @@ it("refuses to overwrite an activated Worker or unconfirmed settings with static
   await expect(assertStaticApplication(development, request)).rejects.toThrow(/asset upload is forbidden/);
   const mocks = deploymentMocks();
   mocks.staticApplication.mockRejectedValue(new Error("Already activated"));
-  await expect(deployWorkers(development, mocks)).rejects.toThrow("Already activated");
+  await expect(deployWorkers({ ...development, MINSKY_DEV_BACKEND: "supabase" }, mocks)).rejects.toThrow("Already activated");
   expect(mocks.execute).not.toHaveBeenCalled();
 });
 
@@ -266,7 +268,7 @@ it("builds the selected backend without private tokens and records the build rev
   for (const backend of ["supabase", "cloudflare"]) {
     const target = backend === "cloudflare"
       ? (await deploymentTargets(cloudflare, "app", { installation }))[0]
-      : (await deploymentTargets(development, "app"))[0];
+      : (await deploymentTargets({ ...development, MINSKY_DEV_BACKEND: "supabase" }, "app"))[0];
     const execute = vi.fn();
     const write = vi.fn();
     await buildWorkers({ ...development, VITE_BACKEND: "wrong", AUTH_SECRET: "private-secret" }, {
@@ -292,7 +294,7 @@ it("requires an exact build match before either deployment mode can upload", asy
       ? JSON.stringify({ sha, backend: "supabase", config: "wrangler.jsonc", databaseId: null,
           bucketName: null, origin: "https://minsky-dev.icaic-minsky.workers.dev", ...change })
       : read(path, encoding);
-    await expect(deployWorkers(development, mocks)).rejects.toThrow(/guarded deployment build/);
+    await expect(deployWorkers({ ...development, MINSKY_DEV_BACKEND: "supabase" }, mocks)).rejects.toThrow(/guarded deployment build/);
     expect(mocks.execute).not.toHaveBeenCalled();
     expect(mocks.staticApplication).not.toHaveBeenCalled();
   }
@@ -423,7 +425,7 @@ it("verifies live application bindings and the anonymous API denial after upload
   }
 });
 
-it("validates the committed development target without credentials and leaves activation disabled by default", async () => {
+it("selects the committed Cloudflare target by default and keeps Supabase explicit", async () => {
   const config = "src/server/adapters/cloudflare/deploy/development.wrangler.jsonc";
   const expected = {
     accountId: "458ad6a930b0fb717796dfa19ca6a2b1", workerName: "minsky-dev",
@@ -435,12 +437,12 @@ it("validates the committed development target without credentials and leaves ac
     MINSKY_DEV_CLOUDFLARE_CONFIG: config, MINSKY_DEV_DATABASE_ID: expected.databaseId,
     MINSKY_DEV_DATABASE_NAME: expected.databaseName, MINSKY_DEV_BUCKET_NAME: expected.bucketName,
   };
-  const enabled = await deploymentTargets({ ...prepared, MINSKY_DEV_BACKEND: "cloudflare" }, "app");
+  const enabled = await deploymentTargets(prepared, "app");
   expect(enabled).toHaveLength(1);
   expect(enabled[0]).toMatchObject({ name: "minsky-dev", config, backend: "cloudflare", settings: expected });
   expect(enabled[0].settings).toEqual(JSON.parse(readFileSync(
     "src/server/adapters/cloudflare/deploy/development.settings.json", "utf8",
   )));
-  const disabled = await deploymentTargets(prepared, "app");
-  expect(disabled).toEqual([{ name: "minsky-dev", config: "wrangler.jsonc", assets: "dist", backend: "supabase" }]);
+  const supabase = await deploymentTargets({ ...prepared, MINSKY_DEV_BACKEND: "supabase" }, "app");
+  expect(supabase).toEqual([{ name: "minsky-dev", config: "wrangler.jsonc", assets: "dist", backend: "supabase" }]);
 });

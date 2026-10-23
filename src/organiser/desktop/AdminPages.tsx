@@ -360,7 +360,7 @@ export function AccountsPage({
       <div className="grid gap-4 xl:grid-cols-2">
         <Collapsible title="Assign an existing account by ID">
           <p className="mb-3 text-sm text-muted-foreground">
-            For trusted provisioning and accounts already created in Supabase.
+            For trusted provisioning and accounts that already exist.
           </p>
           <AssignByIdForm
             teams={state.teams}

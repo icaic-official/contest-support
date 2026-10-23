@@ -40,19 +40,30 @@ See [frontend architecture](docs/frontend-architecture.md) and the [design recor
 ## Local development
 
 Use npm with Node.js 22.13 or later within 22.x, or Node.js 24 or later. Docker is not required.
-The Vite setup below uses the retained Supabase implementation.
-For a complete isolated Cloudflare runtime, use the [installation guide](site/src/content/docs/operators/installation.md).
+The live development backend is Cloudflare.
+The Worker is `minsky-dev`. The D1 database is `minsky-development`.
+The development app is [https://minsky-dev.icaic-minsky.workers.dev](https://minsky-dev.icaic-minsky.workers.dev).
+A plain Vite server does not provide that API.
+For a separate Cloudflare installation, use the [installation guide](site/src/content/docs/operators/installation.md).
 
 ```sh
 npm ci
 cp .env.example .env.local
+npm run dev
 ```
 
-Set `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` in `.env.local` using the development project's public credentials.
-Never put service credentials in a `VITE_` variable.
+`.env.example` sets `VITE_BACKEND=cloudflare`.
+Open [http://127.0.0.1:5173](http://127.0.0.1:5173).
+Sign-in on that Vite server fails because the API is absent.
+Use `npm run test:connector:ui:local` for a temporary local Cloudflare application.
+Use the hosted development app for the shared development data.
 
-Then connect to the development project and start the frontend.
-Enter the database password privately when prompted by the link command.
+### Supabase provider
+
+Set `VITE_BACKEND=supabase` to select the Supabase provider.
+Also set `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` in `.env.local`.
+Use that project's public credentials.
+Never put a service credential in a `VITE_` variable.
 
 ```sh
 npm run cloud:login
@@ -60,11 +71,12 @@ npm run cloud:link
 npm run dev
 ```
 
+Enter the database password privately when the link command prompts for it.
 Open [http://127.0.0.1:5173](http://127.0.0.1:5173).
-Provider access and app membership are separate: an administrator must grant your account session access.
+Provider access and app membership are separate. An administrator must grant your account session access.
 Sign in with your organizer-provided username and password, then change any temporary password.
-
-See [cloud onboarding](docs/cloud-onboarding.md#contributor-setup) for provider access, first setup, migrations, account recovery, and deployment.
+`npm run cloud:recover-admin` is this provider's administrator recovery. It does not change the Cloudflare installation.
+See [Supabase provider](docs/cloud-onboarding.md#contributor-setup) for access, setup, migrations, and recovery.
 
 ## Checks and common commands
 
@@ -112,16 +124,17 @@ npx playwright install chromium
 If the default browser folder is not writable, set `PLAYWRIGHT_BROWSERS_PATH` to a writable folder before the install and before each test run.
 If your shell sets `NODE_ENV=production`, unset it before `npm run dev` or `npm run test:e2e`. Otherwise the page stays blank.
 
-These commands connect to provider accounts. Several of them change hosted data or deployments. Confirm the target before you run them:
+These commands connect to provider accounts. Several of them change hosted data or deployments. Confirm the target before you run them.
+`cloud:login`, `cloud:link`, `cloud:plan`, `cloud:migrate`, `cloud:functions`, `cloud:bootstrap`, and `cloud:recover-admin` belong to the Supabase provider.
 
 | Command | Purpose |
 | --- | --- |
-| `npm run cloud:login` and `npm run cloud:link` | Sign in to Supabase and link the development project. |
+| `npm run cloud:login` and `npm run cloud:link` | Sign in to Supabase and link the Supabase provider's development project. |
 | `npm run cloud:plan` | Show the migrations that `cloud:migrate` would apply. |
 | `npm run cloud:migrate` | Apply migrations to the linked project. |
 | `npm run cloud:functions` | Deploy the `admin` and `attachments` functions to the development project. |
 | `npm run cloud:bootstrap` | Make the first session admin. |
-| `npm run cloud:recover-admin` | Reset the password of an existing admin when the only admin cannot sign in. |
+| `npm run cloud:recover-admin` | Reset a Supabase provider administrator when that provider's only admin cannot sign in. |
 | `npm run cloud:hosting-login` | Sign in to Cloudflare with Wrangler. |
 | `npm run deploy` | Build and deploy the frontend Worker. Deploy only after an explicit request. |
 | `npm run deploy:preview` | Build and upload a preview version of the frontend Worker. |
@@ -133,7 +146,7 @@ For `npm run test:cloud` and `npm run test:hosted`, follow [cloud verification](
 For shared adapter checks, follow [Run the shared provider tests](docs/run-provider-tests.md).
 The two hosted store commands accept the optional [D1 API transport](docs/run-provider-tests.md#use-the-d1-api-transport).
 Run those API commands in sequence. Default binding checks and protected CI keep their existing transport.
-`VITE_BACKEND` defaults to `supabase`. An isolated Cloudflare application build sets `VITE_BACKEND=cloudflare` and uses its own origin.
+`VITE_BACKEND` defaults to `cloudflare`. Set `VITE_BACKEND=supabase` to select the Supabase provider.
 Cloudflare cookies and API requests require the same origin. A plain Vite server does not supply that API.
 If an existing cloud fixture cleanup fails, follow [fixture recovery](docs/cloud-onboarding.md#fixture-recovery).
 
@@ -177,12 +190,12 @@ The [T0021 activation record](docs/current-state.md#t0021-approved-activation-20
 - [Frontend architecture](docs/frontend-architecture.md) — UI selection, shells, data hooks, the jury award lists, and the Tailwind and shadcn/ui setup.
 - [Frontend redesign record](design/redesign/README.md) — the mockups, the chosen direction, and how its open decisions were resolved.
 - [Current state](docs/current-state.md) — implementation details, verification records, and limitations.
-- [Supabase cloud onboarding](docs/cloud-onboarding.md) covers the retained provider, account administration, and isolated verification.
+- [Supabase provider](docs/cloud-onboarding.md) covers that provider's projects, account administration, recovery, and isolated verification.
 - [Jury worklist specification](docs/jury-worklist.md) records T0009 behavior and verified acceptance.
 - [Manual verification](docs/manual-verification.md) — workflow and interface checks.
 - [Code quality](docs/code-quality.md) — CI checks and review requirements.
 - [Server workflow reference](docs/server-workflow.md) inventories existing rules and the shared service and persistence boundaries.
-- [Verify the shared server workflow](docs/verify-server-workflow.md) gives local, CI-only hosted, and recovery commands.
+- [Verify the Supabase provider workflow](docs/verify-server-workflow.md) gives that provider's local, hosted, and recovery commands.
 - [Backend contracts](docs/backend-contracts.md) describe the provider interfaces and their behavior.
 - [Add a backend provider](docs/add-provider.md) gives contributor interfaces, registration points, installation, cleanup, and required shared verification.
 - [Activate Cloudflare development](docs/activate-cloudflare-development.md) gives the fresh-installation approval, deployment, verification, and recovery gates.

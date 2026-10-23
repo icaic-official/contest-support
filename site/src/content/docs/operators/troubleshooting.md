@@ -50,10 +50,12 @@ An operator should check the attachment function and storage errors if retries c
 
 ## A new frontend cannot call the backend
 
-Check that its build contains the intended public Supabase URL and key.
-Check the backend's frontend URL, allowed redirects, and `ALLOWED_ORIGINS`.
-Check that both account and attachment functions use the same reviewed revision as the frontend.
-Rebuild the frontend after changing its public connection settings.
+For Cloudflare, build with `VITE_BACKEND=cloudflare`.
+The browser calls the same origin. Check the Worker, its bindings, and `AUTH_ORIGIN`.
+For the Supabase provider, set `VITE_BACKEND=supabase`.
+Check its public URL, publishable key, allowed origins, and `ALLOWED_ORIGINS`.
+Check that its account and attachment functions use the same reviewed revision as the frontend.
+Rebuild the frontend after you change its public connection settings.
 
 ## The docs search has no results locally
 

@@ -63,6 +63,16 @@ or signing key. Scans of all fetched history include this announcements-branch c
 even on dependency PRs. The exception covers only that commit, file, rule, and line.
 Other findings, including new findings in the same file, still fail the scan.
 
+## Prepare a Cursor cloud agent
+
+Cursor runs `.cursor/install.sh` when a saved environment uses `.cursor/environment.json`.
+The script installs the root lockfile and the `site` lockfile with `npm ci`.
+When `deno` is missing from `PATH`, the script copies the Deno 2.9.6 binary from that locked package to `/usr/local/bin`.
+It then installs Playwright Chromium and the system libraries used by browser tests.
+Run the script again on a prepared machine. `npm ci` reinstalls from the lockfiles, and the Deno copy is skipped when `deno` already runs.
+The script does not start the app, deploy it, or read secrets.
+The machine must already have Node.js 22.22 or later, or Node.js 24. The script does not install Node.js.
+
 ## Human review
 
 [The PR template](../.github/pull_request_template.md) covers scope, readability, authorization, privacy, workflow behavior, migration compatibility, verification, and documentation.

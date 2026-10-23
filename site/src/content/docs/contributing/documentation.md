@@ -83,16 +83,15 @@ The repository CI also builds and checks the site.
 ## 5. Submit the documentation change
 
 Push your branch and open a pull request.
-Wait for `checks`, `secrets`, and `dependencies` to pass.
+Wait for `Workers Builds: minsky-ci` to pass.
 Ask a maintainer to review the content and the generated site.
 
-After account setup, repository branch pushes publish app and docs previews when CI passes.
-Open the docs preview URL in the push run's summary.
-Fork pull requests run checks without deployment credentials and do not publish previews.
-The user reviews and merges. A passing `main` run then updates the stable sites.
+Workers Builds runs `npm run ci` for branches in this repository.
+It does not publish the docs or the application.
+A fork pull request does not push a branch here, so it does not start a build.
+The user reviews and merges.
 
-For activation or manual recovery, follow the repository's `docs/cloudflare-builds.md` guide.
-The first automatic deployments remain unverified.
+For publication or manual recovery, follow the repository's `docs/cloudflare-builds.md` guide.
 
 ## 6. Check the published result
 

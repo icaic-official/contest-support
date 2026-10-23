@@ -95,7 +95,7 @@ See [cloud onboarding](docs/cloud-onboarding.md#contributor-setup) for provider 
 | `npm run test:auth:hosted -- --account=… --database=…` | Run account cases on the explicit isolated hosted authentication D1 target. |
 | `npm run test:auth:http -- --account=… --database=… --origin=…` | Check the isolated deployed authentication Worker. |
 | `npm run test:auth:hash` | Measure password cost in a temporary local Worker. |
-| `npm run test:e2e:smoke` | Run the critical-path browser files `tests/landing.spec.ts` and `tests/journey.spec.ts`. | |
+| `npm run test:e2e:smoke` | Run the critical-path browser files `tests/landing.spec.ts` and `tests/journey.spec.ts`. |
 | `npm run test:e2e` | Run every mocked browser test, including the smoke files. |
 | `npm run test:cloud` | Run the browser and workflow suite with isolated fixtures on the CI project. Needs cloud credentials. |
 | `npm run test:hosted` | Repeat the suite with real accounts against the deployed app. Needs cloud credentials. |
@@ -124,7 +124,6 @@ These commands connect to provider accounts. Several of them change hosted data 
 | `npm run cloud:recover-admin` | Reset the password of an existing admin when the only admin cannot sign in. |
 | `npm run cloud:hosting-login` | Sign in to Cloudflare with Wrangler. |
 | `npm run deploy` | Build and deploy the frontend Worker. Deploy only after an explicit request. |
-| `npm run deploy:preview` | Build and upload a preview version of the frontend Worker. |
 
 See [cloud onboarding](docs/cloud-onboarding.md) for the exact arguments.
 

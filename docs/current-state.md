@@ -91,7 +91,7 @@ Remote merge enforcement remains unverified. The earlier protection lookup and v
 
 The owner merged PR #43 at `4e43739` on 2026-10-19 at 12:29:54 UTC, then requested removal of duplicate CI checks.
 The isolated `feature/t0022-ci-run-deduplication` branch starts from that main revision.
-See [event routing](cloudflare-build-settings.md#events-and-prerequisites) for the implemented behavior and branch-head coverage.
+See [Run checks on Workers Builds](cloudflare-builds.md) for the current check behavior and branch coverage.
 Reverting the workflow change restores both executions.
 
 ### Initial local verification

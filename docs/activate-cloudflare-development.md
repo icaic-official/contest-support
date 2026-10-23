@@ -42,7 +42,6 @@ These targets exist in account `458ad6a930b0fb717796dfa19ca6a2b1`:
 
 The stable URL uses Cloudflare after the approved activation.
 `MINSKY_DEV_BACKEND=cloudflare` and the four exact target variables select the complete Worker.
-`CLOUDFLARE_DEPLOY_ENABLED=true` enables eligible publication. Set it to `false` before a coordinated switch or repair.
 The candidate remains stopped, with its public and preview URLs disabled and its cron list empty.
 The separate installation-verification and CI resources are listed in [current state](current-state.md#t0021-fresh-development-installation-2026-10-18).
 Do not substitute those resources for development.
@@ -85,7 +84,7 @@ Keep private credentials out of chat, command arguments, Git, frontend variables
 
 ## Quiesce the candidate before stable secret preparation
 
-Pause publishing and cancel any active publication job separately.
+Do not start another publish.
 Stop candidate tests and close their browser contexts and live connections.
 In account `458ad6a930b0fb717796dfa19ca6a2b1`, select only `minsky-development-candidate`:
 
@@ -135,7 +134,7 @@ The stable application uses `__Host-minsky-session` with `Secure`, `HttpOnly`, a
 
 From the approved checkout, validate the Cloudflare build and full configuration.
 Before setting publication variables, require the recorded drain deadline to pass. Confirm that pending notifications are zero.
-Reconfirm paused publishing, no active publication job, candidate shutdown, exact targets, and the preserved stable secret.
+Reconfirm candidate shutdown, exact targets, and the preserved stable secret.
 
 Run the build and dry run:
 
@@ -154,10 +153,8 @@ gh variable set MINSKY_DEV_CLOUDFLARE_CONFIG --body "$MINSKY_DEV_CLOUDFLARE_CONF
 gh variable set MINSKY_DEV_DATABASE_ID --body "$MINSKY_DEV_DATABASE_ID"
 gh variable set MINSKY_DEV_DATABASE_NAME --body "$MINSKY_DEV_DATABASE_NAME"
 gh variable set MINSKY_DEV_BUCKET_NAME --body "$MINSKY_DEV_BUCKET_NAME"
-gh variable set CLOUDFLARE_DEPLOY_ENABLED --body true
 ```
 
-`CLOUDFLARE_DEPLOY_ENABLED` no longer starts a publisher. The Actions jobs are removed.
 Publish the approved revision with the guarded script in [deployment settings](cloudflare-build-settings.md#publication-commands).
 Confirm the script's revision matches the recorded approval before it uploads.
 The app command selects `VITE_BACKEND=cloudflare`, validates the exact hosted targets, and deploys the complete Worker.
@@ -206,7 +203,7 @@ Supabase resources and accounts remain intact. No Supabase data or identifiers t
 
 ## Repair a failed activation
 
-Pause publishing with `CLOUDFLARE_DEPLOY_ENABLED=false`. Cancel active publishing jobs separately.
+Do not start another publish.
 Retain all new D1 records, R2 objects, owner results, journals, and private secrets.
 Use the latest recorded compatible complete stable revision with the retained stable configuration.
 The first verified complete stable source is `4e43739ac2ce56cca7e7739e4db189aa2854d4a9`.

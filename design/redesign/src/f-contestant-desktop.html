@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Minsky · Contestant app (desktop)</title>
+<!--SHADCN-->
+<style>
+  body { font-feature-settings: "cv11", "ss01"; }
+  .item[aria-current="true"] { background: hsl(var(--accent)); }
+  .tile:has(:checked) { border-color: hsl(var(--primary)); box-shadow: 0 0 0 1px hsl(var(--primary)); }
+</style>
+</head>
+<body class="bg-background text-foreground font-sans antialiased">
+<div class="h-screen flex flex-col">
+  <header class="h-14 shrink-0 border-b border-border flex items-center gap-4 px-5">
+    <div class="flex items-center gap-2.5"><div class="size-8 rounded-lg bg-primary text-primary-foreground grid place-items-center font-bold">M</div><div class="leading-tight"><div class="text-sm font-semibold">Minsky</div><div class="text-xs text-muted-foreground">Northern Informatics Open · Finals, contest day</div></div></div>
+    <div class="flex-1"></div>
+    <span class="badge"><span class="size-2 rounded-full bg-emerald-500"></span>Live</span>
+    <label class="flex items-center gap-2 text-xs text-muted-foreground" title="Mockup only"><span>Preview: intake</span><button class="switch" role="switch" aria-checked="true" id="intake" aria-label="Preview intake open"></button></label>
+    <button class="btn btn-ghost btn-sm" id="theme" aria-label="Toggle theme"><i data-lucide="sun-moon"></i></button>
+    <div class="h-6 w-px bg-border"></div>
+    <button class="flex items-center gap-2.5 rounded-lg px-2 py-1 hover:bg-accent"><span class="size-8 rounded-full bg-muted grid place-items-center text-xs font-semibold">TA</span><span class="text-left leading-tight"><span class="block text-sm font-medium">Team Aurora</span><span class="block text-xs text-muted-foreground">Hall A · Table 4</span></span><i data-lucide="chevron-down" class="text-muted-foreground"></i></button>
+  </header>
+  <div class="flex-1 min-h-0 grid grid-cols-[320px_1fr]">
+    <aside class="border-r border-border flex flex-col min-h-0 bg-sidebar">
+      <div class="p-4"><button class="btn btn-primary w-full h-10" data-new><i data-lucide="plus"></i>Report an issue</button><p class="text-xs text-muted-foreground mt-2 text-center" id="intake-note"></p></div>
+      <div class="px-4 pb-2 text-xs font-medium text-muted-foreground">Your reports</div>
+      <nav class="flex-1 overflow-y-auto px-2 space-y-1" id="list"></nav>
+      <div class="p-4 border-t border-border text-xs text-muted-foreground flex items-center gap-2"><i data-lucide="key-round"></i><a href="#" class="hover:underline">Change password</a><span class="flex-1"></span><a href="#" class="hover:underline">Sign out</a></div>
+    </aside>
+    <main class="overflow-y-auto" id="main"></main>
+  </div>
+</div>
+<script>
+/*DATA*/
+// The contestant sees only their own team's issues, and only public activity and images.
+const MINE = [
+  DATA.issues.find((i) => i.id === "i29"),
+  { ...DATA.issues.find((i) => i.id === "i26"), team: "t1", reporter: "Team Aurora" },
+];
+DATA.history.i26 = DATA.history.i26.map((h) => h.t === "event" ? { ...h, text: h.text.replace("Segfault Society", "Team Aurora") } : h);
+let sel = "i29", intakeOpen = true, cat = 0;
+const $ = (s) => document.querySelector(s);
+const statusBadge = (s) => `<span class="badge s-${s}"><i data-lucide="${STATUS[s].icon}" style="width:12px;height:12px"></i>${s === "escalated" ? "With a specialist" : STATUS[s].label}</span>`;
+const CAT_ICONS = ["monitor", "wifi", "gavel", "file-text", "printer", "circle-help"];
+const CAT_HELP = ["Keyboard, mouse, screen, IDE", "Cannot reach the contest site", "Submissions or verdicts", "Questions about a problem", "Print requests", "Anything else"];
+
+function list() {
+  $("#list").innerHTML = MINE.map((i) => `<button data-sel="${i.id}" aria-current="${sel === i.id}" class="item w-full text-left rounded-lg p-3 hover:bg-accent"><div class="flex items-center gap-2">${statusBadge(i.status)}<span class="ml-auto font-mono text-xs tabular-nums ${i.status === "resolved" ? "text-muted-foreground" : ""}" data-timer="${i.id}">${clock(elapsedMs(i))}</span></div><div class="text-sm font-medium mt-2 line-clamp-2">${esc(i.description)}</div><div class="text-xs text-muted-foreground mt-1">ISS-${i.number} · ${i.category} · ${relTime(i.created)}</div></button>`).join("");
+  $("#intake-note").innerHTML = intakeOpen ? "A helper comes to your table." : "Reporting is closed by the organisers.";
+  document.querySelector("[data-new]").disabled = !intakeOpen;
+  document.querySelector("[data-new]").style.opacity = intakeOpen ? 1 : .5;
+}
+
+function tracker(i) {
+  const steps = [
+    ["send", "Sent", wallTime(i.created), true],
+    ["footprints", "Helper assigned", i.owner ? `${i.owner} · ${wallTime(i.first)}` : "Waiting for a helper", !!i.owner],
+    ["circle-check", "Resolved", i.resolved ? wallTime(i.resolved) : i.status === "escalated" ? "A specialist is looking" : "Not yet", i.status === "resolved"],
+    ["scale", "Time award", i.award ? `+${i.award.minutes} min decided` : i.status === "resolved" ? "Jury reviewing" : "After resolution", !!i.award],
+  ];
+  const cur = steps.findIndex((s) => !s[3]);
+  return `<ol class="grid grid-cols-4 gap-3">${steps.map(([ic, l, sub, done], n) => `<li><div class="flex items-center gap-2"><span class="size-8 rounded-full grid place-items-center shrink-0 ${done ? "bg-primary text-primary-foreground" : n === cur ? "border-2 border-primary" : "border border-border text-muted-foreground"}"><i data-lucide="${done ? "check" : ic}" style="width:15px"></i></span><span class="h-0.5 flex-1 rounded ${n === 3 ? "hidden" : done ? "bg-primary" : "bg-border"}"></span></div><div class="mt-2 text-sm font-medium ${done || n === cur ? "" : "text-muted-foreground"}">${l}</div><div class="text-xs text-muted-foreground">${sub}</div></li>`).join("")}</ol>`;
+}
+
+function headline(i) {
+  return { open: "Your report is in the queue. A helper will come to Table 4.", claimed: `${i.owner?.split(" ")[0]} is handling your report.`, escalated: "A specialist is looking at your report.", resolved: "This issue is resolved." }[i.status];
+}
+
+function detail(i) {
+  const pub = (DATA.history[i.id] ?? []).filter((h) => h.t !== "internal");
+  const imgs = (DATA.images[i.id] ?? []).filter((m) => m.vis === "public");
+  const resolve = pub.find((h) => h.t === "resolve");
+  return `<div class="max-w-4xl mx-auto p-8 space-y-6">
+    <div><div class="flex items-center gap-2 text-sm text-muted-foreground"><span class="font-mono">ISS-${i.number}</span>·<span>${i.category}</span>·<span>sent ${wallTime(i.created)}</span></div>
+    <h1 class="text-2xl font-semibold tracking-tight mt-1">${headline(i)}</h1></div>
+    <section class="rounded-xl border border-border bg-card p-6"><div class="flex items-start gap-6"><div class="flex-1"><div class="text-xs text-muted-foreground">Your report</div><p class="mt-1 text-[15px]">${esc(i.description)}</p></div><div class="text-right"><div class="text-xs text-muted-foreground flex items-center gap-1.5 justify-end">${i.status !== "resolved" ? `<span class="size-1.5 rounded-full bg-emerald-500 animate-pulse"></span>Unresolved time` : "Total unresolved time"}</div><div class="font-mono text-4xl font-semibold tabular-nums" data-timer="${i.id}">${clock(elapsedMs(i))}</div></div></div>
+      <div class="mt-6 pt-6 border-t border-border">${tracker(i)}</div></section>
+    ${resolve ? `<section class="rounded-xl border border-emerald-500/40 bg-emerald-500/5 p-5"><div class="flex items-center gap-2 text-sm s-resolved font-medium"><i data-lucide="circle-check"></i>Resolution</div><p class="mt-1 text-lg font-medium">${esc(resolve.text)}</p><p class="text-xs text-muted-foreground mt-1">${resolve.who} · ${wallTime(resolve.at)}</p>
+      <details class="mt-4 group"><summary class="text-sm text-muted-foreground cursor-pointer hover:text-foreground list-none flex items-center gap-1.5"><i data-lucide="rotate-ccw" style="width:14px"></i>The problem is back? Reopen this issue</summary><div class="mt-3 flex gap-2"><input class="field flex-1" placeholder="Tell staff what is still wrong"><button class="btn btn-outline">Reopen</button></div><p class="text-xs text-muted-foreground mt-1.5">The same helper stays responsible. The timer continues from where it stopped.</p></details></section>` : ""}
+    ${i.award ? `<section class="rounded-xl border border-border bg-card p-5 grid grid-cols-[auto_1fr] gap-5 items-center"><div class="text-center px-4"><div class="text-4xl font-bold tabular-nums">+${i.award.minutes}</div><div class="text-xs text-muted-foreground">minutes</div></div><div><div class="font-medium">Time award</div><p class="text-sm text-muted-foreground">${esc(i.award.explanation)}</p><div class="flex gap-4 mt-3 text-xs"><span class="flex items-center gap-1.5 s-resolved"><i data-lucide="circle-check" style="width:14px"></i>Decided by the jury</span><span class="flex items-center gap-1.5 ${i.award.applied ? "s-resolved" : "text-muted-foreground"}"><i data-lucide="${i.award.applied ? "circle-check" : "circle-dashed"}" style="width:14px"></i>${i.award.applied ? "Applied to your contest time" : "Not yet applied to your contest time"}</span></div></div></section>` : ""}
+    <section class="rounded-xl border border-border bg-card"><div class="px-5 py-4 border-b border-border flex items-center"><h2 class="font-semibold">Messages</h2><span class="ml-2 text-xs text-muted-foreground">Staff and your team</span></div>
+      <div class="p-5 space-y-4">${pub.map((h) => h.t === "public" ? (h.who === "Team Aurora" ? `<div class="flex justify-end"><div class="max-w-[70%] rounded-2xl rounded-br-md bg-primary text-primary-foreground px-4 py-2.5"><div class="text-xs opacity-70">You · ${wallTime(h.at)}</div><div class="text-sm">${esc(h.text)}</div></div></div>` : `<div class="flex gap-3"><span class="size-8 rounded-full bg-muted grid place-items-center text-[11px] font-semibold shrink-0">${initials(h.who)}</span><div class="max-w-[70%] rounded-2xl rounded-bl-md border border-border px-4 py-2.5"><div class="text-xs text-muted-foreground">${h.who} · Staff · ${wallTime(h.at)}</div><div class="text-sm">${esc(h.text)}</div></div></div>`) : `<div class="flex items-center gap-3 text-xs text-muted-foreground"><span class="h-px flex-1 bg-border"></span>${esc(h.text.replace("Team Aurora", "you"))} · ${wallTime(h.at)}<span class="h-px flex-1 bg-border"></span></div>`).join("")}</div>
+      ${imgs.length ? `<div class="px-5 pb-5"><div class="text-xs text-muted-foreground mb-2">Images from staff</div><div class="flex gap-2">${imgs.map((m) => `<div class="w-28 aspect-[4/3] rounded-lg" style="background:linear-gradient(135deg,hsl(${m.hue} 60% 55%),hsl(${m.hue + 40} 60% 35%))"></div>`).join("")}</div></div>` : ""}
+      ${i.status !== "resolved" ? `<div class="p-4 border-t border-border flex gap-2"><input class="field flex-1" placeholder="Add details for staff…"><button class="btn btn-primary h-10"><i data-lucide="send"></i>Send</button></div>` : ""}</section>
+  </div>`;
+}
+
+function newReport() {
+  return `<div class="max-w-3xl mx-auto p-8"><h1 class="text-2xl font-semibold tracking-tight">Report an issue</h1><p class="text-muted-foreground mt-1">A helper will come to <b class="text-foreground">Hall A · Table 4</b>. Your unresolved time starts when you send this report.</p>
+    ${intakeOpen ? "" : `<div class="mt-4 rounded-lg border border-amber-500/40 bg-amber-500/10 p-4 text-sm flex gap-3"><i data-lucide="circle-pause" class="s-escalated"></i><div><b>Reporting is closed.</b> The organisers closed new reports for this session. Raise your hand if you need help now.</div></div>`}
+    <fieldset ${intakeOpen ? "" : "disabled class='opacity-50'"}><div class="mt-6 text-sm font-medium">What kind of problem?</div><div class="grid grid-cols-3 gap-3 mt-2">${DATA.session.categories.map((c, n) => `<label class="tile rounded-xl border border-border p-4 cursor-pointer hover:bg-accent/50"><input type="radio" name="cat" class="sr-only" ${n === cat ? "checked" : ""} data-cat="${n}"><i data-lucide="${CAT_ICONS[n]}"></i><div class="font-medium mt-2">${c}</div><div class="text-xs text-muted-foreground">${CAT_HELP[n]}</div></label>`).join("")}</div>
+    <label class="block mt-6"><span class="text-sm font-medium">What is happening?</span><textarea class="field mt-2 min-h-32" maxlength="2000" placeholder="For example: the keyboard stopped working after the IDE froze. The mouse still works."></textarea></label>
+    <div class="flex items-center justify-between mt-4"><span class="text-xs text-muted-foreground">Staff can see your report and reply here. Do not include solution code.</span><div class="flex gap-2"><button class="btn btn-outline" data-sel="${MINE[0].id}">Cancel</button><button class="btn btn-primary"><i data-lucide="send"></i>Send report</button></div></div></fieldset></div>`;
+}
+
+function render() {
+  list();
+  $("#main").innerHTML = sel === "new" ? newReport() : detail(MINE.find((i) => i.id === sel));
+  lucide.createIcons();
+}
+document.addEventListener("click", (e) => {
+  const g = (s) => e.target.closest(s);
+  if (g("[data-sel]")) sel = g("[data-sel]").dataset.sel;
+  else if (g("[data-new]")) sel = "new";
+  else if (g("#intake")) { intakeOpen = !intakeOpen; $("#intake").setAttribute("aria-checked", intakeOpen); }
+  else if (g("#theme")) { document.documentElement.classList.toggle("dark"); return; }
+  else return;
+  render();
+});
+document.addEventListener("change", (e) => { if (e.target.dataset.cat) cat = Number(e.target.dataset.cat); });
+setInterval(() => document.querySelectorAll("[data-timer]").forEach((n) => { n.textContent = clock(elapsedMs(MINE.find((x) => x.id === n.dataset.timer))); }), 1000);
+render();
+</script>
+</body>
+</html>

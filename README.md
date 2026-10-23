@@ -6,7 +6,7 @@ Jury members record time awards, and staff confirm their application to the exte
 Administrators manage accounts, roles, and contestant intake.
 Staff can attach images to issues and choose staff-only or team visibility.
 
-The app uses React, TypeScript, and Vite.
+The app uses React, TypeScript, Vite, Tailwind CSS, and shadcn/ui.
 Its shared [backend contract](docs/backend-contracts.md) has Supabase and Cloudflare implementations.
 Supabase remains the active development backend.
 The Cloudflare installation serves the frontend and API through Workers, with D1, private R2 images, and Durable Object live updates.
@@ -18,6 +18,19 @@ T0021 prepares a fresh Cloudflare development installation after PR #42 merged a
 It transfers no existing Supabase records or accounts. Supabase stays intact and active until the owner approves the concrete backend switch.
 See [current state](docs/current-state.md) for source-specific checks and [activation](docs/activate-cloudflare-development.md) for the remaining gates.
 These are development installations that require connectivity. Live-contest readiness and capacity for 800 simultaneous users remain unverified.
+
+## User interfaces
+
+T0015 redesigns the frontend on `feature/t0015-frontend-redesign`. It is not merged yet.
+After sign-in, the membership selects one of three UIs:
+
+- **Contestant desktop app.** A membership with a team gets this app. It shows the team's reports, a live timer, a progress tracker, public messages, team-visible images and the report form. It has no phone layout and needs a window at least 1024 px wide.
+- **Organiser phone app.** Staff in a window narrower than 1024 px get bottom tabs by role: Queue, Mine, Find, Awards, Session and Me. Issues open in a full-screen view with an action bar and bottom sheets.
+- **Organiser desktop console.** Staff in a window 1024 px wide or wider get a sidebar, a queue table, an issue side sheet, a ⌘K command palette, Award review and the admin pages.
+
+The jury award lists from T0009 are in the phone **Awards** tab and the desktop **Award review** page.
+All UIs use shadcn/ui, Tailwind CSS and the same data hooks, with light and dark themes.
+See [frontend architecture](docs/frontend-architecture.md) and the [design record](design/redesign/README.md).
 
 ## Local development
 
@@ -75,15 +88,36 @@ See [cloud onboarding](docs/cloud-onboarding.md#contributor-setup) for provider 
 | `npm run test:auth:http -- --account=… --database=… --origin=…` | Check the isolated deployed authentication Worker. |
 | `npm run test:auth:hash` | Measure password cost in a temporary local Worker. |
 | `npm run test:e2e` | Run browser tests with mocked cloud responses. |
+| `npm run test:cloud` | Run the browser and workflow suite with isolated fixtures on the CI project. Needs cloud credentials. |
+| `npm run test:hosted` | Repeat the suite with real accounts against the deployed app. Needs cloud credentials. |
 | `npm run test:providers:list` | List the shared provider scenarios without hosted credentials. |
 | `npm run test:providers -- --provider=supabase` | Run the shared contracts against an explicitly configured isolated Supabase project. |
 | `npm run test:providers -- --provider=cloudflare --config=… --account=… --database=… --origin=…` | Run the same contracts through the isolated Cloudflare browser adapter. |
 
-Install Chromium once before browser tests:
+Install the Chromium build that matches the installed Playwright (1.64) before browser tests:
 
 ```sh
 npx playwright install chromium
 ```
+
+If the default browser folder is not writable, set `PLAYWRIGHT_BROWSERS_PATH` to a writable folder before the install and before each test run.
+If your shell sets `NODE_ENV=production`, unset it before `npm run dev` or `npm run test:e2e`. Otherwise the page stays blank.
+
+These commands connect to provider accounts. Several of them change hosted data or deployments. Confirm the target before you run them:
+
+| Command | Purpose |
+| --- | --- |
+| `npm run cloud:login` and `npm run cloud:link` | Sign in to Supabase and link the development project. |
+| `npm run cloud:plan` | Show the migrations that `cloud:migrate` would apply. |
+| `npm run cloud:migrate` | Apply migrations to the linked project. |
+| `npm run cloud:functions` | Deploy the `admin` and `attachments` functions to the development project. |
+| `npm run cloud:bootstrap` | Make the first session admin. |
+| `npm run cloud:recover-admin` | Reset the password of an existing admin when the only admin cannot sign in. |
+| `npm run cloud:hosting-login` | Sign in to Cloudflare with Wrangler. |
+| `npm run deploy` | Build and deploy the frontend Worker. Deploy only after an explicit request. |
+| `npm run deploy:preview` | Build and upload a preview version of the frontend Worker. |
+
+See [cloud onboarding](docs/cloud-onboarding.md) for the exact arguments.
 
 Deno and the provider CLIs are pinned npm dependencies.
 For `npm run test:cloud` and `npm run test:hosted`, follow [cloud verification](docs/cloud-onboarding.md#verification-and-protected-cloud-ci).
@@ -134,6 +168,8 @@ PR #42 merged at `104d9d1`. T0021 includes the accepted connector and its final 
 - [Deployment setup](docs/cloudflare-builds.md) explains branch previews, deployment after CI passes, and first-run verification.
 - [Documentation release plan](docs/documentation-release-plan.md) — public-reader requirements, specific gaps, and completion criteria.
 - [Development tickets](docs/tickets.md) — ticket scope, status, and acceptance criteria.
+- [Frontend architecture](docs/frontend-architecture.md) — UI selection, shells, data hooks, the jury award lists, and the Tailwind and shadcn/ui setup.
+- [Frontend redesign record](design/redesign/README.md) — the mockups, the chosen direction, and how its open decisions were resolved.
 - [Current state](docs/current-state.md) — implementation details, verification records, and limitations.
 - [Cloud onboarding](docs/cloud-onboarding.md) — provider setup, costs, accounts, and deployment.
 - [Jury worklist specification](docs/jury-worklist.md) records T0009 behavior and verified acceptance.

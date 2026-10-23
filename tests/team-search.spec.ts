@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 import type { Command, Issue, Membership, Snapshot } from '../src/connected/model';
 
 const USER_ID = '00000000-0000-4000-8000-000000000001';
@@ -14,8 +14,25 @@ const ISSUE_IDS = [
   '00000000-0000-4000-8000-000000000022',
 ];
 
-/** Intercepts Auth and session reads; every identity and record is fictional. */
-async function signIn(page: Page) {
+/** The desktop console at its smallest supported size. */
+const desktop = { width: 1280, height: 800 };
+/** A common phone size for the organiser phone app. */
+const phone = { width: 390, height: 844 };
+
+type Viewport = typeof desktop;
+
+const sessionNames: Record<string, string> = {
+  [SESSION_ID]: 'Session one',
+  [SECOND_SESSION_ID]: 'Session two',
+};
+
+/**
+ * Intercepts Auth and session reads; every identity and record is fictional.
+ * Session one has Aurora (issue 1 open, issue 2 resolved) and Cedar (issue 3
+ * open). Session two has one team, Another, with all three issues.
+ */
+async function signIn(page: Page, viewport: Viewport) {
+  await page.setViewportSize(viewport);
   const user = {
     id: USER_ID,
     aud: 'authenticated',
@@ -77,7 +94,7 @@ async function signIn(page: Page) {
     } else if (path === '/rest/v1/sessions') {
       result = memberships.map((member) => ({
         id: member.session_id,
-        name: member.session_id === SESSION_ID ? 'Session one' : 'Session two',
+        name: sessionNames[member.session_id],
       }));
     } else if (path === '/rest/v1/rpc/session_snapshot') {
       const sessionId: string = route.request().postDataJSON().p_session;
@@ -96,7 +113,7 @@ async function signIn(page: Page) {
         session: {
           id: sessionId,
           event_id: EVENT_ID,
-          name: 'Review session',
+          name: sessionNames[sessionId],
           intake_open: true,
           categories: ['Network', 'Device'],
           revision: 0,
@@ -149,8 +166,15 @@ async function signIn(page: Page) {
   await page.getByLabel('Username', { exact: true }).fill('reviewer');
   await page.getByLabel('Password', { exact: true }).fill('fixture-password');
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
-  await expect(page.locator('#queue-team-search')).toBeVisible();
-  await expect(page.locator('.issue-list .issue-card')).toHaveCount(3);
+  if (viewport.width >= 1024) {
+    await expect(page.locator('[data-ui="organiser-desktop"]')).toBeVisible();
+    await expect(page.locator('#queue-team-search')).toBeVisible();
+    // The Active tab hides the resolved issue 2.
+    await expect(issueRows(page)).toHaveCount(2);
+  } else {
+    await expect(page.locator('[data-ui="organiser-phone"]')).toBeVisible();
+    await expect(page.locator('[id^="issue-card-"]')).toHaveCount(2);
+  }
   return {
     commands,
     errors,
@@ -166,151 +190,313 @@ async function signIn(page: Page) {
   };
 }
 
-test('Tab leaves open suggestions and selection still supports keyboard and pointer', async ({ page }) => {
-  const fixture = await signIn(page);
+/** The issue number buttons of the desktop queue table. */
+function issueRows(page: Page): Locator {
+  return page.locator('[data-issue-row]');
+}
+
+/** The team names in the Team column of the desktop queue table. */
+function rowTeams(page: Page): Locator {
+  return page.locator('tbody tr td:nth-child(4) div:first-child');
+}
+
+function statusTab(page: Page, label: string): Locator {
+  return page
+    .getByRole('group', { name: 'Filter by status' })
+    .getByRole('button', { name: new RegExp(`^${label} \\d+$`) });
+}
+
+/** Asks the app to read the session again, as a returning window does. */
+async function refresh(page: Page) {
+  await page.evaluate(() => { window.dispatchEvent(new Event('focus')); });
+}
+
+/** Opens the staff report dialog (desktop) or sheet (phone). */
+async function openReport(page: Page): Promise<Locator> {
+  const name = (page.viewportSize()?.width ?? 0) >= 1024 ? 'Report for a team' : 'Report';
+  await page.getByRole('button', { name, exact: true }).click();
+  const report = page.getByRole('dialog', { name: 'Report for a team' });
+  await expect(report).toBeVisible();
+  return report;
+}
+
+test('desktop queue filter: Tab leaves open suggestions, and keyboard and pointer select a team', async ({ page }) => {
+  const fixture = await signIn(page, desktop);
   const queue = page.locator('#queue-team-search');
-  const options = page.locator('.team-suggestions [role=option]');
+  const options = page.getByRole('option');
   await queue.fill('aur');
   await expect(options).toHaveCount(1);
   await queue.press('Tab');
-  await expect(page.locator('.filter-label select')).toBeFocused();
+  await expect(queue).not.toBeFocused();
   await expect(options).toHaveCount(0);
-  await expect(page.locator('.issue-list .issue-card')).toHaveCount(3);
+  await expect(issueRows(page)).toHaveCount(2);
   await queue.focus();
   await queue.press('ArrowDown');
   await queue.press('Enter');
   await expect(queue).toHaveValue('Aurora');
-  await expect(page.locator('.issue-list .issue-card')).toHaveCount(2);
-  await page.locator('.filter-label select').selectOption('resolved');
-  await expect(page.locator('.issue-list .issue-card')).toHaveCount(1);
+  await expect(issueRows(page)).toHaveCount(1);
   await expect(page.locator('#queue-team-search-chosen')).toContainText('1 unresolved issue');
-  await page.getByRole('button', { name: 'Report for team', exact: true }).click();
-  const report = page.locator('#report-team-search');
-  await expect(report).toHaveValue('Aurora');
-  await report.fill('ced');
+  await statusTab(page, 'All').click();
+  await expect(issueRows(page)).toHaveCount(2);
+  await statusTab(page, 'Resolved').click();
+  await expect(issueRows(page)).toHaveCount(1);
+  await expect(issueRows(page)).toHaveText('Open ISS-2');
+
+  // The report dialog has its own team choice. It does not change the queue filter.
+  const report = await openReport(page);
+  const reportTeam = report.locator('#report-team-search');
+  const submit = report.getByRole('button', { name: 'Submit issue', exact: true });
+  await expect(reportTeam).toHaveValue('');
+  await reportTeam.fill('ced');
   await expect(options).toHaveCount(1);
-  await report.press('Tab');
-  await expect(page.locator('select[name=category]')).toBeFocused();
+  await reportTeam.press('Tab');
+  await expect(report.getByRole('radio', { name: 'Network', exact: true })).toBeFocused();
   await expect(options).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Submit issue', exact: true })).toBeDisabled();
-  await report.focus();
+  await report.getByLabel('What’s happening?').fill('Review submission');
+  await expect(submit).toBeDisabled();
+  await reportTeam.focus();
   await options.click();
-  await expect(queue).toHaveValue('Cedar');
-  await page.getByLabel('What’s happening?').fill('Review submission');
-  await page.getByRole('button', { name: 'Submit issue', exact: true }).click();
-  await expect(report).toHaveCount(0);
-  expect(fixture.commands).toEqual([{ type: 'submit', team_id: CEDAR_ID, category: 'Network', description: 'Review submission' }]);
+  await expect(reportTeam).toHaveValue('Cedar');
+  await expect(submit).toBeEnabled();
+  await submit.click();
+  await expect(report).toBeHidden();
+  await expect.poll(() => fixture.commands).toEqual([
+    { type: 'submit', team_id: CEDAR_ID, category: 'Network', description: 'Review submission' },
+  ]);
+  await expect(queue).toHaveValue('Aurora');
   expect(fixture.errors).toEqual([]);
 });
 
-for (const activation of ['Enter', 'Space']) {
-  test(`Clear team with ${activation} resets both controls and restores the queue`, async ({ page }) => {
-    await page.setViewportSize({
-      width: activation === 'Enter' ? 1400 : 320,
-      height: activation === 'Enter' ? 950 : 844,
-    });
-    const fixture = await signIn(page);
-    const queue = page.locator('#queue-team-search');
-    const options = page.locator('.team-suggestions [role=option]');
-    const rows = page.locator('.issue-list .issue-card');
-    const status = page.locator('.filter-label select');
-    await status.selectOption('open');
-    await queue.fill('aur');
-    await queue.press('ArrowDown');
-    await queue.press('Enter');
-    await expect(queue).toHaveValue('Aurora');
-    await expect(rows).toHaveCount(1);
-    await queue.press('Tab');
-    await expect(page.locator('.queue-toolbar .team-search-clear')).toBeFocused();
-    await page.keyboard.press(activation);
-    await expect(queue).toHaveValue('');
-    await expect(queue).toBeFocused();
-    await expect(rows).toHaveCount(2);
-    await expect(status).toHaveValue('open');
-    await expect(page.locator('.team-search-clear')).toHaveCount(0);
-    await expect(options).toHaveCount(0);
+test('phone report sheet: Tab leaves open suggestions, and keyboard and pointer select a team', async ({ page }) => {
+  const fixture = await signIn(page, phone);
+  const options = page.getByRole('option');
+  const report = await openReport(page);
+  const reportTeam = report.locator('#report-team-search');
+  const submit = report.getByRole('button', { name: 'Submit issue', exact: true });
+  await reportTeam.fill('ced');
+  await expect(options).toHaveCount(1);
+  await reportTeam.press('Tab');
+  await expect(report.getByRole('radio', { name: 'Network', exact: true })).toBeFocused();
+  await expect(options).toHaveCount(0);
+  await expect(submit).toBeDisabled();
+  await reportTeam.focus();
+  await options.click();
+  await expect(reportTeam).toHaveValue('Cedar');
+  await reportTeam.fill('aur');
+  await reportTeam.press('ArrowDown');
+  await reportTeam.press('Enter');
+  await expect(reportTeam).toHaveValue('Aurora');
+  await expect(report.locator('#report-team-search-chosen')).toContainText('1 unresolved issue');
+  await report.getByLabel('What’s happening?').fill('Phone submission');
+  await submit.click();
+  await expect.poll(() => fixture.commands).toEqual([
+    { type: 'submit', team_id: AURORA_ID, category: 'Network', description: 'Phone submission' },
+  ]);
+  expect(fixture.errors).toEqual([]);
+});
 
-    await queue.fill('ced');
-    await options.click();
-    await page.getByRole('button', { name: 'Report for team', exact: true }).click();
-    const report = page.locator('#report-team-search');
-    const submit = page.getByRole('button', { name: 'Submit issue', exact: true });
-    await expect(report).toHaveValue('Cedar');
-    await expect(submit).toBeEnabled();
-    await page.locator('select[name=category]').selectOption('Device');
-    await page.getByLabel('What’s happening?').fill('Keep this draft');
-    await report.focus();
-    await report.press('Tab');
-    await expect(page.locator('#issue-report .team-search-clear')).toBeFocused();
-    await page.keyboard.press(activation);
-    await expect(report).toHaveValue('');
-    await expect(report).toBeFocused();
-    await expect(queue).toHaveValue('');
-    await expect(rows).toHaveCount(2);
-    await expect(status).toHaveValue('open');
-    await expect(submit).toBeDisabled();
-    await expect(page.locator('.team-search-clear')).toHaveCount(0);
-    await expect(page.getByLabel('What’s happening?')).toHaveValue('Keep this draft');
-    await expect(page.locator('select[name=category]')).toHaveValue('Device');
+test('phone Find tab searches teams by name and location and opens a team', async ({ page }) => {
+  const fixture = await signIn(page, phone);
+  await page
+    .getByRole('navigation', { name: 'Organiser sections' })
+    .getByRole('button', { name: 'Find', exact: true })
+    .click();
+  const find = page.getByLabel('Find a team, table or issue number');
+  const teams = page.getByRole('region', { name: 'Teams' }).getByRole('button');
+  await expect(teams).toHaveCount(2);
+  await find.fill('hall b');
+  await expect(teams).toHaveCount(1);
+  await expect(teams).toContainText('Cedar');
+  await find.fill('aur');
+  await expect(teams).toHaveCount(1);
+  await teams.click();
+  await expect(page.getByRole('heading', { name: 'Aurora', exact: true })).toBeVisible();
+  await expect(page.locator('[id^="issue-card-"]')).toHaveCount(2);
+  await page.getByRole('button', { name: 'All teams', exact: true }).click();
+  await expect(find).toHaveValue('aur');
+  await find.fill('zzz');
+  await expect(page.getByText('No matching teams.')).toBeVisible();
+  expect(fixture.errors).toEqual([]);
+});
 
-    // A new choice still enables submission, and pointer clearing still works.
-    await report.fill('aur');
-    await options.click();
-    await expect(queue).toHaveValue('Aurora');
-    await expect(submit).toBeEnabled();
-    await page.locator('#issue-report .team-search-clear').click();
-    await expect(report).toHaveValue('');
-    await expect(report).toBeFocused();
-    await expect(queue).toHaveValue('');
-    await expect(rows).toHaveCount(2);
-    await expect(submit).toBeDisabled();
-    expect(fixture.commands).toEqual([]);
-    expect(fixture.errors).toEqual([]);
-  });
+/**
+ * Chooses Cedar in the open report form, then clears it with the keyboard
+ * and the pointer. The category and description stay.
+ */
+async function clearReportTeam(page: Page, report: Locator, activation: string) {
+  const reportTeam = report.locator('#report-team-search');
+  const clear = report.getByRole('button', { name: 'Clear team', exact: true });
+  const submit = report.getByRole('button', { name: 'Submit issue', exact: true });
+  const description = report.getByLabel('What’s happening?');
+  const device = report.getByRole('radio', { name: 'Device', exact: true });
+  await reportTeam.fill('ced');
+  await page.getByRole('option').click();
+  await expect(reportTeam).toHaveValue('Cedar');
+  await report.getByText('Device', { exact: true }).click();
+  await expect(device).toBeChecked();
+  await description.fill('Keep this draft');
+  await expect(submit).toBeEnabled();
+  await reportTeam.focus();
+  await reportTeam.press('Tab');
+  await expect(clear).toBeFocused();
+  await page.keyboard.press(activation);
+  await expect(reportTeam).toHaveValue('');
+  await expect(reportTeam).toBeFocused();
+  await expect(submit).toBeDisabled();
+  await expect(clear).toHaveCount(0);
+  await expect(page.getByRole('option')).toHaveCount(0);
+  await expect(description).toHaveValue('Keep this draft');
+  await expect(device).toBeChecked();
+
+  // A new choice enables submission again, and pointer clearing still works.
+  await reportTeam.fill('aur');
+  await page.getByRole('option').click();
+  await expect(submit).toBeEnabled();
+  await clear.click();
+  await expect(reportTeam).toHaveValue('');
+  await expect(reportTeam).toBeFocused();
+  await expect(submit).toBeDisabled();
 }
 
+test('Clear team with Enter resets the desktop queue filter and the report team', async ({ page }) => {
+  const fixture = await signIn(page, desktop);
+  const queue = page.locator('#queue-team-search');
+  const open = statusTab(page, 'Open');
+  await open.click();
+  await queue.fill('aur');
+  await queue.press('ArrowDown');
+  await queue.press('Enter');
+  await expect(queue).toHaveValue('Aurora');
+  await expect(issueRows(page)).toHaveCount(1);
+  await queue.press('Tab');
+  await expect(page.getByRole('button', { name: 'Clear team', exact: true })).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(queue).toHaveValue('');
+  await expect(queue).toBeFocused();
+  await expect(issueRows(page)).toHaveCount(2);
+  await expect(open).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByRole('button', { name: 'Clear team', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('option')).toHaveCount(0);
+
+  await clearReportTeam(page, await openReport(page), 'Enter');
+  await page.keyboard.press('Escape');
+  await expect(queue).toHaveValue('');
+  await expect(issueRows(page)).toHaveCount(2);
+  expect(fixture.commands).toEqual([]);
+  expect(fixture.errors).toEqual([]);
+});
+
+test('Clear team with Space resets the report team in a 320 px phone sheet', async ({ page }) => {
+  const fixture = await signIn(page, { width: 320, height: 844 });
+  await clearReportTeam(page, await openReport(page), 'Space');
+  expect(fixture.commands).toEqual([]);
+  expect(fixture.errors).toEqual([]);
+});
+
 test('a refreshed contestant membership drops the hidden staff team filter', async ({ page }) => {
-  const fixture = await signIn(page);
+  const fixture = await signIn(page, desktop);
   await page.locator('#queue-team-search').fill('ced');
-  await page.locator('.team-suggestions [role=option]').click();
-  await expect(page.locator('.issue-list .issue-card')).toHaveCount(1);
+  await page.getByRole('option').click();
+  await expect(issueRows(page)).toHaveCount(1);
   fixture.assignContestant();
-  await page.evaluate(() => { window.dispatchEvent(new Event('focus')); });
-  await expect(page.getByRole('heading', { name: 'My team’s issues', exact: true })).toBeVisible();
+  await refresh(page);
+  await expect(page.locator('[data-ui="contestant"]')).toBeVisible();
   await expect(page.locator('#queue-team-search')).toHaveCount(0);
-  await expect(page.locator('.issue-list .issue-card')).toHaveCount(2);
+  // Aurora's open and resolved issues show. The Cedar filter is gone.
+  await expect(page.getByRole('navigation', { name: 'Reports' }).getByRole('button')).toHaveCount(2);
   await page.getByRole('button', { name: 'Report an issue', exact: true }).click();
+  await expect(page.getByLabel('What is happening?')).toBeVisible();
   await expect(page.locator('#report-team-search')).toHaveCount(0);
   expect(fixture.errors).toEqual([]);
 });
 
-test('automatic session fallback drops the previous session’s team selection', async ({ page }) => {
-  const fixture = await signIn(page);
+test('automatic session fallback drops the previous session’s desktop team selections', async ({ page }) => {
+  const fixture = await signIn(page, desktop);
   const queue = page.locator('#queue-team-search');
   await queue.fill('ced');
-  await page.locator('.team-suggestions [role=option]').click();
+  await page.getByRole('option').click();
   await expect(queue).toHaveValue('Cedar');
+  const report = await openReport(page);
+  await report.locator('#report-team-search').fill('ced');
+  await page.getByRole('option').click();
+  await report.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await expect(report).toBeHidden();
   fixture.revokeFirstSession();
-  await page.evaluate(() => { window.dispatchEvent(new Event('focus')); });
-  await expect(page.locator('.session-name')).toHaveText('Review session');
+  await refresh(page);
+  await expect(page.getByText('Session two', { exact: true }).first()).toBeVisible();
   await expect(queue).toHaveValue('');
-  await expect(page.locator('.issue-list .issue-card')).toHaveCount(3);
-  await expect(page.locator('.issue-list .team-cell strong').first()).toHaveText('Another');
+  await expect(issueRows(page)).toHaveCount(2);
+  await expect(rowTeams(page)).toHaveText(['Another', 'Another']);
+  await expect((await openReport(page)).locator('#report-team-search')).toHaveValue('');
   expect(fixture.errors).toEqual([]);
 });
 
-test('a team removed from the snapshot cannot filter or receive a staff report', async ({ page }) => {
-  const fixture = await signIn(page);
+test('automatic session fallback drops the previous session’s phone report team', async ({ page }) => {
+  const fixture = await signIn(page, phone);
+  const report = await openReport(page);
+  await report.locator('#report-team-search').fill('ced');
+  await page.getByRole('option').click();
+  await report.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await expect(report).toBeHidden();
+  fixture.revokeFirstSession();
+  await refresh(page);
+  await expect(page.getByText('Review event · Session two')).toBeVisible();
+  await expect((await openReport(page)).locator('#report-team-search')).toHaveValue('');
+  expect(fixture.errors).toEqual([]);
+});
+
+test('a team removed from the snapshot cannot filter the desktop queue or receive a staff report', async ({ page }) => {
+  const fixture = await signIn(page, desktop);
   const queue = page.locator('#queue-team-search');
   await queue.fill('ced');
-  await page.locator('.team-suggestions [role=option]').click();
+  await page.getByRole('option').click();
+  await expect(issueRows(page)).toHaveCount(1);
+  const report = await openReport(page);
+  const reportTeam = report.locator('#report-team-search');
+  await reportTeam.fill('ced');
+  await page.getByRole('option').click();
+  await report.getByLabel('What’s happening?').fill('Stale team report');
   fixture.removeTeam(CEDAR_ID);
-  await page.evaluate(() => { window.dispatchEvent(new Event('focus')); });
+  await refresh(page);
+  await expect(reportTeam).toHaveValue('');
+  await expect(report.getByRole('button', { name: 'Submit issue', exact: true })).toBeDisabled();
+  await reportTeam.fill('ced');
+  await expect(report.getByText('No matching teams.')).toBeVisible();
+  await report.getByRole('button', { name: 'Cancel', exact: true }).click();
   await expect(queue).toHaveValue('');
-  await expect(page.locator('.issue-list .issue-card')).toHaveCount(2);
-  await page.getByRole('button', { name: 'Report for team', exact: true }).click();
-  await expect(page.locator('#report-team-search')).toHaveValue('');
-  await expect(page.getByRole('button', { name: 'Submit issue', exact: true })).toBeDisabled();
+  await expect(issueRows(page)).toHaveCount(1);
+  await expect(rowTeams(page)).toHaveText(['Aurora']);
+  expect(fixture.commands).toEqual([]);
+  expect(fixture.errors).toEqual([]);
+});
+
+test('a team removed from the snapshot leaves the phone Find tab and report sheet', async ({ page }) => {
+  const fixture = await signIn(page, phone);
+  const report = await openReport(page);
+  await report.locator('#report-team-search').fill('ced');
+  await page.getByRole('option').click();
+  await report.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await expect(report).toBeHidden();
+  await page
+    .getByRole('navigation', { name: 'Organiser sections' })
+    .getByRole('button', { name: 'Find', exact: true })
+    .click();
+  await page.getByRole('region', { name: 'Teams' }).getByRole('button', { name: /Cedar/ }).click();
+  await expect(page.getByRole('heading', { name: 'Cedar', exact: true })).toBeVisible();
+  fixture.removeTeam(CEDAR_ID);
+  await refresh(page);
+  await expect(page.getByRole('heading', { name: 'Cedar', exact: true })).toHaveCount(0);
+  const teams = page.getByRole('region', { name: 'Teams' }).getByRole('button');
+  await expect(teams).toHaveCount(1);
+  await expect(teams).toContainText('Aurora');
+  await page
+    .getByRole('navigation', { name: 'Organiser sections' })
+    .getByRole('button', { name: 'Queue', exact: true })
+    .click();
+  await expect(page.locator('[id^="issue-card-"]')).toHaveCount(1);
+  const reopened = await openReport(page);
+  await expect(reopened.locator('#report-team-search')).toHaveValue('');
+  await expect(reopened.getByRole('button', { name: 'Submit issue', exact: true })).toBeDisabled();
   expect(fixture.commands).toEqual([]);
   expect(fixture.errors).toEqual([]);
 });

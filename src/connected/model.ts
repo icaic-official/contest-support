@@ -165,6 +165,11 @@ export function isSupport(member: Membership): boolean {
 export function isStaff(member: Membership): boolean {
   return member.roles.length > 0 || member.is_admin;
 }
+/** The UI for a membership. Team accounts get the contestant UI. */
+export type UiKind = "contestant" | "organiser";
+export function uiKindFor(member: Membership): UiKind {
+  return member.team_id ? "contestant" : "organiser";
+}
 export function unresolvedTime(
   issue: Issue,
   resolutions: readonly Resolution[],

@@ -1,0 +1,386 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Minsky · Organiser app (phone-first)</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet" />
+<script>
+tailwind.config = {
+  darkMode: "class",
+  theme: { extend: {
+    fontFamily: { sans: ["Inter", "sans-serif"], mono: ["JetBrains Mono", "monospace"] },
+    colors: {
+      border: "hsl(var(--border))", input: "hsl(var(--input))", ring: "hsl(var(--ring))",
+      background: "hsl(var(--background))", foreground: "hsl(var(--foreground))",
+      primary: { DEFAULT: "hsl(var(--primary))", foreground: "hsl(var(--primary-foreground))" },
+      muted: { DEFAULT: "hsl(var(--muted))", foreground: "hsl(var(--muted-foreground))" },
+      accent: { DEFAULT: "hsl(var(--accent))", foreground: "hsl(var(--accent-foreground))" },
+      card: "hsl(var(--card))", sidebar: "hsl(var(--sidebar))",
+    },
+  } },
+};
+</script>
+<style>
+  :root { --background: 0 0% 100%; --foreground: 240 10% 3.9%; --card: 0 0% 100%; --sidebar: 0 0% 98%; --muted: 240 4.8% 95.9%; --muted-foreground: 240 3.8% 46.1%; --accent: 240 4.8% 95.9%; --accent-foreground: 240 5.9% 10%; --primary: 240 5.9% 10%; --primary-foreground: 0 0% 98%; --border: 240 5.9% 90%; --input: 240 5.9% 90%; --ring: 240 5% 64.9%; }
+  .dark { --background: 240 10% 3.9%; --foreground: 0 0% 98%; --card: 240 10% 5.5%; --sidebar: 240 6% 7%; --muted: 240 3.7% 15.9%; --muted-foreground: 240 5% 64.9%; --accent: 240 3.7% 15.9%; --accent-foreground: 0 0% 98%; --primary: 0 0% 98%; --primary-foreground: 240 5.9% 10%; --border: 240 3.7% 15.9%; --input: 240 3.7% 15.9%; --ring: 240 4.9% 83.9%; }
+  [data-lucide] { width: 16px; height: 16px; stroke-width: 2; flex-shrink: 0; }
+  .btn { display:inline-flex; align-items:center; justify-content:center; gap:.5rem; height:2.25rem; padding:0 .875rem; border-radius:.5rem; font-size:.875rem; font-weight:500; transition: background .15s, opacity .15s; white-space:nowrap; }
+  .btn-primary { background:hsl(var(--primary)); color:hsl(var(--primary-foreground)); } .btn-primary:hover { opacity:.9; }
+  .btn-outline { border:1px solid hsl(var(--border)); background:hsl(var(--background)); } .btn-outline:hover, .btn-ghost:hover { background:hsl(var(--accent)); }
+  .btn-lg { height:3rem; border-radius:.75rem; font-size:1rem; font-weight:600; }
+  .btn-sm { height:2rem; padding:0 .625rem; font-size:.8125rem; }
+  .badge { display:inline-flex; align-items:center; gap:.3rem; border-radius:9999px; padding:.125rem .55rem; font-size:.75rem; font-weight:500; border:1px solid hsl(var(--border)); white-space:nowrap; }
+  .s-open { color:#2563eb; } .s-claimed { color:#7c3aed; } .s-escalated { color:#b45309; } .s-resolved { color:#047857; }
+  .dark .s-open { color:#60a5fa; } .dark .s-claimed { color:#a78bfa; } .dark .s-escalated { color:#fbbf24; } .dark .s-resolved { color:#34d399; }
+  .age-fresh { color:hsl(var(--muted-foreground)); } .age-warn { color:#d97706; } .age-crit { color:#e11d48; } .age-done { color:hsl(var(--muted-foreground)); }
+  .dark .age-warn { color:#f59e0b; } .dark .age-crit { color:#fb7185; }
+  .internal { background: repeating-linear-gradient(135deg, rgb(245 158 11 / .07) 0 8px, transparent 8px 16px); border-color: rgb(245 158 11 / .45) !important; }
+  .switch { width:2.75rem; height:1.5rem; border-radius:9999px; background:hsl(var(--input)); position:relative; transition:background .2s; flex-shrink:0; }
+  .switch::after { content:""; position:absolute; top:2px; left:2px; width:1.25rem; height:1.25rem; border-radius:9999px; background:hsl(var(--background)); box-shadow: 0 1px 2px rgb(0 0 0 / .2); transition: transform .2s; }
+  .switch[aria-checked="true"] { background:#10b981; } .switch[aria-checked="true"]::after { transform: translateX(1.25rem); }
+  .seg { display:inline-flex; border-radius:.5rem; background:hsl(var(--muted)); padding:.2rem; }
+  .seg > button { border-radius:.375rem; padding:0 .75rem; height:2rem; font-size:.8125rem; font-weight:500; color:hsl(var(--muted-foreground)); }
+  .seg > button[aria-pressed="true"] { background:hsl(var(--background)); color:hsl(var(--foreground)); box-shadow:0 1px 2px rgb(0 0 0 / .12); }
+  .kbd { font-family: "JetBrains Mono", monospace; font-size:.6875rem; border:1px solid hsl(var(--border)); border-radius:.25rem; padding:0 .3rem; color:hsl(var(--muted-foreground)); }
+  input, textarea, select { background: transparent; }
+  .field { width:100%; border:1px solid hsl(var(--input)); border-radius:.5rem; padding:.5rem .75rem; font-size:.9375rem; outline:none; }
+  .field:focus { box-shadow: 0 0 0 2px hsl(var(--ring)); }
+</style>
+
+<style>
+  body { font-feature-settings: "cv11", "ss01"; }
+  .phone { width: 390px; height: min(820px, calc(100vh - 24px)); border-radius: 48px; padding: 10px; background: #0b0b0f; box-shadow: 0 40px 90px -30px rgb(0 0 0 / .5), inset 0 0 0 2px #2a2a33; flex-shrink: 0; }
+  .screen { border-radius: 38px; overflow: hidden; height: 100%; position: relative; }
+  .view { position: absolute; inset: 0; display: flex; flex-direction: column; background: hsl(var(--background)); }
+  .push { transition: transform .28s cubic-bezier(.32,.72,0,1); }
+  .body { flex: 1; overflow-y: auto; scrollbar-width: none; }
+  .sheet { transition: transform .3s cubic-bezier(.32,.72,0,1); }
+  .scrim { transition: opacity .2s; }
+  .tabbar { padding-bottom: 22px; }
+  @media (max-width: 640px) {
+    .frame-page { padding: 0 !important; display: block !important; }
+    .frame-info { display: none !important; }
+    .phone { width: 100vw; height: 100dvh; border-radius: 0; padding: 0; box-shadow: none; background: none; }
+    .screen { border-radius: 0; }
+    .fake-status { visibility: hidden; height: env(safe-area-inset-top, 0) !important; padding: 0 !important; }
+  }
+</style>
+</head>
+<body class="bg-muted text-foreground font-sans antialiased">
+<div class="frame-page min-h-screen flex items-center justify-center gap-14 p-3">
+  <section class="frame-info max-w-sm space-y-5">
+    <div class="flex items-center gap-2"><div class="size-8 rounded-lg bg-primary text-primary-foreground grid place-items-center font-bold">M</div><span class="font-semibold">Minsky · Organiser app</span></div>
+    <h1 class="text-3xl font-bold tracking-tight leading-tight">Phone-first for organisers in the hall.</h1>
+    <p class="text-muted-foreground text-sm leading-relaxed">Staff open Minsky in their phone browser. One thumb reaches the main action. Sheets slide up for replies, resolutions and awards. The tabs change with the person's roles.</p>
+    <div><div class="text-xs font-medium text-muted-foreground mb-2">Preview as (mockup only)</div><div class="seg" id="roles"></div></div>
+    <ul class="text-sm space-y-2 text-muted-foreground">
+      <li class="flex gap-2"><i data-lucide="hand" class="mt-0.5"></i><span><b class="text-foreground">Helper</b>: volunteer and specialist. Claim, reply, escalate, accept handoffs, resolve, report for a team.</span></li>
+      <li class="flex gap-2"><i data-lucide="scale" class="mt-0.5"></i><span><b class="text-foreground">Jury</b>: resolved issues only. Record awards and confirm external application.</span></li>
+      <li class="flex gap-2"><i data-lucide="shield" class="mt-0.5"></i><span><b class="text-foreground">Admin</b>: helper tabs, plus a Session tab for intake, image limits and accounts.</span></li>
+    </ul>
+    <p class="text-xs text-muted-foreground">On a phone-sized window this page shows the app full screen without the frame.</p>
+  </section>
+  <div class="phone"><div class="screen" id="screen"></div></div>
+</div>
+<script>
+// Fictional sample data shared by every mockup. Times are relative to page load.
+const NOW0 = Date.now();
+const ago = (m) => new Date(NOW0 - m * 60000).toISOString();
+const DATA = {
+  event: { name: "Northern Informatics Open 2026", archived: false },
+  sessions: ["Finals · Contest day", "Finals · Practice round"],
+  session: { name: "Finals · Contest day", intake_open: true, categories: ["Workstation", "Network", "Judge system", "Problem statement", "Printing", "Other"], max_image_mb: 8, max_images: 6, max_total_mb: 30 },
+  me: { name: "Priya Raman", initials: "PR", roles: ["volunteer", "specialist"], admin: true },
+  teams: [
+    { id: "t1", name: "Team Aurora", location: "Hall A · Table 4", x: 1, y: 1 },
+    { id: "t2", name: "Byte Bandits", location: "Hall A · Table 7", x: 4, y: 1 },
+    { id: "t3", name: "Null Pointers", location: "Hall A · Table 12", x: 3, y: 3 },
+    { id: "t4", name: "Segfault Society", location: "Hall B · Table 2", x: 7, y: 1 },
+    { id: "t5", name: "Off By One", location: "Hall B · Table 9", x: 8, y: 3 },
+    { id: "t6", name: "Café Lambda", location: "Hall B · Table 15", x: 6, y: 4 },
+    { id: "t7", name: "Greedy Goblins", location: "Hall A · Table 18", x: 1, y: 4 },
+    { id: "t8", name: "Heap Heroes", location: "Hall B · Table 21", x: 9, y: 5 },
+    { id: "t9", name: "Recursive Rabbits", location: "Hall A · Table 22", x: 4, y: 5 },
+  ],
+  people: { "Priya Raman": "PR", "Marcus Lee": "ML", "Sofia Ortega": "SO", "Dev Patel": "DP", "Hana Kim": "HK" },
+  issues: [
+    { id: "i31", number: 31, team: "t3", category: "Workstation", description: "Keyboard stopped responding after the IDE froze. Mouse still works.", status: "open", created: 2.2, first: null, owner: null, reporter: "Null Pointers" },
+    { id: "i30", number: 30, team: "t5", category: "Judge system", description: "Submission stuck on “Judging” for problem C for over ten minutes.", status: "escalated", created: 14.5, first: 12.9, owner: "Marcus Lee", reporter: "Off By One" },
+    { id: "i29", number: 29, team: "t1", category: "Network", description: "Cannot reach the contest site. Browser shows a connection reset.", status: "claimed", created: 9.1, first: 7.4, owner: "Priya Raman", reporter: "Team Aurora" },
+    { id: "i28", number: 28, team: "t6", category: "Printing", description: "Print request from 10:42 never arrived at our table.", status: "claimed", created: 23.8, first: 21.0, owner: "Sofia Ortega", reporter: "Café Lambda" },
+    { id: "i27", number: 27, team: "t2", category: "Problem statement", description: "Sample output for problem E contradicts the constraints in section 2.", status: "open", created: 5.6, first: null, owner: null, reporter: "Dev Patel" },
+    { id: "i26", number: 26, team: "t4", category: "Workstation", description: "Monitor flickers and goes black every few minutes.", status: "resolved", created: 48, first: 46.5, owner: "Priya Raman", reporter: "Segfault Society", resolved: 31, award: { minutes: 10, explanation: "Workstation replaced; 17 minutes lost.", by: "Hana Kim", at: 25, applied: null } },
+    { id: "i25", number: 25, team: "t7", category: "Network", description: "Intermittent packet loss when submitting large files.", status: "resolved", created: 72, first: 70, owner: "Marcus Lee", reporter: "Greedy Goblins", resolved: 52, award: { minutes: 5, explanation: "Brief outage confirmed by network team.", by: "Hana Kim", at: 44, applied: { by: "Dev Patel", at: 40 } } },
+    { id: "i24", number: 24, team: "t8", category: "Other", description: "Chair is broken and the table is wobbling.", status: "resolved", created: 95, first: 93, owner: "Sofia Ortega", reporter: "Heap Heroes", resolved: 88 },
+    { id: "i23", number: 23, team: "t9", category: "Judge system", description: "Scoreboard shows our accepted solution as wrong answer.", status: "claimed", created: 31, first: 29.5, owner: "Marcus Lee", reporter: "Recursive Rabbits", reopened: true },
+  ],
+  history: {
+    i31: [{ t: "event", text: "Submitted by Null Pointers", at: 2.2 }],
+    i30: [
+      { t: "event", text: "Submitted by Off By One", at: 14.5 },
+      { t: "event", text: "Claimed by Marcus Lee", at: 12.9 },
+      { t: "public", who: "Marcus Lee", text: "We can see the submission in the queue. Checking the judge host now.", at: 11.2 },
+      { t: "internal", who: "Marcus Lee", text: "Judge host 3 has a stuck worker. Needs a specialist to restart it safely.", at: 9.0 },
+      { t: "event", text: "Marcus Lee requested a specialist handoff", at: 8.8 },
+    ],
+    i29: [
+      { t: "event", text: "Submitted by Team Aurora", at: 9.1 },
+      { t: "event", text: "Claimed by Priya Raman", at: 7.4 },
+      { t: "public", who: "Priya Raman", text: "On my way to Table 4.", at: 7.2 },
+      { t: "internal", who: "Priya Raman", text: "Cable looks loose at the switch. Swapping the port first.", at: 3.1 },
+      { t: "public", who: "Team Aurora", text: "Thanks! It came back for a second, then dropped again.", at: 2.4 },
+    ],
+    i28: [{ t: "event", text: "Submitted by Café Lambda", at: 23.8 }, { t: "event", text: "Claimed by Sofia Ortega", at: 21.0 }, { t: "public", who: "Sofia Ortega", text: "Checking the print queue now.", at: 20.1 }],
+    i27: [{ t: "event", text: "Submitted by Dev Patel for Byte Bandits", at: 5.6 }],
+    i26: [
+      { t: "event", text: "Submitted by Segfault Society", at: 48 },
+      { t: "event", text: "Claimed by Priya Raman", at: 46.5 },
+      { t: "internal", who: "Priya Raman", text: "Spare workstation W-17 is ready. Moving the team's session over.", at: 40 },
+      { t: "resolve", who: "Priya Raman", text: "Device issue resolved", at: 31 },
+      { t: "award", who: "Hana Kim", text: "10 minutes awarded", at: 25 },
+    ],
+    i25: [{ t: "event", text: "Submitted by Greedy Goblins", at: 72 }, { t: "resolve", who: "Marcus Lee", text: "Service restored", at: 52 }, { t: "award", who: "Hana Kim", text: "5 minutes awarded", at: 44 }, { t: "event", text: "Dev Patel confirmed the award was applied externally", at: 40 }],
+    i24: [{ t: "event", text: "Submitted by Heap Heroes", at: 95 }, { t: "resolve", who: "Sofia Ortega", text: "Resolved without comment", at: 88 }],
+    i23: [
+      { t: "event", text: "Submitted by Recursive Rabbits", at: 31 },
+      { t: "resolve", who: "Marcus Lee", text: "Problem statement clarified", at: 22 },
+      { t: "reopen", who: "Recursive Rabbits", text: "Reopened: the verdict is still wrong after the rejudge.", at: 12 },
+      { t: "internal", who: "Marcus Lee", text: "Rejudge job failed silently. Asking the judge team.", at: 6 },
+    ],
+  },
+  images: {
+    i29: [{ name: "switch-port.jpg", who: "Priya Raman", vis: "internal", hue: 200 }, { name: "error-page.png", who: "Priya Raman", vis: "public", hue: 340 }],
+    i26: [{ name: "monitor.webp", who: "Priya Raman", vis: "public", hue: 30 }],
+  },
+  members: [
+    { name: "Priya Raman", username: "priya", roles: ["volunteer", "specialist"], admin: true },
+    { name: "Marcus Lee", username: "marcus", roles: ["volunteer"], admin: false },
+    { name: "Sofia Ortega", username: "sofia", roles: ["volunteer"], admin: false },
+    { name: "Dev Patel", username: "dev", roles: ["specialist"], admin: false },
+    { name: "Hana Kim", username: "hana", roles: ["jury"], admin: false },
+    { name: "Team Aurora", username: "team-aurora", team: "Team Aurora" },
+    { name: "Byte Bandits", username: "byte-bandits", team: "Byte Bandits" },
+    { name: "Null Pointers", username: "null-pointers", team: "Null Pointers" },
+  ],
+};
+const STATUS = {
+  open: { label: "Open", icon: "circle-dashed" },
+  claimed: { label: "In progress", icon: "circle-dot" },
+  escalated: { label: "Awaiting specialist", icon: "arrow-up-right" },
+  resolved: { label: "Resolved", icon: "circle-check" },
+};
+const teamOf = (issue) => DATA.teams.find((t) => t.id === issue.team);
+// Unresolved time: from creation to now, or to resolution.
+const elapsedMs = (issue) => ((issue.status === "resolved" ? issue.created - issue.resolved : issue.created) * 60000) + (issue.status === "resolved" ? 0 : Date.now() - NOW0);
+const clock = (ms) => { const s = Math.max(0, Math.floor(ms / 1000)); const h = Math.floor(s / 3600); const m = Math.floor((s % 3600) / 60); const r = s % 60; return (h ? h + ":" + String(m).padStart(2, "0") : String(m)) + ":" + String(r).padStart(2, "0"); };
+const relTime = (m) => m < 1 ? "just now" : m < 60 ? Math.round(m) + "m ago" : Math.floor(m / 60) + "h " + Math.round(m % 60) + "m ago";
+const wallTime = (m) => new Date(NOW0 - m * 60000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
+const initials = (n) => n.split(/\s+/).slice(0, 2).map((p) => p[0]).join("").toUpperCase();
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+// Aging tier for live timers: fresh < 10 min, warning < 20 min, critical after.
+const age = (issue) => issue.status === "resolved" ? "done" : elapsedMs(issue) < 600000 ? "fresh" : elapsedMs(issue) < 1200000 ? "warn" : "crit";
+// Small fuzzy match: every query token must prefix-match a word in name or location.
+const fuzzy = (q, s) => { const words = s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").split(/[^a-z0-9]+/); return q.toLowerCase().split(/\s+/).filter(Boolean).every((tok) => words.some((w) => w.startsWith(tok))); };
+
+let role = "helper";        // helper | jury | admin
+let tab = "queue";
+let issueId = null;          // pushed detail view
+let sheet = null;            // bottom sheet name
+let chip = "waiting";
+let composer = "public";
+let awardTab = "decide";
+let awardMinutes = 10;
+let searchQ = "";
+let reportTeam = null;
+const ME = "Priya Raman";
+const $ = (s) => document.querySelector(s);
+const icons = () => lucide.createIcons();
+
+const ROLES = { helper: "Helper", jury: "Jury", admin: "Admin" };
+const TABS = {
+  helper: [["queue", "inbox", "Queue"], ["mine", "user-round-check", "Mine"], ["find", "search", "Find"], ["me", "circle-user-round", "Me"]],
+  jury: [["awards", "scale", "Awards"], ["find", "search", "Find"], ["me", "circle-user-round", "Me"]],
+  admin: [["queue", "inbox", "Queue"], ["mine", "user-round-check", "Mine"], ["session", "settings-2", "Session"], ["me", "circle-user-round", "Me"]],
+};
+const statusBadge = (s) => `<span class="badge s-${s}"><i data-lucide="${STATUS[s].icon}" style="width:12px;height:12px"></i>${STATUS[s].label}</span>`;
+const avatar = (n, c = "size-7") => n ? `<span class="${c} rounded-full bg-muted grid place-items-center text-[10px] font-semibold shrink-0">${initials(n)}</span>` : `<span class="${c} rounded-full border border-dashed border-border shrink-0"></span>`;
+const tableNo = (t) => t.location.split("Table ")[1];
+const hall = (t) => t.location.slice(5, 6);
+const statusBar = `<div class="fake-status h-12 px-8 flex items-end pb-1.5 justify-between text-[13px] font-semibold shrink-0"><span>10:46</span><span class="flex gap-1 items-center"><i data-lucide="signal" style="width:14px"></i><i data-lucide="wifi" style="width:14px"></i><i data-lucide="battery-full" style="width:18px"></i></span></div>`;
+
+function header(title, sub, right = "") {
+  return `<div class="px-5 pt-1 pb-3 shrink-0"><div class="flex items-end gap-3"><div class="flex-1 min-w-0"><div class="text-xs text-muted-foreground font-medium flex items-center gap-1.5"><span class="size-1.5 rounded-full bg-emerald-500"></span>Live · Finals, contest day</div><h1 class="text-[28px] font-bold tracking-tight leading-tight">${title}</h1>${sub ? `<p class="text-sm text-muted-foreground">${sub}</p>` : ""}</div>${right}</div></div>`;
+}
+
+function issueCard(i) {
+  const t = teamOf(i), a = age(i);
+  const quick = i.status === "open" ? `<button data-act="claim" data-id="${i.id}" class="btn btn-primary btn-sm">Claim</button>` : i.status === "escalated" ? `<button data-act="accept" data-id="${i.id}" class="btn btn-outline btn-sm">Accept</button>` : "";
+  return `<div data-open="${i.id}" role="button" tabindex="0" class="flex gap-3 rounded-xl border ${a === "crit" ? "border-rose-300 dark:border-rose-900" : "border-border"} bg-card p-3 active:bg-accent cursor-pointer">
+    <div class="w-12 h-14 self-start shrink-0 rounded-lg ${a === "crit" ? "bg-rose-600 text-white" : "bg-muted"} grid place-items-center leading-none text-center"><div><div class="text-[10px] font-medium opacity-70">Hall ${hall(t)}</div><div class="text-xl font-bold mt-0.5">${tableNo(t)}</div></div></div>
+    <div class="min-w-0 flex-1"><div class="flex items-center gap-2">${statusBadge(i.status)}<span class="ml-auto font-mono text-sm tabular-nums age-${a}" data-timer="${i.id}">${clock(elapsedMs(i))}</span></div>
+      <div class="font-semibold text-[15px] mt-1.5 truncate">${t.name}</div><div class="text-sm text-muted-foreground line-clamp-2 leading-snug">${esc(i.description)}</div>
+      <div class="flex items-center gap-2 mt-2.5"><span class="text-xs text-muted-foreground">${i.category}</span>${i.reopened ? `<span class="text-xs text-muted-foreground flex items-center gap-1"><i data-lucide="rotate-ccw" style="width:12px"></i>Reopened</span>` : ""}<span class="ml-auto flex items-center gap-2">${i.owner && !quick ? `${avatar(i.owner, "size-6")}<span class="text-xs">${i.owner === ME ? "You" : i.owner.split(" ")[0]}</span>` : quick}</span></div></div></div>`;
+}
+
+function queueTab() {
+  const live = DATA.issues.filter((i) => i.status !== "resolved");
+  const chips = [["waiting", "Waiting", (i) => i.status === "open"], ["handoff", "Handoffs", (i) => i.status === "escalated"], ["active", "All active", (i) => i.status !== "resolved"], ["resolved", "Resolved", (i) => i.status === "resolved"]];
+  const fn = chips.find((c) => c[0] === chip)[2];
+  const list = DATA.issues.filter(fn).sort((a, b) => elapsedMs(b) - elapsedMs(a));
+  const open = DATA.issues.filter((i) => i.status === "open").sort((a, b) => elapsedMs(b) - elapsedMs(a));
+  return header("Queue", "", `<button data-sheet="report" class="btn btn-primary btn-sm rounded-full mb-1"><i data-lucide="plus"></i>Report</button>`) + `<div class="body px-4 pb-6">
+    ${open.length ? `<div class="rounded-2xl bg-primary text-primary-foreground p-4"><div class="flex items-center justify-between text-xs opacity-70"><span>Oldest waiting</span><span>${open.length} waiting</span></div><div class="flex items-end gap-3 mt-1"><div class="flex-1 min-w-0"><div class="font-semibold truncate">${teamOf(open[0]).name} · Table ${tableNo(teamOf(open[0]))}</div><div class="text-sm opacity-70 truncate">${esc(open[0].description)}</div></div><span class="font-mono text-2xl font-semibold" data-timer="${open[0].id}">${clock(elapsedMs(open[0]))}</span></div><button data-act="claim" data-id="${open[0].id}" class="mt-3 w-full h-11 rounded-xl bg-primary-foreground text-primary font-semibold flex items-center justify-center gap-2"><i data-lucide="hand"></i>Claim and go</button></div>` : ""}
+    <div class="flex gap-2 overflow-x-auto mt-4 -mx-4 px-4 pb-1" style="scrollbar-width:none">${chips.map(([k, l, f]) => `<button data-chip="${k}" class="h-8 px-3 rounded-full text-sm font-medium border whitespace-nowrap ${chip === k ? "bg-primary text-primary-foreground border-primary" : "border-border"}">${l} <span class="opacity-60 tabular-nums">${DATA.issues.filter(f).length}</span></button>`).join("")}</div>
+    <div class="space-y-2.5 mt-3">${list.map(issueCard).join("") || `<div class="text-center text-sm text-muted-foreground py-12"><i data-lucide="party-popper" class="mx-auto mb-2" style="width:24px;height:24px"></i>Nothing here. Good work.</div>`}</div>
+    <p class="text-[11px] text-muted-foreground text-center mt-4">Sorted by unresolved time, oldest first.</p></div>`;
+}
+
+function mineTab() {
+  const mine = DATA.issues.filter((i) => i.owner === ME && i.status !== "resolved");
+  const done = DATA.issues.filter((i) => i.owner === ME && i.status === "resolved");
+  return header("Mine", `${mine.length} active · ${done.length} resolved today`) + `<div class="body px-4 pb-6 space-y-2.5">${mine.map(issueCard).join("")}
+    <div class="text-xs font-medium text-muted-foreground pt-4 px-1">Resolved by you</div>${done.map(issueCard).join("")}</div>`;
+}
+
+function findTab() {
+  const q = searchQ;
+  const teams = DATA.teams.filter((t) => !q || fuzzy(q, t.name + " " + t.location + " hall " + hall(t) + " table " + tableNo(t)));
+  const issues = q ? DATA.issues.filter((i) => fuzzy(q, `${i.number} iss ${i.description}`) && (role !== "jury" || i.status === "resolved")) : [];
+  return header("Find", "Team name, hall or table number") + `<div class="px-4 shrink-0"><div class="flex items-center gap-2 h-11 rounded-xl border border-input px-3 bg-card"><i data-lucide="search" class="text-muted-foreground"></i><input id="find" value="${esc(q)}" class="flex-1 outline-none text-[15px]" placeholder="Try “b 9”, “aurora” or “31”" autocomplete="off"></div></div>
+  <div class="body px-4 pb-6 pt-3">${issues.length ? `<div class="text-xs font-medium text-muted-foreground px-1 pb-2">Issues</div><div class="space-y-2.5 mb-4">${issues.map(issueCard).join("")}</div>` : ""}
+    <div class="text-xs font-medium text-muted-foreground px-1 pb-2">Teams</div><div class="rounded-xl border border-border divide-y divide-border bg-card">${teams.map((t) => { const n = DATA.issues.filter((i) => i.team === t.id && i.status !== "resolved").length; return `<button data-team="${t.id}" class="w-full flex items-center gap-3 p-3 text-left"><span class="size-10 rounded-lg bg-muted grid place-items-center font-bold">${tableNo(t)}</span><span class="flex-1 min-w-0"><span class="block font-medium truncate">${t.name}</span><span class="block text-xs text-muted-foreground">${t.location}</span></span>${n ? `<span class="badge s-escalated">${n} unresolved</span>` : `<span class="text-xs text-muted-foreground">Clear</span>`}<i data-lucide="chevron-right" class="text-muted-foreground"></i></button>`; }).join("") || `<p class="p-4 text-sm text-muted-foreground">No team matches “${esc(q)}”.</p>`}</div></div>`;
+}
+
+function awardsTab() {
+  const res = DATA.issues.filter((i) => i.status === "resolved");
+  const lists = { decide: res.filter((i) => !i.award), apply: res.filter((i) => i.award && !i.award.applied), done: res.filter((i) => i.award?.applied) };
+  return header("Awards", "Resolved issues only") + `<div class="px-4 shrink-0"><div class="seg w-full grid grid-cols-3">${[["decide", "To decide"], ["apply", "To apply"], ["done", "Applied"]].map(([k, l]) => `<button data-awardtab="${k}" aria-pressed="${awardTab === k}">${l} <span class="opacity-60">${lists[k].length}</span></button>`).join("")}</div></div>
+  <div class="body px-4 pb-6 pt-3 space-y-2.5">${lists[awardTab].map((i) => { const t = teamOf(i); return `<div data-open="${i.id}" role="button" class="rounded-xl border border-border bg-card p-4"><div class="flex items-center gap-2 text-xs text-muted-foreground"><span class="font-mono">ISS-${i.number}</span>·<span>${t.name}</span><span class="ml-auto font-mono">${clock(elapsedMs(i))} lost</span></div><div class="text-[15px] font-medium mt-1.5 leading-snug">${esc(i.description)}</div>
+    ${i.award ? `<div class="flex items-center gap-3 mt-3"><span class="text-2xl font-bold tabular-nums">+${i.award.minutes}<span class="text-sm text-muted-foreground font-medium"> min</span></span><span class="text-xs text-muted-foreground flex-1">“${esc(i.award.explanation)}”</span></div>${i.award.applied ? `<div class="text-xs s-resolved mt-2 flex items-center gap-1.5"><i data-lucide="check-check" style="width:14px"></i>Applied by ${i.award.applied.by} · ${wallTime(i.award.applied.at)}</div>` : `<button data-act="apply" data-id="${i.id}" class="btn btn-outline w-full mt-3"><i data-lucide="check-check"></i>Confirm applied externally</button>`}` : `<button data-sheet="award" data-id="${i.id}" class="btn btn-primary w-full mt-3"><i data-lucide="scale"></i>Decide award</button>`}</div>`; }).join("") || `<div class="text-center text-sm text-muted-foreground py-12">Nothing in this list.</div>`}</div>`;
+}
+
+function sessionTab() {
+  const s = DATA.session;
+  const stepper = (label, val, unit, help) => `<div class="flex items-center gap-3 p-4"><div class="flex-1"><div class="text-[15px] font-medium">${label}</div><div class="text-xs text-muted-foreground">${help}</div></div><div class="flex items-center rounded-lg border border-border"><button class="size-9 grid place-items-center" aria-label="Decrease"><i data-lucide="minus"></i></button><span class="w-14 text-center font-mono tabular-nums text-sm">${val}${unit}</span><button class="size-9 grid place-items-center" aria-label="Increase"><i data-lucide="plus"></i></button></div></div>`;
+  const counts = Object.keys(STATUS).map((k) => [k, DATA.issues.filter((i) => i.status === k).length]);
+  return header("Session", s.name) + `<div class="body px-4 pb-6 space-y-5">
+    <div class="grid grid-cols-4 gap-2">${counts.map(([k, n]) => `<div class="rounded-xl border border-border bg-card p-2.5 text-center"><i data-lucide="${STATUS[k].icon}" class="s-${k} mx-auto"></i><div class="text-xl font-bold mt-1 tabular-nums">${n}</div><div class="text-[10px] text-muted-foreground leading-tight">${STATUS[k].label}</div></div>`).join("")}</div>
+    <div class="rounded-xl border border-border bg-card"><div class="flex items-center gap-3 p-4"><div class="flex-1"><div class="text-[15px] font-medium">Contestant intake</div><div class="text-xs text-muted-foreground" id="intake-help">${s.intake_open ? "Teams can submit new reports." : "Closed. Staff can still report for a team."}</div></div><button class="switch" role="switch" aria-checked="${s.intake_open}" aria-label="Contestant intake" data-act="intake"></button></div></div>
+    <div><div class="text-xs font-medium text-muted-foreground px-1 pb-2">Issue images</div><div class="rounded-xl border border-border bg-card divide-y divide-border">${stepper("Largest image", s.max_image_mb, " MB", "Per file")}${stepper("Images per issue", s.max_images, "", "All audiences")}${stepper("Total per issue", s.max_total_mb, " MB", "Combined size")}</div><p class="text-[11px] text-muted-foreground px-1 mt-1.5">A lower limit does not remove images that are already attached.</p></div>
+    <div><div class="flex items-center px-1 pb-2"><span class="text-xs font-medium text-muted-foreground flex-1">Accounts · ${DATA.members.length}</span><button data-sheet="create" class="btn btn-ghost btn-sm"><i data-lucide="user-plus"></i>New</button></div>
+      <div class="rounded-xl border border-border bg-card divide-y divide-border">${DATA.members.map((m) => `<button class="w-full flex items-center gap-3 p-3 text-left">${avatar(m.name, "size-9")}<span class="flex-1 min-w-0"><span class="block font-medium truncate">${m.name}</span><span class="block text-xs text-muted-foreground font-mono">${m.username}</span></span><span class="flex gap-1">${m.team ? `<span class="badge">Team</span>` : m.roles.map((r) => `<span class="badge capitalize">${r.slice(0, 4)}</span>`).join("") + (m.admin ? `<span class="badge bg-primary text-primary-foreground border-transparent">Admin</span>` : "")}</span></button>`).join("")}</div></div></div>`;
+}
+
+function meTab() {
+  const roles = { helper: "Volunteer · Specialist", jury: "Jury", admin: "Volunteer · Specialist · Admin" }[role];
+  const name = role === "jury" ? "Hana Kim" : ME;
+  const row = (ic, l, r = "") => `<button class="w-full flex items-center gap-3 p-4 text-left"><i data-lucide="${ic}" class="text-muted-foreground"></i><span class="flex-1 text-[15px]">${l}</span>${r}<i data-lucide="chevron-right" class="text-muted-foreground"></i></button>`;
+  return header("Me", "") + `<div class="body px-4 pb-6 space-y-5"><div class="flex items-center gap-4 p-1">${avatar(name, "size-14")}<div><div class="text-lg font-semibold">${name}</div><div class="text-sm text-muted-foreground">${roles}</div></div></div>
+    <div class="rounded-xl border border-border bg-card divide-y divide-border">${row("calendar-range", "Session", `<span class="text-sm text-muted-foreground">Contest day</span>`)}${row("key-round", "Change password")}${row("moon", "Appearance", `<span class="text-sm text-muted-foreground">System</span>`)}</div>
+    <div class="rounded-xl border border-border bg-card">${row("log-out", "Sign out")}</div>
+    <p class="text-xs text-muted-foreground px-1">Ask an organiser if your roles need to change.</p></div>`;
+}
+
+function timeline(i) {
+  return (DATA.history[i.id] ?? []).map((h) => {
+    if (h.t === "public" || h.t === "internal") { const int = h.t === "internal"; return `<div class="flex gap-2.5">${avatar(h.who)}<div class="flex-1 rounded-xl border border-border p-3 ${int ? "internal" : "bg-card"}"><div class="flex items-center gap-2 text-xs"><span class="font-medium">${h.who}</span><span class="text-muted-foreground">${wallTime(h.at)}</span>${int ? `<span class="ml-auto flex items-center gap-1 text-amber-600 font-medium"><i data-lucide="lock" style="width:11px"></i>Staff only</span>` : ""}</div><p class="text-sm mt-1">${esc(h.text)}</p></div></div>`; }
+    if (h.t === "resolve") return `<div class="rounded-xl border border-emerald-500/40 bg-emerald-500/5 p-3"><div class="text-xs s-resolved flex items-center gap-1.5"><i data-lucide="circle-check" style="width:13px"></i>Resolved by ${h.who} · ${wallTime(h.at)}</div><div class="font-medium text-sm mt-1">${esc(h.text)}</div></div>`;
+    return `<div class="flex items-center gap-2 text-xs text-muted-foreground pl-2"><i data-lucide="${h.t === "reopen" ? "rotate-ccw" : h.t === "award" ? "scale" : "dot"}" style="width:13px"></i>${esc(h.text)} · ${wallTime(h.at)}</div>`;
+  }).join("");
+}
+
+function detail() {
+  const i = DATA.issues.find((x) => x.id === issueId);
+  if (!i) return "";
+  const t = teamOf(i);
+  const jury = role === "jury";
+  const order = ["open", "claimed", "escalated", "resolved"], at = order.indexOf(i.status);
+  const steps = ["Submitted", "Claimed", "Specialist", "Resolved"];
+  const imgs = DATA.images[i.id] ?? [];
+  const primary = jury ? (i.award ? (i.award.applied ? "" : `<button data-act="apply" data-id="${i.id}" class="btn btn-primary btn-lg flex-1">Confirm applied</button>`) : `<button data-sheet="award" data-id="${i.id}" class="btn btn-primary btn-lg flex-1"><i data-lucide="scale"></i>Decide award</button>`)
+    : { open: `<button data-act="claim" data-id="${i.id}" class="btn btn-primary btn-lg flex-1"><i data-lucide="hand"></i>Claim</button>`, claimed: i.owner === ME ? `<button data-sheet="more" class="btn btn-outline btn-lg w-12 !px-0" aria-label="More actions"><i data-lucide="ellipsis"></i></button><button data-sheet="resolve" class="btn btn-primary btn-lg flex-1"><i data-lucide="check"></i>Resolve</button>` : "", escalated: `<button data-act="accept" data-id="${i.id}" class="btn btn-primary btn-lg flex-1"><i data-lucide="handshake"></i>Accept handoff</button>`, resolved: `<button data-sheet="reopen" class="btn btn-outline btn-lg flex-1"><i data-lucide="rotate-ccw"></i>Reopen</button>` }[i.status];
+  return `${statusBar}<div class="flex items-center gap-2 px-3 pb-2 shrink-0"><button data-back class="btn btn-ghost !px-2"><i data-lucide="chevron-left" style="width:20px;height:20px"></i>Back</button><span class="font-mono text-sm text-muted-foreground ml-auto mr-2">ISS-${i.number}</span></div>
+  <div class="body px-4 pb-32">
+    <div class="flex items-center gap-2">${statusBadge(i.status)}<span class="badge text-muted-foreground">${i.category}</span></div>
+    <div class="flex items-center gap-3 mt-3"><span class="size-14 rounded-xl bg-primary text-primary-foreground grid place-items-center leading-none text-center"><span><span class="block text-[10px] opacity-70">Hall ${hall(t)}</span><span class="block text-2xl font-bold">${tableNo(t)}</span></span></span><div><div class="text-lg font-semibold leading-tight">${t.name}</div><div class="text-sm text-muted-foreground">${t.location}</div></div></div>
+    <p class="mt-3 text-[15px] leading-relaxed">${esc(i.description)}</p>
+    <div class="grid grid-cols-2 gap-2 mt-4"><div class="rounded-xl border border-border p-3"><div class="text-xs text-muted-foreground flex items-center gap-1.5">${i.status !== "resolved" ? `<span class="size-1.5 rounded-full bg-emerald-500 animate-pulse"></span>Unresolved` : "Unresolved · stopped"}</div><div class="font-mono text-2xl font-semibold tabular-nums mt-0.5 age-${age(i)}" data-timer="${i.id}">${clock(elapsedMs(i))}</div></div><div class="rounded-xl border border-border p-3"><div class="text-xs text-muted-foreground">First assignment</div><div class="font-mono text-2xl font-semibold mt-0.5">${i.first ? clock((i.created - i.first) * 60000) : "—"}</div></div></div>
+    <div class="grid grid-cols-4 gap-1 mt-4">${steps.map((l, n) => `<div><div class="h-1.5 rounded-full ${n < at || (n === at && i.status === "resolved") ? "bg-primary" : n === at ? "bg-primary/50 animate-pulse" : "bg-muted"}"></div><div class="text-[11px] mt-1 ${n <= at ? "font-medium" : "text-muted-foreground"}">${l}</div></div>`).join("")}</div>
+    <div class="flex items-center gap-3 mt-4 rounded-xl border border-border p-3">${avatar(i.owner, "size-9")}<div class="flex-1"><div class="text-xs text-muted-foreground">Owner</div><div class="font-medium">${i.owner === ME ? "You" : i.owner ?? "Nobody yet"}</div></div></div>
+    ${i.status === "escalated" ? `<div class="mt-3 rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 text-sm flex gap-3"><i data-lucide="arrow-up-right" class="s-escalated mt-0.5"></i><div><div class="font-medium">Specialist handoff requested</div><div class="text-muted-foreground">${i.owner} stays responsible until a specialist accepts.</div></div></div>` : ""}
+    ${i.award ? `<div class="mt-3 rounded-xl border border-border p-3"><div class="flex items-baseline justify-between"><span class="text-xl font-bold">+${i.award.minutes} min</span><span class="badge ${i.award.applied ? "s-resolved" : "s-escalated"}">${i.award.applied ? "Applied" : "Not applied yet"}</span></div><p class="text-sm text-muted-foreground mt-1">${esc(i.award.explanation)}</p><p class="text-xs text-muted-foreground mt-2">Decided by ${i.award.by}${i.award.applied ? ` · applied by ${i.award.applied.by}` : ""}</p></div>` : ""}
+    ${imgs.length || !jury ? `<div class="mt-5"><div class="text-xs font-medium text-muted-foreground pb-2">Images · ${imgs.length} of ${DATA.session.max_images}</div><div class="flex gap-2 overflow-x-auto" style="scrollbar-width:none">${imgs.map((m) => `<div class="relative size-20 rounded-xl shrink-0" style="background:linear-gradient(135deg,hsl(${m.hue} 60% 55%),hsl(${m.hue + 40} 60% 35%))"><span class="absolute bottom-1 left-1 badge bg-background/90 !text-[10px] !px-1.5">${m.vis === "internal" ? "Staff" : "Team"}</span></div>`).join("")}${!jury && i.status !== "resolved" ? `<button data-sheet="photo" class="size-20 rounded-xl border border-dashed border-border grid place-items-center text-muted-foreground shrink-0"><i data-lucide="camera" style="width:20px;height:20px"></i></button>` : ""}</div></div>` : ""}
+    <div class="mt-5"><div class="text-xs font-medium text-muted-foreground pb-2">Activity</div><div class="space-y-2.5">${timeline(i)}</div></div>
+  </div>
+  <div class="absolute bottom-0 inset-x-0 p-3 pb-7 border-t border-border bg-background/95 backdrop-blur flex gap-2">${!jury && i.status !== "resolved" ? `<button data-sheet="reply" class="btn btn-outline btn-lg w-12 !px-0" aria-label="Reply"><i data-lucide="message-square-plus" style="width:20px;height:20px"></i></button>` : ""}${primary || `<div class="flex-1 text-sm text-muted-foreground self-center text-center">${i.owner} owns this issue.</div>`}</div>`;
+}
+
+const SHEETS = {
+  reply: () => { const int = composer === "internal"; return `<div class="seg w-full grid grid-cols-2"><button data-composer="public" aria-pressed="${!int}"><span class="flex items-center justify-center gap-1.5"><i data-lucide="eye" style="width:14px"></i>To the team</span></button><button data-composer="internal" aria-pressed="${int}" class="${int ? "!bg-amber-500 !text-white" : ""}"><span class="flex items-center justify-center gap-1.5"><i data-lucide="lock" style="width:14px"></i>Staff only</span></button></div>
+    <p class="text-xs mt-2 ${int ? "text-amber-600" : "text-muted-foreground"}">${int ? "Internal note. The team never sees this." : "Public reply. The team sees this on their screen."}</p>
+    <textarea class="field mt-3 min-h-28 ${int ? "internal" : ""}" placeholder="${int ? "Note for staff…" : "Message to the team…"}"></textarea>
+    <button data-close class="btn btn-primary btn-lg w-full mt-3">${int ? "Add internal note" : "Send to team"}</button>`; },
+  resolve: () => `<h2 class="text-lg font-semibold">Resolve issue</h2><p class="text-sm text-muted-foreground">The team sees this summary. The timer stops.</p><div class="space-y-2 mt-4">${["Service restored", "Device issue resolved", "Problem statement clarified", "Resolved without comment", "Write a custom summary…"].map((r, n) => `<label class="flex items-center gap-3 rounded-xl border border-border p-3.5 text-[15px] has-[:checked]:border-primary has-[:checked]:ring-1 has-[:checked]:ring-primary"><input type="radio" name="res" ${n === 0 ? "checked" : ""} class="accent-current size-4">${r}</label>`).join("")}</div><button data-close class="btn btn-primary btn-lg w-full mt-4"><i data-lucide="check"></i>Resolve</button>`,
+  more: () => `<div class="rounded-xl border border-border divide-y divide-border"><button data-sheet="escalate" class="w-full flex items-center gap-3 p-4 text-left"><i data-lucide="arrow-up-right" class="s-escalated"></i><span class="flex-1"><span class="block font-medium">Escalate to a specialist</span><span class="block text-xs text-muted-foreground">You stay the owner until someone accepts.</span></span></button><button data-sheet="photo" class="w-full flex items-center gap-3 p-4 text-left"><i data-lucide="camera"></i><span class="flex-1 font-medium">Add an image</span></button></div><button data-close class="btn btn-outline btn-lg w-full mt-3">Cancel</button>`,
+  escalate: () => `<h2 class="text-lg font-semibold">Escalate to a specialist?</h2><p class="text-sm text-muted-foreground mt-1">Specialists get a handoff request. You stay responsible until one accepts. Add an internal note so they know what you tried.</p><textarea class="field mt-3 min-h-20 internal" placeholder="Internal note (optional)"></textarea><button data-close class="btn btn-primary btn-lg w-full mt-3">Request handoff</button>`,
+  reopen: () => `<h2 class="text-lg font-semibold">Reopen issue</h2><p class="text-sm text-muted-foreground mt-1">The previous owner stays responsible. Resolved time is not counted.</p><textarea class="field mt-3 min-h-24" placeholder="Reason, visible to the team"></textarea><button data-close class="btn btn-primary btn-lg w-full mt-3">Reopen</button>`,
+  photo: () => `<h2 class="text-lg font-semibold">Add an image</h2><p class="text-sm text-muted-foreground mt-1">Choose who can see it. You cannot change this later.</p><div class="grid grid-cols-2 gap-2 mt-4"><label class="rounded-xl border border-border p-3 has-[:checked]:border-primary has-[:checked]:ring-1 has-[:checked]:ring-primary"><input type="radio" name="vis" checked class="sr-only"><i data-lucide="lock"></i><div class="font-medium mt-1.5">Staff only</div><div class="text-xs text-muted-foreground">Default</div></label><label class="rounded-xl border border-border p-3 has-[:checked]:border-primary has-[:checked]:ring-1 has-[:checked]:ring-primary"><input type="radio" name="vis" class="sr-only"><i data-lucide="eye"></i><div class="font-medium mt-1.5">Team can see</div><div class="text-xs text-muted-foreground">Shown to the team</div></label></div><button data-close class="btn btn-primary btn-lg w-full mt-4"><i data-lucide="camera"></i>Take photo or choose</button><p class="text-[11px] text-muted-foreground text-center mt-2">JPEG, PNG or WebP · up to ${DATA.session.max_image_mb} MB</p>`,
+  report: () => { const q = searchQ; const teams = DATA.teams.filter((t) => !q || fuzzy(q, t.name + " " + t.location + " table " + tableNo(t))).slice(0, 4); const sel = DATA.teams.find((t) => t.id === reportTeam); return `<h2 class="text-lg font-semibold">Report for a team</h2><p class="text-sm text-muted-foreground">Works even when contestant intake is closed.</p>
+    ${sel ? `<div class="flex items-center gap-3 rounded-xl border border-primary p-3 mt-4"><span class="size-10 rounded-lg bg-muted grid place-items-center font-bold">${tableNo(sel)}</span><span class="flex-1"><span class="block font-medium">${sel.name}</span><span class="block text-xs text-muted-foreground">${sel.location}</span></span><button data-pickteam="" class="btn btn-ghost btn-sm">Change</button></div>` : `<div class="flex items-center gap-2 h-11 rounded-xl border border-input px-3 mt-4"><i data-lucide="search" class="text-muted-foreground"></i><input id="report-find" value="${esc(q)}" class="flex-1 outline-none text-[15px]" placeholder="Team or table — “b 9”" autocomplete="off"></div><div class="mt-2 rounded-xl border border-border divide-y divide-border">${teams.map((t) => `<button data-pickteam="${t.id}" class="w-full flex items-center gap-3 p-2.5 text-left"><span class="size-8 rounded-md bg-muted grid place-items-center text-sm font-bold">${tableNo(t)}</span><span class="flex-1 text-sm"><b class="font-medium">${t.name}</b> <span class="text-muted-foreground">${t.location}</span></span></button>`).join("")}</div>`}
+    <div class="flex flex-wrap gap-2 mt-4">${DATA.session.categories.map((c, n) => `<label class="h-9 px-3 rounded-full border border-border text-sm flex items-center has-[:checked]:bg-primary has-[:checked]:text-primary-foreground"><input type="radio" name="cat" class="sr-only" ${n === 0 ? "checked" : ""}>${c}</label>`).join("")}</div>
+    <textarea class="field mt-3 min-h-20" placeholder="What is happening?"></textarea><button data-close class="btn btn-primary btn-lg w-full mt-3" ${sel ? "" : "disabled style='opacity:.5'"}>Submit issue</button>`; },
+  award: () => `<h2 class="text-lg font-semibold">Decide award</h2><p class="text-sm text-muted-foreground">Staff confirm separately when it is applied in the contest system.</p><div class="text-center my-4"><span class="text-6xl font-bold tracking-tight tabular-nums">${awardMinutes}</span><span class="text-muted-foreground font-medium"> min</span></div><div class="grid grid-cols-5 gap-1.5">${[0, 5, 10, 15, 30].map((m) => `<button data-minutes="${m}" class="h-11 rounded-xl font-semibold ${awardMinutes === m ? "bg-primary text-primary-foreground" : "bg-muted"}">${m}</button>`).join("")}</div><button class="text-sm text-muted-foreground underline mt-2 w-full">Other amount</button><textarea class="field mt-3 min-h-20" placeholder="Public explanation for the team"></textarea><button data-close class="btn btn-primary btn-lg w-full mt-3">Record ${awardMinutes} minutes</button>`,
+  create: () => `<h2 class="text-lg font-semibold">New account</h2><div class="grid grid-cols-2 gap-2 mt-4"><label class="rounded-xl border border-border p-3 has-[:checked]:border-primary has-[:checked]:ring-1 has-[:checked]:ring-primary"><input type="radio" name="kind" checked class="sr-only"><i data-lucide="user-round"></i><div class="font-medium mt-1.5">Staff</div><div class="text-xs text-muted-foreground">One person</div></label><label class="rounded-xl border border-border p-3 has-[:checked]:border-primary has-[:checked]:ring-1 has-[:checked]:ring-primary"><input type="radio" name="kind" class="sr-only"><i data-lucide="users"></i><div class="font-medium mt-1.5">Team</div><div class="text-xs text-muted-foreground">Shared login</div></label></div><input class="field mt-3" placeholder="Display name"><input class="field mt-2 font-mono" placeholder="username" autocapitalize="none"><div class="flex flex-wrap gap-2 mt-3">${["Volunteer", "Specialist", "Jury", "Admin"].map((r, n) => `<label class="h-9 px-3 rounded-full border border-border text-sm flex items-center has-[:checked]:bg-primary has-[:checked]:text-primary-foreground"><input type="checkbox" class="sr-only" ${n === 0 ? "checked" : ""}>${r}</label>`).join("")}</div><button data-sheet="cred" class="btn btn-primary btn-lg w-full mt-4">Create account</button>`,
+  cred: () => `<div class="size-11 rounded-full bg-emerald-500/15 s-resolved grid place-items-center"><i data-lucide="key-round"></i></div><h2 class="text-lg font-semibold mt-3">Share these in person</h2><p class="text-sm text-muted-foreground">The password appears only once. The user changes it at first sign-in.</p><div class="mt-4 rounded-xl border border-border divide-y divide-border"><div class="flex items-center p-3.5"><span class="flex-1"><span class="block text-xs text-muted-foreground">Username</span><span class="font-mono">alex-morgan</span></span><button class="btn btn-ghost btn-sm"><i data-lucide="copy"></i></button></div><div class="flex items-center p-3.5"><span class="flex-1"><span class="block text-xs text-muted-foreground">Temporary password</span><span class="font-mono">tulip-orbit-7319</span></span><button class="btn btn-ghost btn-sm"><i data-lucide="copy"></i></button></div></div><button data-close class="btn btn-primary btn-lg w-full mt-4">Done</button>`,
+};
+
+function render() {
+  const tabs = TABS[role];
+  if (!tabs.some((t) => t[0] === tab)) tab = tabs[0][0];
+  const page = { queue: queueTab, mine: mineTab, find: findTab, awards: awardsTab, session: sessionTab, me: meTab }[tab]();
+  const focused = document.activeElement?.id;
+  $("#screen").innerHTML = `
+    <div class="view">${statusBar}${page}
+      <nav class="tabbar grid border-t border-border bg-background/95 backdrop-blur pt-2 text-[11px] font-medium shrink-0" style="grid-template-columns:repeat(${tabs.length},1fr)">${tabs.map(([k, ic, l]) => `<button data-tab="${k}" class="flex flex-col items-center gap-1 ${tab === k ? "text-foreground" : "text-muted-foreground"}"><i data-lucide="${ic}" style="width:22px;height:22px;${tab === k ? "stroke-width:2.4" : ""}"></i>${l}</button>`).join("")}</nav></div>
+    <div class="view push ${issueId ? "" : "translate-x-full"}">${detail()}</div>
+    <div data-close class="scrim absolute inset-0 bg-black/40 ${sheet ? "opacity-100" : "opacity-0 pointer-events-none"}"></div>
+    <div class="sheet absolute inset-x-0 bottom-0 max-h-[88%] overflow-y-auto rounded-t-3xl bg-background p-5 pb-9 ${sheet ? "" : "translate-y-full"}" style="scrollbar-width:none"><div class="mx-auto w-10 h-1.5 rounded-full bg-muted mb-4"></div>${sheet ? SHEETS[sheet]() : ""}</div>`;
+  $("#roles").innerHTML = Object.entries(ROLES).map(([k, v]) => `<button data-role="${k}" aria-pressed="${role === k}">${v}</button>`).join("");
+  icons();
+  if (focused && document.getElementById(focused)) { const el = document.getElementById(focused); el.focus(); el.setSelectionRange(el.value.length, el.value.length); }
+}
+
+document.addEventListener("click", (e) => {
+  const g = (s) => e.target.closest(s);
+  if (g("[data-role]")) { role = g("[data-role]").dataset.role; issueId = null; sheet = null; tab = TABS[role][0][0]; }
+  else if (g("[data-tab]")) { tab = g("[data-tab]").dataset.tab; issueId = null; }
+  else if (g("[data-chip]")) chip = g("[data-chip]").dataset.chip;
+  else if (g("[data-awardtab]")) awardTab = g("[data-awardtab]").dataset.awardtab;
+  else if (g("[data-composer]")) composer = g("[data-composer]").dataset.composer;
+  else if (g("[data-minutes]")) awardMinutes = Number(g("[data-minutes]").dataset.minutes);
+  else if (g("[data-pickteam]")) { reportTeam = g("[data-pickteam]").dataset.pickteam || null; searchQ = ""; }
+  else if (g("[data-act]")) {
+    const a = g("[data-act]").dataset.act, i = DATA.issues.find((x) => x.id === g("[data-act]").dataset.id);
+    const nowAgo = -(Date.now() - NOW0) / 60000;
+    if (a === "claim") { i.status = "claimed"; i.owner = ME; i.first = nowAgo; DATA.history[i.id] = [...(DATA.history[i.id] ?? []), { t: "event", text: "Claimed by " + ME, at: nowAgo }]; issueId = i.id; }
+    if (a === "accept") { i.status = "claimed"; i.owner = ME; DATA.history[i.id].push({ t: "event", text: ME + " accepted the specialist handoff", at: nowAgo }); issueId = i.id; }
+    if (a === "apply") { i.award.applied = { by: role === "jury" ? "Hana Kim" : ME, at: nowAgo }; }
+    if (a === "intake") { DATA.session.intake_open = !DATA.session.intake_open; }
+  }
+  else if (g("[data-sheet]")) { const el = g("[data-sheet]"); sheet = el.dataset.sheet; if (sheet === "report") { searchQ = ""; reportTeam = null; } }
+  else if (g("[data-close]")) sheet = null;
+  else if (g("[data-back]")) issueId = null;
+  else if (g("[data-team]")) { searchQ = DATA.teams.find((t) => t.id === g("[data-team]").dataset.team).name; }
+  else if (g("[data-open]")) issueId = g("[data-open]").dataset.open;
+  else return;
+  render();
+});
+document.addEventListener("input", (e) => { if (e.target.id === "find" || e.target.id === "report-find") { searchQ = e.target.value; render(); } });
+setInterval(() => document.querySelectorAll("[data-timer]").forEach((n) => { n.textContent = clock(elapsedMs(DATA.issues.find((x) => x.id === n.dataset.timer))); }), 1000);
+render();
+</script>
+</body>
+</html>

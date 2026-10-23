@@ -285,3 +285,21 @@ export function clearTeamSelection(): TeamSelection {
 export function submitTeamId(selection: TeamSelection): string | null {
   return selection.teamId;
 }
+
+/**
+ * Keeps a chosen team after a refresh only while the person can still search
+ * teams and the team still exists in the session.
+ */
+export function keepTeamSelection(
+  selection: TeamSelection,
+  canSearchTeams: boolean,
+  teams: readonly { id: string }[],
+): TeamSelection {
+  if (
+    !canSearchTeams ||
+    (selection.teamId && !teams.some((team) => team.id === selection.teamId))
+  ) {
+    return initialTeamSelection();
+  }
+  return selection;
+}

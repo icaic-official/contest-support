@@ -1,0 +1,53 @@
+import { useCallback, useRef, useState } from "react";
+import { type CommandRunner, useCommand } from "./useCommand";
+import type { SessionData } from "./useSessionSnapshot";
+
+/** Command and issue selection state that a UI shell shares with its layouts. */
+export interface WorkflowState {
+  command: CommandRunner;
+  /** The issue that the person looks at, or "" for the first visible issue. */
+  selectedIssueId: string;
+  selectIssue: (issueId: string) => void;
+  /** "all" or an issue status. */
+  statusFilter: string;
+  setStatusFilter: (filter: string) => void;
+}
+
+/**
+ * Creates the command runner and the selected issue for one shell. Call it in
+ * the shell, above any layout switch, so a pending request and the selected
+ * issue survive a change of viewport.
+ */
+export function useWorkflowState(data: SessionData): WorkflowState {
+  const [selectedIssueId, setSelectedIssueId] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  // Counts selection changes. A recorded command selects its issue only when
+  // the selection did not change while the command ran, so Back during the
+  // refresh after a command is not undone.
+  const selections = useRef(0);
+  const selectionsAtStart = useRef(0);
+  const selectIssue = useCallback((issueId: string) => {
+    selections.current++;
+    setSelectedIssueId(issueId);
+  }, []);
+  const command = useCommand({
+    sessionId: data.sessionId,
+    refresh: data.refresh,
+    onStart: () => {
+      selectionsAtStart.current = selections.current;
+    },
+    onRecorded: (issueId, recorded) => {
+      if (selections.current !== selectionsAtStart.current) return;
+      selectIssue(issueId);
+      // Show a reopened issue even when the filter was "resolved".
+      if (recorded.type === "reopen") setStatusFilter("claimed");
+    },
+  });
+  return {
+    command,
+    selectedIssueId,
+    selectIssue,
+    statusFilter,
+    setStatusFilter,
+  };
+}

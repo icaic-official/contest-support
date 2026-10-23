@@ -5,7 +5,9 @@ import type { Command, Snapshot } from "../src/connected/model";
 
 // Uses actual migrations, RLS, snapshots, and workflow transactions. Only the
 // hosted Auth/HTTP/Realtime transport is simulated; this is not a cloud test.
-export async function createJuryFixture() {
+// `seedIssues: false` starts the first session without issues, for the full
+// local journey.
+export async function createJuryFixture({ seedIssues = true } = {}) {
   const db = new PGlite();
   const event = crypto.randomUUID();
   const sessions = [crypto.randomUUID(), crypto.randomUUID()];
@@ -14,6 +16,7 @@ export async function createJuryFixture() {
     "jury",
     "combined",
     "volunteer",
+    "specialist",
     "admin",
     "contestant",
   ] as const;
@@ -84,7 +87,9 @@ export async function createJuryFixture() {
           ? ["volunteer", "specialist", "jury"]
           : name === "volunteer"
             ? ["volunteer"]
-            : [];
+            : name === "specialist"
+              ? ["specialist"]
+              : [];
     await db.query(
       "insert into public.memberships(session_id,user_id,team_id,roles,is_admin) values($1,$2,$3,$4,$5)",
       [
@@ -103,7 +108,7 @@ export async function createJuryFixture() {
   const issues: string[] = [];
   const stamp = (minutes: number) =>
     new Date(Date.now() - minutes * 60000).toISOString();
-  for (let n = 1; n <= 6; n++) {
+  for (let n = 1; seedIssues && n <= 6; n++) {
     const issue = crypto.randomUUID();
     const resolution = crypto.randomUUID();
     const reopened = n === 4 || n === 6;

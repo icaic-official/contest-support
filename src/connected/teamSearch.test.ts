@@ -7,6 +7,7 @@ import {
   editTeamQuery,
   initialTeamSelection,
   issueVisibleForTeam,
+  keepTeamSelection,
   moveTeamHighlight,
   searchTeams,
   type SearchIssue,
@@ -153,5 +154,16 @@ describe("team search", () => {
       "exact-place",
     );
     expect(submitTeamId(clearTeamSelection())).toBeNull();
+  });
+
+  it("keeps a chosen team after a refresh only while it remains searchable", () => {
+    const chosen = chooseTeam("aurora");
+    expect(keepTeamSelection(chosen, true, teams)).toBe(chosen);
+    expect(keepTeamSelection(chosen, false, teams)).toEqual(initialTeamSelection());
+    expect(
+      keepTeamSelection(chosen, true, teams.filter((team) => team.id !== "aurora")),
+    ).toEqual(initialTeamSelection());
+    const searching = editTeamQuery(initialTeamSelection(), "aur");
+    expect(keepTeamSelection(searching, true, [])).toBe(searching);
   });
 });

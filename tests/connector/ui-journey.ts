@@ -238,6 +238,7 @@ export async function runUiJourney(browser: Browser, fixture: UiFixture, options
     const reportButton = contestant.page.getByRole('complementary', { name: 'Your reports' })
       .getByRole('button', { name: 'Report an issue', exact: true });
     await consolePage(admin.page, 'Session settings');
+    await expect(admin.page).toHaveURL(new URL('/administration/settings', fixture.origin).href);
     // The settings page switch. The console header has a second, shorter one.
     const intake = admin.page.getByRole('switch', { name: /^Contestant intake (?:Open|Closed)\./ });
     await expect(intake).toBeChecked();
@@ -253,6 +254,7 @@ export async function runUiJourney(browser: Browser, fixture: UiFixture, options
     await admin.page.getByLabel('Total per issue (MB)', { exact: true }).fill('3');
     await adminAction(admin.page, admin.page.getByRole('button', { name: 'Save image limits', exact: true }));
     await consolePage(admin.page, 'Accounts');
+    await expect(admin.page).toHaveURL(new URL('/administration/accounts', fixture.origin).href);
     let member = await manage(admin.page, 'volunteer');
     await choose(member.getByRole('checkbox', { name: 'Jury', exact: true }));
     await adminAction(admin.page, member.getByRole('button', { name: 'Save membership', exact: true }));
@@ -273,9 +275,11 @@ export async function runUiJourney(browser: Browser, fixture: UiFixture, options
     await phoneTabs(volunteer.page).getByRole('button', { name: 'Me', exact: true }).focus();
     await volunteer.page.keyboard.press('Enter');
     await expect(volunteer.page.getByRole('heading', { level: 1, name: 'Me', exact: true })).toBeFocused();
+    await expect(volunteer.page).toHaveURL(new URL('/account', fixture.origin).href);
     await phoneTabs(volunteer.page).getByRole('button', { name: 'Queue', exact: true }).focus();
     await volunteer.page.keyboard.press('Enter');
     await expect(volunteer.page.getByRole('heading', { level: 1, name: 'Queue', exact: true })).toBeFocused();
+    await expect(volunteer.page).toHaveURL(new URL('/issues', fixture.origin).href);
     expect(await fitsWidth(volunteer.page)).toBe(true);
     await volunteer.page.setViewportSize(phone);
     phase = 'contestant submission and first assignment';
@@ -392,6 +396,7 @@ export async function runUiJourney(browser: Browser, fixture: UiFixture, options
     await expect(contestantTimer(contestant.page)).toContainText('stopped');
     const stoppedTimer = (await contestantTimer(contestant.page).textContent())!;
     await phoneTab(jury.page, 'Awards');
+    await expect(jury.page).toHaveURL(new URL('/jury', fixture.origin).href);
     const juryRow = (list: string) => jury.page.getByRole('list', { name: list, exact: true }).getByRole('listitem')
       .filter({ has: jury.page.getByText(issueReference, { exact: true }) });
     await expect(juryRow('To decide')).toContainText('Resolution: Service restored');
@@ -435,7 +440,9 @@ export async function runUiJourney(browser: Browser, fixture: UiFixture, options
     await expect(timeAward).toContainText('Applied to your contest time');
     await expect(owner(sheet)).toHaveText(`You (${specialistName})`);
     await expect(firstAssignment(sheet)).toHaveText(firstAssigned);
-    await contestant.page.reload();
+    const reloaded = await contestant.page.reload();
+    expect(reloaded?.status()).toBe(200);
+    await expect(contestant.page).toHaveURL(new URL('/issues', fixture.origin).href);
     await expect(uiRoot(contestant.page, 'contestant')).toBeVisible({ timeout: 30_000 });
     await chooseReport(contestant.page, description);
     await expect(contestant.page.getByText(publicText, { exact: true })).toBeVisible();

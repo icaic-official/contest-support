@@ -1,5 +1,8 @@
 import { CircleAlert, Plus, RotateCw } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useLocation } from "react-router";
+import { AccountPage } from "@/connected/AccountPage";
+import { useRouteFocus } from "@/connected/navigation";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { useNow } from "@/connected/hooks/useNow";
@@ -29,6 +32,8 @@ export function ContestantApp(props: ShellProps) {
   const workflow = useWorkflowState(data);
   const { command, selectedIssueId, selectIssue } = workflow;
   const now = useNow(data.clockOffset);
+  const { pathname } = useLocation();
+  const accountPage = pathname.replace(/\/+$/u, "") === "/account";
   const [reporting, setReporting] = useState(false);
   const [reportDraft, setReportDraft] = useState<ReportDraft>({
     category: "",
@@ -53,6 +58,10 @@ export function ContestantApp(props: ShellProps) {
 
   const state = data.snapshot;
   const membership = state?.membership;
+  const headingId = accountPage
+    ? "contestant-account-heading"
+    : contestantHeadingId;
+  useRouteFocus(headingId, Boolean(membership));
   if (!state || !membership || !state.session || !membership.team_id) {
     return (
       <NoSessionAccess
@@ -117,7 +126,17 @@ export function ContestantApp(props: ShellProps) {
         changePassword={changePassword}
         signOut={signOut}
       />
-      <div className="grid min-h-0 flex-1 grid-cols-[320px_1fr] grid-rows-[minmax(0,1fr)]">
+      {accountPage && (
+        <AccountPage shell={props} member={membership} headingId={headingId} />
+      )}
+      <div
+        hidden={accountPage}
+        className={
+          accountPage
+            ? "hidden"
+            : "grid min-h-0 flex-1 grid-cols-[320px_1fr] grid-rows-[minmax(0,1fr)]"
+        }
+      >
         <aside
           aria-label="Your reports"
           className="flex min-h-0 flex-col border-r bg-sidebar"

@@ -1,4 +1,5 @@
 import { type ReactNode, useState } from "react";
+import { useNavigate } from "react-router";
 import { BrandMark } from "@/components/brand";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -18,6 +19,7 @@ import { backend, backendSetupMessage } from "@/backend";
 import { useAccountStatus } from "./hooks/useAccountStatus";
 import { useAuthSession } from "./hooks/useAuthSession";
 import { Workspace } from "./Workspace";
+import { WorkflowRetryProvider } from "./WorkflowRetry";
 
 const documentationUrl = "https://minsky-docs.icaic-minsky.workers.dev";
 
@@ -26,6 +28,7 @@ const documentationUrl = "https://minsky-docs.icaic-minsky.workers.dev";
  * change, and then hands over to Workspace, which selects the UI.
  */
 export function ConnectedApp() {
+  const navigate = useNavigate();
   const auth = useAuthSession();
   const { user } = auth;
   const account = useAccountStatus(user?.id);
@@ -97,7 +100,10 @@ export function ConnectedApp() {
         key={user.id}
         user={user}
         username={status.username}
-        changePassword={() => setPasswordSetup(true)}
+        changePassword={() => {
+          navigate("/account");
+          setPasswordSetup(true);
+        }}
         signOut={auth.signOut}
       />
     );
@@ -138,7 +144,9 @@ export function ConnectedApp() {
               <AlertDescription>{auth.error}</AlertDescription>
             </Alert>
           )}
-          {content}
+          <WorkflowRetryProvider key={user?.id ?? ""} actorId={user?.id ?? ""}>
+            {content}
+          </WorkflowRetryProvider>
         </main>
         {!dashboardReady && (
           <footer className="px-6 py-4 text-center text-xs text-muted-foreground">

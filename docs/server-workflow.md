@@ -6,12 +6,11 @@ Its rules contain no provider SDK, SQL, environment configuration, or provider s
 The [verification guide](verify-server-workflow.md) describes the checks.
 [Current state](current-state.md) records observed results.
 
-Supabase remains the active backend.
-The active browser adapter still calls the legacy `public.workflow` RPC.
+Cloudflare is the active development backend. Its application Worker executes the shared service through guarded D1 batches.
+The Supabase browser adapter retains the guarded `public.workflow` RPC.
 The separate `workflow` Edge Function runs the shared service against Supabase for replacement verification.
 An opt-in [browser executor](../src/backend/supabase/workflow.ts) calls that function with the existing `Backend.workflows.execute` signature.
-T0020 retains that active Supabase path and uses the same service for the complete Cloudflare workflow.
-It does not switch the development backend.
+Both provider implementations remain available. The development switch changed no workflow decision or transaction boundary.
 
 ## Existing compatibility baseline
 

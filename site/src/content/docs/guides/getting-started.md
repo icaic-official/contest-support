@@ -49,6 +49,11 @@ Your roles select the staff tabs and pages:
 Staff with several roles get all the tabs and pages of those roles.
 Contestants change their password and sign out through the account menu in the top bar.
 Staff use the **Me** tab on a phone, or the account menu at the bottom of the desktop sidebar.
+
+The queue uses `/issues`, award review uses `/jury`, administration uses `/administration`, and account details use `/account`.
+You can bookmark a section or use browser Back and Forward.
+Opening a section directly asks you to sign in when necessary and checks your current permissions.
+Refreshing retains the section and loads current session data.
 Use **Sign out** when you finish on a shared device.
 
 ## Recover access

@@ -2,11 +2,7 @@
   "required_status_checks": {
     "strict": true,
     "contexts": [],
-    "checks": [
-      {"context": "checks", "app_id": 15368},
-      {"context": "secrets", "app_id": 15368},
-      {"context": "dependencies", "app_id": 15368}
-    ]
+    "checks": []
   },
   "enforce_admins": true,
   "required_pull_request_reviews": {

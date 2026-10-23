@@ -3,7 +3,7 @@ title: Feature status
 description: What is merged, what is pending, and what is not verified.
 ---
 
-Checked on **23 October 2026** against `main` at `03105ab`. This is a dated record, not a live dashboard.
+Checked on **23 October 2026** against `main` at `21bfd6e`. This is a dated record, not a live dashboard.
 
 ## In main
 

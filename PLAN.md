@@ -1,5 +1,24 @@
 # Minsky planning record
 
+**Workers Builds CI, 2026-10-23.** The owner keeps GitHub on the free plan.
+The Actions minute cap stopped hosted checks. It is not a failed payment.
+Move every automatic check to Workers Builds on the existing Workers Paid plan.
+Remove the GitHub Actions workflow so pushes do not start jobs.
+Do not add a GitHub Actions fallback.
+Browser tests and hosted Supabase or Cloudflare suites stay on-demand commands.
+The Workers Builds image does not provide Chromium, and the hosted jobs exceed the 20 minute build limit.
+The CI Worker is `minsky-ci`. Its deploy command is a dry run. It does not publish `minsky-dev` or `minsky-docs`.
+The owner connects the repository. This change does not deploy or edit secrets.
+
+**PR #45 update from main, 2026-10-23.** The owner requests current `main` and conflict resolution for the existing PR.
+Merge `origin/main` at `a938e6a`, which includes the merged T0015 frontend and T0022 CI change.
+Port PR #45 browser routes and retry protections to the redesigned shells and shared data hooks.
+Preserve the activation, manual-publication, and source-specific verification records.
+Keep both providers, server authorization, deployment prerequisites, and protected environment rules.
+The request covers the merge and its local verification. Keep PR #45 draft for owner review.
+Hosted verification, deployment, provider changes, and the separate Supabase skip-link failure remain outside this request.
+The owner reviews and merges. Earlier approvals below retain their original scope.
+
 **Reduce duplicate CI checks, 2026-10-20.** The owner requested removal of duplicate GitHub runs before considering a CI provider migration.
 T0022 starts from updated `main` at `4e43739`, after the owner merged PR #43.
 Use `feature/t0022-ci-run-deduplication` in a separate worktree.
@@ -11,6 +30,31 @@ Correct that parser within T0022 so previews remain usable. Keep URL restriction
 Same-repository PRs use branch-head evidence instead of a second test of GitHub's synthetic merge commit.
 Revert the workflow change to restore both executions. Cloudflare CI migration remains candidate work.
 The owner reviews and merges. No provider configuration, paid service, backend activation, or cloud-test allowlist change is authorized.
+
+**PR #45 retry review fixes, 2026-10-20.** The owner requests backend and frontend fixes through separate subagents.
+Bind uncertain workflow requests to their authenticated actor and original contest session.
+Retain each request ID through transient account-check failures. Continue to hide protected content while the check fails.
+Verify explicit retries, access removal, identity changes, and duplicate prevention.
+Keep provider resources, deployment settings, server authorization, and transaction rules unchanged.
+The owner reviews and merges the existing PR. The separate cached-image concern remains follow-up work.
+
+**T0021 frontend follow-up, 2026-10-20.** The owner requests separate feature modules and URL routing in existing PR #45.
+Use the existing ticket checkout and branch. Preserve shared session state, workflow requests, access rules, and both providers.
+Verify direct links, reload, browser history, phone navigation, and current membership checks.
+Keep provider resources and deployment settings unchanged. The owner reviews and merges the expanded PR.
+
+**T0021 owner merge and approved activation, 2026-10-19.** The owner merged PR #43 at `4e43739ac2ce56cca7e7739e4db189aa2854d4a9`.
+Its tree matches final protected source `2125875653db9157f686c5f46cdddf8519c290d1`.
+The main push checks pass in [run 39252514749, attempt 1](https://github.com/GiftedNovaHD/minsky/actions/runs/39252514749/attempts/1).
+The owner separately approved the concrete stable Cloudflare switch and a repeat automated deployment of this reviewed revision.
+The owner confirmed that independent Cloudflare Git builds are disconnected for both `minsky-dev` and `minsky-docs`.
+This approval reuses the fresh development installation. It authorizes no Supabase transfer, reset, or resource deletion.
+Stop the candidate before stable publication. Preserve the development D1 records, private R2 objects, and stable authentication secret during recovery.
+Keep docs independent, app previews isolated, and the existing protected-environment rules intact.
+Use only bounded required checks within the existing $5 plan. Add no service, upgrade, or optional stress test.
+The stable URL now uses Cloudflare. Automated publication attempts 3 and 4 pass on the same approved `4e43739` source. Each deployment passes all 14 stable application cases and scoped cleanup. The repeat retains the exact namespace, resource bindings, authentication configuration, cron, and CPU cap.
+The [current activation record](docs/current-state.md#t0021-approved-activation-2026-10-19) owns deployment revisions, Worker versions, verification results, and remaining checks.
+Earlier dated decisions below retain their original scope and evidence.
 
 **T0021 maintainability review follow-up, 2026-10-19.** The owner requests small changes in open PR #43 after verification of `0254f60`.
 Clarify workflow authorization and D1 transaction stages without changing behavior or atomic execution.

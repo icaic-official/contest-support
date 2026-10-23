@@ -1,4 +1,6 @@
 import { ChevronDown, KeyRound, LogOut, MapPin } from "lucide-react";
+import { Link } from "react-router";
+import { useRef } from "react";
 import { BrandMark } from "@/components/brand";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Badge } from "@/components/ui/badge";
@@ -6,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuRadioGroup,
@@ -59,6 +62,7 @@ export function ContestantTopBar({
   changePassword: () => void;
   signOut: () => void;
 }) {
+  const openingAccount = useRef(false);
   return (
     <header className="flex h-14 shrink-0 items-center gap-4 border-b px-5">
       <BrandMark />
@@ -140,7 +144,15 @@ export function ContestantTopBar({
             <ChevronDown className="text-muted-foreground" aria-hidden="true" />
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-60">
+        <DropdownMenuContent
+          align="end"
+          className="w-60"
+          onCloseAutoFocus={(event) => {
+            if (!openingAccount.current) return;
+            event.preventDefault();
+            openingAccount.current = false;
+          }}
+        >
           <DropdownMenuLabel className="font-normal">
             <span className="block font-medium">{teamName}</span>
             {location && (
@@ -156,14 +168,24 @@ export function ContestantTopBar({
             )}
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
-          <DropdownMenuItem disabled={locked} onSelect={changePassword}>
-            <KeyRound aria-hidden="true" />
-            Change password
-          </DropdownMenuItem>
-          <DropdownMenuItem onSelect={signOut}>
-            <LogOut aria-hidden="true" />
-            Sign out
-          </DropdownMenuItem>
+          <DropdownMenuGroup>
+            <DropdownMenuItem
+              asChild
+              onSelect={() => {
+                openingAccount.current = true;
+              }}
+            >
+              <Link to="/account">My account</Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem disabled={locked} onSelect={changePassword}>
+              <KeyRound aria-hidden="true" />
+              Change password
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={signOut}>
+              <LogOut aria-hidden="true" />
+              Sign out
+            </DropdownMenuItem>
+          </DropdownMenuGroup>
         </DropdownMenuContent>
       </DropdownMenu>
     </header>

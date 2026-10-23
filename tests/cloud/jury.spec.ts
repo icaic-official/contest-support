@@ -79,6 +79,7 @@ test("hosted jury Awards tab preserves zero-minute decisions and retries through
   await login(page, "jury", "organiser-phone");
   const awardsHeading = page.getByRole("heading", { level: 1, name: "Awards", exact: true });
   await expect(awardsHeading).toBeVisible();
+  await expect(page).toHaveURL("/jury");
   const card = byId(page, `issue-card-${issue.id}`);
   await card.click();
   await expect(issueHeading(page)).toBeFocused();
@@ -159,6 +160,9 @@ test("two hosted clients update the award lists while preserving drafts, focus a
     const queue = await rows.allTextContents();
     await consoleLink(page, "Award review").click();
     await expect(page.getByRole("heading", { level: 1, name: "Award review" })).toBeFocused();
+    await expect(page).toHaveURL("/jury");
+    await expect(byId(page, `award-issue-${first.id}`)).toBeVisible();
+    await expect(byId(page, `award-issue-${second.id}`)).toBeVisible();
     const order = await page.locator('[id^="award-issue-"]').evaluateAll((buttons) => buttons.map((button) => button.id));
     expect(order.indexOf(`award-issue-${first.id}`)).toBeGreaterThanOrEqual(0);
     expect(order.indexOf(`award-issue-${first.id}`)).toBeLessThan(order.indexOf(`award-issue-${second.id}`));
@@ -216,6 +220,8 @@ test("two hosted clients update the award lists while preserving drafts, focus a
     // The shared status filter survives the change between layouts.
     await page.setViewportSize(desktop);
     await expect(uiRoot(page, "organiser-desktop")).toBeVisible();
+    await consoleLink(page, "Queue").click();
+    await expect(page).toHaveURL("/issues");
     await expect(open).toHaveAttribute("aria-pressed", "true");
     expect(await rows.allTextContents()).toEqual(queue);
   } finally {

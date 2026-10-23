@@ -120,10 +120,16 @@ async function focusHeadingAfterHash(page: Page): Promise<void> {
 
 /** Presses Enter on the skip link and reads the focused element after paint. */
 async function skipTargetIsMain(page: Page): Promise<boolean> {
-  await page.keyboard.press("Tab");
-  await expect(
-    page.getByRole("link", { name: "Skip to main content" }),
-  ).toBeFocused();
+  const skip = page.getByRole("link", { name: "Skip to main content" });
+  // Route navigation focuses the page heading. Reach the skip link from there.
+  for (let step = 0; step < 40; step++) {
+    if (await skip.evaluate((link) => link === document.activeElement)) break;
+    const onHeading = await page.evaluate(() =>
+      document.activeElement instanceof HTMLHeadingElement,
+    );
+    await page.keyboard.press(onHeading || step > 0 ? "Shift+Tab" : "Tab");
+  }
+  await expect(skip).toBeFocused();
   await page.keyboard.press("Enter");
   await page.evaluate(
     () =>

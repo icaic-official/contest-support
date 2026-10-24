@@ -1,9 +1,9 @@
 import { expect, it, vi } from "vitest";
 import { checkCloudBackend } from "./check-cloud-backend.mjs";
 
-const env = { MINSKY_TEST_PROJECT_REF: "ghtztmovdkhuketcbjmq", SUPABASE_ACCESS_TOKEN: "fixture-token" };
+const env = { MINSKY_TEST_PROJECT_REF: "abcdefghijklmnopqrst", SUPABASE_ACCESS_TOKEN: "fixture-token" };
 const migrations = ["202610110001", "202610140001"];
-const active = ["admin", "attachments"].map(slug => ({ slug, status: "ACTIVE" }));
+const active = ["admin", "attachments", "announcement-images"].map(slug => ({ slug, status: "ACTIVE" }));
 function responses(rows, functions = active) {
   return vi.fn().mockResolvedValueOnce({ ok: true, json: async () => rows })
     .mockResolvedValueOnce({ ok: true, json: async () => functions });
@@ -27,9 +27,12 @@ it("rejects missing image migrations even when an unrelated migration is present
   expect(request).toHaveBeenCalledTimes(1);
 });
 
-it.each([{ functions: [] }, { functions: [{ slug: "attachments", status: "FAILED" }] }])("rejects an absent or inactive attachment function", async ({ functions }) => {
-  const request = responses(migrations.map(version => ({ version })), [{ slug: "admin", status: "ACTIVE" }, ...functions]);
-  await expect(checkCloudBackend({ env, request, migrations })).rejects.toThrow("active functions: attachments");
+it.each(["attachments", "announcement-images"])("rejects an absent or inactive %s function", async slug => {
+  const others = active.filter(fn => fn.slug !== slug);
+  for (const functions of [others, [...others, { slug, status: "FAILED" }]]) {
+    const request = responses(migrations.map(version => ({ version })), functions);
+    await expect(checkCloudBackend({ env, request, migrations })).rejects.toThrow(`active functions: ${slug}.`);
+  }
 });
 
 it("checks the selected project with a read-only query and reports additional migrations", async () => {
@@ -37,8 +40,8 @@ it("checks the selected project with a read-only query and reports additional mi
   const report = vi.fn();
   await checkCloudBackend({ env, request, migrations, report });
   expect(request.mock.calls.map(([url]) => url)).toEqual([
-    "https://api.supabase.com/v1/projects/ghtztmovdkhuketcbjmq/database/query",
-    "https://api.supabase.com/v1/projects/ghtztmovdkhuketcbjmq/functions",
+    "https://api.supabase.com/v1/projects/abcdefghijklmnopqrst/database/query",
+    "https://api.supabase.com/v1/projects/abcdefghijklmnopqrst/functions",
   ]);
   expect(JSON.parse(request.mock.calls[0][1].body).read_only).toBe(true);
   expect(report).toHaveBeenCalledWith("Additional remote migration versions: 202610110002.");

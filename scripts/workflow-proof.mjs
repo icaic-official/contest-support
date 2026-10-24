@@ -5,11 +5,9 @@ import { existsSync } from 'node:fs';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { isAbsolute, join } from 'node:path';
 import { tmpdir } from 'node:os';
+import { isolatedSupabaseProject } from '../tests/providers/supabase/target.mjs';
 
-const project = process.env.MINSKY_TEST_PROJECT_REF;
-if (project !== 'ghtztmovdkhuketcbjmq') {
-  throw new Error('Set MINSKY_TEST_PROJECT_REF=ghtztmovdkhuketcbjmq. Only the approved Minsky CI target is permitted.');
-}
+const project = isolatedSupabaseProject(process.env.MINSKY_TEST_PROJECT_REF);
 const options = process.argv.slice(2);
 if (options.length > 1 || options.some((argument) => !argument.startsWith('--recover='))) {
   throw new Error('Only --recover=/absolute/path/fixture.json is accepted. Test configuration overrides are forbidden.');

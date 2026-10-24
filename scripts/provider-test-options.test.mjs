@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest';
 import { providerTestOptions } from './provider-test-options.mjs';
 
 const environment = {
-  MINSKY_TEST_PROJECT_REF: 'ghtztmovdkhuketcbjmq',
+  MINSKY_TEST_PROJECT_REF: 'abcdefghijklmnopqrst',
   SUPABASE_ACCESS_TOKEN: 'fixture-management-value',
   SUPABASE_ANON_KEY: 'fixture-public-value',
   SUPABASE_SERVICE_ROLE_KEY: 'fixture-private-value',

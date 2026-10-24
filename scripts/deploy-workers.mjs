@@ -1,7 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
-import { Buffer } from "node:buffer";
 import process from "node:process";
 import { setTimeout } from "node:timers/promises";
 import { pathToFileURL, URL } from "node:url";
@@ -13,12 +12,8 @@ import { confirmTarget } from "../src/server/adapters/cloudflare/tooling/operati
 import { safeWranglerEnvironment } from "../src/server/adapters/cloudflare/tooling/safe-environment.mjs";
 
 const repository = "GiftedNovaHD/minsky";
-const project = "ovymmobupzowotvrywek";
 const account = "458ad6a930b0fb717796dfa19ca6a2b1";
-const staticWorkers = [
-  { name: "minsky-dev", config: "wrangler.jsonc", assets: "dist" },
-  { name: "minsky-docs", config: "wrangler.docs.jsonc", assets: "site/dist" },
-];
+const docsWorker = { name: "minsky-docs", config: "wrangler.docs.jsonc", assets: "site/dist" };
 
 /** Workers Builds supplies the pushed branch and commit. A manual run sets the same two values. */
 export function deploymentPlan(env) {
@@ -36,29 +31,10 @@ export function deploymentPlan(env) {
     name: `branch-${slug}-${suffix}` };
 }
 
-export function applicationBackend(env) {
-  // Cloudflare is the live development backend. Select supabase explicitly.
-  const backend = env.MINSKY_DEV_BACKEND || "cloudflare";
-  if (!["supabase", "cloudflare"].includes(backend)) throw new Error("Select cloudflare or supabase for MINSKY_DEV_BACKEND.");
-  return backend;
-}
-
 export function validateBuildSettings(env) {
   if (env.CLOUDFLARE_ACCOUNT_ID !== account || env.VITE_ENVIRONMENT !== "development") {
-    throw new Error("Deployment must use the configured Minsky development account and backend.");
+    throw new Error("Deployment must use the configured Minsky development account and environment.");
   }
-  if (applicationBackend(env) === "cloudflare") return;
-  if (env.VITE_SUPABASE_URL !== `https://${project}.supabase.co`) {
-    throw new Error("Deployment must use the configured Minsky development account and backend.");
-  }
-  const key = env.VITE_SUPABASE_PUBLISHABLE_KEY ?? "";
-  if (/^sb_publishable_[A-Za-z0-9_-]+$/.test(key)) return;
-  try {
-    const parts = key.split(".");
-    const payload = JSON.parse(Buffer.from(parts[1], "base64url").toString());
-    if (parts.length === 3 && payload.role === "anon" && payload.ref === project) return;
-  } catch { /* Report a fixed message without including the supplied credential. */ }
-  throw new Error("Use the development publishable key or legacy anon key. Privileged keys are forbidden.");
 }
 
 /** An older build must not replace a newer push. The public repository needs no token. */
@@ -135,39 +111,32 @@ export async function deploymentTargets(env, site = "both", {
   if (env.CLOUDFLARE_ACCOUNT_ID !== account) throw new Error("Unexpected Cloudflare deployment account.");
   const plan = deploymentPlan(env);
   const targets = [];
-  if (site !== "docs") {
-    const backend = applicationBackend(env);
-    if (plan.preview) {
-      // Application previews require independent provider resources first.
-    } else if (backend === "cloudflare") {
-      validateBuildSettings(env);
-      const path = env.MINSKY_DEV_CLOUDFLARE_CONFIG;
-      if (!path || isAbsolute(path) || relative(process.cwd(), resolve(path)).startsWith("..")) {
-        throw new Error("Select a provider-generated configuration inside the repository.");
-      }
-      const settings = await installation(path);
-      if (settings.accountId !== account || settings.workerName !== "minsky-dev" ||
-          settings.origin !== "https://minsky-dev.icaic-minsky.workers.dev" ||
-          settings.databaseId !== env.MINSKY_DEV_DATABASE_ID ||
-          settings.databaseName !== env.MINSKY_DEV_DATABASE_NAME ||
-          settings.bucketName !== env.MINSKY_DEV_BUCKET_NAME ||
-          [settings.databaseName, settings.bucketName].some((name) => /(?:^|-)(?:ci|test|install|installation)(?:-|$)/.test(name))) {
-        throw new Error("Confirm the exact stable development Worker, database, bucket, origin, and account.");
-      }
-      targets.push({ name: "minsky-dev", config: path, assets: "dist", backend, settings });
-    } else {
-      validateBuildSettings(env);
-      targets.push({ ...staticWorkers[0], backend });
+  // Application previews require independent provider resources first.
+  if (site !== "docs" && !plan.preview) {
+    validateBuildSettings(env);
+    const path = env.MINSKY_DEV_CLOUDFLARE_CONFIG;
+    if (!path || isAbsolute(path) || relative(process.cwd(), resolve(path)).startsWith("..")) {
+      throw new Error("Select a provider-generated configuration inside the repository.");
     }
+    const settings = await installation(path);
+    if (settings.accountId !== account || settings.workerName !== "minsky-dev" ||
+        settings.origin !== "https://minsky-dev.icaic-minsky.workers.dev" ||
+        settings.databaseId !== env.MINSKY_DEV_DATABASE_ID ||
+        settings.databaseName !== env.MINSKY_DEV_DATABASE_NAME ||
+        settings.bucketName !== env.MINSKY_DEV_BUCKET_NAME ||
+        [settings.databaseName, settings.bucketName].some((name) => /(?:^|-)(?:ci|test|install|installation)(?:-|$)/.test(name))) {
+      throw new Error("Confirm the exact stable development Worker, database, bucket, origin, and account.");
+    }
+    targets.push({ name: "minsky-dev", config: path, assets: "dist", backend: "cloudflare", settings });
   }
-  if (site !== "app") targets.push(staticWorkers[1]);
-  for (const worker of targets.filter((target) => !target.settings)) {
-    const config = JSON.parse(read(worker.config, "utf8"));
-    if (config.name !== worker.name || config.account_id !== account ||
-        config.assets?.directory !== `./${worker.assets}` || config.main ||
+  if (site !== "app") {
+    const config = JSON.parse(read(docsWorker.config, "utf8"));
+    if (config.name !== docsWorker.name || config.account_id !== account ||
+        config.assets?.directory !== `./${docsWorker.assets}` || config.main ||
         config.d1_databases || config.r2_buckets || config.durable_objects || config.env || config.routes) {
-      throw new Error(`Unexpected deployment target in ${worker.config}.`);
+      throw new Error(`Unexpected deployment target in ${docsWorker.config}.`);
     }
+    targets.push(docsWorker);
   }
   return targets;
 }
@@ -182,20 +151,6 @@ async function workerSettings(env, request) {
     throw new Error("Worker metadata unavailable");
   }
   return body.result;
-}
-
-/** A changed repository variable cannot replace an activated Worker with static assets. */
-export async function assertStaticApplication(env, request = globalThis.fetch) {
-  try {
-    const settings = await workerSettings(env, request);
-    if (settings.bindings.some((binding) => !binding || typeof binding.name !== "string" || !binding.name ||
-        !["plain_text", "secret_text", "assets"].includes(binding.type) ||
-        ["DB", "IMAGES", "LIVE_UPDATES"].includes(binding.name))) {
-      throw new Error("Unsafe Worker settings");
-    }
-  } catch {
-    throw new Error("The stable Worker could not be confirmed as static. A Supabase asset upload is forbidden. Inspect the deployed bindings privately.");
-  }
 }
 
 /** Check deployed metadata and API behavior without creating a session or fixture. */
@@ -236,9 +191,8 @@ export async function verifyApplicationDeployment(worker, env, request = globalT
 
 function applicationMarker(worker, sha) {
   return {
-    sha, backend: worker.backend, databaseId: worker.settings?.databaseId ?? null,
-    bucketName: worker.settings?.bucketName ?? null,
-    origin: worker.settings?.origin ?? "https://minsky-dev.icaic-minsky.workers.dev",
+    sha, backend: worker.backend, databaseId: worker.settings.databaseId,
+    bucketName: worker.settings.bucketName, origin: worker.settings.origin,
   };
 }
 
@@ -292,7 +246,7 @@ export async function prepareApplication(worker, env, execute = execFileSync, re
   await assertCurrentMigrations(worker.settings, runWrangler);
 }
 
-/** The build and upload use the same backend and confirmed public configuration. */
+/** The build and upload use the Cloudflare backend and confirmed public configuration. */
 export async function buildWorkers(env, {
   site = "both", execute = execFileSync, write = writeFileSync, targets = deploymentTargets,
 } = {}) {
@@ -302,10 +256,8 @@ export async function buildWorkers(env, {
     for (const key of ["CLOUDFLARE_API_TOKEN", "GH_TOKEN", "GITHUB_TOKEN", "AUTH_SECRET"]) delete childEnv[key];
     if (worker.backend) {
       childEnv.VITE_BACKEND = worker.backend;
-      if (worker.backend === "cloudflare") {
-        delete childEnv.VITE_SUPABASE_URL;
-        delete childEnv.VITE_SUPABASE_PUBLISHABLE_KEY;
-      }
+      delete childEnv.VITE_SUPABASE_URL;
+      delete childEnv.VITE_SUPABASE_PUBLISHABLE_KEY;
     }
     execute("npm", ["run", worker.backend ? "build" : "docs:build"], { env: childEnv, stdio: "inherit" });
     if (worker.backend) write("dist/minsky-build.json", JSON.stringify({
@@ -317,7 +269,7 @@ export async function buildWorkers(env, {
 export async function deployWorkers(env, {
   site = "both", current = isCurrentRevision, execute = execFileSync, verify = verifyRevision,
   read = readFileSync, write = writeFileSync, report = summary, targets = deploymentTargets,
-  staticApplication = assertStaticApplication, application = prepareApplication,
+  application = prepareApplication,
   deployedApplication = verifyApplicationDeployment,
 } = {}) {
   const plan = deploymentPlan(env);
@@ -342,8 +294,7 @@ export async function deployWorkers(env, {
       if (!isDeepStrictEqual(build, { ...applicationMarker(worker, plan.sha), config: worker.config })) {
         throw new Error("Build the selected backend and revision with the guarded deployment build command before upload.");
       }
-      if (worker.settings) await application(worker, childEnv, execute);
-      else if (!plan.preview) await staticApplication(childEnv);
+      await application(worker, childEnv, execute);
     }
     const marker = worker.backend ? applicationMarker(worker, plan.sha) : { sha: plan.sha };
     write(`${worker.assets}/minsky-revision.json`, `${JSON.stringify(marker)}\n`);
@@ -359,7 +310,7 @@ export async function deployWorkers(env, {
     const url = plan.preview ? previewAddress(output) : `https://${worker.name}.icaic-minsky.workers.dev`;
     report(`Published ${worker.name} at ${url} from ${plan.sha}.`);
     await verify(url, marker);
-    if (worker.settings) await deployedApplication(worker, childEnv);
+    if (worker.backend) await deployedApplication(worker, childEnv);
     report(`The revision and deployment checks passed for ${worker.name}.`);
   }
 }

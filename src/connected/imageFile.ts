@@ -1,6 +1,6 @@
 export const MIB = 1048576;
 export const THUMBNAIL_BYTES = 524288;
-/** The browser re-encodes a profile picture to at most 512 by 512 pixels before upload. */
+/** The profile picture limit for both providers. A 512 by 512 JPEG or WebP picture fits below it. */
 export const AVATAR_MAX_BYTES = 262144;
 
 export function imageKind(

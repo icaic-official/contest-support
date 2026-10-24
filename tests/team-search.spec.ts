@@ -473,6 +473,23 @@ test('a team removed from the snapshot cannot filter the desktop queue or receiv
   expect(fixture.errors).toEqual([]);
 });
 
+test('an empty filtered queue offers a way back to the active issues', async ({ page }) => {
+  const fixture = await signIn(page, desktop);
+  const queue = page.locator('#queue-team-search');
+  await queue.fill('ced');
+  await page.getByRole('option').click();
+  await statusTab(page, 'Resolved').click();
+  await expect(issueRows(page)).toHaveCount(0);
+  await expect(page.getByText('No issues in this view.')).toBeVisible();
+  await page.getByRole('button', { name: 'Show active issues', exact: true }).click();
+  await expect(statusTab(page, 'Active')).toHaveAttribute('aria-pressed', 'true');
+  await expect(statusTab(page, 'Active')).toBeFocused();
+  await expect(queue).toHaveValue('');
+  await expect(issueRows(page)).toHaveCount(2);
+  expect(fixture.commands).toEqual([]);
+  expect(fixture.errors).toEqual([]);
+});
+
 test('a team removed from the snapshot leaves the phone Find tab and report sheet', async ({ page }) => {
   const fixture = await signIn(page, phone);
   const report = await openReport(page);

@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/sliding-indicator";
 import { TeamSearch } from "@/connected/TeamSearch";
 import {
+  initialTeamSelection,
   searchTeams,
   type TeamSelection,
   unresolvedCount,
@@ -24,6 +25,7 @@ import { type ConsolePageProps, consoleHeadingId } from "./consoleProps";
 import {
   filterForQueueTab,
   matchesQueueTab,
+  type QueueTab,
   queueTabForFilter,
   queueTabs,
 } from "./consoleModel";
@@ -74,6 +76,11 @@ export function ReportButton({
   );
 }
 
+/** The id of a status tab. The empty state moves focus to the Active tab. */
+function queueTabId(tab: QueueTab): string {
+  return `queue-tab-${tab}`;
+}
+
 const footnote =
   "Sorted by unresolved time, longest first. Timers are grey under 10 minutes, amber under 20 minutes and rose after that. Press J or K to move between rows.";
 
@@ -105,6 +112,30 @@ export function QueuePage({
     now,
   );
   const archived = Boolean(state.event?.archived);
+  const narrowed = tab !== "active" || Boolean(teamSelection.teamId);
+  let empty: ReactNode =
+    "Reports will appear here when they are submitted.";
+  if (issues.length && narrowed) {
+    empty = (
+      <>
+        <p>No issues in this view. Choose another status or team.</p>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            document.getElementById(queueTabId("active"))?.focus();
+            workflow.setStatusFilter(filterForQueueTab("active"));
+            onTeamSelection(initialTeamSelection());
+          }}
+        >
+          Show active issues
+        </Button>
+      </>
+    );
+  } else if (issues.length) {
+    empty = "No active issues. Resolved issues are under Resolved and All.";
+  }
   return (
     <div className="space-y-6">
       <PageHeader
@@ -134,6 +165,7 @@ export function QueuePage({
             return (
               <button
                 key={item.tab}
+                id={queueTabId(item.tab)}
                 type="button"
                 aria-pressed={tab === item.tab}
                 onClick={() =>
@@ -166,11 +198,7 @@ export function QueuePage({
         issues={shown}
         props={props}
         caption="Issue queue"
-        empty={
-          issues.length
-            ? "No issues in this view. Choose another status or team."
-            : "Reports will appear here when they are submitted."
-        }
+        empty={empty}
       />
       {shown.length > 0 && (
         <p className="text-xs text-muted-foreground">{footnote}</p>

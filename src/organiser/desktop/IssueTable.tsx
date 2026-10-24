@@ -55,9 +55,9 @@ export function IssueTable({
   const { state, now, workflow } = props;
   if (!issues.length) {
     return (
-      <p className="rounded-xl border border-dashed p-10 text-center text-sm text-muted-foreground">
+      <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed p-10 text-center text-sm text-muted-foreground">
         {empty}
-      </p>
+      </div>
     );
   }
   return (

@@ -180,14 +180,15 @@ npm run docs:dev
 | `npm run docs:build` | Build the static site and check local links and anchors. |
 | `npm run docs:preview` | Serve the built site, including search. |
 | `npm run docs:test` | Check navigation, search, and phone layouts with Chromium. Build the docs first. |
-| `npm run docs:deploy` | Build and publish only the `minsky-docs` Worker during an approved manual recovery. |
+| `npm run docs:deploy` | Build and publish only the `minsky-docs` Worker. Use it only when Workers Builds cannot publish. |
 
 The deployment configuration is `wrangler.docs.jsonc`.
 See [the writing and deployment guide](site/src/content/docs/contributing/documentation.mdx).
 The initial docs deployment is explicitly authorized in T0011 before merge.
-Workers Builds runs `npm run ci` for branches in this repository. It does not publish the application or the docs.
+Workers Builds runs `npm run ci` for branches in this repository. It does not publish the application.
+Workers Builds publishes the docs from `main` and uploads a docs preview version for other branches. See [Publish the docs](docs/cloudflare-builds.md#publish-the-docs).
 See [Workers Builds setup](docs/cloudflare-builds.md) for the dashboard steps and [CI settings](docs/cloudflare-build-settings.md) for on-demand browser and hosted commands.
-Automatic GitHub Actions publication is removed. App and docs publication stay explicit guarded commands.
+Automatic GitHub Actions publication is removed. App publication stays an explicit guarded command.
 The fresh Cloudflare development candidate and a separate empty installation pass the complete application checks.
 The approved activation and a later automated deployment passed their recorded application checks. Those runs used the retired Actions publisher.
 The [T0021 activation record](docs/current-state.md#t0021-approved-activation-2026-10-19) separates protected checks from stable URL verification.

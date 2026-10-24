@@ -35,7 +35,8 @@ Preserve the Workers Builds move and the removed GitHub Actions workflow.
 Do not add an Actions job.
 Browser suites and hosted provider checks stay manual commands.
 `npm run ci` lists provider scenarios. It does not run the hosted Supabase provider suite.
-Do not connect `minsky-dev` or `minsky-docs` to Workers Builds.
+Do not connect `minsky-dev` to Workers Builds.
+`minsky-docs` publishes through Workers Builds. A push to `main` publishes the docs. A push to another branch uploads a preview version that does not receive traffic.
 Do not deploy.
 The owner reviews and merges.
 
@@ -91,10 +92,13 @@ Statements in those records that Supabase is the active backend are superseded b
 
 ## Ticket and Git workflow
 
+- Set the author of every new commit to `CJX <72659439+GiftedNovaHD@users.noreply.github.com>`.
+  Before the first commit, run `git config author.name CJX` and `git config author.email 72659439+GiftedNovaHD@users.noreply.github.com`.
+  Do not change `user.name`, `user.email`, or the committer. The committer identity and its signing key keep the commit verified on GitHub.
 - Include `Co-authored-by: PuR3Luck <aidan.ong822@gmail.com>` and `Co-authored-by: notbowen <contact@hubowen.dev>` in every new commit you create and pushes for this repository.
 - Separate the co-author trailer from the commit body with a blank line.
 - Preserve the primary author and any other co-author trailers.
-- Before each push, check that every new created commit contains the required trailer exactly once.
+- Before each push, check that every new created commit has the required author and contains the required trailers exactly once.
 - Distinguish development tickets from contestant issues in code, documentation, and communication.
 - Start each development ticket from updated `main`.
 - Use `feature/tNNNN-description` for ticket branches.

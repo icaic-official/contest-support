@@ -30,12 +30,19 @@ Patch and minor TypeScript updates remain enabled.
 Updates require the same checks and review as other changes.
 
 No process automatically applies upgrades or runs `npm audit fix`.
+
+`package.json` overrides `undici` to `7.30.1`.
+`miniflare`, through `wrangler`, pins `undici` 7.29.1, which has high-severity advisories (GHSA-4qv8-2p9j-2685, GHSA-f72v-6w45-q472, GHSA-xjj6-f33q-929c).
+The override was added on 2026-10-24.
+Remove it when the installed `miniflare` depends on `undici` 7.30.1 or later. Then run `npm install` and `npm run ci`.
+
 Gitleaks uses pinned release 8.30.1 and a verified SHA-256 checksum.
 Ordinary builds do not receive cloud credentials.
 Hosted Supabase and Cloudflare checks are on-demand commands against isolated CI targets.
 They are not required PR checks.
-Workers Builds does not publish `minsky-dev` or `minsky-docs`.
-Keep those two Workers disconnected from Git builds so a provider build cannot skip the checks or replace the complete application.
+Workers Builds does not publish `minsky-dev`.
+Keep that Worker disconnected from Git builds so a provider build cannot skip the checks or replace the complete application.
+Workers Builds publishes the static `minsky-docs` Worker from `main`. The docs contain no application data.
 
 Run the usual README checks locally.
 With Gitleaks 8.30.1 installed, scan history with this command:

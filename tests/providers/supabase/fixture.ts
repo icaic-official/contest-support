@@ -2,7 +2,7 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { readFile, rename, unlink, writeFile } from 'node:fs/promises';
 import { z } from 'zod';
 import { createSupabaseBackend } from '../../../src/backend/supabase/backend';
-import { removeFixtureSessions } from '../../support/supabaseCleanup';
+import { removeFixtureAvatars, removeFixtureSessions } from '../../support/supabaseCleanup';
 import { createdAccountMarkers, type Actor, type ScenarioData, type TestAccount } from '../contracts';
 import { isolatedSupabaseProject } from './target.mjs';
 
@@ -338,6 +338,7 @@ export async function cleanupFixture(path: string): Promise<void> {
     (await admin.from('events').delete().eq('id', journal.eventId)).error,
     'remove fixture event',
   );
+  await removeFixtureAvatars(admin, accountIds);
   for (const id of accountIds) {
     checked(
       (await admin.from('people').delete().eq('id', id)).error,

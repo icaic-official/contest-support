@@ -49,3 +49,16 @@ export async function removeFixtureSessions(admin: SupabaseClient, sessionIds: s
   }
   if ((await admin.from("sessions").delete().in("id", sessionIds)).error) fail("sessions");
 }
+
+/**
+ * Delete the avatar files and rows of fixture people. Run it before the people are deleted.
+ * It filters every request by the given person IDs.
+ */
+export async function removeFixtureAvatars(admin: SupabaseClient, personIds: string[]): Promise<void> {
+  if (!personIds.length) return;
+  const avatars = await admin.from("person_avatars").select("id,person_id").in("person_id", personIds);
+  if (avatars.error) fail("avatar lookup");
+  const paths = (avatars.data ?? []).map((avatar) => `${avatar.person_id}/${avatar.id}`);
+  if (paths.length && (await admin.storage.from("person-avatars").remove(paths)).error) fail("person-avatars objects");
+  if ((await admin.from("person_avatars").delete().in("person_id", personIds)).error) fail("person_avatars");
+}

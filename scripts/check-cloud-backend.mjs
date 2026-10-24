@@ -42,11 +42,12 @@ export async function checkCloudBackend({
   const missing = expected.filter(version => !versions.has(version));
   if (missing.length) throw new Error(`CI backend is missing migrations: ${missing.join(", ")}. No fixtures were created.`);
   const functions = await read("/functions");
-  const absent = ["admin", "attachments", "announcement-images"].filter(slug =>
+  const required = ["admin", "attachments", "announcement-images", "avatars"];
+  const absent = required.filter(slug =>
     !functions.some(fn => fn.slug === slug && fn.status === "ACTIVE"));
   if (absent.length) throw new Error(`CI backend is missing active functions: ${absent.join(", ")}. No fixtures were created.`);
   const extra = [...versions].filter(version => !expected.includes(version));
-  report(`CI backend has all ${expected.length} required migration versions and all three active functions.`);
+  report(`CI backend has all ${expected.length} required migration versions and all ${required.length} active functions.`);
   if (extra.length) report(`Additional remote migration versions: ${extra.join(", ")}.`);
 }
 

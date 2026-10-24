@@ -112,6 +112,8 @@ it("keeps exact fixture records after a rejected deletion and removes the file a
     { table: "teams", column: "session_id", value: ["session-one"] },
     { table: "sessions", column: "id", value: ["session-one"] },
     { table: "events", column: "id", value: "event-one" },
+    { table: "person_avatars", columns: "id,person_id", column: "person_id", value: ["user-one"] },
+    { table: "person_avatars", column: "person_id", value: ["user-one"] },
     { table: "people", column: "id", value: "user-one" },
     { table: "auth.users", column: "id", value: "user-one" },
   ]);

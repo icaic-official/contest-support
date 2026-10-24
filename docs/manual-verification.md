@@ -504,3 +504,29 @@ Use two browser windows for the live checks. Run these checks after a reviewed d
     In a window about 1280 by 720 px, open **New announcement** and **Edit**. Check that every field and the **Publish** or **Save changes** button shows without scrolling inside the strip.
 13. Archive the event. Check that announcements stay readable and every management control disappears.
 14. Repeat the checks on a Supabase build when you run the adapter on your own project.
+
+## 16. Motion and reduced motion
+
+Run these checks in a window of 1280 by 800 px, in the light and dark themes.
+Run the phone checks at 390 by 844 px.
+Use a development or test session with staff and contestant accounts.
+
+1. Open the issue queue in the desktop console. Select each status tab with the mouse.
+   Check that the white pill slides and resizes to the selected tab, with no jump.
+2. Reload the page. Check that the pill is already under **Active** and does not slide in from a corner.
+3. Press Tab until a status tab has focus. Press Space.
+   Check that the pill follows, the tab keeps `aria-pressed` and the focus ring is visible.
+4. Select a team in **Find a team**, then select **Resolved**. Check that the empty state offers **Show active issues**.
+   Select it. Check that the team filter clears, **Active** is selected and focus is on the **Active** tab.
+5. Open an issue. Press the right and left arrow keys on the sheet tabs.
+   Check that the selection moves, the underline slides with it and the panel fades in.
+   Select **Internal note** and **Public reply** in the composer. Check that the pill slides and is amber for the internal note.
+   As a jury member, open **Award review** and select each list. Check that the pill slides.
+6. Check that the side sheet opens in about a quarter of a second and closes faster.
+7. With a second account, report or claim an issue. Check that the row fades from a blue tint on the first screen.
+   Change the status tab and check that no row fades because of that.
+8. As a contestant, keep a report open. Claim it as staff. Check that the progress tracker changes color over a moment.
+9. In the phone app, select each bottom tab. Check that the bar along the top edge slides to the tab.
+   Press and hold a queue card and a button. Check that the card tints and the button shrinks a little.
+10. Turn on **Reduce motion** in the operating system, or set `prefers-reduced-motion: reduce` in the browser developer tools.
+    Repeat steps 1, 5, 7 and 9. Check that every change is instant and the **Live** dot does not pulse.

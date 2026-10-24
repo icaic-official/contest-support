@@ -13,8 +13,8 @@ export default defineConfig({
   test: {
     include: ["src/**/*.test.ts", "src/**/*.test.mjs", "scripts/**/*.test.mjs"],
     exclude: ["**/hostedHttp.test.ts"],
-    // Many files start their own miniflare process. On a slow Workers Builds runner,
-    // startup can pass Vitest's 5 s default and fail an otherwise correct test.
+    // Some tests start miniflare, esbuild, embedded PostgreSQL, or a child process.
+    // A slow Workers Builds runner can pass Vitest's 5 s default. Longer explicit limits still apply.
     testTimeout: 30_000,
     hookTimeout: 30_000,
   },

@@ -1,317 +1,202 @@
-# Supabase provider
+# Run the Supabase adapter
 
-Use this guide when you choose the Supabase provider.
-Cloudflare is the live development backend.
-Its Worker is `minsky-dev` and its D1 database is `minsky-development`.
-The development app is https://minsky-dev.icaic-minsky.workers.dev.
-Use [Install Cloudflare](../site/src/content/docs/operators/installation.mdx) for that installation.
-Use [deployment setup](cloudflare-builds.md) for automation and [activation](activate-cloudflare-development.md) for the approved switch and recovery procedure.
-Workers Builds runs ordinary checks. For each push to `main`, a separate trigger checks and publishes the Cloudflare `minsky-dev` application. See [Publish the application](cloudflare-builds.md#publish-the-application).
-Application previews remain disabled until independent preview resources exist.
-That trigger applies new D1 migrations. Supabase migrations, bootstrap, secrets, and activation retain their explicit steps.
-Earlier setup records are in [Supabase provider records](history/supabase-provider-records.md).
+Use this guide to run Minsky on your own Supabase project.
 
-This page covers the retained Supabase projects, their commands, and isolated Supabase checks.
-Supabase uses managed authentication, Postgres, Realtime, and private Storage.
-Its projects, accounts, and data remain intact.
-The fresh Cloudflare installation received no Supabase accounts, passwords, records, images, or IDs.
-This provider does not serve the development URL.
-Docker is optional.
-The user permits full authorized cloud credential access for contributors.
+The project does not operate a Supabase installation.
+On 2026-10-23 the owner selected Cloudflare as the live backend. On 2026-10-24 the owner retired the project's own Supabase projects.
+The Supabase adapter stays in the repository as a second implementation of the shared [backend contract](backend-contracts.md).
+`npm run ci` checks it with embedded PostgreSQL and Deno on every push. Nothing in this repository connects to a Supabase project unless you run one of the commands below.
 
-## Separate Cloudflare authentication checks
+**Status: unverified procedure.** The adapter passes its local checks. The project last passed the hosted Supabase checks on 2026-10-19, against its own CI project. Nobody has run this procedure from start to end on a new project since that project was retired. Record your result if you run it.
 
-T0018 uses separate local development databases and the isolated hosted `minsky-auth-ci` database and Worker.
-Follow [the authentication verification guide](verify-cloudflare-authentication.md) for explicit targets, credentials, checks, and recovery.
-The [identity choice](cloudflare-authentication-choice.md) records measured Worker CPU and the Standard plan need and cost.
-These resources contain fictional fixtures. They are separate from both the Cloudflare development installation and the Supabase projects below.
+Supabase provides managed authentication, Postgres, Realtime, and private Storage for this adapter.
+Earlier setup records are in [Supabase provider records](history/supabase-provider-records.md). They are history, not instructions.
 
-## Authentication decision (2026-10-02)
+## Before you start
 
-The user replaced email invitations and email recovery with organizer-created **usernames and passwords**.
-SMTP and personal email addresses are not prerequisites.
-Team contestants share a team account.
-Staff have individual accounts.
-Supabase manages passwords and sessions through internal identifiers with email format.
-These identifiers are not mailboxes and must not receive mail.
+You need:
 
-### Create and recover Supabase accounts
+- Node.js 22.13 or later within 22.x, or Node.js 24 or later, and npm.
+- A Supabase account that can create projects.
+- One project for your installation. Use a second, separate project for the hosted test commands. The tests create and delete temporary accounts, and they must not run against real data.
 
-To assign a username to an existing account:
+Docker is not required. The Supabase CLI is a pinned npm dependency, and functions bundle on the Supabase servers.
 
-1. Sign in to Minsky as admin.
-2. Under **Session accounts**, expand the account.
-3. Select **Assign username → Set username**.
-
-Existing Supabase trial accounts can use their original email and password until an admin assigns a username.
-Usernames contain 3–32 letters, digits, underscores, or hyphens.
-The app stores them in lowercase.
-Username assignment preserves the password, Auth UUID, memberships, and history.
-It replaces that account's email login.
-Do not distribute the old email as future login instructions.
-
-To create an account:
-
-1. Open the **Session** tab in the organiser phone app and select **New account**. In the desktop console, open **Accounts** and select **Create account**. Enter a display name.
-2. Enter a unique username.
-3. Select a roster team for a contestant, or staff permissions for an individual.
-4. Select **Create account**.
-5. Share the displayed username and generated temporary password through an agreed secure channel.
-6. Record the credentials privately.
-7. Select **Done** to dismiss the displayed credentials.
-
-The app does not retain a recoverable password copy.
-If you lose the response, reset the password.
-Users must change temporary passwords before they can read or change contest data.
-Refresh and direct API calls cannot bypass this requirement.
-
-To recover an account:
-
-1. Verify the requester's identity outside the app.
-2. Open the account in the **Session** tab, or select **Manage** on **Accounts** in the desktop console.
-3. Select **Reset password** and confirm it.
-4. Share the replacement temporary password securely.
-
-Existing sessions and refresh tokens lose access.
-The user must sign in again and change the replacement password.
-For your own account, use **Change password** and enter the current password.
-Account-wide resets and username assignment require admin access to every session where the target has membership.
-These operations reject archived memberships.
-Ordinary session permission changes remain scoped to that session.
-
-If the sole admin loses their password, a trusted provider maintainer can use the recovery command below.
-`npm run cloud:recover-admin` is this provider's recovery command. It does not change the Cloudflare installation.
-First, link the intended project.
-Run the command in a **private terminal**:
-
-```sh
-npm run cloud:recover-admin -- --user EXISTING_ADMIN_AUTH_UUID
-```
-
-The command holds service credentials in memory.
-It verifies an existing admin for an active event.
-It issues a temporary password and invalidates previous sessions.
-The next login requires a password change.
-The command displays the temporary password only in that terminal.
-
-Never run this command in CI.
-Never paste its output into chat or commit it.
-Ordinary app accounts cannot access its service-only recovery RPC.
-Recovery audit entries identify a provider operation.
-They do not attribute the operation to the person who lost access.
-
-This flow uses no public signup, email confirmation links, invitation links, or email recovery.
-Keep signup and anonymous sign-in disabled.
-The trusted creation function explicitly confirms internal accounts.
-This creates the account without verifying a mailbox.
-Previously configured redirect URLs may remain.
-T0003 does not require a sender, domain, or SMTP setup.
-
-### Recover a Cloudflare admin password
-
-`npm run cloud:recover-admin` changes a Supabase account only.
-For a Cloudflare admin, follow [Recover a Cloudflare admin password](activate-cloudflare-development.md#recover-a-cloudflare-admin-password).
-
-## Ownership and costs
-
-### Existing provider records
-
-On 2026-10-02, the user deferred records of provider ownership and billing details.
-On 2026-10-03, the user moved these scope notes from T0004.
-They stay deferred.
-The guidance below still applies before any paid upgrade.
-Workers Paid and R2 are active for Cloudflare development. No further paid upgrade is selected.
-
-Use individual provider logins and membership controls for Supabase and Cloudflare.
-Provider access and Minsky app membership are separate.
-The user completes provider account verification and payment entry privately.
-Keep passwords, database credentials, recovery codes, and API secrets outside Git, chat, and public logs.
-
-Record these non-secret details in a dated record:
-
-- The organization or account owner and maintainer access.
-- The billing contact and selected plan for each provider.
-- Current recurring charges.
-- The location of the usage dashboard.
-- Receipt and reimbursement procedures.
-
-The original T0003 pilot selected Supabase Free and Workers Free.
-That ticket required no SMTP provider, image bucket, custom application domain, R2, or AWS account.
-Later Cloudflare work activated Workers Paid and R2 after recording the password-hashing requirement and cost.
-The owner limits current verification to the existing US$5 monthly plan. No further upgrade is approved.
-Static assets served without Worker code invocation are free and unlimited.
-Supabase Free limits and inactivity pausing still apply.
-Review usage before a pilot.
-Before any paid upgrade, record the concrete blocker, current cost, and expected monthly spend.
-
-Free tiers do not establish capacity for 800 users.
-See [Workers pricing](https://developers.cloudflare.com/workers/platform/pricing/) and [Supabase pricing](https://supabase.com/pricing).
-
-## Issue image storage (T0005)
-
-T0005 adds a private Storage bucket named `issue-attachments`.
-The bucket accepts JPEG, PNG, and WebP objects up to 50 MB.
-Each image uses two paths: `{session}/{issue}/{attachment}/original` and `{session}/{issue}/{attachment}/thumbnail`.
-The browser creates the JPEG thumbnail.
-Its longest edge is 480 pixels, and its maximum size is 512 KB.
-Thumbnails do not count toward the image count or the issue total.
-Supabase Free includes 1 GB of file storage.
-It does not include image transformations.
-This ticket does not enable transformations or a paid plan.
-At the default 120 MB issue total, about eight full issues use 1 GB.
-
-The user authorized the T0005 preview and use of the existing development backend on 2026-10-11.
-The migration and `admin`/`attachments` functions are applied to `Minsky` development.
-`Minsky CI` remains unchanged.
-Apply the migration before you deploy functions.
-Then deploy the functions.
-Then deploy the frontend.
-`npm run cloud:functions` deploys the `admin`, `attachments`, and `announcement-images` functions to development.
-Prepare these backend changes before a dependent frontend merges. Frontend publication does not apply backend changes.
-
-The review fixes use `202610140001_attachment_fixes.sql`.
-Keep the first attachment migration unchanged.
-Apply the new migration, then deploy the updated `attachments` function, then deploy the frontend.
-The migration removes the old upload-completion function.
-The new function requires the verified login-session ID from `account_status`.
-The older deployed attachment function cannot complete uploads after this migration.
-Complete the function update in the same release before testing uploads.
-
-Failed file deletion keeps a cleanup record for the uploader.
-The record remains available after refresh.
-**Retry removal** repeats file deletion and confirms completion in the database.
-Other members cannot see the uploader's cleanup record.
-This does not add a deletion job.
-New removal requests stop after archival.
-File cleanup for a removal already approved before archival can still finish.
-
-## Contributor setup
-
-These commands select the retained Supabase development project.
-They do not configure the live Cloudflare deployment.
-For Cloudflare work, use the isolated installation and provider verification guides.
-When `VITE_BACKEND=supabase`, set `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` in `.env.local`.
-`.env.example` selects Cloudflare and does not contain those values.
-
-Use Node.js 22.13 or later within 22.x, or Node.js 24 or later.
-Use npm.
-For a fresh clone, run these commands in sequence:
+Install the locked dependencies:
 
 ```sh
 npm ci
-cp .env.example .env.local
-npm run cloud:login
-npm run cloud:link
-npm run dev
 ```
 
-Enter the project's public URL in `.env.local`.
-Enter its publishable key in `.env.local`.
-Obtain authorized provider access.
-Enter the database password privately at the CLI prompt.
-An application admin must separately grant Minsky session membership.
-Never put privileged credentials in `VITE_` variables or frontend builds.
+Keep the database password, the service role key, and access tokens out of Git, chat, frontend builds, and logs.
+Never put a service credential in a `VITE_` variable.
 
-Use timestamped, repository-owned migrations.
-Run `npm run cloud:plan` before `cloud:migrate`.
-Migrations never seed the shared product.
-First setup uses an explicitly selected existing Auth account:
+## Create and link your project
+
+1. In the Supabase dashboard, create a project. Record its reference. The reference is the 20-letter name in its URL, `https://<your-project-ref>.supabase.co`.
+2. Sign in to the Supabase CLI:
+
+   ```sh
+   npm run cloud:login
+   ```
+
+3. Link the checkout to your project. Enter the database password privately when the command asks for it.
+
+   ```sh
+   npx supabase link --project-ref <your-project-ref>
+   ```
+
+The `cloud:plan`, `cloud:migrate`, `cloud:bootstrap`, and `cloud:recover-admin` commands act on the linked project.
+Check the linked project before you run them. To run commands against your test project, use a separate checkout that you link to that project.
+
+## Apply the authentication settings
+
+`supabase/config.toml` holds the repository's Auth settings.
+They disable public signup and anonymous sign-in. They keep the email and password provider, which the internal username identifiers need.
+
+Review the difference, then apply it:
+
+```sh
+npx supabase config diff --project-ref <your-project-ref>
+npx supabase config push --project-ref <your-project-ref>
+```
+
+Minsky uses organizer-created usernames and temporary passwords.
+It sends no mail. It needs no SMTP server or personal email addresses.
+
+## Apply the migrations
+
+Show the migrations that the linked project does not have, then apply them:
 
 ```sh
 npm run cloud:plan
 npm run cloud:migrate
-npm run cloud:bootstrap -- --admin-user EXISTING_AUTH_UUID
-npm run cloud:functions
-npx supabase secrets set ALLOWED_ORIGINS=http://127.0.0.1:5173,http://127.0.0.1:4174 --project-ref ovymmobupzowotvrywek
-npm run build
 ```
 
-Before first setup, review `scripts/bootstrap.sql`.
-The bootstrap refuses to run if an admin already exists.
-Do not run it again against the development project, which already has an admin.
-Initial intake is closed until an admin opens it.
-`cloud:functions` bundles remotely with `--use-api`.
-Docker is not required.
-These Supabase setup commands do not publish to the stable Cloudflare URL.
-The guarded deployment path refuses to replace its complete Worker with static Supabase assets.
+Migrations create the schema, policies, and the private `issue-attachments` Storage bucket. They add no seed data.
+Apply migrations before you deploy functions that depend on them.
 
-Supabase supplies the function's service credentials.
-Only `ALLOWED_ORIGINS` requires custom function configuration.
-List only frontends that use this Supabase project. `https://minsky-dev.icaic-minsky.workers.dev` uses Cloudflare, so it does not need a Supabase origin.
-The previous `APP_URL` setting is unused.
+## Deploy the functions
 
-## Development and release process
-
-| Environment | Supabase project | Use |
-| --- | --- | --- |
-| Retained development | `Minsky` — `ovymmobupzowotvrywek` | Supabase contributor work and existing trial accounts. The stable URL uses Cloudflare. |
-| CI | `Minsky CI` — `ghtztmovdkhuketcbjmq` | Temporary automated accounts and workflow and authorization fixtures scoped by UUID. |
-| Production | Not provisioned | Future real contest accounts and data. Use a separate database, credentials, and frontend. |
-
-For a Supabase provider change, use this sequence:
-
-1. Create its branch from updated `main`.
-2. Develop against the retained Supabase project `Minsky`, reference `ovymmobupzowotvrywek`.
-3. Add versioned migrations.
-4. Run the fast README checks.
-5. Prepare the PR.
-6. Run cloud integration checks against the reviewed revision.
-7. Let the user review and merge.
-8. Workers Builds publishes the Cloudflare `minsky-dev` application from `main`. It does not change the Supabase project. Coordinate Supabase migrations, functions, bootstrap, and secrets separately.
-
-Automatic GitHub Actions publication is removed.
-Record any later publication separately from merge.
-Prepare compatible backend changes before a dependent frontend merges, or pause frontend deployment for that release.
-When production exists, validate changes on development and CI before you apply them to production.
-See [AGENTS.md](../AGENTS.md#cloud-development-and-deployment-workflow).
-
-**T0004 exception (2026-10-03):** the user's "Deploy first" instruction authorized frontend deployment to the existing `minsky-dev` Worker before merge.
-That deployment and all 12 hosted cases passed.
-[Run log](history/run-log.md#t0004-development-deployment-2026-10-03) records the revision, version, and asset checks.
-No database migration or account-function deployment was necessary.
-The user merged [PR #9](https://github.com/notbowen/minsky/pull/9) on 2026-10-11 (SGT).
-The [merge record](history/run-log.md#t0004-merge-and-documentation-follow-up-2026-10-11) identifies its revision and exact timestamp.
-
-Run CI project commands from a **separate checkout**.
-Link that checkout with `npx supabase link --project-ref ghtztmovdkhuketcbjmq`.
-Keep the primary checkout linked to development.
-Use these commands in the CI checkout:
+Deploy the three functions that the browser uses:
 
 ```sh
-npx supabase config diff --project-ref ghtztmovdkhuketcbjmq
-npx supabase config push --project-ref ghtztmovdkhuketcbjmq
-npx supabase db push --linked --dry-run
-npx supabase db push --linked
-npx supabase functions deploy admin --project-ref ghtztmovdkhuketcbjmq --use-api
-npx supabase functions deploy attachments --project-ref ghtztmovdkhuketcbjmq --use-api
-npx supabase functions deploy announcement-images --project-ref ghtztmovdkhuketcbjmq --use-api
-npx supabase secrets set ALLOWED_ORIGINS=http://127.0.0.1:4174 --project-ref ghtztmovdkhuketcbjmq
-MINSKY_TEST_PROJECT_REF=ghtztmovdkhuketcbjmq npm run test:cloud
+npx supabase functions deploy admin --project-ref <your-project-ref> --use-api
+npx supabase functions deploy attachments --project-ref <your-project-ref> --use-api
+npx supabase functions deploy announcement-images --project-ref <your-project-ref> --use-api
 ```
 
-Review the configuration diff before you apply it.
-Review the migration target before you apply migrations.
-Deploy each function only from a checkout that contains it.
-The merged T0005 image migrations and the `admin` and `attachments` functions are installed in `Minsky CI` as of 2026-10-17.
-That preparation retained migration version `202610110002` from PR #20, which is closed. Its file is not in `main`.
-`main` now adds `202610240001_announcements.sql`. It creates `public.announcements` without `if not exists`.
-Before you apply it to `Minsky CI`, inspect the CI database for announcement objects from PR #20.
-On 2026-10-17, `Minsky CI` also ran an `announcement-images` function from PR #20 (version 3).
-No record shows `202610240001` or the PR #62 version of that function in `Minsky CI`.
-See the [T0014 verification record](history/run-log.md#t0014-existing-backend-verification-2026-10-17) for the setup and recovery evidence.
-The `cloud:link` and `cloud:functions` npm shortcuts target development.
-Use the explicit CI commands above in the separate checkout.
+The `workflow` function is the opt-in server path for workflow commands. The default browser path does not use it.
+Deploy it to a test project before you run `npm run test:workflow:hosted`:
 
-`auth.enable_signup = false` blocks public signup.
-Anonymous sign-in is disabled.
-Keep `auth.email.enable_signup = true`.
-The hosted CLI maps this setting to the email and password provider required for internal username identifiers.
-The cloud suite checks that public signup fails while organizer-created accounts can sign in.
-Personal mailboxes and SMTP are not required.
+```sh
+npx supabase functions deploy workflow --project-ref <your-project-ref> --use-api
+```
 
-## Verification and hosted cloud checks
+Set the browser origins that may call the functions. List only frontends that use this project.
+Port 5173 is `npm run dev`. Port 4174 is the hosted test commands.
 
-Run these checks:
+```sh
+npx supabase secrets set ALLOWED_ORIGINS=http://127.0.0.1:5173,http://127.0.0.1:4174 --project-ref <your-project-ref>
+```
+
+Supabase supplies the functions' service credentials. `ALLOWED_ORIGINS` is the only custom setting.
+
+## Make the first admin
+
+1. In the Supabase dashboard, open **Authentication > Users** and add a user with a password.
+   Set its email to `<username>@accounts.minsky.invalid`, for example `organizer@accounts.minsky.invalid`.
+   Minsky signs in usernames with this internal identifier. It sends no mail to it.
+2. Copy the user's UUID.
+3. Review `scripts/bootstrap.sql`. It creates one development event, one session, and three fictional teams, and makes the user that session's admin.
+4. Run the bootstrap against the linked project:
+
+   ```sh
+   npm run cloud:bootstrap -- --admin-user <auth-user-uuid>
+   ```
+
+The bootstrap stops if an admin already exists. Run it once per project.
+Contestant intake stays closed until an admin opens it.
+
+## Connect the frontend
+
+1. Copy the example settings:
+
+   ```sh
+   cp .env.example .env.local
+   ```
+
+2. In `.env.local`, set these values. Use the project's public keys only.
+
+   | Variable | Value |
+   | --- | --- |
+   | `VITE_BACKEND` | `supabase`. The default is `cloudflare`. |
+   | `VITE_SUPABASE_URL` | `https://<your-project-ref>.supabase.co` |
+   | `VITE_SUPABASE_PUBLISHABLE_KEY` | The project's publishable key, or its legacy `anon` key. |
+
+3. Start the frontend:
+
+   ```sh
+   npm run dev
+   ```
+
+4. Open [http://127.0.0.1:5173](http://127.0.0.1:5173). Sign in as the first admin with the username, for example `organizer`, and the password from the dashboard.
+5. Change the password if the app asks for it.
+
+`npm run build` creates static assets in `dist/` with the same settings. You can serve them from any static host. Add that origin to `ALLOWED_ORIGINS`.
+The guarded `npm run deploy` command publishes only the project's Cloudflare Worker. It does not publish a Supabase build.
+
+## Manage accounts
+
+Team contestants share a team account. Staff have individual accounts.
+Supabase stores each username as an internal identifier in email format. These identifiers are not mailboxes.
+
+To create an account:
+
+1. Open the **Session** tab in the organiser phone app and select **New account**. In the desktop console, open **Accounts** and select **Create account**. Enter a display name.
+2. Enter a unique username. Usernames contain 3–32 letters, digits, underscores, or hyphens. The app stores them in lowercase.
+3. Select a roster team for a contestant, or staff permissions for an individual.
+4. Select **Create account**.
+5. Share the displayed username and temporary password through an agreed secure channel.
+6. Select **Done** to dismiss the credentials.
+
+The app keeps no copy of the password. If you lose it, reset the password.
+Users must change a temporary password before they can read or change contest data. Refresh and direct API calls cannot bypass this rule.
+
+To assign a username to an account that signs in with an email identifier, expand the account under **Session accounts** and select **Assign username → Set username**.
+The password, Auth UUID, memberships, and history stay the same.
+
+To reset a password:
+
+1. Verify the requester's identity outside the app.
+2. Open the account in the **Session** tab, or select **Manage** on **Accounts** in the desktop console.
+3. Select **Reset password** and confirm it.
+4. Share the new temporary password securely.
+
+The reset ends the account's existing sessions. To change your own password, use **Change password**.
+Account-wide resets and username assignment need admin access to every session where the account is a member. They reject archived memberships.
+
+## Recover the only admin
+
+Use this procedure when the only admin cannot sign in.
+It changes the Supabase account only. For a Cloudflare admin, use [Recover a Cloudflare admin password](activate-cloudflare-development.md#recover-a-cloudflare-admin-password).
+
+1. Link the checkout to the affected project.
+2. Find the admin's Auth UUID in **Authentication > Users**.
+3. In a private terminal, run:
+
+   ```sh
+   npm run cloud:recover-admin -- --user <existing-admin-auth-uuid>
+   ```
+
+The command reads the service key into memory. It checks that the account is an admin of an active event.
+It prints a temporary password once in that terminal and ends the account's existing sessions. The next sign-in requires a password change.
+Never run it in CI. Never paste its output into chat or commit it.
+Its audit entry names a provider operation, not the person who lost access.
+
+## Run the local checks
+
+These checks need no Supabase project or credentials:
 
 ```sh
 npm run typecheck
@@ -322,76 +207,75 @@ npm test
 npm run build
 ```
 
-Embedded PostgreSQL executes the actual migrations and policies with stubs for Auth context, sessions, and password hashes.
-It does not establish managed Auth behavior.
-`npm run test:functions` checks the attachment and announcement-images HTTP handlers with fake Auth, database, and Storage clients.
-It tests revoked access, invalid login sessions, failed file deletion, retained files after failed completion, and retries.
-`npm run test:e2e` checks login, team search, workspace refresh, and image previews with fictional API responses and no cloud credentials.
-The old demo and its tests are removed.
-`npm run test:cloud` tests managed Auth, database, and Realtime behavior against a local frontend.
-`npm run test:hosted` is a legacy Supabase wrapper that fixes its frontend target to `minsky-dev`.
-Do not use it after Cloudflare activation. Its Supabase fixtures cannot verify that frontend.
-Use [the Cloudflare provider and UI checks](run-provider-tests.md) against their dedicated CI targets.
-Use [the activation procedure](activate-cloudflare-development.md#verify-activation-and-subsequent-deployment) to verify the stable installation. Keep its records separate from CI fixtures.
-`npm run test:cloud` retains the separate Supabase verification path through its local frontend.
-Run the [shared provider suite](provider-test-contracts.md) through the Supabase adapter with the on-demand command in [CI settings](cloudflare-build-settings.md#on-demand-checks).
-See [Run the shared provider tests](run-provider-tests.md) for its explicit target settings and separate recovery journal.
+Expect each command to exit with code zero. `npm run ci` runs all of them.
 
-Install Chromium with `npx playwright install chromium`.
-Cloud tests create unique temporary sessions and accounts.
-They change temporary passwords and check the shared workflow and account creation and reset behavior.
-They explicitly delete only their own rows.
-They never reset the shared project.
-Credentials remain in memory and an ignored temporary fixture file.
+- `npm test` runs the migrations and policies in embedded PostgreSQL, with stubs for Auth context, sessions, and password hashes. It does not prove managed Auth behavior.
+- `npm run check:functions` type-checks the four functions with Deno.
+- `npm run test:functions` tests the attachment and announcement image handlers with fake Auth, database, and Storage clients.
+- `npm run test:e2e` runs the browser tests against mocked Supabase responses. Install Chromium first with `npx playwright install chromium`.
 
-Do not interrupt fixture deletion.
-Do not capture live temporary credentials in screenshots.
-Tests dismiss the credentials before capture.
+## Run the hosted checks on your test project
 
-Workers Builds runs checks without hosted secrets.
-No GitHub workflow runs hosted checks. The retired GitHub `cloud` job and its `cloud-test` environment are not used.
-Run the hosted Supabase checks on demand from the separate CI checkout, on a reviewed revision.
-The commands are in [CI settings](cloudflare-build-settings.md#on-demand-checks).
-Record the revision and the result.
+These commands create real temporary accounts and records in a Supabase project. Run them only against your separate test project.
+They are manual commands. `npm run ci` does not run them.
 
-Set these values in that shell only. Do not commit them:
+Prepare the test project with this guide: link it, apply the settings and migrations, deploy all four functions, and allow origin `http://127.0.0.1:4174`. You do not need to make a first admin.
 
-- `MINSKY_TEST_PROJECT_REF`: the CI project reference, `ghtztmovdkhuketcbjmq`.
-- `SUPABASE_ACCESS_TOKEN`: reads the project's migration and function metadata.
-- `SUPABASE_DB_PASSWORD`: lets `supabase db push` run without a password prompt. It is optional.
-- `SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY`: the CI project's keys for the test fixtures.
+Set these values in your private shell only:
 
-`scripts/check-cloud-backend.mjs` refuses the shared development reference `ovymmobupzowotvrywek`.
-`npm run test:cloud` refuses it only when `CI` is set. Without `MINSKY_TEST_PROJECT_REF`, it uses the linked project.
-Always set `MINSKY_TEST_PROJECT_REF` before you run it.
+| Variable | Value |
+| --- | --- |
+| `MINSKY_TEST_PROJECT_REF` | Your test project's reference. Every hosted command requires it. None falls back to the linked project. |
+| `SUPABASE_ACCESS_TOKEN` | A personal access token that can read the project's migration and function metadata. |
+| `SUPABASE_ANON_KEY` | The test project's public key. |
+| `SUPABASE_SERVICE_ROLE_KEY` | The test project's service role key, for fixture setup and cleanup. |
 
-When the change includes migrations, functions, or configuration, apply those to the isolated CI project before the tests.
-To test a frontend change against the existing CI backend, skip that preparation.
-Use this mode only when the change needs no new backend migration, function, or configuration.
-The existing backend must already allow the test origin `http://127.0.0.1:4174`.
+| Command | What it checks |
+| --- | --- |
+| `npm run test:providers -- --provider=supabase` | The 11 shared provider scenarios through the browser adapter. |
+| `npm run test:workflow:hosted` | The shared workflow service through the deployed `workflow` function. |
+| `npm run test:cloud` | Managed Auth, database, Realtime, and images through a local frontend. |
 
-Skipping preparation still creates and deletes isolated fixtures.
-Before fixture creation, `scripts/check-cloud-backend.mjs` requires every local migration version and active `admin` and `attachments` functions.
-The check reads provider metadata and reports additional remote migration versions.
-It stops when prerequisites are missing. It does not compare deployed function source or prove that database objects match migration history.
-A passing result verifies the frontend against the recorded backend. It does not verify installation of that revision's backend.
-Keep the default mode for changes to migrations, functions, or backend configuration.
-If the migration history differs, resolve that difference before an installation check.
-Do not remove a migration record while its database objects remain.
+[Run the shared provider tests](run-provider-tests.md#run-against-the-supabase-provider) gives each procedure, its expected result, and its prerequisite checks.
+The commands refuse a reference that is not 20 lowercase letters. They also refuse the retired project `Minsky`, `ovymmobupzowotvrywek`, while it exists, because it holds trial accounts.
 
-Use [deployment setup](cloudflare-builds.md) for current publication settings and verification gates.
-Application previews currently skip. They must use independent resources before they can be enabled.
-See [why app previews are disabled](cloudflare-builds.md#why-app-previews-are-disabled).
+## Recover fixtures
 
-## Fixture recovery
+Each hosted command deletes only the records and accounts that its run created.
+If cleanup fails, the command keeps a local recovery file and prints its path. Do not delete that file. Do not reset the project.
 
-Successful teardown deletes the fixture file after all fixture records and accounts are removed.
-The wrapper then removes its temporary directory, including when a test assertion failed.
-If cleanup fails, the wrapper keeps the file and prints its path.
-The file retains the recorded account and session IDs and its existing access restrictions.
-It can contain temporary test passwords. Do not copy its contents into logs, chat, or a pull request.
+| Command | Recovery |
+| --- | --- |
+| `npm run test:providers -- --provider=supabase` | `npm run test:providers -- --provider=supabase --recover=/absolute/path/recovery.json` |
+| `npm run test:workflow:hosted` | `npm run test:workflow:hosted -- --recover=/absolute/path/fixture.json` |
+| `npm run test:cloud` | Manual. See [Recover test:cloud fixtures](run-provider-tests.md#recover-testcloud-fixtures). |
 
-Use the recorded IDs to identify the remaining fixtures in the selected test project.
-Delete only records and accounts from that test run.
-Remove the recovery file and its directory after cleanup succeeds.
-The file is local to the machine that ran the tests.
+Set the same `MINSKY_TEST_PROJECT_REF` and keys before you run a recovery command.
+Recovery checks that each record belongs to the failed run before it deletes the record.
+See [Recover an incomplete fixture](run-provider-tests.md#recover-an-incomplete-fixture) for the complete steps.
+
+## Issue images
+
+Migrations create the private Storage bucket `issue-attachments`.
+It accepts JPEG, PNG, and WebP files up to 50 MB.
+Each image has two objects: `{session}/{issue}/{attachment}/original` and `{session}/{issue}/{attachment}/thumbnail`.
+The browser creates the JPEG thumbnail. Its longest edge is 480 pixels and its maximum size is 512 KB.
+Thumbnails do not count toward the image count or the issue total.
+The adapter uses no Supabase image transformations.
+
+When file deletion fails, the uploader keeps a cleanup record after refresh. **Retry removal** repeats the deletion and confirms it in the database.
+Other members cannot see that record. New removal requests stop after archival.
+
+The Supabase Free plan includes 1 GB of file storage. At the default 120 MB issue total, about eight full issues use 1 GB.
+A free plan does not establish capacity for a live contest. See [Supabase pricing](https://supabase.com/pricing).
+
+## Update an installation
+
+To install a newer revision on your project:
+
+1. Run `npm run cloud:plan`, then `npm run cloud:migrate`.
+2. Deploy each function that changed.
+3. Build and publish the frontend.
+
+Apply migrations before functions, and functions before the frontend. A newer frontend can need a newer function or schema.
+Run the hosted checks on your test project before you update a project with real data.

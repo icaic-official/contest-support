@@ -3,7 +3,7 @@
 The browser uses `Backend` in [contracts.ts](../src/backend/contracts.ts) for accounts, workflows, administration, images, announcements, and live updates.
 An adapter implements those operations for a provider.
 Cloudflare is the active development implementation.
-The Supabase adapter remains available for Supabase builds and isolated provider verification.
+The Supabase adapter remains available for Supabase builds on a reader's own project and for isolated provider verification. The project operates no Supabase installation.
 Both implementations use the same contract.
 See [run log](history/run-log.md) for source-specific verification and deployment limits.
 
@@ -33,7 +33,7 @@ The Supabase browser adapter calls the guarded `public.workflow` RPC.
 Its administration, snapshots, images, and live updates retain their existing Supabase paths.
 The active Cloudflare application executes workflow commands through the shared service and guarded D1 batches.
 Issue decisions use one shared service. Other operations remain inside their provider implementations.
-Use [the Supabase provider verification guide](verify-server-workflow.md) for that provider's isolated execution path and separate evidence categories.
+Use [Run the shared workflow check](run-provider-tests.md#run-the-shared-workflow-check) for that provider's isolated execution path and separate evidence categories.
 
 ## Complete Cloudflare implementation
 
@@ -258,8 +258,8 @@ Those mocked checks establish request and UI behavior. Hosted provider checks ru
 `npm test` also checks complete D1 persistence through `WorkflowPersistence`.
 It includes shared-service rules and Supabase persistence tests with embedded PostgreSQL.
 `npm run test:workflow:hosted` exercises the deployed opt-in Supabase function with the shared workflow scenarios and additional boundary checks.
-That runner permits only the approved Minsky CI project. It does not activate the replacement in development.
-Hosted checks use isolated accounts and records through [on-demand hosted cloud checks](supabase-provider.md#verification-and-hosted-cloud-checks).
+That runner requires an explicit isolated project in `MINSKY_TEST_PROJECT_REF`. It does not activate the replacement in the browser path.
+Hosted checks use isolated accounts and records through [the hosted Supabase checks](run-provider-tests.md#run-against-the-supabase-provider).
 The [shared provider suite](provider-test-contracts.md) checks these contracts through real browser adapters. It does not cover `announcements` yet.
 Supabase and Cloudflare have separate fixture implementations with the same scenario assertions.
 [Run the shared checks](run-provider-tests.md) separately from the provider-specific hosted UI suite.

@@ -42,13 +42,13 @@ These targets exist in account `458ad6a930b0fb717796dfa19ca6a2b1`:
 | Repeat deployment version | `9f3686bd-ffa8-46bf-977f-2d9554235d41` |
 
 The stable URL uses Cloudflare after the approved activation.
-`MINSKY_DEV_BACKEND=cloudflare` and the four exact target variables select the complete Worker.
+The four exact target variables select the complete Worker. Since 2026-10-24 the deploy script publishes only Cloudflare and ignores `MINSKY_DEV_BACKEND`.
 The candidate remains stopped, with its public and preview URLs disabled and its cron list empty.
 The separate installation-verification and CI resources are listed in [run log](history/run-log.md#t0021-fresh-development-installation-2026-10-18).
 Do not substitute those resources for development.
 
 Existing Supabase records, accounts, passwords, images, and IDs do not appear in the fresh installation.
-Leave Supabase intact. Do not export records, reset its accounts, or delete its resources.
+The activation left Supabase intact. It exported no records, reset no accounts, and deleted no resources.
 The new owner comes from the supported bootstrap process. Its credentials stay in private files outside the checkout.
 
 ## Complete the approval record
@@ -148,7 +148,6 @@ The dry run makes no provider change.
 Export the approved values in the publishing shell. No GitHub workflow reads repository variables now.
 
 ```sh
-export MINSKY_DEV_BACKEND=cloudflare
 export MINSKY_DEV_CLOUDFLARE_CONFIG MINSKY_DEV_DATABASE_ID MINSKY_DEV_DATABASE_NAME MINSKY_DEV_BUCKET_NAME
 ```
 
@@ -197,7 +196,7 @@ No assertion, timeout, or protection changed. The initial wait failure has no co
 | Repeat verification and retained namespace | CLI stable verification passes 14/14 at 14:07:38 UTC, with clean owned-fixture removal. The live audit confirms namespace `71700338eed643d59185f4a777fcb7b2` and every binding match the first deployment. |
 
 The [run log](history/run-log.md) owns detailed verification results and remaining manual checks.
-Supabase resources and accounts remain intact. No Supabase data or identifiers transferred.
+No Supabase data or identifiers transferred.
 
 ## Recover a Cloudflare admin password
 

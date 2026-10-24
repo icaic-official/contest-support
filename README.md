@@ -10,7 +10,7 @@ The app uses React, TypeScript, Vite, Tailwind CSS, and shadcn/ui.
 Its shared [backend contract](docs/backend-contracts.md) has Supabase and Cloudflare implementations.
 The [development application](https://minsky-dev.icaic-minsky.workers.dev) runs Cloudflare. See [run log](docs/history/run-log.md) for its deployed source.
 The Cloudflare installation serves the frontend and API through Workers, with D1, private R2 images, and Durable Object live updates.
-Both providers retain the shared workflow behavior. Supabase resources and accounts remain intact.
+Both providers retain the shared workflow behavior. The project operates no Supabase project. You can run the Supabase adapter on your own project.
 
 The frontend separates contestant screens, organiser screens, and shared session hooks.
 `src/connected/` owns account checks, workspace state, browser routes, and workflow retry protection.
@@ -20,7 +20,7 @@ See [frontend architecture](docs/frontend-architecture.md) for module responsibi
 Use [the installation guide](site/src/content/docs/operators/installation.mdx) for an isolated Cloudflare instance.
 The owner merged T0021 in [PR #43](https://github.com/GiftedNovaHD/minsky/pull/43) at `4e43739` on 2026-10-19.
 The owner separately approved the Cloudflare switch and a repeat automated deployment.
-It transfers no Supabase accounts, passwords, records, images, or IDs. Supabase resources and accounts stay intact.
+It transferred no Supabase accounts, passwords, records, images, or IDs.
 See [run log](docs/history/run-log.md#t0021-approved-activation-2026-10-19) for the deployment results and [activation](docs/activate-cloudflare-development.md) for the procedure.
 These are development installations that require connectivity. Live-contest readiness and capacity for 800 simultaneous users remain unverified.
 
@@ -68,26 +68,12 @@ Anyone who can read that log can sign in as that admin. Use only fictional data 
 
 `npm run typecheck` does not check `.lapiz/bootstrap.ts`. The preview setup bundles it with esbuild, which does not check types.
 
-### Supabase provider
+### Supabase adapter
 
-Set `VITE_BACKEND=supabase` to select the Supabase provider.
-Also set `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` in `.env.local`.
-Use that project's public credentials.
+The project does not operate a Supabase installation. The Supabase adapter stays as a second implementation that you can run on your own Supabase project.
+Set `VITE_BACKEND=supabase`, `VITE_SUPABASE_URL`, and `VITE_SUPABASE_PUBLISHABLE_KEY` in `.env.local` to select it.
 Never put a service credential in a `VITE_` variable.
-
-```sh
-npm run cloud:login
-npm run cloud:link
-npm run dev
-```
-
-Enter the database password privately when the link command prompts for it.
-Open [http://127.0.0.1:5173](http://127.0.0.1:5173).
-Provider access and app membership are separate. An administrator must grant your account session access.
-Sign in with your organizer-provided username and password, then change any temporary password.
-`npm run cloud:recover-admin` is this provider's administrator recovery. It does not change the Cloudflare installation.
-Use `npm run cloudflare:recover-admin` to reset a Cloudflare admin password.
-See [Supabase provider](docs/supabase-provider.md#contributor-setup) for access, setup, migrations, and recovery.
+[Run the Supabase adapter](docs/supabase-provider.md) gives the complete procedure: create and link a project, apply the migrations, deploy the functions, make the first admin, and run the checks.
 
 ## Checks and common commands
 
@@ -95,14 +81,14 @@ See [Supabase provider](docs/supabase-provider.md#contributor-setup) for access,
 | --- | --- |
 | `npm run dev` | Start the local frontend. |
 | `npm run build` | Check types and create static assets in `dist/`. |
-| `npm run deploy` | Build the selected app, apply new D1 migrations, and publish it through guarded deployment tooling. Workers Builds runs it for each push to `main`. A manual run needs `WORKERS_CI_BRANCH`, `WORKERS_CI_COMMIT_SHA`, and the approved target settings. |
+| `npm run deploy` | Build the Cloudflare app, apply new D1 migrations, and publish it through guarded deployment tooling. Workers Builds runs it for each push to `main`. A manual run needs `WORKERS_CI_BRANCH`, `WORKERS_CI_COMMIT_SHA`, and the approved target settings. |
 | `node scripts/deploy-workers.mjs --check --site=app` | Validate the selected deployment target without provider changes. Use `--site=docs` for independent docs settings. |
-| `node scripts/deploy-workers.mjs --build --site=app` | Build the explicitly selected backend and record its revision before guarded publication. |
+| `node scripts/deploy-workers.mjs --build --site=app` | Build the Cloudflare app and record its revision before guarded publication. |
 | `npm run preview` | Serve built assets locally. |
 | `npm run typecheck` | Check TypeScript. |
 | `npm run lint` | Run ESLint. |
 | `npm run ci` | Run the Workers Builds check: installs, type checking, lint, unit tests, both builds, audits, and the Gitleaks scan. |
-| `npm run check:functions` | Check the account, attachment, and workflow functions with Deno. |
+| `npm run check:functions` | Check the Supabase `admin`, `attachments`, `announcement-images`, and `workflow` functions with Deno. |
 | `npm run test:functions` | Test attachment authorization and file removal with fake clients. |
 | `npm test` | Run unit, script, and embedded database tests without cloud credentials. |
 | `npm run test:d1` | Run every D1 workflow case with local emulation and current identity guards. |
@@ -112,7 +98,7 @@ See [Supabase provider](docs/supabase-provider.md#contributor-setup) for access,
 | `npm run test:connector:workflow:hosted -- --config=… --account=… --database=…` | Run every workflow case on the confirmed D1-only store CI target. |
 | `npm run test:connector:accounts:hosted -- --config=… --account=… --database=…` | Check account guards on the same D1-only store CI target. |
 | `npm run cloudflare:install -- plan --settings=… --config=…` | Inspect an independent Cloudflare installation plan without provider changes. See the [installation guide](site/src/content/docs/operators/installation.mdx). |
-| `npm run test:workflow:hosted` | Verify the shared server through the deployed Supabase function on approved Minsky CI. See the [verification guide](docs/verify-server-workflow.md). |
+| `npm run test:workflow:hosted` | Verify the shared workflow through the deployed Supabase `workflow` function on your isolated test project. Requires `MINSKY_TEST_PROJECT_REF`. See [the Supabase workflow check](docs/run-provider-tests.md#run-the-shared-workflow-check). |
 | `npm run test:auth` | Run Cloudflare account and permission tests on local D1. |
 | `npm run test:auth:browser` | Check cookies, origins, and request protection with a local HTTPS Worker and Chromium. |
 | `npm run test:auth:hosted -- --account=… --database=…` | Run account cases on the explicit isolated hosted authentication D1 target. |
@@ -120,10 +106,9 @@ See [Supabase provider](docs/supabase-provider.md#contributor-setup) for access,
 | `npm run test:auth:hash` | Measure password cost in a temporary local Worker. |
 | `npm run test:e2e:smoke` | Run the critical-path browser files `tests/landing.spec.ts` and `tests/journey.spec.ts`. |
 | `npm run test:e2e` | Run every mocked browser test, including the smoke files. |
-| `npm run test:cloud` | Run the Supabase browser and workflow suite with isolated fixtures on the CI project. Needs cloud credentials. Always set `MINSKY_TEST_PROJECT_REF`. |
-| `npm run test:hosted` | Legacy Supabase wrapper that targets `minsky-dev`. Do not use it: that URL now runs Cloudflare. |
+| `npm run test:cloud` | Run the Supabase browser suite with isolated fixtures on your test project. Requires `MINSKY_TEST_PROJECT_REF`. |
 | `npm run test:providers:list` | List the shared provider scenarios without hosted credentials. |
-| `npm run test:providers -- --provider=supabase` | Run the shared contracts against an explicitly configured isolated Supabase project. |
+| `npm run test:providers -- --provider=supabase` | Run the shared contracts against your explicitly configured isolated Supabase project. |
 | `npm run test:providers -- --provider=cloudflare --config=… --account=… --database=… --origin=…` | Run the same contracts through the isolated Cloudflare browser adapter. |
 
 Install the Chromium build that matches the installed Playwright (1.64) before browser tests:
@@ -136,29 +121,28 @@ If the default browser folder is not writable, set `PLAYWRIGHT_BROWSERS_PATH` to
 If your shell sets `NODE_ENV=production`, unset it before `npm run dev` or `npm run test:e2e`. Otherwise the page stays blank.
 
 These commands connect to provider accounts. Several of them change hosted data or deployments. Confirm the target before you run them.
-`cloud:login`, `cloud:link`, `cloud:plan`, `cloud:migrate`, `cloud:functions`, `cloud:bootstrap`, and `cloud:recover-admin` belong to the Supabase provider.
+`cloud:login`, `cloud:plan`, `cloud:migrate`, `cloud:bootstrap`, and `cloud:recover-admin` belong to the Supabase adapter. They act on the project that you linked with `npx supabase link --project-ref <your-project-ref>`.
 
 | Command | Purpose |
 | --- | --- |
-| `npm run cloud:login` and `npm run cloud:link` | Sign in to Supabase and link the Supabase provider's development project. |
+| `npm run cloud:login` | Sign in to the Supabase CLI. |
 | `npm run cloud:plan` | Show the migrations that `cloud:migrate` would apply. |
 | `npm run cloud:migrate` | Apply migrations to the linked project. |
-| `npm run cloud:functions` | Deploy the `admin`, `attachments`, and `announcement-images` functions to the development project. |
 | `npm run cloud:bootstrap` | Make the first session admin. |
 | `npm run cloud:recover-admin` | Reset a Supabase provider administrator when that provider's only admin cannot sign in. |
 | `npm run cloudflare:recover-admin` | Reset the password of an existing Cloudflare admin. Prints the temporary password once in that terminal. |
 | `npm run cloud:hosting-login` | Sign in to Cloudflare with Wrangler. |
 
-See [Supabase provider guide](docs/supabase-provider.md) for the exact arguments.
+See [Run the Supabase adapter](docs/supabase-provider.md) for the exact arguments and the `npx supabase functions deploy` commands.
 
 Deno and the provider CLIs are pinned npm dependencies.
-For `npm run test:cloud` and `npm run test:hosted`, follow [Supabase provider guide](docs/supabase-provider.md#verification-and-hosted-cloud-checks).
+For the hosted Supabase commands, follow [Run against the Supabase provider](docs/run-provider-tests.md#run-against-the-supabase-provider).
 For shared adapter checks, follow [Run the shared provider tests](docs/run-provider-tests.md).
 The two hosted store commands accept the optional [D1 API transport](docs/run-provider-tests.md#use-the-d1-api-transport).
 Run those API commands in sequence. Default binding checks and protected CI keep their existing transport.
 `VITE_BACKEND` defaults to `cloudflare`. Set `VITE_BACKEND=supabase` to select the Supabase provider.
 Cloudflare cookies and API requests require the same origin. A plain Vite server does not supply that API.
-If an existing cloud fixture cleanup fails, follow [fixture recovery](docs/supabase-provider.md#fixture-recovery).
+If a hosted fixture cleanup fails, follow [Recover an incomplete fixture](docs/run-provider-tests.md#recover-an-incomplete-fixture).
 
 ## Documentation
 
@@ -215,7 +199,7 @@ Backend:
 - [Cloudflare backend design](docs/cloudflare-backend-design.md) explains the implemented server boundaries.
 - [Cloudflare authentication reference](docs/cloudflare-authentication.md) and the [authentication choice](docs/cloudflare-authentication-choice.md).
 - [Add a backend provider](docs/add-provider.md) gives contributor interfaces, registration points, installation, cleanup, and required shared verification.
-- [Supabase provider](docs/supabase-provider.md) covers that provider's projects, account administration, recovery, and isolated verification.
+- [Run the Supabase adapter](docs/supabase-provider.md) — run the second implementation on your own Supabase project.
 
 Operations:
 
@@ -227,7 +211,7 @@ Verification:
 
 - [Manual verification](docs/manual-verification.md) — workflow and interface checks.
 - [Run the shared provider tests](docs/run-provider-tests.md) and [shared provider test contracts](docs/provider-test-contracts.md).
-- [Verify the Supabase provider workflow](docs/verify-server-workflow.md) and [verify Cloudflare authentication](docs/verify-cloudflare-authentication.md).
+- [Verify Cloudflare authentication](docs/verify-cloudflare-authentication.md).
 
 History:
 

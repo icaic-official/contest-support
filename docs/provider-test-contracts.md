@@ -20,7 +20,7 @@ Commands pass through the deployed `workflow` Edge Function, the shared service,
 Reads and other operations retain their existing Supabase adapters.
 Scenario assertions remain provider-neutral and unchanged for the replacement path.
 This focused suite does not constitute a second complete `Backend` implementation.
-Use [Verify the Supabase provider workflow](verify-server-workflow.md) to run it.
+Use [Run the shared workflow check](run-provider-tests.md#run-the-shared-workflow-check) to run it.
 The focused workflow run shares one owned fixture across cases with distinct request and issue IDs.
 Its organizer setup uses a fresh privileged Auth password update, then completes the actual mandatory-change database gate.
 That setup avoids password-change rate limits. It is not evidence for the account password-change endpoint.
@@ -44,7 +44,8 @@ It does not replace provider-specific policy tests or prove capacity, installati
 | `scripts/provider-test.mjs` | Target checks, backend prerequisites, process status, and recovery-journal retention. |
 | `playwright.providers.config.ts` | Hosted suite isolation and disabled credential-bearing captures. |
 | `tests/workflow/supabase.test.ts` | Reuses workflow scenarios through the opt-in shared server path and adds trusted-boundary checks. |
-| `scripts/workflow-proof.mjs` | Restricts the focused workflow run to approved Minsky CI and retains recovery journals on cleanup failure. |
+| `scripts/workflow-proof.mjs` | Requires an explicit isolated project in `MINSKY_TEST_PROJECT_REF` and retains recovery journals on cleanup failure. |
+| `tests/providers/supabase/target.mjs` | Validates the Supabase test project reference and refuses the retired development project. |
 
 Each connection has a separate browser context, including its cookies and local storage.
 The Node scenarios call a `Backend` bridge that invokes the real adapter in that context.

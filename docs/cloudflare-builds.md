@@ -13,7 +13,7 @@ GitHub Actions no longer runs checks or publication. The GitHub account stays on
 ## Why app previews are disabled
 
 A frontend preview can change shared data when it uses a stable backend.
-Earlier Supabase previews used the development project directly.
+Earlier Supabase previews used the shared Supabase development project directly. That project is retired.
 Cloudflare previews receive no stable D1, R2, or Durable Object bindings.
 A future preview needs its own resources, credentials, fixture ownership, and cleanup checks.
 Docs previews are safe because the docs contain no application data.
@@ -153,7 +153,7 @@ You need access to Cloudflare account `458ad6a930b0fb717796dfa19ca6a2b1`.
 
    The deploy script compares the last four values with the committed configuration.
    A pull request that changes the configuration to another database or bucket fails until you also change these values.
-10. Do not add `MINSKY_DEV_BACKEND`. Its absence selects Cloudflare.
+10. Do not add `MINSKY_DEV_BACKEND` or Supabase variables. The script always publishes the Cloudflare app.
 11. Do not add `AUTH_SECRET`. That secret stays on the Worker and is never a build input.
 12. Leave **Build watch paths** at the default, which includes every file.
 
@@ -190,12 +190,11 @@ Pause publication during a live contest. A merge then does not change the applic
 
 To publish by hand, run `npm run deploy` from an updated `main` with the same variables, a token with the same permissions, `WORKERS_CI_BRANCH=main`, and `WORKERS_CI_COMMIT_SHA` set to the output of `git rev-parse HEAD`.
 
-The script sets `VITE_BACKEND` from `MINSKY_DEV_BACKEND` and guards the complete Worker:
+The script sets `VITE_BACKEND=cloudflare` and guards the complete Worker:
 
-- A Cloudflare app needs its API code, D1 database, private R2 bucket, and live coordinator. An assets-only upload would remove them.
-- The Supabase path runs only when `MINSKY_DEV_BACKEND=supabase`. It refuses the upload when the deployed Worker has application bindings.
-- The Cloudflare path validates the generated configuration and exact hosted targets before upload. After upload, it checks the published targets, live bindings, and an anonymous rejection at the authentication API.
-- It rejects pushes by Dependabot.
+- The app needs its API code, D1 database, private R2 bucket, and live coordinator. The script has no assets-only upload path that could remove them.
+- It validates the generated configuration and exact hosted targets before upload. After upload, it checks the published targets, live bindings, and an anonymous rejection at the authentication API.
+- It publishes the app only from `main`. Other branches, including Dependabot branches, skip the app.
 
 These checks do not verify authenticated behavior. The installation and activation procedures require the full application checks.
 A broken application target cannot block the docs, because Workers Builds publishes them separately.

@@ -3,6 +3,17 @@
 This file records the current agreed scope, newest first.
 Earlier requests, approvals, branch exceptions, and the original demo plan are in the [planning log](docs/history/plan-log.md).
 
+**Retire the hosted Supabase setup, 2026-10-24.** The owner decided that the project no longer operates Supabase projects.
+The Supabase adapter stays as a working second implementation. Anyone can run it on their own Supabase project.
+Keep `supabase/`, `src/backend/supabase/`, `src/server/adapters/supabase/`, the embedded-PostgreSQL tests, the Deno function checks, `VITE_BACKEND=supabase`, the shared provider driver, and the mocked browser suite. Every local Supabase adapter test must keep passing.
+Remove `npm run test:hosted`, `scripts/cloud-smoke.mjs`, `cloud:link`, `cloud:functions`, and the Supabase upload path in `scripts/deploy-workers.mjs`. `minsky-dev` publishes only the complete Cloudflare Worker. The deploy script ignores `MINSKY_DEV_BACKEND`.
+The hosted Supabase runners accept any explicit isolated project in `MINSKY_TEST_PROJECT_REF`. They keep refusing the former development project while it exists.
+`docs/supabase-provider.md` becomes "Run the Supabase adapter". The workflow verification guide merges into `docs/run-provider-tests.md`.
+The owner asked for this change on the existing publication PR #66, on a branch named by the Contributions rules.
+Leave the Supabase projects `Minsky` (`ovymmobupzowotvrywek`) and `Minsky CI` (`ghtztmovdkhuketcbjmq`), the `SUPABASE_*` GitHub secrets, and the repository settings unchanged. The owner removes them separately.
+Do not deploy. Do not change Cloudflare resources. Moving the mocked browser suite to Cloudflare mocks is separate follow-up work.
+This decision supersedes the 2026-10-23 statement below that Supabase is a supported provider with retained projects.
+
 **Automatic application publication, 2026-10-24.** The owner chose automatic publication of `main` to `minsky-dev`.
 Before this decision, `minsky-dev` served `a25f9f1`, 108 commits behind `main`, and lacked D1 migration `0010_announcements.sql`.
 The `minsky-dev` Worker gets one Workers Builds trigger for `main`. Builds for other branches stay disabled.
@@ -29,7 +40,7 @@ Name the branch and PR as the AGENTS.md Contributions section states. The owner 
 **Cloudflare is the live backend, 2026-10-23.** The owner selected Cloudflare as the live backend.
 The development Worker is `minsky-dev`. The development D1 database is `minsky-development`.
 Keep the Supabase adapter, its migrations, its functions, and its provider tests.
-Supabase is a supported second provider behind the shared backend interfaces.
+Supabase is a supported second provider behind the shared backend interfaces. The 2026-10-24 retirement entry above narrows this to the adapter code.
 It shows that another provider can implement the same behavior. AWS, GCP, Azure, and a possible Docker adapter remain later work.
 Absent `VITE_BACKEND` and absent `MINSKY_DEV_BACKEND` select Cloudflare.
 Set either value to `supabase` to select the Supabase provider.

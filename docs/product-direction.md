@@ -35,7 +35,7 @@ They are not part of T0005.
 Implemented interface decision (2026-10-02): provide a public login landing page and a sidebar for the authenticated workspace.
 The user removed the old local demo, its commands, and tests that applied only to the demo.
 At that stage, Supabase accounts and shared data replaced the local demo.
-The later backend decision below retains Supabase as a provider option and selects Cloudflare for development.
+The later backend decisions below select Cloudflare for development and keep Supabase as adapter code that readers run on their own projects.
 Isolated fixtures remain for verification.
 The broader organizer tools below remain incomplete.
 
@@ -65,7 +65,7 @@ The broader organizer tools below remain incomplete.
 
 [ROADMAP.md](../ROADMAP.md) owns the current and target technology stack.
 On 2026-10-23 the owner selected Cloudflare as the live backend. The development Worker is `minsky-dev` and its D1 database is `minsky-development`.
-Supabase stays a supported second provider. Its projects and accounts remain intact.
+On 2026-10-24 the owner retired the project's own Supabase projects. The Supabase adapter stays as a second implementation that anyone can run on their own project with [Run the Supabase adapter](supabase-provider.md).
 [Cloudflare backend design](cloudflare-backend-design.md) explains the implemented boundaries. [Add a backend provider](add-provider.md) states what another provider must implement.
 A backend switch needs separate owner approval. Follow the [activation procedure](activate-cloudflare-development.md).
 
@@ -93,7 +93,7 @@ Existing Supabase records are disposable trial data, including the administrator
 Transfer no accounts, passwords, issues, history, images, or IDs.
 Create a new administrator through the supported bootstrap process and require a temporary-password change.
 This replaces the 2026-10-17 data-preservation decision. Preserve application behavior and database rules.
-Leave Supabase intact. Do not export data, reset its accounts, or delete its resources.
+T0021 left Supabase intact. It did not export data, reset accounts, or delete resources. The 2026-10-24 retirement leaves deletion of those projects to the owner.
 T0021 requires fresh credential distribution, recovery, expiry, and revocation checks before activation.
 The [verification record](history/run-log.md) distinguishes those checks from later deployment results.
 

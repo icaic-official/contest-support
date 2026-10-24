@@ -129,13 +129,10 @@ This paragraph is arithmetic from the pricing page. It is not a measured bill.
 The hosted connector job used a 45 minute limit and the hosted authentication job used 35 minutes.
 Both exceed the 20 minute Workers Builds timeout, so they cannot move into a build command.
 
-Hosted Supabase checks need the isolated CI project and its private keys.
-Do not point them at development project `ovymmobupzowotvrywek`.
-Run them from the separate CI checkout in the [Supabase provider guide](supabase-provider.md#development-and-release-process), with `MINSKY_TEST_PROJECT_REF` set.
-Keep the primary checkout linked to development.
+Hosted Supabase checks need your own isolated Supabase test project and its private keys. The project operates no Supabase project.
+Prepare the test project and set `MINSKY_TEST_PROJECT_REF` as [Run against the Supabase provider](run-provider-tests.md#run-against-the-supabase-provider) states.
 
 ```sh
-npx supabase link --project-ref "$MINSKY_TEST_PROJECT_REF"
 node scripts/check-cloud-backend.mjs
 npm run test:cloud
 npm run test:providers -- --provider=supabase
@@ -182,10 +179,8 @@ The [setup guide](cloudflare-builds.md#connect-the-worker) lists the exact value
 | --- | --- | --- |
 | Build API token | `CLOUDFLARE_API_TOKEN` | Private user token limited to the account. |
 | Retired variable | `CLOUDFLARE_DEPLOY_ENABLED` | Nothing reads it. |
-| Build variable | `MINSKY_DEV_BACKEND` | `cloudflare` is the live development selection and the default when the variable is absent. `supabase` selects static Supabase mode. The binding guard refuses that replacement after activation. |
-| Build variable | `VITE_SUPABASE_URL` | `https://ovymmobupzowotvrywek.supabase.co`, required in Supabase mode. |
-| Build variable | `VITE_SUPABASE_PUBLISHABLE_KEY` | Development public publishable key or legacy `anon` key, required in Supabase mode. |
-| Build variable | `MINSKY_DEV_CLOUDFLARE_CONFIG` | Repository-relative generated Wrangler path, required in Cloudflare mode. |
+| Retired variable | `MINSKY_DEV_BACKEND` | Nothing reads it since 2026-10-24. The app always publishes the complete Cloudflare Worker. |
+| Build variable | `MINSKY_DEV_CLOUDFLARE_CONFIG` | Repository-relative generated Wrangler path. |
 | Build variable | `MINSKY_DEV_DATABASE_ID` | Exact approved development D1 UUID. |
 | Build variable | `MINSKY_DEV_DATABASE_NAME` | Exact approved development D1 name. |
 | Build variable | `MINSKY_DEV_BUCKET_NAME` | Exact approved private development bucket name. |
@@ -221,14 +216,12 @@ The removed `deploy:preview` command cannot upload an assets-only app version.
 
 | Site and mode | Configuration | Worker | Assets |
 | --- | --- | --- | --- |
-| Supabase app | `wrangler.jsonc` | `minsky-dev` | `dist` |
-| Cloudflare app | `MINSKY_DEV_CLOUDFLARE_CONFIG`, validated by the provider generator | `minsky-dev` | `dist` |
+| App | `MINSKY_DEV_CLOUDFLARE_CONFIG`, validated by the provider generator | `minsky-dev` | `dist` |
 | Docs | `wrangler.docs.jsonc` | `minsky-docs` | `site/dist` |
 
 The stable URLs are `https://minsky-dev.icaic-minsky.workers.dev` and `https://minsky-docs.icaic-minsky.workers.dev`.
-The app build always sets `VITE_BACKEND` from `MINSKY_DEV_BACKEND`.
-A missing Cloudflare configuration does not fall back to a static upload.
-Cloudflare mode omits Supabase public settings and uses same-origin cookie authentication.
+The app build always sets `VITE_BACKEND=cloudflare` and removes Supabase public settings. It uses same-origin cookie authentication.
+A missing Cloudflare configuration stops the app publication. There is no static upload path.
 The selected Cloudflare config must have the exact stable name, origin, account, D1 UUID, database name, and bucket name.
 The script rejects CI, test, and installation resource names.
 The provider validator rejects extra bindings, unknown variables, and environment overrides.
@@ -241,8 +234,6 @@ The config disables its preview URLs. Application previews receive no stable dat
 
 `dist/minsky-build.json` records the app build's revision, backend, config path, D1 UUID, bucket name, and origin.
 The upload requires those fields to match the selected deployment.
-Before a Supabase assets upload, the script reads the stable Worker's current bindings.
-Any D1, R2, or Durable Object binding blocks that upload. Failed or malformed metadata also blocks it.
 Before a Cloudflare upload, the script confirms current account access, D1 metadata, private R2 settings, and `AUTH_SECRET` presence.
 Then it runs `wrangler d1 migrations apply` on the confirmed database.
 Then it requires the applied migrations to equal the checkout's migrations. More applied migrations mean that a newer build already ran, so the older build stops.
@@ -257,7 +248,7 @@ A newer push does not cancel an upload already in progress.
 The script has no lock. Do not start a manual publication while a Workers Builds publication runs.
 
 For the app, `minsky-revision.json` records `sha`, `backend`, `databaseId`, `bucketName`, and `origin`.
-Supabase mode uses null database and bucket values. Cloudflare mode records the exact selected targets.
+The app record holds the exact selected targets.
 The docs record contains only `sha`.
 The HTTP check compares every expected field.
 It retries up to 12 times with five-second intervals and a ten-second request timeout.

@@ -12,6 +12,8 @@ Workers Builds runs `npm run ci` for each push to a branch in this repository.
 The [CI reference](cloudflare-build-settings.md#workers-builds) owns the command list, limits, and on-demand checks.
 `npm run ci` fails on type errors, lint errors, test failures, a failed build, a docs link error, a high or critical `npm audit` advisory, or any Gitleaks finding.
 Browser suites and hosted provider suites are on-demand commands. They are not required PR checks.
+`npm run ci` keeps the Supabase adapter checks: Deno function checks and tests, and embedded-PostgreSQL migration and policy tests. They need no Supabase project.
+The project operates no Supabase project. Hosted Supabase suites run only against a project that the person running them owns.
 
 ## Dependency updates
 

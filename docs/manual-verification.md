@@ -22,8 +22,8 @@ The live development app is the Cloudflare Worker at https://minsky-dev.icaic-mi
 Use an organizer-provided username and password.
 Docker and persona switching are not required.
 For a separate Cloudflare installation, create the first admin through its bootstrap step.
-For the Supabase provider, follow [Supabase provider](supabase-provider.md).
-`npm run cloud:recover-admin` is that provider's administrator recovery.
+For the Supabase adapter on your own project, follow [Run the Supabase adapter](supabase-provider.md).
+`npm run cloud:recover-admin` is that adapter's administrator recovery.
 Use `npm run cloudflare:recover-admin` when the Cloudflare development admin cannot sign in.
 Use a separate browser or profile for each account: contestant, volunteer, specialist, jury, and admin.
 Work only in a clearly identified development or test session.
@@ -267,11 +267,11 @@ Review the contestant, jury and admin views at 1280 × 800 and at 200% zoom.
 2. Compare two simultaneous awards.
 3. Check state after refresh and reconnect.
 4. Attempt unauthorized queries across teams and sessions.
-5. For the Supabase provider, run `MINSKY_TEST_PROJECT_REF=ghtztmovdkhuketcbjmq npm run test:cloud` for repeatable checks with real accounts on the isolated `Minsky CI` project.
-   Always set `MINSKY_TEST_PROJECT_REF`. Without it, the suite uses the linked project, which can be the shared development project.
+5. For the Supabase adapter, run `MINSKY_TEST_PROJECT_REF=<your-test-project-ref> npm run test:cloud` for repeatable checks with real accounts on your isolated test project.
+   The suite requires `MINSKY_TEST_PROJECT_REF`. It does not fall back to the linked project.
 
 The suite creates isolated test fixtures and deletes only those fixtures.
-It does not reset the shared project.
+It does not reset the project.
 
 ## 10. Issue images
 
@@ -388,7 +388,7 @@ Use isolated test accounts for these checks.
 The credential-free tests in `tests/workspace-refresh.spec.ts` cover these UI effects and exact write requests.
 The cleanup tests in `scripts/cloud-test.test.mjs` check a failed deletion, a successful retry, and the retained recovery file.
 They use mocked cloud responses and a local child process. They do not access hosted data.
-See [fixture recovery](supabase-provider.md#fixture-recovery) for failed cloud cleanup.
+See [Recover test:cloud fixtures](run-provider-tests.md#recover-testcloud-fixtures) for failed cloud cleanup.
 
 Record observed results in [run log](history/run-log.md).
 Suggested manual checks are not completed checks.
@@ -397,7 +397,7 @@ Browser automation does not establish results for real devices, assistive techno
 ## 13. Jury worklist (T0009)
 
 Run these checks on the current T0009 revision after merging current `main`.
-For hosted acceptance, confirm Minsky CI project `ghtztmovdkhuketcbjmq` before creating UUID-owned fictional accounts and records.
+For hosted acceptance, confirm your isolated test target before creating UUID-owned fictional accounts and records.
 Delete only that run's fixtures. Verify cleanup after the run. Use jury-only, combined jury/support, support-only,
 admin-only, and contestant accounts. Do not use real contest reports as fixtures.
 This is a checklist, not evidence that hosted or physical-device checks have passed.
@@ -446,15 +446,15 @@ The credential-free browser harness exercises actual migrations and RLS with
 simulated hosted transport. It does not establish real Auth, Storage, Realtime,
 deployment, offline operation, or capacity results.
 
-For isolated hosted acceptance of the Supabase provider from a local CLI, follow the credential prerequisites in the [Supabase provider guide](supabase-provider.md#verification-and-hosted-cloud-checks).
-Then run the current cloud suite against the explicit CI target:
+For isolated hosted acceptance of the Supabase adapter from a local CLI, prepare your own test project and credentials as [Run against the Supabase provider](run-provider-tests.md#run-against-the-supabase-provider) states.
+Then run the current cloud suite against that explicit target:
 
 ```sh
-MINSKY_TEST_PROJECT_REF=ghtztmovdkhuketcbjmq npm run test:cloud
+MINSKY_TEST_PROJECT_REF=<your-test-project-ref> npm run test:cloud
 ```
 
 Do not apply unrelated remote migrations or change provider configuration for this test.
-If cleanup retains a recovery file, follow [fixture recovery](supabase-provider.md#fixture-recovery).
+If cleanup retains a recovery file, follow [Recover test:cloud fixtures](run-provider-tests.md#recover-testcloud-fixtures).
 Record local simulations and hosted-service CLI results separately.
 
 
@@ -502,4 +502,4 @@ Use two browser windows for the live checks. Run these checks after a reviewed d
 11. Reload each window. Check that the state is unchanged and the reporting form never waited for announcements.
 12. At 320 px and 390 px wide, check that the announcement strip wraps, scrolls inside its area, and causes no horizontal page scroll.
 13. Archive the event. Check that announcements stay readable and every management control disappears.
-14. Repeat the checks on the Supabase build and on the Cloudflare build when both are deployed.
+14. Repeat the checks on a Supabase build when you run the adapter on your own project.

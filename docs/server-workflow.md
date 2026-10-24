@@ -3,7 +3,7 @@
 T0019 extracted the existing issue decisions into [workflow.ts](../src/server/workflow.ts).
 `WorkflowService` accepts all nine existing `Command` variants.
 Its rules contain no provider SDK, SQL, environment configuration, or provider selection.
-The [Supabase provider verification guide](verify-server-workflow.md) describes that provider's checks.
+[Run the shared workflow check](run-provider-tests.md#run-the-shared-workflow-check) describes that provider's checks.
 [Run log](history/run-log.md) records observed results.
 
 Cloudflare is the active development backend. Its application Worker executes the shared service through guarded D1 batches.

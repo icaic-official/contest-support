@@ -69,7 +69,7 @@ Do not add a version selector before there are distinct versions worth maintaini
 ### 3. Remove the shared-development assumption
 
 **Observed:** [README setup](../README.md#local-development) and [contributor setup](../site/src/content/docs/contributing/development.md) assume the project's development backend.
-`cloud:link`, `cloud:functions`, and the root Wrangler configuration target the original installation.
+The root Wrangler configuration targets the original installation. On 2026-10-24 the Supabase retirement removed `cloud:link` and `cloud:functions`, which targeted the project's own Supabase project.
 The public contributor guide omits the fork and clone steps.
 
 **Complete when:** a new contributor can clone a fork and run ordinary checks without provider access.
@@ -140,7 +140,7 @@ Explain the difference between a reply, image upload, award decision, and extern
 
 **Observed:** [administration](../site/src/content/docs/guides/administration.md) omits username validation and account-wide permission restrictions.
 It omits what to do if the one-time credential response is lost.
-The repository's Supabase provider guide contains more detail than the public guide.
+[Run the Supabase adapter](supabase-provider.md) contains more detail than the public guide.
 
 **Complete when:** document the 3–32 character username rule, lowercase storage, and required initial letter or digit.
 Explain the temporary credential display and recovery after a lost response.
@@ -153,7 +153,7 @@ Document the distinction between the current password and the new password durin
 
 **Observed:** [troubleshooting](../site/src/content/docs/operators/troubleshooting.md) sends users to an organizer for password recovery.
 It gives no public procedure for loss of the sole administrator account.
-The repository already contains `scripts/recover-admin.mjs` and a maintainer procedure in `docs/supabase-provider.md`.
+The repository already contains `scripts/recover-admin.mjs` and a Supabase procedure in [Run the Supabase adapter](supabase-provider.md#recover-the-only-admin).
 
 **Complete when:** publish a scoped operator procedure with the required provider access and explicit project check.
 Explain private handling of the generated password, prior-session invalidation, and the next required password change.

@@ -197,7 +197,7 @@ export function IssueCard({
 }) {
   const team = state.teams.find((item) => item.id === issue.team_id);
   return (
-    <li className="relative rounded-xl border bg-card p-3 has-[>button:focus-visible]:ring-[3px] has-[>button:focus-visible]:ring-ring/50">
+    <li className="relative rounded-xl border bg-card p-3 transition-colors duration-(--motion-fast) ease-out has-[>button:active]:bg-accent has-[>button:focus-visible]:ring-[3px] has-[>button:focus-visible]:ring-ring/50">
       <button
         id={`issue-card-${issue.id}`}
         type="button"

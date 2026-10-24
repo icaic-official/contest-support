@@ -2,6 +2,7 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 import { defaultIssues, type FixtureIssue, signInConsole } from './support/consoleFixture';
 
 const desktop = { width: 1280, height: 800 };
+const phone = { width: 390, height: 844 };
 
 function statusGroup(page: Page): Locator {
   return page.getByRole('group', { name: 'Filter by status' });
@@ -142,6 +143,29 @@ test('issue sheet tabs: arrow keys move the selection and the underline follows'
   await page.keyboard.press('Home');
   await expect(activity).toHaveAttribute('aria-selected', 'true');
   await expect.poll(() => gap(underline, activity, 'horizontal')).toBeLessThan(1.5);
+});
+
+test('a held button presses in, and a held phone queue card shows its pressed state', async ({ page }) => {
+  await signInConsole(page, desktop);
+  const claim = page.getByRole('button', { name: 'Claim ISS-1', exact: true });
+  await claim.hover();
+  await page.mouse.down();
+  await expect(claim).toHaveCSS('scale', '0.98');
+  // Leave the button before release so the press does not claim the issue.
+  await page.mouse.move(0, 0);
+  await page.mouse.up();
+  await expect(claim).toHaveCSS('scale', 'none');
+
+  await page.setViewportSize(phone);
+  const card = page.locator('[id^="issue-card-"]').first().locator('xpath=..');
+  await expect(card).toBeVisible();
+  const resting = await card.evaluate((element) => getComputedStyle(element).backgroundColor);
+  await page.locator('[id^="issue-card-"]').first().hover({ position: { x: 12, y: 12 } });
+  await page.mouse.down();
+  await expect.poll(() => card.evaluate((element) => getComputedStyle(element).backgroundColor)).not.toBe(resting);
+  await page.mouse.move(0, 0);
+  await page.mouse.up();
+  await expect.poll(() => card.evaluate((element) => getComputedStyle(element).backgroundColor)).toBe(resting);
 });
 
 test.describe('reduced motion', () => {

@@ -8,6 +8,8 @@ Move dated records to `docs/history/`. Rename `docs/current-state.md` to `docs/h
 Merge the preview rationale into the Workers Builds guide. Move planning entries before 2026-10-23 to the planning log.
 `ROADMAP.md` owns the technology stack. `docs/product-direction.md` owns product requirements.
 The PR template owns the pull request format. AGENTS.md owns branch and commit names.
+Contribution types use the full names in AGENTS.md, such as `[Bugfix]` and `[Feature]` in titles and `bugfix/` and `feature/` in branch names.
+The target CI/CD is Cloudflare Workers Builds. GitHub Actions is not part of the target stack.
 
 **Stale documentation cleanup, 2026-10-24.** The owner asked to identify and correct stale documentation on `main`.
 Correct present-tense instructions that still describe the removed GitHub Actions workflow, merged PRs as open, or the five-group `Backend`.

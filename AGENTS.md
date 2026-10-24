@@ -23,7 +23,7 @@
 ## Contributions
 
 - Contribution types include, but are not limited to: `bugfix`, `build`, `feature`, `style`, `refactor`, `perf`, `test`, `ci`, `chore`.
-- Name every branch `<type>/<title>`, whether or not it gets a PR. For example: `fix/race-request-fix`.
+- Name every branch `<type>/<title>`, whether or not it gets a PR. For example: `bugfix/race-request-fix` or `feature/session-announcements`.
 - Write each commit message in this form. Merge commits are exempt.
 
   ```

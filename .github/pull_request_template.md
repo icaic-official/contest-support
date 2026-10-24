@@ -1,7 +1,7 @@
 <!--
 Title: [Type] Brief description of what the PR addresses.
-Capitalize the type. Example: [Fix] Prevent racing of requests
-For several contribution types, use several brackets: [Fix] [Feat] Prevent racing of requests and add support for Chinese language
+Capitalize the type. Example: [Bugfix] Prevent racing of requests
+For several contribution types, use several brackets: [Bugfix] [Feature] Prevent racing of requests and add support for Chinese language
 Use the contribution types in AGENTS.md. The branch name is <type>/<title>.
 
 Replace the next line with <type>[optional scope]: <description>, in commit message form.

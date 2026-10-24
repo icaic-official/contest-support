@@ -51,7 +51,7 @@ flowchart LR
 | Auth | better-auth | Provider-agnostic, data stays in Postgres |
 | Observability | Workers Logs + Sentry | Logs plus error tracking |
 | Backups | Nightly `pg_dump` → R2 | Off-site restore path |
-| CI/CD | GitHub Actions + Workers Builds | Test matrix plus deploys |
+| CI/CD | Cloudflare Workers Builds | Checks on every branch push and docs publication. No GitHub Actions. |
 ---
 
 ## Adapter matrix

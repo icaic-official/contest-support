@@ -2,6 +2,7 @@
 -- avatar. Retired and expired rows keep their object names until the avatars function
 -- confirms the file deletion. That function is the only writer of stored files.
 -- Deleting a person fails while avatar rows exist, so a cleanup must delete the files first.
+-- SQLSTATE MN422 marks a rejected picture request. MN410 marks an expired upload.
 create table public.person_avatars (
   id uuid primary key default gen_random_uuid(),
   person_id uuid not null references public.people(id),
@@ -60,16 +61,16 @@ begin
   select * into avatar from public.person_avatars where person_id=who and request_id=p_request;
   if found then
     if avatar.bytes<>p_bytes or avatar.content_type<>p_type or avatar.digest<>p_digest then
-      raise exception 'This picture request ID has different content.';
+      raise exception 'This picture request ID has different content.' using errcode='MN422';
     end if;
     if avatar.status='expired' or (avatar.status='pending' and avatar.created_at<=clock_timestamp()-interval '15 minutes') then
-      raise exception 'The picture upload expired. Select the picture again.';
+      raise exception 'The picture upload expired. Select the picture again.' using errcode='MN410';
     end if;
     return jsonb_build_object('id',avatar.id,'status',avatar.status,'path',app_private.avatar_object(who,avatar.id));
   end if;
-  if p_bytes is null or p_bytes not between 1 and 262144 then raise exception 'Choose a picture of up to 256 KB.'; end if;
+  if p_bytes is null or p_bytes not between 1 and 262144 then raise exception 'Choose a picture of up to 256 KB.' using errcode='MN422'; end if;
   if p_type is null or p_type not in ('image/jpeg','image/png','image/webp') or p_digest is null or p_digest !~ '^[0-9a-f]{64}$' then
-    raise exception 'Choose a JPEG, PNG, or WebP picture.';
+    raise exception 'Choose a JPEG, PNG, or WebP picture.' using errcode='MN422';
   end if;
   update public.person_avatars set status='expired'
     where person_id=who and status='pending' and created_at<=clock_timestamp()-interval '15 minutes';

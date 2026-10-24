@@ -22,6 +22,11 @@ const finishedSchema = z.object({
   cleanup: z.array(z.string()),
 });
 const removedSchema = z.object({ cleanup: z.array(z.string()) });
+// The avatar database functions mark rejected requests with these SQLSTATE codes.
+const databaseFlags: Record<string, { validation?: true; restart?: true }> = {
+  MN422: { validation: true },
+  MN410: { restart: true },
+};
 
 class AvatarRequestError extends Error {
   constructor(
@@ -114,7 +119,9 @@ export function createAvatarHandler(
 
     async function call(name: string, args?: Record<string, unknown>) {
       const { data, error } = await caller.rpc(name, args);
-      if (error) throw new AvatarRequestError(error.message);
+      if (error) {
+        throw new AvatarRequestError(error.message, databaseFlags[error.code]);
+      }
       return data;
     }
 

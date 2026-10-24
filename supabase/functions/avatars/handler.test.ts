@@ -20,6 +20,7 @@ interface State {
   removals: string[][];
   confirmed: string[][];
   begins: Array<Record<string, unknown>>;
+  begin: () => { data: unknown; error: { message: string; code: string } | null } | undefined;
   complete: () => { data: unknown; error: { message: string } | null };
   cleanup: string[];
   removeError: boolean;
@@ -34,6 +35,7 @@ function fixture(overrides: Partial<State> = {}) {
     removals: [],
     confirmed: [],
     begins: [],
+    begin: () => undefined,
     complete: () => ({ data: { status: "ready", cleanup: [replacedPath] }, error: null }),
     cleanup: [replacedPath],
     removeError: false,
@@ -46,7 +48,7 @@ function fixture(overrides: Partial<State> = {}) {
     async rpc(name: string, args: Record<string, unknown>) {
       if (name === "begin_avatar") {
         state.begins.push(args);
-        return { data: { id: avatar, status: state.status, path }, error: null };
+        return state.begin() ?? { data: { id: avatar, status: state.status, path }, error: null };
       }
       if (name === "complete_avatar") return state.complete();
       if (name === "remove_avatar") return { data: { cleanup: state.cleanup }, error: null };
@@ -146,6 +148,18 @@ Deno.test("deletes a late file when the upload expired and asks for a new pictur
   check(response.status === 400 && body.restart === true, "The caller must select the picture again.");
   check(!state.files.has(path), "The expired file is deleted.");
   check(JSON.stringify(state.confirmed) === JSON.stringify([[path]]), "The deletion is confirmed.");
+});
+
+Deno.test("keeps the database classification of a reused or expired request", async () => {
+  for (const [code, flag] of [["MN410", "restart"], ["MN422", "validation"]]) {
+    const { state, handle } = fixture({
+      begin: () => ({ data: null, error: { message: "Rejected request.", code } }),
+    });
+    const response = await handle(upload());
+    const body = await response.json();
+    check(response.status === 400 && body[flag] === true, `SQLSTATE ${code} sets ${flag}.`);
+    check(state.uploads === 0, "A rejected request stores nothing.");
+  }
 });
 
 Deno.test("rejects non-images and oversized files before reserving", async () => {

@@ -1365,7 +1365,7 @@ describe("person avatars", () => {
     expect(await readable(specialist)).toEqual([second.path]);
     await actor(volunteer);
     expect(await begin(12, requestId)).toEqual({ id: second.avatar.avatar_id, status: "ready", path: second.path });
-    await expect(begin(13, requestId)).rejects.toThrow("different content");
+    await expect(begin(13, requestId)).rejects.toMatchObject({ code: "MN422", message: expect.stringContaining("different content") });
     await expect(db.query("select public.avatar_files_removed($1)", [[first.path]])).rejects.toThrow("permission denied");
     await db.exec("reset role; set role service_role");
     await db.query("select public.avatar_files_removed($1)", [[first.path]]);
@@ -1397,9 +1397,10 @@ describe("person avatars", () => {
 
   it("rejects invalid files, unfinished or expired uploads, and temporary passwords", async () => {
     await actor(volunteer);
-    await expect(begin(262145)).rejects.toThrow("256 KB");
-    await expect(begin(12, undefined, "image/gif")).rejects.toThrow("JPEG, PNG, or WebP");
-    const started = await begin();
+    await expect(begin(262145)).rejects.toMatchObject({ code: "MN422", message: expect.stringContaining("256 KB") });
+    await expect(begin(12, undefined, "image/gif")).rejects.toMatchObject({ code: "MN422" });
+    const requestId = id(3903);
+    const started = await begin(12, requestId);
     await expect(complete(started.id)).rejects.toThrow("Upload the picture before finishing");
     await store(started.path, 13);
     await actor(volunteer);
@@ -1410,6 +1411,7 @@ describe("person avatars", () => {
     await db.query("update public.person_avatars set created_at=created_at-interval '16 minutes' where id=$1", [started.id]);
     await actor(volunteer);
     expect(await complete(started.id)).toEqual({ status: "expired", cleanup: [started.path] });
+    await expect(begin(12, requestId)).rejects.toMatchObject({ code: "MN410", message: expect.stringContaining("expired") });
     expect(await list(volunteer)).toEqual([]);
     const ready = await readyAvatar(volunteer);
     await db.exec("reset role");

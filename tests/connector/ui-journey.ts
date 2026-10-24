@@ -234,6 +234,20 @@ export async function runUiJourney(browser: Browser, fixture: UiFixture, options
     const specialist = await login('specialist');
     const jury = await login('jury');
     const admin = await login('admin');
+    phase = 'account page password change';
+    await admin.page.getByRole('button', { name: /^Account settings for / }).click();
+    await expect(admin.page).toHaveURL(new URL('/account', fixture.origin).href);
+    const replacement = crypto.randomUUID() + 'A9!';
+    await privateFill(admin.page.getByLabel('Current password', { exact: true }), fixture.accounts.admin.password);
+    await privateFill(admin.page.getByLabel('New password', { exact: true }), replacement);
+    await privateFill(admin.page.getByLabel('Confirm password', { exact: true }), replacement);
+    await admin.page.getByRole('button', { name: 'Save password', exact: true }).click();
+    await expect(admin.page.getByRole('status').filter({ hasText: 'Your password was changed.' })).toBeVisible();
+    fixture.accounts.admin.password = replacement;
+    // The change replaces the login. The person stays signed in, also after a reload.
+    await admin.page.reload();
+    await expect(admin.page.getByRole('heading', { level: 1, name: 'My account', exact: true })).toBeVisible();
+    await expect(liveBadge(admin.page)).toBeVisible({ timeout: 30_000 });
     phase = 'administration settings';
     const reportButton = contestant.page.getByRole('complementary', { name: 'Your reports' })
       .getByRole('button', { name: 'Report an issue', exact: true });

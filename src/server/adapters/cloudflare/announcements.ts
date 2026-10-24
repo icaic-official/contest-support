@@ -35,18 +35,31 @@ const commandSchema = z.discriminatedUnion('type', [
   z.strictObject({ type: z.literal('remove'), id: uuid, revision }),
 ]);
 
-/** Bind the caller and session, then the session again. Archived events fail. */
-export const announcementManagerSql = `SELECT 1 FROM (${currentAccessSql}) c
-  JOIN sessions s ON s.id = ? JOIN events e ON e.id = s.event_id
-  WHERE e.archived = 0 AND (c.is_admin = 1 OR EXISTS (SELECT 1 FROM json_each(c.roles) WHERE value = 'jury'))`;
-
-export function announcementManagerBindings(caller: Caller, sessionId: string): Value[] {
-  return [...currentAccessBindings(caller, sessionId), sessionId];
+/** Session admins and jury manage announcements. `row` names a current access row. */
+export function announcementManager(row: string): string {
+  return `(${row}.is_admin = 1 OR EXISTS (SELECT 1 FROM json_each(${row}.roles) WHERE value = 'jury'))`;
 }
 
 export function announcementAssertion(db: D1Connection, id: string, sql: string, ...values: Value[]): D1Statement {
   return db.prepare(`INSERT INTO command_assertions (id, valid) VALUES (?, CASE WHEN EXISTS (${sql}) THEN 1 ELSE 0 END)`)
     .bind(id, ...values);
+}
+
+/**
+ * Check first that the caller manages announcements in an active event.
+ * Time can pass between batch statements, so recheck the credential after the writes.
+ * `statements` can add a `${guard}:state` assertion.
+ */
+export function guardedAnnouncementBatch(db: D1Connection, guard: string, caller: Caller, sessionId: string,
+  statements: D1Statement[]): D1Statement[] {
+  return [
+    announcementAssertion(db, guard, `SELECT 1 FROM (${currentAccessSql}) c
+      JOIN sessions s ON s.id = ? JOIN events e ON e.id = s.event_id WHERE e.archived = 0 AND ${announcementManager('c')}`,
+    ...currentAccessBindings(caller, sessionId), sessionId),
+    ...statements,
+    announcementAssertion(db, `${guard}:access`, currentReadyLoginSql, ...currentReadyLoginBindings(caller)),
+    db.prepare('DELETE FROM command_assertions WHERE id IN (?, ?, ?)').bind(guard, `${guard}:state`, `${guard}:access`),
+  ];
 }
 
 /** Every member reads announcements, so every live audience of the session changes. */
@@ -63,7 +76,7 @@ interface ReceiptRow { session_id: string; command: string; announcement_id: str
 interface AnnouncementRow { revision: number; removed_at: string | null }
 
 const snapshotSql = `WITH access AS (${currentAccessSql}),
-  manager AS (SELECT 1 FROM access WHERE is_admin = 1 OR EXISTS (SELECT 1 FROM json_each(roles) WHERE value = 'jury')),
+  manager AS (SELECT 1 FROM access WHERE ${announcementManager('access')}),
   visible AS (SELECT a.* FROM announcements a WHERE a.session_id = ? AND EXISTS (SELECT 1 FROM access)
     AND (EXISTS (SELECT 1 FROM manager) OR (a.removed_at IS NULL AND (a.expires_at IS NULL OR a.expires_at > ${announcementNow}))))
 SELECT json_object(
@@ -132,17 +145,13 @@ export class D1AnnouncementService {
 
     const id = command.type === 'publish' ? crypto.randomUUID() : command.id;
     const guardId = crypto.randomUUID();
-    const assertion = (suffix: string, sql: string, ...values: Value[]) =>
-      announcementAssertion(this.db, `${guardId}${suffix}`, sql, ...values);
-    const statements: D1Statement[] = [
-      assertion('', announcementManagerSql, ...announcementManagerBindings(caller, sessionId)),
-    ];
+    const statements: D1Statement[] = [];
     if (command.type === 'publish') {
       statements.push(this.statement(`INSERT INTO announcements (id, session_id, title, details, author, author_name, expires_at)
         SELECT ?, ?, ?, ?, id, name, ? FROM accounts WHERE id = ?`,
       id, sessionId, command.title, command.details, command.expires_at, caller.accountId));
     } else {
-      statements.push(assertion(':state', `SELECT 1 FROM announcements WHERE id = ? AND session_id = ?
+      statements.push(announcementAssertion(this.db, `${guardId}:state`, `SELECT 1 FROM announcements WHERE id = ? AND session_id = ?
         AND removed_at IS NULL AND revision = ?`, id, sessionId, command.revision));
       statements.push(command.type === 'edit'
         ? this.statement(`UPDATE announcements SET title = ?, details = ?, expires_at = ?, edited_at = ${announcementNow},
@@ -158,12 +167,9 @@ export class D1AnnouncementService {
       this.statement(`INSERT INTO announcement_receipts (actor, request_id, session_id, command, announcement_id)
         VALUES (?, ?, ?, ?, ?)`, caller.accountId, requestId, sessionId, JSON.stringify(command), id),
       ...notificationStatements(this.db, sessionId, await sessionAudiences(this.db, sessionId)),
-      // Time can pass between batch statements. Recheck the credential after the writes.
-      announcementAssertion(this.db, `${guardId}:access`, currentReadyLoginSql, ...currentReadyLoginBindings(caller)),
-      this.statement('DELETE FROM command_assertions WHERE id IN (?, ?, ?)', guardId, `${guardId}:state`, `${guardId}:access`),
     );
     try {
-      await this.db.batch(statements);
+      await this.db.batch(guardedAnnouncementBatch(this.db, guardId, caller, sessionId, statements));
     } catch (error) {
       // A concurrent retry of this request can commit first. A lost response can hide a commit.
       const committed = await this.receipt(caller, requestId);

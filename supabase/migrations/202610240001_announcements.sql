@@ -115,6 +115,7 @@ create table public.announcement_images (
   check (status<>'ready' or uploaded_at is not null)
 );
 create index announcement_images_by_parent on public.announcement_images(announcement_id,status);
+create index announcement_images_by_session on public.announcement_images(session_id,status);
 alter table public.announcement_images enable row level security;
 revoke all on public.announcement_images from public,anon,authenticated;
 grant select on public.announcement_images to authenticated,service_role;

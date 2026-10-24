@@ -9,7 +9,7 @@ export const ANNOUNCEMENT_DETAILS_MAX = 10000;
 export const ANNOUNCEMENT_IMAGE_MAX_COUNT = 4;
 export const ANNOUNCEMENT_IMAGE_MAX_BYTES = 10485760;
 
-export const announcementSchema = z.object({
+const announcementSchema = z.object({
   id: uuid,
   session_id: uuid,
   title: z.string(),
@@ -26,7 +26,7 @@ export const announcementSchema = z.object({
   removed_name: z.string().nullable(),
   revision: z.number(),
 });
-export const announcementImageSchema = z.object({
+const announcementImageSchema = z.object({
   id: uuid,
   session_id: uuid,
   announcement_id: uuid,

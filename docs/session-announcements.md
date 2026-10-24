@@ -1,8 +1,6 @@
-# T0006 — Session announcements
+# Session announcements
 
-Status: implemented on both providers and verified locally. Hosted checks and deployment are not run.
-Branch: `feature/t0006-session-announcements-port`, from `main` at `ecc75e2`.
-This port supersedes [PR #20](https://github.com/GiftedNovaHD/minsky/pull/20). PR #20 targeted an older `main` and only the Supabase provider.
+Ticket status and verification evidence are in the [T0006 ticket](tickets.md#t0006--session-announcements).
 
 An announcement is a short message for one contest session.
 Admins and jury publish it. Every current member of the session reads it.

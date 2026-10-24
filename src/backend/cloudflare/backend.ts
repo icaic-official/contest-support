@@ -87,7 +87,13 @@ export function createCloudflareBackend(options: {
     return `/api/image/${path.split('/').map(encodeURIComponent).join('/')}`;
   }
 
-  const hex = (bytes: ArrayBuffer) => Array.from(new Uint8Array(bytes), (byte) => byte.toString(16).padStart(2, '0')).join('');
+  /** The Worker requires the SHA-256 digest of the exact bytes, and R2 checks it again. */
+  async function putImage(url: string, body: Blob, contentType: string, bytes: ArrayBuffer): Promise<void> {
+    const digest = await crypto.subtle.digest('SHA-256', bytes);
+    const headers = await csrfHeaders(contentType);
+    headers.set('X-Minsky-Digest', Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join(''));
+    await imageResult(await send(url, { method: 'PUT', headers, body }));
+  }
 
   const announcements: Announcements = {
     async snapshot(sessionId, signal) {
@@ -114,9 +120,7 @@ export function createCloudflareBackend(options: {
       const started = reservedSchema.parse(await imageResult(await post('/api/announcement-images',
         { action: 'begin', sessionId, announcementId, requestId, name: file.name, bytes: file.size })));
       onProgress(0);
-      const headers = await csrfHeaders(kind);
-      headers.set('X-Minsky-Digest', hex(await crypto.subtle.digest('SHA-256', bytes)));
-      await imageResult(await send(announcementImagePath(started.path), { method: 'PUT', headers, body: file }));
+      await putImage(announcementImagePath(started.path), file, kind, bytes);
       onProgress(100);
       await imageResult(await post('/api/announcement-images', { action: 'finish', sessionId, imageId: started.id }));
     },
@@ -231,13 +235,7 @@ export function createCloudflareBackend(options: {
     images: {
       async begin(input) { return startedSchema.parse(await imageResult(await post('/api/images', { action: 'begin', ...input }))); },
       async upload(path, body, contentType, onProgress) {
-        const digest = await crypto.subtle.digest('SHA-256', await body.arrayBuffer());
-        const headers = await csrfHeaders(contentType);
-        headers.set('X-Minsky-Digest', Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join(''));
-        const response = await send(imagePath(path), {
-          method: 'PUT', headers, body,
-        });
-        await imageResult(response);
+        await putImage(imagePath(path), body, contentType, await body.arrayBuffer());
         onProgress(body.size);
       },
       async finish(sessionId, attachmentId) { await imageResult(await post('/api/images', { action: 'finish', sessionId, attachmentId })); },

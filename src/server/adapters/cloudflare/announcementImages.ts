@@ -1,15 +1,15 @@
 import { z } from 'zod';
 import { ANNOUNCEMENT_IMAGE_MAX_BYTES, ANNOUNCEMENT_IMAGE_MAX_COUNT } from '../../../connected/announcementModel';
 import { ImageRequestError } from '../../../backend/errors';
-import { imageKind } from '../../../connected/imageFile';
+import { megabytes } from '../../../connected/imageFile';
 import type { Caller } from '../../authentication';
 import { equalWorkflowJson } from '../../workflow';
 import type { D1Connection, D1Statement } from '../d1/connection';
 import {
-  announcementAssertion, announcementManagerBindings, announcementManagerSql, announcementNow, sessionAudiences,
+  announcementAssertion, announcementManager, announcementNow, guardedAnnouncementBatch, sessionAudiences,
 } from './announcements';
-import { currentAccessBindings, currentAccessSql, currentReadyLoginBindings, currentReadyLoginSql, notificationStatements } from './application';
-import type { PrivateBucket } from './images';
+import { currentAccessBindings, currentAccessSql, notificationStatements } from './application';
+import { cleanImageName, putVerifiedImage, storedImage, type PrivateBucket } from './images';
 
 interface Image {
   id: string; session_id: string; announcement_id: string; uploader: string; uploader_name: string;
@@ -25,13 +25,18 @@ const beginSchema = z.strictObject({
 const keySchema = z.tuple([z.uuid(), z.literal('announcements'), z.uuid(), z.uuid()]);
 type Value = string | number | null;
 
+/** A ready image, or a reservation that has not expired. */
+function usable(image: { state: string; expired: number }): boolean {
+  return image.state === 'ready' || image.state === 'pending' && !image.expired;
+}
+
 export function announcementImageKey(sessionId: string, announcementId: string, imageId: string): string {
   return `${sessionId}/announcements/${announcementId}/${imageId}`;
 }
 
 const imageSql = `SELECT x.id, x.session_id, x.announcement_id, x.uploader, x.uploader_name, x.name,
   x.declared_bytes, x.content_type, x.object_key, x.state, x.request_command, (x.expires_at <= unixepoch()) AS expired,
-  c.archived, (c.is_admin = 1 OR EXISTS (SELECT 1 FROM json_each(c.roles) WHERE value = 'jury')) AS manager,
+  c.archived, ${announcementManager('c')} AS manager,
   (a.removed_at IS NOT NULL) AS announcement_removed,
   (a.expires_at IS NOT NULL AND a.expires_at <= ${announcementNow}) AS announcement_expired
   FROM announcement_images x JOIN announcements a ON a.id = x.announcement_id
@@ -59,11 +64,9 @@ export class R2AnnouncementImageService {
     }
   }
 
-  private async batch(id: string, caller: Caller, statements: D1Statement[]): Promise<void> {
+  private async batch(id: string, caller: Caller, sessionId: string, statements: D1Statement[]): Promise<void> {
     try {
-      await this.db.batch([...statements,
-        announcementAssertion(this.db, `${id}:access`, currentReadyLoginSql, ...currentReadyLoginBindings(caller)),
-        this.statement('DELETE FROM command_assertions WHERE id IN (?, ?, ?)', id, `${id}:state`, `${id}:access`)]);
+      await this.db.batch(guardedAnnouncementBatch(this.db, id, caller, sessionId, statements));
     } catch (error) {
       if (error instanceof Error && error.message.includes('CHECK constraint failed: valid = 1')) {
         throw new ImageRequestError('Announcement access or limits changed. Refresh and try again.', { validation: true });
@@ -76,10 +79,10 @@ export class R2AnnouncementImageService {
   async begin(caller: Caller, input: { sessionId: string; announcementId: string; requestId: string; name: string; bytes: number }):
   Promise<{ id: string; path: string }> {
     const parsed = beginSchema.safeParse(input);
-    if (!parsed.success) throw new ImageRequestError('Choose an image of up to 10 MB.', { validation: true });
+    if (!parsed.success) throw new ImageRequestError(`Choose an image of up to ${megabytes(ANNOUNCEMENT_IMAGE_MAX_BYTES)} MB.`, { validation: true });
     const value = parsed.data;
     // Keep the first 200 characters, as the Supabase provider does.
-    const cleanName = [...value.name.trim().replace(/\p{Cc}/gu, '').replace(/[/\\]/g, '-')].slice(0, 200).join('');
+    const cleanName = [...cleanImageName(value.name)].slice(0, 200).join('');
     if (!cleanName.trim()) throw new ImageRequestError('Choose an image with a file name.', { validation: true });
     const repeat = async (): Promise<{ id: string; path: string } | undefined> => {
       const prior = await this.statement(`SELECT x.id FROM announcement_images x JOIN (${currentAccessSql}) c
@@ -91,7 +94,7 @@ export class R2AnnouncementImageService {
       if (!equalWorkflowJson(JSON.parse(image.request_command), value)) {
         throw new ImageRequestError('This image request ID has different content.', { validation: true });
       }
-      if (image.state !== 'ready' && (image.state !== 'pending' || image.expired)) {
+      if (!usable(image)) {
         throw new ImageRequestError('Upload reservation expired. Select the image again.', { restart: true });
       }
       return { id: image.id, path: image.object_key };
@@ -102,8 +105,7 @@ export class R2AnnouncementImageService {
     const guard = crypto.randomUUID();
     const key = announcementImageKey(value.sessionId, value.announcementId, id);
     try {
-      await this.batch(guard, caller, [
-        announcementAssertion(this.db, guard, announcementManagerSql, ...announcementManagerBindings(caller, value.sessionId)),
+      await this.batch(guard, caller, value.sessionId, [
         announcementAssertion(this.db, `${guard}:state`, `SELECT 1 FROM announcements a WHERE a.id = ? AND a.session_id = ?
           AND a.removed_at IS NULL AND (SELECT count(*) FROM announcement_images x WHERE x.announcement_id = a.id
             AND (x.state = 'ready' OR x.state = 'pending' AND x.expires_at > unixepoch())) < ?`,
@@ -130,44 +132,24 @@ export class R2AnnouncementImageService {
     const row = await this.image(caller, sessionId, id);
     this.manage(row);
     if (row.uploader !== caller.accountId) throw new ImageRequestError('Only the person who added this image can upload it.', { validation: true });
-    if (path !== row.object_key || row.announcement_removed || !['pending', 'ready'].includes(row.state) ||
-        row.state === 'pending' && row.expired) {
+    if (path !== row.object_key || row.announcement_removed || !usable(row)) {
       throw new ImageRequestError('Upload reservation expired. Select the image again.', { restart: true });
     }
     if (length !== row.declared_bytes || !['image/png', 'image/jpeg', 'image/webp'].includes(contentType)) {
       throw new ImageRequestError('Choose a JPEG, PNG, or WebP image within the reserved size.', { validation: true });
     }
     try {
-      const object = await this.bucket.put(path, body, {
-        onlyIf: { etagDoesNotMatch: '*' }, sha256: digest,
-        httpMetadata: { contentType, cacheControl: 'private, no-store' }, customMetadata: { digest },
-      });
-      const existing = await this.bucket.get(path, { range: { offset: 0, length: 16 } });
-      const matches = existing?.customMetadata?.digest === digest && existing.size === length;
-      if (existing) await existing.body.cancel();
-      if (!matches) {
-        // A conditional retry must never delete a different, earlier object.
-        if (object !== null) await this.bucket.delete([path]);
-        throw new ImageRequestError('The stored image does not match this transfer. Select the image again.', { restart: true });
-      }
+      await putVerifiedImage(this.bucket, path, body, { contentType, digest, length }, 'Select the image again.');
     } catch (error) {
       // Inspect the stored state independently so a late transfer cannot outlive its reservation.
       const current = await this.statement(`SELECT state, expires_at <= unixepoch() AS expired
         FROM announcement_images WHERE id = ? AND session_id = ? AND object_key = ?`, id, sessionId, path)
         .first<{ state: string; expired: number }>();
-      if (!current || !['pending', 'ready'].includes(current.state) || current.state === 'pending' && current.expired) {
+      if (!current || !usable(current)) {
         await this.bucket.delete([path]);
       }
       throw error;
     }
-  }
-
-  private async stored(path: string): Promise<{ size: number; kind: string; digest: string }> {
-    const object = await this.bucket.get(path, { range: { offset: 0, length: 16 } });
-    if (!object) throw new ImageRequestError('Upload the image before finishing.', { incomplete: true });
-    const kind = imageKind(new Uint8Array(await object.arrayBuffer()));
-    if (!kind || !object.customMetadata?.digest) throw new ImageRequestError('Choose a JPEG, PNG, or WebP image.', { validation: true });
-    return { size: object.size, kind, digest: object.customMetadata.digest };
   }
 
   private changed(row: Image, caller: Caller): D1Statement {
@@ -189,14 +171,13 @@ export class R2AnnouncementImageService {
     if (row.state !== 'pending' || row.expired || row.announcement_removed) {
       throw new ImageRequestError('Upload reservation expired. Select the image again.', { restart: true });
     }
-    const stored = await this.stored(row.object_key);
+    const stored = await storedImage(this.bucket, row.object_key);
     if (stored.size !== row.declared_bytes) {
       throw new ImageRequestError('Choose a JPEG, PNG, or WebP image within the reserved size.', { validation: true });
     }
     const guard = crypto.randomUUID();
     try {
-      await this.batch(guard, caller, [
-        announcementAssertion(this.db, guard, announcementManagerSql, ...announcementManagerBindings(caller, sessionId)),
+      await this.batch(guard, caller, sessionId, [
         announcementAssertion(this.db, `${guard}:state`, `SELECT 1 FROM announcement_images x JOIN announcements a ON a.id = x.announcement_id
           WHERE x.id = ? AND x.state = 'pending' AND x.uploader = ? AND x.expires_at > unixepoch() AND a.removed_at IS NULL
             AND (SELECT count(*) FROM announcement_images o WHERE o.announcement_id = x.announcement_id AND o.state = 'ready') < ?`,
@@ -221,8 +202,7 @@ export class R2AnnouncementImageService {
     if (!repeated) {
       if (row.state !== (abandon ? 'pending' : 'ready')) throw new ImageRequestError('Image unavailable.', { validation: true });
       const guard = crypto.randomUUID();
-      await this.batch(guard, caller, [
-        announcementAssertion(this.db, guard, announcementManagerSql, ...announcementManagerBindings(caller, sessionId)),
+      await this.batch(guard, caller, sessionId, [
         announcementAssertion(this.db, `${guard}:state`, 'SELECT 1 FROM announcement_images WHERE id = ? AND state = ?', id, abandon ? 'pending' : 'ready'),
         this.statement(`UPDATE announcement_images SET state = ?, deleted_by = ?, deleted_at = ${announcementNow} WHERE id = ?`,
           abandon ? 'abandoned' : 'deleting', caller.accountId, id),

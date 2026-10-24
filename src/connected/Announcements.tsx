@@ -27,6 +27,7 @@ import {
 import { checkAnnouncementImage } from "./announcementImage";
 import {
   ANNOUNCEMENT_DETAILS_MAX,
+  ANNOUNCEMENT_IMAGE_MAX_BYTES,
   ANNOUNCEMENT_IMAGE_MAX_COUNT,
   ANNOUNCEMENT_TITLE_MAX,
   type Announcement,
@@ -38,18 +39,17 @@ import {
 import { type AnnouncementData, useAnnouncements } from "./hooks/useAnnouncements";
 import { useNow } from "./hooks/useNow";
 import type { SessionData } from "./hooks/useSessionSnapshot";
+import { megabytes } from "./imageFile";
+import { formatDate } from "./labels";
 
-type Outcome = "done" | "conflict" | "failed";
+/** `unknown` keeps the request ID for Retry. */
+type Outcome = "done" | "rejected" | "unknown";
 
 /** An open edit. `base` is the revision that the draft starts from. */
 interface Edit {
   id: string;
   base: number;
   draft: AnnouncementDraft;
-}
-
-function time(value: string): string {
-  return new Date(value).toLocaleString();
 }
 
 /**
@@ -80,15 +80,12 @@ function useAnnouncementCommand(list: AnnouncementData) {
         pending.current = undefined;
         setRetryable(false);
         setError(errorMessage(cause));
-        if (cause.conflict) {
-          await list.refresh();
-          return "conflict";
-        }
-        return "failed";
+        if (cause.conflict) await list.refresh();
+        return "rejected";
       }
       setRetryable(true);
       setError("The announcement may not have saved. Retry the same request.");
-      return "failed";
+      return "unknown";
     } finally {
       setBusy(false);
     }
@@ -100,7 +97,6 @@ function useAnnouncementCommand(list: AnnouncementData) {
     retryable,
     run,
     retry: () => (pending.current ? run(pending.current.command) : undefined),
-    clearError: () => setError(""),
   };
 }
 
@@ -127,9 +123,7 @@ export function Announcements({ data }: { data: SessionData }) {
   if (!member) return null;
   const canWrite = manager && !archived;
   const items = list.announcements.filter(
-    (item) =>
-      manager ||
-      (!item.removed_at && (!item.expires_at || Date.parse(item.expires_at) > now)),
+    (item) => manager || announcementStatus(item, now) === "Active",
   );
   // Readers see nothing until there is something to read. Failures stay quiet
   // for them, because issue work continues without announcements.
@@ -165,7 +159,7 @@ export function Announcements({ data }: { data: SessionData }) {
       id: item.id,
       revision: item.revision,
     });
-    if (outcome !== "failed" || !command.retryable) setRemoving(undefined);
+    if (outcome !== "unknown") setRemoving(undefined);
   }
 
   return (
@@ -252,7 +246,6 @@ export function Announcements({ data }: { data: SessionData }) {
               now={now}
               busy={command.busy}
               editing={edit?.id === item.id ? edit : undefined}
-              latest={item}
               removing={removing === item.id}
               onEdit={() => {
                 setOpen((current) => new Set(current).add(item.id));
@@ -283,7 +276,6 @@ function AnnouncementItem(props: {
   now: number;
   busy: boolean;
   editing: Edit | undefined;
-  latest: Announcement;
   removing: boolean;
   onEdit: () => void;
   onEditChange: (edit: Edit) => void;
@@ -326,23 +318,23 @@ function AnnouncementItem(props: {
             <p className="break-words whitespace-pre-wrap">{item.details}</p>
             <p className="text-xs text-muted-foreground">
               Published by {item.author_name}{" "}
-              <time dateTime={item.published_at}>{time(item.published_at)}</time>
+              <time dateTime={item.published_at}>{formatDate(item.published_at)}</time>
               {item.edited_at && item.edited_name && (
                 <>
                   . Last changed by {item.edited_name}{" "}
-                  <time dateTime={item.edited_at}>{time(item.edited_at)}</time>
+                  <time dateTime={item.edited_at}>{formatDate(item.edited_at)}</time>
                 </>
               )}
               {item.expires_at && (
                 <>
                   . {status === "Expired" ? "Expired" : "Expires"}{" "}
-                  <time dateTime={item.expires_at}>{time(item.expires_at)}</time>
+                  <time dateTime={item.expires_at}>{formatDate(item.expires_at)}</time>
                 </>
               )}
               {item.removed_at && item.removed_name && (
                 <>
                   . Removed by {item.removed_name}{" "}
-                  <time dateTime={item.removed_at}>{time(item.removed_at)}</time>
+                  <time dateTime={item.removed_at}>{formatDate(item.removed_at)}</time>
                 </>
               )}
             </p>
@@ -386,7 +378,7 @@ function AnnouncementItem(props: {
         {editing && canWrite && (
           <EditPanel
             edit={editing}
-            latest={props.latest}
+            latest={item}
             now={now}
             busy={busy}
             onChange={props.onEditChange}
@@ -441,7 +433,7 @@ function EditPanel({
               <dt className="inline font-medium">Changed by: </dt>
               <dd className="inline">
                 {latest.edited_name ?? latest.author_name}
-                {latest.edited_at && <> {time(latest.edited_at)}</>}
+                {latest.edited_at && <> {formatDate(latest.edited_at)}</>}
               </dd>
             </div>
           </dl>
@@ -468,11 +460,6 @@ function EditPanel({
       {review === "removed" && (
         <p role="alert" className="text-sm text-destructive">
           This announcement was removed. Your draft is kept, but it cannot be saved.
-        </p>
-      )}
-      {review === "missing" && (
-        <p role="alert" className="text-sm text-destructive">
-          This announcement is no longer available. Your draft is kept, but it cannot be saved.
         </p>
       )}
       <AnnouncementForm
@@ -575,13 +562,18 @@ function AnnouncementForm({
 }
 
 /** Loads one private image through the access-checked download. */
-function useImageUrl(image: AnnouncementImage): { url: string; failed: boolean } {
+function useImageUrl(
+  session_id: string,
+  announcement_id: string,
+  id: string,
+): { url: string; failed: boolean } {
   const [state, setState] = useState({ url: "", failed: false });
+  // A ready image never changes, so only its identity starts a download.
   useEffect(() => {
     let active = true;
     let created = "";
     requireBackend()
-      .announcements.downloadImage(image)
+      .announcements.downloadImage({ session_id, announcement_id, id })
       .then((blob) => {
         created = URL.createObjectURL(blob);
         if (active) setState({ url: created, failed: false });
@@ -594,9 +586,7 @@ function useImageUrl(image: AnnouncementImage): { url: string; failed: boolean }
       active = false;
       if (created) URL.revokeObjectURL(created);
     };
-    // A ready image never changes, and each snapshot parses new objects. Only its identity starts a download.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [image.session_id, image.announcement_id, image.id]);
+  }, [session_id, announcement_id, id]);
   return state;
 }
 
@@ -611,7 +601,7 @@ function AnnouncementImageView({
   busy: boolean;
   onRemove: () => void;
 }) {
-  const { url, failed } = useImageUrl(image);
+  const { url, failed } = useImageUrl(image.session_id, image.announcement_id, image.id);
   return (
     <li className="grid gap-1 rounded-md border bg-background p-2">
       {url ? (
@@ -623,7 +613,7 @@ function AnnouncementImageView({
       )}
       <span className="break-words text-xs text-muted-foreground">
         {image.name}. Added by {image.uploader_name}{" "}
-        <time dateTime={image.uploaded_at}>{time(image.uploaded_at)}</time>
+        <time dateTime={image.uploaded_at}>{formatDate(image.uploaded_at)}</time>
       </span>
       <div className="flex flex-wrap gap-2">
         {url && (
@@ -745,8 +735,8 @@ function AnnouncementImages({
           />
           <p className="text-xs text-muted-foreground">
             {full
-              ? "This announcement has four images. Remove one to add another."
-              : "JPEG, PNG, or WebP. Up to 4 images, 10 MB each."}
+              ? `This announcement has ${ANNOUNCEMENT_IMAGE_MAX_COUNT} images. Remove one to add another.`
+              : `JPEG, PNG, or WebP. Up to ${ANNOUNCEMENT_IMAGE_MAX_COUNT} images, ${megabytes(ANNOUNCEMENT_IMAGE_MAX_BYTES)} MB each.`}
           </p>
           {progress !== undefined && (
             <progress className="w-full" max={100} value={progress} aria-label="Upload progress" />

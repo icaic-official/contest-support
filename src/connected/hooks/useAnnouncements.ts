@@ -17,7 +17,7 @@ export interface AnnouncementData {
   /** The last read error. Earlier records stay visible while it is set. */
   error: string;
   /** Reads again. A newer read cancels an older one. */
-  refresh: () => Promise<AnnouncementSnapshot | undefined>;
+  refresh: () => Promise<void>;
   /** Runs a command, then waits for the refreshed records. */
   execute: (requestId: string, command: AnnouncementCommand) => Promise<void>;
 }
@@ -46,6 +46,7 @@ export function useAnnouncements(
   const [result, setResult] = useState<Loaded>();
   const current = useRef<AbortController>(undefined);
   // Drop records that belong to another session, audience, or lost access.
+  // React discards this render and renders again before it commits.
   if (result && (result.audience !== audience || !allowed)) {
     setResult(undefined);
   }
@@ -59,17 +60,14 @@ export function useAnnouncements(
         sessionId,
         controller.signal,
       );
-      if (controller.signal.aborted) return undefined;
-      setResult({ audience, snapshot, error: "" });
-      return snapshot;
+      if (!controller.signal.aborted) setResult({ audience, snapshot, error: "" });
     } catch (cause) {
-      if (controller.signal.aborted) return undefined;
+      if (controller.signal.aborted) return;
       setResult((previous) => ({
         audience,
         snapshot: previous?.audience === audience ? previous.snapshot : undefined,
         error: errorMessage(cause),
       }));
-      return undefined;
     }
   }, [sessionId, audience]);
 
@@ -96,12 +94,11 @@ export function useAnnouncements(
     [sessionId, refresh],
   );
 
-  const shown = result?.audience === audience && allowed ? result : undefined;
   return {
-    announcements: shown?.snapshot?.announcements ?? none,
-    images: shown?.snapshot?.images ?? none,
-    loaded: Boolean(shown),
-    error: shown?.error ?? "",
+    announcements: result?.snapshot?.announcements ?? none,
+    images: result?.snapshot?.images ?? none,
+    loaded: Boolean(result),
+    error: result?.error ?? "",
     refresh,
     execute,
   };

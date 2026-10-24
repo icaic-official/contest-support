@@ -1,11 +1,11 @@
-import { mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import process from "node:process";
-import { URL, fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
+import { bundleProviderModule } from "../src/server/adapters/cloudflare/tooling/bundle.mjs";
 import { enforceWranglerEnvironment } from "../src/server/adapters/cloudflare/tooling/safe-environment.mjs";
 
 const usage = "Usage: npm run cloudflare:recover-admin -- [--config WRANGLER_CONFIG] (--username NAME | --user ACCOUNT_ID)";
-const repositoryRoot = fileURLToPath(new URL("..", import.meta.url));
 
 function valueAfter(argv, flag) {
   const index = argv.indexOf(flag);
@@ -69,17 +69,11 @@ export function readRecoveryTarget(configText) {
   return { databaseName: name };
 }
 
-const hiddenFailure = "Admin recovery failed. The temporary password was not shown.";
-
 function publicFailureHint(error) {
-  const code = error && typeof error === "object" ? error.code : undefined;
-  if (typeof code === "string" && /^ERR_[A-Z0-9_]{1,48}$/.test(code)) {
-    return `The error code is ${code}.`;
-  }
+  const code = error?.code;
+  if (typeof code === "string" && /^ERR_[A-Z0-9_]{1,48}$/.test(code)) return ` The error code is ${code}.`;
   const name = error instanceof Error ? error.name : "";
-  if (name.length <= 48 && (name === "Error" || /^[A-Z][A-Za-z0-9]*Error$/.test(name))) {
-    return `The error class is ${name}.`;
-  }
+  if (/^[A-Z][A-Za-z0-9]{0,42}Error$/.test(name)) return ` The error class is ${name}.`;
   return "";
 }
 
@@ -92,36 +86,11 @@ function publicError(error) {
     || message.startsWith("Admin recovery runs only")
     || message.startsWith("Admin recovery prints")
   ) return message;
-  const hint = publicFailureHint(error);
-  return hint ? `${hiddenFailure} ${hint}` : hiddenFailure;
+  return `Admin recovery failed. The temporary password was not shown.${publicFailureHint(error)}`;
 }
 
-/** Bundle inside the repository. Node then finds packages in the repository node_modules. */
-export async function loadRecoveryLibrary() {
-  const { build } = await import("esbuild");
-  const cacheRoot = resolve(repositoryRoot, "node_modules/.cache");
-  await mkdir(cacheRoot, { recursive: true });
-  const directory = await mkdtemp(resolve(cacheRoot, "minsky-admin-recovery-"));
-  const output = resolve(directory, "admin-recovery.mjs");
-  try {
-    await build({
-      entryPoints: [resolve(repositoryRoot, "src/server/adapters/cloudflare/adminRecovery.ts")],
-      outfile: output,
-      bundle: true,
-      packages: "external",
-      platform: "node",
-      format: "esm",
-      target: "node22",
-      logLevel: "silent",
-    });
-    return {
-      library: await import(pathToFileURL(output).href),
-      dispose: () => rm(directory, { recursive: true, force: true }),
-    };
-  } catch (error) {
-    await rm(directory, { recursive: true, force: true });
-    throw error;
-  }
+export function loadRecoveryLibrary() {
+  return bundleProviderModule("src/server/adapters/cloudflare/adminRecovery.ts", "admin-recovery-");
 }
 
 async function openRemotePlatform(configPath) {

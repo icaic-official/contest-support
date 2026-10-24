@@ -197,6 +197,7 @@ Backend:
 - [Server workflow reference](docs/server-workflow.md) inventories existing rules and the shared service and persistence boundaries.
 - [Session announcements](docs/session-announcements.md) is the reference for announcement behavior on both providers.
 - [Cloudflare backend design](docs/cloudflare-backend-design.md) explains the implemented server boundaries.
+- [Multiple competitions per installation](docs/multi-competition-design.md) is a proposed design. It is not implemented.
 - [Cloudflare authentication reference](docs/cloudflare-authentication.md) and the [authentication choice](docs/cloudflare-authentication-choice.md).
 - [Add a backend provider](docs/add-provider.md) gives contributor interfaces, registration points, installation, cleanup, and required shared verification.
 - [Run the Supabase adapter](docs/supabase-provider.md) — run the second implementation on your own Supabase project.

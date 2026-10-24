@@ -131,11 +131,14 @@ Deno.test("keeps the file when completion fails so a retry can finish it", async
 Deno.test("does not delete a file that an overlapping request finishes", async () => {
   let release = () => {};
   const gate = new Promise<void>((resolve) => release = resolve);
+  let entered = () => {};
+  const waiting = new Promise<void>((resolve) => entered = resolve);
   let calls = 0;
   const { state, handle } = fixture({
     complete: async () => {
       calls++;
       if (calls === 1) {
+        entered();
         await gate;
         return { error: { message: "Reservation changed." } };
       }
@@ -143,6 +146,9 @@ Deno.test("does not delete a file that an overlapping request finishes", async (
     },
   });
   const first = handle(upload());
+  // Both requests run concurrently. Start the retry only after the first one
+  // holds the gated completion, or the retry can take it and wait forever.
+  await waiting;
   const second = await handle(upload());
   release();
   const failed = await first;

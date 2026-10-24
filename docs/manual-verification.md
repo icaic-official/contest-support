@@ -1,4 +1,4 @@
-# Connected manual verification (T0003 to T0015)
+# Connected manual verification
 
 ## Documentation site (T0011)
 
@@ -10,7 +10,7 @@ Review light and dark themes at desktop and 320px widths.
 The sign-in footer, the **Documentation** item in the desktop console account menu and the documentation link in the phone **Me** tab open the guides in a new tab.
 Those links reach the development app only after its separate frontend deployment.
 
-## Experimental Cloudflare authentication
+## Cloudflare authentication
 
 Follow [Verify Cloudflare authentication](verify-cloudflare-authentication.md) for isolated HTTPS browser checks.
 These checks use fictional local accounts.
@@ -267,7 +267,8 @@ Review the contestant, jury and admin views at 1280 × 800 and at 200% zoom.
 2. Compare two simultaneous awards.
 3. Check state after refresh and reconnect.
 4. Attempt unauthorized queries across teams and sessions.
-5. Run `npm run test:cloud` for repeatable checks with real accounts.
+5. For the Supabase provider, run `MINSKY_TEST_PROJECT_REF=ghtztmovdkhuketcbjmq npm run test:cloud` for repeatable checks with real accounts on the isolated `Minsky CI` project.
+   Always set `MINSKY_TEST_PROJECT_REF`. Without it, the suite uses the linked project, which can be the shared development project.
 
 The suite creates isolated test fixtures and deletes only those fixtures.
 It does not reset the shared project.
@@ -445,7 +446,7 @@ The credential-free browser harness exercises actual migrations and RLS with
 simulated hosted transport. It does not establish real Auth, Storage, Realtime,
 deployment, offline operation, or capacity results.
 
-For isolated hosted acceptance of the Supabase provider from a local CLI, follow the credential prerequisites in the [Supabase provider guide](cloud-onboarding.md#verification-and-protected-cloud-ci).
+For isolated hosted acceptance of the Supabase provider from a local CLI, follow the credential prerequisites in the [Supabase provider guide](cloud-onboarding.md#verification-and-hosted-cloud-checks).
 Then run the current cloud suite against the explicit CI target:
 
 ```sh
@@ -454,8 +455,7 @@ MINSKY_TEST_PROJECT_REF=ghtztmovdkhuketcbjmq npm run test:cloud
 
 Do not apply unrelated remote migrations or change provider configuration for this test.
 If cleanup retains a recovery file, follow [fixture recovery](cloud-onboarding.md#fixture-recovery).
-Record local simulations, hosted-service CLI results, and protected GitHub Actions results separately.
-A skipped protected job is not a pass. The owner approved the exact T0009 branch-only environment policy addition on 2026-10-18.
+Record local simulations and hosted-service CLI results separately.
 
 
 ## 14. Browser routes and workflow retry recovery

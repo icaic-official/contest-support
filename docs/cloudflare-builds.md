@@ -60,7 +60,7 @@ See [the build image](https://developers.cloudflare.com/workers/ci-cd/builds/bui
 
 ## Confirm the first build
 
-Push a commit to `feature/t0021-cloudflare-development-install` or to `main` after this change is on that branch.
+Push a commit to any branch in this repository.
 Then confirm all of the following:
 
 - The commit shows a Workers Builds check. Copy that check's name from the commit status.

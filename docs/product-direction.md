@@ -1,8 +1,8 @@
-# Product direction beyond the demo
+# Product direction
 
 This document preserves the agreed direction from [PLAN.md](../PLAN.md).
 Only requirements listed in [current-state.md](current-state.md) describe implemented behavior.
-The user selects later scope after demo feedback.
+The user selects later scope after feedback on the development installation.
 
 Interface decision (2026-10-17): organisers and contestants get different UIs. This is not one layout with parts hidden.
 Organisers mainly use phones, so they get a phone-first app. At 1024 px and wider, they get a separate desktop console.
@@ -48,17 +48,17 @@ The broader organizer tools below remain incomplete.
 - Configurable roles combine fixed capabilities. Issue categories are configurable.
 - A staff member can hold multiple roles and receives their combined capabilities. Any support staff member can start issue triage. This includes technical specialists and people with both volunteer and specialist roles. Ownership and activity identify the person.
 
-  T0002 implements this behavior in the local demo. Role and permission administration remain deferred in that scope. In the demo, volunteer and specialist roles confer support membership. Jury alone does not.
+  T0002 first implemented this behavior in the retired local demo. The connected product keeps it. Volunteer and specialist roles confer support membership. Jury alone does not. Role and permission administration remain deferred.
 - Contestants and staff can report issues. Staff manually open and close contestant intake.
 - Volunteers, specialists, jury members, and session admins can search team names and locations in the current session. T0008 matches partial words, either word order, accents, small spelling mistakes, and whole table numbers. Suggestions show the unresolved-issue count. The queue filter combines with the status filter. Jury-only members still see resolved issues only. Only volunteers and specialists select the affected team for a new report, and that choice uses the team's database id. Team codes, aliases, and institutions are not part of this search.
 - The current owner retains ownership during escalation until a specialist accepts the handoff. Timers run continuously while an issue remains unresolved. After reopening, unresolved time excludes resolved intervals. Recurrences become linked new reports. Duplicates link to a canonical report.
-- Contestants and helpers must be able to reopen resolved issues. T0002 implements reopening on the same issue and retains its history. Reopening continues an issue whose resolution needs review. A separate recurrence may still use a linked new report in future work. Linked-report controls remain outside T0002. The ticket records the implemented demo rules for ownership, timing, and awards.
+- Contestants and helpers must be able to reopen resolved issues. T0002 implements reopening on the same issue and retains its history. Reopening continues an issue whose resolution needs review. A separate recurrence may still use a linked new report in future work. Linked-report controls remain outside T0002. The ticket records the implemented rules for ownership, timing, and awards.
 - The user confirmed that reopening resumes accumulated unresolved time and excludes time spent resolved. First-assignment delay remains separate. Awards remain discretionary.
 - Public replies and private notes are separate. The agreed direction includes photos, session announcements, in-app alerts, and browser push that users explicitly enable.
 - Staff upload JPEG, PNG, or WebP images on an issue. Each image records its uploader and time. The uploader chooses team-visible or staff-only visibility, and the choice stays fixed. Every staff member can upload while the event is active. Only the uploader can remove an image during that time. Contestants can view team-visible images on their own team's issues. Session admins set the per-session size and count limits. Resolved issues keep their images. Archived events keep the files for preview and download. The Supabase implementation uses a private Storage bucket. The active Cloudflare implementation uses private R2. Contestant uploads remain out of scope.
 - Session admins and jury publish announcements for a session. Every member reads the active ones above the issue workspace. Titles expand to plain-text details and up to four private images. Expiry and removal hide an announcement from readers. Managers keep it. See [session announcements](session-announcements.md).
 - Shared incidents use explicit affected rosters, selective closure of linked reports, and bulk awards with recipient exceptions.
-- Awards use a separate ledger. One authorized decision precedes separate confirmation of external application. Contestants see the decision and application status. The demo permits explicit zero-minute decisions with a public explanation. It also supports preset and custom award amounts.
+- Awards use a separate ledger. One authorized decision precedes separate confirmation of external application. Contestants see the decision and application status. Minsky permits explicit zero-minute decisions with a public explanation. It also supports preset and custom award amounts.
 - The agreed direction includes CSV roster imports and editing forms. Reporting uses dashboards only. Archived events permit reading only. The app does not automatically delete archived events.
 
 ## Provisional architecture and milestones
@@ -187,9 +187,9 @@ For a future backend switch, complete these gates:
 1. Have the owner review and merge the preparation revision. Update from main and reconcile review changes.
 2. Install the reviewed revision into dedicated development resources through the authoritative installation guide.
 3. Verify shared behavior with fictional accounts, private images, live updates, password changes, and owner recovery.
-4. Run required local and hosted checks. Record local hosted and protected GitHub Actions results separately.
+4. Run required local and hosted checks. Record local and CLI hosted results separately.
 5. Present exact targets, approved revision, settings, commands, verification criteria, and recovery to the owner.
-6. Obtain approval, switch the development URL, and verify another automated deployment retains Cloudflare mode and its bindings.
+6. Obtain approval, switch the development URL, and verify that a repeat deployment retains Cloudflare mode and its bindings.
 
 Supabase stays intact throughout this process. Earlier records do not appear in the fresh installation.
 Recovery must retain new Cloudflare records. Do not imply that switching back to Supabase transfers those records.

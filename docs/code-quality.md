@@ -4,7 +4,7 @@ On 2026-10-02, the user selected mandatory CI, a short PR review checklist, and 
 These changes extend T0003.
 The user reviews and merges.
 Workers Builds does not publish the frontend.
-[Deployment activation](cloudflare-builds.md) requires separate account setup.
+[Workers Builds setup](cloudflare-builds.md) describes the CI Worker. [Activation](activate-cloudflare-development.md) records the separate application publication gates.
 
 ## Automated checks
 
@@ -94,10 +94,8 @@ The Google TypeScript style policy and manual interface checks in AGENTS.md stil
 On 2026-10-02, the user deferred remote merge enforcement and setup of vulnerability alerts.
 On 2026-10-03, the user moved these scope notes from T0004.
 They stay deferred.
-They are not part of the T0005 issue-image ticket.
-Existing checks and prepared configuration remain in T0003.
 The owner steps below remain incomplete.
-Setup of the protected cloud integration CI environment remains a separate T0003 requirement.
+Hosted provider checks are on-demand commands. No protected GitHub environment runs them.
 
 Repository inspection on 2026-10-02 confirmed that `GiftedNovaHD` had write access without administration access.
 The lookup returned no repository rulesets.

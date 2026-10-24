@@ -2069,7 +2069,7 @@ The user authorized this first migration step while the other pull requests rema
 8. Docs that need updating. None for the implemented extraction. Future hosted verification must add its result to this record.
 
 The [backend contracts](backend-contracts.md) describe the interfaces and retry rules.
-The [cloud onboarding guide](cloud-onboarding.md#verification-and-protected-cloud-ci) lists the `cloud-test` environment configuration.
+The [cloud onboarding guide](cloud-onboarding.md#verification-and-hosted-cloud-checks) lists the `cloud-test` environment configuration.
 
 [Draft PR #32](https://github.com/GiftedNovaHD/minsky/pull/32) contains implementation commit `408dafa`.
 [GitHub Checks](https://github.com/GiftedNovaHD/minsky/actions/runs/39022916356) and the [secret and dependency checks](https://github.com/GiftedNovaHD/minsky/actions/runs/39022916361) passed for that commit.
@@ -2364,7 +2364,9 @@ Full cloud and hosted workflow tests were not run for this maintenance change.
 No application code, database migration, function, or frontend deployment changed.
 The user reviews and merges the maintenance PR.
 
-## Ticket status
+## Ticket status (historical, 2026-10-17)
+
+This summary describes `main` on 2026-10-17. See [development tickets](tickets.md) for current status.
 
 T0012 merged into `main` in [PR #30](https://github.com/GiftedNovaHD/minsky/pull/30) on 2026-10-17.
 It fixes reply cleanup after a successful retry.
@@ -2979,7 +2981,9 @@ Final hosted result: `npm run test:hosted` passed all five cases (30.2 seconds),
 
 Clean-checkout verification: `/tmp/minsky-t0003-clean` at `bfe94e1` used a fresh `node_modules` install and only public Supabase frontend settings. `npm ci`, type checking, lint, all 66 focused tests, Deno checking and the production build passed, producing the same `index-BwjV5kgP.js` asset as the deployed build. The install reported zero audit vulnerabilities. After installation, `cloud:link` succeeded and `cloud:plan` reported the remote database up to date with no pending migrations or seeds. An initial premature link attempt failed with `supabase: not found`; the sequential rerun passed.
 
-## Pending acceptance and known limits
+## Pending acceptance and known limits (historical T0003, 2026-10-02)
+
+These limits describe the T0003 baseline. Later sections and [development tickets](tickets.md) supersede them.
 
 - Email invitations/recovery and SMTP were removed from T0003 by explicit user decision. Organizer credential delivery and identity checks before recovery are operational responsibilities.
 - Protected cloud CI remains incomplete in T0003. Initial inspection on 2026-10-02 found no GitHub environments and only the shared development Supabase project; the separate CI project has since been prepared as recorded below. The available GitHub account has write access without admin access; the user confirmed they are a contributor and the owner is unavailable. The `Checks` workflow file is absent from `main`, so manual dispatch also requires it to reach the default branch through review and merge. Neither environment protection nor a privileged CI pass is claimed.
@@ -3070,7 +3074,9 @@ Real-device touch, screen readers, other browser engines and 200% browser zoom r
 
 The earlier T0001 implementation and ESLint 10 tooling update passed type checking, lint, 20 focused tests, the build and 3 browser tests. Its browser walkthrough covered desktop contestant/jury views, volunteer screens at both phone widths, keyboard entry points, refresh, privacy and reset. That run also reported zero dependency audit vulnerabilities. These are historical observations; the T0002 results above describe this run. No dependency changes or new dependency audit were performed for T0002.
 
-## Limitations and next work
+## Limitations and next work (historical local demo)
+
+These limits describe the retired local demo.
 
 The demo uses one tab and one local dataset. It does not synchronize concurrent tabs and devices. Browser storage may be cleared or unavailable. Device-clock changes affect running timers. The demo rejects backwards action timestamps. Simulated roles are not authorization, and local history is editable browser data.
 

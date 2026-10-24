@@ -17,7 +17,7 @@ The docs site's earlier build and browser checks passed. Those checks do not est
 
 The entries below record the original T0011 audit and its T0007 dependency.
 T0020 now owns complete Cloudflare installation verification and the [PR #21 component review](pr21-installation-disposition.md).
-T0020's authorization and limits are in the [active ticket](tickets.md#t0020-complete-cloudflare-connector).
+T0020 merged in PR #42. Its authorization and limits are in [its ticket](tickets.md#t0020-complete-cloudflare-connector).
 This audit does not authorize repository publication or license selection.
 Capacity validation and outage features retain their existing scope and remain separate work.
 
@@ -62,7 +62,7 @@ The deployed app's exact revision was not established by the earlier HTTP check.
 
 **Complete when:** each published guide clearly belongs to a named release or a development revision.
 State supported installation paths and their verification limits for that revision.
-Move pending announcements and jury-worklist details out of normal release task guides.
+Keep unmerged features out of normal release task guides. Announcements (T0006) and the jury award lists (T0009 and T0015) are now in `main` and have task guides.
 Keep the distinction between merged, deployed, and verified.
 Do not add a version selector before there are distinct versions worth maintaining.
 

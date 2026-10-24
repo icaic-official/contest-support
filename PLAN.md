@@ -1,5 +1,11 @@
 # Minsky planning record
 
+**Stale documentation cleanup, 2026-10-24.** The owner asked to identify and correct stale documentation on `main`.
+Correct present-tense instructions that still describe the removed GitHub Actions workflow, merged PRs as open, or the five-group `Backend`.
+Add the merged session announcements to the public guides and status page.
+Keep dated records as history. Change no code, hosted resource, secret, or repository setting.
+Name the branch and PR as the AGENTS.md Contributions section states. The owner reviews and merges.
+
 **Cloudflare is the live backend, 2026-10-23.** The owner selected Cloudflare as the live backend.
 The development Worker is `minsky-dev`. The development D1 database is `minsky-development`.
 Keep the Supabase adapter, its migrations, its functions, and its provider tests.

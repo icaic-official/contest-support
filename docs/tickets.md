@@ -8,10 +8,9 @@ Supabase stays a supported second provider.
 Older summaries that say to keep Supabase active describe that ticket's scope.
 The 2026-10-23 decision supersedes them.
 
-[PR #45](https://github.com/GiftedNovaHD/minsky/pull/45) remains the draft T0021 follow-up.
-The owner requests an update from current `main` and conflict resolution on 2026-10-23.
-Preserve its browser routes and retry protections alongside the merged frontend redesign and CI change.
-The owner reviews and merges.
+[T0006 session announcements](#t0006--session-announcements) merged in [PR #62](https://github.com/GiftedNovaHD/minsky/pull/62) at `62d882a` on 2026-10-24.
+[T0023](#t0023--documentation-site-redesign-and-accuracy) merged in [PR #47](https://github.com/GiftedNovaHD/minsky/pull/47) at `df6120c` on 2026-10-24.
+The T0021 follow-up in [PR #45](https://github.com/GiftedNovaHD/minsky/pull/45) merged at `c5bc940` on 2026-10-23. It kept its browser routes and retry protections alongside the frontend redesign and CI change.
 
 [T0021 fresh Cloudflare development installation](#t0021-fresh-cloudflare-development-installation) is complete, including approved activation and repeat deployment.
 The owner merged PR #43 at `4e43739` and separately approved those operations.
@@ -716,7 +715,7 @@ Resilience and event-capacity work remain deferred.
 ## T0006 — Session announcements
 
 Branch: `feature/t0006-session-announcements-port`, from updated `main` at `ecc75e2`.
-Status: implemented and verified locally on both providers. [PR #20](https://github.com/GiftedNovaHD/minsky/pull/20) is superseded by this port. The owner closes PR #20 after this PR passes. Not deployed.
+Status: merged in [PR #62](https://github.com/GiftedNovaHD/minsky/pull/62) at `62d882a` on 2026-10-24. Verified locally on both providers. [PR #20](https://github.com/GiftedNovaHD/minsky/pull/20) is closed and superseded by this port. Not deployed. Hosted provider checks are not run.
 
 This ticket ports the T0006 scope from PR #20 to the current provider architecture.
 PR #20 added a Supabase-only implementation on an older `main`.
@@ -737,7 +736,8 @@ Three corrections from the PR #20 review stay:
 - [x] Cloudflare and Supabase browser adapters with tests.
 - [x] Interface for the contestant, organiser phone, and organiser desktop shells.
 - [x] Local browser tests and documentation.
-- [ ] Owner review and merge. Hosted provider checks and deployment need separate approval.
+- [x] Owner review and merge.
+- [ ] Hosted provider checks and deployment. Each needs separate approval.
 
 ## T0008 — Fuzzy team search
 
@@ -1105,7 +1105,7 @@ The user should still check the admin Accounts and image upload screens against 
 ### Risk
 
 T0009 and T0014 merged into `main`, and step 5 resolved their conflicts.
-If the T0006 and T0007 PRs are still open, they can change `src/connected/`. Whichever merges second needs conflict resolution.
+At that time the T0006 and T0007 PRs were open and could change `src/connected/`. T0006 later merged in PR #62. T0007 in PR #21 remains open.
 
 ### Follow-up candidates
 
@@ -1117,7 +1117,7 @@ If the T0006 and T0007 PRs are still open, they can change `src/connected/`. Whi
 ## T0023 — Documentation site redesign and accuracy
 
 Branch: `feature/t0023-improving-docs`, from `main` at `a25f9f1`.
-Status: implemented and verified locally. The user opens the PR, reviews, and merges.
+Status: merged in [PR #47](https://github.com/GiftedNovaHD/minsky/pull/47) at `df6120c` on 2026-10-24. Verified locally.
 
 The user requested a modern, minimal, easy-to-read docs site on 2026-10-22.
 The pages must match the code, with the code as the source of truth, and use as few words as possible.

@@ -252,15 +252,15 @@ The existing embedded PostgreSQL tests continue to check database rules.
 
 `npm run test:e2e` uses the application with mocked provider responses.
 It covers request-ID reuse after an uncertain write and a new request after a definitive rejection.
-The suite also covers the existing account, team-search, image, and refresh behavior.
+The suite also covers the existing account, team-search, image, refresh, and announcement behavior.
 
 Those mocked checks establish request and UI behavior. Hosted provider checks run separately.
 `npm test` also checks complete D1 persistence through `WorkflowPersistence`.
 It includes shared-service rules and Supabase persistence tests with embedded PostgreSQL.
 `npm run test:workflow:hosted` exercises the deployed opt-in Supabase function with the shared workflow scenarios and additional boundary checks.
 That runner permits only the approved Minsky CI project. It does not activate the replacement in development.
-Hosted checks use isolated accounts and records through [protected cloud CI](cloud-onboarding.md#verification-and-protected-cloud-ci).
-The [shared provider suite](provider-test-contracts.md) checks these contracts through real browser adapters.
+Hosted checks use isolated accounts and records through [on-demand hosted cloud checks](cloud-onboarding.md#verification-and-hosted-cloud-checks).
+The [shared provider suite](provider-test-contracts.md) checks these contracts through real browser adapters. It does not cover `announcements` yet.
 Supabase and Cloudflare have separate fixture implementations with the same scenario assertions.
 [Run the shared checks](run-provider-tests.md) separately from the provider-specific hosted UI suite.
 The latest observed results are in [current state](current-state.md).

@@ -46,8 +46,7 @@ Keep its adapter, migrations, functions, and provider tests.
 Do not describe it as the live backend, the default setup, or the development URL's backend.
 Do not change hosted Supabase or Cloudflare resources, secrets, or repository settings.
 
-This work starts from `feature/t0021-cloudflare-development-install` in draft [PR #45](https://github.com/GiftedNovaHD/minsky/pull/45).
-Open the result as a separate draft pull request into that branch.
+Start new work from updated `main`. Open the result as a draft pull request into `main`.
 Preserve the Workers Builds move and the removed GitHub Actions workflow.
 Do not add an Actions job.
 Browser suites and hosted provider checks stay manual commands.
@@ -117,7 +116,7 @@ Statements in those records that Supabase is the active backend are superseded b
 - Before each push, check that every new commit you created has the required author and contains each required trailer exactly once.
 - Distinguish development tickets from contestant issues in code, documentation, and communication.
 - Start each development ticket from updated `main`.
-- Use `feature/tNNNN-description` for ticket branches.
+- Name branches as the [Contributions](#contributions) section states. Reference the development ticket, if one exists, in the PR description.
 
 Historical branch exceptions remain in [PLAN.md](PLAN.md). Use the normal ticket workflow unless the user gives a newer instruction.
 
@@ -144,7 +143,7 @@ Ask only for missing decisions that materially affect scope or behavior.
 Keep development, CI, and future production databases and credentials separate.
 The hosted `minsky-dev` app uses the complete Cloudflare development installation. It is not production.
 The Cloudflare development resources are `minsky-development` and private bucket `minsky-development-images`.
-Protected Cloudflare checks use the separate connector and store CI targets.
+On-demand hosted Cloudflare checks use the separate connector and store CI targets.
 The retained Supabase `Minsky` development project and `Minsky CI` project remain intact.
 Use `Minsky CI` only for isolated Supabase fixtures.
 No production project exists.
@@ -185,9 +184,7 @@ Production setup remains future work.
 
 This future production work does not authorize provider resource creation or upgrades now.
 Use [the Supabase provider guide](docs/cloud-onboarding.md) for that provider's project references, commands, and observed setup results.
-T0003 retains protected cloud CI.
-These operational items stay deferred.
-They are not part of the T0005 issue-image ticket:
+These operational items stay deferred:
 
 - Ownership and billing records.
 - Remote merge enforcement and vulnerability alerts.

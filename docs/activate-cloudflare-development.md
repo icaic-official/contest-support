@@ -1,6 +1,7 @@
 # Activate the fresh Cloudflare development installation
 
-Use this maintainer procedure to switch the existing development URL after owner approval.
+This maintainer procedure switched the development URL to Cloudflare on 19 October 2026. See the [activation record](#activation-record-19-october-2026).
+Use the same steps for a later approved switch of the same kind. Each switch needs a new owner approval.
 For another installation, use [Install Cloudflare](../site/src/content/docs/operators/installation.mdx).
 That guide owns resource creation, migrations, bootstrap, and trusted owner recovery.
 This guide owns the development switch, verification, and repair.
@@ -28,7 +29,7 @@ These targets exist in account `458ad6a930b0fb717796dfa19ca6a2b1`:
 | Scheduled recovery | `* * * * *` |
 | Stable public origin | `AUTH_ORIGIN=https://minsky-dev.icaic-minsky.workers.dev` |
 | Private Worker secret | `AUTH_SECRET`, created privately during activation and preserved on later deployments. |
-| Private publishing credential | Existing repository secret `CLOUDFLARE_API_TOKEN`. |
+| Private publishing credential | `CLOUDFLARE_API_TOKEN` in the private publishing shell. The 2026-10-19 activation used the former GitHub repository secret. |
 | Public settings | `src/server/adapters/cloudflare/deploy/development.settings.json` |
 | Generated stable configuration | `src/server/adapters/cloudflare/deploy/development.wrangler.jsonc` |
 | Installation marker | `7867c628-36b7-4724-b0a3-83c1894b23e8` |
@@ -57,11 +58,10 @@ Before requesting activation approval, complete these checks:
 1. Have the owner review and merge the preparation revision. Update a clean checkout from `main`.
 2. Record the exact approved main revision and its push run. Reconcile any review changes and repeat affected checks.
 3. Confirm the account and every exact target again. Reconfirm the current stable version for the recovery record.
-4. Require the final local and hosted checks. Record CLI hosted results separately from protected GitHub Actions results.
-5. Obtain any required authorization before adding a branch to `cloud-test`. Preserve all existing entries and protection rules.
-6. In Cloudflare, confirm that independent Git builds remain disabled for `minsky-dev`. The `minsky-docs` docs builds stay connected.
-7. Review the configuration, secret names, deployment sequence, verification criteria, and repair commands below with the owner.
-8. Obtain explicit approval for this backend switch. Do not infer it from the preparation PR merge.
+4. Require the final local and hosted checks. Record local and CLI hosted results separately.
+5. In Cloudflare, confirm that independent Git builds remain disabled for `minsky-dev`. The `minsky-docs` docs builds stay connected.
+6. Review the configuration, secret names, deployment sequence, verification criteria, and repair commands below with the owner.
+7. Obtain explicit approval for this backend switch. Do not infer it from the preparation PR merge.
 
 On 19 October 2026, the owner confirmed that independent Git build connections were disconnected for both Workers.
 The Builds API returned `403`, so that confirmation came from the owner's dashboard check.
@@ -145,21 +145,18 @@ npx wrangler deploy --config="$MINSKY_DEV_CLOUDFLARE_CONFIG" --dry-run
 
 Review the exact Worker, account, D1 UUID, bucket, live class, assets, origin, CPU cap, and cron.
 The dry run makes no provider change.
-Set these public repository variables to the approved values:
+Export the approved values in the publishing shell. No GitHub workflow reads repository variables now.
 
 ```sh
-gh variable set MINSKY_DEV_BACKEND --body cloudflare
-gh variable set MINSKY_DEV_CLOUDFLARE_CONFIG --body "$MINSKY_DEV_CLOUDFLARE_CONFIG"
-gh variable set MINSKY_DEV_DATABASE_ID --body "$MINSKY_DEV_DATABASE_ID"
-gh variable set MINSKY_DEV_DATABASE_NAME --body "$MINSKY_DEV_DATABASE_NAME"
-gh variable set MINSKY_DEV_BUCKET_NAME --body "$MINSKY_DEV_BUCKET_NAME"
+export MINSKY_DEV_BACKEND=cloudflare
+export MINSKY_DEV_CLOUDFLARE_CONFIG MINSKY_DEV_DATABASE_ID MINSKY_DEV_DATABASE_NAME MINSKY_DEV_BUCKET_NAME
 ```
 
 Publish the approved revision with the guarded script in [deployment settings](cloudflare-build-settings.md#publication-commands).
 Confirm the script's revision matches the recorded approval before it uploads.
 The app command selects `VITE_BACKEND=cloudflare`, validates the exact hosted targets, and deploys the complete Worker.
 It does not migrate D1, bootstrap accounts, or rotate secrets.
-Publish docs with the same script and `--site=docs`. Do not use Workers Builds for either site.
+Workers Builds publishes the docs separately. See [Publish the docs](cloudflare-builds.md#publish-the-docs). Do not connect `minsky-dev` to Workers Builds.
 
 ## Verify activation and subsequent deployment
 
@@ -171,11 +168,11 @@ Require these results:
 4. The fictional application journey passes at the stable URL, including jury decisions, persisted timers, private images, internal-note separation, and reconnects.
 5. Live metadata matches the approved D1, R2, live class, origin, cron, CPU cap, and `AUTH_SECRET` name. Record the newly created stable namespace ID.
 6. Docs remain available independently.
-7. A subsequent approved automated deployment preserves Cloudflare mode and the exact bindings, then passes the same checks.
+7. A subsequent approved deployment preserves Cloudflare mode and the exact bindings, then passes the same checks.
 
 Clean only UUID-owned fixtures and exact R2 keys. Retain a recovery journal if cleanup fails.
 Keep the candidate's routes and schedules disabled.
-Record code revisions, Worker versions, CLI results, protected run URLs, and outstanding manual checks in current state.
+Record code revisions, Worker versions, CLI results, and outstanding manual checks in current state.
 Only then mark activation complete.
 
 ## Activation record, 19 October 2026

@@ -46,6 +46,9 @@ flowchart TD
     API --> Images[R2 image service]
     Images --> D1
     Images --> R2[Private R2 bucket]
+    API --> Announcements[Announcement services]
+    Announcements --> D1
+    Announcements --> R2
     D1 --> Pending[Committed notification records]
     Pending --> Live[Durable Object delivery adapter]
     Live --> CF
@@ -54,7 +57,7 @@ flowchart TD
 The diagram includes the Cloudflare connector and the separate Supabase verification path.
 The opt-in Supabase function executes every issue command through the shared service.
 The D1 adapter persists all nine commands from that service.
-The complete [application Worker](../src/server/adapters/cloudflare/applicationWorker.ts) combines authenticated workflow, reads, administration, images, and live connections.
+The complete [application Worker](../src/server/adapters/cloudflare/applicationWorker.ts) combines authenticated workflow, reads, administration, images, announcements, and live connections.
 It guards current identity sessions and credential generations inside workflow commits.
 The Supabase browser workflow retains its guarded SQL RPC.
 The dotted connection identifies the opt-in executor used for replacement verification.
@@ -75,7 +78,8 @@ The Cloudflare implementations remain inside provider adapter modules.
 | Blob store | Store immutable image objects, inspect content, read bytes, and retry deletion. | Bucket clients and provider URLs. |
 | Change delivery | Deliver authorized snapshot invalidations and recover pending notifications. | Durable Object classes and WebSocket lifecycle details. |
 
-The application Worker constructs [D1 application access](../src/server/adapters/cloudflare/application.ts), [R2 images](../src/server/adapters/cloudflare/images.ts), and [live delivery](../src/server/adapters/cloudflare/live.ts).
+The application Worker constructs [D1 application access](../src/server/adapters/cloudflare/application.ts), [R2 images](../src/server/adapters/cloudflare/images.ts), [D1 announcements](../src/server/adapters/cloudflare/announcements.ts), [R2 announcement images](../src/server/adapters/cloudflare/announcementImages.ts), and [live delivery](../src/server/adapters/cloudflare/live.ts).
+See [session announcements](session-announcements.md) for the announcement rules.
 The [browser adapter](../src/backend/cloudflare/backend.ts) implements every `Backend` group.
 Issue decisions remain shared. Other operations preserve their behavior in the corresponding provider server adapter.
 The [operator tooling](../src/server/adapters/cloudflare/tooling/install.mjs) owns Cloudflare configuration, target checks, bootstrap, and owner recovery.
@@ -108,7 +112,7 @@ Terraform can later provision selected resources. Terraform does not replace app
 ## D1 stores the authoritative application state
 
 The connector uses one application database per environment.
-The complete schema includes workflow, account, administration, image, and notification records.
+The complete schema includes workflow, account, administration, image, announcement, and notification records.
 The same database contains account access state and all memberships.
 This permits password-reset authorization across every session assigned to an account.
 Splitting databases by contest session would require a separate consistency design for that rule.
@@ -310,7 +314,8 @@ The [PR #21 component record](pr21-installation-disposition.md) preserves reuse 
 
 Data exports and migration tooling are outside the fresh-installation scope.
 The owner approved the concrete development switch separately from the PR #43 merge.
-Cloudflare now serves the stable development URL. Supabase resources and accounts remain intact.
+On 2026-10-23 the owner selected Cloudflare as the live backend. The development Worker is `minsky-dev` and its D1 database is `minsky-development`.
+Supabase stays a supported second provider. Its resources and accounts remain intact.
 Future backend switches still require separate approval.
 Use the [activation procedure](activate-cloudflare-development.md) for exact targets, the reviewed revision, deployment commands, verification, and recovery.
 The separate documentation Worker retains its independent deployment.

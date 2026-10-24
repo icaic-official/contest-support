@@ -33,22 +33,24 @@ The Cloudflare path validates the provider-generated config and exact hosted tar
 The same command checks the built revision and backend before upload.
 After upload, it checks the published targets, live bindings, and anonymous rejection at the authentication API.
 
-## Why docs and application jobs are independent
+## Why docs and application publication are independent
 
 A broken app target must not block documentation publication.
-The guarded script validates each site separately.
-One site can publish while the other fails. Each run reports its own revision and URL.
+Workers Builds publishes the docs from the `minsky-docs` Worker. The app publishes only through the guarded script.
+One site can publish while the other fails. Each publication reports its own revision and URL.
 
 Neither publication result verifies authenticated behavior.
 The installation and activation procedures require full application checks.
 Migrations, bootstrap, and secret creation stay explicit provider operations.
-The owner must approve the concrete backend switch even after the preparation PR merges.
+A later backend switch needs separate owner approval, even after its preparation PR merges.
 
-## Why contributor pull requests do not publish
+## Why pushes and pull requests do not publish the application
 
 Pull request code can change build commands.
-Pull request jobs receive no deployment credentials.
-Publishing requires a trusted repository branch push from an actor other than Dependabot.
+`minsky-dev` is not connected to Workers Builds, so no push or pull request publishes the application.
+The guarded script also rejects pushes by Dependabot.
+Workers Builds uploads a docs preview version for each push to a branch in this repository. Preview versions receive no traffic.
+A push to `main` publishes the docs. The docs contain no application data.
 Repository write access remains a trusted publishing capability.
 Passing checks does not replace review or establish remote merge enforcement.
 

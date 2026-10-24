@@ -137,7 +137,8 @@ The browser receives a fresh session only after the credential commit.
 The final self-change guard retains both original session deadlines while the batch deliberately revokes and deletes the old sessions.
 Login creation also rechecks the captured credential generation and both current session expiries before completion.
 
-Daily maintenance removes password-attempt counters and expired login records after a one-day retention period.
+Scheduled maintenance removes password-attempt counters and expired login records after a one-day retention period.
+The application Worker runs it every minute. The isolated authentication CI Worker runs it daily.
 Login attempts allow ten attempts per normalized username per 15-minute window.
 Self password verification uses a separate ten-attempt account window.
 The replacement login after an authenticated password change does not consume a public username attempt.

@@ -1,6 +1,6 @@
 ---
 title: Manage a session
-description: Create accounts, reset passwords, control intake, and set image limits.
+description: Create accounts, reset passwords, control intake, set image limits, and post announcements.
 ---
 
 Use the **Session** tab (phone) or the **Accounts** and **Session settings** pages (console).
@@ -44,6 +44,10 @@ Staff can still report for a team, and existing issues can still be reopened.
 
 The total must be at least the single-image limit. Lower limits do not remove existing images.
 Uploads cannot be switched off.
+
+## Announcements
+
+Session admins and jury members post announcements to the whole session. See [Post announcements](/guides/announcements/).
 
 ## Archived events
 

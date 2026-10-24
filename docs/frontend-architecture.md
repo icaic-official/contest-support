@@ -2,7 +2,7 @@
 
 This reference describes the shared frontend, its three layouts, and its browser routes.
 T0015 provides the contestant desktop app, organiser phone app, and organiser desktop console.
-PR #45 retains its routes and workflow retry protections when it integrates that redesign.
+PR #45 added browser routes and workflow retry protections to the redesigned shells.
 See [T0015](tickets.md#t0015--organiser-and-contestant-frontend-redesign) and [T0021](tickets.md#t0021-fresh-cloudflare-development-installation) for the recorded scope.
 
 ## Stack
@@ -63,7 +63,6 @@ The frontend does not call Supabase directly.
 Hooks, `SignIn`, `PasswordForm`, `useSessionAdmin` and `useIssueImages` call `requireBackend()` from `src/backend/index.ts`.
 That function returns the `Backend` from `src/backend/contracts.ts`, or it throws the setup message when `.env.local` has no public connection settings.
 The implementations are in `src/backend/supabase/` and `src/backend/cloudflare/`. See [backend contracts](backend-contracts.md).
-The old `src/connected/client.ts` was removed on `main` and is not part of T0015.
 
 ## From sign-in to a UI
 
@@ -290,7 +289,6 @@ These rules apply:
 
 T0009 added a separate jury worklist on `main`. See [the worklist specification](jury-worklist.md).
 The step 5 merge moved its rules into the phone Awards tab (`AwardsTab` in `PhoneTabs.tsx`) and the desktop `AwardReviewPage`.
-The legacy `src/connected/JuryWorklist.tsx` and its styles were removed.
 
 `awardLists(state)` in `organiserModel.ts` uses `juryWorklists()` from `src/connected/jury.ts`. It gives three lists:
 
@@ -316,7 +314,6 @@ The root element of each layout has `data-ui="contestant"`, `data-ui="organiser-
 
 Put components that both organiser layouts use in `src/organiser/`.
 Keep `IssueImages`, `TeamSearch`, `teamSearch.ts`, `model.ts`, `jury.ts` and the image modules. Restyle them only.
-The legacy workspace (`src/connected/legacy/`) was removed with the desktop console.
 
 ## Local checks
 

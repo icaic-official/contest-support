@@ -186,8 +186,9 @@ npm run docs:deploy
 
 Confirm the account and Worker name before the final command.
 The user authorized the initial documentation deployment before merge on 2026-10-17.
-This is a T0011 exception for the docs Worker only.
-After automation setup, later stable updates use review, merge, passing CI, and automatic frontend deployment.
+This was a T0011 exception for the docs Worker only.
+Workers Builds now publishes the docs from `main`. See [Publish the docs](cloudflare-builds.md#publish-the-docs).
+Use `npm run docs:deploy` only when Workers Builds cannot publish.
 The app's `npm run deploy` command is separate.
 See [the complete guide](../site/src/content/docs/contributing/documentation.mdx).
 
@@ -196,7 +197,6 @@ See [the complete guide](../site/src/content/docs/contributing/documentation.mdx
 On 2026-10-02, the user deferred records of provider ownership and billing details.
 On 2026-10-03, the user moved these scope notes from T0004.
 They stay deferred.
-They are not part of the T0005 issue-image ticket.
 The guidance below still applies before any paid upgrade.
 Workers Paid and R2 are active for Cloudflare development. No further paid upgrade is selected.
 
@@ -242,10 +242,10 @@ The user authorized the T0005 preview and use of the existing development backen
 The migration and `admin`/`attachments` functions are applied to `Minsky` development.
 `Minsky CI` remains unchanged.
 Apply the migration before you deploy functions.
-Then deploy `admin` and `attachments`.
+Then deploy the functions.
 Then deploy the frontend.
-`npm run cloud:functions` deploys both functions to development.
-Prepare these backend changes before a dependent frontend merges. Automatic frontend deployment does not apply backend changes.
+`npm run cloud:functions` deploys the `admin`, `attachments`, and `announcement-images` functions to development.
+Prepare these backend changes before a dependent frontend merges. Frontend publication does not apply backend changes.
 
 The review fixes use `202610140001_attachment_fixes.sql`.
 Keep the first attachment migration unchanged.
@@ -309,7 +309,7 @@ npm run cloud:plan
 npm run cloud:migrate
 npm run cloud:bootstrap -- --admin-user EXISTING_AUTH_UUID
 npm run cloud:functions
-npx supabase secrets set ALLOWED_ORIGINS=http://127.0.0.1:5173,http://127.0.0.1:4174,https://minsky-dev.icaic-minsky.workers.dev --project-ref ovymmobupzowotvrywek
+npx supabase secrets set ALLOWED_ORIGINS=http://127.0.0.1:5173,http://127.0.0.1:4174 --project-ref ovymmobupzowotvrywek
 npm run build
 ```
 
@@ -324,6 +324,7 @@ The guarded deployment path refuses to replace its complete Worker with static S
 
 Supabase supplies the function's service credentials.
 Only `ALLOWED_ORIGINS` requires custom function configuration.
+List only frontends that use this Supabase project. `https://minsky-dev.icaic-minsky.workers.dev` uses Cloudflare, so it does not need a Supabase origin.
 The previous `APP_URL` setting is unused.
 
 ## Development and release process
@@ -370,15 +371,20 @@ npx supabase db push --linked --dry-run
 npx supabase db push --linked
 npx supabase functions deploy admin --project-ref ghtztmovdkhuketcbjmq --use-api
 npx supabase functions deploy attachments --project-ref ghtztmovdkhuketcbjmq --use-api
+npx supabase functions deploy announcement-images --project-ref ghtztmovdkhuketcbjmq --use-api
 npx supabase secrets set ALLOWED_ORIGINS=http://127.0.0.1:4174 --project-ref ghtztmovdkhuketcbjmq
-npm run test:cloud
+MINSKY_TEST_PROJECT_REF=ghtztmovdkhuketcbjmq npm run test:cloud
 ```
 
 Review the configuration diff before you apply it.
 Review the migration target before you apply migrations.
-Deploy `attachments` only from a checkout that contains that function.
-The merged T0005 image migrations and both functions are installed in `Minsky CI` as of 2026-10-17.
-The CI preparation retained the already applied announcement migration from open PR #20.
+Deploy each function only from a checkout that contains it.
+The merged T0005 image migrations and the `admin` and `attachments` functions are installed in `Minsky CI` as of 2026-10-17.
+That preparation retained migration version `202610110002` from PR #20, which is closed. Its file is not in `main`.
+`main` now adds `202610240001_announcements.sql`. It creates `public.announcements` without `if not exists`.
+Before you apply it to `Minsky CI`, inspect the CI database for announcement objects from PR #20.
+On 2026-10-17, `Minsky CI` also ran an `announcement-images` function from PR #20 (version 3).
+No record shows `202610240001` or the PR #62 version of that function in `Minsky CI`.
 See the [T0014 verification record](current-state.md#t0014-existing-backend-verification-2026-10-17) for the setup and recovery evidence.
 The `cloud:link` and `cloud:functions` npm shortcuts target development.
 Use the explicit CI commands above in the separate checkout.
@@ -390,7 +396,7 @@ The hosted CLI maps this setting to the email and password provider required for
 The cloud suite checks that public signup fails while organizer-created accounts can sign in.
 Personal mailboxes and SMTP are not required.
 
-## Verification and protected cloud CI
+## Verification and hosted cloud checks
 
 Run these checks:
 
@@ -430,34 +436,26 @@ Do not capture live temporary credentials in screenshots.
 Tests dismiss the credentials before capture.
 
 Workers Builds runs checks without hosted secrets.
-The retired GitHub `cloud` job used a protected environment named **cloud-test** and a **separate Supabase test project**.
-That workflow is removed. Run the same checks with the commands in [CI settings](cloudflare-build-settings.md#on-demand-checks).
-Those commands refuse the shared development reference `ovymmobupzowotvrywek`.
-
-Configure `MINSKY_TEST_PROJECT_REF` as an environment variable.
-Configure these environment secrets:
-
-- `SUPABASE_ACCESS_TOKEN`
-- `SUPABASE_DB_PASSWORD`
-- `SUPABASE_ANON_KEY`
-- `SUPABASE_SERVICE_ROLE_KEY`
-
-Restrict execution to trusted revisions.
-The GitHub `cloud-test` environment remains. No workflow dispatches it.
-Run the hosted commands from [CI settings](cloudflare-build-settings.md#on-demand-checks) on a reviewed revision.
+No GitHub workflow runs hosted checks. The retired GitHub `cloud` job and its `cloud-test` environment are not used.
+Run the hosted Supabase checks on demand from the separate CI checkout, on a reviewed revision.
+The commands are in [CI settings](cloudflare-build-settings.md#on-demand-checks).
 Record the revision and the result.
-When the change includes migrations, functions, or configuration, apply those to the isolated CI project before the tests.
-The retired job applied configuration and migrations, deployed `admin` and `attachments`, and set the test origin before the tests.
 
+Set these values in that shell only. Do not commit them:
+
+- `MINSKY_TEST_PROJECT_REF`: the CI project reference, `ghtztmovdkhuketcbjmq`.
+- `SUPABASE_ACCESS_TOKEN`: reads the project's migration and function metadata.
+- `SUPABASE_DB_PASSWORD`: lets `supabase db push` run without a password prompt. It is optional.
+- `SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY`: the CI project's keys for the test fixtures.
+
+`scripts/check-cloud-backend.mjs` refuses the shared development reference `ovymmobupzowotvrywek`.
+`npm run test:cloud` refuses it only when `CI` is set. Without `MINSKY_TEST_PROJECT_REF`, it uses the linked project.
+Always set `MINSKY_TEST_PROJECT_REF` before you run it.
+
+When the change includes migrations, functions, or configuration, apply those to the isolated CI project before the tests.
 To test a frontend change against the existing CI backend, skip that preparation.
 Use this mode only when the change needs no new backend migration, function, or configuration.
 The existing backend must already allow the test origin `http://127.0.0.1:4174`.
-T0014 used this dispatch, which no longer starts a job:
-
-```sh
-gh workflow run checks.yml --repo GiftedNovaHD/minsky \
-	--ref feature/t0014-backend-adapters -f existing_backend=true
-```
 
 Skipping preparation still creates and deletes isolated fixtures.
 Before fixture creation, `scripts/check-cloud-backend.mjs` requires every local migration version and active `admin` and `attachments` functions.
@@ -471,22 +469,6 @@ Do not remove a migration record while its database objects remain.
 Use [deployment setup](cloudflare-builds.md) for current publication settings and verification gates.
 Application previews currently skip. They must use independent resources before they can be enabled.
 See [preview behavior](cloudflare-preview-behavior.md).
-
-See [GitHub environment documentation](https://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/manage-environments).
-Initial inspection on 2026-10-02 found no GitHub environments and no separate Supabase test project.
-The user later created `Minsky CI`.
-The completion record below describes its setup.
-The contributor has write access without repository administration access.
-The repository owner must configure `cloud-test` for this personal-account repository.
-
-The private repository's plan must support environments and the selected protection rules.
-Do not replace environment protection with repository-wide privileged secrets.
-
-The existing setup record also identifies the absence of the `Checks` workflow from `main`.
-GitHub requires a manually dispatched workflow on the default branch before execution, even when another reviewed branch is selected.
-The user must review and merge the workflow before the first dispatch.
-The agent must not merge it to bypass that step.
-See [manual workflow requirements](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/manually-run-a-workflow).
 
 ## Fixture recovery
 
@@ -515,4 +497,4 @@ Use [current state](current-state.md) for current CI and deployment evidence.
 - Historical migrations `202610020001_cloud.sql` through `202610020003_private_signals.sql` and the first bootstrap were applied without seeds. Both username/password migrations were applied without seeds, the account function was deployed, and all eight final hosted cases passed. Current deployment/version and detailed verification are recorded in current-state.md.
 - SMTP: deliberately removed from T0003 requirements by the user. No sender domain or paid mail service was configured; prior SMTP blockers are historical.
 - Ownership/billing: selected plans, organization owner, billing contact, recurring charges and receipt handling remain unverified. They stay deferred and are not part of the T0005 issue-image ticket. No paid upgrade was selected or payment action performed by the agent.
-- Protected cloud CI: remains in T0003. The separate test project is prepared; protected GitHub environment setup and the first protected cloud run remain pending, including owner access and default-branch workflow availability. Local runs against isolated fixtures are separate evidence.
+- Protected cloud CI (superseded on 2026-10-23, when the GitHub workflow was removed): remains in T0003. The separate test project is prepared; protected GitHub environment setup and the first protected cloud run remain pending, including owner access and default-branch workflow availability. Local runs against isolated fixtures are separate evidence.

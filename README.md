@@ -120,8 +120,8 @@ See [Supabase provider](docs/cloud-onboarding.md#contributor-setup) for access, 
 | `npm run test:auth:hash` | Measure password cost in a temporary local Worker. |
 | `npm run test:e2e:smoke` | Run the critical-path browser files `tests/landing.spec.ts` and `tests/journey.spec.ts`. |
 | `npm run test:e2e` | Run every mocked browser test, including the smoke files. |
-| `npm run test:cloud` | Run the browser and workflow suite with isolated fixtures on the CI project. Needs cloud credentials. |
-| `npm run test:hosted` | Repeat the suite with real accounts against the deployed app. Needs cloud credentials. |
+| `npm run test:cloud` | Run the Supabase browser and workflow suite with isolated fixtures on the CI project. Needs cloud credentials. Always set `MINSKY_TEST_PROJECT_REF`. |
+| `npm run test:hosted` | Legacy Supabase wrapper that targets `minsky-dev`. Do not use it: that URL now runs Cloudflare. |
 | `npm run test:providers:list` | List the shared provider scenarios without hosted credentials. |
 | `npm run test:providers -- --provider=supabase` | Run the shared contracts against an explicitly configured isolated Supabase project. |
 | `npm run test:providers -- --provider=cloudflare --config=… --account=… --database=… --origin=…` | Run the same contracts through the isolated Cloudflare browser adapter. |
@@ -148,12 +148,11 @@ These commands connect to provider accounts. Several of them change hosted data 
 | `npm run cloud:recover-admin` | Reset a Supabase provider administrator when that provider's only admin cannot sign in. |
 | `npm run cloudflare:recover-admin` | Reset the password of an existing Cloudflare admin. Prints the temporary password once in that terminal. |
 | `npm run cloud:hosting-login` | Sign in to Cloudflare with Wrangler. |
-| `npm run deploy` | Build and deploy the frontend Worker. Deploy only after an explicit request. |
 
 See [cloud onboarding](docs/cloud-onboarding.md) for the exact arguments.
 
 Deno and the provider CLIs are pinned npm dependencies.
-For `npm run test:cloud` and `npm run test:hosted`, follow [cloud verification](docs/cloud-onboarding.md#verification-and-protected-cloud-ci).
+For `npm run test:cloud` and `npm run test:hosted`, follow [cloud verification](docs/cloud-onboarding.md#verification-and-hosted-cloud-checks).
 For shared adapter checks, follow [Run the shared provider tests](docs/run-provider-tests.md).
 The two hosted store commands accept the optional [D1 API transport](docs/run-provider-tests.md#use-the-d1-api-transport).
 Run those API commands in sequence. Default binding checks and protected CI keep their existing transport.
@@ -209,6 +208,7 @@ The [T0021 activation record](docs/current-state.md#t0021-approved-activation-20
 - [Server workflow reference](docs/server-workflow.md) inventories existing rules and the shared service and persistence boundaries.
 - [Verify the Supabase provider workflow](docs/verify-server-workflow.md) gives that provider's local, hosted, and recovery commands.
 - [Backend contracts](docs/backend-contracts.md) describe the provider interfaces and their behavior.
+- [Session announcements](docs/session-announcements.md) is the reference for announcement behavior on both providers.
 - [Add a backend provider](docs/add-provider.md) gives contributor interfaces, registration points, installation, cleanup, and required shared verification.
 - [Activate Cloudflare development](docs/activate-cloudflare-development.md) gives the fresh-installation approval, deployment, verification, and recovery gates.
 - [Cloudflare backend design](docs/cloudflare-backend-design.md) explains the implemented server boundaries.
@@ -218,5 +218,7 @@ The [T0021 activation record](docs/current-state.md#t0021-approved-activation-20
 - [Cloudflare installation](site/src/content/docs/operators/installation.mdx) gives the complete development installation procedure and owner recovery.
 - [PR #21 component record](docs/pr21-installation-disposition.md) records reused safeguards and replaced or deferred scaffolding.
 - [Shared provider test contracts](docs/provider-test-contracts.md) describe reusable assertions, fixture ownership, and provider requirements.
+- [Run the shared provider tests](docs/run-provider-tests.md) gives the local and on-demand hosted commands and fixture recovery.
+- [Preview behavior](docs/cloudflare-preview-behavior.md) explains why pushes and pull requests do not publish the application.
 - [Product direction](docs/product-direction.md) — agreed requirements and open decisions.
 - [Contributor rules](AGENTS.md) and [planning record](PLAN.md).

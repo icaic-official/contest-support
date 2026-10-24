@@ -39,6 +39,7 @@ export default defineConfig({
         {label: 'Contestants', slug: 'guides/contestants'},
         {label: 'Volunteers and specialists', slug: 'guides/staff'},
         {label: 'Jury', slug: 'guides/jury'},
+        {label: 'Announcements', slug: 'guides/announcements'},
         {label: 'Session admins', slug: 'guides/administration'},
       ]},
       {label: 'Operate', items: [

@@ -23,6 +23,14 @@ The deployed-binding guard still refuses an assets-only replacement of an activa
 The app build sets `VITE_BACKEND` explicitly. A shell's inherited value cannot select a different backend.
 A preparation PR merge does not approve a future backend switch.
 
+## Why app previews are disabled
+
+A frontend preview can change shared data when it uses a stable backend.
+Earlier Supabase previews used the development project directly.
+Cloudflare previews receive no stable D1, R2, or Durable Object bindings.
+A future preview needs its own resources, credentials, fixture ownership, and cleanup checks.
+Docs previews are safe because the docs contain no application data.
+
 ## Connect one CI Worker
 
 You need access to Cloudflare account `458ad6a930b0fb717796dfa19ca6a2b1`.
@@ -60,7 +68,7 @@ See [the build image](https://developers.cloudflare.com/workers/ci-cd/builds/bui
 
 ## Confirm the first build
 
-Push a commit to `feature/t0021-cloudflare-development-install` or to `main` after this change is on that branch.
+Push a commit to any branch in this repository.
 Then confirm all of the following:
 
 - The commit shows a Workers Builds check. Copy that check's name from the commit status.
@@ -104,6 +112,16 @@ Automatic application publication is removed with the GitHub Actions workflow.
 Publish the application only with the guarded script in [deployment settings](cloudflare-build-settings.md#publication-commands), and only for an approved revision.
 The script still requires a repository branch-push context.
 This CI setup does not provide that context.
+
+The script sets `VITE_BACKEND` from `MINSKY_DEV_BACKEND` and guards the complete Worker:
+
+- A Cloudflare app needs its API code, D1 database, private R2 bucket, and live coordinator. An assets-only upload would remove them.
+- The Supabase path runs only when `MINSKY_DEV_BACKEND=supabase`. It refuses the upload when the deployed Worker has application bindings.
+- The Cloudflare path validates the generated configuration and exact hosted targets before upload. After upload, it checks the published targets, live bindings, and an anonymous rejection at the authentication API.
+- It rejects pushes by Dependabot.
+
+These checks do not verify authenticated behavior. The installation and activation procedures require the full application checks.
+A broken application target cannot block the docs, because Workers Builds publishes them separately.
 
 ## Checks that stay on demand
 

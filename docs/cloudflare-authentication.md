@@ -3,7 +3,7 @@
 The Cloudflare application uses maintained Better Auth identity operations and guarded D1 account records.
 Cloudflare serves the development application. Supabase remains available as a separate provider implementation.
 This reference describes the authentication API and its access rules.
-Use the [installation guide](../site/src/content/docs/operators/installation.mdx) for setup and [current state](current-state.md) for dated verification evidence.
+Use the [installation guide](../site/src/content/docs/operators/installation.mdx) for setup and [run log](history/run-log.md) for dated verification evidence.
 
 The [identity choice](cloudflare-authentication-choice.md) explains Better Auth, cryptographic components, limitations, and measured resource costs.
 The [verification guide](verify-cloudflare-authentication.md) gives exact test commands and fixture recovery steps.
@@ -137,7 +137,8 @@ The browser receives a fresh session only after the credential commit.
 The final self-change guard retains both original session deadlines while the batch deliberately revokes and deletes the old sessions.
 Login creation also rechecks the captured credential generation and both current session expiries before completion.
 
-Daily maintenance removes password-attempt counters and expired login records after a one-day retention period.
+Scheduled maintenance removes password-attempt counters and expired login records after a one-day retention period.
+The application Worker runs it every minute. The isolated authentication CI Worker runs it daily.
 Login attempts allow ten attempts per normalized username per 15-minute window.
 Self password verification uses a separate ten-attempt account window.
 The replacement login after an authenticated password change does not consume a public username attempt.

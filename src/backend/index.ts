@@ -14,7 +14,7 @@ export const backend: Backend | undefined = provider === 'cloudflare'
   : url && key ? createSupabaseBackend(url, key) : undefined;
 
 export const backendSetupMessage =
-  'The Supabase provider needs VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY in .env.local. See docs/cloud-onboarding.md.';
+  'The Supabase provider needs VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY in .env.local. See docs/supabase-provider.md.';
 
 export function requireBackend(): Backend {
   if (!backend) throw new Error(backendSetupMessage);

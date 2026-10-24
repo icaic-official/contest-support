@@ -1,8 +1,19 @@
+<!--
+Title: [Type] Brief description of what the PR addresses.
+Capitalize the type. Example: [Bugfix] Prevent racing of requests
+For several contribution types, use several brackets: [Bugfix] [Feature] Prevent racing of requests and add support for Chinese language
+Use the contribution types in AGENTS.md. The branch name is <type>/<title>.
+
+Replace the next line with <type>[optional scope]: <description>, in commit message form.
+Put optional footers, such as Closes #123, at the end of the description.
+-->
+<type>[optional scope]: <description>
+
 ## Change
 
 Describe the problem.
 Describe the resulting behavior.
-Reference the development ticket.
+Reference the development ticket, if one exists.
 
 ## Verification
 

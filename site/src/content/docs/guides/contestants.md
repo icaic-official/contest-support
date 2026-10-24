@@ -25,6 +25,11 @@ Open an issue to see replies, images that staff shared with your team, resolutio
 You can reply while the issue is unresolved. You see only your team's issues.
 Staff notes and staff-only images stay hidden. You cannot upload images.
 
+## Read announcements
+
+The **Announcements** list is at the top of the page. Select a title to show its details and images.
+Announcements leave the list when they expire or staff remove them.
+
 ## Reopen
 
 If the problem returns, select **Reopen issue** and give a reason.

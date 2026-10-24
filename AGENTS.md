@@ -21,21 +21,20 @@
 - When a technical term is necessary, explain it in plain language on first use. Keep code names and commands exact.
 
 ## Contributions
-Pull requests are to be structured as follows:
-```
-<type>[optional scope]: <description>
 
-[optional body]
+- Contribution types include, but are not limited to: `bugfix`, `build`, `feature`, `style`, `refactor`, `perf`, `test`, `ci`, `chore`, `docs`.
+- Name every branch `<type>/<title>`, whether or not it gets a PR. For example: `bugfix/race-request-fix` or `feature/session-announcements`.
+- Write each commit message in this form. Merge commits are exempt.
 
-[optional footer(s)] 
-```
-- The types of contributions proposed include, but are not limited to: `bugfix`, `build`, `feature`, `style`, `refactor`, `perf`, `test`, `ci`, `chore`.
-- Branches are to be written as such: `<type>/<title>`, regardless whether they intend to be attached to a PR or not. For example: `fix/race-request-fix`.
-- The title of the PR is to be written with a square bracket encapsulating the type of contribution, followed by a brief description of what the PR intends to address.
-The first letter of the `type` must be capitalized in the PR title.
-Reusing the example in the previous point, the title for that branch becomes: `[Fix] Prevent racing of requests`.
-  - If that PR addresses multiple contributions, the PR title may include multiple square brackets. For example, `[Fix] [Feat] Prevent racing of requests and add support for Chinese language`.
-  - Normal commit comments, with the exception of commits like merge, etc., are to follow the same convention as stated above. 
+  ```
+  <type>[optional scope]: <description>
+
+  [optional body]
+
+  [optional footer(s)]
+  ```
+
+- Write pull requests with [the PR template](.github/pull_request_template.md). It defines the PR title and description format.
 
 ## Current scope
 
@@ -46,6 +45,7 @@ Keep its adapter, migrations, functions, and provider tests.
 Do not describe it as the live backend, the default setup, or the development URL's backend.
 Do not change hosted Supabase or Cloudflare resources, secrets, or repository settings.
 
+Start new work from updated `main`. Open the result as a draft pull request into `main`.
 Preserve the Workers Builds move and the removed GitHub Actions workflow.
 Do not add an Actions job.
 Browser suites and hosted provider checks stay manual commands.
@@ -55,9 +55,9 @@ Do not connect `minsky-dev` to Workers Builds.
 Do not deploy.
 The owner reviews and merges.
 
-T0021's separately approved Cloudflare activation and repeat deployment retain their dated evidence in [current state](docs/current-state.md#t0021-approved-activation-2026-10-19).
+T0021's separately approved Cloudflare activation and repeat deployment retain their dated evidence in [run log](docs/history/run-log.md#t0021-approved-activation-2026-10-19).
 Supabase resources and accounts remain intact. Development, CI, and installation-verification resources remain separate.
-Earlier provider permissions and exact protected branch limits remain in [PLAN.md](PLAN.md) and dated run records.
+Earlier provider permissions and exact protected branch limits remain in the [planning log](docs/history/plan-log.md) and dated run records.
 Those historical approvals do not authorize a new activation or deployment.
 Statements in those records that Supabase is the active backend are superseded by the 2026-10-23 decision.
 
@@ -115,9 +115,9 @@ Statements in those records that Supabase is the active backend are superseded b
 - Before each push, check that every new commit you created has the required author and contains each required trailer exactly once.
 - Distinguish development tickets from contestant issues in code, documentation, and communication.
 - Start each development ticket from updated `main`.
-- Use `feature/tNNNN-description` for ticket branches.
+- Name branches as the [Contributions](#contributions) section states. Reference the development ticket, if one exists, in the PR description.
 
-Historical branch exceptions remain in [PLAN.md](PLAN.md). Use the normal ticket workflow unless the user gives a newer instruction.
+Historical branch exceptions remain in the [planning log](docs/history/plan-log.md). Use the normal ticket workflow unless the user gives a newer instruction.
 
 Complete these steps in sequence:
 
@@ -142,7 +142,7 @@ Ask only for missing decisions that materially affect scope or behavior.
 Keep development, CI, and future production databases and credentials separate.
 The hosted `minsky-dev` app uses the complete Cloudflare development installation. It is not production.
 The Cloudflare development resources are `minsky-development` and private bucket `minsky-development-images`.
-Protected Cloudflare checks use the separate connector and store CI targets.
+On-demand hosted Cloudflare checks use the separate connector and store CI targets.
 The retained Supabase `Minsky` development project and `Minsky CI` project remain intact.
 Use `Minsky CI` only for isolated Supabase fixtures.
 No production project exists.
@@ -178,14 +178,12 @@ After production is selected and provisioned, validate the approved revision on 
 Then apply its D1 migrations to production.
 Deploy the complete Worker, its bindings, and its static assets.
 Verify the production deployment afterward.
-The Supabase provider keeps its own migration, function, and frontend order in the [Supabase provider guide](docs/cloud-onboarding.md).
+The Supabase provider keeps its own migration, function, and frontend order in the [Supabase provider guide](docs/supabase-provider.md).
 Production setup remains future work.
 
 This future production work does not authorize provider resource creation or upgrades now.
-Use [the Supabase provider guide](docs/cloud-onboarding.md) for that provider's project references, commands, and observed setup results.
-T0003 retains protected cloud CI.
-These operational items stay deferred.
-They are not part of the T0005 issue-image ticket:
+Use [the Supabase provider guide](docs/supabase-provider.md) for that provider's project references, commands, and observed setup results.
+These operational items stay deferred:
 
 - Ownership and billing records.
 - Remote merge enforcement and vulnerability alerts.
@@ -221,7 +219,7 @@ Do not call an installation path supported until its documented procedure passes
 
 Update relevant documents in the same change as behavior or workflow changes.
 Distinguish proposed, implemented, and verified capabilities.
-Use PLAN.md as the initial baseline.
+Use the original plan in the [planning log](docs/history/plan-log.md) as the initial baseline.
 Record later decisions explicitly in the appropriate document.
 Do not leave conflicting instructions.
 

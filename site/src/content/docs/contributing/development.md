@@ -39,7 +39,7 @@ See the repository's [frontend architecture](https://github.com/GiftedNovaHD/min
 | `npm run test:d1` | D1 workflow on local emulation |
 | `npm run test:connector:runtime` | Cloudflare connector on a local Worker |
 | `npm run check:functions` | Supabase functions (Deno) |
-| `npm run test:functions` | Attachment function with fake clients |
+| `npm run test:functions` | Attachment and announcement image functions with fake clients |
 | `npm run build` | Production build |
 | `npm run test:e2e` | Browser UI with mocked Supabase responses. The suite sets `VITE_BACKEND=supabase`. |
 

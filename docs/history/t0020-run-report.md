@@ -2,7 +2,7 @@
 
 This record covers the PR #42 review follow-up on `feature/t0020-cloudflare-connector`.
 The [earlier implementation report](https://github.com/GiftedNovaHD/minsky/blob/88ea5020a0f9dfc34a32ed7fbd84dfea07423297/docs/t0020-run-report.md) preserves its full commands and results.
-The [current-state record](current-state.md) preserves resource identities and dated hosted evidence.
+The [run log](run-log.md) preserves resource identities and dated hosted evidence.
 Supabase remains active. The owner reviews and merges.
 
 ## 1. Summary of changes
@@ -18,7 +18,7 @@ Cleared inherited Wrangler environment selection before trusted CLI and API oper
 Included hosted UI recovery journals in protected CI artifacts.
 Shared the bounded JSON reader and replaced custom configuration comparators with the Node.js implementation.
 
-Published one complete [installation procedure](../site/src/content/docs/operators/installation.mdx).
+Published one complete [installation procedure](../../site/src/content/docs/operators/installation.mdx).
 Its shell setup now explicitly clears inherited Wrangler environment selection and disables debug log files. The fresh trial used the same settings.
 Removed superseded proof and implementation walkthroughs, obsolete installer navigation, repeated status summaries, and old ticket instructions from agent guidance.
 Historical records link to their frozen source revision.
@@ -171,7 +171,7 @@ A clean checkout of that source passes the complete empty-installation procedure
 The browser case passes in 248.574 seconds with no failures, skips, flaky results, infrastructure errors, or retries.
 All nine migrations, both owner password gates, repeated-initialization safeguards, trusted recovery, and exact fixture cleanup pass.
 The final read-only audit passes at 09:24:06.795 UTC. A further refusal proof passes at 09:24:53.362 UTC.
-The [current-state record](current-state.md#fresh-installation-after-review-fixes) identifies the resources and retained installation baseline.
+The [run log](run-log.md#fresh-installation-after-review-fixes) identifies the resources and retained installation baseline.
 Protected [Cloudflare run 39114678438](https://github.com/GiftedNovaHD/minsky/actions/runs/39114678438) passes on `2b6f6f0`.
 It passes all 70 hosted workflow cases, 82 account cases, eight shared scenarios, and the complete hosted React journey.
 The workflow and account suites have zero skips. The React result has zero failures, skips, or flaky cases.

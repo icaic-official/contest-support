@@ -6,7 +6,7 @@ The maintenance run used integration baseline `7d19b00`, including PR #41.
 Its local checks, hosted jury acceptance, protected CI, and scoped cleanup passed on runtime source `f45d03f`.
 The final follow-up changed documentation only.
 Later combined application verification belongs to its recorded source and provider.
-See [current state](current-state.md#t0009-parallel-maintenance-2026-10-18).
+See [run log](run-log.md#t0009-parallel-maintenance-2026-10-18).
 
 The owner authorized the 2026-10-18 maintenance in a separate worktree alongside T0020.
 Supabase was active during that run. Its authorization excluded deployment, backend changes, and data migration.
@@ -19,7 +19,7 @@ There is no separate **Jury worklist** sidebar entry and no **Back to jury workl
 The award and confirmation forms stay on the desktop Award review cards.
 The legacy `src/connected/JuryWorklist.tsx` was removed.
 The sections below record the T0009 specification as accepted.
-See [frontend architecture](frontend-architecture.md#jury-award-lists).
+See [frontend architecture](../frontend-architecture.md#jury-award-lists).
 
 ## Outcome and scope
 

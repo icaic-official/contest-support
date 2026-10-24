@@ -5,10 +5,9 @@ Use an isolated test backend. Never use development or production accounts.
 For the suite's responsibilities and limits, see [the test contracts](provider-test-contracts.md).
 
 Both drivers use the same 11 shared scenarios.
-The added account-creation, image-limit, and reconnect cases require fresh hosted verification.
-Earlier eight-case results do not verify these additions.
-Record local checks, CLI runs against hosted resources, and protected GitHub runs separately.
-See [current state](current-state.md) for tested revisions, results, and cleanup evidence.
+On 2026-10-19, protected runs at `2125875` passed all 11 cases on both providers. A later change needs fresh hosted verification.
+Record local checks and CLI runs against hosted resources separately. Keep earlier protected GitHub runs as dated evidence.
+See [run log](history/run-log.md) for tested revisions, results, and cleanup evidence.
 For a new implementation, complete [Add a backend provider](add-provider.md) before using this runner.
 The runner currently accepts only `supabase` and `cloudflare`.
 The commands below verify existing implementations. They do not register a provider or provision a new installation.
@@ -34,7 +33,7 @@ The command lists the cases without creating accounts, records, or a browser ses
 
 This run is a manual command. It is not part of `npm run ci`.
 
-1. Use a separate test project with the repository migrations and active `admin` and `attachments` functions.
+1. Use a separate test project with the repository migrations and active `admin`, `attachments`, and `announcement-images` functions.
 2. Set the function origin to `http://127.0.0.1:4174`.
 3. Supply the following variables through your private environment.
 
@@ -228,7 +227,7 @@ The final result still requires every case to pass without failures or skips.
 ### Use the D1 API transport
 
 The commands above use native D1 bindings through the local Wrangler preview proxy.
-This remains the default transport and the transport used by protected GitHub checks.
+This remains the default transport.
 If that local proxy disconnects, you can select `--transport=api` for these two store suites.
 Read-only probes reproduced a failure while the local proxy forwarded requests to the remote preview Worker.
 The underlying connection fault remains unresolved. This option bypasses that proxy for database requests.
@@ -279,7 +278,7 @@ If a request loses its response, its database outcome can be unknown. Inspect re
 Follow [direct D1 fixture recovery](#recover-direct-d1-fixtures) if cleanup is incomplete.
 Record the selected transport with the result.
 An API result checks database behavior through the D1 HTTP API.
-It does not replace protected native-binding checks, Worker execution checks, or browser checks.
+It does not replace native-binding checks, Worker execution checks, or browser checks.
 
 ## Check the hosted React application
 
@@ -296,15 +295,14 @@ node src/server/adapters/cloudflare/tooling/test-ui.mjs \
 The required result is one hosted UI case with no failures, skips, or retries and verified fixture cleanup.
 The journey checks all nine commands, jury worklist transitions, images, live updates, and account administration.
 Follow [the installation guide](../site/src/content/docs/operators/installation.mdx) for the separate empty-installation procedure.
-Record the tested source revision and installation result in the current-state record.
+Record the tested source revision and installation result in the [run log](history/run-log.md).
 
 ## Run hosted checks on demand
 
 GitHub Actions no longer runs these checks.
-A coding agent runs them against the isolated targets below.
-Preserve the `cloud-test` allowlist. Do not change it for this command.
+A maintainer or coding agent runs them against the isolated targets below.
 
-1. Confirm the target in [cloud onboarding](cloud-onboarding.md#verification-and-protected-cloud-ci).
+1. Confirm the target in [Supabase provider guide](supabase-provider.md#verification-and-hosted-cloud-checks).
 2. Check out the reviewed revision.
 3. For Supabase, run the commands in [CI settings](cloudflare-build-settings.md#on-demand-checks).
 4. Record the revision, backend versions, results, and cleanup outcome.
@@ -312,18 +310,15 @@ Preserve the `cloud-test` allowlist. Do not change it for this command.
 Skip Supabase backend preparation when the change does not include migrations, functions, or configuration.
 The tests still create and delete fixtures. They do not check a fresh installation.
 Prepare the CI backend only when the remote migration history matches the intended revision.
-The [earlier CI preparation record](current-state.md#t0014-existing-backend-verification-2026-10-17) includes an extra announcement migration.
+The [earlier CI preparation record](history/run-log.md#t0014-existing-backend-verification-2026-10-17) includes an extra announcement migration.
 Inspect the live migration history before preparation rather than assuming it matches a clean checkout.
-Do not change the `cloud-test` allowlist for an on-demand run.
 
 For the complete Cloudflare connector, run the hosted commands in this guide on the reviewed revision.
 Do not point them at the development database.
-The commands migrate the dedicated store CI database, then the separate full connector database.
-They deploy the isolated application Worker, then run the shared contracts and React journey.
+The test commands do not migrate, deploy, or create resources.
+Before you run them, migrate the store and connector CI databases and deploy the isolated application Worker, as [Run against Cloudflare](#run-against-cloudflare) states.
 The private bucket, service activation, and initial Worker secret must exist before those commands can pass.
-The commands do not activate a paid service or create the bucket.
-Record the result and tested revision in [current state](current-state.md), separately from other hosted CLI results.
-Preserve unrelated allowlist entries and protection rules.
+Record the result and tested revision in [run log](history/run-log.md), separately from other hosted CLI results.
 Earlier authentication runs do not check this connector path.
 Record Supabase verification separately from Cloudflare CLI runs.
 
@@ -332,15 +327,14 @@ Record Supabase verification separately from Cloudflare CLI runs.
 ### Recover shared browser fixtures
 
 1. Locate the `recovery.json` path printed by the failed local run.
-2. For a GitHub run, download its `provider-recovery-*` or `connector-recovery-*` artifact before the seven-day retention period ends.
-3. Restore the same provider target and privileged provider access to your private environment.
-4. For Supabase, run recovery with the journal's absolute path:
+2. Restore the same provider target and privileged provider access to your private environment.
+3. For Supabase, run recovery with the journal's absolute path:
 
    ```sh
    npm run test:providers -- --provider=supabase --recover=/absolute/path/recovery.json
    ```
 
-5. For Cloudflare, retain every exact target option and add the journal path:
+4. For Cloudflare, retain every exact target option and add the journal path:
 
    ```sh
    npm run test:providers -- --provider=cloudflare \
@@ -351,7 +345,7 @@ Record Supabase verification separately from Cloudflare CLI runs.
      --recover=/absolute/path/recovery.json
    ```
 
-6. Check that recovery exits with code zero and deletes the journal.
+5. Check that recovery exits with code zero and deletes the journal.
 
 Recovery checks the target and fixture ownership before deletion.
 Do not substitute a project reference or edit identifiers to make a mismatch pass.

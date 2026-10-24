@@ -112,6 +112,8 @@ Both exceed the 20 minute Workers Builds timeout, so they cannot move into a bui
 
 Hosted Supabase checks need the isolated CI project and its private keys.
 Do not point them at development project `ovymmobupzowotvrywek`.
+Run them from the separate CI checkout in the [Supabase provider guide](supabase-provider.md#development-and-release-process), with `MINSKY_TEST_PROJECT_REF` set.
+Keep the primary checkout linked to development.
 
 ```sh
 npx supabase link --project-ref "$MINSKY_TEST_PROJECT_REF"
@@ -136,7 +138,7 @@ Run them only against the documented CI database names.
 ## Publication commands
 
 The GitHub Actions jobs `checks`, `secrets`, `dependencies`, `deploy`, and `deploy-app` are removed.
-Protected `cloud-test` rules stay in GitHub. No workflow uses them.
+Publication is an explicit, guarded command. Run it only after an explicit request.
 
 `scripts/deploy-workers.mjs` accepts a branch push only when these shell variables match:
 
@@ -225,26 +227,27 @@ The bucket must have its managed public domain disabled and no custom domain att
 Provider diagnostics and secret values are withheld.
 
 Each upload checks that the push revision is still the branch's current revision.
-GitHub errors fail the job. Deleted or outdated branches skip remaining uploads.
-Uploads for one push branch run in sequence across push runs.
-A newer push does not cancel an upload already in progress.
+GitHub errors fail the command. Deleted or outdated branches skip remaining uploads.
+The script has no lock. Do not run two publication commands for the same Worker at the same time.
 
 For the app, `minsky-revision.json` records `sha`, `backend`, `databaseId`, `bucketName`, and `origin`.
 Supabase mode uses null database and bucket values. Cloudflare mode records the exact selected targets.
 The docs record contains only `sha`.
 The HTTP check compares every expected field.
 It retries up to 12 times with five-second intervals and a ten-second request timeout.
-The summary records the URL and result.
+The script prints the URL and result. When `GITHUB_STEP_SUMMARY` is set, it also writes them there.
 
 After a Cloudflare upload, the script checks the deployed `DB`, `IMAGES`, `LIVE_UPDATES`, `AUTH_ORIGIN`, and `AUTH_SECRET` bindings.
 The database UUID, bucket name, origin, and binding types must match the reviewed configuration.
 The live binding must name `SessionLiveCoordinator` and a namespace within this Worker.
 An anonymous `/api/auth/session` request must return `401` and `Sign in to continue.`.
-A mismatch fails the deployment job. The script withholds provider diagnostics and secret values.
+A mismatch fails the command. The script withholds provider diagnostics and secret values.
 These checks verify publication, selection, bindings, and an anonymous denial.
 Authenticated authorization, private images, recovery, and live updates require the separate application checks.
 
-Docs previews use a normalized branch name with a 12-character SHA-256 suffix.
+Workers Builds now publishes the docs and their preview versions. See [Publish the docs](cloudflare-builds.md#publish-the-docs).
+The script's `--site=docs` path remains a manual fallback.
+Its docs previews use a normalized branch name with a 12-character SHA-256 suffix.
 The preview parser accepts asset-progress lines before the JSON response. Malformed JSON and URLs outside the permitted Worker domain remain rejected.
 The script runs `wrangler preview` with `--ignore-base-config`, the revision tag, and JSON output.
 Stable publication uses `wrangler deploy` with the reviewed configuration.

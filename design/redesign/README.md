@@ -1,6 +1,6 @@
 # Minsky frontend redesign: concepts and directions
 
-Status: **direction chosen (2026-10-17) and implemented in T0015 (2026-10-18)** on `feature/t0015-frontend-redesign`. The PR is not merged yet. See [section 6](#6-chosen-direction-2026-10-17).
+Status: **direction chosen (2026-10-17) and implemented in T0015 (2026-10-18)**. [PR #44](https://github.com/GiftedNovaHD/minsky/pull/44) merged it on 2026-10-21. See [section 6](#6-chosen-direction-2026-10-17).
 This file is the design record. [Frontend architecture](../../docs/frontend-architecture.md) describes the implemented code.
 Sections 1 to 5 describe the app before T0015 and the proposals at that time.
 The mockups use fictional sample data. They do not connect to Supabase.

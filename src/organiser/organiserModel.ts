@@ -341,6 +341,61 @@ export function issueThatLeft(
   return last.id === selectedIssueId ? last : undefined;
 }
 
+/**
+ * The ids of issues that are new in `next`, or whose status or revision
+ * differs from `previous`. A reply, a claim or any other recorded change
+ * raises the revision, so it counts.
+ */
+export function changedIssueIds(
+  previous: readonly Issue[],
+  next: readonly Issue[],
+): ReadonlySet<string> {
+  const before = new Map(previous.map((issue) => [issue.id, issue]));
+  const changed = new Set<string>();
+  for (const issue of next) {
+    const old = before.get(issue.id);
+    if (!old || old.status !== issue.status || old.revision !== issue.revision) {
+      changed.add(issue.id);
+    }
+  }
+  return changed;
+}
+
+/**
+ * The highlights that still run after an update. `current` maps an issue id
+ * to the time its highlight began. Entries older than `windowMs` drop out,
+ * so ids from earlier updates never pile up. An id that is already
+ * highlighted keeps its start time, because its animation does not restart.
+ */
+export function recentChanges(
+  current: ReadonlyMap<string, number>,
+  fresh: ReadonlySet<string>,
+  now: number,
+  windowMs: number,
+): ReadonlyMap<string, number> {
+  const next = new Map<string, number>();
+  for (const [id, began] of current) {
+    if (now - began < windowMs) next.set(id, began);
+  }
+  for (const id of fresh) {
+    if (!next.has(id)) next.set(id, now);
+  }
+  return next;
+}
+
+/** The ids whose highlight still runs at `now`. */
+export function liveChangeIds(
+  changes: ReadonlyMap<string, number>,
+  now: number,
+  windowMs: number,
+): ReadonlySet<string> {
+  const live = new Set<string>();
+  for (const [id, began] of changes) {
+    if (now - began < windowMs) live.add(id);
+  }
+  return live;
+}
+
 /** Initials for an avatar, for example "PR" for "Priya Raman". */
 export function initials(name: string): string {
   return name

@@ -50,6 +50,8 @@
   --age-warn: #d97706;
   --age-critical: #e11d48;
   --internal: rgb(245 158 11);
+  /* The tint of a row that a live update added or changed. */
+  --highlight: hsl(217 91% 52%);
   /* Motion. Use these in every transition and animation, with Tailwind's
    * ease-out curve: duration-(--motion-base) ease-out. Enter with
    * --motion-slow at most. A highlight that must stay visible long enough to
@@ -93,6 +95,7 @@
   --status-resolved: #34d399;
   --age-warn: #f59e0b;
   --age-critical: #fb7185;
+  --highlight: hsl(213 94% 68%);
 }
 
 @theme inline {
@@ -135,6 +138,13 @@
   --color-age-warn: var(--age-warn);
   --color-age-critical: var(--age-critical);
   --color-internal: var(--internal);
+  /* A row that a live update added or changed starts tinted and fades out. */
+  --animate-row-flash: row-flash var(--motion-highlight) ease-out;
+  @keyframes row-flash {
+    from {
+      background-color: color-mix(in oklab, var(--highlight) 18%, transparent);
+    }
+  }
 }
 
 @layer base {

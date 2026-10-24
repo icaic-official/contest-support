@@ -80,6 +80,33 @@ async function finishAnimations(target: Locator): Promise<void> {
   });
 }
 
+/** Starts to record which queue rows ever carried the highlight, however briefly. */
+async function watchHighlights(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const state = window as unknown as { highlighted: Set<string> };
+    state.highlighted = new Set();
+    const note = (element: Element) => {
+      if (element.hasAttribute('data-changed')) {
+        state.highlighted.add(element.querySelector('[data-issue-row]')?.textContent?.replace('Open ', '') ?? '?');
+      }
+    };
+    new MutationObserver((records) => {
+      for (const record of records) {
+        if (record.target instanceof Element) note(record.target);
+        for (const added of record.addedNodes) {
+          if (!(added instanceof Element)) continue;
+          note(added);
+          added.querySelectorAll('[data-changed]').forEach(note);
+        }
+      }
+    }).observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['data-changed'] });
+  });
+}
+
+function highlighted(page: Page): Promise<string[]> {
+  return page.evaluate(() => [...(window as unknown as { highlighted: Set<string> }).highlighted].sort());
+}
+
 /** Animations that last longer than a blink. Reduced motion must leave none. */
 function longAnimations(page: Page): Promise<number> {
   return page.evaluate(
@@ -267,6 +294,34 @@ test('phone tab bar: the marker slides along the top edge to the selected tab', 
   expect(midway.x).toBeLessThan(target.x + 16 - 5);
   await finishAnimations(bar);
   await expect.poll(() => gap(bar, find, 'centre')).toBeLessThan(1.5);
+  expect(fixture.errors).toEqual([]);
+});
+
+test('queue rows: a live update highlights what is new or changed, not a filter change', async ({ page }) => {
+  const fixture = await signInConsole(page, desktop);
+  await watchHighlights(page);
+
+  // Rows that a filter reveals were already there. Nothing is new.
+  await statusTab(page, 'All').click();
+  await expect(page.locator('[data-issue-row]')).toHaveCount(5);
+  await statusTab(page, 'Active').click();
+  await expect(page.locator('[data-issue-row]')).toHaveCount(4);
+  expect(await highlighted(page)).toEqual([]);
+
+  // Staff claim ISS-1 elsewhere and a team reports ISS-9. ISS-4 stays as it was.
+  fixture.setIssues([
+    ...defaultIssues.map((item) => (item.number === 1 ? { ...item, status: 'claimed' as const, revision: 1 } : item)),
+    { number: 9, status: 'open', minutesAgo: 0, team: 2 },
+  ]);
+  await fixture.refresh();
+  await expect(page.getByRole('button', { name: 'Open ISS-9', exact: true })).toBeVisible();
+  await expect.poll(() => highlighted(page)).toEqual(['ISS-1', 'ISS-9']);
+  await expect(page.locator('tr[data-changed]')).toHaveCount(0);
+
+  // The same list again is not an update.
+  await fixture.refresh();
+  await page.waitForTimeout(300);
+  expect(await highlighted(page)).toEqual(['ISS-1', 'ISS-9']);
   expect(fixture.errors).toEqual([]);
 });
 

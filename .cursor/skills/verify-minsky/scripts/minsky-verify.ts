@@ -20,6 +20,9 @@ const CONTROL_PORT = 5198;
 const CDP_PORT = 9223;
 const INSPECTOR_PORT = 9239;
 const ACTION_TIMEOUT_MS = 90_000;
+// Longer than one action, so the client receives the action's own error.
+const REPLY_TIMEOUT_MS = ACTION_TIMEOUT_MS + 30_000;
+const SHUTDOWN_TIMEOUT_MS = 10_000;
 const SESSION_DIR = '.verify-minsky';
 const EVIDENCE_DIR = path.join(SESSION_DIR, 'evidence');
 const STATE_DIR = path.join(SESSION_DIR, 'state');
@@ -244,9 +247,19 @@ function alive(pid: number): boolean {
   if (pid <= 0) return false;
   try {
     process.kill(pid, 0);
-    return true;
   } catch (error) {
     return errno(error) === 'EPERM';
+  }
+  return !zombie(pid);
+}
+
+/** An exited child that its new parent has not reaped yet. */
+function zombie(pid: number): boolean {
+  try {
+    const stat = readFileSync(`/proc/${pid}/stat`, 'utf8');
+    return stat.slice(stat.lastIndexOf(')') + 2).startsWith('Z');
+  } catch {
+    return false;
   }
 }
 
@@ -408,17 +421,18 @@ function printUsage(): void {
   node .cursor/skills/verify-minsky/scripts/minsky-verify.ts cleanup`);
 }
 
-async function request(root: string, command: Command): Promise<Result> {
+async function request(root: string, command: Command, timeoutMs = REPLY_TIMEOUT_MS): Promise<Result> {
   const session = readSession(root);
   const port = session?.controlPort ?? CONTROL_PORT;
   return new Promise((resolve, reject) => {
-    const socket = createClient(port, resolve, reject);
+    const socket = createClient(port, timeoutMs, resolve, reject);
     socket.write(`${JSON.stringify(command)}\n`);
   });
 }
 
 function createClient(
   port: number,
+  timeoutMs: number,
   resolve: (result: Result) => void,
   reject: (error: Error) => void,
 ): Socket {
@@ -426,8 +440,8 @@ function createClient(
   let buffer = '';
   const timer = setTimeout(() => {
     socket.destroy();
-    reject(new Error('The verification session did not answer within 60 seconds.'));
-  }, 60_000);
+    reject(new Error(`The verification session did not answer within ${timeoutMs / 1000} seconds.`));
+  }, timeoutMs);
   socket.on('data', (chunk) => {
     buffer += chunk.toString('utf8');
     const end = buffer.indexOf('\n');
@@ -507,13 +521,26 @@ function refuseIfBusy(port: number, label: string): void {
 function signalIfRecorded(pid: number, matches: (line: string) => boolean): void {
   if (!alive(pid)) return;
   const line = cmdline(pid);
+  // An empty command line means the process exited after the alive check.
+  if (line === '') return;
   if (!matches(line)) {
     throw new Error(`Refusing to signal pid ${pid}. Its command line is not the recorded verification process.`);
   }
+  signalGroup(pid, 'SIGTERM');
+}
+
+function signalGroup(pid: number, signal: NodeJS.Signals): void {
   try {
-    process.kill(-pid, 'SIGTERM');
+    process.kill(-pid, signal);
+    return;
+  } catch {
+    // The pid does not lead a process group, for example when serve started
+    // from a shell without job control. Signal the pid alone.
+  }
+  try {
+    process.kill(pid, signal);
   } catch (error) {
-    if (errno(error) !== 'ESRCH') process.kill(pid, 'SIGTERM');
+    if (errno(error) !== 'ESRCH') throw error;
   }
 }
 
@@ -530,13 +557,7 @@ async function stopRecorded(pid: number, matches: (line: string) => boolean): Pr
   if (!alive(pid)) return;
   signalIfRecorded(pid, matches);
   if (await waitDead(pid)) return;
-  if (alive(pid) && matches(cmdline(pid))) {
-    try {
-      process.kill(-pid, 'SIGKILL');
-    } catch (error) {
-      if (errno(error) !== 'ESRCH') process.kill(pid, 'SIGKILL');
-    }
-  }
+  if (alive(pid) && matches(cmdline(pid))) signalGroup(pid, 'SIGKILL');
   if (!(await waitDead(pid))) throw new Error(`Pid ${pid} is still running after SIGKILL.`);
 }
 
@@ -572,9 +593,10 @@ async function cleanup(root: string): Promise<void> {
     return;
   }
   try {
-    await request(root, { op: 'shutdown' });
-  } catch (error) {
-    if (!(error instanceof Error) || !error.message.includes('No verification session')) throw error;
+    await request(root, { op: 'shutdown' }, SHUTDOWN_TIMEOUT_MS);
+  } catch {
+    // A stopped, busy, or hung session cannot answer. The recorded pids are
+    // still signalled below.
   }
   if (alive(session.sessionPid)) {
     signalIfRecorded(session.sessionPid, sessionMatches);

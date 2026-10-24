@@ -20,7 +20,7 @@ npm ci
 npx playwright install chromium
 ```
 
-Use Node.js 22.13 or later within 22.x, or Node.js 24 or later.
+Use Node.js 22.18 or later within 22.x, or Node.js 24 or later. Earlier Node.js 22 releases cannot run a `.ts` file without the `--experimental-strip-types` flag.
 
 Leave the serve process running in its own terminal. On a machine that uses tmux, use a session named `verify-minsky`.
 
@@ -143,7 +143,7 @@ Stop only the processes recorded in `.verify-minsky/session.json`.
 node .cursor/skills/verify-minsky/scripts/minsky-verify.ts cleanup
 ```
 
-Cleanup sends shutdown to the session. It then signals the recorded `serve` pid, the recorded Chromium pid, the recorded Wrangler pid, and the recorded Worker pid, and only when `/proc/<pid>/cmdline` still matches that process. It does not kill by process name. It removes `.verify-minsky/session.json` and `.verify-minsky/state/`, including the local D1 directory. It leaves `.verify-minsky/evidence/` and `.verify-minsky/worker.log`.
+Cleanup sends shutdown to the session. If the session does not answer within 10 seconds, cleanup continues. It then signals the recorded `serve` pid, the recorded Chromium pid, the recorded Wrangler pid, and the recorded Worker pid, and only when `/proc/<pid>/cmdline` still matches that process. It does not kill by process name. It removes `.verify-minsky/session.json` and `.verify-minsky/state/`, including the local D1 directory. It leaves `.verify-minsky/evidence/` and `.verify-minsky/worker.log`.
 
 If the session file is missing and ports 5198, 5199, or 9223 are in use, cleanup exits with an error and does not signal those pids.
 
@@ -151,7 +151,7 @@ Run cleanup after every failed attempt, then confirm the evidence directory is s
 
 ## Helpers
 
-The helper is executable TypeScript. Node.js 22 runs it directly. `npm run typecheck` includes the file.
+The helper is executable TypeScript. Node.js 22.18 and later run it directly. `npm run typecheck` includes the file.
 
 ```sh
 node .cursor/skills/verify-minsky/scripts/minsky-verify.ts serve --seed empty

@@ -10,6 +10,8 @@ The build that finishes last replaces the preview. A build that another build re
 The preview accepts migrations that other branches applied. It still requires every migration in the checkout.
 Branch code can change the deploy checks, so only the token protects development data. The preview token must reach only the preview Worker, database, and bucket. If Cloudflare cannot limit it that way, the owner disconnects the trigger and decides on a separate account.
 The owner connected the trigger on 2026-10-24 and applies changes to its settings, such as the build command and the branch exclusion. `minsky-dev` publication from `main` does not change.
+The same day, the owner switched off branch builds on `minsky-preview`. The trigger offers only tokens that Workers Builds creates. They reach every Worker and R2 bucket, and D1 Edit could not be limited to one database.
+Branch previews stay off until the trigger can use a token limited to the preview resources, or until the owner moves the preview to a separate Cloudflare account. The preview code and docs stay in the repository for that case.
 
 **CI audit follow-up, 2026-10-24.** After a CI audit, the owner asked to add two safeguards to PR #67, because `main` now publishes automatically.
 `npm test` and the deploy reject a D1 migration that drops or renames schema, unless `reviewedDestructiveMigrations` records a reviewed exception. Data changes are not checked.

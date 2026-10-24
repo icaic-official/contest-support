@@ -96,7 +96,7 @@ The combined build time of checks and publication is not measured yet. It must s
 ## Preview Workers Builds
 
 The `minsky-preview` Worker publishes branch previews. [Publish branch previews](cloudflare-builds.md#publish-branch-previews) explains the behavior and the dashboard steps.
-The owner connected this trigger on 2026-10-24. The owner applies changes to these settings in the dashboard.
+The owner connected this trigger on 2026-10-24 and switched off its branch builds the same day, because its token cannot be limited to the preview resources. The table lists the settings for when branch builds are on.
 
 | Setting | Value |
 | --- | --- |

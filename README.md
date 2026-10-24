@@ -81,7 +81,7 @@ Never put a service credential in a `VITE_` variable.
 | --- | --- |
 | `npm run dev` | Start the local frontend. |
 | `npm run build` | Check types and create static assets in `dist/`. |
-| `npm run deploy` | Build the Cloudflare app, apply new D1 migrations, and publish it through guarded deployment tooling. Workers Builds runs it on `minsky-dev` for each push to `main`, and on `minsky-preview` for each push to another branch. A manual run needs `WORKERS_CI_BRANCH`, `WORKERS_CI_COMMIT_SHA`, and the approved target settings. |
+| `npm run deploy` | Build the Cloudflare app, apply new D1 migrations, and publish it through guarded deployment tooling. Workers Builds runs it on `minsky-dev` for each push to `main`. Branch previews on `minsky-preview` are switched off. A manual run needs `WORKERS_CI_BRANCH`, `WORKERS_CI_COMMIT_SHA`, and the approved target settings. |
 | `node scripts/deploy-workers.mjs --check --site=app` | Validate the selected deployment target without provider changes. Use `--site=docs` for independent docs settings. |
 | `node scripts/deploy-workers.mjs --build --site=app` | Build the Cloudflare app and record its revision before guarded publication. |
 | `npm run preview` | Serve built assets locally. |
@@ -168,7 +168,7 @@ npm run docs:dev
 The deployment configuration is `wrangler.docs.jsonc`.
 See [the writing and deployment guide](site/src/content/docs/contributing/documentation.mdx).
 The initial docs deployment is explicitly authorized in T0011 before merge.
-Four Workers Builds triggers check and publish this repository. A branch push runs the checks and publishes the branch to the shared preview `minsky-preview`. A merge into `main` publishes `minsky-dev` and the docs.
+Four Workers Builds triggers check and publish this repository. A branch push runs the checks. Branch previews on `minsky-preview` are switched off, because Workers Builds cannot limit their token to the preview resources. A merge into `main` publishes `minsky-dev` and the docs.
 [Build and publication flow](docs/cloudflare-builds.md#build-and-publication-flow) describes each trigger and what each push does.
 See [Workers Builds setup](docs/cloudflare-builds.md) for the dashboard steps and [CI settings](docs/cloudflare-build-settings.md) for on-demand browser and hosted commands.
 Automatic GitHub Actions publication is removed.

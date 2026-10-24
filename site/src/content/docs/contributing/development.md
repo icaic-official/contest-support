@@ -51,11 +51,10 @@ Hosted test commands need isolated CI resources. Check their targets first, and 
 
 1. Branch from updated `main`. Name the branch `<type>/<title>`, for example `bugfix/race-request-fix`.
 2. Implement, verify, and update the docs in the same change.
-3. Push the branch. Wait for `Workers Builds: minsky-ci` and `Workers Builds: minsky-preview` to pass.
-4. Test the change on the shared preview at `https://minsky-preview.icaic-minsky.workers.dev`.
-   It uses only test data. The build that finishes last replaces it. Check that its `/minsky-revision.json` shows your commit.
-5. Open a draft pull request into `main`. The owner reviews and merges.
-6. After the merge, Workers Builds checks `main` again and publishes the development app and the docs.
+3. Push the branch. Wait for `Workers Builds: minsky-ci` to pass.
+   Test the change locally. The shared preview does not build branches now, because [branch previews are switched off](https://github.com/GiftedNovaHD/minsky/blob/main/docs/cloudflare-builds.md#publish-branch-previews).
+4. Open a draft pull request into `main`. The owner reviews and merges.
+5. After the merge, Workers Builds checks `main` again and publishes the development app and the docs.
 
 [Build and publication flow](https://github.com/GiftedNovaHD/minsky/blob/main/docs/cloudflare-builds.md#build-and-publication-flow) describes each trigger.
 Write D1 migrations that only add tables, columns, or indexes. The checks reject a migration that drops or renames schema.

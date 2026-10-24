@@ -1,7 +1,7 @@
 # Activate the fresh Cloudflare development installation
 
 Use this maintainer procedure to switch the existing development URL after owner approval.
-For another installation, use [Install Cloudflare](../site/src/content/docs/operators/installation.md).
+For another installation, use [Install Cloudflare](../site/src/content/docs/operators/installation.mdx).
 That guide owns resource creation, migrations, bootstrap, and trusted owner recovery.
 This guide owns the development switch, verification, and repair.
 

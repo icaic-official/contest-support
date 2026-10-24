@@ -1,76 +1,51 @@
 ---
-title: Manage accounts and session controls
-description: Create accounts, assign access, control contestant intake, and set image limits.
+title: Manage a session
+description: Create accounts, reset passwords, control intake, and set image limits.
 ---
+
+Use the **Session** tab (phone) or the **Accounts** and **Session settings** pages (console).
 
 ## Create an account
 
-As a session admin, open the **Session** tab on a phone, or **Accounts** in the desktop console.
-Select **New account** on a phone, or **Create account** on the desktop.
-Create a username account for a roster team or an individual staff member.
-Minsky shows the username and temporary password once. Copy them before you select **Done**.
-Distribute the temporary password through your organization's approved private channel.
-The user must change it before contest access.
+1. Select **New account** (phone) or **Create account** (console).
+2. Create a team account for contestants or a personal account for each staff member.
+3. Copy the username and temporary password before you select **Done**. Minsky shows them once.
+4. Send them through a private channel.
 
-Minsky app membership is separate from Cloudflare, GitHub, and Supabase access.
-An organizer does not need to give provider credentials to contestants or support staff.
-
-## Assign session access
-
-Choose the team for a contestant account.
-Assign the required roles to staff accounts.
-A person can hold volunteer, specialist, and jury roles together.
-Session-admin access controls account and session administration.
-
-Review the selected session before changing membership.
-Removing membership removes access to that session.
-Historical ownership and activity still identify the same person.
-Minsky prevents removal of the last administrator.
+Choose the team for a contestant. Give staff any of **Volunteer**, **Specialist**, **Jury**, and **Admin**. Roles combine.
+App access is separate from Cloudflare, GitHub, and Supabase access.
 
 ## Reset a password
 
-1. Check the requester's identity through your organizer procedure.
-2. Reset the account password from the account sheet on a phone, or from **Manage** on the desktop. Confirm the reset.
-3. Give the replacement temporary password to the account holder privately.
-4. Ask the user to sign in again and change it.
+1. Confirm who is asking.
+2. Reset from the account sheet (phone) or **Manage** (console).
+3. Give the new temporary password privately.
 
-The reset invalidates prior access.
-Account IDs and historical activity remain.
-Existing passwords are never displayed.
+The reset signs the account out everywhere. History stays.
+Resets and username changes affect the whole account, so you need admin access to all its sessions.
 
-Password resets and username changes affect the whole account.
-You need admin access to every session assigned to that account.
-An archived membership blocks these account-wide changes.
-Ordinary session permission changes apply only to the selected session.
+## Remove access
 
-## Control contestant intake
+Removing a membership removes access to that session. History still names the person.
+Minsky keeps at least one admin.
 
-Open intake when contestants may submit new reports.
-Close intake when new contestant reports must stop.
-Staff can still report on behalf of a team during an active event.
-Existing issues can still be reopened.
-Intake and event archival are different controls.
+## Intake
 
-## Set image limits
+Open intake to let contestants submit reports. Close it to stop new reports.
+Staff can still report for a team, and existing issues can still be reopened.
 
-Session admins set three limits.
-One MB is 1,048,576 bytes.
+## Image limits
 
-| Limit | Allowed range | Default |
+| Limit | Range | Default |
 | --- | --- | --- |
 | One image | 1–50 MB | 10 MB |
-| Image count per issue | 1–24 | 12 |
-| Combined image size per issue | 1–120 MB | 120 MB |
+| Images per issue | 1–24 | 12 |
+| Total per issue | 1–120 MB | 120 MB |
 
-The combined limit must be at least the single-image limit.
-Reducing a limit does not remove existing images.
-The next upload must fit the current limits.
-There is no switch that disables all staff uploads.
+The total must be at least the single-image limit. Lower limits do not remove existing images.
+Uploads cannot be switched off.
 
-## Understand archival
+## Archived events
 
-Archived events remain readable by authorized members.
-Issue changes, uploads, removal, and image-limit changes stop.
-Minsky does not automatically delete archived records or files.
-General event, roster, and category editors remain future work.
-Use the [installation guide](/operators/installation/) for the current first-install preparation process.
+Archived events stay readable. Changes, uploads, and limit changes stop. Nothing is deleted.
+Editors for events, rosters, and categories do not exist yet; the [installer](/operators/installation/#6-create-the-first-owner) creates them.

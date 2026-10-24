@@ -63,6 +63,16 @@ or signing key. Scans of all fetched history include this announcements-branch c
 even on dependency PRs. The exception covers only that commit, file, rule, and line.
 Other findings, including new findings in the same file, still fail the scan.
 
+## Prepare a Cursor cloud agent
+
+Cursor runs `.cursor/install.sh` when a saved environment uses `.cursor/environment.json`.
+The script installs the root lockfile and the `site` lockfile with `npm ci`.
+When `deno` is missing from `PATH`, the script copies the Deno 2.9.6 binary from that locked package to `/usr/local/bin`.
+It then installs Playwright Chromium and the system libraries used by browser tests.
+Run the script again on a prepared machine. `npm ci` reinstalls from the lockfiles, and the Deno copy is skipped when `deno` already runs.
+The script does not start the app, deploy it, or read secrets.
+The machine must already have Node.js 22.22 or later, or Node.js 24. The script does not install Node.js.
+
 ## Human review
 
 [The PR template](../.github/pull_request_template.md) covers scope, readability, authorization, privacy, workflow behavior, migration compatibility, verification, and documentation.
@@ -88,21 +98,25 @@ The branch-protection lookup returned HTTP 404.
 With these permissions, that response does not establish whether a protection rule already exists.
 This change did not configure remote enforcement.
 
-The repository owner must first review existing protections.
-Then configure `main` with these requirements:
+`.github/main-protection.json` records the intended protection for `main`.
+The repository is private, and the owner keeps GitHub Free.
+GitHub Free does not support branch protection or rulesets on a private repository.
+The file is not applied.
+The required status check is `Workers Builds: minsky-ci`.
+The check entry omits the app id.
+
+The file records these requirements:
 
 - Require pull requests and one independent approving review.
 - Dismiss approvals when reviewable changes arrive.
 - Require resolution of review threads.
-- Do not require the retired Actions names `checks`, `secrets`, or `dependencies`.
-- After the first green Workers Builds run, require that check's exact context and app id.
+- Require the status check `Workers Builds: minsky-ci`.
 - Require the branch to be current before merge.
 - Apply protection to administrators.
 - Prohibit force pushes and branch deletion.
 
-After the Workers Builds check appears on a commit, copy its context and app id into `.github/main-protection.json`.
-The file currently requires no status checks. Do not apply it until that check name is present.
-An authenticated repository administrator can then use the prepared payload.
+While the repository stays on GitHub Free, do not send this payload.
+When the plan supports branch protection for this private repository, an administrator can apply the file.
 Before you use it, reconcile it with existing rules.
 
 ```sh
@@ -114,8 +128,6 @@ gh api --method PUT repos/GiftedNovaHD/minsky/vulnerability-alerts
 
 The payload replaces branch protection.
 Preserve any stricter existing settings.
-The retired Actions contexts used GitHub Actions app ID `15368`.
-Do not put that app id back. Workers Builds uses its own GitHub app.
 See [GitHub's branch-protection API](https://docs.github.com/en/rest/branches/branch-protection#update-branch-protection).
 
 The final command enables Dependabot vulnerability alerts separately from update PRs.
@@ -127,6 +139,4 @@ The committed Gitleaks and npm audit commands work without those features.
 CI secret scanning detects committed secrets after push.
 It does not provide GitHub push protection.
 
-If the owner's GitHub plan does not support protection for this private repository, record the limitation.
-Record the concrete upgrade cost before you select a paid plan.
 Do not claim merge enforcement until the owner verifies the remote rules.

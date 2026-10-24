@@ -63,7 +63,7 @@
   "workspace": {
     "packageJson": {
       "dependencies": [
-        "npm:@electric-sql/pglite@0.5.9",
+        "npm:@electric-sql/pglite@0.5.10",
         "npm:@eslint/js@^10.0.1",
         "npm:@fontsource-variable/inter@^5.3.0",
         "npm:@fontsource-variable/jetbrains-mono@^5.3.0",
@@ -74,8 +74,8 @@
         "npm:@types/react-dom@^19.1.9",
         "npm:@types/react@^19.1.12",
         "npm:@vitejs/plugin-react@^5.0.2",
-        "npm:better-auth@1.7.10",
-        "npm:class-variance-authority@^0.7.1",
+        "npm:better-auth@1.7.11",
+        "npm:class-variance-authority@~0.7.1",
         "npm:clsx@^2.1.1",
         "npm:cmdk@^1.1.1",
         "npm:deno@2.9.6",
@@ -98,7 +98,7 @@
         "npm:vaul@^1.1.2",
         "npm:vite@^8.3.3",
         "npm:vitest@^5.0.4",
-        "npm:wrangler@4.149.0",
+        "npm:wrangler@4.151.2",
         "npm:zod@^4.6.7"
       ]
     }

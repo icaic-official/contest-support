@@ -17,6 +17,8 @@ export default tseslint.config(
   { ignores: ["dist", "design", "node_modules", "playwright-report", "test-results", "site/dist", "site/.astro", "site/node_modules", "**/.wrangler/**"] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
+  // The Lapiz preview scripts run in Node.
+  { files: [".lapiz/**/*.mjs"], languageOptions: { globals: globals.node } },
   {
     files: ["**/*.{ts,tsx}"],
     languageOptions: { globals: { ...globals.browser, ...globals.node } },

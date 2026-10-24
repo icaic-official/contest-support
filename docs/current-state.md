@@ -1,5 +1,17 @@
 # Current state
 
+## Live backend, 2026-10-23
+
+The owner selected Cloudflare as the live backend on 2026-10-23.
+The development Worker is `minsky-dev`. The development D1 database is `minsky-development`.
+The development app is https://minsky-dev.icaic-minsky.workers.dev.
+Supabase is a supported second provider.
+Its adapter, migrations, functions, provider tests, projects, and accounts stay in place.
+It does not serve the development URL.
+Earlier sections that say Supabase remains active describe the decision on that date.
+The 2026-10-23 decision supersedes those statements.
+This record does not read or change the live deployment.
+
 ## PR #45 update from main, 2026-10-23
 
 The owner requests current `main` and conflict resolution for the existing draft PR.
@@ -446,7 +458,7 @@ The authorization and evidence update changes documentation only. Application co
 ## PR #42 review fixes and cleanup, 2026-10-18
 
 The owner requested the review fixes, removal of obsolete tests and code, and fresh verification before PR #42 is ready.
-Supabase remains active. The owner reviews and merges.
+Supabase remains active. Superseded on 2026-10-23. The owner reviews and merges.
 
 The current code removes the historical D1 proof implementation, its command and configuration, and the test-only issue-view interface.
 D1 workflow tests now call the shared service and the real authorized application snapshots.
@@ -460,7 +472,7 @@ Protected CI retains the hosted React recovery journal and the consolidated runn
 Authentication and application HTTP routes share the bounded JSON reader.
 Node.js supplies exact configuration comparison in place of duplicate sorting functions.
 
-The complete installation procedure now lives in [the public installation source](../site/src/content/docs/operators/installation.md).
+The complete installation procedure now lives in [the public installation source](../site/src/content/docs/operators/installation.mdx).
 Completed proof and implementation instructions link to their frozen historical source.
 The [review run report](t0020-run-report.md) lists changes, commands, checks, and remaining verification.
 
@@ -547,7 +559,7 @@ Private credential files have mode `0600`; their contents were not printed or co
 T0020 starts from merged PR #41 at `7d19b00`.
 The active branch is `feature/t0020-cloudflare-connector`.
 Hosted CLI, protected Cloudflare verification, and the current empty-installation trial pass on `25b2033`.
-Supabase remains active.
+Supabase remains active. Superseded on 2026-10-23.
 During final verification, the owner merged PR #23 at `c144a2a`.
 T0020 includes that main revision and preserves the jury worklist.
 The combined source passes 614 unit and database tests across 41 files and all 45 ordinary browser cases.
@@ -1153,7 +1165,7 @@ T0020 retains its complete-connector and empty-installation scope.
 
 The worklist uses provider-neutral `Backend` contracts and authorized snapshots.
 Existing workflow operations enforce current permissions, transitions, stale revisions, and request receipts at the server.
-Supabase remains active. This maintenance adds no schema, backend feature, provider implementation, or runtime dependency.
+Supabase remains active. Superseded on 2026-10-23. This maintenance adds no schema, backend feature, provider implementation, or runtime dependency.
 The owner reviews and merges. No application deployment or data migration is authorized.
 
 ### Current local checks
@@ -1348,7 +1360,7 @@ retains its existing bundle-size warning. No deployment was performed.
 The owner requested the PR #41 fixes, a second review, bounded code cleanup, and completion of hosted authentication verification.
 Implementation commit `7abaf2e` is on `feature/t0019-shared-server-workflow` and is pushed to PR #41.
 The owner confirmed Workers Paid activation during this run.
-Supabase remains the active application backend. The owner still reviews and merges.
+Supabase remains the active application backend. Superseded on 2026-10-23. The owner still reviews and merges.
 
 ### Expiry correction and code review
 
@@ -1497,7 +1509,7 @@ Existing D1 and SQL test files retain their local quote style.
 3. Commands run. Used `git` for status, fetch, worktree creation, diffs, commits, trailer checks, push, and the merge from updated main. Used `gh` for PR inspection, creation, checks, and environment-policy reads. Read source and migrations with `cat`, `sed`, and `rg`. Read the official TypeScript guide and Supabase Auth documentation. Ran `npm run typecheck`, `lint`, `build`, `check:functions`, `test:functions`, `test:e2e`, `test:providers:list`, `docs:build`, and `docs:test`. Ran `npm test`, `npm run test:auth:browser`, `npm ci --prefix site`, and `playwright install chromium`. Ran `npm run test:workflow:hosted` and `npm run test:d1:hosted` with explicit isolated targets. Supabase commands included `projects list`, `link`, `migration list`, `migration fetch`, `db push --dry-run`, `db push --yes`, `functions deploy`, and `functions list`. Confirmed existing Cloudflare access with `wrangler whoami`. Ran documentation path, writing, and whitespace checks. Initial sandbox Git, sockets, provider access, and Deno downloads needed escalation. Corrected initial test compilation and lint issues. Excluded the hosted Vitest suite from Playwright discovery and supplied its missing browser binary under `/tmp`. Astro required a local locked install instead of a dependency symlink.
 4. Build/test results. The list above gives observed passing results. Initial hosted failures were fixture Auth rate limits. Protected GitHub results remain separate and unverified.
 5. Manual verification steps. Inspected effective migrations, identity boundaries, commit dependencies, provider targets, cleanup scope, and unchanged environment restrictions. Bounded agents independently inventoried rules, implemented persistence/tests, and reviewed the shared service. Manual product UI checks: not repeated. The active UI path remains unchanged.
-6. Risks. The active backend still uses legacy SQL. The new path has verification evidence on CI only. D1 identity-backed workflows need commit guards for credential generations and Better Auth session expiry and deletion. Full D1 commands, live delivery, installation, migration, and contest capacity remain unverified. T0018's hosted HTTP check remains incomplete.
+6. Risks. The active backend still uses legacy SQL. Superseded on 2026-10-23. The new path has verification evidence on CI only. D1 identity-backed workflows need commit guards for credential generations and Better Auth session expiry and deletion. Full D1 commands, live delivery, installation, migration, and contest capacity remain unverified. T0018's hosted HTTP check remains incomplete.
 7. Follow-up tickets. Owner review and merge of T0019. Later candidates are remaining D1 persistence through the shared service, full connector verification, and an approved Supabase-path activation. PR #40 has merged. Its authentication source remains unchanged by this extraction. AWS, Terraform, R2, and migration tooling remain deferred.
 8. Docs that need updating. None for the completed scope. A later approved protected run must add its separate evidence.
 
@@ -1508,7 +1520,7 @@ T0018 starts from `main` at `0c797ad` after PR #39 merged on 2026-10-17 at 15:49
 The working tree was clean. The branch is `feature/t0018-cloudflare-authentication`.
 [PR #40](https://github.com/GiftedNovaHD/minsky/pull/40) contains implementation commit `48ed3dbc2f1359e8160610fdfe7ffa4cec313f44`.
 The owner reviews and merges.
-Supabase remains the active application backend. No real-data export, real-account reset, migration, or backend switch occurred.
+Supabase remains the active application backend. Superseded on 2026-10-23. No real-data export, real-account reset, migration, or backend switch occurred.
 
 ### Implemented behavior
 
@@ -1736,7 +1748,7 @@ wrangler.auth-ci.jsonc
 
 T0017 starts from merged `main` at `53f9dfd` on `feature/t0017-d1-transaction-proof`.
 The working tree was clean. Open PRs #20, #21, and #23 cover separate tickets.
-Supabase remains active. This ticket adds an experimental store, not a complete Cloudflare connector.
+Supabase remains active. Superseded on 2026-10-23. This ticket adds an experimental store, not a complete Cloudflare connector.
 
 The owner selected organizer-issued replacement temporary passwords for the later migration.
 Mandatory changes preserve the contest-access gate. Account IDs, memberships, permissions, and history remain required.
@@ -1817,7 +1829,7 @@ This branch now includes that merge commit.
 The user merged T0016 in [PR #36](https://github.com/GiftedNovaHD/minsky/pull/36) at `b68ef72` on 2026-10-17 at 13:50:36 UTC. The design review is complete.
 The [design](cloudflare-backend-design.md) separates existing contracts from proposed server components.
 The [implementation plan](https://github.com/GiftedNovaHD/minsky/blob/88ea5020a0f9dfc34a32ed7fbd84dfea07423297/docs/cloudflare-implementation-plan.md) defines bounded phases and acceptance evidence.
-Supabase remains active. No Cloudflare backend, authentication replacement, or data migration is implemented here.
+Supabase remains active. Superseded on 2026-10-23. No Cloudflare backend, authentication replacement, or data migration is implemented here.
 
 1. Summary of changes. Prepared the Cloudflare architecture and implementation acceptance plan. Recorded the parallel branch exception and AWS portability motivation.
 2. Files changed. `AGENTS.md`, `PLAN.md`, `README.md`, `docs/cloudflare-backend-design.md`, `docs/cloudflare-implementation-plan.md`, `docs/current-state.md`, `docs/product-direction.md`, and `docs/tickets.md`.

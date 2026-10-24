@@ -205,7 +205,7 @@ Image failures use `ImageRequestError`.
 ## Avatars
 
 `Backend.avatars` reads and changes profile pictures. A picture belongs to an account, not to a session.
-No screen uses this group yet. A later frontend change adds the picture controls and their display.
+The account page and the phone **Me** tab change the caller's picture. `PersonAvatar` shows the pictures. See [Profile pictures](frontend-architecture.md#profile-pictures).
 
 This visibility rule decides which pictures a caller can read:
 
@@ -222,14 +222,14 @@ This visibility rule decides which pictures a caller can read:
 
 The server accepts a JPEG, PNG, or WebP file of up to `AVATAR_MAX_BYTES`, 262,144 bytes, from [imageFile.ts](../src/connected/imageFile.ts).
 It checks the file signature and stores that type. The declared content type does not change the result.
-The planned frontend crops the picture to a square and encodes it at no more than 512 by 512 pixels before upload. The new encoding removes EXIF and location metadata.
+The frontend crops the picture to a square and encodes it as a JPEG of no more than 512 by 512 pixels before upload. The new encoding removes EXIF and location metadata.
 Each stored picture has its own `avatar_id`, so a client can use it as a cache key.
 
 Failures use `ImageRequestError`. `validation` marks a rejected file or request. `restart` means that the upload expired. The caller then selects the picture again with a new request ID.
 
 The issue snapshot and its `members` list do not contain pictures.
 A picture change sends no live signal.
-The planned frontend reads `list()` again after each live signal and on the 10-second refresh. Other people then see a changed picture after their next refresh or signal.
+The frontend reads `list()` again after each live signal and every 10 seconds. Other people then see a changed picture after their next read.
 
 The providers differ in one check.
 A Supabase Storage object name has no session, so Storage allows a read in any session where both people are staff.

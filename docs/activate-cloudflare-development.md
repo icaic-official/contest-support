@@ -59,7 +59,7 @@ Before requesting activation approval, complete these checks:
 3. Confirm the account and every exact target again. Reconfirm the current stable version for the recovery record.
 4. Require the final local and hosted checks. Record CLI hosted results separately from protected GitHub Actions results.
 5. Obtain any required authorization before adding a branch to `cloud-test`. Preserve all existing entries and protection rules.
-6. In Cloudflare, confirm that independent Git builds remain disabled for `minsky-dev` and `minsky-docs`.
+6. In Cloudflare, confirm that independent Git builds remain disabled for `minsky-dev`. The `minsky-docs` docs builds stay connected.
 7. Review the configuration, secret names, deployment sequence, verification criteria, and repair commands below with the owner.
 8. Obtain explicit approval for this backend switch. Do not infer it from the preparation PR merge.
 

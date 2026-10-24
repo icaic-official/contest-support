@@ -235,7 +235,10 @@ export async function prepareApplication(worker, env, execute = execFileSync, re
       throw new Error("Cloudflare target inspection failed. Provider output was withheld.");
     }
   };
-  await confirmTarget({ account, database: worker.settings.databaseId }, worker.settings, runWrangler);
+  const preview = worker.name === previewWorker.name;
+  // The build variable, not the committed configuration, names the expected database.
+  const database = preview ? env.MINSKY_PREVIEW_DATABASE_ID : env.MINSKY_DEV_DATABASE_ID;
+  await confirmTarget({ account, database }, worker.settings, runWrangler);
   try {
     const bucket = `https://api.cloudflare.com/client/v4/accounts/${account}/r2/buckets/${worker.settings.bucketName}`;
     const results = await Promise.all(["", "/domains/managed", "/domains/custom"].map(async (suffix) => {
@@ -279,7 +282,8 @@ export async function prepareApplication(worker, env, execute = execFileSync, re
   } catch {
     throw new Error("The migration outcome is unknown. Provider output was withheld. Inspect applied versions before retrying.");
   }
-  await assertCurrentMigrations(worker.settings, runWrangler);
+  // All branches share the preview database. Another branch can add migrations that this checkout lacks.
+  await assertCurrentMigrations(worker.settings, runWrangler, { allowExtra: preview });
 }
 
 /** The build and upload use the Cloudflare backend and confirmed public configuration. */

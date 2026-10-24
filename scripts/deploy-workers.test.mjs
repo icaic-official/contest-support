@@ -309,6 +309,12 @@ it("confirms the live target before it applies migrations and requires the check
   expect(execute.mock.calls[0][2].stdio).toEqual(["ignore", "pipe", "pipe"]);
   expect(execute.mock.calls[0][2].env.CI).toBe("true");
 
+  // The build variable must match the committed configuration.
+  const unmatched = vi.fn(provider());
+  await expect(prepareApplication(worker, { ...cloudflare, MINSKY_DEV_DATABASE_ID: "other" }, unmatched, request))
+    .rejects.toThrow(/exactly match the selected configuration/);
+  expect(unmatched).not.toHaveBeenCalled();
+
   const unconfirmed = vi.fn(() => "private rejected provider detail");
   await expect(prepareApplication(worker, cloudflare, unconfirmed, request)).rejects.toThrow(/could not be confirmed/);
   expect(applies(unconfirmed)).toHaveLength(0);
@@ -475,6 +481,40 @@ describe("branch previews", () => {
     expect(mocks.verify).toHaveBeenCalledWith("https://minsky-preview.icaic-minsky.workers.dev", marker);
     expect(mocks.deployedApplication).toHaveBeenCalledWith(worker, expect.anything());
     expect(mocks.report).toHaveBeenCalledWith("Target: shared preview Worker `minsky-preview`.");
+  });
+
+  it("accepts migrations from other branches but requires every migration in the checkout", async () => {
+    const worker = (await deploymentTargets(preview, "app"))[0];
+    const names = await currentMigrationNames();
+    const request = vi.fn(async (url) => ({ ok: true, json: async () => ({ success: true,
+      result: url.endsWith("/managed") ? { enabled: false } : url.endsWith("/custom") ? { domains: [] }
+        : { name: previewSettings.bucketName },
+    }) }));
+    const provider = (applied) => vi.fn((command, args) => {
+      if (args[0] === "whoami") return previewSettings.accountId;
+      if (args[0] === "d1" && args[1] === "info") {
+        return JSON.stringify({ uuid: previewSettings.databaseId, name: previewSettings.databaseName });
+      }
+      if (args[0] === "secret") return JSON.stringify([{ name: "AUTH_SECRET", type: "secret_text" }]);
+      if (args[0] === "d1" && args[1] === "time-travel") {
+        return JSON.stringify({ bookmark: "00000085-0000024c-00004c6d-8e61117bf38d7adb71b934ebbf891683" });
+      }
+      if (args[0] === "d1" && args[1] === "migrations") return "Migrations applied";
+      if (args[0] === "d1" && args[1] === "execute") {
+        return JSON.stringify([{ success: true, results: applied.map((name) => ({ name })) }]);
+      }
+      throw new Error("Unexpected command");
+    });
+
+    // Another branch applied 9999_other.sql to the shared database.
+    await prepareApplication(worker, preview, provider([...names, "9999_other.sql"]), request, vi.fn());
+    await expect(prepareApplication(worker, preview, provider(names.slice(1)), request, vi.fn()))
+      .rejects.toThrow(/hosted migrations differ/);
+
+    const other = provider(names);
+    await expect(prepareApplication(worker, { ...preview, MINSKY_PREVIEW_DATABASE_ID: settings.databaseId },
+      other, request)).rejects.toThrow(/exactly match the selected configuration/);
+    expect(other).not.toHaveBeenCalled();
   });
 
   it("reads the live bindings of the preview Worker", async () => {

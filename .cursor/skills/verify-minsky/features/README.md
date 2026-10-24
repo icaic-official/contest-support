@@ -2,7 +2,7 @@
 
 This directory is the maintained source for user-facing Minsky behavior. Read this index, then follow one feature file. The launch, doctor, and cleanup commands live in [the skill](../SKILL.md).
 
-Keep this map aligned with the app by running `/maintain-verification-skill`.
+Update this map in the same change as any user-facing behavior change. Announcements have no feature file yet.
 
 ## Baseline preconditions
 

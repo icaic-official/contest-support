@@ -131,6 +131,8 @@ Both exceed the 20 minute Workers Builds timeout, so they cannot move into a bui
 
 Hosted Supabase checks need the isolated CI project and its private keys.
 Do not point them at development project `ovymmobupzowotvrywek`.
+Run them from the separate CI checkout in the [Supabase provider guide](supabase-provider.md#development-and-release-process), with `MINSKY_TEST_PROJECT_REF` set.
+Keep the primary checkout linked to development.
 
 ```sh
 npx supabase link --project-ref "$MINSKY_TEST_PROJECT_REF"
@@ -155,7 +157,7 @@ Run them only against the documented CI database names.
 ## Publication commands
 
 The GitHub Actions jobs `checks`, `secrets`, `dependencies`, `deploy`, and `deploy-app` are removed.
-Protected `cloud-test` rules stay in GitHub. No workflow uses them.
+Publication is an explicit, guarded command. Run it only after an explicit request.
 
 `scripts/deploy-workers.mjs` reads the pushed branch and commit from two variables:
 
@@ -252,6 +254,7 @@ Each upload checks that the push revision is still the branch's current revision
 Lookup errors fail the build. Deleted or outdated branches skip remaining uploads.
 This check runs before the migrations.
 A newer push does not cancel an upload already in progress.
+The script has no lock. Do not start a manual publication while a Workers Builds publication runs.
 
 For the app, `minsky-revision.json` records `sha`, `backend`, `databaseId`, `bucketName`, and `origin`.
 Supabase mode uses null database and bucket values. Cloudflare mode records the exact selected targets.
@@ -264,11 +267,13 @@ After a Cloudflare upload, the script checks the deployed `DB`, `IMAGES`, `LIVE_
 The database UUID, bucket name, origin, and binding types must match the reviewed configuration.
 The live binding must name `SessionLiveCoordinator` and a namespace within this Worker.
 An anonymous `/api/auth/session` request must return `401` and `Sign in to continue.`.
-A mismatch fails the deployment job. The script withholds provider diagnostics and secret values.
+A mismatch fails the command. The script withholds provider diagnostics and secret values.
 These checks verify publication, selection, bindings, and an anonymous denial.
 Authenticated authorization, private images, recovery, and live updates require the separate application checks.
 
-Docs previews use a normalized branch name with a 12-character SHA-256 suffix.
+Workers Builds now publishes the docs and their preview versions. See [Publish the docs](cloudflare-builds.md#publish-the-docs).
+The script's `--site=docs` path remains a manual fallback.
+Its docs previews use a normalized branch name with a 12-character SHA-256 suffix.
 The preview parser accepts asset-progress lines before the JSON response. Malformed JSON and URLs outside the permitted Worker domain remain rejected.
 The script runs `wrangler preview` with `--ignore-base-config`, the revision tag, and JSON output.
 Stable publication uses `wrangler deploy` with the reviewed configuration.

@@ -1,4 +1,8 @@
-# Current state
+# Run log
+
+This file records dated runs, decisions, and verification evidence, newest first.
+It was named `docs/current-state.md` until 2026-10-24.
+Each section describes its own date and revision. Check the repository, [development tickets](../tickets.md), and the public [feature status](../../site/src/content/docs/reference/status.md) for the current state.
 
 ## Live backend, 2026-10-23
 
@@ -16,7 +20,7 @@ This record does not read or change the live deployment.
 
 This run ports T0006 session announcements from [PR #20](https://github.com/GiftedNovaHD/minsky/pull/20) to current `main` at `ecc75e2`.
 It supersedes PR #20, which targeted an older `main` and only Supabase. The owner closes PR #20 after the new PR passes.
-The branch is `feature/t0006-session-announcements-port`. See [session announcements](session-announcements.md) and the [T0006 ticket](tickets.md#t0006--session-announcements).
+The branch is `feature/t0006-session-announcements-port`. See [session announcements](../session-announcements.md) and the [T0006 ticket](../tickets.md#t0006--session-announcements).
 The branch was later updated from `main` at `70fafa8`.
 Nothing is deployed. No migration, function, secret, or hosted resource changed.
 
@@ -54,7 +58,7 @@ A review after the update from `main` found these defects. Each fix has a regres
 - Hosted Supabase and hosted Cloudflare behavior, including R2 transfers and Durable Object delivery.
 - Image upload in a browser. Service, database, function, and adapter tests cover its parts. No test runs the Cloudflare browser adapter, HTTP route, and image service together.
 - The shared provider test bridge. It reports that it does not cover announcements.
-- Other browsers, screen readers, 200% zoom, and physical devices. [Manual checks](manual-verification.md#15-session-announcements-t0006) list them.
+- Other browsers, screen readers, 200% zoom, and physical devices. [Manual checks](../manual-verification.md#15-session-announcements-t0006) list them.
 
 ## Docs publication through Workers Builds, 2026-10-24
 
@@ -78,7 +82,7 @@ The build record does not include the commit hash.
 The owner requests current `main` and conflict resolution for the existing draft PR.
 The merge includes `origin/main` at `a938e6a`, which contains PR #44's redesigned frontend and PR #46's CI change.
 The integration retains browser routes and binds workflow retries to their original actor, session, request ID, and command.
-The [frontend architecture](frontend-architecture.md) is the current reference. Earlier records below describe their recorded source.
+The [frontend architecture](../frontend-architecture.md) is the current reference. Earlier records below describe their recorded source.
 PR #45 remains draft. The local checks below verify the combined source before the merge commit.
 No hosted verification, deployment, provider change, or separate Supabase skip-link fix is part of this request.
 
@@ -164,7 +168,7 @@ Remote merge enforcement remains unverified. The earlier protection lookup and v
 
 The owner merged PR #43 at `4e43739` on 2026-10-19 at 12:29:54 UTC, then requested removal of duplicate CI checks.
 The isolated `feature/t0022-ci-run-deduplication` branch starts from that main revision.
-See [Run checks on Workers Builds](cloudflare-builds.md) for the current check behavior and branch coverage.
+See [Run checks on Workers Builds](../cloudflare-builds.md) for the current check behavior and branch coverage.
 Reverting the workflow change restores both executions.
 
 ### Initial local verification
@@ -242,7 +246,7 @@ The owner extends existing [PR #45](https://github.com/GiftedNovaHD/minsky/pull/
 The original `ConnectedApp.tsx` mixed authentication, the workspace, issue screens, administration, and account settings in 2,101 lines.
 `src/app/` now owns the account gate and shared workspace.
 `src/features/` separates issues, administration, account settings, authentication, and jury worklists.
-The [frontend reference](frontend-architecture.md) records each responsibility and route.
+The [frontend reference](../frontend-architecture.md) records each responsibility and route.
 
 The sidebar uses links to `/issues`, `/administration`, `/account`, and `/jury`.
 Direct paths survive sign-in and reload. Browser history restores the section.
@@ -393,7 +397,7 @@ The owner merged PR #42 at `104d9d1` at 11:39:27 UTC, then resumed T0021.
 The separate `feature/t0021-cloudflare-development-install` worktree includes that main revision and its accepted verification records.
 [PR #43](https://github.com/GiftedNovaHD/minsky/pull/43) contains the preparation. The owner reviews and merges.
 Supabase and the stable development URL remain unchanged. No source records or credentials were exported, transferred, reset, or deleted.
-The [activation procedure](activate-cloudflare-development.md) identifies the proposed switch and remaining approval gates.
+The [activation procedure](../activate-cloudflare-development.md) identifies the proposed switch and remaining approval gates.
 
 Wrangler confirmed existing access to account `458ad6a930b0fb717796dfa19ca6a2b1` before creation.
 Exact Worker, D1, and bucket name checks confirmed that each new target was absent.
@@ -489,7 +493,7 @@ All 27 application tables are empty afterward. Sequential API files remove the p
 Before implementation, a scoped API probe verifies native-equivalent number and null binding, ordered results, failed-batch rollback, and write metadata.
 That probe removes its only UUID-owned authentication-limit record and recovery journal.
 This transport avoids the faulty preview hop. It does not repair the underlying Cloudflare connection.
-See [the verification procedure](run-provider-tests.md#use-the-d1-api-transport) for exact commands and limits.
+See [the verification procedure](../run-provider-tests.md#use-the-d1-api-transport) for exact commands and limits.
 PR #43 records the final revision and fresh verification results separately for each transport.
 
 ### Final executable verification and protected access
@@ -533,7 +537,7 @@ Protected CI retains the hosted React recovery journal and the consolidated runn
 Authentication and application HTTP routes share the bounded JSON reader.
 Node.js supplies exact configuration comparison in place of duplicate sorting functions.
 
-The complete installation procedure now lives in [the public installation source](../site/src/content/docs/operators/installation.mdx).
+The complete installation procedure now lives in [the public installation source](../../site/src/content/docs/operators/installation.mdx).
 Completed proof and implementation instructions link to their frozen historical source.
 The [review run report](t0020-run-report.md) lists changes, commands, checks, and remaining verification.
 
@@ -625,7 +629,7 @@ During final verification, the owner merged PR #23 at `c144a2a`.
 T0020 includes that main revision and preserves the jury worklist.
 The combined source passes 614 unit and database tests across 41 files and all 45 ordinary browser cases.
 The complete local React journey also passes through the merged jury worklist.
-The [ticket](tickets.md#t0020-complete-cloudflare-connector) records the complete acceptance criteria.
+The [ticket](../tickets.md#t0020-complete-cloudflare-connector) records the complete acceptance criteria.
 The [PR #21 component record](pr21-installation-disposition.md) explains installation reuse decisions.
 The [run report](t0020-run-report.md) lists changed files, commands, results, and remaining work.
 
@@ -1067,9 +1071,9 @@ The newest record appears first. Older sections describe their own revisions and
 
 Step 5 of T0015 is on `feature/t0015-frontend-redesign` in [PR #44](https://github.com/GiftedNovaHD/minsky/pull/44), which is ready for review. It is not merged or deployed.
 The user reviews and merges the PR. Deployment is a separate explicit step.
-See [T0015](tickets.md#t0015--organiser-and-contestant-frontend-redesign) and [frontend architecture](frontend-architecture.md).
+See [T0015](../tickets.md#t0015--organiser-and-contestant-frontend-redesign) and [frontend architecture](../frontend-architecture.md).
 
-This ticket is the frontend redesign. It is a different record from [T0015 shared provider tests](tickets.md#t0015-shared-provider-tests) from PR #37.
+This ticket is the frontend redesign. It is a different record from [T0015 shared provider tests](../tickets.md#t0015-shared-provider-tests) from PR #37.
 The two records share the ticket number. Their anchors stay separate.
 
 ### Implemented capabilities
@@ -1138,7 +1142,7 @@ After these checks, `main` moved to `104d9d1` (PR #42, T0020 Cloudflare connecto
 `1df20d8` ports the shared journey to the T0015 UIs. It uses the contestant UI, the organiser phone app for the volunteer and the jury member, and the desktop console for the specialist and the admin. It keeps all earlier checks, including admin intake, image limits, role changes, revocation and account recovery. At `1df20d8`, lint, type checking, the build, `npm run check:functions`, 684 unit and database tests, 61 of 61 browser tests and `npm run test:connector:runtime` passed. `npm run test:connector:ui:local` passed in three runs, with verified fixture cleanup. `npm run test:cloud` and the hosted connector UI check were not run, because no cloud credentials exist here.
 
 Visual checks used the browser tool, the Vite dev server and a temporary server that wrapped the PGlite jury fixture. That server is not committed. The checks covered the organiser phone app at 390 × 844 with touch, the organiser desktop console at 1280 × 800 and the contestant desktop app at 1280 × 800. Each UI was checked in light and dark themes. Keyboard checks covered Tab, the skip link, J, Ctrl+K, Escape and sheet **Cancel**. A reload kept the session, the internal note and the running timer. The contestant saw the public reply and not the internal note.
-The [T0015 ticket](tickets.md#verification-2026-10-18) has the details.
+The [T0015 ticket](../tickets.md#verification-2026-10-18) has the details.
 
 ### Limitations
 
@@ -1147,7 +1151,7 @@ The [T0015 ticket](tickets.md#verification-2026-10-18) has the details.
 - Mockup items that need new data are out of scope: "Near me" and helper zones, quick replies, a floor map, configurable aging thresholds, and category icons and descriptions. Category tiles use one generic icon.
 - `npm run build` reports the chunk-size warning above. Code splitting is not done.
 - `src/styles.css` still holds all legacy styles (1,748 lines), with the Public Sans font. Only the image preview page uses them, inside `.legacy-ui`. Step 5 did not remove the unused rules. This is follow-up work.
-- The T0015 design differs from [the T0009 specification](jury-worklist.md) in two ways. The desktop award and confirmation forms stay on the Award review cards. There is no separate **Jury worklist** sidebar entry and no **Back to jury worklist** button.
+- The T0015 design differs from [the T0009 specification](t0009-jury-worklist.md) in two ways. The desktop award and confirmation forms stay on the Award review cards. There is no separate **Jury worklist** sidebar entry and no **Back to jury worklist** button.
 - The ticket number T0015 is also used by the earlier shared provider tests record.
 - The `main` landmark holds the desktop console sidebar, so the skip link moves focus to the start of the sidebar, not to the page content.
 - The updated cloud specs have not run against a cloud project.
@@ -1160,7 +1164,7 @@ Step 4 (step 2b) of T0015 is on `feature/t0015-frontend-redesign` at `4bad47d`. 
 At 1024 px and wider, organisers get the console from `a-console.html` instead of the legacy workspace.
 It reuses the phone app forms, `useSessionAdmin` and the shared rules. `consoleModel.ts` holds the page, tab, count and search rules and has unit tests.
 `src/connected/legacy/` was deleted.
-See [frontend architecture](frontend-architecture.md#organiser-desktop-console).
+See [frontend architecture](../frontend-architecture.md#organiser-desktop-console).
 
 After this step, 11 mocked browser tests failed because they used the old desktop selectors: all 6 tests in `team-search.spec.ts` and all 5 tests in `workspace-refresh.spec.ts`.
 The cloud specs `journey.spec.ts` and `attachments.spec.ts` also used the old desktop selectors. Step 5 updates them.
@@ -1171,7 +1175,7 @@ Protected cloud tests and hosted checks were not run.
 Step 3 of T0015 is on `feature/t0015-frontend-redesign`. It is not merged or deployed.
 Team accounts get the contestant app from `f-contestant-desktop.html` instead of the legacy workspace.
 It shows only public history and team-visible images. `contestantView.ts` holds the pure view rules and has unit tests.
-See [frontend architecture](frontend-architecture.md#contestant-app).
+See [frontend architecture](../frontend-architecture.md#contestant-app).
 
 After this step, one mocked browser test in `team-search.spec.ts` and the cloud specs `journey.spec.ts` and `attachments.spec.ts` still used the old contestant selectors. Step 5 updates them.
 
@@ -1181,7 +1185,7 @@ The step 2a follow-up of T0015 is on `feature/t0015-frontend-redesign`. It is no
 The admin Session tab of the phone app now uses shadcn/ui instead of the administration page from before T0015.
 It keeps every admin action of that page. New accounts and password resets show the credentials once.
 The request logic and the forms are in `src/organiser/admin/`, so the desktop console can use them.
-See [frontend architecture](frontend-architecture.md#organiser-phone-app).
+See [frontend architecture](../frontend-architecture.md#organiser-phone-app).
 
 Local type checking, lint, build and 118 unit and database tests passed.
 26 of 28 mocked browser tests passed. The two failures are the same two tests as in step 2a. Step 5 updates their selectors.
@@ -1194,7 +1198,7 @@ No development account was available. Protected cloud tests and hosted checks we
 Step 2a of T0015 is on `feature/t0015-frontend-redesign`. It is not merged or deployed.
 Below 1024 px, organisers get the phone app from `e-organiser-phone.html` instead of the legacy workspace.
 The Session tab showed the administration page from before T0015. The follow-up above replaces it.
-See [frontend architecture](frontend-architecture.md#organiser-phone-app).
+See [frontend architecture](../frontend-architecture.md#organiser-phone-app).
 
 Local type checking, lint, build and 100 unit and database tests passed.
 26 of 28 mocked browser tests passed. Two tests still use old selectors: one runs at 320 px and now gets the phone app, and one uses the contestant UI from step 3. Step 5 updates them.
@@ -1210,7 +1214,7 @@ Sign-in, password change and session access screens use shadcn/ui, with light an
 After sign-in, a team membership gets `ContestantApp`. Every other membership gets `OrganiserApp`.
 `OrganiserApp` shows a phone layout below 1024 px and a desktop console at 1024 px and wider.
 All three layouts still render the workflow UI from before T0015 as placeholders.
-See [frontend architecture](frontend-architecture.md).
+See [frontend architecture](../frontend-architecture.md).
 
 Local type checking, lint, build, 70 unit and database tests and 28 mocked browser tests passed.
 The browser tests ran in a job VM without `NODE_ENV=production`.
@@ -1388,7 +1392,7 @@ The simulated Realtime payload now includes PostgreSQL column metadata. Browser
 testing caught the return-focus case after a row moved sections; it was corrected
 before the passing run. None of those failed attempts count as passing checks.
 
-The [specification](jury-worklist.md) and [manual walkthrough](manual-verification.md#13-jury-worklist-t0009)
+The [specification](t0009-jury-worklist.md) and [manual walkthrough](../manual-verification.md#13-jury-worklist-t0009)
 record remaining acceptance. Cloud results must not be inferred from local
 transport simulations. The hosted test includes zero-minute award, reopening,
 external confirmation, re-resolution, and rejection of a second award, but is unverified.
@@ -1506,7 +1510,7 @@ T0019 then merged that updated main to resolve review conflicts and preserve the
 Its protected HTTP authentication result remains incomplete after the Workers Free resource limit.
 No paid subscription change occurred.
 
-The [workflow reference](server-workflow.md) inventories all nine existing commands and their effective SQL definitions.
+The [workflow reference](../server-workflow.md) inventories all nine existing commands and their effective SQL definitions.
 `WorkflowService` now makes the shared decisions and coordinates request receipts and guarded commits.
 The Supabase `workflow` Edge Function verifies the bearer with Auth, then calls the shared service.
 Service-only persistence functions recheck current access and captured state under locks.
@@ -1532,7 +1536,7 @@ Hosted Supabase verifies the shared lifecycle, all command variants, persisted h
 It also verifies duplicate and conflicting request IDs, concurrent claims, and a response lost after commit followed by retry.
 It also rejects forged browser identity fields, unsigned callers, direct browser commit plans, and a permission change between read and commit.
 The additional local PostgreSQL cases test credential, login, account, event, membership, intake, and private-state changes before commit, repeated resolution timing, rollback, and direct table denial.
-The [verification guide](verify-server-workflow.md) gives exact commands and recovery steps.
+The [verification guide](../verify-server-workflow.md) gives exact commands and recovery steps.
 
 ### CI preparation and cleanup
 
@@ -1601,7 +1605,7 @@ An unknown commit outcome requires checking the new credentials. It does not pro
 
 The same temporary-authentication lifecycle assertions now serve Supabase and Cloudflare.
 Cloudflare's complete workflow, image, and live-update provider scenarios remain later connector work.
-See the [API reference](cloudflare-authentication.md), [choice and costs](cloudflare-authentication-choice.md), and [verification guide](verify-cloudflare-authentication.md).
+See the [API reference](../cloudflare-authentication.md), [choice and costs](../cloudflare-authentication-choice.md), and [verification guide](../verify-cloudflare-authentication.md).
 
 ### PR review corrections, 2026-10-18
 
@@ -1699,7 +1703,7 @@ Hosted adaptive analytics recorded 66.425 ms for verification and 75.577 ms for 
 A separate small hash sample recorded a 96.311 ms median and a 196.446 ms 99th percentile.
 These samples exceed the Workers Free 10 ms CPU allowance.
 The selected maintained hash therefore needs a larger CPU allowance for dependable hosting.
-The [choice record](cloudflare-authentication-choice.md#resource-evidence-and-deployment-cost) documents Standard's minimum US$5 monthly cost and usage charges.
+The [choice record](../cloudflare-authentication-choice.md#resource-evidence-and-deployment-cost) documents Standard's minimum US$5 monthly cost and usage charges.
 No paid upgrade occurred. Three temporary benchmark Workers were deleted.
 The protected HTTP failure produced one `exceededResources` invocation at 252.901 ms CPU.
 The same invocation reported 16,724,317 bytes of memory in adaptive metrics. That value does not establish peak native allocation or concurrent capacity.
@@ -1888,7 +1892,7 @@ The user authorized this design in parallel with shared provider tests while PR 
 The user then merged PR #32 at `ef6a029` on 2026-10-17 at 12:51:42 UTC.
 This branch now includes that merge commit.
 The user merged T0016 in [PR #36](https://github.com/GiftedNovaHD/minsky/pull/36) at `b68ef72` on 2026-10-17 at 13:50:36 UTC. The design review is complete.
-The [design](cloudflare-backend-design.md) separates existing contracts from proposed server components.
+The [design](../cloudflare-backend-design.md) separates existing contracts from proposed server components.
 The [implementation plan](https://github.com/GiftedNovaHD/minsky/blob/88ea5020a0f9dfc34a32ed7fbd84dfea07423297/docs/cloudflare-implementation-plan.md) defines bounded phases and acceptance evidence.
 Supabase remains active. Superseded on 2026-10-23. No Cloudflare backend, authentication replacement, or data migration is implemented here.
 
@@ -1912,7 +1916,7 @@ This documentation update changes no application, workflow, or test code.
 
 The user authorized this work in parallel with T0016 Cloudflare design while PR #32 was under review.
 PR #32 then merged at `ef6a029`. Both follow-up branches include that revision.
-T0015 implements [shared test contracts](provider-test-contracts.md) and a [run and recovery guide](run-provider-tests.md).
+T0015 implements [shared test contracts](../provider-test-contracts.md) and a [run and recovery guide](../run-provider-tests.md).
 Supabase is the first hosted fixture implementation. Cloudflare and AWS implementations remain future work.
 
 The scenarios call the real browser adapter through a typed bridge.
@@ -2068,8 +2072,8 @@ The user authorized this first migration step while the other pull requests rema
 7. Follow-up tickets. Complete T0014 protected cloud verification and user review. The next candidate is a shared hosted contract suite before the Cloudflare implementation. Authentication migration, D1, R2, Durable Objects, and eventual data cutover remain later work. Other providers and Terraform remain deferred.
 8. Docs that need updating. None for the implemented extraction. Future hosted verification must add its result to this record.
 
-The [backend contracts](backend-contracts.md) describe the interfaces and retry rules.
-The [cloud onboarding guide](cloud-onboarding.md#verification-and-protected-cloud-ci) lists the `cloud-test` environment configuration.
+The [backend contracts](../backend-contracts.md) describe the interfaces and retry rules.
+The [cloud onboarding guide](../supabase-provider.md#verification-and-hosted-cloud-checks) lists the `cloud-test` environment configuration.
 
 [Draft PR #32](https://github.com/GiftedNovaHD/minsky/pull/32) contains implementation commit `408dafa`.
 [GitHub Checks](https://github.com/GiftedNovaHD/minsky/actions/runs/39022916356) and the [secret and dependency checks](https://github.com/GiftedNovaHD/minsky/actions/runs/39022916361) passed for that commit.
@@ -2148,7 +2152,7 @@ The setup guide includes the one-time dashboard routing change before the first 
 No remote Worker setting changed in this run.
 
 The repository Actions API reported zero secrets and zero variables during inspection.
-The user chose to complete those settings later through [the setup guide](cloudflare-builds.md).
+The user chose to complete those settings later through [the setup guide](../cloudflare-builds.md).
 Automatic uploads and hosted revision checks remain unverified. This run does not deploy either site.
 Disable independent Cloudflare Git builds before activation so they cannot publish before GitHub checks finish.
 Previews share development data and need approved function origins for account and image operations.
@@ -2178,7 +2182,7 @@ This earlier record describes the initial configuration. The CI workflow above r
 
 The user selected automatic branch previews and stable frontend deployment from `main`.
 Both static Workers now have empty `previews` configurations for the installed Wrangler preview command.
-[Cloudflare build setup](cloudflare-builds.md) gives the exact Git connection, branch, command, and build-variable settings.
+[Cloudflare build setup](../cloudflare-builds.md) gives the exact Git connection, branch, command, and build-variable settings.
 The dashboard connection and first automatic builds remain unverified. No provider settings changed during this preparation.
 The setup preserves separate app and docs hosting. Supabase migrations and functions remain explicit deployment steps.
 App previews share the configured development backend and need approved origins for account and image operations.
@@ -2186,11 +2190,11 @@ The preview explanation records a proposed origin registry as separate backend w
 
 The public guides now state the current-owner resolution rule, different-specialist handoff rule, and resolved-conversation restriction.
 The administrator guide explains account-wide reset permissions and the archived-membership restriction.
-The [audit](documentation-release-plan.md#permission-documentation-fixes) maps these corrections and remaining proposed improvements.
+The [audit](../documentation-release-plan.md#permission-documentation-fixes) maps these corrections and remaining proposed improvements.
 These changes preserve application authorization behavior.
 
 The user supplied `unslop` and `technical-writing` principles.
-The [writing guide](writing-guide.md) records their application to repository writing.
+The [writing guide](../writing-guide.md) records their application to repository writing.
 Cloudflare setup steps, settings reference, and backend explanation now have separate pages.
 
 `npm run docs:build` passed, including its local-link check.
@@ -2208,7 +2212,7 @@ The active T0013 checkout and its temporary test files were left intact during t
 ## Documentation release audit (2026-10-17)
 
 The user required documentation suitable for an open-source release and requested a specific cleanup audit.
-The [release plan](documentation-release-plan.md) records 20 findings, their source files, and completion criteria.
+The [release plan](../documentation-release-plan.md) records 20 findings, their source files, and completion criteria.
 It covers outside contributors, versioned guidance, installation, operating procedures, permissions, usability, and hosting.
 The initial site remains a working development baseline. Release readiness remains incomplete.
 
@@ -2364,7 +2368,9 @@ Full cloud and hosted workflow tests were not run for this maintenance change.
 No application code, database migration, function, or frontend deployment changed.
 The user reviews and merges the maintenance PR.
 
-## Ticket status
+## Ticket status (historical, 2026-10-17)
+
+This summary describes `main` on 2026-10-17. See [development tickets](../tickets.md) for current status.
 
 T0012 merged into `main` in [PR #30](https://github.com/GiftedNovaHD/minsky/pull/30) on 2026-10-17.
 It fixes reply cleanup after a successful retry.
@@ -2638,7 +2644,7 @@ Implemented on `feature/t0005-issue-attachments`:
 - Contestants see team-visible images on their own team's issues.
 - Volunteers, specialists, jury members, and session admins can upload while the event is active.
 - Only the uploader can remove an image, and only while the event is active.
-- Session admins set the file size, image count, and combined size inside the ranges in [T0005](tickets.md#t0005--issue-images).
+- Session admins set the file size, image count, and combined size inside the ranges in [T0005](../tickets.md#t0005--issue-images).
 - Resolved issues keep their images and still accept authorized uploads.
 - Archived events keep the files for preview and download.
 - Uploads, removal, and limit changes stop after archive.
@@ -2686,7 +2692,7 @@ The visible attachment ids are the dependency instead.
 Incoming reports preserve the displayed issue and its reply draft.
 Membership forms use the current saved roles, admin flag, and team. Unchanged membership values preserve local edits.
 Cloud test cleanup retains its recovery file on failure and removes it after success.
-See [fixture recovery](cloud-onboarding.md#fixture-recovery) for the recovery steps.
+See [fixture recovery](../supabase-provider.md#fixture-recovery) for the recovery steps.
 
 At `c785964`, all 33 unit/database tests and 11 browser tests passed on Node.js 24.19.0.
 Lint, type checking, the Deno function check, the production build, and whitespace checks also passed.
@@ -2713,7 +2719,7 @@ Focused Vitest coverage is in `src/connected/teamSearch.test.ts`.
 `npm test` passed: 4 files, 28 tests.
 `npm run lint`, `npm run typecheck` through `tsc --noEmit`, `npm run build`, and `git diff --check` passed.
 Signed-in browser use of the queue and report form was not run in this change.
-The manual steps are in [manual verification](manual-verification.md#11-team-search).
+The manual steps are in [manual verification](../manual-verification.md#11-team-search).
 Cloud integration checks and deployment were not run.
 
 ## T0008 review fixes (2026-10-14)
@@ -2767,8 +2773,8 @@ The existing double-quote style in the React component remains unchanged; the br
 
 ## Ticket allocation (2026-10-03)
 
-[T0004](tickets.md#t0004--ui-makeover) uses the user's dark green workspace and centered sign-in references.
-Previous T0004 scope notes move to [T0005](tickets.md#t0005--issue-images).
+[T0004](../tickets.md#t0004--ui-makeover) uses the user's dark green workspace and centered sign-in references.
+Previous T0004 scope notes move to [T0005](../tickets.md#t0005--issue-images).
 They include the operational work above and candidate organizer tools and configurable issue attachments.
 The [T0005 section](#t0005-issue-images-2026-10-11) records the later attachment decisions and implementation.
 
@@ -2807,7 +2813,7 @@ Implemented:
 
 Verification: `npm run typecheck`, `npm run lint`, `npm run build` and `npm run check:functions` passed. `npm test` passed all 22 focused/database tests; the final credential-free browser run passed all three sign-in cases. `MINSKY_TEST_PROJECT_REF=ghtztmovdkhuketcbjmq npm run test:cloud` passed all 12 cases on the isolated Minsky CI project (about 1.5 minutes), with fixture teardown completed. The development checkout's project link was retained. This local cloud run is separate from protected GitHub Actions verification; the repository still has no `cloud-test` environment. Documentation paths/anchors and whitespace passed.
 
-Visual review checked [desktop workspace](ui/t0004-workspace.png), laptop queue/detail, 390/320px support, [centered sign-in](ui/t0004-sign-in.png), contestant resolution/award, account and desktop/phone administration screenshots. Browser checks exercised keyboard focus/skip links, report open/cancel, phone menu/queue/detail return, password visibility, refresh, temporary passwords and reset, retained handoff ownership, repeated reopening, separate awards/application, private-note exclusion, races, revocation and read-only archived navigation. Real-device, screen-reader, other-engine and 200% zoom acceptance remains manual in T0005. The development deployment is recorded below.
+Visual review checked [desktop workspace](../ui/t0004-workspace.png), laptop queue/detail, 390/320px support, [centered sign-in](../ui/t0004-sign-in.png), contestant resolution/award, account and desktop/phone administration screenshots. Browser checks exercised keyboard focus/skip links, report open/cancel, phone menu/queue/detail return, password visibility, refresh, temporary passwords and reset, retained handoff ownership, repeated reopening, separate awards/application, private-note exclusion, races, revocation and read-only archived navigation. Real-device, screen-reader, other-engine and 200% zoom acceptance remains manual in T0005. The development deployment is recorded below.
 
 Initial failures were corrected before the final runs: npm's sandboxed network lookup failed, then the approved install passed; an early build/browser attempt overlapped dependency installation and lacked installed tools, then checks passed after installation. Playwright's sandboxed server start failed, then the approved run passed. The first password-toggle test kept the old accessible name after the toggle; its locator was corrected. The first cloud run exposed the password-button navigation change and the recovery test's checkout-project assumption; both were corrected. The failed recovery call used a CI UUID absent from development and was rejected before any account mutation. Automatic review rejected a broad formatting cleanup; the narrower cleanup first proved three unrelated tests had identical TypeScript syntax trees, then removed only their incidental formatting changes.
 
@@ -2979,7 +2985,9 @@ Final hosted result: `npm run test:hosted` passed all five cases (30.2 seconds),
 
 Clean-checkout verification: `/tmp/minsky-t0003-clean` at `bfe94e1` used a fresh `node_modules` install and only public Supabase frontend settings. `npm ci`, type checking, lint, all 66 focused tests, Deno checking and the production build passed, producing the same `index-BwjV5kgP.js` asset as the deployed build. The install reported zero audit vulnerabilities. After installation, `cloud:link` succeeded and `cloud:plan` reported the remote database up to date with no pending migrations or seeds. An initial premature link attempt failed with `supabase: not found`; the sequential rerun passed.
 
-## Pending acceptance and known limits
+## Pending acceptance and known limits (historical T0003, 2026-10-02)
+
+These limits describe the T0003 baseline. Later sections and [development tickets](../tickets.md) supersede them.
 
 - Email invitations/recovery and SMTP were removed from T0003 by explicit user decision. Organizer credential delivery and identity checks before recovery are operational responsibilities.
 - Protected cloud CI remains incomplete in T0003. Initial inspection on 2026-10-02 found no GitHub environments and only the shared development Supabase project; the separate CI project has since been prepared as recorded below. The available GitHub account has write access without admin access; the user confirmed they are a contributor and the owner is unavailable. The `Checks` workflow file is absent from `main`, so manual dispatch also requires it to reach the default branch through review and merge. Neither environment protection nor a privileged CI pass is claimed.
@@ -3005,7 +3013,7 @@ T0003 now includes the user-selected CI/review/security improvements:
 - A short PR template covers scope/readability, authorization/privacy, workflow invariants, compatible migrations, verification and documentation.
 - Secret-free security CI runs redacted Gitleaks history scanning and a lockfile audit that fails on high/critical runtime or development advisories. Both run on PRs, `main`, manual dispatch and a weekly default-branch schedule.
 - Weekly Dependabot npm/action update PRs are configured. Update scheduling begins after this configuration reaches `main`.
-- The prepared branch-protection payload requires up-to-date `checks`, `secrets` and `dependencies` from GitHub Actions, one independent approval, resolved threads and no administrator bypass, force pushes or branch deletion. **Remote merge protection and vulnerability alerts still require owner setup**: the available account has write permission, not administration access. Private-repository plan availability has not been verified. See [code-quality.md](code-quality.md).
+- The prepared branch-protection payload requires up-to-date `checks`, `secrets` and `dependencies` from GitHub Actions, one independent approval, resolved threads and no administrator bypass, force pushes or branch deletion. **Remote merge protection and vulnerability alerts still require owner setup**: the available account has write permission, not administration access. Private-repository plan availability has not been verified. See [code-quality.md](../code-quality.md).
 
 Local verification for this change: actionlint and YAML/JSON validation passed;
 documentation paths and whitespace passed; type checking, ESLint, Deno checking,
@@ -3064,18 +3072,20 @@ Initial browser tests and server startup failed under sandbox restrictions; appr
 
 Style choices: keep existing double-quoted formatting, React component capitalization/default App export, concise JSX handlers and inferred Zod schema types for repository consistency and framework readability. New shared functions use named exports. These are deliberate exceptions to the [Google TypeScript Style Guide](https://google.github.io/styleguide/tsguide.html), without unrelated style rewrites.
 
-Real-device touch, screen readers, other browser engines and 200% browser zoom remain unverified. Follow the [manual guide](manual-verification.md) for those checks. Local testing provides no evidence of production authorization, offline operation or 800-user capacity.
+Real-device touch, screen readers, other browser engines and 200% browser zoom remain unverified. Follow the [manual guide](../manual-verification.md) for those checks. Local testing provides no evidence of production authorization, offline operation or 800-user capacity.
 
 ## Historical T0001 verification
 
 The earlier T0001 implementation and ESLint 10 tooling update passed type checking, lint, 20 focused tests, the build and 3 browser tests. Its browser walkthrough covered desktop contestant/jury views, volunteer screens at both phone widths, keyboard entry points, refresh, privacy and reset. That run also reported zero dependency audit vulnerabilities. These are historical observations; the T0002 results above describe this run. No dependency changes or new dependency audit were performed for T0002.
 
-## Limitations and next work
+## Limitations and next work (historical local demo)
+
+These limits describe the retired local demo.
 
 The demo uses one tab and one local dataset. It does not synchronize concurrent tabs and devices. Browser storage may be cleared or unavailable. Device-clock changes affect running timers. The demo rejects backwards action timestamps. Simulated roles are not authorization, and local history is editable browser data.
 
 Persona/filter selections reset on refresh. These checks establish no production security, offline operation, or 800-user capacity.
 
-T0002 retains one award per issue, even after reopening; award adjustments and role editors remain deferred. [T0003](tickets.md#t0003--cloud-onboarding-and-authenticated-shared-product) now scopes cloud onboarding, authenticated shared workflows, role dashboards, minimal admin controls and contributor setup. Its planning changes were prepared on updated `main`; no application code or provider resources were changed. The [onboarding guide](cloud-onboarding.md) distinguishes setup tasks from completed work.
+T0002 retains one award per issue, even after reopening; award adjustments and role editors remain deferred. [T0003](../tickets.md#t0003--cloud-onboarding-and-authenticated-shared-product) now scopes cloud onboarding, authenticated shared workflows, role dashboards, minimal admin controls and contributor setup. Its planning changes were prepared on updated `main`; no application code or provider resources were changed. The [onboarding guide](../supabase-provider.md) distinguishes setup tasks from completed work.
 
 The user explicitly chose cloud features first and deferred outage/resilience work. Free tiers are preferred; necessary paid services are acceptable after identifying the cost and reason. Helpers' issue-linked images and configurable volunteer upload permissions are recorded for the next candidate alongside broader admin tools. Attachment visibility and setting scope/defaults remain undecided. No T0004 is created. UI redesign, notifications, CSV imports and shared incidents remain deferred.

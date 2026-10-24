@@ -23,7 +23,7 @@ Use these interfaces and components:
 
 | Boundary | Required implementation or reusable component |
 | --- | --- |
-| [`Backend`](../src/backend/contracts.ts) | Supply all five groups: `auth`, `workflows`, `admin`, `images`, and `updates`. Preserve their types and error meanings. |
+| [`Backend`](../src/backend/contracts.ts) | Supply all six groups: `auth`, `workflows`, `admin`, `images`, `announcements`, and `updates`. Preserve their types and error meanings. |
 | [`Command` and `snapshotSchema`](../src/connected/model.ts) | Reuse the existing commands, roles, and validated snapshot structure. The jury worklist consumes this same snapshot. |
 | [`WorkflowPersistence`](../src/server/workflow.ts) | Implement `read()` and `commit()` for `WorkflowService`. Keep database queries and transaction controls inside the adapter. |
 | [`Caller`](../src/server/authentication.ts) | Derive `accountId` and `loginId` from trusted authentication. Never accept a caller identity from a request body. |
@@ -50,7 +50,7 @@ Use a trusted database timestamp for each commit.
 Return `retry` for a detected state conflict and let the shared service bound retries.
 Preserve the distinction between confirmed rejection and an unknown write outcome.
 
-Application reads, administration, images, and live delivery currently remain provider implementations.
+Application reads, administration, images, announcements, and live delivery currently remain provider implementations.
 There is no shared persistence interface for every operation.
 Add a shared interface only when current callers need one.
 
@@ -134,7 +134,7 @@ Make cleanup reject another target or any relationship outside the fixture's own
 Include identity records, database rows, exact storage keys, and durable live-delivery state in cleanup.
 Retain the recovery journal if cleanup fails.
 
-Do not edit protected environment rules or branch allowlists as an incidental registration step.
+Do not change repository settings or hosted resources as an incidental registration step.
 Obtain the authorization required by the repository's current workflow.
 
 ## Verify and report limits
@@ -161,10 +161,11 @@ A new provider needs the registration changes above before it can use that runne
 Document its exact target, environment variables, verification command, and recovery command in that guide.
 
 Every provider must pass the same shared behavior scenarios.
+The shared scenarios do not cover `announcements` yet. Use the [announcement reference](session-announcements.md) and its local tests for that group.
 Additional provider-specific checks must cover authorization, atomic commits, concurrent changes, identity expiry, revocation, and partial failures.
 Use the [additional check requirements](provider-test-contracts.md#requirements-for-another-provider) as the acceptance checklist.
 Verify a fresh installation, owner recovery, and the authenticated UI journey independently of fixture setup.
 
 Record the tested revision, exact target, result, and scoped cleanup outcome.
-Separate local emulation, CLI runs against hosted resources, and protected GitHub Actions results.
+Separate local emulation results from CLI runs against hosted resources.
 State any unverified behavior. Passing one provider's scenarios does not verify another implementation.

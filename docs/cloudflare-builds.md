@@ -10,6 +10,14 @@ On `minsky-docs`, Workers Builds publishes the docs. See [Publish the docs](#pub
 On `minsky-dev`, Workers Builds checks each push to `main` and then publishes it. See [Publish the application](#publish-the-application).
 GitHub Actions no longer runs checks or publication. The GitHub account stays on the free plan.
 
+## Why app previews are disabled
+
+A frontend preview can change shared data when it uses a stable backend.
+Earlier Supabase previews used the development project directly.
+Cloudflare previews receive no stable D1, R2, or Durable Object bindings.
+A future preview needs its own resources, credentials, fixture ownership, and cleanup checks.
+Docs previews are safe because the docs contain no application data.
+
 ## Connect one CI Worker
 
 You need access to Cloudflare account `458ad6a930b0fb717796dfa19ca6a2b1`.
@@ -181,6 +189,16 @@ Pause publication during a live contest. A merge then does not change the applic
 - If a migration damaged data, restore the database with [D1 Time Travel](https://developers.cloudflare.com/d1/reference/time-travel/).
 
 To publish by hand, run `npm run deploy` from an updated `main` with the same variables, a token with the same permissions, `WORKERS_CI_BRANCH=main`, and `WORKERS_CI_COMMIT_SHA` set to the output of `git rev-parse HEAD`.
+
+The script sets `VITE_BACKEND` from `MINSKY_DEV_BACKEND` and guards the complete Worker:
+
+- A Cloudflare app needs its API code, D1 database, private R2 bucket, and live coordinator. An assets-only upload would remove them.
+- The Supabase path runs only when `MINSKY_DEV_BACKEND=supabase`. It refuses the upload when the deployed Worker has application bindings.
+- The Cloudflare path validates the generated configuration and exact hosted targets before upload. After upload, it checks the published targets, live bindings, and an anonymous rejection at the authentication API.
+- It rejects pushes by Dependabot.
+
+These checks do not verify authenticated behavior. The installation and activation procedures require the full application checks.
+A broken application target cannot block the docs, because Workers Builds publishes them separately.
 
 ## Checks that stay on demand
 

@@ -8,41 +8,37 @@ Workers Builds publishes `main` to the `minsky-dev` development application afte
 
 ## Automated checks
 
-Workers Builds runs `npm run ci` for pushes to branches in this repository.
-The [CI reference](cloudflare-build-settings.md#workers-builds) records the command and the limits.
-Fork pull requests do not push a branch here, so they do not start a build.
+Workers Builds runs `npm run ci` for each push to a branch in this repository.
+The [CI reference](cloudflare-build-settings.md#workers-builds) owns the command list, limits, and on-demand checks.
+`npm run ci` fails on type errors, lint errors, test failures, a failed build, a docs link error, a high or critical `npm audit` advisory, or any Gitleaks finding.
+Browser suites and hosted provider suites are on-demand commands. They are not required PR checks.
 
-| Check | Required behavior |
-| --- | --- |
-| `npm run ci` | Type checking, ESLint, Deno function checks, unit tests, both site builds, docs links, `npm audit` at high severity, and a Gitleaks history scan must pass. |
-| Gitleaks | The scan reads fetched Git history, including secrets that later commits removed. It redacts findings. Any finding fails the check. |
-| `npm audit` | `npm audit --package-lock-only --audit-level=high` checks the root and `site` lockfiles. High and critical advisories fail the check. Lower severities remain visible for review. Registry failures also fail the check. |
+## Dependency updates
 
-Browser suites and hosted provider suites are on-demand commands.
-There is no weekly Actions run. A week with no pushes is not scanned.
 Dependabot proposes weekly npm updates for the application and the documentation site.
 It permits at most three open update PRs per directory.
 The GitHub Actions ecosystem is not monitored. The repository has no Actions workflow.
+There is no scheduled scan. A week with no pushes is not scanned.
+No process automatically applies upgrades or runs `npm audit fix`.
+Updates require the same checks and review as other changes.
+
 TypeScript major updates are ignored.
 `typescript-eslint` 8.71 accepts TypeScript `>=4.8.4 <6.1.0`.
 TypeScript 7 makes `npm ci` fail.
 Patch and minor TypeScript updates remain enabled.
-Updates require the same checks and review as other changes.
-
-No process automatically applies upgrades or runs `npm audit fix`.
 
 `package.json` overrides `undici` to `7.30.1`.
 `miniflare`, through `wrangler`, pins `undici` 7.29.1, which has high-severity advisories (GHSA-4qv8-2p9j-2685, GHSA-f72v-6w45-q472, GHSA-xjj6-f33q-929c).
 The override was added on 2026-10-24.
 Remove it when the installed `miniflare` depends on `undici` 7.30.1 or later. Then run `npm install` and `npm run ci`.
 
+## Secret scanning
+
 Gitleaks uses pinned release 8.30.1 and a verified SHA-256 checksum.
+The scan reads fetched Git history, including secrets that later commits removed. It redacts findings.
 Ordinary builds do not receive cloud credentials.
-Hosted Supabase and Cloudflare checks are on-demand commands against isolated CI targets.
-They are not required PR checks.
 The `minsky-dev` trigger runs `npm run ci` before `npm run deploy` in one build, so a failed check stops publication.
 `npm run ci` removes the deployment token before it installs packages or runs checks.
-Workers Builds publishes the static `minsky-docs` Worker from `main`. The docs contain no application data.
 
 Run the usual README checks locally.
 With Gitleaks 8.30.1 installed, scan history with this command:
@@ -94,10 +90,8 @@ The Google TypeScript style policy and manual interface checks in AGENTS.md stil
 On 2026-10-02, the user deferred remote merge enforcement and setup of vulnerability alerts.
 On 2026-10-03, the user moved these scope notes from T0004.
 They stay deferred.
-They are not part of the T0005 issue-image ticket.
-Existing checks and prepared configuration remain in T0003.
 The owner steps below remain incomplete.
-Setup of the protected cloud integration CI environment remains a separate T0003 requirement.
+Hosted provider checks are on-demand commands. No protected GitHub environment runs them.
 
 Repository inspection on 2026-10-02 confirmed that `GiftedNovaHD` had write access without administration access.
 The lookup returned no repository rulesets.

@@ -8,7 +8,7 @@ Staff can attach images to issues and choose staff-only or team visibility.
 
 The app uses React, TypeScript, Vite, Tailwind CSS, and shadcn/ui.
 Its shared [backend contract](docs/backend-contracts.md) has Supabase and Cloudflare implementations.
-The [development application](https://minsky-dev.icaic-minsky.workers.dev) runs Cloudflare. See [current state](docs/current-state.md) for its deployed source.
+The [development application](https://minsky-dev.icaic-minsky.workers.dev) runs Cloudflare. See [run log](docs/history/run-log.md) for its deployed source.
 The Cloudflare installation serves the frontend and API through Workers, with D1, private R2 images, and Durable Object live updates.
 Both providers retain the shared workflow behavior. Supabase resources and accounts remain intact.
 
@@ -21,7 +21,7 @@ Use [the installation guide](site/src/content/docs/operators/installation.mdx) f
 The owner merged T0021 in [PR #43](https://github.com/GiftedNovaHD/minsky/pull/43) at `4e43739` on 2026-10-19.
 The owner separately approved the Cloudflare switch and a repeat automated deployment.
 It transfers no Supabase accounts, passwords, records, images, or IDs. Supabase resources and accounts stay intact.
-See [current state](docs/current-state.md#t0021-approved-activation-2026-10-19) for the deployment results and [activation](docs/activate-cloudflare-development.md) for the procedure.
+See [run log](docs/history/run-log.md#t0021-approved-activation-2026-10-19) for the deployment results and [activation](docs/activate-cloudflare-development.md) for the procedure.
 These are development installations that require connectivity. Live-contest readiness and capacity for 800 simultaneous users remain unverified.
 
 ## User interfaces
@@ -87,7 +87,7 @@ Provider access and app membership are separate. An administrator must grant you
 Sign in with your organizer-provided username and password, then change any temporary password.
 `npm run cloud:recover-admin` is this provider's administrator recovery. It does not change the Cloudflare installation.
 Use `npm run cloudflare:recover-admin` to reset a Cloudflare admin password.
-See [Supabase provider](docs/cloud-onboarding.md#contributor-setup) for access, setup, migrations, and recovery.
+See [Supabase provider](docs/supabase-provider.md#contributor-setup) for access, setup, migrations, and recovery.
 
 ## Checks and common commands
 
@@ -120,8 +120,8 @@ See [Supabase provider](docs/cloud-onboarding.md#contributor-setup) for access, 
 | `npm run test:auth:hash` | Measure password cost in a temporary local Worker. |
 | `npm run test:e2e:smoke` | Run the critical-path browser files `tests/landing.spec.ts` and `tests/journey.spec.ts`. |
 | `npm run test:e2e` | Run every mocked browser test, including the smoke files. |
-| `npm run test:cloud` | Run the browser and workflow suite with isolated fixtures on the CI project. Needs cloud credentials. |
-| `npm run test:hosted` | Repeat the suite with real accounts against the deployed app. Needs cloud credentials. |
+| `npm run test:cloud` | Run the Supabase browser and workflow suite with isolated fixtures on the CI project. Needs cloud credentials. Always set `MINSKY_TEST_PROJECT_REF`. |
+| `npm run test:hosted` | Legacy Supabase wrapper that targets `minsky-dev`. Do not use it: that URL now runs Cloudflare. |
 | `npm run test:providers:list` | List the shared provider scenarios without hosted credentials. |
 | `npm run test:providers -- --provider=supabase` | Run the shared contracts against an explicitly configured isolated Supabase project. |
 | `npm run test:providers -- --provider=cloudflare --config=… --account=… --database=… --origin=…` | Run the same contracts through the isolated Cloudflare browser adapter. |
@@ -149,16 +149,16 @@ These commands connect to provider accounts. Several of them change hosted data 
 | `npm run cloudflare:recover-admin` | Reset the password of an existing Cloudflare admin. Prints the temporary password once in that terminal. |
 | `npm run cloud:hosting-login` | Sign in to Cloudflare with Wrangler. |
 
-See [cloud onboarding](docs/cloud-onboarding.md) for the exact arguments.
+See [Supabase provider guide](docs/supabase-provider.md) for the exact arguments.
 
 Deno and the provider CLIs are pinned npm dependencies.
-For `npm run test:cloud` and `npm run test:hosted`, follow [cloud verification](docs/cloud-onboarding.md#verification-and-protected-cloud-ci).
+For `npm run test:cloud` and `npm run test:hosted`, follow [Supabase provider guide](docs/supabase-provider.md#verification-and-hosted-cloud-checks).
 For shared adapter checks, follow [Run the shared provider tests](docs/run-provider-tests.md).
 The two hosted store commands accept the optional [D1 API transport](docs/run-provider-tests.md#use-the-d1-api-transport).
 Run those API commands in sequence. Default binding checks and protected CI keep their existing transport.
 `VITE_BACKEND` defaults to `cloudflare`. Set `VITE_BACKEND=supabase` to select the Supabase provider.
 Cloudflare cookies and API requests require the same origin. A plain Vite server does not supply that API.
-If an existing cloud fixture cleanup fails, follow [fixture recovery](docs/cloud-onboarding.md#fixture-recovery).
+If an existing cloud fixture cleanup fails, follow [fixture recovery](docs/supabase-provider.md#fixture-recovery).
 
 ## Documentation
 
@@ -190,32 +190,45 @@ See [Workers Builds setup](docs/cloudflare-builds.md) for the dashboard steps an
 Automatic GitHub Actions publication is removed.
 The fresh Cloudflare development candidate and a separate empty installation pass the complete application checks.
 The approved activation and a later automated deployment passed their recorded application checks. Those runs used the retired Actions publisher.
-The [T0021 activation record](docs/current-state.md#t0021-approved-activation-2026-10-19) separates protected checks from stable URL verification.
+The [T0021 activation record](docs/history/run-log.md#t0021-approved-activation-2026-10-19) separates protected checks from stable URL verification.
 
 ### Repository records
 
-- [Writing guide](docs/writing-guide.md) gives the documentation structure and sentence rules.
-- [Workers Builds setup](docs/cloudflare-builds.md) explains the CI Worker, the owner checklist, and application publication from `main`.
-- [Documentation release plan](docs/documentation-release-plan.md) — public-reader requirements, specific gaps, and completion criteria.
+Plans and rules:
+
+- [Contributor rules](AGENTS.md), the [planning record](PLAN.md), and the [roadmap](ROADMAP.md) for the technology stack.
+- [Product direction](docs/product-direction.md) — agreed requirements and open decisions.
 - [Development tickets](docs/tickets.md) — ticket scope, status, and acceptance criteria.
+- [Writing guide](docs/writing-guide.md) and [documentation release plan](docs/documentation-release-plan.md).
+- [Code quality](docs/code-quality.md) — CI summary, dependency policy, secret scanning, and review requirements.
+
+Frontend:
+
 - [Frontend architecture](docs/frontend-architecture.md) — UI selection, shells, data hooks, the jury award lists, and the Tailwind and shadcn/ui setup.
 - [Frontend redesign record](design/redesign/README.md) — the mockups, the chosen direction, and how its open decisions were resolved.
-- [Current state](docs/current-state.md) — implementation details, verification records, and limitations.
-- [Supabase provider](docs/cloud-onboarding.md) covers that provider's projects, account administration, recovery, and isolated verification.
-- [Jury worklist specification](docs/jury-worklist.md) records T0009 behavior and verified acceptance.
-- [Manual verification](docs/manual-verification.md) — workflow and interface checks.
-- [Code quality](docs/code-quality.md) — CI checks and review requirements.
-- [Server workflow reference](docs/server-workflow.md) inventories existing rules and the shared service and persistence boundaries.
-- [Verify the Supabase provider workflow](docs/verify-server-workflow.md) gives that provider's local, hosted, and recovery commands.
+
+Backend:
+
 - [Backend contracts](docs/backend-contracts.md) describe the provider interfaces and their behavior.
-- [Add a backend provider](docs/add-provider.md) gives contributor interfaces, registration points, installation, cleanup, and required shared verification.
-- [Activate Cloudflare development](docs/activate-cloudflare-development.md) gives the fresh-installation approval, deployment, verification, and recovery gates.
+- [Server workflow reference](docs/server-workflow.md) inventories existing rules and the shared service and persistence boundaries.
+- [Session announcements](docs/session-announcements.md) is the reference for announcement behavior on both providers.
 - [Cloudflare backend design](docs/cloudflare-backend-design.md) explains the implemented server boundaries.
-- [Cloudflare authentication reference](docs/cloudflare-authentication.md) defines the API, browser sessions, and account rules.
-- [Authentication choice](docs/cloudflare-authentication-choice.md) records Better Auth, maintained crypto, resource measurements, and costs.
-- [Verify Cloudflare authentication](docs/verify-cloudflare-authentication.md) gives local, hosted, and protected CI procedures.
-- [Cloudflare installation](site/src/content/docs/operators/installation.mdx) gives the complete development installation procedure and owner recovery.
-- [PR #21 component record](docs/pr21-installation-disposition.md) records reused safeguards and replaced or deferred scaffolding.
-- [Shared provider test contracts](docs/provider-test-contracts.md) describe reusable assertions, fixture ownership, and provider requirements.
-- [Product direction](docs/product-direction.md) — agreed requirements and open decisions.
-- [Contributor rules](AGENTS.md) and [planning record](PLAN.md).
+- [Cloudflare authentication reference](docs/cloudflare-authentication.md) and the [authentication choice](docs/cloudflare-authentication-choice.md).
+- [Add a backend provider](docs/add-provider.md) gives contributor interfaces, registration points, installation, cleanup, and required shared verification.
+- [Supabase provider](docs/supabase-provider.md) covers that provider's projects, account administration, recovery, and isolated verification.
+
+Operations:
+
+- [Workers Builds setup](docs/cloudflare-builds.md) — the CI Worker, docs publication, and application publication from `main` — and [CI settings](docs/cloudflare-build-settings.md).
+- [Cloudflare installation](site/src/content/docs/operators/installation.mdx) gives the complete installation procedure and owner recovery.
+- [Activate Cloudflare development](docs/activate-cloudflare-development.md) gives the approval, deployment, admin recovery, and repair steps.
+
+Verification:
+
+- [Manual verification](docs/manual-verification.md) — workflow and interface checks.
+- [Run the shared provider tests](docs/run-provider-tests.md) and [shared provider test contracts](docs/provider-test-contracts.md).
+- [Verify the Supabase provider workflow](docs/verify-server-workflow.md) and [verify Cloudflare authentication](docs/verify-cloudflare-authentication.md).
+
+History:
+
+- [Project history](docs/history/README.md) — the run log, planning log, run reports, and superseded specifications. These are dated records, not current instructions.

@@ -1,6 +1,7 @@
 # Activate the fresh Cloudflare development installation
 
-Use this maintainer procedure to switch the existing development URL after owner approval.
+This maintainer procedure switched the development URL to Cloudflare on 19 October 2026. See the [activation record](#activation-record-19-october-2026).
+Use the same steps for a later approved switch of the same kind. Each switch needs a new owner approval.
 For another installation, use [Install Cloudflare](../site/src/content/docs/operators/installation.mdx).
 That guide owns resource creation, migrations, bootstrap, and trusted owner recovery.
 This guide owns the development switch, verification, and repair.
@@ -28,7 +29,7 @@ These targets exist in account `458ad6a930b0fb717796dfa19ca6a2b1`:
 | Scheduled recovery | `* * * * *` |
 | Stable public origin | `AUTH_ORIGIN=https://minsky-dev.icaic-minsky.workers.dev` |
 | Private Worker secret | `AUTH_SECRET`, created privately during activation and preserved on later deployments. |
-| Private publishing credential | Existing repository secret `CLOUDFLARE_API_TOKEN`. |
+| Private publishing credential | `CLOUDFLARE_API_TOKEN` in the private publishing shell. The 2026-10-19 activation used the former GitHub repository secret. |
 | Public settings | `src/server/adapters/cloudflare/deploy/development.settings.json` |
 | Generated stable configuration | `src/server/adapters/cloudflare/deploy/development.wrangler.jsonc` |
 | Installation marker | `7867c628-36b7-4724-b0a3-83c1894b23e8` |
@@ -43,7 +44,7 @@ These targets exist in account `458ad6a930b0fb717796dfa19ca6a2b1`:
 The stable URL uses Cloudflare after the approved activation.
 `MINSKY_DEV_BACKEND=cloudflare` and the four exact target variables select the complete Worker.
 The candidate remains stopped, with its public and preview URLs disabled and its cron list empty.
-The separate installation-verification and CI resources are listed in [current state](current-state.md#t0021-fresh-development-installation-2026-10-18).
+The separate installation-verification and CI resources are listed in [run log](history/run-log.md#t0021-fresh-development-installation-2026-10-18).
 Do not substitute those resources for development.
 
 Existing Supabase records, accounts, passwords, images, and IDs do not appear in the fresh installation.
@@ -57,11 +58,10 @@ Before requesting activation approval, complete these checks:
 1. Have the owner review and merge the preparation revision. Update a clean checkout from `main`.
 2. Record the exact approved main revision and its push run. Reconcile any review changes and repeat affected checks.
 3. Confirm the account and every exact target again. Reconfirm the current stable version for the recovery record.
-4. Require the final local and hosted checks. Record CLI hosted results separately from protected GitHub Actions results.
-5. Obtain any required authorization before adding a branch to `cloud-test`. Preserve all existing entries and protection rules.
-6. In Cloudflare, confirm that independent Git builds remain disabled for `minsky-dev`. The `minsky-docs` docs builds stay connected.
-7. Review the configuration, secret names, deployment sequence, verification criteria, and repair commands below with the owner.
-8. Obtain explicit approval for this backend switch. Do not infer it from the preparation PR merge.
+4. Require the final local and hosted checks. Record local and CLI hosted results separately.
+5. In Cloudflare, confirm that independent Git builds remain disabled for `minsky-dev`. The `minsky-docs` docs builds stay connected.
+6. Review the configuration, secret names, deployment sequence, verification criteria, and repair commands below with the owner.
+7. Obtain explicit approval for this backend switch. Do not infer it from the preparation PR merge.
 
 On 19 October 2026, the owner confirmed that independent Git build connections were disconnected for both Workers.
 The Builds API returned `403`, so that confirmation came from the owner's dashboard check.
@@ -145,14 +145,11 @@ npx wrangler deploy --config="$MINSKY_DEV_CLOUDFLARE_CONFIG" --dry-run
 
 Review the exact Worker, account, D1 UUID, bucket, live class, assets, origin, CPU cap, and cron.
 The dry run makes no provider change.
-Set these public repository variables to the approved values:
+Export the approved values in the publishing shell. No GitHub workflow reads repository variables now.
 
 ```sh
-gh variable set MINSKY_DEV_BACKEND --body cloudflare
-gh variable set MINSKY_DEV_CLOUDFLARE_CONFIG --body "$MINSKY_DEV_CLOUDFLARE_CONFIG"
-gh variable set MINSKY_DEV_DATABASE_ID --body "$MINSKY_DEV_DATABASE_ID"
-gh variable set MINSKY_DEV_DATABASE_NAME --body "$MINSKY_DEV_DATABASE_NAME"
-gh variable set MINSKY_DEV_BUCKET_NAME --body "$MINSKY_DEV_BUCKET_NAME"
+export MINSKY_DEV_BACKEND=cloudflare
+export MINSKY_DEV_CLOUDFLARE_CONFIG MINSKY_DEV_DATABASE_ID MINSKY_DEV_DATABASE_NAME MINSKY_DEV_BUCKET_NAME
 ```
 
 Publish the approved revision with the guarded script in [deployment settings](cloudflare-build-settings.md#publication-commands).
@@ -172,11 +169,11 @@ Require these results:
 4. The fictional application journey passes at the stable URL, including jury decisions, persisted timers, private images, internal-note separation, and reconnects.
 5. Live metadata matches the approved D1, R2, live class, origin, cron, CPU cap, and `AUTH_SECRET` name. Record the newly created stable namespace ID.
 6. Docs remain available independently.
-7. A subsequent approved automated deployment preserves Cloudflare mode and the exact bindings, then passes the same checks.
+7. A subsequent approved deployment preserves Cloudflare mode and the exact bindings, then passes the same checks.
 
 Clean only UUID-owned fixtures and exact R2 keys. Retain a recovery journal if cleanup fails.
 Keep the candidate's routes and schedules disabled.
-Record code revisions, Worker versions, CLI results, protected run URLs, and outstanding manual checks in current state.
+Record code revisions, Worker versions, CLI results, and outstanding manual checks in the [run log](history/run-log.md).
 Only then mark activation complete.
 
 ## Activation record, 19 October 2026
@@ -199,22 +196,62 @@ No assertion, timeout, or protection changed. The initial wait failure has no co
 | Subsequent automated publication | [Run 39252514749, attempt 4](https://github.com/GiftedNovaHD/minsky/actions/runs/39252514749/attempts/4), source `4e43739`. All five ordinary and publication jobs pass. |
 | Repeat verification and retained namespace | CLI stable verification passes 14/14 at 14:07:38 UTC, with clean owned-fixture removal. The live audit confirms namespace `71700338eed643d59185f4a777fcb7b2` and every binding match the first deployment. |
 
-The [current-state record](current-state.md) owns detailed verification results and remaining manual checks.
+The [run log](history/run-log.md) owns detailed verification results and remaining manual checks.
 Supabase resources and accounts remain intact. No Supabase data or identifiers transferred.
 
-## Recover the development admin password
+## Recover a Cloudflare admin password
 
 The development admin is `organizer`.
-When that admin cannot sign in, follow [Recover a Cloudflare admin password](cloud-onboarding.md#recover-a-cloudflare-admin-password).
-Run this command in a private terminal:
+
+`npm run cloud:recover-admin` changes a Supabase account only.
+Use `npm run cloudflare:recover-admin` when a Cloudflare admin cannot sign in.
+Run it in a private terminal on your computer.
+The command refuses CI.
+It also refuses a terminal whose output is redirected, because the temporary password must stay on that screen.
+
+The command reads the `DB` binding from a Wrangler configuration.
+The default file is `wrangler.jsonc`.
+That file does not name the development database.
+The development Worker binding is in `src/server/adapters/cloudflare/deploy/development.wrangler.jsonc`.
+Its database name is `minsky-development`.
+The command uses the remote database named by the selected file.
+It does not use a local database.
+
+Confirm the database name in the command output before you share the password.
+From the repository root, run:
 
 ```sh
 npm run cloudflare:recover-admin -- --config src/server/adapters/cloudflare/deploy/development.wrangler.jsonc --username organizer
 ```
 
-The command uses remote D1 database `minsky-development`.
-It prints the temporary password once in that terminal.
-It does not write the password to a file.
+Pass `--user ACCOUNT_ID` instead of `--username` when you know the account ID.
+Pass exactly one of those selectors.
+You can pass `--config` with another Wrangler file when the account is in a different remote `DB` binding.
+The binding must set `"remote": true`.
+The file must not define Wrangler environment overrides.
+
+The command checks that the account exists and is not disabled.
+The account must be an admin of an active event, or the installation owner.
+It then writes the same credential rows as **Reset password** in the application.
+It sets `must_change`, increases `credential_generation`, and database triggers increase `access_version`.
+It revokes every login and Better Auth session for that account.
+It records a completed `reset_password` row in `account_operations`.
+The actor on that row is the recovered account, because the maintainer has no Minsky account.
+All of those writes commit in one database batch.
+If the batch fails, the account keeps its previous password.
+
+The command prints the temporary password once on the terminal.
+It does not write the password to a file or a log.
+Copy the password from the terminal and share it through a secure channel.
+The admin must change the password at the next sign-in.
+
+Do not run this command in CI.
+Do not paste its output into chat or commit it.
+Do not run it against a database other than the one named in your selected configuration.
+
+The installation guide has a separate owner recovery command.
+That command requires the installation ID and writes a private result file.
+Use it when you are recovering a new installation and already have those IDs.
 
 ## Repair a failed activation
 

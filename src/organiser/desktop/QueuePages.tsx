@@ -3,6 +3,10 @@ import { ChevronLeft, MapPin, Plus, Search } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  pillIndicator,
+  SlidingIndicator,
+} from "@/components/ui/sliding-indicator";
 import { TeamSearch } from "@/connected/TeamSearch";
 import {
   searchTeams,
@@ -120,8 +124,9 @@ export function QueuePage({
         <div
           role="group"
           aria-label="Filter by status"
-          className="flex flex-wrap gap-1 rounded-lg bg-muted p-1"
+          className="relative isolate flex flex-wrap gap-1 rounded-lg bg-muted p-1"
         >
+          <SlidingIndicator className={pillIndicator} />
           {queueTabs.map((item) => {
             const count = teamIssues.filter((issue) =>
               matchesQueueTab(issue, item.tab),
@@ -135,8 +140,8 @@ export function QueuePage({
                   workflow.setStatusFilter(filterForQueueTab(item.tab))
                 }
                 className={cn(
-                  "h-8 rounded-md px-3 text-sm font-medium text-muted-foreground outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50",
-                  tab === item.tab && "bg-background text-foreground shadow-sm",
+                  "h-8 rounded-md px-3 text-sm font-medium text-muted-foreground outline-none transition-colors duration-(--motion-base) ease-out focus-visible:ring-[3px] focus-visible:ring-ring/50",
+                  tab === item.tab && "text-foreground",
                 )}
               >
                 {item.label}{" "}

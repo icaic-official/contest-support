@@ -295,7 +295,7 @@ node src/server/adapters/cloudflare/tooling/test-ui.mjs \
 
 The required result is one hosted UI case with no failures, skips, or retries and verified fixture cleanup.
 The journey checks all nine commands, jury worklist transitions, images, live updates, and account administration.
-Follow [the installation guide](../site/src/content/docs/operators/installation.md) for the separate empty-installation procedure.
+Follow [the installation guide](../site/src/content/docs/operators/installation.mdx) for the separate empty-installation procedure.
 Record the tested source revision and installation result in the current-state record.
 
 ## Run hosted checks on demand

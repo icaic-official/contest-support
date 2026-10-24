@@ -1,0 +1,22 @@
+---
+// Shows an Excalidraw scene from src/diagrams/ as an inline SVG.
+// Usage in an .mdx page: <Diagram name="issue-lifecycle" alt="…" />
+import {renderExcalidraw} from '../excalidraw/render.mjs';
+
+interface Props {
+  /** The file name in src/diagrams/, without `.excalidraw`. */
+  name: string;
+  /** A text equivalent of the diagram. */
+  alt: string;
+}
+
+const scenes = import.meta.glob<string>('../diagrams/*.excalidraw', {query: '?raw', import: 'default', eager: true});
+const {name, alt} = Astro.props;
+const source = scenes[`../diagrams/${name}.excalidraw`];
+if (!source) throw new Error(`No diagram named ${name} in src/diagrams/.`);
+const svg = renderExcalidraw(JSON.parse(source), {title: alt});
+---
+
+<figure class="excalidraw not-content" data-pagefind-ignore>
+  <Fragment set:html={svg} />
+</figure>

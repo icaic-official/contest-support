@@ -1,8 +1,9 @@
 # Why deployment separates docs and application previews
 
-Workers Builds runs checks and does not publish `minsky-dev` or `minsky-docs`.
-A Git build on either Worker could publish before checks finish or replace a full application with static assets.
-Keep those builds disabled.
+On `minsky-ci`, Workers Builds runs checks and does not publish the application.
+A Git build on `minsky-dev` could publish before checks finish or replace a full application with static assets.
+Keep that build disabled.
+The docs Worker `minsky-docs` is static and separate. Workers Builds publishes it from `main` and uploads preview versions for other branches.
 
 ## Why app previews are disabled
 
@@ -14,8 +15,8 @@ A future preview implementation needs its own resources, credentials, fixture ow
 That implementation is outside T0021.
 
 Docs contain no authenticated application data.
-Automatic docs branch previews are removed with the GitHub Actions publisher.
-A later docs preview still has to target `minsky-docs` and stay independent of the application.
+Workers Builds uploads a docs preview version for each push to a branch other than `main`.
+Each preview targets `minsky-docs` and stays independent of the application.
 
 ## Why backend selection needs a deployment guard
 

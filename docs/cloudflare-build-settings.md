@@ -54,6 +54,22 @@ CPU uses active time.
 A container runner would also be a deployed Worker.
 This change does not add one.
 
+## Docs Workers Builds
+
+The `minsky-docs` Worker has these two triggers since 2026-10-24.
+[Publish the docs](cloudflare-builds.md#publish-the-docs) explains the behavior and the dashboard steps.
+
+| Setting | Production trigger | Preview trigger |
+| --- | --- | --- |
+| Name | `Deploy docs from main` | `Preview docs from other branches` |
+| Branches | `main` | Every branch except `main` |
+| Build command | `npm ci --prefix site && npm run docs:build` | Same |
+| Deploy command | `npx wrangler deploy --config wrangler.docs.jsonc` | `npx wrangler versions upload --config wrangler.docs.jsonc` |
+| Root directory | Repository root | Same |
+| Dependency install | Default `npm clean-install` of the root lockfile | Same |
+| Build variable | `NODE_VERSION=22.23.2` | Same |
+| Build token and repository connection | Same as `minsky-ci` | Same |
+
 ## On-demand checks
 
 Coding agents run these commands. They are not part of `npm run ci`.

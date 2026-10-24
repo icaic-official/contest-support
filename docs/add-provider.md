@@ -98,7 +98,7 @@ Bootstrap is provider-owned. There is no common bootstrap interface.
 The existing Supabase `cloud:bootstrap` command requires an existing Supabase Auth UUID.
 The Cloudflare `cloudflare:install` command creates its installation and administrator through its own guarded tooling.
 Neither command is a universal installer.
-Use the [Cloudflare installation procedure](../site/src/content/docs/operators/installation.md) as an implemented example.
+Use the [Cloudflare installation procedure](../site/src/content/docs/operators/installation.mdx) as an implemented example.
 Keep passwords and privileged credentials in private files or memory.
 Exclude them from chat, logs, Git, browser storage, and ordinary CI artifacts.
 Session cookies remain inside the authentication transport.

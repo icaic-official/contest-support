@@ -66,7 +66,7 @@ Persisted audience cursors suppress old duplicate delivery. A reconnect signals 
 The outbox remains pending until the coordinator accepts delivery. Minutely maintenance retries delivery and image cleanup.
 
 Provider-owned [installation tooling](../src/server/adapters/cloudflare/tooling/install.mjs) checks exact targets and protects returned credentials.
-See [installation](../site/src/content/docs/operators/installation.md), [provider verification](run-provider-tests.md), and [current evidence](current-state.md).
+See [installation](../site/src/content/docs/operators/installation.mdx), [provider verification](run-provider-tests.md), and [current evidence](current-state.md).
 
 ## Module boundaries
 

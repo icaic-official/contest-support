@@ -12,6 +12,23 @@ Earlier sections that say Supabase remains active describe the decision on that 
 The 2026-10-23 decision supersedes those statements.
 This record does not read or change the live deployment.
 
+## Docs publication through Workers Builds, 2026-10-24
+
+The owner asked for the documentation site to publish through Workers Builds, with previews, in [PR #48](https://github.com/GiftedNovaHD/minsky/pull/48).
+The GitHub Actions publisher was removed on 2026-10-23 in PR #45. After that, nothing published the docs.
+Before this change, the last `minsky-docs` deployment was version `b79bf13a` on 2026-10-21 at 20:47 UTC.
+
+On 2026-10-24, the `minsky-docs` Worker received two Workers Builds triggers through the Cloudflare API:
+
+- `Deploy docs from main`, trigger `4a7035a2-db7d-47da-99e4-0bc7f12db288`, runs `npx wrangler deploy --config wrangler.docs.jsonc`.
+- `Preview docs from other branches`, trigger `407c6d11-6e25-42a3-8792-7f9d6b32236c`, runs `npx wrangler versions upload --config wrangler.docs.jsonc`.
+
+Both run `npm ci --prefix site && npm run docs:build` with `NODE_VERSION=22.23.2`.
+A manual build of `main` (build `fc6ed6cf-70df-4104-bef3-37f3cf2c216c`) passed. The `main` head was `df6120c` at that time.
+It checked 13 HTML pages and 530 local links, and deployed `minsky-docs` version `c360c10a-9a05-4e0e-8dd0-ae89bd9b8250`.
+The build record does not include the commit hash.
+`minsky-dev` stays disconnected from Workers Builds. The application deployment was not read or changed.
+
 ## PR #45 update from main, 2026-10-23
 
 The owner requests current `main` and conflict resolution for the existing draft PR.
@@ -472,7 +489,7 @@ Protected CI retains the hosted React recovery journal and the consolidated runn
 Authentication and application HTTP routes share the bounded JSON reader.
 Node.js supplies exact configuration comparison in place of duplicate sorting functions.
 
-The complete installation procedure now lives in [the public installation source](../site/src/content/docs/operators/installation.md).
+The complete installation procedure now lives in [the public installation source](../site/src/content/docs/operators/installation.mdx).
 Completed proof and implementation instructions link to their frozen historical source.
 The [review run report](t0020-run-report.md) lists changes, commands, checks, and remaining verification.
 

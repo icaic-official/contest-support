@@ -39,6 +39,7 @@
     "playwright.cloud.config.ts",
     "playwright.providers.config.ts",
     "playwright.docs.config.ts",
-    "site/tests"
+    "site/tests",
+    ".cursor/skills/verify-minsky/scripts/minsky-verify.ts"
   ]
 }

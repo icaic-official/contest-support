@@ -100,7 +100,10 @@
         "npm:vitest@^5.0.4",
         "npm:wrangler@4.151.2",
         "npm:zod@^4.6.7"
-      ]
+      ],
+      "overrides": {
+        "undici": "7.30.1"
+      }
     }
   }
 }

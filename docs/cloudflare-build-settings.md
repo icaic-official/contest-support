@@ -30,7 +30,9 @@ Both `minsky-ci` triggers set the build variable `NODE_VERSION` to `22.23.2`.
 That value is already set in Cloudflare.
 It keeps CI on Node.js 22.23.2 when the build image's default Node.js changes.
 
-`npm run ci` installs both lockfiles, then runs type checking, ESLint, Deno function checks, function tests, unit tests, the provider scenario list, both production builds, both `npm audit` checks, and a checksum-verified Gitleaks scan.
+`npm run ci` installs both lockfiles, then runs the app production build, ESLint, Deno function checks, function tests, unit tests, the provider scenario list, the docs build, both `npm audit` checks, and a checksum-verified Gitleaks scan.
+The app build starts with `tsc -b`, so it is also the type check. It runs first so that type errors fail early.
+Vitest uses every CPU. It starts the four short authentication files first, because a fresh install has no earlier test durations and Vitest would otherwise start them last.
 `npm run ci:worker` runs `wrangler versions upload --config wrangler.ci.jsonc --dry-run`.
 [Version upload](https://developers.cloudflare.com/workers/versions-and-deployments/deployment-management/) does not send traffic.
 The dry run does not upload a version.

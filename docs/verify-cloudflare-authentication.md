@@ -35,7 +35,8 @@ These batches retain the row assertions and exact fixture ownership checks.
 Local runs use a low-cost scrypt in the same stored format, because each Better Auth hash or check takes about 110 ms.
 `password.test.ts` checks the maintained hasher. Hosted runs use the maintained hasher.
 `npm test` runs these four files with a 30 second case limit.
-`npm run test:auth` and the hosted runs use a 120 second limit. Maintained scrypt is slow on a busy builder.
+`npm run test:auth` uses a 120 second limit.
+Hosted runs also use 120 seconds, because they use maintained scrypt, which is slow on a busy builder.
 The browser suite creates a separate temporary D1 database and a local HTTPS Worker on port 8788.
 It uses Chromium with a self-signed local certificate.
 Expect all 83 account cases and three browser cases to pass.

@@ -8,7 +8,7 @@ import tailwindcss from "@tailwindcss/vite";
 // It then starts larger files first, and these short files that start the local
 // Cloudflare runtime would run last. Start them first so they do not extend the run.
 // The pattern matches the authentication*.test.ts set in vitest.auth.config.ts.
-const slowTestFile = /\/src\/server\/adapters\/cloudflare\/authentication\w*\.test\.ts$/;
+const slowTestFile = /\/src\/server\/adapters\/cloudflare\/authentication[^/]*\.test\.ts$/;
 
 class SlowFirstSequencer extends BaseSequencer {
   override async sort(files: TestSpecification[]): Promise<TestSpecification[]> {

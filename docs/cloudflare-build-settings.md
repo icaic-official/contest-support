@@ -96,7 +96,7 @@ The combined build time of checks and publication is not measured yet. It must s
 ## Preview Workers Builds
 
 The `minsky-preview` Worker publishes branch previews. [Publish branch previews](cloudflare-builds.md#publish-branch-previews) explains the behavior and the dashboard steps.
-The trigger is not connected yet. These settings take effect when the owner connects it.
+The owner connected this trigger on 2026-10-24. The owner applies changes to these settings in the dashboard.
 
 | Setting | Value |
 | --- | --- |

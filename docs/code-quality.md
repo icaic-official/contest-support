@@ -4,7 +4,7 @@ On 2026-10-02, the user selected mandatory CI, a short PR review checklist, and 
 These changes extend T0003.
 The user reviews and merges.
 Workers Builds publishes `main` to the `minsky-dev` development application after the checks pass in the same build.
-After the owner connects the `minsky-preview` trigger, it publishes other branches to that shared preview, which uses only test data. That trigger is not connected yet.
+It publishes other branches to the shared preview `minsky-preview`, which uses only test data.
 [Build and publication flow](cloudflare-builds.md#build-and-publication-flow) describes each trigger.
 
 ## Automated checks

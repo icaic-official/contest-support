@@ -8,8 +8,8 @@ The `minsky-preview` Worker binds only D1 database `minsky-preview` and private 
 Its Workers Builds trigger publishes every branch except `main` and `dependabot/*` with `npm run deploy`. Its build command only installs dependencies without the token, so the preview does not wait for checks. `minsky-ci` still reports them.
 The build that finishes last replaces the preview. A build that another build replaced during verification passes.
 The preview accepts migrations that other branches applied. It still requires every migration in the checkout.
-Branch code can change the deploy checks, so only the token protects development data. The preview token must reach only the preview Worker, database, and bucket. If Cloudflare cannot limit it that way, the trigger stays disconnected and the owner decides on a separate account.
-The owner creates the token and connects the trigger. Until then, the Worker serves a `503` placeholder. `minsky-dev` publication from `main` does not change.
+Branch code can change the deploy checks, so only the token protects development data. The preview token must reach only the preview Worker, database, and bucket. If Cloudflare cannot limit it that way, the owner disconnects the trigger and decides on a separate account.
+The owner connected the trigger on 2026-10-24 and applies changes to its settings, such as the build command and the branch exclusion. `minsky-dev` publication from `main` does not change.
 
 **CI audit follow-up, 2026-10-24.** After a CI audit, the owner asked to add two safeguards to PR #67, because `main` now publishes automatically.
 `npm test` and the deploy reject a D1 migration that drops or renames schema, unless `reviewedDestructiveMigrations` records a reviewed exception. Data changes are not checked.

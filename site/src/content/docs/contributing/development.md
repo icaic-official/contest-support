@@ -51,10 +51,9 @@ Hosted test commands need isolated CI resources. Check their targets first, and 
 
 1. Branch from updated `main`. Name the branch `<type>/<title>`, for example `bugfix/race-request-fix`.
 2. Implement, verify, and update the docs in the same change.
-3. Push the branch. Wait for `Workers Builds: minsky-ci` to pass.
-4. When the `minsky-preview` trigger is connected, wait for `Workers Builds: minsky-preview` too. Then test the change on the shared preview at `https://minsky-preview.icaic-minsky.workers.dev`.
+3. Push the branch. Wait for `Workers Builds: minsky-ci` and `Workers Builds: minsky-preview` to pass.
+4. Test the change on the shared preview at `https://minsky-preview.icaic-minsky.workers.dev`.
    It uses only test data. The build that finishes last replaces it. Check that its `/minsky-revision.json` shows your commit.
-   The trigger is not connected yet. Until it is, the preview returns `503` and pushes report no `minsky-preview` status.
 5. Open a draft pull request into `main`. The owner reviews and merges.
 6. After the merge, Workers Builds checks `main` again and publishes the development app and the docs.
 

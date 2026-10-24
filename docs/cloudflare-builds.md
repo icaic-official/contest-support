@@ -12,14 +12,14 @@ Each build reports a commit status named `Workers Builds: <worker>`.
 | Worker | Branches it builds | Build command | Deploy command | Result |
 | --- | --- | --- | --- | --- |
 | `minsky-ci` | All branches, including `main` | `npm run ci` | `npm run ci:worker` | A check only. It publishes nothing. |
-| `minsky-preview` | All branches except `dependabot/*`. A `main` build does not publish. Not connected yet. | `env -u CLOUDFLARE_API_TOKEN -u CLOUDFLARE_API_KEY npm ci` | `npm run deploy` | Publishes the branch to `https://minsky-preview.icaic-minsky.workers.dev` with test data. |
+| `minsky-preview` | All branches except `dependabot/*`. A `main` build does not publish. | `env -u CLOUDFLARE_API_TOKEN -u CLOUDFLARE_API_KEY npm ci` | `npm run deploy` | Publishes the branch to `https://minsky-preview.icaic-minsky.workers.dev` with test data. |
 | `minsky-docs` | All branches | `npm ci --prefix site && npm run docs:build` | `npx wrangler deploy` on `main`, `npx wrangler versions upload` on other branches | Publishes the docs from `main`. Uploads a docs preview version for other branches. |
 | `minsky-dev` | `main` only | `npm run ci` | `npm run deploy` | Publishes `main` to `https://minsky-dev.icaic-minsky.workers.dev` with development data. |
 
 ### When you push a branch
 
 1. `minsky-ci` runs the checks.
-2. After the owner connects its trigger, `minsky-preview` installs the dependencies, builds the app, applies new migrations to the preview database, and publishes the branch.
+2. `minsky-preview` installs the dependencies, builds the app, applies new migrations to the preview database, and publishes the branch.
    It does not run the checks. `minsky-ci` reports them for the same commit.
    The build that finishes last replaces the preview, even if another branch was pushed later.
 3. `minsky-docs` uploads a docs preview version. That version receives no traffic.
@@ -30,7 +30,7 @@ Each build reports a commit status named `Workers Builds: <worker>`.
 1. `minsky-ci` checks `main`.
 2. `minsky-dev` runs the checks again. It then applies new migrations to `minsky-development` and publishes `main`.
 3. `minsky-docs` publishes the docs.
-4. After the owner connects its trigger, `minsky-preview` installs the dependencies for `main`, but it does not publish.
+4. `minsky-preview` installs the dependencies for `main`, but it does not publish.
 
 A failed check stops its build. The deploy command does not run, and the Worker keeps its previous version.
 On `minsky-preview`, only a failed app build or a failed target check stops publication.
@@ -254,8 +254,7 @@ A broken application target cannot block the docs, because Workers Builds publis
 ## Publish branch previews
 
 The owner chose one shared preview on 2026-10-24.
-The trigger is not connected yet. These settings take effect when the owner connects it.
-Until then, the `minsky-preview` Worker serves a placeholder that returns `503`, and pushes report no `Workers Builds: minsky-preview` status.
+The owner connected the `minsky-preview` trigger on 2026-10-24. Its first preview was `9c70247`.
 
 Each push to a branch other than `main` publishes that branch to `https://minsky-preview.icaic-minsky.workers.dev`.
 A push to `main` builds on this Worker too, but it does not publish. `minsky-dev` publishes `main`.
@@ -287,7 +286,7 @@ The configuration is `src/server/adapters/cloudflare/deploy/preview.wrangler.jso
 
 The `minsky-preview` Worker must exist before you can limit a token to it.
 It exists since 2026-10-24, with `AUTH_SECRET`, all migrations, and a test admin account.
-Until its first build, it serves a placeholder that returns `503`. A local `wrangler deploy` through an authenticating proxy cannot upload static assets, so the first full publication runs in Workers Builds.
+Until its first build, it served a placeholder that returned `503`. A local `wrangler deploy` through an authenticating proxy cannot upload static assets, so the first full publication runs in Workers Builds.
 Every branch that the trigger builds runs its own code with this token. That includes code that nobody has reviewed, Dependabot updates, and the npm packages that they install.
 The checks in `scripts/deploy-workers.mjs` and `scripts/ci.mjs` are branch code too. A branch can change them. So only the token's permissions keep branch code away from development data.
 
@@ -300,6 +299,7 @@ Create an account API token in **Manage Account > Account API Tokens > Create to
 
 Do not use the `minsky-dev` token.
 If the form cannot limit D1 to `minsky-preview` and R2 to `minsky-preview-images`, do not create the token and do not connect the trigger.
+If the connected token is wider than this, disconnect the trigger or replace the token.
 A wider token lets any branch read or change `minsky-development` through the API.
 In that case, the preview needs its own Cloudflare account. That is an account decision for the owner.
 

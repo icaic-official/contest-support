@@ -115,6 +115,12 @@ export function createBrowserProvider(configuration: unknown): BrowserProvider {
       removeImage: async () => unsupported(),
       downloadImage: async () => unsupported(),
     },
+    avatars: {
+      list: async () => unsupported(),
+      upload: async () => unsupported(),
+      remove: async () => unsupported(),
+      download: async () => unsupported(),
+    },
     updates: {
       subscribe(input) {
         changes.add(input.onChange);

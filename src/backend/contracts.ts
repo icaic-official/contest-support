@@ -159,7 +159,7 @@ export interface Avatars {
   upload(input: { requestId: string; file: Blob }): Promise<PersonAvatar>;
   /** Removes the caller's avatar. Removing when none exists succeeds. */
   remove(): Promise<void>;
-  /** The server checks the visibility rule again for this session. */
+  /** The provider checks the visibility rule for this session again before it returns the bytes. */
   download(sessionId: string, avatar: PersonAvatar): Promise<Blob>;
 }
 
@@ -180,5 +180,6 @@ export interface Backend {
   admin: Administration;
   images: ImageTransport;
   announcements: Announcements;
+  avatars: Avatars;
   updates: LiveUpdates;
 }

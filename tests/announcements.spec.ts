@@ -138,3 +138,21 @@ test("the announcement strip fits a phone without horizontal scrolling", async (
   await expect(volunteer.getByRole("button", { name: "New announcement" })).toHaveCount(0);
   await local.close();
 });
+
+test("an open announcement form fits on a laptop screen without scrolling inside the strip", async ({ browser }) => {
+  const local = await createJuryFixture();
+  const admin = await signIn(browser, local, "admin", { width: 1280, height: 720 });
+  await publish(admin, "Room change", "Use room 2.");
+  await admin.getByRole("button", { name: "New announcement" }).click();
+  const create = admin.locator("form").filter({ hasText: "New announcement" });
+  // ratio 1: the strip's own scroll box must not hide any part of the controls.
+  await expect(create.getByRole("button", { name: "Publish" })).toBeInViewport({ ratio: 1 });
+  await expect(create.getByLabel("Expires (optional)")).toBeInViewport({ ratio: 1 });
+  await create.getByRole("button", { name: "Close" }).click();
+
+  await admin.getByRole("button", { name: "Room change" }).click();
+  await admin.getByRole("button", { name: "Edit", exact: true }).click();
+  const edit = admin.locator("form").filter({ hasText: "Edit announcement" });
+  await expect(edit.getByRole("button", { name: "Save changes" })).toBeInViewport({ ratio: 1 });
+  await local.close();
+});

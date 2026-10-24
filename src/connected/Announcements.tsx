@@ -165,7 +165,8 @@ export function Announcements({ data }: { data: SessionData }) {
   return (
     <section
       aria-labelledby={headingId}
-      className="max-h-[40dvh] shrink-0 overflow-y-auto border-b bg-muted/40"
+      // Reading keeps the queue in view. An open form needs room for all its controls.
+      className={`${composing || edit ? "max-h-[80dvh]" : "max-h-[40dvh]"} shrink-0 overflow-y-auto border-b bg-muted/40`}
     >
       <div className="mx-auto grid max-w-4xl gap-2 px-4 py-2 sm:px-8">
         <div className="flex items-center gap-2">
@@ -500,10 +501,16 @@ function AnnouncementForm({
   onCancel: () => void;
 }) {
   const id = useId();
+  const form = useRef<HTMLFormElement>(null);
   const [touched, setTouched] = useState(false);
   const problem = draftProblem(draft, now);
+  // The strip scrolls on its own, so bring the whole form, buttons included, into view once.
+  useEffect(() => {
+    form.current?.scrollIntoView({ block: "nearest" });
+  }, []);
   return (
     <form
+      ref={form}
       className="grid gap-3 rounded-md border bg-background p-3"
       onSubmit={(event) => {
         event.preventDefault();

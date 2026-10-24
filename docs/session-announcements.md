@@ -18,6 +18,7 @@ This page is the reference for the behavior and for both provider implementation
 - The titles appear above the issue workspace and the reporting form in every shell.
   A keyboard-operable disclosure shows the details and the images.
   Reporting stays available under the existing intake and archive rules.
+  The strip uses at most 40% of the window height and scrolls inside that area. While a manager has the new or edit form open, it can use up to 80%, so the whole form fits on a laptop screen.
 - Each announcement shows its publisher and the server publication time.
   After a change, it shows the latest editor and time.
 - Editing keeps the original publisher and time.

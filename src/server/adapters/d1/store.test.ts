@@ -1,18 +1,16 @@
 import { randomUUID } from "node:crypto";
-import { readFileSync, readdirSync } from "node:fs";
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { unstable_splitSqlQuery as splitSqlQuery } from "wrangler";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { openStoreDatabase } from '../cloudflare/tooling/store-database.mjs';
 import type { Caller } from '../../authentication';
 import { WorkflowService } from '../../workflow';
 import { D1ApplicationService } from '../cloudflare/application';
 import type { D1Connection, D1Statement } from "./connection";
 import { D1ApplicationStore } from "./store";
-import { D1Fixture } from "./testFixture";
+import { D1Fixture, applyMigrations } from "./testFixture";
 import { measureD1 } from './testMetrics';
 import type { Command } from "../../../connected/model";
 
-const timeout = 120_000;
+vi.setConfig({ testTimeout: 120_000, hookTimeout: 120_000 });
 const connectorConfig = process.env.MINSKY_CONNECTOR_D1_CONFIG;
 const remote = Boolean(connectorConfig);
 const configPath = connectorConfig ?? 'src/server/adapters/cloudflare/deploy/connector-store-ci.wrangler.jsonc';
@@ -51,15 +49,11 @@ describe("D1 workflow persistence", () => {
     db = metrics?.db ?? platform.db;
     dispose = async () => { metrics?.flush(); await platform.dispose(); };
     if (!remote) {
-      const directory = "src/server/adapters/d1/migrations";
-      for (const filename of readdirSync(directory).filter((name) => name.endsWith(".sql")).sort()) {
-        const schema = readFileSync(`${directory}/${filename}`, "utf8");
-        await db.batch(splitSqlQuery(schema).map((sql) => db.prepare(sql)));
-      }
+      await applyMigrations(db);
     }
-  }, timeout);
+  });
 
-  afterAll(async () => { if (dispose) await dispose(); }, timeout);
+  afterAll(async () => { if (dispose) await dispose(); });
 
   beforeEach(async () => {
     creationComplete = false;
@@ -68,9 +62,9 @@ describe("D1 workflow persistence", () => {
     creationComplete = true;
     workflow = workflowService(db);
     application = new D1ApplicationService(db);
-  }, timeout);
+  });
 
-  afterEach(async () => { if (creationComplete) await fixture.cleanup(); }, timeout);
+  afterEach(async () => { if (creationComplete) await fixture.cleanup(); });
 
   function claim(issueId = fixture.issueId) {
     return { type: "claim", issue_id: issueId, revision: 1 } as const;
@@ -101,7 +95,7 @@ describe("D1 workflow persistence", () => {
     expect(state.sequences.find((row) => row.audience === `team:${fixture.teamId}`)?.sequence).toBe(1);
     expect(state.notifications.map((row) => row.audience).sort()).toEqual(["staff", `team:${fixture.teamId}`].sort());
     await expectNoAssertions();
-  }, timeout);
+  });
 
   it("permits only one concurrent claim with different actors and request IDs", async () => {
     const results = await Promise.all([execute(claim()), execute(claim(), fixture.specialist)]);
@@ -112,7 +106,7 @@ describe("D1 workflow persistence", () => {
     expect(state.history).toHaveLength(1);
     expect(state.notifications).toHaveLength(2);
     expect(state.sequences.every((row) => row.sequence === 1)).toBe(true);
-  }, timeout);
+  });
 
   it("replays concurrent identical request IDs without duplicate writes", async () => {
     const requestId = randomUUID();
@@ -124,7 +118,7 @@ describe("D1 workflow persistence", () => {
     expect(state.receipts).toHaveLength(1);
     expect(state.history).toHaveLength(1);
     expect(state.notifications).toHaveLength(2);
-  }, timeout);
+  });
 
   it("rejects concurrent reuse of a request ID with different commands", async () => {
     const requestId = randomUUID();
@@ -137,7 +131,7 @@ describe("D1 workflow persistence", () => {
     const state = await fixture.durableState();
     expect(state.receipts).toHaveLength(1);
     expect(state.history).toHaveLength(1);
-  }, timeout);
+  });
 
   it("compares canonical command content regardless of input key order", async () => {
     const requestId = randomUUID();
@@ -146,7 +140,7 @@ describe("D1 workflow persistence", () => {
     expect(await execute({ revision: 1, issue_id: fixture.issueId, type: "claim" }, fixture.staff, requestId))
       .toEqual({ outcome: "committed", issueId: fixture.issueId });
     expect(await fixture.durableState()).toEqual(before);
-  }, timeout);
+  });
 
   it("preserves an unknown outcome after committed response loss and safely retries", async () => {
     let lost = false;
@@ -164,7 +158,7 @@ describe("D1 workflow persistence", () => {
     expect(committed.history).toHaveLength(1);
     expect(await execute(claim(), fixture.staff, requestId)).toEqual({ outcome: "committed", issueId: fixture.issueId });
     expect(await fixture.durableState()).toEqual(committed);
-  }, timeout);
+  });
 
   it("rejects changed text whitespace with a reused request ID while replaying the original command", async () => {
     const requestId = randomUUID();
@@ -178,7 +172,7 @@ describe("D1 workflow persistence", () => {
     expect(await execute(original, fixture.staff, requestId))
       .toEqual({ outcome: "committed", issueId: fixture.issueId });
     expect(await fixture.durableState()).toEqual(before);
-  }, timeout);
+  });
 
   it.each(["command", "issue", "session"])("rejects request ID reuse with another %s", async (changed) => {
     const requestId = randomUUID();
@@ -190,7 +184,7 @@ describe("D1 workflow persistence", () => {
       changed === "session" ? fixture.secondSessionId : fixture.sessionId, requestId, command);
     expect(result).toEqual({ outcome: "rejected", reason: "request_id" });
     expect(await fixture.durableState()).toEqual(before);
-  }, timeout);
+  });
 
   const accessChanges = ["membership", "disabled", "must_change", "archive", "expired", "revoked", "roles", "team"] as const;
   async function changeAccess(change: typeof accessChanges[number]) {
@@ -215,7 +209,7 @@ describe("D1 workflow persistence", () => {
     expect(result.outcome).toBe("rejected");
     expect(await fixture.durableState()).toEqual(before);
     await expectNoAssertions();
-  }, timeout);
+  });
 
   it("rereads changed session settings before committing", async () => {
     let batches = 0;
@@ -230,7 +224,7 @@ describe("D1 workflow persistence", () => {
     expect(batches).toBe(2);
     expect((await fixture.durableState()).history).toHaveLength(1);
     await expectNoAssertions();
-  }, timeout);
+  });
 
   it.each(["membership", "disabled", "must_change", "archive", "expired", "revoked"] as const)(
     "checks current %s access before replaying a saved receipt", async (change) => {
@@ -240,7 +234,7 @@ describe("D1 workflow persistence", () => {
       await changeAccess(change);
       expect(await execute(claim(), fixture.staff, requestId)).toEqual({ outcome: "rejected", reason: "access" });
       expect(await fixture.durableState()).toEqual(before);
-    }, timeout,
+    },
   );
 
   it("denies the next consistent snapshot after membership revocation", async () => {
@@ -249,7 +243,7 @@ describe("D1 workflow persistence", () => {
     await changeAccess("membership");
     expect((await application.snapshot(fixture.staff, fixture.sessionId)).issues).toEqual([]);
     expect((await application.snapshot(fixture.otherContestant, fixture.sessionId)).issues).toEqual([]);
-  }, timeout);
+  });
 
   it("checks revocation in the same primary operation that assembles a snapshot", async () => {
     let revoked = false;
@@ -267,7 +261,7 @@ describe("D1 workflow persistence", () => {
       batch: (statements) => db.batch(statements),
     });
     expect((await application.snapshot(fixture.staff, fixture.sessionId)).issues).toEqual([]);
-  }, timeout);
+  });
 
   it("returns only a permitted snapshot or no snapshot when a read overlaps revocation", async () => {
     expect(await execute(message("internal", "Private fixture text")))
@@ -292,7 +286,7 @@ describe("D1 workflow persistence", () => {
       expect(raced.history).toEqual([]);
     }
     expect((await application.snapshot(fixture.contestant, fixture.sessionId)).issues).toEqual([]);
-  }, timeout);
+  });
 
   it("keeps internal history, notifications, and revisions out of the contestant view", async () => {
     const before = await application.snapshot(fixture.contestant, fixture.sessionId);
@@ -306,7 +300,7 @@ describe("D1 workflow persistence", () => {
     expect(state.sequences.map((row) => row.audience)).toEqual(["staff"]);
     expect(state.sequences[0].sequence).toBe(1);
     expect(state.issues.find((row) => row.id === fixture.issueId)).toMatchObject({ public_revision: 1, write_version: 2 });
-  }, timeout);
+  });
 
   it("rereads after a private change and commits the public command without exposing a private conflict", async () => {
     workflow = workflowService(beforeBatch(db, async () => {
@@ -325,7 +319,7 @@ describe("D1 workflow persistence", () => {
     expect(state.receipts).toHaveLength(2);
     expect(state.notifications).toHaveLength(3);
     expect(state.sequences.find((row) => row.audience === `team:${fixture.teamId}`)?.sequence).toBe(1);
-  }, timeout);
+  });
 
   it("bounds retries without changing the public view during repeated private conflicts", async () => {
     const before = await application.snapshot(fixture.contestant, fixture.sessionId);
@@ -343,7 +337,7 @@ describe("D1 workflow persistence", () => {
     expect(state.history).toHaveLength(3);
     expect(state.notifications.every((row) => row.audience === "staff")).toBe(true);
     await expectNoAssertions();
-  }, timeout);
+  });
 
   it("rolls back all writes when a late assertion fails after history and notification writes", async () => {
     const before = await fixture.durableState();
@@ -357,7 +351,7 @@ describe("D1 workflow persistence", () => {
     expect(await execute(claim())).toEqual({ outcome: "unknown" });
     expect(await fixture.durableState()).toEqual(before);
     await expectNoAssertions();
-  }, timeout);
+  });
 
   it("rejects a NULL assertion instead of treating it as a successful SQLite CHECK", async () => {
     const before = await fixture.durableState();
@@ -371,7 +365,7 @@ describe("D1 workflow persistence", () => {
     expect(await execute(claim())).toEqual({ outcome: "unknown" });
     expect(await fixture.durableState()).toEqual(before);
     await expectNoAssertions();
-  }, timeout);
+  });
 
   it("rejects failed state and permission checks without creating any durable effect", async () => {
     const before = await fixture.durableState();
@@ -380,7 +374,7 @@ describe("D1 workflow persistence", () => {
     expect(await execute(message("public"), fixture.otherContestant)).toEqual({ outcome: "rejected", reason: "access" });
     expect(await execute({ ...claim(), revision: 2 })).toEqual({ outcome: "rejected", reason: "state" });
     expect(await fixture.durableState()).toEqual(before);
-  }, timeout);
+  });
 
   it.each([
     "write_version = write_version",
@@ -392,7 +386,7 @@ describe("D1 workflow persistence", () => {
     await expect(fixture.statement(`UPDATE issues SET ${assignments} WHERE id = ?`, fixture.issueId).run())
       .rejects.toThrow("Issue versions must advance with each write");
     expect(await fixture.durableState()).toEqual(before);
-  }, timeout);
+  });
 
   it("retains the existing 2,000-character message limit", async () => {
     const before = await fixture.durableState();
@@ -401,7 +395,7 @@ describe("D1 workflow persistence", () => {
     expect(await fixture.durableState()).toEqual(before);
     expect(await execute(message("public", "x".repeat(2000))))
       .toEqual({ outcome: "committed", issueId: fixture.issueId });
-  }, timeout);
+  });
 
   it("prevents an admin without team membership or staff roles from posting messages", async () => {
     await db.batch([
@@ -412,7 +406,7 @@ describe("D1 workflow persistence", () => {
     expect(await execute(message("public"))).toEqual({ outcome: "rejected", reason: "state" });
     expect(await execute(message("internal"))).toEqual({ outcome: "rejected", reason: "state" });
     expect(await fixture.durableState()).toEqual(before);
-  }, timeout);
+  });
 
   it("rejects a claim after another command changes the issue state before its batch", async () => {
     workflow = workflowService(beforeBatch(db, async () => {
@@ -426,7 +420,7 @@ describe("D1 workflow persistence", () => {
     expect(state.notifications).toHaveLength(2);
     expect((await application.snapshot(fixture.staff, fixture.sessionId)).issues.find((issue) => issue.id === fixture.issueId))
       .toMatchObject({ status: "claimed", owner: fixture.specialist.accountId, revision: 2 });
-  }, timeout);
+  });
 
   it("cleans only its own fixture while preserving another run's workflow and access records", async () => {
     expect(await execute(claim())).toEqual({ outcome: "committed", issueId: fixture.issueId });
@@ -443,7 +437,7 @@ describe("D1 workflow persistence", () => {
     expect(await fixture.durableState()).toEqual(ownState);
     expect((await application.snapshot(fixture.staff, fixture.sessionId)).issues.find((issue) => issue.id === fixture.issueId))
       .toMatchObject({ status: "claimed", owner: fixture.staff.accountId });
-  }, timeout);
+  });
 
   describe('complete D1 workflow with current identity', () => {
     async function command(input: Command, caller = fixture.staff, requestId = randomUUID()) {
@@ -529,7 +523,7 @@ describe("D1 workflow persistence", () => {
       expect(durable.notifications).toHaveLength(21);
       expect(await fixture.rows('SELECT * FROM workflow_commit_times')).toEqual([]);
       await expectNoAssertions();
-    }, timeout);
+    });
 
     it('assigns unique persisted numbers to concurrent submissions and replays a lost submission response', async () => {
       await fixture.statement('UPDATE sessions SET intake_open = 1 WHERE id = ?', fixture.sessionId).run();
@@ -550,7 +544,7 @@ describe("D1 workflow persistence", () => {
       expect(await command(input, fixture.contestant, requestId)).toMatchObject({ outcome: 'committed' });
       expect(await fixture.durableState()).toEqual(committed);
       expect(committed.issue_sequences).toEqual([{ session_id: fixture.sessionId, number: 5 }]);
-    }, timeout);
+    });
 
     it('replays the same submit request concurrently without leaving an extra issue or number', async () => {
       await fixture.statement('UPDATE sessions SET intake_open = 1 WHERE id = ?', fixture.sessionId).run();
@@ -563,7 +557,7 @@ describe("D1 workflow persistence", () => {
       expect(durable.issues).toHaveLength(4);
       expect(durable.history).toHaveLength(1);
       expect(durable.issue_sequences).toEqual([{ session_id: fixture.sessionId, number: 3 }]);
-    }, timeout);
+    });
 
     it('rolls back a batch when its identity expires after the first access check', async () => {
       const before = await fixture.durableState();
@@ -579,7 +573,7 @@ describe("D1 workflow persistence", () => {
       expect(await fixture.durableState()).toEqual(before);
       expect(await fixture.rows('SELECT * FROM workflow_commit_times')).toEqual([]);
       await expectNoAssertions();
-    }, timeout);
+    });
 
     const credentialChanges = ['generation', 'login_generation', 'pending', 'identity_expiry', 'identity_removed', 'identity_account', 'identity_missing'] as const;
     async function changeCredential(change: typeof credentialChanges[number]) {
@@ -602,7 +596,7 @@ describe("D1 workflow persistence", () => {
       expect(await fixture.durableState()).toEqual(before);
       await expect(application.snapshot(fixture.staff, fixture.sessionId)).rejects.toMatchObject({ status: 403 });
       await expectNoAssertions();
-    }, timeout);
+    });
 
     it.each(credentialChanges)('checks %s at the atomic receipt replay boundary', async (change) => {
       const requestId = randomUUID();
@@ -612,7 +606,7 @@ describe("D1 workflow persistence", () => {
       expect(await command(claim(), fixture.staff, requestId)).toEqual({ outcome: 'rejected', reason: 'access' });
       expect(await fixture.durableState()).toEqual(before);
       await expectNoAssertions();
-    }, timeout);
+    });
 
     it.each(['categories', 'intake', 'team'] as const)('rejects submission when %s changes before its commit', async (change) => {
       await fixture.statement('UPDATE sessions SET intake_open = 1 WHERE id = ?', fixture.sessionId).run();
@@ -630,7 +624,7 @@ describe("D1 workflow persistence", () => {
       const result = await command(input, change === 'intake' ? fixture.contestant : fixture.staff);
       expect(result.outcome).toBe('rejected');
       expect(await fixture.durableState()).toEqual(before);
-    }, timeout);
+    });
 
     it.each(['resolve', 'reopen', 'award', 'apply'] as const)('rolls back every %s effect on a late batch failure', async (type) => {
       await resolvedIssue();
@@ -655,7 +649,7 @@ describe("D1 workflow persistence", () => {
       expect(await fixture.durableState()).toEqual(before);
       expect(await fixture.rows('SELECT * FROM workflow_commit_times')).toEqual([]);
       await expectNoAssertions();
-    }, timeout);
+    });
 
     it('records credential-operation audit and account invalidations without team notifications', async () => {
       const operationId = randomUUID();
@@ -672,7 +666,7 @@ describe("D1 workflow persistence", () => {
         { audience: `account:${fixture.contestant.accountId}` }, { audience: 'staff' }]);
       expect(await fixture.rows("SELECT * FROM notifications WHERE audience LIKE 'team:%' AND session_id = ?", fixture.sessionId)).toEqual([]);
       await fixture.statement('DELETE FROM account_operations WHERE id = ?', operationId).run();
-    }, timeout);
+    });
 
     it('rejects incomplete reopening and application records at the database boundary', async () => {
       await resolvedIssue();
@@ -686,7 +680,7 @@ describe("D1 workflow persistence", () => {
       await expect(fixture.statement("UPDATE awards SET applied_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE issue_id = ?",
         fixture.issueId).run()).rejects.toThrow('CHECK constraint failed');
       expect(await fixture.durableState()).toEqual(before);
-    }, timeout);
+    });
 
     it('rereads a concurrent resolution change before recording an award', async () => {
       await resolvedIssue();
@@ -698,6 +692,6 @@ describe("D1 workflow persistence", () => {
       expect(await command({ type: 'award', issue_id: fixture.issueId, revision: 3, minutes: 2, explanation: 'Fixture award' }))
         .toEqual({ outcome: 'rejected', reason: 'state' });
       expect((await fixture.durableState()).awards).toEqual([]);
-    }, timeout);
+    });
   });
 });

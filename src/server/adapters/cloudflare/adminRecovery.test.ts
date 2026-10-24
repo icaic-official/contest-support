@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto';
-import { readFileSync, readdirSync } from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { getPlatformProxy, unstable_splitSqlQuery as splitSqlQuery } from 'wrangler';
+import { getPlatformProxy } from 'wrangler';
 import type { D1Connection, D1Statement } from '../d1/connection';
+import { applyMigrations } from '../d1/testFixture';
 import { recoverCloudflareAdmin, writeTemporaryPassword, type AdminRecoveryResult } from './adminRecovery';
 import { D1AuthenticationService } from './authentication';
 import { createBetterAuthIdentity } from './identity';
@@ -42,10 +42,7 @@ describe('Cloudflare admin password recovery', () => {
     });
     db = platform.env.DB;
     dispose = platform.dispose;
-    const directory = 'src/server/adapters/d1/migrations';
-    for (const file of readdirSync(directory).filter((name) => name.endsWith('.sql')).sort()) {
-      await db.batch(splitSqlQuery(readFileSync(`${directory}/${file}`, 'utf8')).map((sql) => db.prepare(sql)));
-    }
+    await applyMigrations(db);
   }, 120_000);
 
   afterEach(async () => { await dispose?.(); }, 120_000);

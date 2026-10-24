@@ -1,9 +1,8 @@
 import { expect, it } from 'vitest';
-import { readFileSync, readdirSync } from 'node:fs';
-import { getPlatformProxy, unstable_splitSqlQuery as splitSqlQuery } from 'wrangler';
+import { getPlatformProxy } from 'wrangler';
 import type { D1Connection } from './connection';
 import { measureD1 } from './testMetrics';
-import { D1Fixture } from './testFixture';
+import { D1Fixture, applyMigrations } from './testFixture';
 import { D1AuthenticationService } from '../cloudflare/authentication';
 import { createBetterAuthIdentity } from '../cloudflare/identity';
 import { passwordHasher, randomSecret } from '../cloudflare/password';
@@ -18,8 +17,7 @@ it('measures the real D1 transport without exposing data or changing batch rollb
   const secret = 'fixture-private-password-cookie';
   try {
     expect('exec' in db).toBe(true);
-    await db.batch(splitSqlQuery('CREATE TABLE measurements (id INTEGER PRIMARY KEY, value TEXT);')
-      .map((sql) => db.prepare(sql)));
+    await db.batch([db.prepare('CREATE TABLE measurements (id INTEGER PRIMARY KEY, value TEXT)')]);
     await db.prepare('INSERT INTO measurements VALUES (?, ?)').bind(1, secret).run();
     expect(await db.prepare('SELECT value FROM measurements WHERE id = ?').bind(1).first())
       .toEqual({ value: secret });
@@ -53,10 +51,7 @@ it('keeps native D1 capabilities used by the maintained identity adapter', async
   const password = randomSecret();
   const username = `metrics_${fixture.eventId.replaceAll('-', '').slice(0, 20)}`;
   try {
-    const directory = 'src/server/adapters/d1/migrations';
-    for (const file of readdirSync(directory).filter((file) => file.endsWith('.sql')).sort()) {
-      await db.batch(splitSqlQuery(readFileSync(`${directory}/${file}`, 'utf8')).map((sql) => db.prepare(sql)));
-    }
+    await applyMigrations(db);
     await fixture.create();
     created = true;
     const id = fixture.staff.accountId;

@@ -66,7 +66,7 @@ it("keeps exact fixture records after a rejected deletion and removes the file a
   cloud.failure = "history";
   cloud.requests = [];
   await expect(teardown()).rejects.toThrow(
-    "Fixture cleanup failed for history: Delete rejected.",
+    "Fixture cleanup failed for history.",
   );
   expect(readFileSync(path, "utf8")).toBe(
     '{"event":"event-one","sessions":["session-one"],"teams":["team-one"],"accounts":{"helper":{"id":"user-one"}}}',
@@ -76,6 +76,12 @@ it("keeps exact fixture records after a rejected deletion and removes the file a
       table: "attachments", columns: "id,session_id,issue_id",
       column: "session_id", value: ["session-one"],
     },
+    {
+      table: "announcement_images", columns: "id,session_id,announcement_id",
+      column: "session_id", value: ["session-one"],
+    },
+    { table: "announcement_images", column: "session_id", value: ["session-one"] },
+    { table: "announcements", column: "session_id", value: ["session-one"] },
     { table: "attachments", column: "session_id", value: ["session-one"] },
     { table: "admin_audit", column: "session_id", value: ["session-one"] },
     { table: "history", column: "session_id", value: ["session-one"] },
@@ -88,6 +94,12 @@ it("keeps exact fixture records after a rejected deletion and removes the file a
       table: "attachments", columns: "id,session_id,issue_id",
       column: "session_id", value: ["session-one"],
     },
+    {
+      table: "announcement_images", columns: "id,session_id,announcement_id",
+      column: "session_id", value: ["session-one"],
+    },
+    { table: "announcement_images", column: "session_id", value: ["session-one"] },
+    { table: "announcements", column: "session_id", value: ["session-one"] },
     { table: "attachments", column: "session_id", value: ["session-one"] },
     { table: "admin_audit", column: "session_id", value: ["session-one"] },
     { table: "history", column: "session_id", value: ["session-one"] },

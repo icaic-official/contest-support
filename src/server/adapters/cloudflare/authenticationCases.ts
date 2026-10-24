@@ -1,10 +1,8 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { readFileSync, readdirSync } from 'node:fs';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { unstable_splitSqlQuery as splitSqlQuery } from 'wrangler';
 import { openStoreDatabase } from './tooling/store-database.mjs';
 import type { D1Connection, D1Statement } from '../d1/connection';
-import { D1Fixture } from '../d1/testFixture';
+import { D1Fixture, applyMigrations } from '../d1/testFixture';
 import { measureD1 } from '../d1/testMetrics';
 import { D1ApplicationService, notificationStatements } from './application';
 import { D1AuthenticationService } from './authentication';
@@ -30,10 +28,9 @@ export type AuthenticationCases = 'sessions' | 'recovery' | 'initiation' | 'comp
 
 /** Each file owns its fixtures. Hosted files can run concurrently. */
 export function registerAuthenticationCases(group: AuthenticationCases) {
-  // Maintained scrypt is slower than Vitest's 5 second default on Workers Builds.
-  // Recorded account cases there took 1.5 to 8.3 seconds. Allow 30 seconds locally.
-  // Hosted runs keep the 120 second limit from their Vitest configuration.
-  describe('Cloudflare account authentication', remote ? {} : { timeout: 30_000 }, () => {
+  // Maintained scrypt took 1.5 to 8.3 seconds per account case on Workers Builds.
+  // Each Vitest configuration sets a limit above that.
+  describe('Cloudflare account authentication', () => {
     let db: D1Connection;
     let dispose: () => Promise<void>;
     let fixture: D1Fixture;
@@ -55,10 +52,7 @@ export function registerAuthenticationCases(group: AuthenticationCases) {
       db = metrics?.db ?? platform.db;
       dispose = async () => { metrics?.flush(); await platform.dispose(); };
       if (!remote) {
-        const dir = 'src/server/adapters/d1/migrations';
-        for (const file of readdirSync(dir).filter((file) => file.endsWith('.sql')).sort()) {
-          await db.batch(splitSqlQuery(readFileSync(`${dir}/${file}`, 'utf8')).map((sql) => db.prepare(sql)));
-        }
+        await applyMigrations(db);
       }
       fullApplication = !!await db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'admin_audit'").first();
       identity = createBetterAuthIdentity(db as Parameters<typeof createBetterAuthIdentity>[0], {

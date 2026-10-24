@@ -1,11 +1,24 @@
 import { randomUUID } from "node:crypto";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { unstable_splitSqlQuery as splitSqlQuery } from "wrangler";
 import type { Caller } from '../../authentication';
 import type { D1Connection, D1Statement } from "./connection";
 
 type Row = Record<string, unknown>;
+
+const migrations = fileURLToPath(new URL("./migrations", import.meta.url));
+
+/** Apply every repository migration, in order, to an empty local database. Returns the file names. */
+export async function applyMigrations(db: D1Connection): Promise<string[]> {
+  const names = readdirSync(migrations).filter((file) => file.endsWith(".sql")).sort();
+  for (const name of names) {
+    await db.batch(splitSqlQuery(readFileSync(join(migrations, name), "utf8")).map((sql) => db.prepare(sql)));
+  }
+  return names;
+}
 
 /** Fictional records owned by one UUID. This helper never resets a database. */
 export class D1Fixture {

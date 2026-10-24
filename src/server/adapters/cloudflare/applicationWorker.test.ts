@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto';
-import { readFileSync, readdirSync } from 'node:fs';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import { getPlatformProxy, unstable_splitSqlQuery as splitSqlQuery } from 'wrangler';
+import { getPlatformProxy } from 'wrangler';
 import type { D1Connection } from '../d1/connection';
+import { applyMigrations } from '../d1/testFixture';
 import applicationWorker, { type ApplicationEnvironment } from './applicationWorker';
 import { bootstrapInstallation } from './installation';
 
@@ -22,10 +22,7 @@ describe('full Worker installation boundary with real local D1', () => {
     });
     db = platform.env.DB;
     dispose = platform.dispose;
-    const directory = 'src/server/adapters/d1/migrations';
-    for (const file of readdirSync(directory).filter((file) => file.endsWith('.sql')).sort()) {
-      await db.batch(splitSqlQuery(readFileSync(`${directory}/${file}`, 'utf8')).map((sql) => db.prepare(sql)));
-    }
+    await applyMigrations(db);
     env = {
       DB: db, AUTH_ORIGIN: origin, AUTH_SECRET: randomUUID() + randomUUID(),
       ASSETS: { fetch: async () => new Response(null, { status: 404 }) },

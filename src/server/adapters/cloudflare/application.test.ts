@@ -1,14 +1,12 @@
 import { randomUUID } from 'node:crypto';
-import { readFileSync, readdirSync } from 'node:fs';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { getPlatformProxy, unstable_splitSqlQuery as splitSqlQuery } from 'wrangler';
+import { getPlatformProxy } from 'wrangler';
 import type { Caller } from '../../authentication';
 import type { D1Connection, D1Statement } from '../d1/connection';
-import { D1Fixture } from '../d1/testFixture';
+import { D1Fixture, applyMigrations } from '../d1/testFixture';
 import { D1ApplicationService } from './application';
 
-const timeout = 120_000;
-vi.setConfig({ testTimeout: timeout });
+vi.setConfig({ testTimeout: 120_000, hookTimeout: 120_000 });
 
 describe('Cloudflare authorized application and administration', () => {
   let db: D1Connection;
@@ -31,13 +29,10 @@ describe('Cloudflare authorized application and administration', () => {
     });
     db = platform.env.DB;
     dispose = platform.dispose;
-    const directory = 'src/server/adapters/d1/migrations';
-    for (const filename of readdirSync(directory).filter((name) => name.endsWith('.sql')).sort()) {
-      await db.batch(splitSqlQuery(readFileSync(`${directory}/${filename}`, 'utf8')).map((sql) => db.prepare(sql)));
-    }
-  }, timeout);
+    await applyMigrations(db);
+  });
 
-  afterAll(async () => { if (dispose) await dispose(); }, timeout);
+  afterAll(async () => { if (dispose) await dispose(); });
 
   beforeEach(async () => {
     created = false;
@@ -99,14 +94,14 @@ describe('Cloudflare authorized application and administration', () => {
       state, `${id}/original`, `${id}/thumbnail`, state === 'deleting' ? fixture.staff.accountId : null,
       state === 'deleting' ? now : null).run();
     }
-  }, timeout);
+  });
 
   afterEach(async () => {
     if (!created) return;
     await db.batch([fixture.staff, fixture.specialist, fixture.contestant, fixture.otherContestant]
       .map((caller) => statement('DELETE FROM ba_user WHERE id = ?', caller.accountId)));
     await fixture.cleanup();
-  }, timeout);
+  });
 
   function competing(action: () => Promise<unknown>): D1ApplicationService {
     let first = true;

@@ -17,5 +17,3 @@ export const scenarios = {
   'image file, count, combined size, and changed-limit boundaries': imageLimits,
   'transport interruption and missed-change recovery': reconnectRecovery,
 } satisfies Record<string, (context: ScenarioContext) => Promise<void>>;
-
-export type ScenarioName = keyof typeof scenarios;

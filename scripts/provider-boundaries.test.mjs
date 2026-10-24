@@ -61,7 +61,7 @@ test('shared backend files cannot import a provider while registration and provi
 });
 
 test('shared server rules and scenarios reject provider imports and backend selection', async () => {
-  for (const file of ['src/server/workflow.ts', 'tests/providers/scenarios/live.ts']) {
+  for (const file of ['src/server/workflow.ts', 'tests/providers/scenarios/live-updates.ts']) {
     for (const module of ['@google-cloud/storage', '../backend/future-provider/backend',
       '../adapters/d1/store', '../../src/backend/index']) {
       assert.equal((await boundaryErrors(`import ${JSON.stringify(module)};`, file)).length, 1);

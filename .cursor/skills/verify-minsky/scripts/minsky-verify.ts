@@ -10,7 +10,7 @@ import { request as httpsRequest } from 'node:https';
 import { register } from 'node:module';
 import { connect, createServer, type Server, type Socket } from 'node:net';
 import path from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { chromium, type Browser, type Locator, type Page } from '@playwright/test';
 import { snapshotSchema, type Snapshot } from '../../../../src/connected/model.ts';
 import type { D1Connection } from '../../../../src/server/adapters/d1/connection.ts';
@@ -32,7 +32,7 @@ const EVENT_NAME = 'Jury verification';
 const SESSION_NAME = 'Primary';
 const PASSWORD = 'verification-only';
 const LOOPBACK_IP = '198.51.100.17';
-const REMOTE_DEVELOPMENT_DATABASE = 'a1832f97-4d4c-45c2-a848-8d3dfd0b74f5';
+const DEVELOPMENT_SETTINGS = 'src/server/adapters/cloudflare/deploy/development.settings.json';
 
 type Seed = 'empty' | 'jury';
 type Role = Parameters<Page['getByRole']>[0];
@@ -336,10 +336,7 @@ function evidenceFile(root: string, out: string): string {
   return resolved;
 }
 
-function flags(argv: string[]): { command: string; values: Record<string, string | true> } {
-  const script = process.argv.findIndex((arg) => arg.endsWith('minsky-verify.ts'));
-  const start = script === -1 ? 2 : script + 1;
-  const command = process.argv[start] ?? '';
+function flags(argv: string[]): Record<string, string | true> {
   const values: Record<string, string | true> = {};
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
@@ -352,7 +349,7 @@ function flags(argv: string[]): { command: string; values: Record<string, string
       index += 1;
     }
   }
-  return { command, values };
+  return values;
 }
 
 function flag(values: Record<string, string | true>, key: string): string | undefined {
@@ -688,7 +685,6 @@ function localSecret(): string {
 
 function writeWorkerConfig(root: string, directory: string, origin: string, secret: string): string {
   const databaseId = crypto.randomUUID();
-  if (databaseId === REMOTE_DEVELOPMENT_DATABASE) throw new Error('Refusing to use the development database id.');
   const config = {
     name: DATABASE_NAME,
     main: path.join(root, 'src/server/adapters/cloudflare/applicationWorker.ts'),
@@ -714,7 +710,10 @@ function writeWorkerConfig(root: string, directory: string, origin: string, secr
     migrations: [{ tag: 'v1', new_sqlite_classes: ['SessionLiveCoordinator'] }],
   };
   const encoded = JSON.stringify(config);
-  if (encoded.includes('minsky-development') || encoded.includes(REMOTE_DEVELOPMENT_DATABASE) || encoded.includes('"remote":true')) {
+  const development = JSON.parse(readFileSync(path.join(root, DEVELOPMENT_SETTINGS), 'utf8')) as Record<string, unknown>;
+  const remoteNames = [development.databaseName, development.databaseId, development.bucketName]
+    .filter((value): value is string => typeof value === 'string' && value !== '');
+  if (remoteNames.some((name) => encoded.includes(name)) || encoded.includes('"remote":true')) {
     throw new Error('Refusing to write a Worker config that names a remote resource.');
   }
   const file = path.join(directory, 'wrangler.json');
@@ -724,26 +723,34 @@ function writeWorkerConfig(root: string, directory: string, origin: string, secr
   return file;
 }
 
-let typeImportsReady = false;
-
-function enableRepositoryTypeImports(): void {
-  if (typeImportsReady) return;
-  register(pathToFileURL(path.join(repositoryRoot(), '.cursor/skills/verify-minsky/scripts/resolve-typescript.mjs')));
-  typeImportsReady = true;
+function installationFile(root: string): string {
+  return path.join(stateDir(root), 'installation.json');
 }
 
-async function bootstrapLocal(configPath: string, persistDir: string): Promise<Installation> {
-  enableRepositoryTypeImports();
+/**
+ * Runs the bootstrap in a child process with the isolated environment, so the
+ * platform proxy cannot read Cloudflare credentials or the user's Wrangler login.
+ */
+function bootstrapIsolated(root: string, env: NodeJS.ProcessEnv, secret: string): Installation {
+  runNode(root, [fileURLToPath(import.meta.url), 'bootstrap'], env, secret);
+  const file = installationFile(root);
+  const installation = JSON.parse(readFileSync(file, 'utf8')) as Installation;
+  rmSync(file, { force: true });
+  return installation;
+}
+
+async function bootstrapLocal(root: string): Promise<void> {
+  register(pathToFileURL(path.join(root, '.cursor/skills/verify-minsky/scripts/resolve-typescript.mjs')));
   const { getPlatformProxy } = await import('wrangler');
   const { bootstrapInstallation } = await import('../../../../src/server/adapters/cloudflare/installation.ts');
   const proxy = await getPlatformProxy<{ DB: D1Connection }>({
-    configPath,
-    persist: { path: path.join(persistDir, 'v3') },
+    configPath: path.join(stateDir(root), 'wrangler.json'),
+    persist: { path: path.join(stateDir(root), 'persist', 'v3') },
     remoteBindings: false,
     envFiles: [],
   });
   try {
-    return await bootstrapInstallation(proxy.env.DB, {
+    const installation = await bootstrapInstallation(proxy.env.DB, {
       adminUsername: 'admin',
       adminName: 'Test admin',
       eventName: EVENT_NAME,
@@ -754,6 +761,7 @@ async function bootstrapLocal(configPath: string, persistDir: string): Promise<I
         { name: 'Cedar', location: 'A18' },
       ],
     });
+    writeFileSync(installationFile(root), JSON.stringify(installation), { mode: 0o600 });
   } finally {
     await proxy.dispose();
   }
@@ -921,7 +929,7 @@ async function serve(root: string, seed: Seed, viewport: { width: number; height
       '--cwd', directory,
     ], env, secret);
     console.error('Bootstrapping the local installation.');
-    const installation = await bootstrapLocal(configPath, persistDir);
+    const installation = bootstrapIsolated(root, env, secret);
     const current = session();
     current.sessionId = installation.sessionId;
     writeSession(root, current);
@@ -991,6 +999,8 @@ async function serve(root: string, seed: Seed, viewport: { width: number; height
     };
 
     control = createServer((socket) => {
+      // A client that resets the connection must not crash serve. Its reply is dropped.
+      socket.on('error', () => undefined);
       let buffer = '';
       socket.on('data', (chunk) => {
         buffer += chunk.toString('utf8');
@@ -1016,6 +1026,10 @@ async function serve(root: string, seed: Seed, viewport: { width: number; height
             return { ok: false, error: error instanceof Error ? error.message : String(error) };
           }
         }).then((result) => {
+          if (socket.destroyed) {
+            if (result.shuttingDown) void stop(0);
+            return;
+          }
           socket.end(`${JSON.stringify(result)}\n`, () => {
             if (result.shuttingDown) void stop(0);
           });
@@ -1160,8 +1174,9 @@ async function doctorLive(api: LocalApi, page: Page): Promise<Result> {
 
 async function main(): Promise<void> {
   const root = repositoryRoot();
-  const argv = process.argv.slice(process.argv.findIndex((arg) => arg.endsWith('minsky-verify.ts')) + 2);
-  const { command, values } = flags(argv);
+  // Node puts its own options in execArgv, so argv[1] is always this script.
+  const [command = '', ...rest] = process.argv.slice(2);
+  const values = flags(rest);
   if (command === '' || command === 'help' || values.help === true) {
     printUsage();
     return;
@@ -1173,6 +1188,11 @@ async function main(): Promise<void> {
     const match = /^(\d+)x(\d+)$/.exec(viewport);
     if (!match) throw new Error('--viewport must look like 1280x800.');
     await serve(root, seed, { width: Number(match[1]), height: Number(match[2]) });
+    return;
+  }
+  // Internal: serve runs this in a child process. See bootstrapIsolated.
+  if (command === 'bootstrap') {
+    await bootstrapLocal(root);
     return;
   }
   if (command === 'cleanup') {

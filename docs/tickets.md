@@ -4,7 +4,7 @@ These tickets describe development work, not contestant issues.
 
 On 2026-10-23 the owner selected Cloudflare as the live backend.
 The development Worker is `minsky-dev` and the development D1 database is `minsky-development`.
-Supabase stays a supported second provider.
+On 2026-10-24 the owner retired the project's own Supabase projects. The Supabase adapter stays as code that readers run on their own projects.
 Older summaries that say to keep Supabase active describe that ticket's scope.
 The 2026-10-23 decision supersedes them.
 
@@ -249,7 +249,7 @@ Bounded subagent work is authorized.
 ### Verification
 
 The [workflow reference](server-workflow.md) records the existing behavior and implemented boundaries.
-The [verification guide](verify-server-workflow.md) gives the local and CI-only commands and recovery procedure.
+The [workflow check](run-provider-tests.md#run-the-shared-workflow-check) gives the local and hosted commands and recovery procedure.
 [Run log](history/run-log.md) records observed results.
 An interface or an uncalled rule module does not complete this extraction.
 

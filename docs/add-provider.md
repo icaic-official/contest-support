@@ -2,7 +2,7 @@
 
 Use this guide to add a provider without changing Minsky's application behavior.
 A provider supplies identity, persistence, private image storage, and live updates through the existing contracts.
-Supabase and Cloudflare have implementations. AWS, GCP, and Azure remain future contributions.
+Supabase and Cloudflare have implementations. Cloudflare is the live backend. The project operates no Supabase installation; [Run the Supabase adapter](supabase-provider.md) shows how to run that adapter on your own project. AWS, GCP, and Azure remain future contributions.
 There is no generic database adapter or infrastructure provisioning interface.
 
 ## Prepare an isolated implementation

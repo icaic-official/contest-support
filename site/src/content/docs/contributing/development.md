@@ -16,7 +16,8 @@ npm run dev                  # http://127.0.0.1:5173
 `VITE_BACKEND` defaults to `cloudflare`. A plain Vite server has no Cloudflare API, so sign-in fails there.
 Use `npm run test:connector:ui:local` for a temporary local Cloudflare app, or the [development app](https://minsky-dev.icaic-minsky.workers.dev). Its Worker is `minsky-dev` and its D1 database is `minsky-development`.
 
-To use the Supabase provider, set `VITE_BACKEND=supabase`, `VITE_SUPABASE_URL`, and `VITE_SUPABASE_PUBLISHABLE_KEY` in `.env.local`.
+The project operates no Supabase installation. To use the Supabase adapter, run it on your own Supabase project with [Run the Supabase adapter](https://github.com/GiftedNovaHD/minsky/blob/main/docs/supabase-provider.md).
+Then set `VITE_BACKEND=supabase`, `VITE_SUPABASE_URL`, and `VITE_SUPABASE_PUBLISHABLE_KEY` in `.env.local`.
 Never put a service key in a `VITE_` variable. An admin must add your account to a session.
 `npm run cloud:recover-admin` recovers a Supabase admin. Use `npm run cloudflare:recover-admin` for Cloudflare.
 
@@ -52,7 +53,7 @@ Hosted test commands need isolated CI resources. Check their targets first, and 
 2. Implement, verify, and update the docs in the same change.
 3. Open a pull request. The owner reviews and merges.
 
-Workers Builds runs `npm run ci` for branches in this repository. It does not publish the app. A separate Workers Builds trigger publishes the docs from `main` and uploads a docs preview version for other branches.
+Workers Builds runs `npm run ci` for branches in this repository. For each push to `main`, a second trigger runs the checks again and then publishes the development app. A separate Workers Builds trigger publishes the docs from `main` and uploads a docs preview version for other branches.
 Migrations, bootstrap, and secrets are separate steps.
 
 To add a backend, follow the [provider guide](https://github.com/GiftedNovaHD/minsky/blob/main/docs/add-provider.md). New providers must pass the shared scenarios unchanged.

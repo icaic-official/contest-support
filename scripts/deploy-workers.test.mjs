@@ -1,40 +1,37 @@
-import { Buffer } from "node:buffer";
 import { readFileSync } from "node:fs";
 import { currentMigrationNames } from "../src/server/adapters/cloudflare/tooling/migrations.mjs";
 import { describe, expect, it, vi } from "vitest";
 import {
-  applicationBackend, assertStaticApplication, buildWorkers, confirmApplication,
+  buildWorkers, prepareApplication,
   deploymentPlan, deploymentTargets, deployWorkers, isCurrentRevision, previewAddress,
   validateBuildSettings, verifyApplicationDeployment, verifyRevision, wranglerArguments,
 } from "./deploy-workers.mjs";
 
 const sha = "a".repeat(40);
 const env = {
-  GITHUB_EVENT_NAME: "push", GITHUB_REPOSITORY: "GiftedNovaHD/minsky",
-  GITHUB_REF: "refs/heads/feature/docs", GITHUB_SHA: sha, GITHUB_ACTOR: "maintainer",
+  WORKERS_CI: "1", WORKERS_CI_BRANCH: "feature/docs", WORKERS_CI_COMMIT_SHA: sha,
   CLOUDFLARE_ACCOUNT_ID: "458ad6a930b0fb717796dfa19ca6a2b1",
-  VITE_SUPABASE_URL: "https://ovymmobupzowotvrywek.supabase.co",
+  VITE_SUPABASE_URL: "https://abcdefghijklmnopqrst.supabase.co",
   VITE_SUPABASE_PUBLISHABLE_KEY: "sb_publishable_fixture", VITE_ENVIRONMENT: "development",
   CLOUDFLARE_API_TOKEN: "fixture-token", GH_TOKEN: "fixture-github-token",
 };
 
 describe("deployment selection", () => {
   it.each([
-    { GITHUB_EVENT_NAME: "pull_request" }, { GITHUB_EVENT_NAME: "pull_request_target" },
-    { GITHUB_EVENT_NAME: "workflow_dispatch" }, { GITHUB_EVENT_NAME: "schedule" },
-    { GITHUB_REPOSITORY: "contributor/minsky" }, { GITHUB_ACTOR: "dependabot[bot]" },
-    { GITHUB_REF: "refs/tags/main" }, { GITHUB_REF: "refs/heads/" },
-    { GITHUB_SHA: "0".repeat(40) }, { GITHUB_SHA: "" },
-  ])("rejects unsupported events and revisions: %j", (change) => {
+    { WORKERS_CI_BRANCH: undefined }, { WORKERS_CI_BRANCH: "" }, { WORKERS_CI_BRANCH: "main\n" },
+    { WORKERS_CI_COMMIT_SHA: undefined }, { WORKERS_CI_COMMIT_SHA: "0".repeat(40) },
+    { WORKERS_CI_COMMIT_SHA: "" }, { WORKERS_CI_COMMIT_SHA: "A".repeat(40) },
+    { WORKERS_CI_COMMIT_SHA: "a".repeat(39) },
+  ])("rejects missing or invalid branches and revisions: %j", (change) => {
     expect(() => deploymentPlan({ ...env, ...change })).toThrow();
   });
 
   it("publishes main to the stable Worker and all other branches to previews", () => {
     const worker = { config: "wrangler.docs.jsonc" };
-    const main = deploymentPlan({ ...env, GITHUB_REF: "refs/heads/main" });
+    const main = deploymentPlan({ ...env, WORKERS_CI_BRANCH: "main" });
     expect(wranglerArguments(worker, main)).toEqual(["deploy", "--config", worker.config]);
     for (const branch of ["Main", "main-fix", "feature/docs", "release/1.0"]) {
-      const plan = deploymentPlan({ ...env, GITHUB_REF: `refs/heads/${branch}` });
+      const plan = deploymentPlan({ ...env, WORKERS_CI_BRANCH: branch });
       expect(plan.preview).toBe(true);
       expect(wranglerArguments(worker, plan)).toContain("preview");
       expect(wranglerArguments(worker, plan)).not.toContain("deploy");
@@ -44,9 +41,9 @@ describe("deployment selection", () => {
   it("keeps preview names stable, short, and distinct after normalization", () => {
     const names = ["feature/docs", "feature-docs", "Feature/docs", "文档", "a".repeat(200),
       "feature/$(touch${IFS}/tmp/never);echo", "a`id`"].map((branch) => {
-      const plan = deploymentPlan({ ...env, GITHUB_REF: `refs/heads/${branch}` });
+      const plan = deploymentPlan({ ...env, WORKERS_CI_BRANCH: branch });
       expect(plan.name).toMatch(/^[a-z0-9-]{1,63}$/);
-      expect(deploymentPlan({ ...env, GITHUB_REF: `refs/heads/${branch}` }).name).toBe(plan.name);
+      expect(deploymentPlan({ ...env, WORKERS_CI_BRANCH: branch }).name).toBe(plan.name);
       return plan.name;
     });
     expect(new Set(names).size).toBe(names.length);
@@ -54,41 +51,31 @@ describe("deployment selection", () => {
 });
 
 describe("frontend settings", () => {
-  function jwt(payload) {
-    return `fixture.${Buffer.from(JSON.stringify(payload)).toString("base64url")}.fixture`;
-  }
-  it("accepts public keys and rejects privileged or wrong-project configuration", () => {
-    const supabase = { ...env, MINSKY_DEV_BACKEND: "supabase" };
+  it("accepts only the development account and environment", () => {
     expect(() => validateBuildSettings(env)).not.toThrow();
-    expect(() => validateBuildSettings({ ...env, VITE_SUPABASE_PUBLISHABLE_KEY: "" })).not.toThrow();
-    expect(() => validateBuildSettings({ ...env, VITE_SUPABASE_URL: "https://ghtztmovdkhuketcbjmq.supabase.co" })).not.toThrow();
-    expect(() => validateBuildSettings(supabase)).not.toThrow();
-    expect(() => validateBuildSettings({ ...supabase, VITE_SUPABASE_PUBLISHABLE_KEY:
-      jwt({ role: "anon", ref: "ovymmobupzowotvrywek" }) })).not.toThrow();
-    for (const key of ["", "sb_secret_fixture", "malformed", jwt({ role: "service_role",
-      ref: "ovymmobupzowotvrywek" }), jwt({ role: "anon", ref: "another-project" })]) {
-      expect(() => validateBuildSettings({ ...supabase, VITE_SUPABASE_PUBLISHABLE_KEY: key })).toThrow(/key/);
-    }
     for (const change of [{ CLOUDFLARE_ACCOUNT_ID: "another-account" }, { VITE_ENVIRONMENT: "production" }]) {
       expect(() => validateBuildSettings({ ...env, ...change })).toThrow(/development/);
     }
-    expect(() => validateBuildSettings({
-      ...supabase, VITE_SUPABASE_URL: "https://ghtztmovdkhuketcbjmq.supabase.co",
-    })).toThrow(/development/);
   });
 });
 
-it("skips stale and deleted branches, and stops on GitHub errors", async () => {
+it("skips stale and deleted branches, and stops on GitHub errors", () => {
   const plan = deploymentPlan(env);
-  const request = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ object: { sha } }) });
-  expect(await isCurrentRevision(plan, env, request)).toBe(true);
-  expect(request.mock.calls[0][0]).toContain("heads/feature%2Fdocs");
-  request.mockResolvedValue({ ok: true, json: async () => ({ object: { sha: "b".repeat(40) } }) });
-  expect(await isCurrentRevision(plan, env, request)).toBe(false);
-  request.mockResolvedValue({ status: 404 });
-  expect(await isCurrentRevision(plan, env, request)).toBe(false);
-  request.mockResolvedValue({ status: 403 });
-  await expect(isCurrentRevision(plan, env, request)).rejects.toThrow("HTTP 403");
+  const ref = "refs/heads/feature/docs";
+  const execute = vi.fn().mockReturnValue(`${sha}\t${ref}\n`);
+  expect(isCurrentRevision(plan, execute)).toBe(true);
+  expect(execute.mock.calls[0][0]).toBe("git");
+  expect(execute.mock.calls[0][1]).toEqual(["ls-remote", "--exit-code", "https://github.com/GiftedNovaHD/minsky.git", ref]);
+  expect(execute.mock.calls[0][2].env.GIT_TERMINAL_PROMPT).toBe("0");
+  execute.mockReturnValue(`${"b".repeat(40)}\t${ref}\n`);
+  expect(isCurrentRevision(plan, execute)).toBe(false);
+  // A longer ref that ends with the same path does not count as this branch.
+  execute.mockReturnValue(`${sha}\trefs/heads/other/${ref}\n`);
+  expect(isCurrentRevision(plan, execute)).toBe(false);
+  execute.mockImplementation(() => { throw Object.assign(new Error("no match"), { status: 2 }); });
+  expect(isCurrentRevision(plan, execute)).toBe(false);
+  execute.mockImplementation(() => { throw Object.assign(new Error("private network detail"), { status: 128 }); });
+  expect(() => isCurrentRevision(plan, execute)).toThrow("The GitHub branch lookup failed.");
 });
 
 it("uses Cloudflare's preview URL and rejects missing or unrelated URLs", () => {
@@ -135,6 +122,22 @@ it("verifies the deployed revision and fails when propagation never completes", 
   expect(request).toHaveBeenCalledTimes(12);
 });
 
+const development = { ...env, WORKERS_CI_BRANCH: "main" };
+const settings = {
+  accountId: env.CLOUDFLARE_ACCOUNT_ID, workerName: "minsky-dev",
+  databaseName: "minsky-development", databaseId: "c26de6ab-c28d-4522-9b77-25b6b5034edb",
+  bucketName: "minsky-development-images", origin: "https://minsky-dev.icaic-minsky.workers.dev",
+};
+const cloudflare = {
+  ...development,
+  MINSKY_DEV_CLOUDFLARE_CONFIG: "cloudflare-development.wrangler.jsonc",
+  MINSKY_DEV_DATABASE_ID: settings.databaseId, MINSKY_DEV_DATABASE_NAME: settings.databaseName,
+  MINSKY_DEV_BUCKET_NAME: settings.bucketName,
+};
+const installation = vi.fn().mockResolvedValue(settings);
+const build = { sha, backend: "cloudflare", config: cloudflare.MINSKY_DEV_CLOUDFLARE_CONFIG,
+  databaseId: settings.databaseId, bucketName: settings.bucketName, origin: settings.origin };
+
 function deploymentMocks() {
   return {
     current: vi.fn().mockResolvedValue(true),
@@ -142,17 +145,17 @@ function deploymentMocks() {
       urls: ["https://branch-minsky-dev.icaic-minsky.workers.dev"],
     } })),
     verify: vi.fn(), write: vi.fn(), report: vi.fn(),
-    staticApplication: vi.fn(), application: vi.fn(), deployedApplication: vi.fn(),
+    application: vi.fn(), deployedApplication: vi.fn(),
+    targets: (target, site, options) => deploymentTargets(target, site, { ...options, installation }),
     read: (path, encoding) => path === "dist/minsky-build.json"
-      ? JSON.stringify({ sha, backend: "supabase", config: "wrangler.jsonc", databaseId: null,
-        bucketName: null, origin: "https://minsky-dev.icaic-minsky.workers.dev" })
+      ? JSON.stringify(build)
       : readFileSync(path, encoding),
   };
 }
 
 it("publishes both exact build directories without passing GitHub credentials to Wrangler", async () => {
   const mocks = deploymentMocks();
-  await deployWorkers({ ...env, GITHUB_REF: "refs/heads/main", MINSKY_DEV_BACKEND: "supabase" }, mocks);
+  await deployWorkers(cloudflare, mocks);
   expect(mocks.write.mock.calls.map(([file]) => file)).toEqual([
     "dist/minsky-revision.json", "site/dist/minsky-revision.json",
   ]);
@@ -164,11 +167,11 @@ it("publishes both exact build directories without passing GitHub credentials to
 it("does not publish a stale revision or continue after a failed upload", async () => {
   const stale = deploymentMocks();
   stale.current.mockResolvedValue(false);
-  await deployWorkers({ ...env, GITHUB_REF: "refs/heads/main", MINSKY_DEV_BACKEND: "supabase" }, stale);
+  await deployWorkers(cloudflare, stale);
   expect(stale.execute).not.toHaveBeenCalled();
   const failed = deploymentMocks();
   failed.execute.mockImplementation(() => { throw new Error("Cloudflare rejected upload"); });
-  await expect(deployWorkers({ ...env, GITHUB_REF: "refs/heads/main", MINSKY_DEV_BACKEND: "supabase" }, failed)).rejects.toThrow("Provider output was withheld");
+  await expect(deployWorkers(cloudflare, failed)).rejects.toThrow("Provider output was withheld");
   expect(failed.execute).toHaveBeenCalledTimes(1);
   expect(failed.verify).not.toHaveBeenCalled();
 });
@@ -176,34 +179,16 @@ it("does not publish a stale revision or continue after a failed upload", async 
 it("checks the branch again between Workers and rejects changed targets before any upload", async () => {
   const moved = deploymentMocks();
   moved.current.mockResolvedValueOnce(true).mockResolvedValue(false);
-  await deployWorkers({ ...env, GITHUB_REF: "refs/heads/main", MINSKY_DEV_BACKEND: "supabase" }, moved);
+  await deployWorkers(cloudflare, moved);
   expect(moved.execute).toHaveBeenCalledTimes(1);
   const wrong = { ...deploymentMocks(), read: vi.fn().mockReturnValue('{"name":"other"}') };
-  await expect(deployWorkers({ ...env, GITHUB_REF: "refs/heads/main", MINSKY_DEV_BACKEND: "supabase" }, wrong)).rejects.toThrow(/Unexpected deployment target/);
+  await expect(deployWorkers(cloudflare, wrong)).rejects.toThrow(/Unexpected deployment target/);
   expect(wrong.execute).not.toHaveBeenCalled();
 });
 
-const development = { ...env, GITHUB_REF: "refs/heads/main" };
-const settings = {
-  accountId: env.CLOUDFLARE_ACCOUNT_ID, workerName: "minsky-dev",
-  databaseName: "minsky-development", databaseId: "c26de6ab-c28d-4522-9b77-25b6b5034edb",
-  bucketName: "minsky-development-images", origin: "https://minsky-dev.icaic-minsky.workers.dev",
-};
-const cloudflare = {
-  ...development, MINSKY_DEV_BACKEND: "cloudflare",
-  MINSKY_DEV_CLOUDFLARE_CONFIG: "cloudflare-development.wrangler.jsonc",
-  MINSKY_DEV_DATABASE_ID: settings.databaseId, MINSKY_DEV_DATABASE_NAME: settings.databaseName,
-  MINSKY_DEV_BUCKET_NAME: settings.bucketName,
-};
-const installation = vi.fn().mockResolvedValue(settings);
 
-it("selects Cloudflare by default and keeps an explicit Supabase target", async () => {
-  expect(applicationBackend(development)).toBe("cloudflare");
-  expect(applicationBackend({ ...development, MINSKY_DEV_BACKEND: "supabase" })).toBe("supabase");
-  expect(() => applicationBackend({ ...development, MINSKY_DEV_BACKEND: "typo" })).toThrow();
+it("requires the complete Cloudflare target for the stable application", async () => {
   await expect(deploymentTargets(development, "app")).rejects.toThrow(/provider-generated configuration/);
-  const target = (await deploymentTargets({ ...development, MINSKY_DEV_BACKEND: "supabase" }, "app"))[0];
-  expect(target).toMatchObject({ backend: "supabase", config: "wrangler.jsonc" });
   expect(await deploymentTargets(cloudflare, "app", { installation })).toEqual([
     { name: "minsky-dev", assets: "dist", backend: "cloudflare", settings,
       config: "cloudflare-development.wrangler.jsonc" },
@@ -226,83 +211,44 @@ it("selects Cloudflare by default and keeps an explicit Supabase target", async 
 });
 
 it("keeps docs deployment independent and omits all app previews", async () => {
-  const brokenApplication = { ...env, MINSKY_DEV_BACKEND: "invalid", VITE_SUPABASE_URL: "" };
+  const brokenApplication = { ...development, VITE_ENVIRONMENT: "", MINSKY_DEV_CLOUDFLARE_CONFIG: "" };
   expect((await deploymentTargets(brokenApplication, "docs")).map((target) => target.name)).toEqual(["minsky-docs"]);
-  for (const backend of ["supabase", "cloudflare"]) {
-    expect(await deploymentTargets({ ...env, MINSKY_DEV_BACKEND: backend }, "app")).toEqual([]);
-    const mocks = deploymentMocks();
-    await deployWorkers({ ...env, MINSKY_DEV_BACKEND: backend }, mocks);
-    expect(mocks.execute).toHaveBeenCalledTimes(1);
-    expect(mocks.execute.mock.calls[0][1]).toContain("wrangler.docs.jsonc");
-    expect(mocks.application).not.toHaveBeenCalled();
-    expect(mocks.staticApplication).not.toHaveBeenCalled();
-  }
-});
-
-it("refuses to overwrite an activated Worker or unconfirmed settings with static assets", async () => {
-  const request = vi.fn().mockResolvedValue({ ok: true, json: async () => ({
-    success: true, result: { bindings: [] },
-  }) });
-  await assertStaticApplication(development, request);
-  expect(request.mock.calls[0][0]).toBe(`https://api.cloudflare.com/client/v4/accounts/${settings.accountId}/workers/scripts/minsky-dev/settings`);
-  for (const type of ["d1", "r2_bucket", "durable_object_namespace"]) {
-    request.mockResolvedValue({ ok: true, json: async () => ({ success: true, result: { bindings: [{ name: "binding", type }] } }) });
-    await expect(assertStaticApplication(development, request)).rejects.toThrow(/asset upload is forbidden/);
-  }
-  for (const binding of [{ type: "plain_text" }, { name: "name", type: "unknown" },
-    { name: "DB", type: "plain_text" }, null]) {
-    request.mockResolvedValue({ ok: true, json: async () => ({ success: true, result: { bindings: [binding] } }) });
-    await expect(assertStaticApplication(development, request)).rejects.toThrow(/asset upload is forbidden/);
-  }
-  for (const response of [
-    { ok: false, json: async () => ({ errors: ["private provider detail"] }) },
-    { ok: true, json: async () => ({ success: true, result: {} }) },
-    { ok: true, json: async () => { throw new Error("private provider detail"); } },
-  ]) {
-    request.mockResolvedValue(response);
-    await expect(assertStaticApplication(development, request)).rejects.toThrow(/asset upload is forbidden/);
-  }
-  request.mockRejectedValue(new Error("private provider detail"));
-  await expect(assertStaticApplication(development, request)).rejects.toThrow(/asset upload is forbidden/);
+  expect(await deploymentTargets(env, "app")).toEqual([]);
   const mocks = deploymentMocks();
-  mocks.staticApplication.mockRejectedValue(new Error("Already activated"));
-  await expect(deployWorkers({ ...development, MINSKY_DEV_BACKEND: "supabase" }, mocks)).rejects.toThrow("Already activated");
-  expect(mocks.execute).not.toHaveBeenCalled();
+  await deployWorkers(env, mocks);
+  expect(mocks.execute).toHaveBeenCalledTimes(1);
+  expect(mocks.execute.mock.calls[0][1]).toContain("wrangler.docs.jsonc");
+  expect(mocks.application).not.toHaveBeenCalled();
 });
 
-it("builds the selected backend without private tokens and records the build revision", async () => {
-  for (const backend of ["supabase", "cloudflare"]) {
-    const target = backend === "cloudflare"
-      ? (await deploymentTargets(cloudflare, "app", { installation }))[0]
-      : (await deploymentTargets({ ...development, MINSKY_DEV_BACKEND: "supabase" }, "app"))[0];
-    const execute = vi.fn();
-    const write = vi.fn();
-    await buildWorkers({ ...development, VITE_BACKEND: "wrong", AUTH_SECRET: "private-secret" }, {
-      execute, write, targets: async () => [target],
-    });
-    const buildEnv = execute.mock.calls[0][2].env;
-    expect(buildEnv.VITE_BACKEND).toBe(backend);
-    for (const key of ["CLOUDFLARE_API_TOKEN", "GH_TOKEN", "GITHUB_TOKEN", "AUTH_SECRET"]) {
-      expect(buildEnv[key]).toBeUndefined();
-    }
-    if (backend === "cloudflare") expect(buildEnv.VITE_SUPABASE_PUBLISHABLE_KEY).toBeUndefined();
-    expect(JSON.parse(write.mock.calls[0][1])).toMatchObject({ sha, backend, config: target.config });
+it("builds the Cloudflare backend without private tokens or Supabase settings and records the build revision", async () => {
+  const target = (await deploymentTargets(cloudflare, "app", { installation }))[0];
+  const execute = vi.fn();
+  const write = vi.fn();
+  await buildWorkers({ ...development, VITE_BACKEND: "supabase", AUTH_SECRET: "private-secret" }, {
+    execute, write, targets: async () => [target],
+  });
+  const buildEnv = execute.mock.calls[0][2].env;
+  expect(buildEnv.VITE_BACKEND).toBe("cloudflare");
+  for (const key of ["CLOUDFLARE_API_TOKEN", "GH_TOKEN", "GITHUB_TOKEN", "AUTH_SECRET",
+    "VITE_SUPABASE_URL", "VITE_SUPABASE_PUBLISHABLE_KEY"]) {
+    expect(buildEnv[key]).toBeUndefined();
   }
+  expect(JSON.parse(write.mock.calls[0][1])).toEqual(build);
 });
 
-it("requires an exact build match before either deployment mode can upload", async () => {
+it("requires an exact build match before upload", async () => {
   for (const change of [
-    { sha: "old" }, { backend: "cloudflare" }, { config: "other.json" }, { databaseId: "other" }, { bucketName: "other" }, { origin: "https://wrong.example" },
+    { sha: "old" }, { backend: "supabase" }, { config: "other.json" }, { databaseId: "other" }, { bucketName: "other" }, { origin: "https://wrong.example" },
   ]) {
     const mocks = deploymentMocks();
     const read = mocks.read;
     mocks.read = (path, encoding) => path === "dist/minsky-build.json"
-      ? JSON.stringify({ sha, backend: "supabase", config: "wrangler.jsonc", databaseId: null,
-          bucketName: null, origin: "https://minsky-dev.icaic-minsky.workers.dev", ...change })
+      ? JSON.stringify({ ...build, ...change })
       : read(path, encoding);
-    await expect(deployWorkers({ ...development, MINSKY_DEV_BACKEND: "supabase" }, mocks)).rejects.toThrow(/guarded deployment build/);
+    await expect(deployWorkers(cloudflare, mocks)).rejects.toThrow(/guarded deployment build/);
     expect(mocks.execute).not.toHaveBeenCalled();
-    expect(mocks.staticApplication).not.toHaveBeenCalled();
+    expect(mocks.application).not.toHaveBeenCalled();
   }
 });
 
@@ -314,10 +260,10 @@ it("uses the complete generated configuration for Cloudflare uploads and confirm
     bucketName: settings.bucketName, origin: settings.origin });
   await deployWorkers(cloudflare, mocks);
   expect(mocks.application).toHaveBeenCalledTimes(1);
+  expect(mocks.application.mock.calls[0][4]).toBe(mocks.report);
   expect(mocks.deployedApplication).toHaveBeenCalledTimes(1);
   expect(mocks.verify.mock.calls[0][1]).toEqual({ sha, backend: "cloudflare", databaseId: settings.databaseId,
     bucketName: settings.bucketName, origin: settings.origin });
-  expect(mocks.staticApplication).not.toHaveBeenCalled();
   expect(mocks.execute.mock.calls[0][1]).toEqual(["deploy", "--config", worker.config]);
   expect(mocks.execute.mock.calls[0][2].env.WRANGLER_WRITE_LOGS).toBe("false");
   mocks.execute.mockClear();
@@ -326,52 +272,78 @@ it("uses the complete generated configuration for Cloudflare uploads and confirm
   expect(mocks.execute).not.toHaveBeenCalled();
 });
 
-it("confirms live account, D1 identifiers, and authentication secret metadata before deployment", async () => {
+it("confirms the live target before it applies migrations and requires the checkout's schema", async () => {
   const worker = (await deploymentTargets(cloudflare, "app", { installation }))[0];
   const migrations = JSON.stringify([{ success: true, results: (await currentMigrationNames()).map((name) => ({ name })) }]);
-  const request = vi.fn(async (url) => ({ ok: true, json: async () => ({ success: true,
-    result: url.endsWith("/managed") ? { enabled: false } : url.endsWith("/custom")
-      ? { domains: [] } : { name: settings.bucketName },
-  }) }));
-  const execute = vi.fn((command, args) => {
-    if (args[0] === "d1" && args[1] === "execute") return migrations;
+  const bucket = (rejected) => async (url) => ({ ok: true, json: async () => ({ success: true,
+    result: url.endsWith("/managed") ? { enabled: rejected === "managed" }
+      : url.endsWith("/custom") ? { domains: rejected === "custom" ? [{ enabled: true }] : [] }
+        : { name: rejected === "bucket" ? "different-bucket" : settings.bucketName },
+  }) });
+  const request = vi.fn(bucket());
+  const bookmark = "00000085-0000024c-00004c6d-8e61117bf38d7adb71b934ebbf891683";
+  const provider = ({ secrets = [{ name: "AUTH_SECRET", type: "secret_text" }], applied = migrations,
+    apply = () => "Migrations applied", travel = () => JSON.stringify({ bookmark }) } = {}) => (command, args) => {
     if (args[0] === "whoami") return settings.accountId;
-    if (args[0] === "d1") return JSON.stringify({ uuid: settings.databaseId, name: settings.databaseName });
-    if (args[0] === "secret") return JSON.stringify([{ name: "AUTH_SECRET", type: "secret_text" }]);
+    if (args[0] === "d1" && args[1] === "time-travel") return travel();
+    if (args[0] === "d1" && args[1] === "info") return JSON.stringify({ uuid: settings.databaseId, name: settings.databaseName });
+    if (args[0] === "secret") return JSON.stringify(secrets);
+    if (args[0] === "d1" && args[1] === "migrations") return apply();
+    if (args[0] === "d1" && args[1] === "execute") return applied;
     throw new Error("Unexpected command");
-  });
-  await confirmApplication(worker, cloudflare, execute, request);
-  expect(execute).toHaveBeenCalledTimes(4);
+  };
+  const applies = (execute) => execute.mock.calls.filter(([, args]) => args[1] === "migrations");
+
+  const execute = vi.fn(provider());
+  const report = vi.fn();
+  await prepareApplication(worker, cloudflare, execute, request, report);
+  expect(execute.mock.calls.map(([, args]) => args.slice(0, 2).join(" "))).toEqual([
+    "whoami --config", "d1 info", "secret list", "d1 time-travel", "d1 migrations", "d1 execute",
+  ]);
+  expect(execute.mock.calls[3][1]).toEqual(["d1", "time-travel", "info", settings.databaseName, "--json",
+    "--config", worker.config]);
+  expect(report).toHaveBeenCalledWith(`Restore point before migrations: ${bookmark}. To restore it, run: ` +
+    `npx wrangler d1 time-travel restore ${settings.databaseName} --bookmark=${bookmark} --config ${worker.config}`);
+  expect(applies(execute)[0][1]).toEqual(["d1", "migrations", "apply", settings.databaseName, "--remote",
+    "--config", worker.config]);
   expect(execute.mock.calls[0][2].stdio).toEqual(["ignore", "pipe", "pipe"]);
-  execute.mockImplementation(() => "private rejected provider detail");
-  await expect(confirmApplication(worker, cloudflare, execute, request)).rejects.toThrow(/could not be confirmed/);
-  execute.mockImplementation((command, args) => {
-    if (args[0] === "d1" && args[1] === "execute") return migrations;
-    if (args[0] === "whoami") return settings.accountId;
-    if (args[0] === "d1") return JSON.stringify({ uuid: settings.databaseId, name: settings.databaseName });
-    return "[]";
-  });
-  await expect(confirmApplication(worker, cloudflare, execute, request)).rejects.toThrow(/Confirm AUTH_SECRET/);
+  expect(execute.mock.calls[0][2].env.CI).toBe("true");
+
+  const unconfirmed = vi.fn(() => "private rejected provider detail");
+  await expect(prepareApplication(worker, cloudflare, unconfirmed, request)).rejects.toThrow(/could not be confirmed/);
+  expect(applies(unconfirmed)).toHaveLength(0);
+
+  const noSecret = vi.fn(provider({ secrets: [] }));
+  await expect(prepareApplication(worker, cloudflare, noSecret, request)).rejects.toThrow(/Confirm AUTH_SECRET/);
+  expect(applies(noSecret)).toHaveLength(0);
+
   for (const rejected of ["bucket", "managed", "custom"]) {
-    request.mockImplementation(async (url) => ({ ok: true, json: async () => ({ success: true,
-      result: url.endsWith("/managed") ? { enabled: rejected === "managed" }
-        : url.endsWith("/custom") ? { domains: rejected === "custom" ? [{ enabled: true }] : [] }
-          : { name: rejected === "bucket" ? "different-bucket" : settings.bucketName },
-    }) }));
-    await expect(confirmApplication(worker, cloudflare, execute, request)).rejects.toThrow(/R2 bucket could not be confirmed/);
+    const publicBucket = vi.fn(provider());
+    await expect(prepareApplication(worker, cloudflare, publicBucket, vi.fn(bucket(rejected))))
+      .rejects.toThrow(/R2 bucket could not be confirmed/);
+    expect(applies(publicBucket)).toHaveLength(0);
   }
-  execute.mockImplementation((command, args) => {
-    if (args[0] === "whoami") return settings.accountId;
-    if (args[0] === "d1" && args[1] === "execute") return JSON.stringify([{ success: true, results: [] }]);
-    return JSON.stringify({ uuid: settings.databaseId, name: settings.databaseName });
-  });
-  request.mockClear();
-  await expect(confirmApplication(worker, cloudflare, execute, request)).rejects.toThrow(/hosted migrations differ/);
-  expect(request).not.toHaveBeenCalled();
+
+  // Without a recorded restore point, no migration starts.
+  for (const travel of [() => { throw new Error("private provider detail"); }, () => "{}",
+    () => JSON.stringify({ bookmark: "$(touch /tmp/never)" })]) {
+    const unrecorded = vi.fn(provider({ travel }));
+    await expect(prepareApplication(worker, cloudflare, unrecorded, request, vi.fn()))
+      .rejects.toThrow("The D1 restore point could not be recorded. No migration started.");
+    expect(applies(unrecorded)).toHaveLength(0);
+  }
+
+  const failed = vi.fn(provider({ apply: () => { throw new Error("private migration detail"); } }));
+  await expect(prepareApplication(worker, cloudflare, failed, request, vi.fn())).rejects.toThrow(/migration outcome is unknown/);
+
+  // An older build after a newer migration sees extra hosted migrations and stops.
+  const ahead = vi.fn(provider({ applied: JSON.stringify([{ success: true, results: [
+    ...(await currentMigrationNames()), "9999_newer.sql"].map((name) => ({ name })) }]) }));
+  await expect(prepareApplication(worker, cloudflare, ahead, request, vi.fn())).rejects.toThrow(/hosted migrations differ/);
 });
 
 it("accepts the former preparation branch after its dependency merged while omitting its app preview", async () => {
-  const prepared = { ...env, GITHUB_REF: "refs/heads/feature/t0021-cloudflare-development-install" };
+  const prepared = { ...env, WORKERS_CI_BRANCH: "feature/t0021-cloudflare-development-install" };
   expect(deploymentPlan(prepared).preview).toBe(true);
   expect((await deploymentTargets(prepared)).map((target) => target.name)).toEqual(["minsky-docs"]);
 });
@@ -431,7 +403,7 @@ it("verifies live application bindings and the anonymous API denial after upload
   }
 });
 
-it("selects the committed Cloudflare target by default and keeps Supabase explicit", async () => {
+it("selects the committed Cloudflare target and ignores a retired Supabase selection", async () => {
   const config = "src/server/adapters/cloudflare/deploy/development.wrangler.jsonc";
   const expected = {
     accountId: "458ad6a930b0fb717796dfa19ca6a2b1", workerName: "minsky-dev",
@@ -449,6 +421,5 @@ it("selects the committed Cloudflare target by default and keeps Supabase explic
   expect(enabled[0].settings).toEqual(JSON.parse(readFileSync(
     "src/server/adapters/cloudflare/deploy/development.settings.json", "utf8",
   )));
-  const supabase = await deploymentTargets({ ...prepared, MINSKY_DEV_BACKEND: "supabase" }, "app");
-  expect(supabase).toEqual([{ name: "minsky-dev", config: "wrangler.jsonc", assets: "dist", backend: "supabase" }]);
+  expect(await deploymentTargets({ ...prepared, MINSKY_DEV_BACKEND: "supabase" }, "app")).toEqual(enabled);
 });

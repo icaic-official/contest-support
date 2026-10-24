@@ -152,6 +152,22 @@ process.exit(${status});
   return { result, path };
 }
 
+it.each([undefined, "ovymmobupzowotvrywek"])(
+  "refuses project %s before credentials or the cloud child start, even with a linked project",
+  (project) => {
+    const cwd = directory();
+    mkdirSync(join(cwd, "supabase/.temp"), { recursive: true });
+    writeFileSync(join(cwd, "supabase/.temp/project-ref"), "abcdefghijklmnopqrst");
+    const env = { ...process.env };
+    delete env.MINSKY_TEST_PROJECT_REF;
+    if (project) env.MINSKY_TEST_PROJECT_REF = project;
+    const result = spawnSync(process.execPath, [runner], { cwd, encoding: "utf8", env });
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("Set MINSKY_TEST_PROJECT_REF to an isolated Supabase test project.");
+    expect(existsSync(join(cwd, "child-result.json"))).toBe(false);
+  },
+);
+
 it("reports the retained recovery file when the cloud child fails before cleanup completes", () => {
   const { result, path } = runChild(false, 1);
   expect(result.status).toBe(1);

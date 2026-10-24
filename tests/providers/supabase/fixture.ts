@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { createSupabaseBackend } from '../../../src/backend/supabase/backend';
 import { removeFixtureSessions } from '../../support/supabaseCleanup';
 import { createdAccountMarkers, type Actor, type ScenarioData, type TestAccount } from '../contracts';
+import { isolatedSupabaseProject } from './target.mjs';
 
 export interface SupabaseFixture extends ScenarioData {
   url: string;
@@ -43,14 +44,9 @@ const actors: Actor[] = [
 ];
 
 function configuration() {
-  const project = process.env.MINSKY_TEST_PROJECT_REF ?? '';
+  const project = isolatedSupabaseProject(process.env.MINSKY_TEST_PROJECT_REF);
   const publicKey = process.env.SUPABASE_ANON_KEY ?? '';
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? '';
-  if (!/^[a-z]{20}$/.test(project) || project === 'ovymmobupzowotvrywek') {
-    throw new Error(
-      'Select an isolated Supabase test project. Development is forbidden.',
-    );
-  }
   if (!publicKey || !serviceKey) {
     throw new Error('Supply the isolated test project credentials.');
   }

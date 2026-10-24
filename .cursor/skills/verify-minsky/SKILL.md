@@ -7,7 +7,7 @@ description: Drive the Minsky contest-support web app in a local browser and cap
 
 Minsky's primary surface is the web app. Contestants report issues. Staff claim and reply. Jury members record time awards. Administrators manage accounts. After sign-in, the membership and the window width select one of three layouts: the contestant desktop, the organiser phone layout below 1024 px, or the organiser desktop console at 1024 px and wider.
 
-This skill drives the local Cloudflare backend. D1 stores the rows. R2 is the local image bucket. A Durable Object serves live updates. Supabase remains a supported second provider. This skill does not start it.
+This skill drives the local Cloudflare backend. D1 stores the rows. R2 is the local image bucket. A Durable Object serves live updates. The Supabase adapter stays as code that readers run on their own projects. This skill does not start it.
 
 This skill does not drive the documentation site, maintainer npm scripts, or a deployed Worker. Those are separate surfaces.
 

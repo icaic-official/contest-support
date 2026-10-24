@@ -68,7 +68,7 @@ npx wrangler d1 info minsky-auth-ci --config wrangler.auth-ci.jsonc --json
 Expect account `458ad6a930b0fb717796dfa19ca6a2b1` and database `5d746d29-0a66-4346-96a6-4974126685d7`.
 The database name must be `minsky-auth-ci`. Stop if any value differs.
 The local authentication tests use temporary local databases.
-The Cloudflare development database, retained Supabase projects, and earlier D1 proof database are separate targets.
+The Cloudflare development database, the retired Supabase projects, and the earlier D1 proof database are separate targets.
 
 The committed Worker configuration requests a 1,000 ms CPU cap per request.
 Cloudflare requires Workers Paid for that setting.

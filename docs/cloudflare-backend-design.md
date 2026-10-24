@@ -3,13 +3,13 @@
 This page explains the Cloudflare connector and its provider boundaries.
 The browser uses the same `Backend` contract for Supabase and Cloudflare.
 Issue decisions use one `WorkflowService`. Provider adapters supply persistence, authentication, images, and live delivery.
-Cloudflare is the active development backend. Supabase remains a separate provider option.
+Cloudflare is the active development backend. The Supabase adapter remains a separate implementation that readers run on their own projects.
 
 The user selected Workers, D1 with a SQLite rewrite, private R2, and Durable Objects.
 On 2026-10-18, the owner selected a fresh development installation instead of transferring existing trial data.
 Preserve application behavior and database rules. Create new accounts, IDs, and records through supported installation paths.
 Do not transfer Supabase accounts, passwords, issues, history, images, or IDs.
-Leave Supabase intact, including its existing trial data and resources.
+T0021 left Supabase intact, including its existing trial data and resources.
 See [activation and recovery](activate-cloudflare-development.md) for the approved development switch and its operating procedure.
 See [backend contracts](backend-contracts.md) for the browser interface and [run log](history/run-log.md) for dated evidence.
 
@@ -315,7 +315,7 @@ The [PR #21 component record](history/pr21-installation-disposition.md) preserve
 Data exports and migration tooling are outside the fresh-installation scope.
 The owner approved the concrete development switch separately from the PR #43 merge.
 On 2026-10-23 the owner selected Cloudflare as the live backend. The development Worker is `minsky-dev` and its D1 database is `minsky-development`.
-Supabase stays a supported second provider. Its resources and accounts remain intact.
+On 2026-10-24 the owner retired the project's own Supabase projects. The Supabase adapter stays as code. See [Run the Supabase adapter](supabase-provider.md).
 Future backend switches still require separate approval.
 Use the [activation procedure](activate-cloudflare-development.md) for exact targets, the reviewed revision, deployment commands, verification, and recovery.
 The separate documentation Worker retains its independent deployment.

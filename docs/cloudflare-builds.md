@@ -7,26 +7,13 @@ Use [activation](activate-cloudflare-development.md) for the separate developmen
 On `minsky-ci`, Workers Builds runs `npm run ci` and then `npm run ci:worker`.
 It does not publish `minsky-dev` or `minsky-docs`.
 On `minsky-docs`, Workers Builds publishes the docs. See [Publish the docs](#publish-the-docs).
+On `minsky-dev`, Workers Builds checks each push to `main` and then publishes it. See [Publish the application](#publish-the-application).
 GitHub Actions no longer runs checks or publication. The GitHub account stays on the free plan.
-
-## Keep the application Worker disconnected
-
-The approved development application uses `MINSKY_DEV_BACKEND=cloudflare`.
-Its committed configuration selects the complete Worker and the exact development resources.
-Keep Workers Builds disconnected on `minsky-dev`.
-A build on that Worker can replace the application or publish before the checks finish.
-
-`MINSKY_DEV_BACKEND` defaults to `cloudflare` when absent.
-Supabase mode requires `MINSKY_DEV_BACKEND=supabase`.
-A missing Cloudflare configuration does not fall back to a static upload.
-The deployed-binding guard still refuses an assets-only replacement of an activated Worker.
-The app build sets `VITE_BACKEND` explicitly. A shell's inherited value cannot select a different backend.
-A preparation PR merge does not approve a future backend switch.
 
 ## Why app previews are disabled
 
 A frontend preview can change shared data when it uses a stable backend.
-Earlier Supabase previews used the development project directly.
+Earlier Supabase previews used the shared Supabase development project directly. That project is retired.
 Cloudflare previews receive no stable D1, R2, or Durable Object bindings.
 A future preview needs its own resources, credentials, fixture ownership, and cleanup checks.
 Docs previews are safe because the docs contain no application data.
@@ -68,7 +55,7 @@ See [the build image](https://developers.cloudflare.com/workers/ci-cd/builds/bui
 
 ## Confirm the first build
 
-Push a commit to any branch in this repository.
+Push a commit to a branch other than `main`.
 Then confirm all of the following:
 
 - The commit shows a Workers Builds check. Copy that check's name from the commit status.
@@ -105,20 +92,128 @@ To recreate the triggers, open **Workers & Pages > minsky-docs > Settings > Buil
 6. Add build variable `NODE_VERSION` with value `22.23.2` to both triggers.
 7. Do not add application secrets. The docs build does not use them.
 
-## Application publication
+## Publish the application
 
-Automatic application publication is removed with the GitHub Actions workflow.
-`CLOUDFLARE_DEPLOY_ENABLED` no longer starts a job.
-Publish the application only with the guarded script in [deployment settings](cloudflare-build-settings.md#publication-commands), and only for an approved revision.
-The script still requires a repository branch-push context.
-This CI setup does not provide that context.
+On 2026-10-24 the owner chose automatic publication of `main` to `minsky-dev`.
+One `minsky-dev` build runs the checks, applies new D1 migrations, and publishes the complete Worker.
+A failed step stops the build. Later steps do not run.
+`minsky-dev` is a development installation. It is not production.
 
-The script sets `VITE_BACKEND` from `MINSKY_DEV_BACKEND` and guards the complete Worker:
+The deploy command is `npm run deploy`. It runs these steps in order:
 
-- A Cloudflare app needs its API code, D1 database, private R2 bucket, and live coordinator. An assets-only upload would remove them.
-- The Supabase path runs only when `MINSKY_DEV_BACKEND=supabase`. It refuses the upload when the deployed Worker has application bindings.
-- The Cloudflare path validates the generated configuration and exact hosted targets before upload. After upload, it checks the published targets, live bindings, and an anonymous rejection at the authentication API.
-- It rejects pushes by Dependabot.
+1. Build the Cloudflare application.
+2. Stop if the build's commit is no longer the head of `main`. A newer push then owns the publication.
+3. Stop if a D1 migration removes or renames schema. See [Change the D1 schema](#change-the-d1-schema).
+4. Confirm the account, the D1 database, the private R2 bucket, and the `AUTH_SECRET` name.
+5. Record the D1 Time Travel restore point. The build log prints it with the exact restore command. Stop if it cannot be read.
+6. Apply new D1 migrations with `wrangler d1 migrations apply minsky-development --remote`.
+7. Stop if the applied migrations differ from the checkout. An older build stops here after a newer build has migrated.
+8. Publish the complete Worker with `wrangler deploy`.
+9. Read `minsky-revision.json` and the live bindings. Confirm that an anonymous `/api/auth/session` request returns `401`.
+
+[Deployment settings](cloudflare-build-settings.md#publication-checks) describe each check.
+
+### Prepare the deployment token
+
+The automatic Workers Builds token cannot read D1. The migration step and the target check fail with that token.
+Create a user API token for account `458ad6a930b0fb717796dfa19ca6a2b1` with these permissions:
+
+- **Account > Workers Scripts > Edit**
+- **Account > D1 > Edit**
+- **Account > Workers R2 Storage > Read**
+- **Account > Account Settings > Read**
+- **User > User Details > Read**
+- **User > Memberships > Read**
+
+Limit the token to that account. Do not add other accounts or zones.
+
+### Connect the Worker
+
+You need access to Cloudflare account `458ad6a930b0fb717796dfa19ca6a2b1`.
+
+1. In the Cloudflare dashboard, open **Workers & Pages > minsky-dev > Settings > Build**.
+2. Connect GitHub repository `GiftedNovaHD/minsky`.
+3. Set the production branch to `main`.
+4. Open **Branch control**. Disable builds for branches other than `main`.
+   `minsky-ci` already checks those branches. A `minsky-dev` build runs only to publish.
+5. Set the build command to `npm run ci`.
+6. Set the deploy command to `npm run deploy`.
+7. Leave the root directory empty.
+8. Under **API token**, select the token from [Prepare the deployment token](#prepare-the-deployment-token).
+9. Add these build variables:
+
+   | Name | Value |
+   | --- | --- |
+   | `SKIP_DEPENDENCY_INSTALL` | `1` |
+   | `NODE_VERSION` | `22.23.2` |
+   | `CLOUDFLARE_ACCOUNT_ID` | `458ad6a930b0fb717796dfa19ca6a2b1` |
+   | `VITE_ENVIRONMENT` | `development` |
+   | `MINSKY_DEV_CLOUDFLARE_CONFIG` | `src/server/adapters/cloudflare/deploy/development.wrangler.jsonc` |
+   | `MINSKY_DEV_DATABASE_ID` | `a1832f97-4d4c-45c2-a848-8d3dfd0b74f5` |
+   | `MINSKY_DEV_DATABASE_NAME` | `minsky-development` |
+   | `MINSKY_DEV_BUCKET_NAME` | `minsky-development-images` |
+
+   The deploy script compares the last four values with the committed configuration.
+   A pull request that changes the configuration to another database or bucket fails until you also change these values.
+10. Do not add `MINSKY_DEV_BACKEND` or Supabase variables. The script always publishes the Cloudflare app.
+11. Do not add `AUTH_SECRET`. That secret stays on the Worker and is never a build input.
+12. Leave **Build watch paths** at the default, which includes every file.
+
+Workers Builds supplies `WORKERS_CI_BRANCH` and `WORKERS_CI_COMMIT_SHA`. The deploy script reads them.
+If the first build stops with `Missing CLOUDFLARE_API_TOKEN.`, add the same token as build secret `CLOUDFLARE_API_TOKEN`.
+`npm run ci` removes `CLOUDFLARE_API_TOKEN` before it installs packages or runs checks.
+
+### Confirm the first publication
+
+Start a build of `main` from **Workers & Pages > minsky-dev > Deployments**, or merge a pull request.
+Then confirm all of the following:
+
+- The build log runs `npm run ci` and exits zero.
+- The deploy log prints `Published minsky-dev at https://minsky-dev.icaic-minsky.workers.dev` and `The revision and deployment checks passed for minsky-dev.`
+- `https://minsky-dev.icaic-minsky.workers.dev/minsky-revision.json` shows the commit of `main` and `"backend":"cloudflare"`.
+
+The first build applies every migration that `minsky-development` does not have yet.
+
+### Pause publication
+
+Pause publication during a live contest. A merge then does not change the application for volunteers.
+
+1. Open **Workers & Pages > minsky-dev > Settings > Build**.
+2. Disconnect the repository, or disable the `main` trigger.
+3. Connect it again after the contest. The next push to `main` publishes.
+
+### Recover from a failed or bad publication
+
+- If `npm run ci` fails, nothing is published. Fix the check and merge again.
+- If the build stops before `wrangler deploy`, the previous Worker keeps serving. Read the fixed error message. Provider output is withheld on purpose.
+- If the message says that the migration outcome is unknown, compare `SELECT name FROM d1_migrations` with `src/server/adapters/d1/migrations` before you retry.
+- If a published version is bad, roll back the Worker with `npx wrangler rollback --config src/server/adapters/cloudflare/deploy/development.wrangler.jsonc`. Write migrations that only add tables, columns, or indexes, so that the earlier Worker still runs against the newer schema.
+- If a migration damaged data, find `Restore point before migrations:` in the deploy log. Run the `npx wrangler d1 time-travel restore` command on that line. It returns `minsky-development` to its state before the migration and discards later writes. See [D1 Time Travel](https://developers.cloudflare.com/d1/reference/time-travel/).
+
+### Change the D1 schema
+
+Every merge to `main` applies its new D1 migrations automatically. A Worker rollback then runs the earlier code against the newer schema.
+So a migration may only add tables, columns, indexes, triggers, or views.
+It may also drop a trigger, index, or view and create it again with the same name in the same file.
+
+`npm test` runs this check on every migration in `src/server/adapters/d1/migrations`. The deploy runs it again before it changes anything.
+It fails on `DROP TABLE`, `DROP COLUMN`, `RENAME`, and a dropped trigger, index, or view that the file does not create again.
+It does not check data changes such as `UPDATE` or `DELETE`.
+
+To ship a migration that removes or renames schema:
+
+1. Pause publication, as [Pause publication](#pause-publication) describes.
+2. Add the file name and the reason to `reviewedDestructiveMigrations` in `src/server/adapters/cloudflare/tooling/migrations.mjs`, in the same PR.
+3. After the merge, apply the migration and publish by hand. Record the restore point first.
+4. Reconnect the trigger.
+
+To publish by hand, run `npm run deploy` from an updated `main` with the same variables, a token with the same permissions, `WORKERS_CI_BRANCH=main`, and `WORKERS_CI_COMMIT_SHA` set to the output of `git rev-parse HEAD`.
+
+The script sets `VITE_BACKEND=cloudflare` and guards the complete Worker:
+
+- The app needs its API code, D1 database, private R2 bucket, and live coordinator. The script has no assets-only upload path that could remove them.
+- It validates the generated configuration and exact hosted targets before upload. After upload, it checks the published targets, live bindings, and an anonymous rejection at the authentication API.
+- It publishes the app only from `main`. Other branches, including Dependabot branches, skip the app.
 
 These checks do not verify authenticated behavior. The installation and activation procedures require the full application checks.
 A broken application target cannot block the docs, because Workers Builds publishes them separately.

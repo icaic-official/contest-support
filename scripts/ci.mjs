@@ -64,7 +64,15 @@ export async function scanSecrets() {
   }
 }
 
+// The minsky-dev build token can reach this process. Checks, package install
+// scripts, and the secret scan run without it.
+export function removePrivateVariables(env) {
+  for (const name of ['CLOUDFLARE_API_TOKEN', 'CLOUDFLARE_API_KEY', 'AUTH_SECRET']) delete env[name];
+  return env;
+}
+
 export async function main() {
+  removePrivateVariables(process.env);
   const env = { ...process.env, CI: 'true' };
   for (const [command, args] of commands) runCommand(command, args, env);
   await scanSecrets();

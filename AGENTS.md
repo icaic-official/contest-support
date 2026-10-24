@@ -40,8 +40,9 @@
 
 On 2026-10-23 the owner selected Cloudflare as the live backend.
 The development Worker is `minsky-dev`. The development D1 database is `minsky-development`.
-Supabase remains a supported second provider behind the shared backend interfaces.
-Keep its adapter, migrations, functions, and provider tests.
+On 2026-10-24 the owner retired the project's hosted Supabase setup. The project no longer operates Supabase projects.
+The Supabase adapter stays as a second implementation behind the shared backend interfaces. Anyone can run it on their own Supabase project with [Run the Supabase adapter](docs/supabase-provider.md).
+Keep its adapter, migrations, functions, local tests, and provider test driver. Every local Supabase adapter test must keep passing.
 Do not describe it as the live backend, the default setup, or the development URL's backend.
 Do not change hosted Supabase or Cloudflare resources, secrets, or repository settings.
 
@@ -50,16 +51,17 @@ Preserve the Workers Builds move and the removed GitHub Actions workflow.
 Do not add an Actions job.
 Browser suites and hosted provider checks stay manual commands.
 `npm run ci` lists provider scenarios. It does not run the hosted Supabase provider suite.
-Do not connect `minsky-dev` to Workers Builds.
+On 2026-10-24 the owner chose automatic publication of `main` to `minsky-dev` through one Workers Builds trigger. That trigger runs `npm run ci` and then `npm run deploy`. Builds for other branches stay disabled on `minsky-dev`. Do not change the trigger or its token yourself.
 `minsky-docs` publishes through Workers Builds. A push to `main` publishes the docs. A push to another branch uploads a preview version that does not receive traffic.
 Do not deploy.
 The owner reviews and merges.
 
 T0021's separately approved Cloudflare activation and repeat deployment retain their dated evidence in [run log](docs/history/run-log.md#t0021-approved-activation-2026-10-19).
-Supabase resources and accounts remain intact. Development, CI, and installation-verification resources remain separate.
+The retired Supabase projects `Minsky` and `Minsky CI` still exist until the owner deletes them. Do not use them. Development, CI, and installation-verification resources remain separate.
 Earlier provider permissions and exact protected branch limits remain in the [planning log](docs/history/plan-log.md) and dated run records.
 Those historical approvals do not authorize a new activation or deployment.
 Statements in those records that Supabase is the active backend are superseded by the 2026-10-23 decision.
+Statements that the project keeps or uses its own Supabase projects are superseded by the 2026-10-24 decision.
 
 ## Code and documentation cleanup
 - Subtract before adding. Remove code that the current architecture no longer needs.
@@ -143,8 +145,7 @@ Keep development, CI, and future production databases and credentials separate.
 The hosted `minsky-dev` app uses the complete Cloudflare development installation. It is not production.
 The Cloudflare development resources are `minsky-development` and private bucket `minsky-development-images`.
 On-demand hosted Cloudflare checks use the separate connector and store CI targets.
-The retained Supabase `Minsky` development project and `Minsky CI` project remain intact.
-Use `Minsky CI` only for isolated Supabase fixtures.
+The project operates no Supabase project. Hosted Supabase checks run only against an isolated project that the person running them owns.
 No production project exists.
 
 For each ticket, use this sequence:
@@ -156,13 +157,13 @@ For each ticket, use this sequence:
 5. Prepare the PR.
 6. Run cloud integration checks on the reviewed revision.
 7. Let the user review and merge.
-8. Workers Builds runs ordinary checks. It does not publish the application.
-   A Cloudflare application deployment includes the complete Worker. Coordinate migrations, bootstrap, secrets, and activation separately.
+8. Workers Builds runs ordinary checks. After the merge, the `minsky-dev` trigger checks `main` again, applies new D1 migrations, and publishes the complete Worker.
+   Write D1 migrations that only add tables, columns, or indexes. `npm test` and the deploy reject a migration that drops or renames schema. Coordinate bootstrap, secrets, and activation separately.
 
-Automatic GitHub Actions publication is removed.
-Report any later publication separately from merge. Record its exact source revision.
+Automatic GitHub Actions publication is removed. Workers Builds publishes `minsky-dev` from `main`.
+Report a manual publication separately from merge. Record its exact source revision.
 Prepare compatible backend changes before a dependent frontend merges, or pause frontend deployment for that release.
-Hosted Supabase and Cloudflare checks are on-demand commands against isolated CI targets.
+Hosted Supabase and Cloudflare checks are on-demand commands against isolated targets.
 Ordinary Workers Builds checks run without cloud credentials.
 Record local cloud runs separately from earlier protected GitHub Actions runs.
 Neither replaces the other. GitHub Actions no longer runs those checks.
@@ -178,11 +179,10 @@ After production is selected and provisioned, validate the approved revision on 
 Then apply its D1 migrations to production.
 Deploy the complete Worker, its bindings, and its static assets.
 Verify the production deployment afterward.
-The Supabase provider keeps its own migration, function, and frontend order in the [Supabase provider guide](docs/supabase-provider.md).
+The Supabase adapter keeps its own migration, function, and frontend order in [Run the Supabase adapter](docs/supabase-provider.md).
 Production setup remains future work.
 
 This future production work does not authorize provider resource creation or upgrades now.
-Use [the Supabase provider guide](docs/supabase-provider.md) for that provider's project references, commands, and observed setup results.
 These operational items stay deferred:
 
 - Ownership and billing records.
@@ -237,7 +237,7 @@ Only the uploader can remove a ready image during that time.
 Session admins set the file size, image count, and combined size limits. There is no upload-disable control.
 Contestants can view only team-visible images on their own team's issues.
 
-Keep both provider implementations available. Use embedded PostgreSQL for fast Supabase policy and transaction checks.
+Keep both provider implementations in the repository. Use embedded PostgreSQL for fast Supabase policy and transaction checks.
 Docker is optional. Privileged credentials stay outside Git and frontend builds.
 Cloud CI uses isolated fictional fixtures. Provider access does not grant application membership.
 A free-tier pilot does not establish production capacity.

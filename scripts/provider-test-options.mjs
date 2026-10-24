@@ -1,5 +1,6 @@
 import { isAbsolute, resolve } from 'node:path';
 import { connectorTarget } from '../tests/providers/cloudflare/target.mjs';
+import { isolatedSupabaseProject } from '../tests/providers/supabase/target.mjs';
 
 /** Validate the explicit target before a browser or privileged client starts. */
 export function providerTestOptions(arguments_, environment) {
@@ -35,13 +36,10 @@ export function providerTestOptions(arguments_, environment) {
     }
     target.config = resolve(target.config);
   }
-  const project = environment.MINSKY_TEST_PROJECT_REF ?? '';
+  const project = provider === 'supabase'
+    ? isolatedSupabaseProject(environment.MINSKY_TEST_PROJECT_REF)
+    : '';
   if (provider === 'supabase') {
-    if (!/^[a-z]{20}$/.test(project) || project === 'ovymmobupzowotvrywek') {
-      throw new Error(
-        'Select an isolated Supabase project with MINSKY_TEST_PROJECT_REF. Development is forbidden.',
-      );
-    }
     if (
       !environment.SUPABASE_ANON_KEY || !environment.SUPABASE_SERVICE_ROLE_KEY
     ) {

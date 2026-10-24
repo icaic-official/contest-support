@@ -10,9 +10,9 @@ import type { Actor } from '../providers/contracts';
 import type { WorkflowScenarioContext } from '../providers/scenarios/workflows';
 import { createFixture, cleanupFixture, type SupabaseFixture } from '../providers/supabase/fixture';
 import { lifecycle, accessSeparation, idempotency } from '../providers/scenarios/workflows';
+import { isolatedSupabaseProject } from '../providers/supabase/target.mjs';
 
-const project = process.env.MINSKY_TEST_PROJECT_REF;
-if (project !== 'ghtztmovdkhuketcbjmq') throw new Error('Shared workflow verification requires the approved Minsky CI project.');
+const project = isolatedSupabaseProject(process.env.MINSKY_TEST_PROJECT_REF);
 const path = process.env.MINSKY_WORKFLOW_FIXTURE;
 if (!path) throw new Error('Run this suite through scripts/workflow-proof.mjs.');
 const journalPath = path;

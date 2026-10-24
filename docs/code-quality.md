@@ -3,15 +3,18 @@
 On 2026-10-02, the user selected mandatory CI, a short PR review checklist, and scans for secrets and dependencies.
 These changes extend T0003.
 The user reviews and merges.
-Workers Builds does not publish the frontend.
-[Workers Builds setup](cloudflare-builds.md) describes the CI Worker. [Activation](activate-cloudflare-development.md) records the separate application publication gates.
+Workers Builds publishes `main` to the `minsky-dev` development application after the checks pass in the same build.
+[Publish the application](cloudflare-builds.md#publish-the-application) describes that trigger.
 
 ## Automated checks
 
 Workers Builds runs `npm run ci` for each push to a branch in this repository.
 The [CI reference](cloudflare-build-settings.md#workers-builds) owns the command list, limits, and on-demand checks.
 `npm run ci` fails on type errors, lint errors, test failures, a failed build, a docs link error, a high or critical `npm audit` advisory, or any Gitleaks finding.
+Its tests also fail on a D1 migration that drops or renames schema, because `main` publishes automatically. See [Change the D1 schema](cloudflare-builds.md#change-the-d1-schema).
 Browser suites and hosted provider suites are on-demand commands. They are not required PR checks.
+`npm run ci` keeps the Supabase adapter checks: Deno function checks and tests, and embedded-PostgreSQL migration and policy tests. They need no Supabase project.
+The project operates no Supabase project. Hosted Supabase suites run only against a project that the person running them owns.
 
 ## Dependency updates
 
@@ -37,6 +40,8 @@ Remove it when the installed `miniflare` depends on `undici` 7.30.1 or later. Th
 Gitleaks uses pinned release 8.30.1 and a verified SHA-256 checksum.
 The scan reads fetched Git history, including secrets that later commits removed. It redacts findings.
 Ordinary builds do not receive cloud credentials.
+The `minsky-dev` trigger runs `npm run ci` before `npm run deploy` in one build, so a failed check stops publication.
+`npm run ci` removes the deployment token before it installs packages or runs checks.
 
 Run the usual README checks locally.
 With Gitleaks 8.30.1 installed, scan history with this command:

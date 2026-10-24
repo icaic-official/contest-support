@@ -24,7 +24,7 @@ beforeEach(async () => {
   journal = {
     version: 1,
     provider: 'supabase',
-    project: 'ghtztmovdkhuketcbjmq',
+    project: 'abcdefghijklmnopqrst',
     runId: randomUUID(),
     eventId: randomUUID(),
     sessionIds: [randomUUID(), randomUUID()],
@@ -139,10 +139,10 @@ describe('provider fixture recovery boundaries', () => {
     await writeFile(path, JSON.stringify(journal));
     vi.stubEnv('MINSKY_TEST_PROJECT_REF', 'ovymmobupzowotvrywek');
     await expect(createFixture(path)).rejects.toThrow(
-      'Development is forbidden',
+      'development project is forbidden',
     );
     await expect(cleanupFixture(path)).rejects.toThrow(
-      'Development is forbidden',
+      'development project is forbidden',
     );
     expect(createClient).not.toHaveBeenCalled();
     expect(JSON.parse(await readFile(path, 'utf8'))).toEqual(journal);

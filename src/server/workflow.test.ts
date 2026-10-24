@@ -44,4 +44,18 @@ describe('shared workflow compatibility edges', () => {
     expect(decision).toMatchObject({ apply: { awardId: 'award' } });
     expect(decision).not.toHaveProperty('issue');
   });
+  it('lets an admin resolve an assigned issue that another person owns', () => {
+    const admin = { ...state, actor: { id: 'admin', name: 'Fictional Admin' },
+      membership: { team_id: null, roles: [], is_admin: true } };
+    for (const status of ['claimed', 'escalated'] as const) {
+      const decision = decideWorkflow({ ...admin, issue: { ...state.issue!, status } },
+        { type: 'resolve', issue_id: issueId, revision: 0, summary: 'Restored' });
+      expect(decision).toMatchObject({ issue: { status: 'resolved' }, resolution: { summary: 'Restored' } });
+      expect(decision).not.toHaveProperty('issue.owner');
+    }
+    expect(decideWorkflow({ ...admin, issue: { ...state.issue!, status: 'open', owner: null } },
+      { type: 'resolve', issue_id: issueId, revision: 0, summary: 'Restored' })).toEqual({ outcome: 'rejected', reason: 'state' });
+    expect(decideWorkflow({ ...state, actor: { id: 'other', name: 'Other Support' } },
+      { type: 'resolve', issue_id: issueId, revision: 0, summary: 'Restored' })).toEqual({ outcome: 'rejected', reason: 'state' });
+  });
 });

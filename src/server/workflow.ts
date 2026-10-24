@@ -167,14 +167,17 @@ export function decideWorkflow(state: WorkflowState, command: Command): Workflow
       decision.history = { text: workflowText(command.text), visibility: command.visibility };
       break;
     }
-    case 'resolve':
-      if (!hasSupportRole || issue.owner !== actor.id || !['claimed', 'escalated'].includes(issue.status)) {
+    case 'resolve': {
+      // Admins can close an assigned issue for an absent owner. The owner stays recorded.
+      const isOwner = hasSupportRole && issue.owner === actor.id;
+      if (!(isOwner || member.is_admin) || !['claimed', 'escalated'].includes(issue.status)) {
         return reject('state');
       }
       decision.issue = { status: 'resolved' };
       decision.resolution = { summary: workflowText(command.summary) };
       decision.history.text = `Resolved: ${decision.resolution.summary}`;
       break;
+    }
     case 'reopen':
       if (issue.status !== 'resolved' || (!hasSupportRole && !isIssueTeam)) {
         return reject('state');

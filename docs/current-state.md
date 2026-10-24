@@ -46,6 +46,7 @@ A review after the update from `main` found these defects. Each fix has a regres
 - The Cloudflare route passed `action` into the strict image reservation schema, so every announcement image upload failed. The route now passes only the reservation fields. The route test checks the exact service input.
 - The image view downloaded every image again on each poll and live change, because each snapshot parses new objects. It now downloads only when the image identity changes. No browser test covers this.
 - On Supabase, removing an image of a removed announcement changed that announcement's attribution and revision. Removal could also mark another uploader's pending image as removed while its file was still being stored. Removal now accepts only ready images and leaves a removed announcement unchanged, as D1 does.
+- On Cloudflare, a file name over 200 characters was rejected with a size message. It is now shortened to 200 characters, as on Supabase.
 - The specification now states that managers can still remove the images of a removed announcement. The code and the Cloudflare tests already allowed it. The Supabase cleanup limit is now documented.
 
 ### Not verified

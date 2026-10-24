@@ -20,7 +20,7 @@ interface Image {
 
 const beginSchema = z.strictObject({
   requestId: z.uuid(), sessionId: z.uuid(), announcementId: z.uuid(),
-  name: z.string().min(1).max(200), bytes: z.number().int().min(1).max(ANNOUNCEMENT_IMAGE_MAX_BYTES),
+  name: z.string().min(1), bytes: z.number().int().min(1).max(ANNOUNCEMENT_IMAGE_MAX_BYTES),
 });
 const keySchema = z.tuple([z.uuid(), z.literal('announcements'), z.uuid(), z.uuid()]);
 type Value = string | number | null;
@@ -78,7 +78,8 @@ export class R2AnnouncementImageService {
     const parsed = beginSchema.safeParse(input);
     if (!parsed.success) throw new ImageRequestError('Choose an image of up to 10 MB.', { validation: true });
     const value = parsed.data;
-    const cleanName = value.name.trim().replace(/\p{Cc}/gu, '').replace(/[/\\]/g, '-');
+    // Keep the first 200 characters, as the Supabase provider does.
+    const cleanName = [...value.name.trim().replace(/\p{Cc}/gu, '').replace(/[/\\]/g, '-')].slice(0, 200).join('');
     if (!cleanName.trim()) throw new ImageRequestError('Choose an image with a file name.', { validation: true });
     const repeat = async (): Promise<{ id: string; path: string } | undefined> => {
       const prior = await this.statement(`SELECT x.id FROM announcement_images x JOIN (${currentAccessSql}) c

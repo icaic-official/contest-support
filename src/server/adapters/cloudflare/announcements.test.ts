@@ -316,6 +316,13 @@ describe('Cloudflare session announcements with local D1 and R2 bindings', () =>
     expect(await bucket.get(image.path)).toBeNull();
   });
 
+  it('shortens a long file name instead of rejecting the image', async () => {
+    const id = await publish();
+    const image = await images.begin(admin, { sessionId: fixture.sessionId, announcementId: id, requestId: randomUUID(),
+      name: `${'a'.repeat(300)}.png`, bytes: png.byteLength });
+    expect(await statement('SELECT name FROM announcement_images WHERE id = ?', image.id).first()).toEqual({ name: 'a'.repeat(200) });
+  });
+
   it('abandons unfinished uploads and cleans expired reservations', async () => {
     const id = await publish();
     const abandoned = await reserve(id);

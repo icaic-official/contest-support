@@ -92,7 +92,7 @@ Text of 10,000 characters can use up to 40,000 bytes in UTF-8.
 | Commands | The `announcement_command`, `begin_announcement_image`, `complete_announcement_image`, and `remove_announcement_image` functions recheck membership, account readiness, role, and archive state in a transaction. A stale revision raises SQLSTATE `MN409`. |
 | Images | The [announcement-images function](../supabase/functions/announcement-images/handler.ts) is the only writer of stored files. It checks the file signature and size. Postgres checks the stored object size and type when it completes an upload. |
 | Live updates | Each write raises the session revision. Clients already listen for that change. |
-| Cleanup | The next upload to the same announcement deletes the files of its expired reservations. No scheduled run exists, so an abandoned reservation can keep an unreadable file until then. |
+| Cleanup | The next upload to the same announcement tries once to delete the files of its expired reservations. No scheduled run or retry exists, so an abandoned reservation can keep an unreadable file. |
 
 ## Verification
 

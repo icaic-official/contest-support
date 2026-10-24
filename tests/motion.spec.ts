@@ -53,25 +53,31 @@ async function stopTrail(page: Page): Promise<number[]> {
 }
 
 /**
- * Stops the running transitions of an element halfway through. A test then
- * reads the in-between state without a race against frame timing.
+ * Arms a trap on an element. When its transitions start, the trap pauses them
+ * halfway through, so a test reads the in-between state without a race against
+ * frame timing or machine load. Arm it before the action that causes the
+ * transition. The returned function waits until the trap has fired.
  */
-async function freezeMidway(target: Locator): Promise<void> {
-  // Finding and pausing the transition in one page call keeps a slow machine
-  // from letting it end between the two steps.
-  await target.evaluate(async (element) => {
-    const deadline = Date.now() + 5000;
-    let running = element.getAnimations();
-    while (!running.length && Date.now() < deadline) {
-      await new Promise((resolve) => requestAnimationFrame(resolve));
-      running = element.getAnimations();
-    }
-    if (!running.length) throw new Error('No transition started.');
-    for (const animation of running) {
-      animation.pause();
-      animation.currentTime = Number(animation.effect?.getComputedTiming().duration ?? 0) / 2;
-    }
+async function trapMidway(target: Locator): Promise<() => Promise<void>> {
+  await target.evaluate((element) => {
+    const state = element as unknown as { trapped?: boolean };
+    state.trapped = false;
+    element.addEventListener(
+      'transitionrun',
+      (event) => {
+        if (event.target !== element) return;
+        for (const animation of element.getAnimations()) {
+          animation.pause();
+          animation.currentTime = Number(animation.effect?.getComputedTiming().duration ?? 0) / 2;
+        }
+        state.trapped = true;
+      },
+      { once: true },
+    );
   });
+  return async () => {
+    await expect.poll(() => target.evaluate((element) => (element as unknown as { trapped?: boolean }).trapped)).toBe(true);
+  };
 }
 
 async function finishAnimations(target: Locator): Promise<void> {
@@ -129,9 +135,10 @@ test('queue tabs: the indicator starts under the selected tab and slides to the 
   expect(await pill.evaluate((element) => element.getAnimations().length)).toBe(0);
 
   const from = await pill.boundingBox();
+  const midwayReached = await trapMidway(pill);
   await waiting.click();
   await expect(waiting).toHaveAttribute('aria-pressed', 'true');
-  await freezeMidway(pill);
+  await midwayReached();
   const midway = await pill.boundingBox();
   const target = await waiting.boundingBox();
   if (!from || !midway || !target) throw new Error('Missing box.');
@@ -238,9 +245,10 @@ test('contestant tracker: a step fills in over a moment when staff claim the rep
   const fill = () => circle.evaluate((element) => getComputedStyle(element).backgroundColor);
   await expect(progress).toBeVisible();
   const before = await fill();
+  const midwayReached = await trapMidway(circle);
   fixture.setIssues([{ number: 4, status: 'claimed', minutesAgo: 3, team: 0 }]);
   await fixture.refresh();
-  await freezeMidway(circle);
+  await midwayReached();
   const midway = await fill();
   await finishAnimations(circle);
   const after = await fill();
@@ -260,8 +268,9 @@ test('issue composer: the audience switch slides to Internal note and turns ambe
   await expect.poll(() => gap(pill, publicReply, 'box')).toBeLessThan(1.5);
   const white = await fill();
 
+  const midwayReached = await trapMidway(pill);
   await internalNote.click();
-  await freezeMidway(pill);
+  await midwayReached();
   const midway = await pill.boundingBox();
   const target = await internalNote.boundingBox();
   const from = await publicReply.boundingBox();
@@ -284,9 +293,10 @@ test('phone tab bar: the marker slides along the top edge to the selected tab', 
   await expect.poll(() => gap(bar, queue, 'centre')).toBeLessThan(1.5);
 
   const from = await bar.boundingBox();
+  const midwayReached = await trapMidway(bar);
   await find.click();
   await expect(find).toHaveAttribute('aria-current', 'page');
-  await freezeMidway(bar);
+  await midwayReached();
   const midway = await bar.boundingBox();
   const target = await find.boundingBox();
   if (!from || !midway || !target) throw new Error('Missing box.');

@@ -3,8 +3,8 @@ import { currentMigrationNames } from "../src/server/adapters/cloudflare/tooling
 import { describe, expect, it, vi } from "vitest";
 import {
   buildWorkers, prepareApplication,
-  deploymentPlan, deploymentTargets, deployWorkers, isCurrentRevision, previewAddress,
-  validateBuildSettings, verifyApplicationDeployment, verifyRevision, wranglerArguments,
+  deploymentPlan, deploymentTargets, deployWorkers, isCurrentRevision,
+  publishedRevision, validateBuildSettings, verifyApplicationDeployment, verifyRevision,
 } from "./deploy-workers.mjs";
 
 const sha = "a".repeat(40);
@@ -26,27 +26,11 @@ describe("deployment selection", () => {
     expect(() => deploymentPlan({ ...env, ...change })).toThrow();
   });
 
-  it("publishes main to the stable Worker and all other branches to previews", () => {
-    const worker = { config: "wrangler.docs.jsonc" };
-    const main = deploymentPlan({ ...env, WORKERS_CI_BRANCH: "main" });
-    expect(wranglerArguments(worker, main)).toEqual(["deploy", "--config", worker.config]);
+  it("treats main as stable and all other branches as previews", () => {
+    expect(deploymentPlan({ ...env, WORKERS_CI_BRANCH: "main" }).preview).toBe(false);
     for (const branch of ["Main", "main-fix", "feature/docs", "release/1.0"]) {
-      const plan = deploymentPlan({ ...env, WORKERS_CI_BRANCH: branch });
-      expect(plan.preview).toBe(true);
-      expect(wranglerArguments(worker, plan)).toContain("preview");
-      expect(wranglerArguments(worker, plan)).not.toContain("deploy");
+      expect(deploymentPlan({ ...env, WORKERS_CI_BRANCH: branch }).preview).toBe(true);
     }
-  });
-
-  it("keeps preview names stable, short, and distinct after normalization", () => {
-    const names = ["feature/docs", "feature-docs", "Feature/docs", "文档", "a".repeat(200),
-      "feature/$(touch${IFS}/tmp/never);echo", "a`id`"].map((branch) => {
-      const plan = deploymentPlan({ ...env, WORKERS_CI_BRANCH: branch });
-      expect(plan.name).toMatch(/^[a-z0-9-]{1,63}$/);
-      expect(deploymentPlan({ ...env, WORKERS_CI_BRANCH: branch }).name).toBe(plan.name);
-      return plan.name;
-    });
-    expect(new Set(names).size).toBe(names.length);
   });
 });
 
@@ -78,36 +62,12 @@ it("skips stale and deleted branches, and stops on GitHub errors", () => {
   expect(() => isCurrentRevision(plan, execute)).toThrow("The GitHub branch lookup failed.");
 });
 
-it("uses Cloudflare's preview URL and rejects missing or unrelated URLs", () => {
-  const url = "https://branch-minsky-docs.icaic-minsky.workers.dev";
-  expect(previewAddress(JSON.stringify({ preview: { urls: [url] } }))).toBe(url);
-  for (const value of ["https://evil.example", "https://icaic-minsky.workers.dev.evil.example",
-    "https://user:pass@branch-minsky-docs.icaic-minsky.workers.dev", "http://branch-minsky-docs.icaic-minsky.workers.dev"]) {
-    expect(() => previewAddress(JSON.stringify({ preview: { urls: [value] } }))).toThrow();
-  }
-  expect(() => previewAddress("{}")).toThrow();
-});
-
-it("reads preview JSON after asset progress and rejects malformed responses", async () => {
-  const url = "https://branch-minsky-docs.icaic-minsky.workers.dev";
-  const payload = JSON.stringify({ preview: { urls: [url] } }, null, 2);
-  const output = `🌀 Building list of assets...\n🌀 Starting asset upload...\n${payload}\n`;
-  expect(previewAddress(output)).toBe(url);
-  for (const invalid of [
-    `Progress without JSON: ${url}`, `Progress\n{broken JSON`, `${output}trailing output`,
-    JSON.stringify({ preview: { urls: url } }),
-    JSON.stringify({ preview: { urls: ["https://evil.example"] } }),
-  ]) {
-    expect(() => previewAddress(invalid)).toThrow(/Cloudflare did not return/);
-  }
+it("leaves docs previews to the minsky-docs build", async () => {
+  expect(await deploymentTargets(env, "docs")).toEqual([]);
   const mocks = deploymentMocks();
-  mocks.execute.mockReturnValue(output);
   await deployWorkers(env, { ...mocks, site: "docs" });
-  expect(mocks.verify).toHaveBeenCalledWith(url, { sha });
-  mocks.verify.mockClear();
-  mocks.execute.mockReturnValue(`Progress\n{broken JSON`);
-  await expect(deployWorkers(env, { ...mocks, site: "docs" })).rejects.toThrow("valid preview JSON");
-  expect(mocks.verify).not.toHaveBeenCalled();
+  expect(mocks.execute).not.toHaveBeenCalled();
+  expect(mocks.report).toHaveBeenCalledWith("Skipped the docs. The minsky-docs build uploads docs previews.");
 });
 
 it("verifies the deployed revision and fails when propagation never completes", async () => {
@@ -141,10 +101,9 @@ const build = { sha, backend: "cloudflare", config: cloudflare.MINSKY_DEV_CLOUDF
 function deploymentMocks() {
   return {
     current: vi.fn().mockResolvedValue(true),
-    execute: vi.fn().mockReturnValue(JSON.stringify({ preview: {
-      urls: ["https://branch-minsky-dev.icaic-minsky.workers.dev"],
-    } })),
-    verify: vi.fn(), write: vi.fn(), report: vi.fn(),
+    execute: vi.fn(),
+    verify: vi.fn().mockResolvedValue(true), write: vi.fn(), report: vi.fn(),
+    revision: vi.fn().mockResolvedValue(null),
     application: vi.fn(), deployedApplication: vi.fn(),
     targets: (target, site, options) => deploymentTargets(target, site, { ...options, installation }),
     read: (path, encoding) => path === "dist/minsky-build.json"
@@ -210,14 +169,16 @@ it("requires the complete Cloudflare target for the stable application", async (
   }
 });
 
-it("keeps docs deployment independent and omits all app previews", async () => {
+it("keeps docs deployment independent and skips the app outside the preview build", async () => {
   const brokenApplication = { ...development, VITE_ENVIRONMENT: "", MINSKY_DEV_CLOUDFLARE_CONFIG: "" };
   expect((await deploymentTargets(brokenApplication, "docs")).map((target) => target.name)).toEqual(["minsky-docs"]);
   expect(await deploymentTargets(env, "app")).toEqual([]);
   const mocks = deploymentMocks();
-  await deployWorkers(env, mocks);
+  await deployWorkers(brokenApplication, { ...mocks, site: "docs" });
   expect(mocks.execute).toHaveBeenCalledTimes(1);
-  expect(mocks.execute.mock.calls[0][1]).toContain("wrangler.docs.jsonc");
+  expect(mocks.execute.mock.calls[0][1]).toEqual(["deploy", "--config", "wrangler.docs.jsonc"]);
+  expect(mocks.verify).toHaveBeenCalledWith("https://minsky-docs.icaic-minsky.workers.dev", { sha },
+    globalThis.fetch, expect.any(Function), undefined);
   expect(mocks.application).not.toHaveBeenCalled();
 });
 
@@ -309,6 +270,12 @@ it("confirms the live target before it applies migrations and requires the check
   expect(execute.mock.calls[0][2].stdio).toEqual(["ignore", "pipe", "pipe"]);
   expect(execute.mock.calls[0][2].env.CI).toBe("true");
 
+  // The build variable must match the committed configuration.
+  const unmatched = vi.fn(provider());
+  await expect(prepareApplication(worker, { ...cloudflare, MINSKY_DEV_DATABASE_ID: "other" }, unmatched, request))
+    .rejects.toThrow(/exactly match the selected configuration/);
+  expect(unmatched).not.toHaveBeenCalled();
+
   const unconfirmed = vi.fn(() => "private rejected provider detail");
   await expect(prepareApplication(worker, cloudflare, unconfirmed, request)).rejects.toThrow(/could not be confirmed/);
   expect(applies(unconfirmed)).toHaveLength(0);
@@ -340,12 +307,6 @@ it("confirms the live target before it applies migrations and requires the check
   const ahead = vi.fn(provider({ applied: JSON.stringify([{ success: true, results: [
     ...(await currentMigrationNames()), "9999_newer.sql"].map((name) => ({ name })) }]) }));
   await expect(prepareApplication(worker, cloudflare, ahead, request, vi.fn())).rejects.toThrow(/hosted migrations differ/);
-});
-
-it("accepts the former preparation branch after its dependency merged while omitting its app preview", async () => {
-  const prepared = { ...env, WORKERS_CI_BRANCH: "feature/t0021-cloudflare-development-install" };
-  expect(deploymentPlan(prepared).preview).toBe(true);
-  expect((await deploymentTargets(prepared)).map((target) => target.name)).toEqual(["minsky-docs"]);
 });
 
 it("rejects an app marker with the right revision and the wrong backend or data target", async () => {
@@ -422,4 +383,148 @@ it("selects the committed Cloudflare target and ignores a retired Supabase selec
     "src/server/adapters/cloudflare/deploy/development.settings.json", "utf8",
   )));
   expect(await deploymentTargets({ ...prepared, MINSKY_DEV_BACKEND: "supabase" }, "app")).toEqual(enabled);
+});
+
+const previewConfig = "src/server/adapters/cloudflare/deploy/preview.wrangler.jsonc";
+const previewSettings = JSON.parse(readFileSync("src/server/adapters/cloudflare/deploy/preview.settings.json", "utf8"));
+const preview = { ...env, VITE_ENVIRONMENT: "preview", MINSKY_PREVIEW_DATABASE_ID: previewSettings.databaseId };
+
+describe("branch previews", () => {
+  it("selects the committed preview Worker, database, and bucket on a branch", async () => {
+    const targets = await deploymentTargets(preview, "app");
+    expect(targets).toEqual([{ name: "minsky-preview", config: previewConfig, assets: "dist",
+      backend: "cloudflare", settings: previewSettings }]);
+    expect(previewSettings).toMatchObject({ workerName: "minsky-preview", databaseName: "minsky-preview",
+      bucketName: "minsky-preview-images", origin: "https://minsky-preview.icaic-minsky.workers.dev" });
+  });
+
+  it("refuses development variables, another database, and non-preview resources", async () => {
+    for (const change of [
+      { MINSKY_PREVIEW_DATABASE_ID: undefined }, { MINSKY_PREVIEW_DATABASE_ID: settings.databaseId },
+      { MINSKY_DEV_DATABASE_ID: settings.databaseId }, { MINSKY_DEV_CLOUDFLARE_CONFIG: previewConfig },
+    ]) {
+      await expect(deploymentTargets({ ...preview, ...change }, "app")).rejects.toThrow();
+    }
+    for (const change of [
+      { workerName: "minsky-dev" }, { databaseName: "minsky-development" }, { bucketName: "minsky-development-images" },
+      { origin: "https://minsky-dev.icaic-minsky.workers.dev" }, { accountId: "other" },
+    ]) {
+      await expect(deploymentTargets(preview, "app", {
+        installation: async () => ({ ...previewSettings, ...change }),
+      })).rejects.toThrow(/exact preview Worker/);
+    }
+  });
+
+  it("never publishes the preview from main and skips main on the preview build", async () => {
+    const main = { ...preview, WORKERS_CI_BRANCH: "main" };
+    expect(await deploymentTargets(main, "app")).toEqual([]);
+    const mocks = deploymentMocks();
+    await deployWorkers(main, { ...mocks, site: "app" });
+    expect(mocks.report).toHaveBeenCalledWith("Skipped the application. The minsky-dev build publishes main.");
+    expect(mocks.execute).not.toHaveBeenCalled();
+    expect(mocks.application).not.toHaveBeenCalled();
+    const build = vi.fn();
+    await buildWorkers(main, { site: "app", execute: build, write: vi.fn() });
+    expect(build).not.toHaveBeenCalled();
+  });
+
+  it("migrates and replaces the shared preview Worker, then verifies it", async () => {
+    const mocks = deploymentMocks();
+    const worker = (await deploymentTargets(preview, "app"))[0];
+    const marker = { sha, backend: "cloudflare", databaseId: previewSettings.databaseId,
+      bucketName: previewSettings.bucketName, origin: previewSettings.origin };
+    mocks.targets = async () => [worker];
+    mocks.read = () => JSON.stringify({ ...marker, config: previewConfig });
+    await deployWorkers(preview, { ...mocks, site: "app" });
+    expect(mocks.application).toHaveBeenCalledWith(worker, expect.anything(), mocks.execute, globalThis.fetch, mocks.report);
+    expect(mocks.execute.mock.calls[0][1]).toEqual(["deploy", "--config", previewConfig]);
+    expect(mocks.revision).toHaveBeenCalledWith("https://minsky-preview.icaic-minsky.workers.dev");
+    expect(mocks.verify).toHaveBeenCalledWith("https://minsky-preview.icaic-minsky.workers.dev", marker,
+      globalThis.fetch, expect.any(Function), null);
+    expect(mocks.deployedApplication).toHaveBeenCalledWith(worker, expect.anything());
+    expect(mocks.report).toHaveBeenCalledWith("Target: shared preview Worker `minsky-preview`.");
+
+    // A newer build from another branch published after this one. This build does not fail.
+    mocks.verify.mockResolvedValue(false);
+    mocks.deployedApplication.mockClear();
+    await deployWorkers(preview, { ...mocks, site: "app" });
+    expect(mocks.deployedApplication).not.toHaveBeenCalled();
+    expect(mocks.report).toHaveBeenCalledWith(
+      "Another build replaced minsky-preview after this upload. That build verifies its own deployment.");
+  });
+
+  it("recognizes a newer build on the shared preview and keeps waiting during propagation", async () => {
+    const pause = vi.fn();
+    const serving = (...shas) => {
+      const request = vi.fn();
+      for (const value of shas) request.mockResolvedValueOnce({ ok: true, json: async () => ({ sha: value }) });
+      return request;
+    };
+    // The earlier revision is still visible at first. Then the expected revision appears.
+    expect(await verifyRevision("https://example.test", sha, serving("before", sha), pause, "before")).toBe(true);
+    expect(await verifyRevision("https://example.test", sha, serving("before", "newer"), pause, "before")).toBe(false);
+    // Without a recorded earlier revision, any other revision comes from a newer build.
+    expect(await verifyRevision("https://example.test", sha, serving("newer"), pause, null)).toBe(false);
+    // A Worker that only one build publishes never reports a replacement.
+    const stale = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ sha: "newer" }) });
+    await expect(verifyRevision("https://example.test", sha, stale, pause)).rejects.toThrow(/could not be verified/);
+
+    const request = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ sha }) });
+    expect(await publishedRevision("https://example.test", request)).toBe(sha);
+    expect(request.mock.calls[0][0]).toBe("https://example.test/minsky-revision.json");
+    for (const failure of [vi.fn().mockRejectedValue(new Error("DNS")), vi.fn().mockResolvedValue({ ok: false }),
+      vi.fn().mockResolvedValue({ ok: true, json: async () => ({}) })]) {
+      expect(await publishedRevision("https://example.test", failure)).toBeNull();
+    }
+  });
+
+  it("accepts migrations from other branches but requires every migration in the checkout", async () => {
+    const worker = (await deploymentTargets(preview, "app"))[0];
+    const names = await currentMigrationNames();
+    const request = vi.fn(async (url) => ({ ok: true, json: async () => ({ success: true,
+      result: url.endsWith("/managed") ? { enabled: false } : url.endsWith("/custom") ? { domains: [] }
+        : { name: previewSettings.bucketName },
+    }) }));
+    const provider = (applied) => vi.fn((command, args) => {
+      if (args[0] === "whoami") return previewSettings.accountId;
+      if (args[0] === "d1" && args[1] === "info") {
+        return JSON.stringify({ uuid: previewSettings.databaseId, name: previewSettings.databaseName });
+      }
+      if (args[0] === "secret") return JSON.stringify([{ name: "AUTH_SECRET", type: "secret_text" }]);
+      if (args[0] === "d1" && args[1] === "time-travel") {
+        return JSON.stringify({ bookmark: "00000085-0000024c-00004c6d-8e61117bf38d7adb71b934ebbf891683" });
+      }
+      if (args[0] === "d1" && args[1] === "migrations") return "Migrations applied";
+      if (args[0] === "d1" && args[1] === "execute") {
+        return JSON.stringify([{ success: true, results: applied.map((name) => ({ name })) }]);
+      }
+      throw new Error("Unexpected command");
+    });
+
+    // Another branch applied 9999_other.sql to the shared database.
+    await prepareApplication(worker, preview, provider([...names, "9999_other.sql"]), request, vi.fn());
+    await expect(prepareApplication(worker, preview, provider(names.slice(1)), request, vi.fn()))
+      .rejects.toThrow(/hosted migrations differ/);
+
+    const other = provider(names);
+    await expect(prepareApplication(worker, { ...preview, MINSKY_PREVIEW_DATABASE_ID: settings.databaseId },
+      other, request)).rejects.toThrow(/exactly match the selected configuration/);
+    expect(other).not.toHaveBeenCalled();
+  });
+
+  it("reads the live bindings of the preview Worker", async () => {
+    const worker = (await deploymentTargets(preview, "app"))[0];
+    const request = vi.fn(async (url) => url.endsWith("/settings")
+      ? { ok: true, json: async () => ({ success: true, result: { bindings: [
+        { name: "DB", type: "d1", id: previewSettings.databaseId },
+        { name: "IMAGES", type: "r2_bucket", bucket_name: previewSettings.bucketName },
+        { name: "LIVE_UPDATES", type: "durable_object_namespace", class_name: "SessionLiveCoordinator", namespace_id: "namespace" },
+        { name: "AUTH_ORIGIN", type: "plain_text", text: previewSettings.origin },
+        { name: "AUTH_SECRET", type: "secret_text" },
+      ] } }) }
+      : { status: 401, json: async () => ({ error: "Sign in to continue." }) });
+    await verifyApplicationDeployment(worker, preview, request);
+    expect(request.mock.calls[0][0]).toMatch(/\/workers\/scripts\/minsky-preview\/settings$/);
+    expect(request.mock.calls[1][0]).toBe(`${previewSettings.origin}/api/auth/session`);
+  });
 });

@@ -93,6 +93,24 @@ The build runs `npm run ci` once more on `main`, after `minsky-ci` has checked t
 That repeat makes the publication depend on checks in the same build. The deploy step cannot run after a failed check.
 The combined build time of checks and publication is not measured yet. It must stay under the 20 minute build limit.
 
+## Preview Workers Builds
+
+The `minsky-preview` Worker publishes branch previews. [Publish branch previews](cloudflare-builds.md#publish-branch-previews) explains the behavior and the dashboard steps.
+The owner connected this trigger on 2026-10-24 and switched off its branch builds the same day, because its token cannot be limited to the preview resources. The table lists the settings for when branch builds are on.
+
+| Setting | Value |
+| --- | --- |
+| Worker | `minsky-preview` |
+| Branches | Production branch `main`, which builds but does not publish. Builds for other branches are enabled. Branches that match `dependabot/*` are excluded. |
+| Build command | `env -u CLOUDFLARE_API_TOKEN -u CLOUDFLARE_API_KEY npm ci`. It installs dependencies without the token and runs no checks. |
+| Deploy command | `npm run deploy` for every branch |
+| Root directory | Repository root |
+| API token | Account token in [Prepare the preview token](cloudflare-builds.md#prepare-the-preview-token), limited to `minsky-preview` and `minsky-preview-images`. Never the `minsky-dev` token. |
+| Build variables | `SKIP_DEPENDENCY_INSTALL=1`, `NODE_VERSION=22.23.2`, `CLOUDFLARE_ACCOUNT_ID`, `VITE_ENVIRONMENT=preview`, `MINSKY_PREVIEW_DATABASE_ID=3189b257-13f9-4e73-9bd1-bf211c7cbb25` |
+
+The preview resources are D1 database `minsky-preview` and private bucket `minsky-preview-images`, both in APAC.
+They hold only test data.
+
 ## On-demand checks
 
 Coding agents run these commands. They are not part of `npm run ci`.
@@ -163,7 +181,7 @@ Publication is an explicit, guarded command. Run it only after an explicit reque
 - `WORKERS_CI_BRANCH` is the branch name. Workers Builds sets it.
 - `WORKERS_CI_COMMIT_SHA` is 40 lowercase hexadecimal characters and is not all zeros. Workers Builds sets it.
 
-A manual run sets both variables itself. `main` selects the stable Worker. Other branches select a preview.
+A manual run sets both variables itself. `main` selects the stable Workers. On other branches, the script publishes only the app, and only on the `minsky-preview` build.
 Publication also requires `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`.
 `CLOUDFLARE_API_TOKEN` is the token for the target checks, the migrations, and the upload.
 `CLOUDFLARE_ACCOUNT_ID` must be `458ad6a930b0fb717796dfa19ca6a2b1`.
@@ -209,7 +227,7 @@ Install the locked dependencies before these commands:
 | Validate public app deployment settings | `node scripts/deploy-workers.mjs --check --site=app` |
 | Build the selected app and record its backend | `node scripts/deploy-workers.mjs --build --site=app` |
 | Publish the selected app | `node scripts/deploy-workers.mjs --site=app` |
-| Validate, build, or publish docs | Use the same options with `--site=docs`. |
+| Validate, build, or publish docs from `main` | Use the same options with `--site=docs`. |
 | Guarded app build and publication | `npm run deploy` |
 
 These commands require the branch and commit variables under [Publication commands](#publication-commands).
@@ -219,6 +237,7 @@ The removed `deploy:preview` command cannot upload an assets-only app version.
 | Site and mode | Configuration | Worker | Assets |
 | --- | --- | --- | --- |
 | App | `MINSKY_DEV_CLOUDFLARE_CONFIG`, validated by the provider generator | `minsky-dev` | `dist` |
+| Branch preview | `src/server/adapters/cloudflare/deploy/preview.wrangler.jsonc`, validated by the provider generator | `minsky-preview` | `dist` |
 | Docs | `wrangler.docs.jsonc` | `minsky-docs` | `site/dist` |
 
 The stable URLs are `https://minsky-dev.icaic-minsky.workers.dev` and `https://minsky-docs.icaic-minsky.workers.dev`.
@@ -230,7 +249,9 @@ The provider validator rejects extra bindings, unknown variables, and environmen
 
 The generated full Worker includes application code, static assets, `DB`, `IMAGES`, `LIVE_UPDATES`, and `ASSETS`.
 It includes Durable Object migration tag `v1`, a one-minute recovery cron, and a 1,000 ms CPU cap.
-The config disables its preview URLs. Application previews receive no stable data bindings.
+The configs disable Cloudflare preview URLs. Branch previews replace the separate `minsky-preview` Worker, which binds only preview resources.
+A branch build selects the preview only when `VITE_ENVIRONMENT` is `preview`. Other branch builds skip the app.
+A `main` build with `VITE_ENVIRONMENT=preview` skips the app, because `minsky-dev` publishes `main`.
 
 ## Publication checks
 
@@ -267,10 +288,8 @@ These checks verify publication, selection, bindings, and an anonymous denial.
 Authenticated authorization, private images, recovery, and live updates require the separate application checks.
 
 Workers Builds now publishes the docs and their preview versions. See [Publish the docs](cloudflare-builds.md#publish-the-docs).
-The script's `--site=docs` path remains a manual fallback.
-Its docs previews use a normalized branch name with a 12-character SHA-256 suffix.
-The preview parser accepts asset-progress lines before the JSON response. Malformed JSON and URLs outside the permitted Worker domain remain rejected.
-The script runs `wrangler preview` with `--ignore-base-config`, the revision tag, and JSON output.
-Stable publication uses `wrangler deploy` with the reviewed configuration.
+The script's `--site=docs` path remains a manual fallback for `main`.
+On other branches, the script skips the docs, because the `minsky-docs` build uploads their preview versions.
+The script publishes each Worker with `wrangler deploy` and the reviewed configuration.
 Docs deployment never reads app backend variables or configuration.
 A stable Cloudflare publication applies new development migrations. Bootstrap, secret creation, and approved activation remain separate operations.

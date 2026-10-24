@@ -1,0 +1,9 @@
+{
+  "accountId": "458ad6a930b0fb717796dfa19ca6a2b1",
+  "workerName": "minsky-preview",
+  "databaseName": "minsky-preview",
+  "databaseId": "3189b257-13f9-4e73-9bd1-bf211c7cbb25",
+  "bucketName": "minsky-preview-images",
+  "origin": "https://minsky-preview.icaic-minsky.workers.dev",
+  "placementRegion": "aws:ap-southeast-1"
+}

@@ -1,0 +1,67 @@
+{
+  "$schema": "../../../../../node_modules/wrangler/config-schema.json",
+  "name": "minsky-preview",
+  "main": "../applicationWorker.ts",
+  "account_id": "458ad6a930b0fb717796dfa19ca6a2b1",
+  "compatibility_date": "2026-10-13",
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "workers_dev": true,
+  "preview_urls": false,
+  "placement": {
+    "region": "aws:ap-southeast-1"
+  },
+  "limits": {
+    "cpu_ms": 1000
+  },
+  "observability": {
+    "enabled": false
+  },
+  "triggers": {
+    "crons": [
+      "* * * * *"
+    ]
+  },
+  "vars": {
+    "AUTH_ORIGIN": "https://minsky-preview.icaic-minsky.workers.dev"
+  },
+  "assets": {
+    "directory": "../../../../../dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": true
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "minsky-preview",
+      "database_id": "3189b257-13f9-4e73-9bd1-bf211c7cbb25",
+      "migrations_dir": "../../d1/migrations",
+      "remote": true
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "IMAGES",
+      "bucket_name": "minsky-preview-images",
+      "remote": true
+    }
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "LIVE_UPDATES",
+        "class_name": "SessionLiveCoordinator"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": [
+        "SessionLiveCoordinator"
+      ]
+    }
+  ]
+}

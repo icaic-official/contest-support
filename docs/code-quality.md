@@ -4,7 +4,8 @@ On 2026-10-02, the user selected mandatory CI, a short PR review checklist, and 
 These changes extend T0003.
 The user reviews and merges.
 Workers Builds publishes `main` to the `minsky-dev` development application after the checks pass in the same build.
-[Publish the application](cloudflare-builds.md#publish-the-application) describes that trigger.
+Branch previews on `minsky-preview` are switched off, because Workers Builds cannot limit their token to the preview resources.
+[Build and publication flow](cloudflare-builds.md#build-and-publication-flow) describes each trigger.
 
 ## Automated checks
 

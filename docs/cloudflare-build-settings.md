@@ -101,11 +101,11 @@ These settings take effect when the owner connects the trigger.
 | Setting | Value |
 | --- | --- |
 | Worker | `minsky-preview` |
-| Branches | Production branch `main`, which builds but does not publish. Builds for other branches are enabled. |
+| Branches | Production branch `main`, which builds but does not publish. Builds for other branches are enabled. Branches that match `dependabot/*` are excluded. |
 | Build command | `npm run ci` |
 | Deploy command | `npm run deploy` for every branch |
 | Root directory | Repository root |
-| API token | Account token in [Prepare the preview token](cloudflare-builds.md#prepare-the-preview-token). Never the `minsky-dev` token. |
+| API token | Account token in [Prepare the preview token](cloudflare-builds.md#prepare-the-preview-token), limited to `minsky-preview` and `minsky-preview-images`. Never the `minsky-dev` token. |
 | Build variables | `SKIP_DEPENDENCY_INSTALL=1`, `NODE_VERSION=22.23.2`, `CLOUDFLARE_ACCOUNT_ID`, `VITE_ENVIRONMENT=preview`, `MINSKY_PREVIEW_DATABASE_ID=3189b257-13f9-4e73-9bd1-bf211c7cbb25` |
 
 The preview resources are D1 database `minsky-preview` and private bucket `minsky-preview-images`, both in APAC.

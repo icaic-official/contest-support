@@ -43,7 +43,7 @@ A preview runs branch code that nobody has reviewed yet. It must not change the 
 So app previews use a separate Worker, `minsky-preview`, with its own resources and token:
 
 - D1 database `minsky-preview` and private bucket `minsky-preview-images`. They hold only test data.
-- A build token that cannot publish `minsky-dev`.
+- A build token that cannot publish `minsky-dev` and reaches only the preview database and bucket.
 - `minsky-dev` builds only `main`. Its token never runs branch code.
 
 Cloudflare preview URLs stay disabled on both Workers. Cloudflare does not create them for Workers that use a Durable Object.
@@ -244,7 +244,7 @@ The script sets `VITE_BACKEND=cloudflare` and guards the complete Worker:
 
 - The app needs its API code, D1 database, private R2 bucket, and live coordinator. The script has no assets-only upload path that could remove them.
 - It validates the generated configuration and exact hosted targets before upload. After upload, it checks the published targets, live bindings, and an anonymous rejection at the authentication API.
-- It publishes the app only from `main`. Other branches, including Dependabot branches, skip the app.
+- On `minsky-dev`, it publishes the app only from `main`. On `minsky-preview`, it publishes every other branch that the trigger builds. See [Publish branch previews](#publish-branch-previews).
 
 These checks do not verify authenticated behavior. The installation and activation procedures require the full application checks.
 A broken application target cannot block the docs, because Workers Builds publishes them separately.
@@ -265,7 +265,8 @@ With `VITE_ENVIRONMENT=preview` on a branch, it runs the steps in [Publish the a
 3. Stop if any `MINSKY_DEV_*` variable is set. Those variables belong to the `minsky-dev` build.
 4. Stop unless the committed configuration names Worker `minsky-preview`, database `minsky-preview`, bucket `minsky-preview-images`, and the database ID in `MINSKY_PREVIEW_DATABASE_ID`.
 5. Confirm the account, the database, the private bucket, and the `AUTH_SECRET` name. Record a restore point.
-6. Apply new migrations to `minsky-preview`. Stop if its applied migrations differ from the checkout.
+6. Apply new migrations to `minsky-preview`. Stop if the database lacks a migration from the checkout.
+   Migrations that other branches applied are accepted, because every migration only adds schema.
 7. Publish the Worker `minsky-preview` with `wrangler deploy`. Verify its revision, bindings, and an anonymous `401`.
 
 The configuration is `src/server/adapters/cloudflare/deploy/preview.wrangler.jsonc`.
@@ -276,21 +277,27 @@ The configuration is `src/server/adapters/cloudflare/deploy/preview.wrangler.jso
 The `minsky-preview` Worker must exist before you can limit a token to it.
 It exists since 2026-10-24, with `AUTH_SECRET`, all migrations, and a test admin account.
 Until its first build, it serves a placeholder that returns `503`. A local `wrangler deploy` through an authenticating proxy cannot upload static assets, so the first full publication runs in Workers Builds.
+Every branch that the trigger builds runs its own code with this token. That includes code that nobody has reviewed, Dependabot updates, and the npm packages that they install.
+The checks in `scripts/deploy-workers.mjs` and `scripts/ci.mjs` are branch code too. A branch can change them. So only the token's permissions keep branch code away from development data.
+
 Create an account API token in **Manage Account > Account API Tokens > Create token > Custom token**:
 
 - **Workers**: **Editor**. Set the scope to **Specified Workers** and select only `minsky-preview`.
-- **D1**: **Edit**. If the form lets you select databases, select only `minsky-preview`.
-- **Workers R2 Storage**: **Read**. If the form lets you select buckets, select only `minsky-preview-images`.
+- **D1**: **Edit**. Select only database `minsky-preview`.
+- **Workers R2 Storage**: **Read**. Select only bucket `minsky-preview-images`.
 - **Account Settings**: **Read**.
 
-Do not use the `minsky-dev` token. If the form cannot limit D1 to one database, the token can also reach other databases in the account through the API.
-Only people who can push to the repository can run branch code with it.
+Do not use the `minsky-dev` token.
+If the form cannot limit D1 to `minsky-preview` and R2 to `minsky-preview-images`, do not create the token and do not connect the trigger.
+A wider token lets any branch read or change `minsky-development` through the API.
+In that case, the preview needs its own Cloudflare account. That is an account decision for the owner.
 
 ### Connect the preview Worker
 
 1. Open **Workers & Pages > minsky-preview > Settings > Build**.
 2. Connect GitHub repository `GiftedNovaHD/minsky`.
 3. Set the production branch to `main`. Enable builds for non-production branches.
+   Exclude branches that match `dependabot/*`. Dependabot branches install package updates that nobody has reviewed. `minsky-ci` still checks them.
 4. Set the build command to `npm run ci`.
 5. Set the deploy command and the non-production branch deploy command to `npm run deploy`.
 6. Leave the root directory empty.
@@ -323,7 +330,11 @@ Sign in with the preview test account. Its credentials are in a private file out
 ### Reset the preview data
 
 All branches share `minsky-preview`. A branch can apply a migration that another branch does not have.
-The other branch's build then stops at the migration comparison.
+The other branch's build still publishes, because its code runs against the added schema.
+The preview database keeps that schema after the branch is merged, renamed, or deleted.
+
+A build stops at the migration comparison only when the database still lacks a migration from its checkout after the apply step. Inspect the applied migrations before you build again.
+The comparison checks names only. If you change a migration after a build applied it, the preview keeps the old version. Add a new migration instead, or reset the preview data.
 
 To reset the preview data, find `Restore point before migrations:` in an earlier `minsky-preview` build log.
 Run the `npx wrangler d1 time-travel restore minsky-preview` command from that line. Then build the branch again.

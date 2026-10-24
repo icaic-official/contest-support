@@ -52,8 +52,12 @@ export async function assertAdditiveMigrations({
   }
 }
 
-/** Require the checkout's complete schema before enabling or changing accounts. */
-export async function assertCurrentMigrations(settings, runWrangler) {
+/**
+ * Require the checkout's complete schema before enabling or changing accounts.
+ * With allowExtra, the database may also have migrations that this checkout does not have.
+ * Migrations only add schema, so the checkout's code still runs against them.
+ */
+export async function assertCurrentMigrations(settings, runWrangler, { allowExtra = false } = {}) {
   const expected = await currentMigrationNames();
   let applied;
   try {
@@ -66,7 +70,8 @@ export async function assertCurrentMigrations(settings, runWrangler) {
   } catch {
     throw new Error('The hosted migration list could not be confirmed. No operation started.');
   }
-  if (JSON.stringify(applied) !== JSON.stringify(expected)) {
+  const missing = expected.some((name) => !applied.includes(name));
+  if (missing || (!allowExtra && applied.length !== expected.length)) {
     throw new Error('The hosted migrations differ from this checkout. Apply the reviewed migrations before continuing.');
   }
 }

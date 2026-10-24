@@ -12,6 +12,50 @@ Earlier sections that say Supabase remains active describe the decision on that 
 The 2026-10-23 decision supersedes those statements.
 This record does not read or change the live deployment.
 
+## T0006 announcement port, 2026-10-24
+
+This run ports T0006 session announcements from [PR #20](https://github.com/GiftedNovaHD/minsky/pull/20) to current `main` at `ecc75e2`.
+It supersedes PR #20, which targeted an older `main` and only Supabase. The owner closes PR #20 after the new PR passes.
+The branch is `feature/t0006-session-announcements-port`. See [session announcements](session-announcements.md) and the [T0006 ticket](tickets.md#t0006--session-announcements).
+The branch was later updated from `main` at `70fafa8`.
+Nothing is deployed. No migration, function, secret, or hosted resource changed.
+
+### Local verification
+
+| Check | Result |
+| --- | --- |
+| `npm run typecheck`, `npm run lint`, `npm run build` | Pass. The build keeps its large-chunk warning. |
+| `npm run check:functions` | Pass for the new `announcement-images` function and the workflow function. |
+| `npm run test:functions` | 19 Deno cases pass. 7 are new. They cover retained files after failed and overlapping completion. |
+| `npm test` | 782 unit, embedded-database, and tooling cases pass in five consecutive runs. New cases cover both D1 and R2 services, the HTTP routes, the Supabase migration and policies in embedded PostgreSQL, both browser adapters, and draft and expiry rules. |
+| `npm run test:d1` | 70 cases pass. |
+| `npx playwright test --workers=2` | 92 cases pass. 5 are new. They cover live titles, keyboard disclosure, a report draft during a live change, a slow read during reporting, removal, competing edits with both review choices, and a 390 px layout. |
+| `npm run docs:build`, both `npm audit` runs, Gitleaks | Pass. No vulnerabilities and no leaks. |
+
+I ran each step of `npm run ci` separately to avoid reinstalling dependencies.
+The browser cases use embedded PostgreSQL with simulated Auth, HTTP, and Realtime. They do not transfer images.
+
+Two existing tests had a 5-second default timeout and failed under load.
+`testMetrics.test.ts` and `provider-boundaries.test.mjs` now use longer limits.
+They failed intermittently under parallel load once this branch added more suites. I did not measure `main`.
+
+### Review fixes
+
+A review after the update from `main` found these defects. Each fix has a regression test unless stated.
+
+- The Cloudflare route passed `action` into the strict image reservation schema, so every announcement image upload failed. The route now passes only the reservation fields. The route test checks the exact service input.
+- The image view downloaded every image again on each poll and live change, because each snapshot parses new objects. It now downloads only when the image identity changes. No browser test covers this.
+- On Supabase, removing an image of a removed announcement changed that announcement's attribution and revision. Removal could also mark another uploader's pending image as removed while its file was still being stored. Removal now accepts only ready images and leaves a removed announcement unchanged, as D1 does.
+- On Cloudflare, a file name over 200 characters was rejected with a size message. It is now shortened to 200 characters, as on Supabase.
+- The specification now states that managers can still remove the images of a removed announcement. The code and the Cloudflare tests already allowed it. The Supabase cleanup limit is now documented.
+
+### Not verified
+
+- Hosted Supabase and hosted Cloudflare behavior, including R2 transfers and Durable Object delivery.
+- Image upload in a browser. Service, database, function, and adapter tests cover its parts. No test runs the Cloudflare browser adapter, HTTP route, and image service together.
+- The shared provider test bridge. It reports that it does not cover announcements.
+- Other browsers, screen readers, 200% zoom, and physical devices. [Manual checks](manual-verification.md#15-session-announcements-t0006) list them.
+
 ## Docs publication through Workers Builds, 2026-10-24
 
 The owner asked for the documentation site to publish through Workers Builds, with previews, in [PR #48](https://github.com/GiftedNovaHD/minsky/pull/48).

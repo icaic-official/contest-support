@@ -143,7 +143,7 @@ These commands connect to provider accounts. Several of them change hosted data 
 | `npm run cloud:login` and `npm run cloud:link` | Sign in to Supabase and link the Supabase provider's development project. |
 | `npm run cloud:plan` | Show the migrations that `cloud:migrate` would apply. |
 | `npm run cloud:migrate` | Apply migrations to the linked project. |
-| `npm run cloud:functions` | Deploy the `admin` and `attachments` functions to the development project. |
+| `npm run cloud:functions` | Deploy the `admin`, `attachments`, and `announcement-images` functions to the development project. |
 | `npm run cloud:bootstrap` | Make the first session admin. |
 | `npm run cloud:recover-admin` | Reset a Supabase provider administrator when that provider's only admin cannot sign in. |
 | `npm run cloudflare:recover-admin` | Reset the password of an existing Cloudflare admin. Prints the temporary password once in that terminal. |

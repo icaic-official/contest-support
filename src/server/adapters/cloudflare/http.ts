@@ -6,6 +6,8 @@ import { AuthenticationError, type AuthenticationService, type Caller } from '..
 import type { WorkflowService } from '../../workflow';
 import type { D1ApplicationService } from './application';
 import type { R2ImageService } from './images';
+import { AnnouncementCommandError, type D1AnnouncementService } from './announcements';
+import type { R2AnnouncementImageService } from './announcementImages';
 
 const uuid = z.uuid();
 const member = z.strictObject({ teamId: uuid.nullable(), roles: z.array(roleSchema).max(3), isAdmin: z.boolean() });
@@ -22,6 +24,15 @@ const imageSchema = z.discriminatedUnion('action', [
   z.strictObject({ action: z.enum(['finish', 'remove', 'abandon']), sessionId: uuid, attachmentId: uuid }),
 ]);
 
+const announcementSchema = z.strictObject({ sessionId: uuid, requestId: uuid, command: z.unknown() });
+const announcementImageSchema = z.discriminatedUnion('action', [
+  z.strictObject({ action: z.literal('begin'), sessionId: uuid, requestId: uuid, announcementId: uuid,
+    name: z.string(), bytes: z.number() }),
+  z.strictObject({ action: z.enum(['finish', 'remove', 'abandon']), sessionId: uuid, imageId: uuid }),
+]);
+// Announcement text can use 10,000 characters of up to four bytes each.
+const announcementBodyLimit = 65_536;
+
 export const privateHeaders = {
   'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff',
   'Referrer-Policy': 'no-referrer', 'Vary': 'Origin, Cookie',
@@ -36,6 +47,8 @@ export interface ApplicationHttpServices {
   application: Pick<D1ApplicationService, 'sessions' | 'snapshot' | 'setIntake' | 'setImageLimits' | 'saveMember' | 'removeMember'>;
   workflow: Pick<WorkflowService, 'execute'>;
   images: Pick<R2ImageService, 'begin' | 'upload' | 'finish' | 'remove' | 'download'>;
+  announcements: Pick<D1AnnouncementService, 'snapshot' | 'execute'>;
+  announcementImages: Pick<R2AnnouncementImageService, 'begin' | 'upload' | 'finish' | 'remove' | 'download'>;
   connect(request: Request, caller: Caller, sessionId: string): Promise<Response>;
 }
 
@@ -65,6 +78,13 @@ export function createApplicationHandler(services: ApplicationHttpServices, orig
           }
           return services.connect(request, caller, sessionId);
         }
+        if (url.pathname === '/api/announcements') {
+          return privateJson(await services.announcements.snapshot(caller, uuid.parse(url.searchParams.get('sessionId'))));
+        }
+        if (url.pathname.startsWith('/api/announcement-image/')) {
+          const image = await services.announcementImages.download(caller, decodeURIComponent(url.pathname.slice('/api/announcement-image/'.length)));
+          return new Response(image.body, { headers: { ...privateHeaders, 'Content-Type': image.contentType } });
+        }
         if (url.pathname.startsWith('/api/image/')) {
           const image = await services.images.download(caller, decodeURIComponent(url.pathname.slice('/api/image/'.length)));
           return new Response(image.body, { headers: { ...privateHeaders, 'Content-Type': image.contentType } });
@@ -76,22 +96,48 @@ export function createApplicationHandler(services: ApplicationHttpServices, orig
         throw new AuthenticationError(403, 'The request protection checks failed.');
       }
       if (request.method === 'PUT') {
-        if (!url.pathname.startsWith('/api/image/')) return privateJson({ error: 'The endpoint does not exist.' }, 404);
+        const announcement = url.pathname.startsWith('/api/announcement-image/');
+        if (!announcement && !url.pathname.startsWith('/api/image/')) return privateJson({ error: 'The endpoint does not exist.' }, 404);
         const lengthHeader = request.headers.get('Content-Length');
         if (lengthHeader === null || !/^[1-9][0-9]*$/.test(lengthHeader)) return privateJson({ error: 'An image transfer requires its exact length.' }, 411);
-        await services.images.upload(caller, decodeURIComponent(url.pathname.slice('/api/image/'.length)), request.body,
+        const prefix = announcement ? '/api/announcement-image/' : '/api/image/';
+        await (announcement ? services.announcementImages : services.images).upload(caller,
+          decodeURIComponent(url.pathname.slice(prefix.length)), request.body,
           request.headers.get('Content-Type') ?? '', request.headers.get('X-Minsky-Digest') ?? '', Number(lengthHeader));
         return privateJson({});
       }
       if (request.headers.get('Content-Type')?.split(';')[0].trim().toLowerCase() !== 'application/json') {
         throw new AuthenticationError(400, 'A JSON request body is required.');
       }
-      const body = await readJsonBody(request);
+      const body = await readJsonBody(request, url.pathname === '/api/announcements' ? announcementBodyLimit : undefined);
       if (url.pathname === '/api/workflow') {
         const parsed = workflowSchema.safeParse(body);
         if (!parsed.success) return privateJson({ outcome: 'rejected', reason: 'input' }, 400);
         const result = await services.workflow.execute(caller, parsed.data.sessionId, parsed.data.requestId, parsed.data.command);
         return privateJson(result, result.outcome === 'committed' ? 200 : result.outcome === 'rejected' ? 409 : 503);
+      }
+      if (url.pathname === '/api/announcements') {
+        const parsed = announcementSchema.safeParse(body);
+        if (!parsed.success) return privateJson({ outcome: 'rejected', reason: 'input' }, 400);
+        try {
+          return privateJson({ outcome: 'committed', id: await services.announcements.execute(
+            caller, parsed.data.sessionId, parsed.data.requestId, parsed.data.command) });
+        } catch (error) {
+          if (!(error instanceof AnnouncementCommandError)) throw error;
+          return privateJson({ outcome: 'rejected', reason: error.reason, error: error.message }, error.reason === 'input' ? 400 : 409);
+        }
+      }
+      if (url.pathname === '/api/announcement-images') {
+        const command = announcementImageSchema.parse(body);
+        if (command.action === 'begin') {
+          return privateJson(await services.announcementImages.begin(caller, {
+            sessionId: command.sessionId, requestId: command.requestId, announcementId: command.announcementId,
+            name: command.name, bytes: command.bytes,
+          }));
+        }
+        if (command.action === 'finish') await services.announcementImages.finish(caller, command.sessionId, command.imageId);
+        else await services.announcementImages.remove(caller, command.sessionId, command.imageId, command.action === 'abandon');
+        return privateJson({});
       }
       if (url.pathname === '/api/admin') {
         const command = adminSchema.parse(body);

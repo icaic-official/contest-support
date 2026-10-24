@@ -52,6 +52,39 @@ const imageSql = `SELECT x.*, i.team_id, s.max_image_bytes, s.max_images_per_iss
   JOIN (${currentAccessSql}) c ON c.staff = 1 OR c.team_id = i.team_id OR (? = 1 AND x.uploader = c.account_id)
   WHERE x.session_id = ? AND x.id = ?`;
 
+/** Remove control characters and path separators from an uploaded file name. */
+export function cleanImageName(name: string): string {
+  return name.trim().replace(/\p{Cc}/gu, '').replace(/[/\\]/g, '-');
+}
+
+/**
+ * Store a transfer at most once and confirm that the stored object is this transfer.
+ * R2 verifies SHA-256. A conditional retry never deletes a different, earlier object.
+ */
+export async function putVerifiedImage(bucket: PrivateBucket, path: string, body: ReadableStream<Uint8Array>,
+  file: { contentType: string; digest: string; length: number }, restart: string): Promise<void> {
+  const object = await bucket.put(path, body, {
+    onlyIf: { etagDoesNotMatch: '*' }, sha256: file.digest,
+    httpMetadata: { contentType: file.contentType, cacheControl: 'private, no-store' }, customMetadata: { digest: file.digest },
+  });
+  const existing = await bucket.get(path, { range: { offset: 0, length: 16 } });
+  const matches = existing?.customMetadata?.digest === file.digest && existing.size === file.length;
+  if (existing) await existing.body.cancel();
+  if (!matches) {
+    if (object !== null) await bucket.delete([path]);
+    throw new ImageRequestError(`The stored image does not match this transfer. ${restart}`, { restart: true });
+  }
+}
+
+/** Read a stored image's size, signature, and digest without downloading it. */
+export async function storedImage(bucket: PrivateBucket, path: string): Promise<{ size: number; kind: string; digest: string }> {
+  const object = await bucket.get(path, { range: { offset: 0, length: 16 } });
+  if (!object) throw new ImageRequestError('Upload the image before finishing.', { incomplete: true });
+  const kind = imageKind(new Uint8Array(await object.arrayBuffer()));
+  if (!kind || !object.customMetadata?.digest) throw new ImageRequestError('Choose a JPEG, PNG, or WebP image.', { validation: true });
+  return { size: object.size, kind, digest: object.customMetadata.digest };
+}
+
 export class R2ImageService {
   constructor(private readonly db: D1Connection, private readonly bucket: PrivateBucket) {}
 
@@ -99,7 +132,7 @@ export class R2ImageService {
     const parsed = beginSchema.safeParse(input);
     if (!parsed.success) throw new ImageRequestError('Choose valid image details.', { validation: true });
     const value = parsed.data;
-    const cleanName = value.name.trim().replace(/\p{Cc}/gu, '').replace(/[/\\]/g, '-');
+    const cleanName = cleanImageName(value.name);
     if (!cleanName.trim()) throw new ImageRequestError('Choose a JPEG, PNG, or WebP image.', { validation: true });
     const repeat = async (): Promise<StartedImage | undefined> => {
       const prior = await this.statement(`SELECT x.id FROM issue_images x JOIN (${currentAccessSql}) c ON c.staff = 1
@@ -163,18 +196,7 @@ export class R2ImageService {
     // Forward the original HTTP body. R2 requires a stream with a known length.
     // The HTTP boundary requires Content-Length, and R2 verifies SHA-256 itself.
     try {
-      const object = await this.bucket.put(path, body, {
-        onlyIf: { etagDoesNotMatch: '*' }, sha256: digest,
-        httpMetadata: { contentType, cacheControl: 'private, no-store' }, customMetadata: { digest },
-      });
-      const existing = await this.bucket.get(path, { range: { offset: 0, length: 16 } });
-      const matches = existing?.customMetadata?.digest === digest && existing.size === length;
-      if (existing) await existing.body.cancel();
-      if (!matches) {
-        // A conditional retry must never delete a different, earlier object.
-        if (object !== null) await this.bucket.delete([path]);
-        throw new ImageRequestError('The stored image does not match this transfer. Start a new image upload.', { restart: true });
-      }
+      await putVerifiedImage(this.bucket, path, body, { contentType, digest, length }, 'Start a new image upload.');
       const after = await this.image(caller, sessionId, id, true);
       if (!['pending', 'ready'].includes(after.state) || after.state === 'pending' && after.expired) {
         throw new ImageRequestError('Start a new image upload.', { restart: true });
@@ -195,14 +217,6 @@ export class R2ImageService {
     }
   }
 
-  private async stored(path: string): Promise<{ size: number; kind: string; digest: string }> {
-    const object = await this.bucket.get(path, { range: { offset: 0, length: 16 } });
-    if (!object) throw new ImageRequestError('Upload the image before finishing.', { incomplete: true });
-    const kind = imageKind(new Uint8Array(await object.arrayBuffer()));
-    if (!kind || !object.customMetadata?.digest) throw new ImageRequestError('Choose a JPEG, PNG, or WebP image.', { validation: true });
-    return { size: object.size, kind, digest: object.customMetadata.digest };
-  }
-
   private activity(row: Image, caller: Caller, text: string): D1Statement[] {
     const visible = row.visibility === 'public';
     return [
@@ -217,7 +231,7 @@ export class R2ImageService {
     const row = await this.image(caller, sessionId, id, true);
     if (row.state === 'ready') return;
     if (row.state !== 'pending' || row.expired) throw new ImageRequestError('Start a new image upload.', { restart: true });
-    const [original, thumb] = await Promise.all([this.stored(row.original_path), this.stored(row.thumbnail_path)]);
+    const [original, thumb] = await Promise.all([storedImage(this.bucket, row.original_path), storedImage(this.bucket, row.thumbnail_path)]);
     if (!original.size || original.size > row.declared_bytes || thumb.size < 1 || thumb.size > THUMBNAIL_BYTES) {
       throw new ImageRequestError('Choose a JPEG, PNG, or WebP image within the reserved size.', { validation: true });
     }

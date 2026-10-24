@@ -1,6 +1,8 @@
 import { z } from 'zod';
-import type { Backend, LiveUpdates } from '../contracts';
-import { ImageRequestError, WorkflowRejectedError } from '../errors';
+import type { Announcements, Backend, LiveUpdates } from '../contracts';
+import { AnnouncementRejectedError, ImageRequestError, WorkflowRejectedError } from '../errors';
+import { announcementSnapshotSchema } from '../../connected/announcementModel';
+import { imageKind } from '../../connected/imageFile';
 import { snapshotSchema } from '../../connected/model';
 import { createCloudflareAuthentication } from './authentication';
 
@@ -12,6 +14,15 @@ const workflowSchema = z.discriminatedUnion('outcome', [
   z.object({ outcome: z.literal('rejected'), reason: z.enum(['input', 'access', 'state', 'request_id']) }),
   z.object({ outcome: z.literal('unknown') }),
 ]);
+const announcementResultSchema = z.discriminatedUnion('outcome', [
+  z.object({ outcome: z.literal('committed'), id: z.uuid() }),
+  z.object({
+    outcome: z.literal('rejected'),
+    reason: z.enum(['input', 'access', 'state', 'conflict', 'request_id']),
+    error: z.string().optional(),
+  }),
+]);
+const reservedSchema = z.object({ id: z.uuid(), path: z.string() });
 const failureSchema = z.object({
   error: z.string(), validation: z.boolean().optional(),
   restart: z.boolean().optional(), incomplete: z.boolean().optional(),
@@ -68,9 +79,63 @@ export function createCloudflareBackend(options: {
     return body;
   }
 
+  function announcementImagePath(path: string): string {
+    return `/api/announcement-image/${path.split('/').map(encodeURIComponent).join('/')}`;
+  }
+
   function imagePath(path: string): string {
     return `/api/image/${path.split('/').map(encodeURIComponent).join('/')}`;
   }
+
+  /** The Worker requires the SHA-256 digest of the exact bytes, and R2 checks it again. */
+  async function putImage(url: string, body: Blob, contentType: string, bytes: ArrayBuffer): Promise<void> {
+    const digest = await crypto.subtle.digest('SHA-256', bytes);
+    const headers = await csrfHeaders(contentType);
+    headers.set('X-Minsky-Digest', Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join(''));
+    await imageResult(await send(url, { method: 'PUT', headers, body }));
+  }
+
+  const announcements: Announcements = {
+    async snapshot(sessionId, signal) {
+      return announcementSnapshotSchema.parse(await readJson(await send(
+        `/api/announcements?sessionId=${encodeURIComponent(sessionId)}`, { signal })));
+    },
+    async execute(sessionId, requestId, command) {
+      const response = await post('/api/announcements', { sessionId, requestId, command });
+      const result = announcementResultSchema.safeParse(await response.json().catch(() => undefined));
+      // Only the endpoint's typed rejection confirms that no command committed.
+      if (result.success && result.data.outcome === 'rejected') {
+        throw new AnnouncementRejectedError(result.data.error ?? 'Check the announcement and try again.',
+          result.data.reason === 'conflict');
+      }
+      if (!response.ok || !result.success || result.data.outcome !== 'committed') {
+        throw new Error('Announcement outcome is unknown. Retry the same request.');
+      }
+      return result.data.id;
+    },
+    async uploadImage({ sessionId, announcementId, requestId, file, onProgress }) {
+      const bytes = await file.arrayBuffer();
+      const kind = imageKind(new Uint8Array(bytes, 0, Math.min(16, bytes.byteLength)));
+      if (!kind) throw new ImageRequestError('Choose a JPEG, PNG, or WebP image.', { validation: true });
+      const started = reservedSchema.parse(await imageResult(await post('/api/announcement-images',
+        { action: 'begin', sessionId, announcementId, requestId, name: file.name, bytes: file.size })));
+      onProgress(0);
+      await putImage(announcementImagePath(started.path), file, kind, bytes);
+      onProgress(100);
+      await imageResult(await post('/api/announcement-images', { action: 'finish', sessionId, imageId: started.id }));
+    },
+    async removeImage(sessionId, imageId) {
+      await imageResult(await post('/api/announcement-images', { action: 'remove', sessionId, imageId }));
+    },
+    async downloadImage(image) {
+      const response = await send(announcementImagePath([image.session_id, 'announcements', image.announcement_id, image.id].join('/')));
+      if (!response.ok) {
+        await imageResult(response);
+        throw new ImageRequestError('This announcement image could not be opened.');
+      }
+      return response.blob();
+    },
+  };
 
   const updates: LiveUpdates = {
     subscribe(input) {
@@ -170,13 +235,7 @@ export function createCloudflareBackend(options: {
     images: {
       async begin(input) { return startedSchema.parse(await imageResult(await post('/api/images', { action: 'begin', ...input }))); },
       async upload(path, body, contentType, onProgress) {
-        const digest = await crypto.subtle.digest('SHA-256', await body.arrayBuffer());
-        const headers = await csrfHeaders(contentType);
-        headers.set('X-Minsky-Digest', Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join(''));
-        const response = await send(imagePath(path), {
-          method: 'PUT', headers, body,
-        });
-        await imageResult(response);
+        await putImage(imagePath(path), body, contentType, await body.arrayBuffer());
         onProgress(body.size);
       },
       async finish(sessionId, attachmentId) { await imageResult(await post('/api/images', { action: 'finish', sessionId, attachmentId })); },
@@ -191,6 +250,7 @@ export function createCloudflareBackend(options: {
         return response.blob();
       },
     },
+    announcements,
     updates,
   };
 }

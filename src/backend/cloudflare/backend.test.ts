@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createCloudflareBackend } from './backend';
 import type { Backend } from '../contracts';
-import { ImageRequestError, WorkflowRejectedError } from '../errors';
+import { AnnouncementRejectedError, ImageRequestError, WorkflowRejectedError } from '../errors';
 
 const origin = 'https://connector.example';
 const sessionId = '49c15a39-79ec-4597-bad6-2b949cfe32b2';
@@ -153,5 +153,83 @@ describe('Cloudflare Backend transport', () => {
     expect(change).toHaveBeenCalledTimes(1);
     expect(factory).toHaveBeenCalledTimes(3);
     expect(factory.mock.calls[0][0]).toBe(`wss://connector.example/api/updates?sessionId=${sessionId}`);
+  });
+
+  describe('announcements', () => {
+    const announcementId = 'a8b7eb54-d82c-4f7a-a35c-bf9d4a5fca2d';
+    const imageId = '5f9d54ec-40a8-4b32-95c6-2f9a1f8b1f9c';
+    const publish = { type: 'publish' as const, title: 'Fictional', details: 'Details.', expires_at: null };
+    const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3]);
+
+    it('validates snapshots and passes cancellation to the request', async () => {
+      const fetcher = transport(() => Response.json({ announcements: [], images: [], server_time: '2026-10-24T00:00:00.000Z' }));
+      const controller = new AbortController();
+      const snapshot = await createCloudflareBackend({ origin, fetch: fetcher }).announcements.snapshot(sessionId, controller.signal);
+      expect(snapshot.announcements).toEqual([]);
+      const request = fetcher.mock.calls.at(-1)!;
+      expect(String(request[0])).toBe(`${origin}/api/announcements?sessionId=${sessionId}`);
+      expect(request[1]?.signal).toBe(controller.signal);
+      const invalid = createCloudflareBackend({ origin, fetch: transport(() => Response.json({ announcements: 'x' })) });
+      await expect(invalid.announcements.snapshot(sessionId)).rejects.toThrow();
+    });
+
+    it('treats only typed rejections as confirmed and marks revision conflicts', async () => {
+      const send = (reply: () => Response) =>
+        createCloudflareBackend({ origin, fetch: transport(reply) }).announcements.execute(sessionId, requestId, publish);
+      await expect(send(() => Response.json({ outcome: 'committed', id: announcementId }))).resolves.toBe(announcementId);
+      const conflict = send(() => Response.json({ outcome: 'rejected', reason: 'conflict', error: 'Announcement changed.' }, { status: 409 }));
+      await expect(conflict).rejects.toMatchObject({ conflict: true, message: 'Announcement changed.' });
+      await expect(send(() => Response.json({ outcome: 'rejected', reason: 'access', error: 'No.' }, { status: 409 })))
+        .rejects.toMatchObject({ conflict: false });
+      await expect(send(() => Response.json({ outcome: 'rejected', reason: 'access', error: 'No.' }, { status: 409 })))
+        .rejects.toBeInstanceOf(AnnouncementRejectedError);
+      for (const unknown of [() => new Response('gateway', { status: 502 }), () => Response.json({ outcome: 'committed' }),
+        () => Response.json({}, { status: 503 })]) {
+        const failure = send(unknown);
+        await expect(failure).rejects.toThrow('outcome is unknown');
+        await expect(failure).rejects.not.toBeInstanceOf(WorkflowRejectedError);
+      }
+    });
+
+    it('reserves, transfers with a SHA-256 digest, then finishes an image', async () => {
+      const calls: Array<{ method: string; path: string; headers: Headers; body?: BodyInit | null }> = [];
+      const fetcher = vi.fn<typeof fetch>(async (input, init) => {
+        const url = new URL(String(input));
+        calls.push({ method: init?.method ?? 'GET', path: url.pathname, headers: new Headers(init?.headers), body: init?.body });
+        if (url.pathname === '/api/auth/session') return Response.json({ csrf: 'fresh-token' });
+        if (init?.method === 'PUT') return Response.json({});
+        const body = JSON.parse(String(init?.body));
+        return body.action === 'begin' ? Response.json({ id: imageId, path: `${sessionId}/announcements/${announcementId}/${imageId}` }) : Response.json({});
+      });
+      const progress = vi.fn();
+      await createCloudflareBackend({ origin, fetch: fetcher }).announcements.uploadImage({
+        sessionId, announcementId, requestId, file: new File([png], 'board.png', { type: 'image/png' }), onProgress: progress,
+      });
+      const put = calls.find((call) => call.method === 'PUT')!;
+      expect(put.path).toBe(`/api/announcement-image/${sessionId}/announcements/${announcementId}/${imageId}`);
+      expect(put.headers.get('Content-Type')).toBe('image/png');
+      expect(put.headers.get('X-Minsky-Digest')).toMatch(/^[0-9a-f]{64}$/);
+      expect(put.headers.get('X-CSRF-Token')).toBe('fresh-token');
+      expect(calls.filter((call) => call.path === '/api/announcement-images').map((call) => JSON.parse(String(call.body)).action))
+        .toEqual(['begin', 'finish']);
+      expect(progress).toHaveBeenLastCalledWith(100);
+      const rejected = vi.fn<typeof fetch>();
+      await expect(createCloudflareBackend({ origin, fetch: rejected }).announcements.uploadImage({
+        sessionId, announcementId, requestId, file: new File([new Uint8Array(32)], 'note.txt'), onProgress: progress,
+      })).rejects.toMatchObject({ validation: true });
+      expect(rejected).not.toHaveBeenCalled();
+    });
+
+    it('classifies announcement image failures and downloads through the access-checked route', async () => {
+      const failing = createCloudflareBackend({ origin, fetch: transport(() => Response.json(
+        { error: 'Upload the image before finishing.', incomplete: true }, { status: 409 })) });
+      await expect(failing.announcements.removeImage(sessionId, imageId)).rejects.toBeInstanceOf(ImageRequestError);
+      const fetcher = transport(() => new Response(png, { headers: { 'Content-Type': 'image/png' } }));
+      const blob = await createCloudflareBackend({ origin, fetch: fetcher }).announcements.downloadImage(
+        { id: imageId, session_id: sessionId, announcement_id: announcementId });
+      expect(blob.size).toBe(png.byteLength);
+      expect(String(fetcher.mock.calls.at(-1)![0])).toBe(
+        `${origin}/api/announcement-image/${sessionId}/announcements/${announcementId}/${imageId}`);
+    });
   });
 });

@@ -25,7 +25,8 @@ test('UI static imports, re-exports, and literal dynamic imports reject provider
       assert.equal((await boundaryErrors(code)).length, 1, code);
     }
   }
-});
+// Each of the 48 cases lints with type information. A busy runner can pass 5 seconds.
+}, 60_000);
 
 test('UI uses shared contracts, errors, the selected backend, and ordinary lazy imports', async () => {
   for (const module of ['../backend', '../backend/index', '../backend/index.ts',

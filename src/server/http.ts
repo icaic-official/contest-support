@@ -1,7 +1,7 @@
 import { AuthenticationError } from './authentication';
 
 /** Read a bounded body before JSON parsing. Do not retain request credentials. */
-export async function readJsonBody(request: Request): Promise<unknown> {
+export async function readJsonBody(request: Request, limit = 16_384): Promise<unknown> {
   const reader = request.body?.getReader();
   if (!reader) throw new AuthenticationError(400, 'A JSON request body is required.');
   const chunks: Uint8Array[] = [];
@@ -11,7 +11,7 @@ export async function readJsonBody(request: Request): Promise<unknown> {
       const { value, done } = await reader.read();
       if (done) break;
       size += value.byteLength;
-      if (size > 16_384) {
+      if (size > limit) {
         await reader.cancel();
         throw new AuthenticationError(400, 'The request body is too large.');
       }

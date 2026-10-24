@@ -108,6 +108,13 @@ export function createBrowserProvider(configuration: unknown): BrowserProvider {
         return image;
       },
     },
+    announcements: {
+      snapshot: async () => unsupported(),
+      execute: async () => unsupported(),
+      uploadImage: async () => unsupported(),
+      removeImage: async () => unsupported(),
+      downloadImage: async () => unsupported(),
+    },
     updates: {
       subscribe(input) {
         changes.add(input.onChange);

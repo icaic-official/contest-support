@@ -6,7 +6,7 @@ import {
   type User,
 } from '@supabase/supabase-js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { WorkflowRejectedError } from '../errors';
+import { AnnouncementRejectedError, WorkflowRejectedError } from '../errors';
 import { createSupabaseBackend } from './backend';
 
 const USER_ID = '00000000-0000-4000-8000-000000000001';
@@ -446,5 +446,48 @@ describe('Supabase live updates adapter', () => {
     for (const [, , callback] of on.mock.calls) callback({});
     expect(onChange).not.toHaveBeenCalled();
     expect(onConnection).not.toHaveBeenCalled();
+  });
+});
+
+describe('Supabase announcement adapter', () => {
+  const ANNOUNCEMENT_ID = '00000000-0000-4000-8000-000000000200';
+  const publish = { type: 'publish' as const, title: 'Fictional', details: 'Details.', expires_at: null };
+
+  it('calls the announcement RPCs with the caller request ID and classifies rejections', async () => {
+    const { backend, requests } = setup(() => json(ANNOUNCEMENT_ID));
+    await expect(backend.announcements.execute(SESSION_ID, REQUEST_ID, publish)).resolves.toBe(ANNOUNCEMENT_ID);
+    expect(new URL(requests[0].url).pathname).toBe('/rest/v1/rpc/announcement_command');
+    expect(await requests[0].json()).toEqual({ p_session: SESSION_ID, p_request: REQUEST_ID, p_action: publish });
+    const stale = setup(() => json({ code: 'MN409', message: 'Announcement changed. Review the latest version and try again.' }, 400));
+    await expect(stale.backend.announcements.execute(SESSION_ID, REQUEST_ID, publish))
+      .rejects.toMatchObject({ conflict: true });
+    const denied = setup(() => json({ code: 'P0001', message: 'Only session admins and jury can manage announcements.' }, 400));
+    const rejection = denied.backend.announcements.execute(SESSION_ID, REQUEST_ID, publish);
+    await expect(rejection).rejects.toBeInstanceOf(AnnouncementRejectedError);
+    await expect(rejection).rejects.toMatchObject({ conflict: false });
+    const offline = setup(() => { throw new TypeError('Failed to fetch'); });
+    const unknown = offline.backend.announcements.execute(SESSION_ID, REQUEST_ID, publish);
+    await expect(unknown).rejects.not.toBeInstanceOf(WorkflowRejectedError);
+  });
+
+  it('validates snapshots and aborts an older read', async () => {
+    const { backend, requests } = setup((request) => {
+      // The stand-in transport honors cancellation as the browser's fetch does.
+      if (request.signal.aborted) throw new DOMException('Aborted', 'AbortError');
+      return json({ announcements: [], images: [], server_time: '2026-10-24T00:00:00.000Z' });
+    });
+    await expect(backend.announcements.snapshot(SESSION_ID)).resolves.toMatchObject({ announcements: [] });
+    expect(new URL(requests[0].url).pathname).toBe('/rest/v1/rpc/announcement_snapshot');
+    const controller = new AbortController();
+    controller.abort();
+    await expect(backend.announcements.snapshot(SESSION_ID, controller.signal)).rejects.toThrow();
+    const invalid = setup(() => json({ announcements: 3 }));
+    await expect(invalid.backend.announcements.snapshot(SESSION_ID)).rejects.toThrow();
+  });
+
+  it('removes images through the function and surfaces its message', async () => {
+    const { backend, requests } = setup(() => json({ error: 'The image is hidden. Retry removal to finish deleting its file.' }, 400));
+    await expect(backend.announcements.removeImage(SESSION_ID, ANNOUNCEMENT_ID)).rejects.toThrow('Retry removal');
+    expect(new URL(requests[0].url).pathname).toBe('/functions/v1/announcement-images');
   });
 });

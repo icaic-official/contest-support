@@ -1,3 +1,4 @@
+import { emptyAnnouncementSnapshot } from './support/announcementSnapshot';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import type { Command, Membership, Snapshot } from '../src/connected/model';
 
@@ -243,6 +244,9 @@ async function openWorkspace(
         break;
       case '/rest/v1/rpc/session_snapshot':
         result = state;
+        break;
+      case '/rest/v1/rpc/announcement_snapshot':
+        result = emptyAnnouncementSnapshot();
         break;
       case '/rest/v1/rpc/manage_member':
         writes.push({ path, body: route.request().postDataJSON() });

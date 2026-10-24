@@ -1,3 +1,8 @@
+import type {
+  AnnouncementCommand,
+  AnnouncementImage,
+  AnnouncementSnapshot,
+} from '../connected/announcementModel.ts';
 import type { Command, Role, Snapshot } from '../connected/model.ts';
 
 export interface AccountIdentity {
@@ -109,6 +114,34 @@ export interface ImageTransport {
   download(path: string): Promise<Blob>;
 }
 
+export interface Announcements {
+  /** A newer read may abort an older one. A failed read leaves issue reads unaffected. */
+  snapshot(sessionId: string, signal?: AbortSignal): Promise<AnnouncementSnapshot>;
+  /**
+   * Reusing a request ID with the same command must not repeat a write.
+   * AnnouncementRejectedError confirms that the server rejected the command.
+   * Other failures leave the outcome unknown. The caller retains the request ID.
+   */
+  execute(
+    sessionId: string,
+    requestId: string,
+    command: AnnouncementCommand,
+  ): Promise<string>;
+  /** Reusing a request ID after a lost response must not publish another image. */
+  uploadImage(input: {
+    sessionId: string;
+    announcementId: string;
+    requestId: string;
+    file: File;
+    onProgress: (percent: number) => void;
+  }): Promise<void>;
+  /** A failed file deletion stays retryable. */
+  removeImage(sessionId: string, imageId: string): Promise<void>;
+  downloadImage(
+    image: Pick<AnnouncementImage, 'id' | 'session_id' | 'announcement_id'>,
+  ): Promise<Blob>;
+}
+
 export interface LiveUpdates {
   /** Notifications invalidate a snapshot. They contain no issue or staff data. */
   subscribe(input: {
@@ -125,5 +158,6 @@ export interface Backend {
   workflows: Workflows;
   admin: Administration;
   images: ImageTransport;
+  announcements: Announcements;
   updates: LiveUpdates;
 }

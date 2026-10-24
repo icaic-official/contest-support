@@ -312,7 +312,7 @@ export function PhoneIssueView({
   })();
 
   return (
-    <div className="flex h-dvh flex-col bg-background">
+    <div className="flex h-full flex-col bg-background">
       <div className="flex shrink-0 items-center gap-2 px-2 pt-[max(0.5rem,env(safe-area-inset-top))] pb-2">
         <Button variant="ghost" className="h-11" onClick={onBack}>
           <ChevronLeft aria-hidden="true" className="size-5" />

@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { ContestantApp } from "@/contestant/ContestantApp";
 import { OrganiserApp } from "@/organiser/OrganiserApp";
 import { NoSessionAccess } from "@/screens/NoSessionAccess";
+import { Announcements } from "./Announcements";
 import { useCommand } from "./hooks/useCommand";
 import { useSessionSnapshot } from "./hooks/useSessionSnapshot";
 import { type UiKind, uiKindFor } from "./model";
@@ -41,9 +42,20 @@ export function Workspace(props: Omit<ShellProps, "data">) {
     return <Navigate to="/issues" replace />;
   }
   const shown = current ?? kind;
-  if (shown === "contestant") return <ContestantApp {...props} data={data} />;
-  if (shown === "organiser") return <OrganiserApp {...props} data={data} />;
-  return <SessionAccess {...props} data={data} />;
+  const app =
+    shown === "contestant" ? (
+      <ContestantApp {...props} data={data} />
+    ) : shown === "organiser" ? (
+      <OrganiserApp {...props} data={data} />
+    ) : undefined;
+  if (!app) return <SessionAccess {...props} data={data} />;
+  // Announcements read independently, so the UI below never waits for them.
+  return (
+    <div className="flex h-dvh flex-col">
+      <Announcements data={data} />
+      <div className="min-h-0 flex-1">{app}</div>
+    </div>
+  );
 }
 
 /** Keeps retries available after the account gate when no memberships remain. */

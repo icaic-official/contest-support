@@ -25,6 +25,11 @@ export interface SessionData {
   refreshError: string;
   /** True while the live update channel is connected. */
   connected: boolean;
+  /**
+   * Counts live change signals and reconnects. Independent reads, such as
+   * announcements, load again when it changes.
+   */
+  updates: number;
   /** Server time minus local time, in milliseconds. Pass it to useNow. */
   clockOffset: Readonly<RefObject<number>>;
   /** Reads the memberships, sessions and snapshot again, in order. */
@@ -45,6 +50,7 @@ export function useSessionSnapshot(userId: string): SessionData {
   const [loaded, setLoaded] = useState(false);
   const [refreshError, setRefreshError] = useState("");
   const [connected, setConnected] = useState(false);
+  const [updates, setUpdates] = useState(0);
   const clockOffset = useRef(0);
   const generation = useRef(0);
   const refreshQueue = useRef<Promise<void>>(Promise.resolve());
@@ -89,11 +95,15 @@ export function useSessionSnapshot(userId: string): SessionData {
           sessionId,
           userId,
           onChange: () => {
+            setUpdates((count) => count + 1);
             void refresh();
           },
           onConnection: (isConnected) => {
             setConnected(isConnected);
-            if (isConnected) void refresh();
+            if (isConnected) {
+              setUpdates((count) => count + 1);
+              void refresh();
+            }
           },
         })
       : undefined;
@@ -129,6 +139,7 @@ export function useSessionSnapshot(userId: string): SessionData {
     loaded,
     refreshError,
     connected,
+    updates,
     clockOffset,
     refresh,
     selectSession,

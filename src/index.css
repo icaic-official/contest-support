@@ -50,6 +50,14 @@
   --age-warn: #d97706;
   --age-critical: #e11d48;
   --internal: rgb(245 158 11);
+  /* Motion. Use these in every transition and animation, with Tailwind's
+   * ease-out curve: duration-(--motion-base) ease-out. Enter with
+   * --motion-slow at most. A highlight that must stay visible long enough to
+   * notice is the one longer duration. */
+  --motion-fast: 120ms;
+  --motion-base: 180ms;
+  --motion-slow: 250ms;
+  --motion-highlight: 1400ms;
 }
 
 .dark {
@@ -147,4 +155,22 @@
     transparent 8px 16px
   );
   border-color: rgb(245 158 11 / 0.45);
+}
+
+/* A person who asks for reduced motion gets instant state changes. This one
+ * rule covers Tailwind transitions, tw-animate-css, Radix, vaul and the pulsing
+ * dots. The duration is 0.01 ms, not zero or `animation: none`, so
+ * `animationend` still fires and Radix removes closing dialogs. One iteration
+ * keeps infinite animations such as `animate-pulse` from flickering. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0s !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    transition-delay: 0s !important;
+    scroll-behavior: auto !important;
+  }
 }

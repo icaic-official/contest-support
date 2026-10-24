@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { fileURLToPath, URL } from "node:url";
 import { defineConfig } from "vitest/config";
 import { BaseSequencer, type TestSpecification } from "vitest/node";
@@ -18,7 +19,22 @@ class SlowFirstSequencer extends BaseSequencer {
   }
 }
 
+// The footer shows this commit. Workers Builds supplies it; a local build asks git.
+function buildId(): string {
+  const supplied = process.env.WORKERS_CI_COMMIT_SHA;
+  if (supplied) return supplied;
+  try {
+    return execFileSync("git", ["rev-parse", "HEAD"], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim();
+  } catch {
+    return "unknown";
+  }
+}
+
 export default defineConfig({
+  define: { __BUILD_ID__: JSON.stringify(buildId()) },
   // The verification helper sets this to an empty directory so the build does
   // not read .env.local. A normal build keeps Vite's project-root default.
   ...(process.env.MINSKY_VERIFY_ENV_DIR ? { envDir: process.env.MINSKY_VERIFY_ENV_DIR } : {}),

@@ -16,6 +16,7 @@ test("centered sign-in explains access and keeps unauthenticated users outside t
   await expect(
     page.getByText("Contact your contest organizers.", { exact: true }),
   ).toBeVisible();
+  await expect(page.getByText(/^Build [0-9a-f]{7}$|^Build unknown$/)).toBeVisible();
   await expect(
     page.getByRole("navigation", { name: "Workspace navigation" }),
   ).toHaveCount(0);

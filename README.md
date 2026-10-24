@@ -4,7 +4,7 @@ Minsky helps contest teams and staff report, triage, resolve, and review technic
 Contestants report issues; volunteers and specialists handle them through a shared queue.
 Jury members record time awards, and staff confirm their application to the external contest clock.
 Administrators manage accounts, roles, and contestant intake.
-Staff can attach images to issues and choose staff-only or team visibility.
+Staff can attach images to issues and choose staff-only or team visibility. 
 
 The app uses React, TypeScript, Vite, Tailwind CSS, and shadcn/ui.
 Its shared [backend contract](docs/backend-contracts.md) has Supabase and Cloudflare implementations.

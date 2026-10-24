@@ -8,15 +8,20 @@ On `minsky-ci`, Workers Builds runs `npm run ci` and then `npm run ci:worker`.
 It does not publish `minsky-dev` or `minsky-docs`.
 On `minsky-docs`, Workers Builds publishes the docs. See [Publish the docs](#publish-the-docs).
 On `minsky-dev`, Workers Builds checks each push to `main` and then publishes it. See [Publish the application](#publish-the-application).
+On `minsky-preview`, Workers Builds checks each push to another branch and publishes it as the shared preview. See [Publish branch previews](#publish-branch-previews).
 GitHub Actions no longer runs checks or publication. The GitHub account stays on the free plan.
 
-## Why app previews are disabled
+## How app previews stay separate
 
-A frontend preview can change shared data when it uses a stable backend.
-Earlier Supabase previews used the shared Supabase development project directly. That project is retired.
-Cloudflare previews receive no stable D1, R2, or Durable Object bindings.
-A future preview needs its own resources, credentials, fixture ownership, and cleanup checks.
-Docs previews are safe because the docs contain no application data.
+A preview runs branch code that nobody has reviewed yet. It must not change the data of `minsky-dev`.
+So app previews use a separate Worker, `minsky-preview`, with its own resources and token:
+
+- D1 database `minsky-preview` and private bucket `minsky-preview-images`. They hold only test data.
+- A build token that cannot publish `minsky-dev`.
+- `minsky-dev` builds only `main`. Its token never runs branch code.
+
+Cloudflare preview URLs stay disabled on both Workers. Cloudflare does not create them for Workers that use a Durable Object.
+Docs previews use Cloudflare preview URLs. They are safe because the docs contain no application data.
 
 ## Connect one CI Worker
 
@@ -217,6 +222,84 @@ The script sets `VITE_BACKEND=cloudflare` and guards the complete Worker:
 
 These checks do not verify authenticated behavior. The installation and activation procedures require the full application checks.
 A broken application target cannot block the docs, because Workers Builds publishes them separately.
+
+## Publish branch previews
+
+The owner chose one shared preview on 2026-10-24.
+These settings take effect when the owner connects the `minsky-preview` trigger.
+
+Each push to a branch other than `main` publishes that branch to `https://minsky-preview.icaic-minsky.workers.dev`.
+The last push replaces the preview. A push to `main` builds on this Worker too, but it does not publish. `minsky-dev` publishes `main`.
+
+The deploy command is `npm run deploy`, the same as on `minsky-dev`.
+With `VITE_ENVIRONMENT=preview` on a branch, it runs the steps in [Publish the application](#publish-the-application) against `minsky-preview`:
+
+1. Build the Cloudflare application for the preview origin.
+2. Stop if the build's commit is no longer the head of its branch.
+3. Stop if any `MINSKY_DEV_*` variable is set. Those variables belong to the `minsky-dev` build.
+4. Stop unless the committed configuration names Worker `minsky-preview`, database `minsky-preview`, bucket `minsky-preview-images`, and the database ID in `MINSKY_PREVIEW_DATABASE_ID`.
+5. Confirm the account, the database, the private bucket, and the `AUTH_SECRET` name. Record a restore point.
+6. Apply new migrations to `minsky-preview`. Stop if its applied migrations differ from the checkout.
+7. Publish the Worker `minsky-preview` with `wrangler deploy`. Verify its revision, bindings, and an anonymous `401`.
+
+The configuration is `src/server/adapters/cloudflare/deploy/preview.wrangler.jsonc`.
+`npm run cloudflare:install -- configure` generated it from `preview.settings.json` in the same directory.
+
+### Prepare the preview token
+
+The `minsky-preview` Worker must exist before you can limit a token to it.
+Create an account API token in **Manage Account > Account API Tokens > Create token > Custom token**:
+
+- **Workers**: **Editor**. Set the scope to **Specified Workers** and select only `minsky-preview`.
+- **D1**: **Edit**. If the form lets you select databases, select only `minsky-preview`.
+- **Workers R2 Storage**: **Read**. If the form lets you select buckets, select only `minsky-preview-images`.
+- **Account Settings**: **Read**.
+
+Do not use the `minsky-dev` token. If the form cannot limit D1 to one database, the token can also reach other databases in the account through the API.
+Only people who can push to the repository can run branch code with it.
+
+### Connect the preview Worker
+
+1. Open **Workers & Pages > minsky-preview > Settings > Build**.
+2. Connect GitHub repository `GiftedNovaHD/minsky`.
+3. Set the production branch to `main`. Enable builds for non-production branches.
+4. Set the build command to `npm run ci`.
+5. Set the deploy command and the non-production branch deploy command to `npm run deploy`.
+6. Leave the root directory empty.
+7. Under **API token**, select the token from [Prepare the preview token](#prepare-the-preview-token).
+8. Add these build variables:
+
+   | Name | Value |
+   | --- | --- |
+   | `SKIP_DEPENDENCY_INSTALL` | `1` |
+   | `NODE_VERSION` | `22.23.2` |
+   | `CLOUDFLARE_ACCOUNT_ID` | `458ad6a930b0fb717796dfa19ca6a2b1` |
+   | `VITE_ENVIRONMENT` | `preview` |
+   | `MINSKY_PREVIEW_DATABASE_ID` | `3189b257-13f9-4e73-9bd1-bf211c7cbb25` |
+
+9. Do not add any `MINSKY_DEV_*` variable. The deploy script stops when it finds one.
+10. Do not add `AUTH_SECRET`. That secret stays on the Worker.
+
+Optionally, protect `minsky-preview.icaic-minsky.workers.dev` with [Cloudflare Access](https://developers.cloudflare.com/workers/configuration/cloudflare-access/). The preview is public without it.
+
+### Confirm the first preview
+
+Push a branch other than `main`. Then confirm all of the following:
+
+- The `minsky-preview` build log prints `Target: shared preview Worker` and `The revision and deployment checks passed for minsky-preview.`
+- `https://minsky-preview.icaic-minsky.workers.dev/minsky-revision.json` shows the pushed commit and database `3189b257-13f9-4e73-9bd1-bf211c7cbb25`.
+- `https://minsky-dev.icaic-minsky.workers.dev/minsky-revision.json` still shows the commit of `main`.
+
+Sign in with the preview test account. Its credentials are in a private file outside Git, not in this repository.
+
+### Reset the preview data
+
+All branches share `minsky-preview`. A branch can apply a migration that another branch does not have.
+The other branch's build then stops at the migration comparison.
+
+To reset the preview data, find `Restore point before migrations:` in an earlier `minsky-preview` build log.
+Run the `npx wrangler d1 time-travel restore minsky-preview` command from that line. Then build the branch again.
+The reset discards all preview data written after that point, including test accounts created after it.
 
 ## Checks that stay on demand
 

@@ -14,6 +14,12 @@ import { safeWranglerEnvironment } from "../src/server/adapters/cloudflare/tooli
 const repository = "GiftedNovaHD/minsky";
 const account = "458ad6a930b0fb717796dfa19ca6a2b1";
 const docsWorker = { name: "minsky-docs", config: "wrangler.docs.jsonc", assets: "site/dist" };
+// Branch previews replace one shared Worker that binds only test resources.
+const previewWorker = {
+  name: "minsky-preview", config: "src/server/adapters/cloudflare/deploy/preview.wrangler.jsonc",
+  databaseName: "minsky-preview", bucketName: "minsky-preview-images",
+  origin: "https://minsky-preview.icaic-minsky.workers.dev",
+};
 
 /** Workers Builds supplies the pushed branch and commit. A manual run sets the same two values. */
 export function deploymentPlan(env) {
@@ -55,7 +61,7 @@ export function isCurrentRevision(plan, execute = execFileSync) {
 }
 
 export function wranglerArguments(worker, plan) {
-  if (!plan.preview) return ["deploy", "--config", worker.config];
+  if (!plan.preview || worker.backend) return ["deploy", "--config", worker.config];
   return ["preview", "--config", worker.config, "--name", plan.name,
     "--tag", plan.sha, "--ignore-base-config", "--json"];
 }
@@ -103,6 +109,20 @@ function summary(message) {
   process.stdout.write(`${message}\n`);
 }
 
+async function previewTarget(env, installation) {
+  // The development build variables identify the minsky-dev build and its token.
+  if (Object.entries(env).some(([key, value]) => key.startsWith("MINSKY_DEV_") && value)) {
+    throw new Error("A preview build must not receive development target variables.");
+  }
+  const settings = await installation(previewWorker.config);
+  if (settings.accountId !== account || settings.workerName !== previewWorker.name ||
+      settings.origin !== previewWorker.origin || settings.databaseName !== previewWorker.databaseName ||
+      settings.bucketName !== previewWorker.bucketName || settings.databaseId !== env.MINSKY_PREVIEW_DATABASE_ID) {
+    throw new Error("Confirm the exact preview Worker, database, bucket, origin, and account.");
+  }
+  return { name: previewWorker.name, config: previewWorker.config, assets: "dist", backend: "cloudflare", settings };
+}
+
 /** Validate the full provider configuration instead of maintaining another generator. */
 export async function deploymentTargets(env, site = "both", {
   read = readFileSync, installation = readInstallationTarget,
@@ -111,8 +131,13 @@ export async function deploymentTargets(env, site = "both", {
   if (env.CLOUDFLARE_ACCOUNT_ID !== account) throw new Error("Unexpected Cloudflare deployment account.");
   const plan = deploymentPlan(env);
   const targets = [];
-  // Application previews require independent provider resources first.
-  if (site !== "docs" && !plan.preview) {
+  // Only the minsky-preview build sets the preview environment. It also builds its
+  // production branch, main, which minsky-dev publishes. Other branch builds skip the app.
+  const previewBuild = env.VITE_ENVIRONMENT === "preview";
+  if (site !== "docs" && plan.preview && previewBuild) {
+    targets.push(await previewTarget(env, installation));
+  }
+  if (site !== "docs" && !plan.preview && !previewBuild) {
     validateBuildSettings(env);
     const path = env.MINSKY_DEV_CLOUDFLARE_CONFIG;
     if (!path || isAbsolute(path) || relative(process.cwd(), resolve(path)).startsWith("..")) {
@@ -141,8 +166,8 @@ export async function deploymentTargets(env, site = "both", {
   return targets;
 }
 
-async function workerSettings(env, request) {
-  const response = await request(`https://api.cloudflare.com/client/v4/accounts/${account}/workers/scripts/minsky-dev/settings`, {
+async function workerSettings(worker, env, request) {
+  const response = await request(`https://api.cloudflare.com/client/v4/accounts/${account}/workers/scripts/${worker.name}/settings`, {
     headers: { Authorization: `Bearer ${env.CLOUDFLARE_API_TOKEN}` },
     signal: globalThis.AbortSignal.timeout(15_000),
   });
@@ -156,7 +181,7 @@ async function workerSettings(env, request) {
 /** Check deployed metadata and API behavior without creating a session or fixture. */
 export async function verifyApplicationDeployment(worker, env, request = globalThis.fetch) {
   try {
-    const settings = await workerSettings(env, request);
+    const settings = await workerSettings(worker, env, request);
     const byName = new Map();
     for (const binding of settings.bindings) {
       if (!binding || typeof binding.name !== "string" || byName.has(binding.name)) {
@@ -210,7 +235,7 @@ export async function prepareApplication(worker, env, execute = execFileSync, re
       throw new Error("Cloudflare target inspection failed. Provider output was withheld.");
     }
   };
-  await confirmTarget({ account, database: env.MINSKY_DEV_DATABASE_ID }, worker.settings, runWrangler);
+  await confirmTarget({ account, database: worker.settings.databaseId }, worker.settings, runWrangler);
   try {
     const bucket = `https://api.cloudflare.com/client/v4/accounts/${account}/r2/buckets/${worker.settings.bucketName}`;
     const results = await Promise.all(["", "/domains/managed", "/domains/custom"].map(async (suffix) => {
@@ -227,7 +252,7 @@ export async function prepareApplication(worker, env, execute = execFileSync, re
       throw new Error("R2 target or privacy mismatch");
     }
   } catch {
-    throw new Error("The exact private development R2 bucket could not be confirmed. Provider output was withheld.");
+    throw new Error("The exact private R2 bucket could not be confirmed. Provider output was withheld.");
   }
   try {
     const secrets = JSON.parse(runWrangler(["secret", "list", "--format", "json"]));
@@ -286,14 +311,18 @@ export async function deployWorkers(env, {
   const plan = deploymentPlan(env);
   if (!env.CLOUDFLARE_API_TOKEN) throw new Error("Missing CLOUDFLARE_API_TOKEN.");
   const workers = await targets(env, site, { read });
-  if (site !== "docs" && plan.preview) {
-    report("Skipped the application preview. Independent preview data is not configured.");
+  if (site !== "docs" && !workers.some((worker) => worker.backend)) {
+    report(plan.preview ? "Skipped the application preview. Only the minsky-preview build publishes it."
+      : "Skipped the application. The minsky-dev build publishes main.");
   }
   const childEnv = safeWranglerEnvironment(env);
   delete childEnv.GH_TOKEN;
   delete childEnv.GITHUB_TOKEN;
   delete childEnv.AUTH_SECRET;
-  report(plan.preview ? `Preview name: \`${plan.name}\`.` : "Target: stable development sites.");
+  if (!workers.length) return;
+  report(!plan.preview ? "Target: stable development sites."
+    : workers.some((worker) => worker.backend) ? `Target: shared preview Worker \`${previewWorker.name}\`.`
+      : `Preview name: \`${plan.name}\`.`);
   for (const worker of workers) {
     if (!await current(plan)) {
       report(`Skipped remaining uploads because ${plan.sha} is no longer the branch's current commit.`);
@@ -318,7 +347,8 @@ export async function deployWorkers(env, {
     } catch {
       throw new Error("Worker publication failed. Provider output was withheld. Inspect the exact target before retrying.");
     }
-    const url = plan.preview ? previewAddress(output) : `https://${worker.name}.icaic-minsky.workers.dev`;
+    const url = plan.preview && !worker.backend
+      ? previewAddress(output) : `https://${worker.name}.icaic-minsky.workers.dev`;
     report(`Published ${worker.name} at ${url} from ${plan.sha}.`);
     await verify(url, marker);
     if (worker.backend) await deployedApplication(worker, childEnv);

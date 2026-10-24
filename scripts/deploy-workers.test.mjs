@@ -210,7 +210,7 @@ it("requires the complete Cloudflare target for the stable application", async (
   }
 });
 
-it("keeps docs deployment independent and omits all app previews", async () => {
+it("keeps docs deployment independent and skips the app outside the preview build", async () => {
   const brokenApplication = { ...development, VITE_ENVIRONMENT: "", MINSKY_DEV_CLOUDFLARE_CONFIG: "" };
   expect((await deploymentTargets(brokenApplication, "docs")).map((target) => target.name)).toEqual(["minsky-docs"]);
   expect(await deploymentTargets(env, "app")).toEqual([]);
@@ -342,12 +342,6 @@ it("confirms the live target before it applies migrations and requires the check
   await expect(prepareApplication(worker, cloudflare, ahead, request, vi.fn())).rejects.toThrow(/hosted migrations differ/);
 });
 
-it("accepts the former preparation branch after its dependency merged while omitting its app preview", async () => {
-  const prepared = { ...env, WORKERS_CI_BRANCH: "feature/t0021-cloudflare-development-install" };
-  expect(deploymentPlan(prepared).preview).toBe(true);
-  expect((await deploymentTargets(prepared)).map((target) => target.name)).toEqual(["minsky-docs"]);
-});
-
 it("rejects an app marker with the right revision and the wrong backend or data target", async () => {
   const expected = { sha, backend: "cloudflare", databaseId: settings.databaseId,
     bucketName: settings.bucketName, origin: settings.origin };
@@ -422,4 +416,80 @@ it("selects the committed Cloudflare target and ignores a retired Supabase selec
     "src/server/adapters/cloudflare/deploy/development.settings.json", "utf8",
   )));
   expect(await deploymentTargets({ ...prepared, MINSKY_DEV_BACKEND: "supabase" }, "app")).toEqual(enabled);
+});
+
+const previewConfig = "src/server/adapters/cloudflare/deploy/preview.wrangler.jsonc";
+const previewSettings = JSON.parse(readFileSync("src/server/adapters/cloudflare/deploy/preview.settings.json", "utf8"));
+const preview = { ...env, VITE_ENVIRONMENT: "preview", MINSKY_PREVIEW_DATABASE_ID: previewSettings.databaseId };
+
+describe("branch previews", () => {
+  it("selects the committed preview Worker, database, and bucket on a branch", async () => {
+    const targets = await deploymentTargets(preview, "app");
+    expect(targets).toEqual([{ name: "minsky-preview", config: previewConfig, assets: "dist",
+      backend: "cloudflare", settings: previewSettings }]);
+    expect(previewSettings).toMatchObject({ workerName: "minsky-preview", databaseName: "minsky-preview",
+      bucketName: "minsky-preview-images", origin: "https://minsky-preview.icaic-minsky.workers.dev" });
+    expect(wranglerArguments(targets[0], deploymentPlan(preview))).toEqual(["deploy", "--config", previewConfig]);
+  });
+
+  it("refuses development variables, another database, and non-preview resources", async () => {
+    for (const change of [
+      { MINSKY_PREVIEW_DATABASE_ID: undefined }, { MINSKY_PREVIEW_DATABASE_ID: settings.databaseId },
+      { MINSKY_DEV_DATABASE_ID: settings.databaseId }, { MINSKY_DEV_CLOUDFLARE_CONFIG: previewConfig },
+    ]) {
+      await expect(deploymentTargets({ ...preview, ...change }, "app")).rejects.toThrow();
+    }
+    for (const change of [
+      { workerName: "minsky-dev" }, { databaseName: "minsky-development" }, { bucketName: "minsky-development-images" },
+      { origin: "https://minsky-dev.icaic-minsky.workers.dev" }, { accountId: "other" },
+    ]) {
+      await expect(deploymentTargets(preview, "app", {
+        installation: async () => ({ ...previewSettings, ...change }),
+      })).rejects.toThrow(/exact preview Worker/);
+    }
+  });
+
+  it("never publishes the preview from main and skips main on the preview build", async () => {
+    const main = { ...preview, WORKERS_CI_BRANCH: "main" };
+    expect(await deploymentTargets(main, "app")).toEqual([]);
+    const mocks = deploymentMocks();
+    await deployWorkers(main, { ...mocks, site: "app" });
+    expect(mocks.report).toHaveBeenCalledWith("Skipped the application. The minsky-dev build publishes main.");
+    expect(mocks.execute).not.toHaveBeenCalled();
+    expect(mocks.application).not.toHaveBeenCalled();
+    const build = vi.fn();
+    await buildWorkers(main, { site: "app", execute: build, write: vi.fn() });
+    expect(build).not.toHaveBeenCalled();
+  });
+
+  it("migrates and replaces the shared preview Worker, then verifies it", async () => {
+    const mocks = deploymentMocks();
+    const worker = (await deploymentTargets(preview, "app"))[0];
+    const marker = { sha, backend: "cloudflare", databaseId: previewSettings.databaseId,
+      bucketName: previewSettings.bucketName, origin: previewSettings.origin };
+    mocks.targets = async () => [worker];
+    mocks.read = () => JSON.stringify({ ...marker, config: previewConfig });
+    await deployWorkers(preview, { ...mocks, site: "app" });
+    expect(mocks.application).toHaveBeenCalledWith(worker, expect.anything(), mocks.execute, globalThis.fetch, mocks.report);
+    expect(mocks.execute.mock.calls[0][1]).toEqual(["deploy", "--config", previewConfig]);
+    expect(mocks.verify).toHaveBeenCalledWith("https://minsky-preview.icaic-minsky.workers.dev", marker);
+    expect(mocks.deployedApplication).toHaveBeenCalledWith(worker, expect.anything());
+    expect(mocks.report).toHaveBeenCalledWith("Target: shared preview Worker `minsky-preview`.");
+  });
+
+  it("reads the live bindings of the preview Worker", async () => {
+    const worker = (await deploymentTargets(preview, "app"))[0];
+    const request = vi.fn(async (url) => url.endsWith("/settings")
+      ? { ok: true, json: async () => ({ success: true, result: { bindings: [
+        { name: "DB", type: "d1", id: previewSettings.databaseId },
+        { name: "IMAGES", type: "r2_bucket", bucket_name: previewSettings.bucketName },
+        { name: "LIVE_UPDATES", type: "durable_object_namespace", class_name: "SessionLiveCoordinator", namespace_id: "namespace" },
+        { name: "AUTH_ORIGIN", type: "plain_text", text: previewSettings.origin },
+        { name: "AUTH_SECRET", type: "secret_text" },
+      ] } }) }
+      : { status: 401, json: async () => ({ error: "Sign in to continue." }) });
+    await verifyApplicationDeployment(worker, preview, request);
+    expect(request.mock.calls[0][0]).toMatch(/\/workers\/scripts\/minsky-preview\/settings$/);
+    expect(request.mock.calls[1][0]).toBe(`${previewSettings.origin}/api/auth/session`);
+  });
 });

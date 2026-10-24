@@ -93,6 +93,24 @@ The build runs `npm run ci` once more on `main`, after `minsky-ci` has checked t
 That repeat makes the publication depend on checks in the same build. The deploy step cannot run after a failed check.
 The combined build time of checks and publication is not measured yet. It must stay under the 20 minute build limit.
 
+## Preview Workers Builds
+
+The `minsky-preview` Worker publishes branch previews. [Publish branch previews](cloudflare-builds.md#publish-branch-previews) explains the behavior and the dashboard steps.
+These settings take effect when the owner connects the trigger.
+
+| Setting | Value |
+| --- | --- |
+| Worker | `minsky-preview` |
+| Branches | Production branch `main`, which builds but does not publish. Builds for other branches are enabled. |
+| Build command | `npm run ci` |
+| Deploy command | `npm run deploy` for every branch |
+| Root directory | Repository root |
+| API token | Account token in [Prepare the preview token](cloudflare-builds.md#prepare-the-preview-token). Never the `minsky-dev` token. |
+| Build variables | `SKIP_DEPENDENCY_INSTALL=1`, `NODE_VERSION=22.23.2`, `CLOUDFLARE_ACCOUNT_ID`, `VITE_ENVIRONMENT=preview`, `MINSKY_PREVIEW_DATABASE_ID=3189b257-13f9-4e73-9bd1-bf211c7cbb25` |
+
+The preview resources are D1 database `minsky-preview` and private bucket `minsky-preview-images`, both in APAC.
+They hold only test data.
+
 ## On-demand checks
 
 Coding agents run these commands. They are not part of `npm run ci`.
@@ -219,6 +237,7 @@ The removed `deploy:preview` command cannot upload an assets-only app version.
 | Site and mode | Configuration | Worker | Assets |
 | --- | --- | --- | --- |
 | App | `MINSKY_DEV_CLOUDFLARE_CONFIG`, validated by the provider generator | `minsky-dev` | `dist` |
+| Branch preview | `src/server/adapters/cloudflare/deploy/preview.wrangler.jsonc`, validated by the provider generator | `minsky-preview` | `dist` |
 | Docs | `wrangler.docs.jsonc` | `minsky-docs` | `site/dist` |
 
 The stable URLs are `https://minsky-dev.icaic-minsky.workers.dev` and `https://minsky-docs.icaic-minsky.workers.dev`.
@@ -230,7 +249,9 @@ The provider validator rejects extra bindings, unknown variables, and environmen
 
 The generated full Worker includes application code, static assets, `DB`, `IMAGES`, `LIVE_UPDATES`, and `ASSETS`.
 It includes Durable Object migration tag `v1`, a one-minute recovery cron, and a 1,000 ms CPU cap.
-The config disables its preview URLs. Application previews receive no stable data bindings.
+The configs disable Cloudflare preview URLs. Branch previews replace the separate `minsky-preview` Worker, which binds only preview resources.
+A branch build selects the preview only when `VITE_ENVIRONMENT` is `preview`. Other branch builds skip the app.
+A `main` build with `VITE_ENVIRONMENT=preview` skips the app, because `minsky-dev` publishes `main`.
 
 ## Publication checks
 

@@ -501,5 +501,6 @@ Use two browser windows for the live checks. Run these checks after a reviewed d
 10. Remove an announcement. Check that readers lose it, the manager sees **Removed** with the remover, and it has no **Edit** control.
 11. Reload each window. Check that the state is unchanged and the reporting form never waited for announcements.
 12. At 320 px and 390 px wide, check that the announcement strip wraps, scrolls inside its area, and causes no horizontal page scroll.
+    In a window about 1280 by 720 px, open **New announcement** and **Edit**. Check that every field and the **Publish** or **Save changes** button shows without scrolling inside the strip.
 13. Archive the event. Check that announcements stay readable and every management control disappears.
 14. Repeat the checks on a Supabase build when you run the adapter on your own project.

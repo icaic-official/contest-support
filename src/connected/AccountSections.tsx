@@ -353,7 +353,7 @@ export function AppearanceSection() {
             <label
               key={value}
               className={cn(
-                "flex cursor-pointer items-center gap-3 rounded-lg border p-3 text-sm font-medium has-[:focus-visible]:ring-[3px] has-[:focus-visible]:ring-ring/50",
+                "relative flex cursor-pointer items-center gap-3 rounded-lg border p-3 text-sm font-medium has-[:focus-visible]:ring-[3px] has-[:focus-visible]:ring-ring/50",
                 selected ? "border-primary bg-accent" : "hover:bg-accent/50",
               )}
             >

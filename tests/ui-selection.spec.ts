@@ -363,6 +363,22 @@ test("the organiser account page shows every section and signs out", async ({
   ).toBeVisible();
 });
 
+test("the theme options work with the keyboard and stay in view", async ({
+  page,
+}) => {
+  await signIn(page, staff, "/account");
+  const options = page.locator("#appearance").getByRole("radio");
+  await expect(options).toHaveCount(3);
+  await options.first().focus();
+  await expect(page.locator("#appearance label").first()).toBeInViewport();
+  await page.keyboard.press("ArrowRight");
+  await expect(options.nth(1)).toBeChecked();
+  await expect(page.locator("html")).not.toHaveClass(/dark/);
+  await page.keyboard.press("ArrowRight");
+  await expect(options.nth(2)).toBeChecked();
+  await expect(page.locator("html")).toHaveClass(/dark/);
+});
+
 test("an address with a section fragment scrolls to that section", async ({
   page,
 }) => {

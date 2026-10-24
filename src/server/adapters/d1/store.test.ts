@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { openStoreDatabase } from '../cloudflare/tooling/store-database.mjs';
 import type { Caller } from '../../authentication';
 import { WorkflowService } from '../../workflow';
@@ -10,7 +10,7 @@ import { D1Fixture, applyMigrations } from "./testFixture";
 import { measureD1 } from './testMetrics';
 import type { Command } from "../../../connected/model";
 
-const timeout = 120_000;
+vi.setConfig({ testTimeout: 120_000, hookTimeout: 120_000 });
 const connectorConfig = process.env.MINSKY_CONNECTOR_D1_CONFIG;
 const remote = Boolean(connectorConfig);
 const configPath = connectorConfig ?? 'src/server/adapters/cloudflare/deploy/connector-store-ci.wrangler.jsonc';
@@ -34,7 +34,7 @@ function beforeBatch(db: D1Connection, action: () => Promise<void>, repeat = fal
   };
 }
 
-describe("D1 workflow persistence", { timeout }, () => {
+describe("D1 workflow persistence", () => {
   let db: D1Connection;
   let dispose: () => Promise<void>;
   let fixture: D1Fixture;
@@ -51,9 +51,9 @@ describe("D1 workflow persistence", { timeout }, () => {
     if (!remote) {
       await applyMigrations(db);
     }
-  }, timeout);
+  });
 
-  afterAll(async () => { if (dispose) await dispose(); }, timeout);
+  afterAll(async () => { if (dispose) await dispose(); });
 
   beforeEach(async () => {
     creationComplete = false;
@@ -62,9 +62,9 @@ describe("D1 workflow persistence", { timeout }, () => {
     creationComplete = true;
     workflow = workflowService(db);
     application = new D1ApplicationService(db);
-  }, timeout);
+  });
 
-  afterEach(async () => { if (creationComplete) await fixture.cleanup(); }, timeout);
+  afterEach(async () => { if (creationComplete) await fixture.cleanup(); });
 
   function claim(issueId = fixture.issueId) {
     return { type: "claim", issue_id: issueId, revision: 1 } as const;
@@ -234,7 +234,7 @@ describe("D1 workflow persistence", { timeout }, () => {
       await changeAccess(change);
       expect(await execute(claim(), fixture.staff, requestId)).toEqual({ outcome: "rejected", reason: "access" });
       expect(await fixture.durableState()).toEqual(before);
-    }, timeout,
+    },
   );
 
   it("denies the next consistent snapshot after membership revocation", async () => {

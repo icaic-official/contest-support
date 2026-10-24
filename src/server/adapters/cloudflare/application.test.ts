@@ -6,8 +6,7 @@ import type { D1Connection, D1Statement } from '../d1/connection';
 import { D1Fixture, applyMigrations } from '../d1/testFixture';
 import { D1ApplicationService } from './application';
 
-const timeout = 120_000;
-vi.setConfig({ testTimeout: timeout });
+vi.setConfig({ testTimeout: 120_000, hookTimeout: 120_000 });
 
 describe('Cloudflare authorized application and administration', () => {
   let db: D1Connection;
@@ -31,9 +30,9 @@ describe('Cloudflare authorized application and administration', () => {
     db = platform.env.DB;
     dispose = platform.dispose;
     await applyMigrations(db);
-  }, timeout);
+  });
 
-  afterAll(async () => { if (dispose) await dispose(); }, timeout);
+  afterAll(async () => { if (dispose) await dispose(); });
 
   beforeEach(async () => {
     created = false;
@@ -95,14 +94,14 @@ describe('Cloudflare authorized application and administration', () => {
       state, `${id}/original`, `${id}/thumbnail`, state === 'deleting' ? fixture.staff.accountId : null,
       state === 'deleting' ? now : null).run();
     }
-  }, timeout);
+  });
 
   afterEach(async () => {
     if (!created) return;
     await db.batch([fixture.staff, fixture.specialist, fixture.contestant, fixture.otherContestant]
       .map((caller) => statement('DELETE FROM ba_user WHERE id = ?', caller.accountId)));
     await fixture.cleanup();
-  }, timeout);
+  });
 
   function competing(action: () => Promise<unknown>): D1ApplicationService {
     let first = true;

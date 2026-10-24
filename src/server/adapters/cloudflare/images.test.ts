@@ -12,8 +12,7 @@ import { D1Fixture, applyMigrations } from '../d1/testFixture';
 import { D1ApplicationService } from './application';
 import { R2ImageService, type PrivateBucket } from './images';
 
-const timeout = 120_000;
-vi.setConfig({ testTimeout: timeout });
+vi.setConfig({ testTimeout: 120_000, hookTimeout: 120_000 });
 const png = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
 const jpeg = Uint8Array.from([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]);
 const sha256 = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('hex');
@@ -55,12 +54,12 @@ describe('Cloudflare private images with local D1 and R2 bindings', () => {
     bucket = platform.env.IMAGES;
     dispose = platform.dispose;
     await applyMigrations(db);
-  }, timeout);
+  });
 
   afterAll(async () => {
     if (dispose) await dispose();
     if (directory) rmSync(directory, { recursive: true, force: true });
-  }, timeout);
+  });
 
   beforeEach(async () => {
     created = false;
@@ -69,7 +68,7 @@ describe('Cloudflare private images with local D1 and R2 bindings', () => {
     await fixture.create();
     created = true;
     service = new R2ImageService(db, bucket);
-  }, timeout);
+  });
 
   afterEach(async () => {
     if (!created) return;
@@ -84,7 +83,7 @@ describe('Cloudflare private images with local D1 and R2 bindings', () => {
       expect((await bucket.list({ prefix })).objects).toEqual([]);
     }
     await fixture.cleanup();
-  }, timeout);
+  });
 
   async function reserve(options: Partial<Parameters<R2ImageService['begin']>[1]> = {}, instance = service, caller = fixture.staff) {
     return instance.begin(caller, {

@@ -3,9 +3,9 @@ import { join, resolve } from 'node:path';
 import { test, expect } from '@playwright/test';
 import { createTestHarness } from 'wrangler';
 import { randomSecret } from '../../src/server/adapters/cloudflare/password';
+import { applyMigrations } from '../../src/server/adapters/d1/testFixture';
 import { createLocalUiFixture, type LocalUiEnvironment } from './local-ui-fixture';
 import { runUiJourney } from './ui-journey';
-import { applyMigrations } from '../../src/server/adapters/d1/testFixture';
 
 test('complete local React UI journey uses real HTTPS, D1, R2, and Durable Objects', async ({ browser }) => {
   const directory = process.env.MINSKY_CF_LOCAL_UI_DIRECTORY;

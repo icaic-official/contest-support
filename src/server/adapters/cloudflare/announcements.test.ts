@@ -11,8 +11,7 @@ import { D1AnnouncementService } from './announcements';
 import { R2AnnouncementImageService } from './announcementImages';
 import type { PrivateBucket } from './images';
 
-const timeout = 120_000;
-vi.setConfig({ testTimeout: timeout });
+vi.setConfig({ testTimeout: 120_000, hookTimeout: 120_000 });
 const png = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
 const sha256 = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('hex');
 
@@ -60,12 +59,12 @@ describe('Cloudflare session announcements with local D1 and R2 bindings', () =>
     bucket = platform.env.IMAGES;
     dispose = platform.dispose;
     await applyMigrations(db);
-  }, timeout);
+  });
 
   afterAll(async () => {
     if (dispose) await dispose();
     if (directory) rmSync(directory, { recursive: true, force: true });
-  }, timeout);
+  });
 
   beforeEach(async () => {
     created = false;
@@ -83,7 +82,7 @@ describe('Cloudflare session announcements with local D1 and R2 bindings', () =>
     volunteer = fixture.staff;
     service = new D1AnnouncementService(db);
     images = new R2AnnouncementImageService(db, bucket);
-  }, timeout);
+  });
 
   afterEach(async () => {
     if (!created) return;
@@ -96,7 +95,7 @@ describe('Cloudflare session announcements with local D1 and R2 bindings', () =>
     }
     await fixture.cleanup();
     expect(await fixture.rows('SELECT id FROM announcements WHERE session_id IN (?, ?)', fixture.sessionId, fixture.secondSessionId)).toEqual([]);
-  }, timeout);
+  });
 
   const publishCommand = (overrides: Record<string, unknown> = {}) => ({
     type: 'publish', title: ' Fictional title ', details: ' Fictional plain details. ', expires_at: null, ...overrides,

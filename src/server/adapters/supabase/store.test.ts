@@ -1,12 +1,12 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { PGlite } from "@electric-sql/pglite";
 import { randomUUID } from "node:crypto";
+import { migrateSupabaseTestDatabase } from '../../../../tests/support/supabaseDatabase';
 import { snapshotSchema, unresolvedTime, type Snapshot } from "../../../connected/model";
 import type { Caller } from '../../authentication';
 import type { CommandResult } from '../../workflow';
 import { WorkflowService, type WorkflowPersistence } from "../../workflow";
 import { createSupabaseWorkflowPersistence } from "./store";
-import { migrateSupabaseTestDatabase } from '../../../../tests/support/supabaseDatabase';
 
 // Execute the repository migrations and database guards. Only Supabase Auth and
 // Storage infrastructure are supplied locally; workflow writes are never faked.

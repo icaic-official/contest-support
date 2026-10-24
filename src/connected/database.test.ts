@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { PGlite } from "@electric-sql/pglite";
+import { sessionTables } from "../../tests/support/supabaseCleanup";
 import { migrateSupabaseTestDatabase } from "../../tests/support/supabaseDatabase";
 
 // Embedded PostgreSQL runs the actual migration and RLS, with a small stand-in
@@ -139,6 +140,15 @@ afterAll(async () => {
 });
 
 describe("cloud database authorization and workflow", () => {
+  it("lists every session table for hosted fixture cleanup", async () => {
+    const tables = await db.query<{ table_name: string }>(
+      `select c.table_name from information_schema.columns c
+        join information_schema.tables t using (table_schema, table_name)
+        where c.table_schema = 'public' and c.column_name = 'session_id' and t.table_type = 'BASE TABLE'`,
+    );
+    expect(tables.rows.map((row) => row.table_name).sort()).toEqual([...sessionTables].sort());
+  });
+
   it("blocks temporary-password reads and RPC writes until Auth records a changed password", async () => {
     await db.query("select public.initialize_account($1,'team-aurora')", [
       contestant,

@@ -2,9 +2,9 @@ import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { getPlatformProxy } from 'wrangler';
 import type { D1Connection } from '../d1/connection';
+import { applyMigrations } from '../d1/testFixture';
 import applicationWorker, { type ApplicationEnvironment } from './applicationWorker';
 import { bootstrapInstallation } from './installation';
-import { applyMigrations } from '../d1/testFixture';
 
 vi.mock('cloudflare:workers', () => ({ WorkerEntrypoint: class {} }));
 

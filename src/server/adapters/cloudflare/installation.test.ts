@@ -2,11 +2,11 @@ import { randomUUID } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { getPlatformProxy } from 'wrangler';
 import type { D1Connection, D1Statement } from '../d1/connection';
+import { applyMigrations } from '../d1/testFixture';
 import { D1AuthenticationService } from './authentication';
 import { createBetterAuthIdentity } from './identity';
 import { bootstrapInstallation, recoverInstallationOwner, validateCompetitionConfiguration } from './installation';
 import { passwordHasher, randomSecret, type PasswordHasher } from './password';
-import { applyMigrations } from '../d1/testFixture';
 
 const competition = {
   adminUsername: 'competition_owner',

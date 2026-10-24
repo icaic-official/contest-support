@@ -8,10 +8,10 @@ import { expect, it } from 'vitest';
 import { getPlatformProxy, unstable_dev } from 'wrangler';
 import { snapshotSchema, type Command, type Snapshot } from '../../src/connected/model';
 import type { D1Connection } from '../../src/server/adapters/d1/connection';
+import { applyMigrations } from '../../src/server/adapters/d1/testFixture';
 import { bootstrapInstallation } from '../../src/server/adapters/cloudflare/installation';
 import { randomSecret } from '../../src/server/adapters/cloudflare/password';
 import type { AccountCommand, StartedImage } from '../../src/backend/contracts';
-import { applyMigrations } from '../../src/server/adapters/d1/testFixture';
 
 const imageBytes = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a7t0AAAAASUVORK5CYII=', 'base64');
 

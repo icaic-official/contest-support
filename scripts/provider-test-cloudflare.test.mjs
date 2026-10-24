@@ -1,16 +1,17 @@
 import { randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
-import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { URL } from 'node:url';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest';
-import { getPlatformProxy, unstable_splitSqlQuery as splitSqlQuery } from 'wrangler';
+import { getPlatformProxy } from 'wrangler';
 import { renderWranglerConfiguration } from '../src/server/adapters/cloudflare/tooling/configuration.mjs';
 import { maintainFixtureSessions, SessionLiveCoordinator } from '../src/server/adapters/cloudflare/live';
 import { passwordHasher } from '../src/server/adapters/cloudflare/password';
 import { D1AuthenticationService } from '../src/server/adapters/cloudflare/authentication';
 import { createBetterAuthIdentity } from '../src/server/adapters/cloudflare/identity';
+import { applyMigrations } from '../src/server/adapters/d1/testFixture';
 import { checkFixtureSchema, cleanupFixture, createFixture, inspectFixtureAuthentication } from '../tests/providers/cloudflare/fixture';
 import { checkCloudflareBackend, connectorTarget, readFixtureTarget } from '../tests/providers/cloudflare/target.mjs';
 import { createBrowserBackend } from '../tests/providers/browser-backend';
@@ -288,10 +289,9 @@ describe('Cloudflare fixture setup and exact cleanup with real local D1/R2', () 
       compatibility_date: '2026-10-13', d1_databases: [{ binding: 'DB', database_name: 'isolated-provider-tests', database_id: randomUUID() }],
       r2_buckets: [{ binding: 'IMAGES', bucket_name: 'isolated-provider-tests-images' }] }));
     platform = await getPlatformProxy({ configPath: path, persist: false, remoteBindings: false, envFiles: [] });
-    const migrationPath = new URL('../src/server/adapters/d1/migrations/', import.meta.url);
+    // The fixture schema check reads the applied names, as Wrangler records them.
     await platform.env.DB.prepare('CREATE TABLE d1_migrations (id INTEGER PRIMARY KEY, name TEXT NOT NULL UNIQUE)').run();
-    for (const name of (await readdir(migrationPath)).filter((name) => name.endsWith('.sql')).sort()) {
-      await platform.env.DB.batch(splitSqlQuery(await readFile(new URL(name, migrationPath), 'utf8')).map((sql) => platform.env.DB.prepare(sql)));
+    for (const name of await applyMigrations(platform.env.DB)) {
       await platform.env.DB.prepare('INSERT INTO d1_migrations (name) VALUES (?)').bind(name).run();
     }
   });

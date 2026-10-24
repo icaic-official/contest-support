@@ -16,16 +16,16 @@ export const gitleaksRelease = {
 };
 
 // Ordinary checks only. Browser and hosted provider commands stay outside this list.
+// `npm run build` starts with `tsc -b`, which is the type check. A separate typecheck repeats it.
 export const commands = [
   ['npm', ['ci']],
   ['npm', ['ci', '--prefix', 'site']],
-  ['npm', ['run', 'typecheck']],
+  ['npm', ['run', 'build']],
   ['npm', ['run', 'lint']],
   ['npm', ['run', 'check:functions']],
   ['npm', ['run', 'test:functions']],
   ['npm', ['test']],
   ['npm', ['run', 'test:providers:list']],
-  ['npm', ['run', 'build']],
   ['npm', ['run', 'docs:build']],
   ['npm', ['audit', '--package-lock-only', '--audit-level=high']],
   ['npm', ['audit', '--prefix', 'site', '--package-lock-only', '--audit-level=high']],

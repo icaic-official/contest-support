@@ -2,7 +2,7 @@ import { betterAuth, type BetterAuthOptions } from "better-auth";
 import { username } from "better-auth/plugins/username";
 import { isAPIError } from "better-auth/api";
 import { AuthenticationError } from "../../authentication";
-import { passwordHasher } from "./password";
+import { passwordHasher, type PasswordHasher } from "./password";
 
 export const IDENTITY_SESSION_SECONDS = 8 * 60 * 60;
 
@@ -21,6 +21,8 @@ export interface IdentityOptions {
   origin: string;
   secret: string;
   secureCookies: boolean;
+  /** Defaults to the maintained Better Auth hasher. */
+  hasher?: PasswordHasher;
 }
 
 /**
@@ -44,6 +46,7 @@ export function createBetterAuthIdentity(
   if (options.secret.length < 32) throw new Error("Configure an authentication secret of at least 32 characters.");
   const cookieName = options.secureCookies ? "__Host-minsky-session" : "minsky-session";
   const clearCookie = `${cookieName}=; Max-Age=0; Path=/; HttpOnly; SameSite=Strict${options.secureCookies ? "; Secure" : ""}`;
+  const hasher = options.hasher ?? passwordHasher;
   const auth = betterAuth({
     appName: "Minsky",
     database,
@@ -60,8 +63,8 @@ export function createBetterAuthIdentity(
       minPasswordLength: 12,
       maxPasswordLength: 128,
       password: {
-        hash: passwordHasher.hash,
-        verify: ({ password, hash }) => passwordHasher.verify(password, hash),
+        hash: hasher.hash,
+        verify: ({ password, hash }) => hasher.verify(password, hash),
       },
     },
     user: { modelName: "ba_user" },

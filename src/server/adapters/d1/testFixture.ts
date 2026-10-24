@@ -83,6 +83,9 @@ export class D1Fixture {
     this.journalDirectory = mkdtempSync(join(tmpdir(), "minsky-d1-proof-"));
     writeFileSync(join(this.journalDirectory, "fixture.json"),
       JSON.stringify(this.recoveryDetails(), null, 2), { mode: 0o600 });
+    // Local D1 charges each batch statement, so each table receives its rows in one statement.
+    const accounts = this.accounts();
+    const repeat = (count: number, row: string) => Array(count).fill(row).join(", ");
     const statements = [
       this.statement("INSERT INTO events (id) VALUES (?)", this.eventId),
       this.statement("INSERT INTO sessions (id, event_id) VALUES (?, ?), (?, ?)",
@@ -90,51 +93,44 @@ export class D1Fixture {
       this.statement("INSERT INTO teams (id, session_id) VALUES (?, ?), (?, ?), (?, ?)",
         this.teamId, this.sessionId, this.otherTeamId, this.sessionId,
         this.secondSessionTeamId, this.secondSessionId),
+      this.statement(`INSERT INTO accounts (id, name, must_change) VALUES ${repeat(accounts.length, "(?, ?, 0)")}`,
+        ...accounts.flatMap((caller, index) => [caller.accountId, `d1-proof:${this.eventId}:${index}`])),
+      this.statement(`INSERT INTO logins (id, account_id, expires_at) VALUES ${repeat(accounts.length, "(?, ?, unixepoch() + 3600)")}`,
+        ...accounts.flatMap((caller) => [caller.loginId, caller.accountId])),
+      this.statement(`INSERT INTO memberships (session_id, account_id, team_id) VALUES ${repeat(accounts.length + 1, "(?, ?, ?)")}`,
+        ...accounts.flatMap((caller, index) => [
+          this.sessionId, caller.accountId, index === 2 ? this.teamId : index === 3 ? this.otherTeamId : null,
+        ]),
+        this.secondSessionId, this.staff.accountId, null),
     ];
-    for (const [index, caller] of this.accounts().entries()) {
+    if (this.workflow) {
+      const now = "strftime('%Y-%m-%dT%H:%M:%fZ', 'now')";
       statements.push(
-        this.statement("INSERT INTO accounts (id, name, must_change) VALUES (?, ?, 0)",
-          caller.accountId, `d1-proof:${this.eventId}:${index}`),
-        this.statement("INSERT INTO logins (id, account_id, expires_at) VALUES (?, ?, unixepoch() + 3600)",
-          caller.loginId, caller.accountId),
-        this.statement("INSERT INTO memberships (session_id, account_id, team_id) VALUES (?, ?, ?)",
-          this.sessionId, caller.accountId, index === 2 ? this.teamId : index === 3 ? this.otherTeamId : null),
+        this.statement(`INSERT INTO ba_user (id, name, email, createdAt, updatedAt)
+          SELECT id, name, id || '@workflow.minsky.invalid', ${now}, ${now}
+          FROM accounts WHERE id IN (${repeat(accounts.length, "?")})`, ...accounts.map((caller) => caller.accountId)),
+        this.statement(`INSERT INTO ba_session (id, userId, token, expiresAt, createdAt, updatedAt)
+          VALUES ${repeat(accounts.length, `(?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '+1 hour'), ${now}, ${now})`)}`,
+        ...accounts.flatMap((caller) => [caller.loginId, caller.accountId, randomUUID()])),
+        this.statement(`UPDATE logins SET identity_session_id = id WHERE id IN (${repeat(accounts.length, "?")})`,
+          ...accounts.map((caller) => caller.loginId)),
       );
     }
-    if (this.workflow) {
-      for (const caller of this.accounts()) {
-        statements.push(
-          this.statement(`INSERT INTO ba_user (id, name, email, createdAt, updatedAt)
-            SELECT id, name, id || '@workflow.minsky.invalid', strftime('%Y-%m-%dT%H:%M:%fZ', 'now'),
-              strftime('%Y-%m-%dT%H:%M:%fZ', 'now') FROM accounts WHERE id = ?`, caller.accountId),
-          this.statement(`INSERT INTO ba_session (id, userId, token, expiresAt, createdAt, updatedAt)
-            VALUES (?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '+1 hour'),
-              strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`,
-          caller.loginId, caller.accountId, randomUUID()),
-          this.statement('UPDATE logins SET identity_session_id = ? WHERE id = ?', caller.loginId, caller.loginId),
-        );
-      }
-    }
     statements.push(
-      this.statement("INSERT INTO membership_roles (session_id, account_id, role) VALUES (?, ?, 'volunteer'), (?, ?, 'specialist')",
-        this.sessionId, this.staff.accountId, this.sessionId, this.specialist.accountId),
-      this.statement("INSERT INTO memberships (session_id, account_id) VALUES (?, ?)",
-        this.secondSessionId, this.staff.accountId),
-      this.statement("INSERT INTO membership_roles (session_id, account_id, role) VALUES (?, ?, 'volunteer')",
+      this.statement("INSERT INTO membership_roles (session_id, account_id, role) VALUES (?, ?, 'volunteer'), (?, ?, 'specialist'), (?, ?, 'volunteer')",
+        this.sessionId, this.staff.accountId, this.sessionId, this.specialist.accountId,
         this.secondSessionId, this.staff.accountId),
     );
     if (this.workflow) {
-      for (const [id, session, team, number] of [
-        [this.issueId, this.sessionId, this.teamId, 1],
-        [this.otherIssueId, this.sessionId, this.teamId, 2],
-        [this.secondSessionIssueId, this.secondSessionId, this.secondSessionTeamId, 1],
-      ] as const) {
-        statements.push(this.statement(`INSERT INTO issues
-          (id, session_id, team_id, status, number, reporter, reporter_name, category, description, created_at)
-          SELECT ?, ?, ?, 'open', ?, id, name, 'Devices', 'Fictional existing issue',
-            strftime('%Y-%m-%dT%H:%M:%fZ', 'now') FROM accounts WHERE id = ?`,
-        id, session, team, number, this.staff.accountId));
-      }
+      statements.push(this.statement(`INSERT INTO issues
+        (id, session_id, team_id, status, number, reporter, reporter_name, category, description, created_at)
+        SELECT issue.column1, issue.column2, issue.column3, 'open', issue.column4, accounts.id, accounts.name,
+          'Devices', 'Fictional existing issue', strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+        FROM (VALUES (?, ?, ?, 1), (?, ?, ?, 2), (?, ?, ?, 1)) AS issue JOIN accounts ON accounts.id = ?`,
+      this.issueId, this.sessionId, this.teamId,
+      this.otherIssueId, this.sessionId, this.teamId,
+      this.secondSessionIssueId, this.secondSessionId, this.secondSessionTeamId,
+      this.staff.accountId));
     } else {
       statements.push(this.statement("INSERT INTO issues (id, session_id, team_id, status) VALUES (?, ?, ?, 'open'), (?, ?, ?, 'open'), (?, ?, ?, 'open')",
         this.issueId, this.sessionId, this.teamId, this.otherIssueId, this.sessionId, this.teamId,
@@ -201,10 +197,11 @@ export class D1Fixture {
       throw new Error(`Fixture session ownership mismatch for ${this.eventId}. Cleanup stopped.`);
     }
     // Remove owned history before deleting its authenticated actors.
+    const accountIds = accounts.map((caller) => caller.accountId);
     await this.db.batch([
       this.statement("DELETE FROM events WHERE id = ?", this.eventId),
-      ...(this.workflow ? accounts.map((caller) => this.statement("DELETE FROM ba_user WHERE id = ?", caller.accountId)) : []),
-      ...accounts.map((caller) => this.statement("DELETE FROM accounts WHERE id = ?", caller.accountId)),
+      ...(this.workflow ? [this.statement("DELETE FROM ba_user WHERE id IN (?, ?, ?, ?)", ...accountIds)] : []),
+      this.statement("DELETE FROM accounts WHERE id IN (?, ?, ?, ?)", ...accountIds),
     ]);
     const workflowQueries = this.durableQueries();
     const checks = await this.rowsBatch([

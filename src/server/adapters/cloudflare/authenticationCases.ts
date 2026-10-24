@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from 'node:crypto';
+import { createHash, randomBytes, randomUUID, scryptSync } from 'node:crypto';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { openStoreDatabase } from './tooling/store-database.mjs';
 import type { D1Connection, D1Statement } from '../d1/connection';
@@ -18,6 +18,24 @@ if (connectorConfig && historicalRemote) throw new Error('Select the full connec
 const remote = historicalRemote || Boolean(connectorConfig);
 const configPath = connectorConfig ?? 'wrangler.auth-ci.jsonc';
 const origin = 'http://127.0.0.1:8788';
+
+// Better Auth's scrypt takes about 110 ms per hash or check, and every case signs in.
+// Local cases test credential flows, so they use a low-cost scrypt in the same stored format.
+// password.test.ts covers the maintained hasher. Hosted runs keep it.
+function quickKey(password: string, salt: string): string {
+  return scryptSync(password.normalize('NFKC'), salt, 64, { N: 16, r: 1, p: 1 }).toString('hex');
+}
+
+const hasher: PasswordHasher = remote ? passwordHasher : {
+  async hash(password) {
+    const salt = randomBytes(16).toString('hex');
+    return `${salt}:${quickKey(password, salt)}`;
+  },
+  async verify(password, hash) {
+    const [salt, key] = hash.split(':');
+    return /^[a-f0-9]{32}:[a-f0-9]{128}$/.test(hash) && quickKey(password, salt) === key;
+  },
+};
 
 /** Failed rejection assertions must never print a password or cookie result. */
 function expectFailure(operation: Promise<unknown>) {
@@ -56,7 +74,7 @@ export function registerAuthenticationCases(group: AuthenticationCases) {
       }
       fullApplication = !!await db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'admin_audit'").first();
       identity = createBetterAuthIdentity(db as Parameters<typeof createBetterAuthIdentity>[0], {
-        origin, secret: randomSecret(), secureCookies: false,
+        origin, secret: randomSecret(), secureCookies: false, hasher,
       });
     }, 120_000);
 
@@ -102,7 +120,7 @@ export function registerAuthenticationCases(group: AuthenticationCases) {
         // follows them, so a failure must undo the credential effects as well.
         const finalGuard = statements.length - 2;
         return db.batch([...statements.slice(0, finalGuard), change, ...statements.slice(finalGuard)]);
-      } }, identity, passwordHasher);
+      } }, identity, hasher);
     }
 
     async function actorRestriction(restriction: string): Promise<D1Statement> {
@@ -129,7 +147,7 @@ export function registerAuthenticationCases(group: AuthenticationCases) {
       created = true;
       password = randomSecret();
       username = `auth_${fixture.eventId.replaceAll('-', '').slice(0, 20)}`;
-      const hash = await passwordHasher.hash(password);
+      const hash = await hasher.hash(password);
       const now = new Date().toISOString();
       const ids = [fixture.staff.accountId, fixture.contestant.accountId];
       const statements: D1Statement[] = [];
@@ -143,7 +161,7 @@ export function registerAuthenticationCases(group: AuthenticationCases) {
       }
       statements.push(stmt('UPDATE memberships SET is_admin = 1 WHERE account_id = ?', fixture.staff.accountId));
       await db.batch(statements);
-      service = new D1AuthenticationService(db, identity, passwordHasher);
+      service = new D1AuthenticationService(db, identity, hasher);
       adminHeaders = await signIn(`${username}_a`);
     }, 120_000);
 
@@ -224,7 +242,7 @@ export function registerAuthenticationCases(group: AuthenticationCases) {
           await stmt("UPDATE accounts SET credential_state = 'ready' WHERE id = ?", fixture.contestant.accountId).run();
           return identity.signIn(name, value);
         } };
-        await expectFailure(signIn(username, password, new D1AuthenticationService(db, racing, passwordHasher))).toMatchObject({ status: 401 });
+        await expectFailure(signIn(username, password, new D1AuthenticationService(db, racing, hasher))).toMatchObject({ status: 401 });
         expect(invoked).toBe(false);
       });
     }
@@ -232,7 +250,7 @@ export function registerAuthenticationCases(group: AuthenticationCases) {
     if (group === 'recovery') {
       it('keeps a lone organizer able to retry an interrupted self password change', async () => {
         await stmt('UPDATE accounts SET must_change = 1 WHERE id = ?', fixture.staff.accountId).run();
-        const interrupted = new D1AuthenticationService(db, identity, { ...passwordHasher, hash: async () => { throw new Error('Interrupted self hash'); } });
+        const interrupted = new D1AuthenticationService(db, identity, { ...hasher, hash: async () => { throw new Error('Interrupted self hash'); } });
         await expectFailure(interrupted.changePassword(adminHeaders, password, randomSecret())).toThrow('Interrupted self hash');
         expect((await service.current(adminHeaders))?.status.must_change).toBe(true);
         const changed = await service.changePassword(adminHeaders, password, randomSecret());
@@ -246,7 +264,7 @@ export function registerAuthenticationCases(group: AuthenticationCases) {
           await db.batch(statements);
           throw new Error('Committed response lost');
         } };
-        await expectFailure(new D1AuthenticationService(lostResponse, identity, passwordHasher).changePassword(headers, password, replacement)).toMatchObject({ status: 409 });
+        await expectFailure(new D1AuthenticationService(lostResponse, identity, hasher).changePassword(headers, password, replacement)).toMatchObject({ status: 409 });
         expect(await service.current(headers)).toBeUndefined();
         expect((await service.current(await signIn(username, replacement)))?.status.must_change).toBe(false);
       });
@@ -260,7 +278,7 @@ export function registerAuthenticationCases(group: AuthenticationCases) {
             return db.batch(statements);
           },
         };
-        const interrupted = new D1AuthenticationService(interruptedDb, identity, passwordHasher);
+        const interrupted = new D1AuthenticationService(interruptedDb, identity, hasher);
         await expectFailure(interrupted.account(adminHeaders, fixture.sessionId, { action: 'reset_password', userId: fixture.contestant.accountId })).toMatchObject({ status: 409 });
         await expectFailure(signIn()).toMatchObject({ status: 401 });
         expect((await stmt('SELECT credential_state FROM accounts WHERE id = ?', fixture.contestant.accountId).first<{credential_state: string}>())?.credential_state).toBe('pending');
@@ -277,7 +295,7 @@ export function registerAuthenticationCases(group: AuthenticationCases) {
           }
           return db.batch(statements);
         } };
-        await expectFailure(new D1AuthenticationService(competingDb, identity, passwordHasher).account(adminHeaders, fixture.sessionId, { action: 'reset_password', userId: fixture.contestant.accountId })).toMatchObject({ status: 409 });
+        await expectFailure(new D1AuthenticationService(competingDb, identity, hasher).account(adminHeaders, fixture.sessionId, { action: 'reset_password', userId: fixture.contestant.accountId })).toMatchObject({ status: 409 });
         expect((await service.current(await signIn()))?.status.must_change).toBe(false);
         expect((await stmt('SELECT count(*) n FROM account_operations WHERE account_id = ?', fixture.contestant.accountId).first<{n: number}>())?.n).toBe(0);
       });
@@ -362,7 +380,7 @@ export function registerAuthenticationCases(group: AuthenticationCases) {
         describe('local SQLite expiry clock', () => {
           it('rejects a self change whose original identity expires after its row is deliberately deleted', async () => {
             const replacement = randomSecret();
-            const hash = await passwordHasher.hash(replacement);
+            const hash = await hasher.hash(replacement);
             const clock = 'minsky_auth_test_clock';
             // Keep this text identical to the production strftime('now') expression.
             const sqliteNow = "strftime('%Y-%m-%dT%H:%M:%fZ', 'now')";
@@ -391,7 +409,7 @@ export function registerAuthenticationCases(group: AuthenticationCases) {
                 const advance = stmt(`UPDATE ${clock} SET now = ?`, expiredAt);
                 return db.batch([...statements.slice(0, finalGuard), advance, ...statements.slice(finalGuard)]);
               },
-            }, identity, { ...passwordHasher, hash: async () => hash });
+            }, identity, { ...hasher, hash: async () => hash });
             try {
               await expectFailure(racing.changePassword(adminHeaders, password, replacement)).toMatchObject({
                 status: 409,
@@ -412,9 +430,9 @@ export function registerAuthenticationCases(group: AuthenticationCases) {
 
     if (group === 'recovery') {
       it('keeps reset restricted if the organizer loses permission during hashing', async () => {
-        const interrupted = new D1AuthenticationService(db, identity, { ...passwordHasher, hash: async (value) => {
+        const interrupted = new D1AuthenticationService(db, identity, { ...hasher, hash: async (value) => {
           await stmt('UPDATE memberships SET is_admin = 0 WHERE account_id = ?', fixture.staff.accountId).run();
-          return passwordHasher.hash(value);
+          return hasher.hash(value);
         } });
         await expectFailure(interrupted.account(adminHeaders, fixture.sessionId, { action: 'reset_password', userId: fixture.contestant.accountId })).toMatchObject({ status: 403 });
         await expectFailure(signIn()).toMatchObject({ status: 401 });
@@ -426,7 +444,7 @@ export function registerAuthenticationCases(group: AuthenticationCases) {
       it('recovers an interrupted account creation without replacing its account ID', async () => {
         const accountUsername = `create_${randomSecret().slice(0, 20)}`;
         usernames.push(accountUsername);
-        const interrupted = new D1AuthenticationService(db, identity, { ...passwordHasher, hash: async () => { throw new Error('Interrupted creation'); } });
+        const interrupted = new D1AuthenticationService(db, identity, { ...hasher, hash: async () => { throw new Error('Interrupted creation'); } });
         await expectFailure(interrupted.account(adminHeaders, fixture.sessionId, { action: 'create_account', username: accountUsername, name: `auth-fixture:${fixture.eventId}`, teamId: fixture.teamId, roles: [], isAdmin: false })).toThrow('Interrupted creation');
         const row = await stmt('SELECT id, credential_state FROM accounts WHERE username = ?', accountUsername).first<{id: string; credential_state: string}>();
         extraIds.push(row!.id);
@@ -534,7 +552,7 @@ export function registerAuthenticationCases(group: AuthenticationCases) {
 
       it('rejects equivalent Unicode passwords as a mandatory password change', async () => {
         const original = randomSecret() + '\u2460';
-        await stmt("UPDATE ba_account SET password = ? WHERE userId = ? AND providerId = 'credential'", await passwordHasher.hash(original), fixture.contestant.accountId).run();
+        await stmt("UPDATE ba_account SET password = ? WHERE userId = ? AND providerId = 'credential'", await hasher.hash(original), fixture.contestant.accountId).run();
         await stmt('UPDATE accounts SET must_change = 1 WHERE id = ?', fixture.contestant.accountId).run();
         const headers = await signIn(username, original);
         await expectFailure(service.changePassword(headers, original, original.normalize('NFKC'))).toMatchObject({ status: 400 });
@@ -631,7 +649,7 @@ export function registerAuthenticationCases(group: AuthenticationCases) {
 
       it('leaves a failed password update restricted and recoverable by another reset', async () => {
         const old = await signIn();
-        const failed: PasswordHasher = { ...passwordHasher, hash: async () => { throw new Error('Interrupted hash'); } };
+        const failed: PasswordHasher = { ...hasher, hash: async () => { throw new Error('Interrupted hash'); } };
         const interrupted = new D1AuthenticationService(db, identity, failed);
         await expectFailure(interrupted.account(adminHeaders, fixture.sessionId, { action: 'reset_password', userId: fixture.contestant.accountId })).toThrow('Interrupted hash');
         expect(await service.current(old)).toBeUndefined();
@@ -647,7 +665,7 @@ export function registerAuthenticationCases(group: AuthenticationCases) {
         let started: () => void = () => undefined;
         const pause = new Promise<void>((resolve) => { release = resolve; });
         const hashing = new Promise<void>((resolve) => { started = resolve; });
-        const delayed = new D1AuthenticationService(db, identity, { ...passwordHasher, hash: async (value) => { started(); await pause; return passwordHasher.hash(value); } });
+        const delayed = new D1AuthenticationService(db, identity, { ...hasher, hash: async (value) => { started(); await pause; return hasher.hash(value); } });
         const first = delayed.account(adminHeaders, fixture.sessionId, { action: 'reset_password', userId: fixture.contestant.accountId });
         // Attach a rejection handler before another reset supersedes this operation.
         const firstOutcome = first.then(() => false, () => true);
@@ -664,7 +682,7 @@ export function registerAuthenticationCases(group: AuthenticationCases) {
           await service.account(adminHeaders, fixture.sessionId, { action: 'reset_password', userId: fixture.contestant.accountId });
           return signed;
         } };
-        await expectFailure(signIn(username, password, new D1AuthenticationService(db, racingIdentity, passwordHasher))).toMatchObject({ status: 409 });
+        await expectFailure(signIn(username, password, new D1AuthenticationService(db, racingIdentity, hasher))).toMatchObject({ status: 409 });
       });
 
       it('passes the same temporary-authentication lifecycle used by the Supabase provider scenario', async () => {

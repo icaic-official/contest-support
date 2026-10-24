@@ -46,8 +46,6 @@ Keep its adapter, migrations, functions, and provider tests.
 Do not describe it as the live backend, the default setup, or the development URL's backend.
 Do not change hosted Supabase or Cloudflare resources, secrets, or repository settings.
 
-This work starts from `feature/t0021-cloudflare-development-install` in draft [PR #45](https://github.com/GiftedNovaHD/minsky/pull/45).
-Open the result as a separate draft pull request into that branch.
 Preserve the Workers Builds move and the removed GitHub Actions workflow.
 Do not add an Actions job.
 Browser suites and hosted provider checks stay manual commands.

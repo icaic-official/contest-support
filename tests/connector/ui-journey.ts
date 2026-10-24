@@ -1,6 +1,7 @@
 import { expect, type Browser, type BrowserContext, type Locator, type Page } from '@playwright/test';
 import type { ScenarioData } from '../providers/contracts';
 import type { Actor } from '../providers/contracts';
+import { leftRedRightBlue } from '../support/pictures';
 
 export interface UiFixture extends Pick<ScenarioData, 'sessionId' | 'otherSessionId' | 'teamId' | 'accounts'> { origin: string }
 
@@ -248,6 +249,33 @@ export async function runUiJourney(browser: Browser, fixture: UiFixture, options
     await admin.page.reload();
     await expect(admin.page.getByRole('heading', { level: 1, name: 'My account', exact: true })).toBeVisible();
     await expect(liveBadge(admin.page)).toBeVisible({ timeout: 30_000 });
+    phase = 'account picture';
+    // The alt text of an avatar is empty, so the blob image inside the card is the evidence.
+    const picture = admin.page.getByRole('button', { name: /^Account settings for / }).locator('img[src^="blob:"]');
+    await expect(picture).toHaveCount(0);
+    const stored = admin.page.waitForResponse((response) => new URL(response.url()).pathname.startsWith('/api/avatar/')
+      && response.request().method() === 'PUT');
+    await admin.page.getByLabel('Choose a profile picture', { exact: true })
+      .setInputFiles({ name: 'admin.png', mimeType: 'image/png', buffer: leftRedRightBlue(640, 480) });
+    await admin.page.getByRole('dialog', { name: 'Use this picture?' })
+      .getByRole('button', { name: 'Save picture', exact: true }).click();
+    expect((await stored).status()).toBe(200);
+    await expect(admin.page.getByText('Profile picture updated.')).toBeVisible();
+    await expect(picture).toBeVisible();
+    // A reload reads the stored picture from the server and downloads it again.
+    await admin.page.reload();
+    await expect(picture).toBeVisible({ timeout: 30_000 });
+    const listed = admin.page.waitForResponse((response) => new URL(response.url()).pathname === '/api/avatars'
+      && response.request().method() === 'GET');
+    await admin.page.getByRole('button', { name: 'Remove picture', exact: true }).click();
+    await admin.page.getByRole('dialog', { name: 'Remove your picture?' })
+      .getByRole('button', { name: 'Remove picture', exact: true }).click();
+    await expect(admin.page.getByText('Profile picture removed.')).toBeVisible();
+    await expect(picture).toHaveCount(0);
+    await admin.page.reload();
+    expect((await listed).status()).toBe(200);
+    await expect(admin.page.getByRole('button', { name: 'Change picture', exact: true })).toBeVisible();
+    await expect(picture).toHaveCount(0);
     phase = 'administration settings';
     const reportButton = contestant.page.getByRole('complementary', { name: 'Your reports' })
       .getByRole('button', { name: 'Report an issue', exact: true });

@@ -49,11 +49,15 @@ Hosted test commands need isolated CI resources. Check their targets first, and 
 
 ## Submit a change
 
-1. Branch from updated `main` as `feature/tNNNN-description`.
+1. Branch from updated `main`. Name the branch `<type>/<title>`, for example `bugfix/race-request-fix`.
 2. Implement, verify, and update the docs in the same change.
-3. Open a pull request. The owner reviews and merges.
+3. Push the branch. Wait for `Workers Builds: minsky-ci` and `Workers Builds: minsky-preview` to pass.
+4. Test the change on the shared preview at `https://minsky-preview.icaic-minsky.workers.dev`. It uses only test data. The last push from any branch replaces it.
+5. Open a draft pull request into `main`. The owner reviews and merges.
+6. After the merge, Workers Builds checks `main` again and publishes the development app and the docs.
 
-Workers Builds runs `npm run ci` for branches in this repository. For each push to `main`, a second trigger runs the checks again and then publishes the development app. A separate Workers Builds trigger publishes the docs from `main` and uploads a docs preview version for other branches.
-Migrations, bootstrap, and secrets are separate steps.
+[Build and publication flow](https://github.com/GiftedNovaHD/minsky/blob/main/docs/cloudflare-builds.md#build-and-publication-flow) describes each trigger.
+Write D1 migrations that only add tables, columns, or indexes. The checks reject a migration that drops or renames schema.
+Bootstrap and secrets are separate steps.
 
 To add a backend, follow the [provider guide](https://github.com/GiftedNovaHD/minsky/blob/main/docs/add-provider.md). New providers must pass the shared scenarios unchanged.

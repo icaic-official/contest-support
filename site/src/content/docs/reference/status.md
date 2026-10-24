@@ -17,7 +17,7 @@ Checked on **24 October 2026** against `main` at `c9c369b`. This is a dated reco
 - Two backends behind one contract: Supabase and Cloudflare (T0020, [PR #42](https://github.com/GiftedNovaHD/minsky/pull/42)). Cloudflare is the live backend ([PR #57](https://github.com/GiftedNovaHD/minsky/pull/57)). The project operates no Supabase installation. The Supabase adapter stays as code that you can run on your own Supabase project.
 - A verified fresh Cloudflare development installation (T0021, [PR #43](https://github.com/GiftedNovaHD/minsky/pull/43)). The owner approved the development switch and a repeat deployment. No Supabase accounts, passwords, records, images, or IDs moved.
 - T0022 CI run deduplication ([PR #46](https://github.com/GiftedNovaHD/minsky/pull/46), merged).
-- Workers Builds runs `npm run ci` for branches in this repository ([PR #45](https://github.com/GiftedNovaHD/minsky/pull/45)). A second trigger checks each push to `main` again and then publishes the development app. GitHub Actions checks are removed.
+- Workers Builds runs `npm run ci` for branches in this repository ([PR #45](https://github.com/GiftedNovaHD/minsky/pull/45)). A second trigger checks each push to `main` again and then publishes the development app. A third trigger publishes other branches to the shared preview ([PR #73](https://github.com/GiftedNovaHD/minsky/pull/73)). GitHub Actions checks are removed.
 - Workers Builds publishes these docs from `main` ([PR #48](https://github.com/GiftedNovaHD/minsky/pull/48)).
 
 ## Not in main
@@ -31,6 +31,7 @@ Checked on **24 October 2026** against `main` at `c9c369b`. This is a dated reco
 | Environment | State |
 | --- | --- |
 | [minsky-dev](https://minsky-dev.icaic-minsky.workers.dev) | Development only. Uses Cloudflare. Can run an older revision than `main`. |
+| [minsky-preview](https://minsky-preview.icaic-minsky.workers.dev) | Shared branch preview. Uses Cloudflare with test data only. Shows the last branch that someone pushed. |
 | Docs | This site. Its own Worker. Workers Builds publishes it from `main` and uploads preview versions for other branches. |
 | Production | None. |
 

@@ -4,7 +4,7 @@ Minsky helps contest teams and staff report, triage, resolve, and review technic
 Contestants report issues; volunteers and specialists handle them through a shared queue.
 Jury members record time awards, and staff confirm their application to the external contest clock.
 Administrators manage accounts, roles, and contestant intake.
-Staff can attach images to issues and choose staff-only or team visibility. 
+Staff can attach images to issues and choose staff-only or team visibility.
 
 The app uses React, TypeScript, Vite, Tailwind CSS, and shadcn/ui.
 Its shared [backend contract](docs/backend-contracts.md) has Supabase and Cloudflare implementations.
@@ -81,7 +81,7 @@ Never put a service credential in a `VITE_` variable.
 | --- | --- |
 | `npm run dev` | Start the local frontend. |
 | `npm run build` | Check types and create static assets in `dist/`. |
-| `npm run deploy` | Build the Cloudflare app, apply new D1 migrations, and publish it through guarded deployment tooling. Workers Builds runs it for each push to `main`. A manual run needs `WORKERS_CI_BRANCH`, `WORKERS_CI_COMMIT_SHA`, and the approved target settings. |
+| `npm run deploy` | Build the Cloudflare app, apply new D1 migrations, and publish it through guarded deployment tooling. Workers Builds runs it on `minsky-dev` for each push to `main`, and on `minsky-preview` for each push to another branch. A manual run needs `WORKERS_CI_BRANCH`, `WORKERS_CI_COMMIT_SHA`, and the approved target settings. |
 | `node scripts/deploy-workers.mjs --check --site=app` | Validate the selected deployment target without provider changes. Use `--site=docs` for independent docs settings. |
 | `node scripts/deploy-workers.mjs --build --site=app` | Build the Cloudflare app and record its revision before guarded publication. |
 | `npm run preview` | Serve built assets locally. |
@@ -168,8 +168,8 @@ npm run docs:dev
 The deployment configuration is `wrangler.docs.jsonc`.
 See [the writing and deployment guide](site/src/content/docs/contributing/documentation.mdx).
 The initial docs deployment is explicitly authorized in T0011 before merge.
-Workers Builds runs `npm run ci` for branches in this repository. For each push to `main`, a second Workers Builds trigger runs the checks again and then publishes `minsky-dev`. See [Publish the application](docs/cloudflare-builds.md#publish-the-application).
-Workers Builds publishes the docs from `main` and uploads a docs preview version for other branches. See [Publish the docs](docs/cloudflare-builds.md#publish-the-docs).
+Four Workers Builds triggers check and publish this repository. A branch push runs the checks and publishes the branch to the shared preview `minsky-preview`. A merge into `main` publishes `minsky-dev` and the docs.
+[Build and publication flow](docs/cloudflare-builds.md#build-and-publication-flow) describes each trigger and what each push does.
 See [Workers Builds setup](docs/cloudflare-builds.md) for the dashboard steps and [CI settings](docs/cloudflare-build-settings.md) for on-demand browser and hosted commands.
 Automatic GitHub Actions publication is removed.
 The fresh Cloudflare development candidate and a separate empty installation pass the complete application checks.

@@ -1,15 +1,41 @@
 # Run checks on Workers Builds
 
-Use this guide to connect repository checks to Cloudflare Workers Builds.
+Use this guide to see which Workers Builds triggers run on each push and to connect them.
 Use [deployment settings](cloudflare-build-settings.md) for commands, limits, and checks that stay on demand.
 Use [activation](activate-cloudflare-development.md) for the separate development-installation approval.
 
-On `minsky-ci`, Workers Builds runs `npm run ci` and then `npm run ci:worker`.
-It does not publish `minsky-dev` or `minsky-docs`.
-On `minsky-docs`, Workers Builds publishes the docs. See [Publish the docs](#publish-the-docs).
-On `minsky-dev`, Workers Builds checks each push to `main` and then publishes it. See [Publish the application](#publish-the-application).
-On `minsky-preview`, Workers Builds checks each push to another branch and publishes it as the shared preview. See [Publish branch previews](#publish-branch-previews).
-GitHub Actions no longer runs checks or publication. The GitHub account stays on the free plan.
+## Build and publication flow
+
+Four Workers build from this repository. Each Worker has its own Workers Builds trigger.
+Each build reports a commit status named `Workers Builds: <worker>`.
+
+| Worker | Branches it builds | Build command | Deploy command | Result |
+| --- | --- | --- | --- | --- |
+| `minsky-ci` | All branches, including `main` | `npm run ci` | `npm run ci:worker` | A check only. It publishes nothing. |
+| `minsky-preview` | All branches. A `main` build does not publish. | `npm run ci` | `npm run deploy` | Publishes the branch to `https://minsky-preview.icaic-minsky.workers.dev` with test data. |
+| `minsky-docs` | All branches | `npm ci --prefix site && npm run docs:build` | `npx wrangler deploy` on `main`, `npx wrangler versions upload` on other branches | Publishes the docs from `main`. Uploads a docs preview version for other branches. |
+| `minsky-dev` | `main` only | `npm run ci` | `npm run deploy` | Publishes `main` to `https://minsky-dev.icaic-minsky.workers.dev` with development data. |
+
+### When you push a branch
+
+1. `minsky-ci` runs the checks.
+2. `minsky-preview` runs the checks. It then applies new migrations to the preview database and publishes the branch.
+   The last push from any branch replaces the preview.
+3. `minsky-docs` uploads a docs preview version. That version receives no traffic.
+4. `minsky-dev` does not build.
+
+### When a pull request merges into `main`
+
+1. `minsky-ci` checks `main`.
+2. `minsky-dev` runs the checks again. It then applies new migrations to `minsky-development` and publishes `main`.
+3. `minsky-docs` publishes the docs.
+4. `minsky-preview` builds `main`, but it does not publish.
+
+A failed check stops its build. The deploy command does not run, and the Worker keeps its previous version.
+A pull request from a fork starts no builds, because it pushes no branch to this repository.
+GitHub Actions runs no checks or publication. The GitHub account stays on the free plan.
+
+The sections below give the dashboard steps for each trigger.
 
 ## How app previews stay separate
 

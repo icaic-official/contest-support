@@ -1,6 +1,6 @@
 ---
 title: Sign in
-description: Get your account, change your temporary password, and choose a session.
+description: Get your account, change your temporary password, choose a session, and set a profile picture.
 ---
 
 ## Sign in the first time
@@ -46,6 +46,23 @@ The queue is `/issues`, award review is `/jury`, administration is `/administrat
 You can bookmark a section or use Back and Forward.
 Opening a section asks you to sign in when needed and checks your permissions.
 A refresh keeps the section and loads current session data.
+
+## Set a profile picture
+
+Your picture shows next to your name, for example on the issues that you own.
+Staff see the pictures of the other staff in the same session. A team account sees only its own picture.
+
+1. Open your account settings.
+2. Select **Change picture**. On the account page you can also select your avatar at the top.
+3. Choose a JPEG, PNG, or WebP image of up to 2 MB. On a phone you can take a photo. Minsky does not accept HEIC, so export an iPhone photo as a JPEG first.
+4. Check the preview. Minsky uses the middle square of the image and shows it as a circle.
+5. Select **Save picture**.
+
+Minsky saves a smaller copy of the image. The copy has no location or camera data.
+If the save fails and the button reads **Try again**, select it. Minsky does not save a second picture.
+
+To remove your picture, select **Remove picture** and confirm. Your initials show instead.
+The picture belongs to your account, so it is the same in every session. Other staff see a change within about 10 seconds.
 
 ## Forgot your password
 

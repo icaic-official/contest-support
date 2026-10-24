@@ -60,7 +60,7 @@ The removal is a follow-up. Before you remove a rule, check the preview page in 
 ## Backend access
 
 The frontend does not call Supabase directly.
-Hooks, `SignIn`, `PasswordForm`, `useSessionAdmin` and `useIssueImages` call `requireBackend()` from `src/backend/index.ts`.
+Hooks, `SignIn`, `PasswordForm`, `useSessionAdmin`, `useIssueImages` and `AvatarProvider` call `requireBackend()` from `src/backend/index.ts`.
 That function returns the `Backend` from `src/backend/contracts.ts`, or it throws the setup message when `.env.local` has no public connection settings.
 The implementations are in `src/backend/supabase/` and `src/backend/cloudflare/`. See [backend contracts](backend-contracts.md).
 
@@ -72,7 +72,7 @@ These steps occur in sequence:
 2. Without a user, it shows `SignIn` (`src/screens/SignIn.tsx`).
 3. `useAccountStatus` checks the account every 10 seconds and on window focus.
    If the password is temporary, `PasswordForm` (`src/screens/PasswordForm.tsx`) shows. The database also enforces this change.
-4. `Workspace` (`src/connected/Workspace.tsx`) loads session data with `useSessionSnapshot` and selects the UI with `uiKindFor` from `model.ts`:
+4. `Workspace` (`src/connected/Workspace.tsx`) loads session data with `useSessionSnapshot`. It wraps the UI in `AvatarProvider`, which loads [profile pictures](#profile-pictures). It selects the UI with `uiKindFor` from `model.ts`:
    - A membership with `team_id` gets `ContestantApp` (`src/contestant/ContestantApp.tsx`).
    - Every other membership gets `OrganiserApp` (`src/organiser/OrganiserApp.tsx`).
 5. `OrganiserApp` uses `useMediaQuery(organiserDesktopQuery)`. At 1024 px and wider it shows `OrganiserDesktopConsole`. Below 1024 px it shows `OrganiserPhoneApp`.
@@ -148,7 +148,7 @@ Thus a pending request and the selected issue stay the same when the viewport ch
 
 ## Data hooks
 
-All hooks are in `src/connected/hooks/`.
+All hooks are in `src/connected/hooks/`, except `useAvatarUrl` and `useAvatarActions`, which are in `src/connected/Avatars.tsx`.
 They share session data and workflow requests across the layouts.
 They call the `Backend` contracts through `requireBackend()`.
 
@@ -159,6 +159,7 @@ They call the `Backend` contracts through `requireBackend()`.
 | `useSessionSnapshot(userId)` | Loads memberships, the session list and the selected snapshot. Reads run in sequence. A generation counter discards responses for an earlier session. It refreshes on Realtime changes, every 10 seconds, on focus and when the browser is online again. It clears the snapshot after an error. It records the server clock offset. |
 | `useCommand({ sessionId, refresh, onRecorded })` | Runs one workflow command at a time. It uses the actor-bound request from `WorkflowRetryProvider`. An explicit retry retains the original session, request ID, and command. `onSuccess` clears the originating form before refresh while that form remains mounted. |
 | `useWorkflowState(data)` | Combines `useCommand` with the selected issue and the status filter. A recorded command selects its issue when the person did not choose an issue while it ran. An inline queue action does not select its issue. A reopened issue sets the filter to `claimed`. |
+| `useAvatarEditor()` | The steps of changing the caller's own profile picture: choose, preview, save and remove. See [Profile pictures](#profile-pictures). |
 | `useTeamSelection(sessionId, snapshot)` | Holds the team-search choice. A session change clears it. A snapshot without that team, or without staff access, also clears it. |
 | `useNow(clockOffset)` | Returns the server-adjusted time every second for live timers. |
 | `useMediaQuery(query)` | Returns whether a CSS media query matches. |
@@ -199,7 +200,7 @@ These rules apply:
 | --- | --- |
 | `OrganiserPhoneApp.tsx` | The shell. It holds the tab, the open issue, the report sheet and the reply drafts. The drafts stay in memory while the snapshot is missing. |
 | `PhoneParts.tsx` | Tab bar, tab header with **Live** or **Reconnecting** and the intake state, the status banners and the queue card. |
-| `PhoneTabs.tsx` | The Queue, Mine, Find, Awards and Me tabs. |
+| `PhoneTabs.tsx` | The Queue, Mine, Find, Awards and Me tabs. The Me tab has the [profile picture](#profile-pictures) controls. |
 | `PhoneSessionTab.tsx` | The Session tab for admins. It puts the admin parts from `src/organiser/admin/` on one page, with one sheet for a new account or one account. |
 | `PhoneIssueView.tsx` | The full-screen issue view with the bottom action bar and its sheets. |
 
@@ -303,7 +304,7 @@ The phone app keeps its own **Me** tab.
 
 These rules apply:
 
-- The page shows only data that the account and the session snapshot already hold. It changes no profile data. The name, the username and the account ID cannot be edited.
+- The page shows only data that the account and the session snapshot already hold. It changes no profile data except the [picture](#profile-pictures). The name, the username and the account ID cannot be edited.
 - `accountSections` gives the section order and the section nav. A team account has no staff roles. Its **Access** section describes what a team account can do. It shows no role badges and no link to **Accounts**.
 - A session admin sees **Manage session accounts**. The link goes to `/administration/accounts`. The backend still checks every request.
 - **Sessions** lists the sessions that the account can open. **Switch** is disabled while a workflow command runs. After the switch, the caller clears its own selection. The console passes `changeSession`. The contestant app passes `resetForSession`.
@@ -311,6 +312,42 @@ These rules apply:
 - An address with a fragment, such as `/account#security`, names a place inside the page. `useRouteFocus` then leaves focus to the page. `useSectionFocus` focuses and scrolls to the section. A router state from `focusRequest()` picks one control inside it. `useOpenPasswordChange()` uses this for **Change password** in the command palette and the contestant menu. It also works when the person is already on `/account`.
 - **Activity** counts open work, resolutions and messages from the snapshot that the person can see. For staff, open work means unresolved issues that the person owns. For a team account, it means unresolved team issues. The list shows the five newest replies, internal notes and resolutions of this person. A team account never sees internal notes.
 - The layout follows the width of the page, not of the window. The section nav stands beside the sections from 768 px of page width.
+
+## Profile pictures
+
+A picture belongs to an account, not to a session. The visibility rule is in [Avatars](backend-contracts.md#avatars). The server enforces it. The frontend shows what the server returns.
+
+`Workspace` wraps both apps in `AvatarProvider`. The provider reads the pictures that the caller can see in the selected session and keeps one downloaded copy of each.
+
+| File | Content |
+| --- | --- |
+| `src/connected/Avatars.tsx` | `AvatarProvider`, `useAvatarUrl(personId)` and `useAvatarActions()`. |
+| `src/connected/avatarImages.ts` | `avatarMap()`, which maps each person ID to a picture, and `AvatarImageCache`. Neither uses React. `avatarImages.test.ts` tests them. |
+| `src/connected/avatarPicture.ts` | Pure rules: the centered square, the encodings to try, the editor states and the state after a failed upload. `avatarPicture.test.ts` tests them. |
+| `src/connected/imageUpload.ts` | `avatarBlob()`, which crops and encodes a chosen file in the browser. |
+| `src/connected/hooks/useAvatarEditor.ts` | The editor state and its steps. |
+| `src/connected/PictureEditor.tsx` | The file input, the preview dialog, the removal question, the status line and the alert. |
+
+These rules apply:
+
+- The provider calls `avatars.list(sessionId)` when the session or `SessionData.updates` changes, and every 10 seconds. A picture change sends no live signal, so the poll shows the change of another person. A failed read keeps the earlier list. A session change or lost access drops the list. An unchanged list keeps the same map object, so the avatars do not render again.
+- Only the newest read or change sets the list. An upload and a removal set the list themselves. A read that started earlier then cannot bring back the old picture.
+- `PersonAvatar` takes an optional `personId`. It shows the picture through `useAvatarUrl`, and it shows initials when the person has no picture, when the caller cannot see it, or when the browser cannot decode it. The picture has an empty `alt`, because the name stands next to it. A call site that has no person ID shows initials.
+- `AvatarImageCache` downloads a picture when the first avatar on screen asks for it. Every other avatar of that picture shares its object URL. The avatar ID is the cache key. It changes on every upload, so a cached picture never goes stale. The cache revokes the URL of a picture that left the list, and all URLs when the session changes or the provider unmounts. After an upload the cache holds the encoded file, so the new picture needs no download.
+- Pictures show in the account page header and **Profile** section, the console sidebar card, the phone **Me** tab, the issue owner in the queue table, the phone queue cards and the issue owner card, the activity entries, and the administration account lists and owner workload. The contestant app shows the picture of the team account on its account page only. The server never returns staff pictures to a team account. The top bar menu of the contestant app shows initials.
+- An avatar belongs to the account, so the controls work in an archived event too.
+
+The steps of a change are in `useAvatarEditor`. The state is one of `idle`, `preparing`, `preview`, `uploading`, `confirmRemoval` and `removing`.
+
+1. **Change picture** opens the file picker. It is in the **Profile** section, on the header avatar and in the phone **Me** tab. The input accepts JPEG, PNG and WebP.
+2. The browser checks the file with `checkImageFile`: the signature, a size of up to 2 MB and a successful decode. A failure shows an alert.
+3. `avatarBlob` crops the middle square and encodes it as a JPEG of at most 512 by 512 pixels. It lowers the quality and then the size until the file fits `AVATAR_MAX_BYTES`. It fills the canvas with white first, because JPEG has no transparency. Decoding follows the EXIF orientation. The canvas keeps no metadata, so the new file has no EXIF or location data.
+4. A dialog shows the encoded square and how it looks as a circle. **Save picture** uploads it.
+5. Each chosen file gets one request ID. After an unknown outcome, such as a lost response, **Try again** sends the same bytes with the same ID, so the server stores one picture. A rejected or expired upload ends the attempt. The person then chooses the file again.
+6. A success shows the toast "Profile picture updated." and shows the new picture at once.
+7. **Remove picture** asks first. A success shows the toast "Profile picture removed." and returns to initials.
+
+Controls are disabled while a step runs. After each step, focus returns to the control that began it. After a removal it goes to **Change picture**, because the **Remove picture** button is gone.
 
 ## Jury award lists
 

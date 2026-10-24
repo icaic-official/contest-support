@@ -7,21 +7,17 @@ import tailwindcss from "@tailwindcss/vite";
 // Workers Builds installs node_modules fresh, so Vitest has no earlier durations.
 // It then starts larger files first, and these short files that start the local
 // Cloudflare runtime would run last. Start them first so they do not extend the run.
-const slowTestFiles = [
-  "src/server/adapters/cloudflare/authenticationCompletion.test.ts",
-  "src/server/adapters/cloudflare/authenticationInitiation.test.ts",
-  "src/server/adapters/cloudflare/authentication.test.ts",
-  "src/server/adapters/cloudflare/authenticationRecovery.test.ts",
-];
+// The pattern matches the authentication*.test.ts set in vitest.auth.config.ts.
+const slowTestFile = /\/src\/server\/adapters\/cloudflare\/authentication\w*\.test\.ts$/;
 
 class SlowFirstSequencer extends BaseSequencer {
   override async sort(files: TestSpecification[]): Promise<TestSpecification[]> {
     const sorted = await super.sort(files);
-    const slow = (file: TestSpecification) =>
-      slowTestFiles.some((path) => file.moduleId.endsWith(`/${path}`));
+    const slow = (file: TestSpecification) => slowTestFile.test(file.moduleId);
     return [...sorted.filter(slow), ...sorted.filter((file) => !slow(file))];
   }
 }
+
 export default defineConfig({
   // The verification helper sets this to an empty directory so the build does
   // not read .env.local. A normal build keeps Vite's project-root default.

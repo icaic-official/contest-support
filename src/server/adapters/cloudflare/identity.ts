@@ -63,7 +63,7 @@ export function createBetterAuthIdentity(
       minPasswordLength: 12,
       maxPasswordLength: 128,
       password: {
-        hash: hasher.hash,
+        hash: (password) => hasher.hash(password),
         verify: ({ password, hash }) => hasher.verify(password, hash),
       },
     },

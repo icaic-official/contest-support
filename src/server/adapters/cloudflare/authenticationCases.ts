@@ -46,8 +46,8 @@ export type AuthenticationCases = 'sessions' | 'recovery' | 'initiation' | 'comp
 
 /** Each file owns its fixtures. Hosted files can run concurrently. */
 export function registerAuthenticationCases(group: AuthenticationCases) {
-  // Maintained scrypt took 1.5 to 8.3 seconds per account case on Workers Builds.
-  // Each Vitest configuration sets a limit above that.
+  // Hosted runs use maintained scrypt, which took 1.5 to 8.3 seconds per account case
+  // on Workers Builds. Their Vitest configurations set a limit above that.
   describe('Cloudflare account authentication', () => {
     let db: D1Connection;
     let dispose: () => Promise<void>;

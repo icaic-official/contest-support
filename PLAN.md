@@ -23,6 +23,12 @@ The Workers Builds image does not provide Chromium, and the hosted jobs exceed t
 The CI Worker is `minsky-ci`. Its deploy command is a dry run. It does not publish `minsky-dev` or `minsky-docs`.
 The owner connects the repository. This change does not deploy or edit secrets.
 
+**Docs publication, 2026-10-24.** The owner asked for the documentation site to publish through Workers Builds, with previews, in PR #48.
+The removal of the GitHub Actions publisher had stopped all docs publication. The last docs deployment before this change was on 2026-10-21.
+The `minsky-docs` Worker has two Workers Builds triggers. A push to `main` runs `wrangler deploy`. A push to any other branch runs `wrangler versions upload`, which creates a preview version without traffic.
+The docs build does not wait for `minsky-ci`. The docs are static and contain no application data.
+`minsky-dev` stays disconnected from Workers Builds.
+
 **PR #45 update from main, 2026-10-23.** The owner requests current `main` and conflict resolution for the existing PR.
 Merge `origin/main` at `a938e6a`, which includes the merged T0015 frontend and T0022 CI change.
 Port PR #45 browser routes and retry protections to the redesigned shells and shared data hooks.

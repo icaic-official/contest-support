@@ -69,6 +69,8 @@ npm run docs:test    # navigation, search, phone layout, 404
 ```
 
 Check the page in light and dark mode and at phone width.
-Wait for `Workers Builds: minsky-ci` to pass. It runs `npm run ci` on every branch push. That builds the site and checks links, but does not run `docs:test` or publish the docs.
+Wait for `Workers Builds: minsky-ci` to pass. It runs `npm run ci` on every branch push. That builds the site and checks links, but does not run `docs:test`.
+A branch push also uploads a docs preview version. Its preview URL is in the `minsky-docs` build log.
+A merge to `main` publishes the docs to the stable URL.
 A fork pull request does not push a branch here, so it does not start a build.
-Manual publishing (`npm run docs:deploy`) is for recovery only; see `docs/cloudflare-builds.md`.
+Manual publishing (`npm run docs:deploy`) is only for when Workers Builds cannot publish; see `docs/cloudflare-builds.md`.

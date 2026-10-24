@@ -35,7 +35,8 @@ Preserve the Workers Builds move and the removed GitHub Actions workflow.
 Do not add an Actions job.
 Browser suites and hosted provider checks stay manual commands.
 `npm run ci` lists provider scenarios. It does not run the hosted Supabase provider suite.
-Do not connect `minsky-dev` or `minsky-docs` to Workers Builds.
+Do not connect `minsky-dev` to Workers Builds.
+`minsky-docs` publishes through Workers Builds. A push to `main` publishes the docs. A push to another branch uploads a preview version that does not receive traffic.
 Do not deploy.
 The owner reviews and merges.
 

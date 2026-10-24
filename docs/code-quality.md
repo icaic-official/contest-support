@@ -34,8 +34,9 @@ Gitleaks uses pinned release 8.30.1 and a verified SHA-256 checksum.
 Ordinary builds do not receive cloud credentials.
 Hosted Supabase and Cloudflare checks are on-demand commands against isolated CI targets.
 They are not required PR checks.
-Workers Builds does not publish `minsky-dev` or `minsky-docs`.
-Keep those two Workers disconnected from Git builds so a provider build cannot skip the checks or replace the complete application.
+Workers Builds does not publish `minsky-dev`.
+Keep that Worker disconnected from Git builds so a provider build cannot skip the checks or replace the complete application.
+Workers Builds publishes the static `minsky-docs` Worker from `main`. The docs contain no application data.
 
 Run the usual README checks locally.
 With Gitleaks 8.30.1 installed, scan history with this command:

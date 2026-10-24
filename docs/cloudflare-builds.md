@@ -4,16 +4,17 @@ Use this guide to connect repository checks to Cloudflare Workers Builds.
 Use [deployment settings](cloudflare-build-settings.md) for commands, limits, and checks that stay on demand.
 Use [activation](activate-cloudflare-development.md) for the separate development-installation approval.
 
-Workers Builds runs `npm run ci` and then `npm run ci:worker`.
+On `minsky-ci`, Workers Builds runs `npm run ci` and then `npm run ci:worker`.
 It does not publish `minsky-dev` or `minsky-docs`.
+On `minsky-docs`, Workers Builds publishes the docs. See [Publish the docs](#publish-the-docs).
 GitHub Actions no longer runs checks or publication. The GitHub account stays on the free plan.
 
-## Keep the application Workers disconnected
+## Keep the application Worker disconnected
 
 The approved development application uses `MINSKY_DEV_BACKEND=cloudflare`.
 Its committed configuration selects the complete Worker and the exact development resources.
-Keep Workers Builds disconnected on `minsky-dev` and `minsky-docs`.
-A build on either Worker can replace the application or publish before the checks finish.
+Keep Workers Builds disconnected on `minsky-dev`.
+A build on that Worker can replace the application or publish before the checks finish.
 
 `MINSKY_DEV_BACKEND` defaults to `cloudflare` when absent.
 Supabase mode requires `MINSKY_DEV_BACKEND=supabase`.
@@ -74,11 +75,33 @@ That comment is the build status. It is not an application preview URL.
 A failed `npm run ci` stops the build before `npm run ci:worker`.
 Fix the reported command and push again. Do not retry by deploying the application.
 
-## Publication
+## Publish the docs
 
-Automatic publication is removed with the GitHub Actions workflow.
+The `minsky-docs` Worker has two Workers Builds triggers. Both use the repository connection and build token of `minsky-ci`.
+The exact settings are in [deployment settings](cloudflare-build-settings.md#docs-workers-builds).
+
+- A push to `main` builds the site and runs `npx wrangler deploy --config wrangler.docs.jsonc`. The new version serves `https://minsky-docs.icaic-minsky.workers.dev`.
+- A push to any other branch builds the site and runs `npx wrangler versions upload --config wrangler.docs.jsonc`. The preview version does not receive traffic. The build log shows its preview URL.
+
+The docs build does not wait for the `minsky-ci` checks. A docs build failure does not change the published version.
+To publish again without a new push, start a build of `main` from **Workers & Pages > minsky-docs > Deployments**.
+If Workers Builds is not available, run `npm ci && npm ci --prefix site && npm run docs:deploy` from an updated `main` with a Wrangler login for account `458ad6a930b0fb717796dfa19ca6a2b1`.
+
+To recreate the triggers, open **Workers & Pages > minsky-docs > Settings > Build**:
+
+1. Connect GitHub repository `GiftedNovaHD/minsky`. Set the production branch to `main`.
+2. Set the build command to `npm ci --prefix site && npm run docs:build`.
+3. Set the deploy command to `npx wrangler deploy --config wrangler.docs.jsonc`.
+4. Enable preview builds. Set the preview command to `npx wrangler versions upload --config wrangler.docs.jsonc`.
+5. Leave the root directory empty. Keep the default dependency install. It installs the root lockfile, which provides Wrangler.
+6. Add build variable `NODE_VERSION` with value `22.23.2` to both triggers.
+7. Do not add application secrets. The docs build does not use them.
+
+## Application publication
+
+Automatic application publication is removed with the GitHub Actions workflow.
 `CLOUDFLARE_DEPLOY_ENABLED` no longer starts a job.
-Publish only with the guarded script in [deployment settings](cloudflare-build-settings.md#publication-commands), and only for an approved revision.
+Publish the application only with the guarded script in [deployment settings](cloudflare-build-settings.md#publication-commands), and only for an approved revision.
 The script still requires a repository branch-push context.
 This CI setup does not provide that context.
 

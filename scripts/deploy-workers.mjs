@@ -87,7 +87,25 @@ export function previewAddress(output) {
   return new URL(address).origin;
 }
 
-export async function verifyRevision(url, expected, request = globalThis.fetch, pause = setTimeout) {
+/** Return the commit that a Worker serves now, or null when it cannot be read. */
+export async function publishedRevision(url, request = globalThis.fetch) {
+  try {
+    const response = await request(`${url}/minsky-revision.json`, {
+      cache: "no-store", signal: globalThis.AbortSignal.timeout(10_000),
+    });
+    const sha = response.ok ? (await response.json()).sha : null;
+    return typeof sha === "string" ? sha : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Return true when the Worker serves the expected marker. On a Worker that all branches share,
+ * pass the revision it served before this upload as `previous`. Then a third revision means
+ * that another build published after this one, and the result is false.
+ */
+export async function verifyRevision(url, expected, request = globalThis.fetch, pause = setTimeout, previous) {
   const marker = typeof expected === "string" ? { sha: expected } : expected;
   // New preview DNS records can take time to become available.
   for (let attempt = 0; attempt < 12; attempt++) {
@@ -97,7 +115,9 @@ export async function verifyRevision(url, expected, request = globalThis.fetch, 
       });
       if (response.ok) {
         const published = await response.json();
-        if (Object.entries(marker).every(([key, value]) => published[key] === value)) return;
+        if (Object.entries(marker).every(([key, value]) => published[key] === value)) return true;
+        if (previous !== undefined && typeof published.sha === "string" &&
+            published.sha !== marker.sha && published.sha !== previous) return false;
       }
     } catch { /* Retry network, DNS, and non-JSON responses within this limit. */ }
     if (attempt < 11) await pause(5000);
@@ -309,7 +329,7 @@ export async function buildWorkers(env, {
 export async function deployWorkers(env, {
   site = "both", current = isCurrentRevision, execute = execFileSync, verify = verifyRevision,
   read = readFileSync, write = writeFileSync, report = summary, targets = deploymentTargets,
-  application = prepareApplication,
+  application = prepareApplication, revision = publishedRevision,
   deployedApplication = verifyApplicationDeployment,
 } = {}) {
   const plan = deploymentPlan(env);
@@ -341,6 +361,9 @@ export async function deployWorkers(env, {
       await application(worker, childEnv, execute, globalThis.fetch, report);
     }
     const marker = worker.backend ? applicationMarker(worker, plan.sha) : { sha: plan.sha };
+    // All branches publish to the preview Worker. Record what it serves before this upload.
+    const previous = worker.name === previewWorker.name
+      ? await revision(`https://${worker.name}.icaic-minsky.workers.dev`) : undefined;
     write(`${worker.assets}/minsky-revision.json`, `${JSON.stringify(marker)}\n`);
     let output;
     try {
@@ -354,7 +377,10 @@ export async function deployWorkers(env, {
     const url = plan.preview && !worker.backend
       ? previewAddress(output) : `https://${worker.name}.icaic-minsky.workers.dev`;
     report(`Published ${worker.name} at ${url} from ${plan.sha}.`);
-    await verify(url, marker);
+    if (!await verify(url, marker, globalThis.fetch, setTimeout, previous)) {
+      report(`Another build replaced ${worker.name} after this upload. That build verifies its own deployment.`);
+      continue;
+    }
     if (worker.backend) await deployedApplication(worker, childEnv);
     report(`The revision and deployment checks passed for ${worker.name}.`);
   }

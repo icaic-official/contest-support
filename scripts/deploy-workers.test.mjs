@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   buildWorkers, prepareApplication,
   deploymentPlan, deploymentTargets, deployWorkers, isCurrentRevision, previewAddress,
-  validateBuildSettings, verifyApplicationDeployment, verifyRevision, wranglerArguments,
+  publishedRevision, validateBuildSettings, verifyApplicationDeployment, verifyRevision, wranglerArguments,
 } from "./deploy-workers.mjs";
 
 const sha = "a".repeat(40);
@@ -103,7 +103,7 @@ it("reads preview JSON after asset progress and rejects malformed responses", as
   const mocks = deploymentMocks();
   mocks.execute.mockReturnValue(output);
   await deployWorkers(env, { ...mocks, site: "docs" });
-  expect(mocks.verify).toHaveBeenCalledWith(url, { sha });
+  expect(mocks.verify).toHaveBeenCalledWith(url, { sha }, globalThis.fetch, expect.any(Function), undefined);
   mocks.verify.mockClear();
   mocks.execute.mockReturnValue(`Progress\n{broken JSON`);
   await expect(deployWorkers(env, { ...mocks, site: "docs" })).rejects.toThrow("valid preview JSON");
@@ -144,7 +144,8 @@ function deploymentMocks() {
     execute: vi.fn().mockReturnValue(JSON.stringify({ preview: {
       urls: ["https://branch-minsky-dev.icaic-minsky.workers.dev"],
     } })),
-    verify: vi.fn(), write: vi.fn(), report: vi.fn(),
+    verify: vi.fn().mockResolvedValue(true), write: vi.fn(), report: vi.fn(),
+    revision: vi.fn().mockResolvedValue(null),
     application: vi.fn(), deployedApplication: vi.fn(),
     targets: (target, site, options) => deploymentTargets(target, site, { ...options, installation }),
     read: (path, encoding) => path === "dist/minsky-build.json"
@@ -478,9 +479,44 @@ describe("branch previews", () => {
     await deployWorkers(preview, { ...mocks, site: "app" });
     expect(mocks.application).toHaveBeenCalledWith(worker, expect.anything(), mocks.execute, globalThis.fetch, mocks.report);
     expect(mocks.execute.mock.calls[0][1]).toEqual(["deploy", "--config", previewConfig]);
-    expect(mocks.verify).toHaveBeenCalledWith("https://minsky-preview.icaic-minsky.workers.dev", marker);
+    expect(mocks.revision).toHaveBeenCalledWith("https://minsky-preview.icaic-minsky.workers.dev");
+    expect(mocks.verify).toHaveBeenCalledWith("https://minsky-preview.icaic-minsky.workers.dev", marker,
+      globalThis.fetch, expect.any(Function), null);
     expect(mocks.deployedApplication).toHaveBeenCalledWith(worker, expect.anything());
     expect(mocks.report).toHaveBeenCalledWith("Target: shared preview Worker `minsky-preview`.");
+
+    // A newer build from another branch published after this one. This build does not fail.
+    mocks.verify.mockResolvedValue(false);
+    mocks.deployedApplication.mockClear();
+    await deployWorkers(preview, { ...mocks, site: "app" });
+    expect(mocks.deployedApplication).not.toHaveBeenCalled();
+    expect(mocks.report).toHaveBeenCalledWith(
+      "Another build replaced minsky-preview after this upload. That build verifies its own deployment.");
+  });
+
+  it("recognizes a newer build on the shared preview and keeps waiting during propagation", async () => {
+    const pause = vi.fn();
+    const serving = (...shas) => {
+      const request = vi.fn();
+      for (const value of shas) request.mockResolvedValueOnce({ ok: true, json: async () => ({ sha: value }) });
+      return request;
+    };
+    // The earlier revision is still visible at first. Then the expected revision appears.
+    expect(await verifyRevision("https://example.test", sha, serving("before", sha), pause, "before")).toBe(true);
+    expect(await verifyRevision("https://example.test", sha, serving("before", "newer"), pause, "before")).toBe(false);
+    // Without a recorded earlier revision, any other revision comes from a newer build.
+    expect(await verifyRevision("https://example.test", sha, serving("newer"), pause, null)).toBe(false);
+    // A Worker that only one build publishes never reports a replacement.
+    const stale = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ sha: "newer" }) });
+    await expect(verifyRevision("https://example.test", sha, stale, pause)).rejects.toThrow(/could not be verified/);
+
+    const request = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ sha }) });
+    expect(await publishedRevision("https://example.test", request)).toBe(sha);
+    expect(request.mock.calls[0][0]).toBe("https://example.test/minsky-revision.json");
+    for (const failure of [vi.fn().mockRejectedValue(new Error("DNS")), vi.fn().mockResolvedValue({ ok: false }),
+      vi.fn().mockResolvedValue({ ok: true, json: async () => ({}) })]) {
+      expect(await publishedRevision("https://example.test", failure)).toBeNull();
+    }
   });
 
   it("accepts migrations from other branches but requires every migration in the checkout", async () => {

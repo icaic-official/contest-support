@@ -20,7 +20,7 @@ Team search tolerates small spelling errors. Select a suggestion; typed text alo
 1. Open an issue and select **Claim**. On a phone, **Claim and go** claims the oldest waiting issue.
 2. Investigate with the team.
 3. If you need a specialist, request a handoff. You stay the owner until another specialist accepts. The timer keeps running.
-4. Resolve with a summary. Pick a preset or write your own. Only the owner can resolve.
+4. Resolve with a summary. Pick a preset or write your own. Only the owner or an admin can resolve. An admin can resolve only an issue that someone has claimed.
 
 The timer uses saved timestamps, so a refresh does not reset it.
 If someone else claims first, the new owner appears.

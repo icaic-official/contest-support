@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
   ArrowUpRight,
   CircleCheck,
@@ -7,6 +8,7 @@ import {
   WifiOff,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { useAvatarUrl } from "@/connected/Avatars";
 import type { JuryRow } from "@/connected/jury";
 import { formatDate, statusNames } from "@/connected/labels";
 import { type Issue, type Resolution, unresolvedTime } from "@/connected/model";
@@ -163,23 +165,45 @@ export function ConnectionBadge({ connected }: { connected: boolean }) {
   );
 }
 
-/** A round avatar with initials, or a dashed circle for nobody. */
+/**
+ * A round avatar with the person's picture, or with initials when the person
+ * has no picture or the caller cannot see it. A dashed circle stands for
+ * nobody. The name always stands next to the avatar, so the picture has no
+ * alt text.
+ */
 export function PersonAvatar({
   name,
+  personId,
   className,
 }: {
   name: string | null | undefined;
+  /** The account that the avatar shows. Without it the avatar shows initials. */
+  personId?: string | null;
   className?: string;
 }) {
+  const url = useAvatarUrl(personId ?? undefined);
+  // A picture that the browser cannot decode falls back to initials.
+  const [unreadable, setUnreadable] = useState<string>();
+  const picture = url !== unreadable ? url : undefined;
   return name ? (
     <span
       aria-hidden="true"
       className={cn(
-        "grid size-8 shrink-0 place-items-center rounded-full bg-muted text-[11px] font-semibold",
+        "grid size-8 shrink-0 place-items-center overflow-hidden rounded-full bg-muted text-[11px] font-semibold",
         className,
       )}
     >
-      {initials(name)}
+      {picture ? (
+        <img
+          src={picture}
+          alt=""
+          decoding="async"
+          onError={() => setUnreadable(picture)}
+          className="size-full object-cover"
+        />
+      ) : (
+        initials(name)
+      )}
     </span>
   ) : (
     <span

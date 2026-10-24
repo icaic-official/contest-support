@@ -502,7 +502,11 @@ export function MeTab(props: PhoneTabProps & { onSessionChange: () => void }) {
   return (
     <div className="space-y-5">
       <div className="flex items-center gap-4 p-1">
-        <PersonAvatar name={name} className="size-14 text-base" />
+        <PersonAvatar
+          name={name}
+          personId={user.id}
+          className="size-14 text-base"
+        />
         <div className="min-w-0">
           <div className="truncate text-lg font-semibold">{name}</div>
           <div className="text-sm text-muted-foreground">

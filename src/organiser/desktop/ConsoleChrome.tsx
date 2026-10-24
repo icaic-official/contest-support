@@ -220,7 +220,7 @@ export function ConsoleSidebar({
         collapsed && "justify-center",
       )}
     >
-      <PersonAvatar name={personName} />
+      <PersonAvatar name={personName} personId={member.user_id} />
       <span className={cn("min-w-0 flex-1", collapsed && "sr-only")}>
         <span className="block truncate text-sm font-medium">{personName}</span>
         <span className="block truncate text-xs text-muted-foreground">

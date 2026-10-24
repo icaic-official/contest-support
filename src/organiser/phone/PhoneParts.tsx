@@ -232,7 +232,11 @@ export function IssueCard({
               {issue.category}
             </span>
             <span className="flex min-w-0 items-center gap-1.5 text-xs">
-              <PersonAvatar name={issue.owner_name} className="size-6 text-[9px]" />
+              <PersonAvatar
+                name={issue.owner_name}
+                personId={issue.owner}
+                className="size-6 text-[9px]"
+              />
               <span className="truncate">
                 {issue.owner_name ?? "Unassigned"}
               </span>

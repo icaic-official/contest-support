@@ -151,7 +151,11 @@ export function AccountPage({
         </p>
       </div>
       <div className="flex flex-wrap items-center gap-4 rounded-xl border bg-card p-5 shadow-sm">
-        <PersonAvatar name={title} className="size-16 text-xl" />
+        <PersonAvatar
+          name={title}
+          personId={shell.user.id}
+          className="size-16 text-xl"
+        />
         <div className="min-w-0 flex-1">
           <p className="truncate text-lg font-semibold">{title}</p>
           <p className="truncate font-mono text-sm text-muted-foreground">

@@ -132,6 +132,7 @@ export function IssueTable({
                   <div className="flex items-center gap-2">
                     <PersonAvatar
                       name={issue.owner_name}
+                      personId={issue.owner}
                       className="size-7 text-[10px]"
                     />
                     <span

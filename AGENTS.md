@@ -45,6 +45,10 @@ The Supabase adapter stays as a second implementation behind the shared backend 
 Keep its adapter, migrations, functions, local tests, and provider test driver. Every local Supabase adapter test must keep passing.
 Do not describe it as the live backend, the default setup, or the development URL's backend.
 Do not change hosted Supabase or Cloudflare resources, secrets, or repository settings.
+Exception: preview resources. On 2026-10-24 the owner allowed agents to create and manage Cloudflare resources for branch previews.
+This includes their D1 migrations, test data, test accounts, and preview secrets.
+Give each preview resource a name that starts with `minsky-preview`.
+The exception does not cover development, CI, or production resources, API tokens, or account and repository settings.
 
 Start new work from updated `main`. Open the result as a draft pull request into `main`.
 Preserve the Workers Builds move and the removed GitHub Actions workflow.
@@ -144,6 +148,8 @@ Ask only for missing decisions that materially affect scope or behavior.
 Keep development, CI, and future production databases and credentials separate.
 The hosted `minsky-dev` app uses the complete Cloudflare development installation. It is not production.
 The Cloudflare development resources are `minsky-development` and private bucket `minsky-development-images`.
+The Cloudflare preview resources are D1 database `minsky-preview` and private bucket `minsky-preview-images`. They hold only test data.
+Never point a preview at development, CI, or production resources.
 On-demand hosted Cloudflare checks use the separate connector and store CI targets.
 The project operates no Supabase project. Hosted Supabase checks run only against an isolated project that the person running them owns.
 No production project exists.

@@ -1,10 +1,10 @@
 import { spawnSync } from 'node:child_process';
 import { Buffer } from 'node:buffer';
 import { randomBytes } from 'node:crypto';
-import { mkdir, mkdtemp, open, realpath, rm } from 'node:fs/promises';
+import { open, realpath } from 'node:fs/promises';
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import process from 'node:process';
-import { pathToFileURL } from 'node:url';
+import { bundleProviderModule } from './bundle.mjs';
 import { readInstallationTarget, readPublicJson, repositoryRoot } from './configuration.mjs';
 import { assertCurrentMigrations } from './migrations.mjs';
 import { enforceWranglerEnvironment, safeWranglerEnvironment } from './safe-environment.mjs';
@@ -80,22 +80,11 @@ async function writePrivateResult(handle, value) {
   await handle.sync();
 }
 
-/** Bundle provider code into ignored scratch. The bundle contains no credentials. */
+/** Bundle the installation library. Its preparation failures never start an operation. */
 export async function loadInstallationLibrary() {
-  const { build } = await import('esbuild');
-  const scratchRoot = resolve(repositoryRoot, '.wrangler');
-  await mkdir(scratchRoot, { recursive: true, mode: 0o700 });
-  const directory = await mkdtemp(join(scratchRoot, 'installation-operator-'));
-  const output = join(directory, 'installation.mjs');
   try {
-    await build({
-      entryPoints: [resolve(repositoryRoot, 'src/server/adapters/cloudflare/installation.ts')],
-      outfile: output, bundle: true, packages: 'external', platform: 'node', format: 'esm',
-      target: 'node22', logLevel: 'silent',
-    });
-    return { library: await import(pathToFileURL(output).href), dispose: () => rm(directory, { recursive: true, force: true }) };
+    return await bundleProviderModule('src/server/adapters/cloudflare/installation.ts', 'installation-operator-');
   } catch {
-    await rm(directory, { recursive: true, force: true });
     throw new Error('The installation library could not be prepared. No operation started.');
   }
 }

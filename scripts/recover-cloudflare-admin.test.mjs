@@ -1,6 +1,9 @@
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { execFile } from "node:child_process";
+import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import process from "node:process";
+import { promisify } from "node:util";
 import { afterEach, expect, it } from "vitest";
 import {
   assertMaintainerTerminal,
@@ -119,4 +122,40 @@ it("does not print a password when recovery refuses the account", async () => {
     }),
   })).rejects.toThrow("not an admin");
   expect(lines).toEqual(["Recovering an admin in remote D1 database minsky-development."]);
+});
+
+async function recoveryBundles() {
+  const names = await readdir(".wrangler").catch(() => []);
+  return names.filter((name) => name.startsWith("admin-recovery-"));
+}
+
+// Vitest resolves packages from the repository root, so only plain Node shows where the bundle can find them.
+const loadInNode = `
+import { loadRecoveryLibrary } from "./scripts/recover-cloudflare-admin.mjs";
+const { library, dispose } = await loadRecoveryLibrary();
+await dispose();
+console.log(typeof library.recoverCloudflareAdmin, typeof library.writeTemporaryPassword);
+`;
+
+it("loads the recovery library in Node without a database or a password", async () => {
+  const before = await recoveryBundles();
+  const { stdout } = await promisify(execFile)(process.execPath, ["--input-type=module", "--eval", loadInNode]);
+  expect(stdout.trim()).toBe("function function");
+  expect(await recoveryBundles()).toEqual(before);
+});
+
+it("adds an error code or class and omits messages, stacks, and secrets", () => {
+  const missing = new Error("Cannot find package 'better-auth' imported from /tmp/minsky-admin-recovery/admin-recovery.mjs");
+  missing.code = "ERR_MODULE_NOT_FOUND";
+  missing.stack = "Error: hunter2\n    at load (/tmp/secret-token)";
+  expect(publicError(missing)).toBe("Admin recovery failed. The temporary password was not shown. The error code is ERR_MODULE_NOT_FOUND.");
+
+  const named = new TypeError("session token sk-live");
+  expect(publicError(named)).toBe("Admin recovery failed. The temporary password was not shown. The error class is TypeError.");
+
+  const unsafe = new Error("hunter2");
+  unsafe.code = "hunter2";
+  expect(publicError(unsafe)).toBe("Admin recovery failed. The temporary password was not shown.");
+  expect(publicError(new Error("The username is invalid. Recovery did not start.")))
+    .toBe("The username is invalid. Recovery did not start.");
 });

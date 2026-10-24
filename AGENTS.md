@@ -95,10 +95,10 @@ Statements in those records that Supabase is the active backend are superseded b
 - Set the author of every new commit to `CJX <72659439+GiftedNovaHD@users.noreply.github.com>`.
   Before the first commit, run `git config author.name CJX` and `git config author.email 72659439+GiftedNovaHD@users.noreply.github.com`.
   Do not change `user.name`, `user.email`, or the committer. The committer identity and its signing key keep the commit verified on GitHub.
-- Include `Co-authored-by: PuR3Luck <aidan.ong822@gmail.com>` and `Co-authored-by: notbowen <contact@hubowen.dev>` in every new commit you create and pushes for this repository.
+- Include `Co-authored-by: PuR3Luck <aidan.ong822@gmail.com>` and `Co-authored-by: notbowen <contact@hubowen.dev>` in every new commit you create and push for this repository.
 - Separate the co-author trailer from the commit body with a blank line.
 - Preserve the primary author and any other co-author trailers.
-- Before each push, check that every new created commit has the required author and contains the required trailers exactly once.
+- Before each push, check that every new commit you created has the required author and contains each required trailer exactly once.
 - Distinguish development tickets from contestant issues in code, documentation, and communication.
 - Start each development ticket from updated `main`.
 - Use `feature/tNNNN-description` for ticket branches.

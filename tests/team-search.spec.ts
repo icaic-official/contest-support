@@ -156,6 +156,8 @@ async function signIn(page: Page, viewport: Viewport) {
       result = snapshot;
     } else if (path === '/rest/v1/rpc/announcement_snapshot') {
       result = emptyAnnouncementSnapshot();
+    } else if (path === '/rest/v1/rpc/avatar_list') {
+      result = [];
     } else if (path === '/rest/v1/rpc/workflow') {
       commands.push(route.request().postDataJSON().p_action);
       result = ISSUE_IDS[0];

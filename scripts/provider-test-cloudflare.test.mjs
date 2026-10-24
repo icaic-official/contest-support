@@ -8,6 +8,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test, vi 
 import { getPlatformProxy } from 'wrangler';
 import { renderWranglerConfiguration } from '../src/server/adapters/cloudflare/tooling/configuration.mjs';
 import { maintainFixtureSessions, SessionLiveCoordinator } from '../src/server/adapters/cloudflare/live';
+import { avatarKey } from '../src/server/adapters/cloudflare/avatars';
 import { passwordHasher } from '../src/server/adapters/cloudflare/password';
 import { D1AuthenticationService } from '../src/server/adapters/cloudflare/authentication';
 import { createBetterAuthIdentity } from '../src/server/adapters/cloudflare/identity';
@@ -441,7 +442,7 @@ describe('Cloudflare fixture setup and exact cleanup with real local D1/R2', () 
     const contents = await readFile(path, 'utf8');
     expect(Object.keys(fixture.accounts)).toHaveLength(10);
     for (const account of Object.values(fixture.accounts)) expect(contents).not.toContain(account.password);
-    expect(Object.keys(journal).sort()).toEqual(['accountIds', 'createdAccounts', 'eventId', 'images', 'provider', 'runId', 'sessionIds', 'target', 'teamIds', 'version']);
+    expect(Object.keys(journal).sort()).toEqual(['accountIds', 'avatars', 'createdAccounts', 'eventId', 'images', 'provider', 'runId', 'sessionIds', 'target', 'teamIds', 'version']);
     const hash = await statement('SELECT password FROM ba_account WHERE userId = ?', fixture.accounts.admin.id).first();
     expect(await passwordHasher.verify(fixture.accounts.admin.password, hash.password)).toBe(true);
     expect(contents).not.toContain(hash.password);
@@ -462,6 +463,13 @@ describe('Cloudflare fixture setup and exact cleanup with real local D1/R2', () 
     const thumbnail = `${fixture.sessionId}/${issueId}/${imageId}/thumbnail`;
     const sessionId = randomUUID();
     const rateKey = `ip:shared-${randomUUID()}`;
+    const [currentAvatar, retiredAvatar, foreignAvatar] = [randomUUID(), randomUUID(), randomUUID()];
+    const currentAvatarKey = avatarKey(fixture.accounts.volunteer.id, currentAvatar);
+    const retiredAvatarKey = avatarKey(fixture.accounts.volunteer.id, retiredAvatar);
+    const foreignAvatarKey = avatarKey(foreignAccount, foreignAvatar);
+    const avatar = (id, accountId, state) => statement(`INSERT INTO account_avatars (id, account_id, request_id, byte_size,
+      content_type, digest, state, ready_at, retired_at) VALUES (?, ?, ?, 3, 'image/png', ?, ?, '2026-10-25T00:00:00.000Z', ?)`,
+    id, accountId, randomUUID(), 'a'.repeat(64), state, state === 'retired' ? '2026-10-25T00:00:01.000Z' : null);
     try {
       await platform.env.DB.batch([
         statement('INSERT INTO events (id, name) VALUES (?, ?)', foreignEvent, 'Unrelated test event'),
@@ -479,7 +487,11 @@ describe('Cloudflare fixture setup and exact cleanup with real local D1/R2', () 
           randomUUID(), fixture.accounts.volunteer.id, fixture.accounts.volunteer.id),
         statement('INSERT INTO authentication_limits (key, window_start, attempts) VALUES (?, unixepoch(), 1), (?, unixepoch(), 1), (?, unixepoch(), 1)',
           `username:${fixture.accounts.volunteer.username}`, `change:${fixture.accounts.volunteer.id}`, rateKey),
+        avatar(retiredAvatar, fixture.accounts.volunteer.id, 'retired'),
+        avatar(currentAvatar, fixture.accounts.volunteer.id, 'ready'),
+        avatar(foreignAvatar, foreignAccount, 'ready'),
       ]);
+      for (const key of [currentAvatarKey, retiredAvatarKey, foreignAvatarKey]) await platform.env.IMAGES.put(key, new Uint8Array([1, 2, 3]));
       await platform.env.IMAGES.put(original, new Uint8Array([1, 2, 3]));
       await platform.env.IMAGES.put(thumbnail, new Uint8Array([1, 2, 3]));
       await platform.env.IMAGES.put(foreignKey, new Uint8Array([4, 5, 6]));
@@ -500,6 +512,7 @@ describe('Cloudflare fixture setup and exact cleanup with real local D1/R2', () 
           delete: async (keys) => {
             if (++deletion === 2) {
               await platform.env.IMAGES.put(original, new Uint8Array([7, 8, 9]));
+              await platform.env.IMAGES.put(currentAvatarKey, new Uint8Array([7, 8, 9]));
               throw new Error('Injected late object after DB cleanup');
             }
             await platform.env.IMAGES.delete(keys);
@@ -510,17 +523,26 @@ describe('Cloudflare fixture setup and exact cleanup with real local D1/R2', () 
       expect(existsSync(path)).toBe(true);
       expect(await statement('SELECT id FROM events WHERE id = ?', journal.eventId).first()).toBeNull();
       expect(JSON.parse(await readFile(path, 'utf8')).images).toEqual([{ id: imageId, session_id: fixture.sessionId, issue_id: issueId }]);
+      expect(await statement('SELECT count(*) AS count FROM account_avatars WHERE account_id = ?', fixture.accounts.volunteer.id).first())
+        .toEqual({ count: 0 });
+      expect(JSON.parse(await readFile(path, 'utf8')).avatars.map((row) => row.id).sort())
+        .toEqual([currentAvatar, retiredAvatar].sort());
       await cleanupFixture(path, dependencies());
       expect(existsSync(path)).toBe(false);
       expect(await platform.env.IMAGES.head(original)).toBeNull();
       expect(await platform.env.IMAGES.head(thumbnail)).toBeNull();
+      expect(await platform.env.IMAGES.head(currentAvatarKey)).toBeNull();
+      expect(await platform.env.IMAGES.head(retiredAvatarKey)).toBeNull();
       expect(await platform.env.IMAGES.head(foreignKey)).not.toBeNull();
+      expect(await platform.env.IMAGES.head(foreignAvatarKey)).not.toBeNull();
+      expect(await statement('SELECT id FROM account_avatars WHERE id = ?', foreignAvatar).first()).toEqual({ id: foreignAvatar });
       expect(await statement('SELECT id FROM events WHERE id = ?', foreignEvent).first()).toEqual({ id: foreignEvent });
       expect(await statement('SELECT id FROM accounts WHERE id = ?', foreignAccount).first()).toEqual({ id: foreignAccount });
       expect(await statement('SELECT attempts FROM authentication_limits WHERE key = ?', rateKey).first()).toEqual({ attempts: 1 });
     } finally {
       if (existsSync(path)) await cleanupFixture(path, dependencies());
-      await platform.env.IMAGES.delete([foreignKey]);
+      await platform.env.IMAGES.delete([foreignKey, foreignAvatarKey]);
+      await statement('DELETE FROM account_avatars WHERE id = ?', foreignAvatar).run();
       await statement('DELETE FROM events WHERE id = ?', foreignEvent).run();
       await statement('DELETE FROM accounts WHERE id = ?', foreignAccount).run();
       await statement('DELETE FROM authentication_limits WHERE key = ?', rateKey).run();

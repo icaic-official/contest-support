@@ -20,11 +20,14 @@ export function avatarKey(accountId: string, avatarId: string): string {
 }
 
 // Every account reads its own avatar. Staff of a session read the avatars of
-// the session's other staff. Team accounts read no one else's avatar.
+// the session's other staff. Team accounts read no one else's avatar. The owner
+// test repeats the staff test of currentAccessSql.
 const visibleSql = `WITH login AS (${currentReadyLoginSql}), access AS (${currentAccessSql})
   SELECT v.account_id AS person_id, v.id AS avatar_id, v.content_type FROM account_avatars v CROSS JOIN login l
   WHERE v.state = 'ready' AND (v.account_id = l.id OR EXISTS (SELECT 1 FROM access a JOIN memberships m
-    ON m.session_id = ? AND m.account_id = v.account_id AND m.team_id IS NULL WHERE a.staff = 1))`;
+    ON m.session_id = ? AND m.account_id = v.account_id AND m.team_id IS NULL AND (m.is_admin = 1 OR EXISTS (
+      SELECT 1 FROM membership_roles r WHERE r.session_id = m.session_id AND r.account_id = m.account_id))
+    WHERE a.staff = 1))`;
 
 /** Profile pictures share the private image bucket under keys that start with the account ID. */
 export class R2AvatarService {

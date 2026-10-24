@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { z } from 'zod';
 import type { D1Connection, D1Statement } from '../../../src/server/adapters/d1/connection';
 import { attachmentPath } from '../../../src/connected/imageFile';
+import { avatarKey } from '../../../src/server/adapters/cloudflare/avatars';
 import { passwordHasher, randomSecret } from '../../../src/server/adapters/cloudflare/password';
 import { createdAccountMarkers, type Actor, type ScenarioData, type TestAccount } from '../contracts';
 import { confirmFixtureTarget, readFixtureTarget, type FixtureTarget } from './target.mjs';
@@ -19,6 +20,7 @@ const journalSchema = z.strictObject({
   accountIds: z.record(z.enum(actors), uuid),
   createdAccounts: z.array(z.strictObject({ name: z.string(), username: z.string(), id: uuid.optional() })).default([]),
   images: z.array(z.strictObject({ id: uuid, session_id: uuid, issue_id: uuid })).default([]),
+  avatars: z.array(z.strictObject({ id: uuid, account_id: uuid })).default([]),
   target: z.strictObject({
     accountId: z.string(), databaseId: uuid, databaseName: z.string(), workerName: z.string(),
     bucketName: z.string(), origin: z.url(), configPath: z.string(),
@@ -31,7 +33,9 @@ const journalSchema = z.strictObject({
     new Set(journal.createdAccounts.map((account) => account.username)).size === journal.createdAccounts.length &&
     journal.createdAccounts.every((account) => markers.some((marker) => marker.name === account.name && marker.username === account.username)) &&
     new Set(journal.images.map((image) => image.id)).size === journal.images.length &&
-    journal.images.every((image) => journal.sessionIds.includes(image.session_id));
+    journal.images.every((image) => journal.sessionIds.includes(image.session_id)) &&
+    new Set(journal.avatars.map((avatar) => avatar.id)).size === journal.avatars.length &&
+    journal.avatars.every((avatar) => Object.values(journal.accountIds).includes(avatar.account_id) || createdIds.includes(avatar.account_id));
 });
 type Journal = z.infer<typeof journalSchema>;
 type Bind = string | number | null;
@@ -134,7 +138,7 @@ export async function createFixture(path: string, dependencies: Dependencies = {
     const journal: Journal = {
       version: 1, provider: 'cloudflare', target, runId: crypto.randomUUID(), eventId: crypto.randomUUID(),
       sessionIds: [crypto.randomUUID(), crypto.randomUUID()],
-      teamIds: [crypto.randomUUID(), crypto.randomUUID(), crypto.randomUUID()], accountIds, images: [], createdAccounts: [],
+      teamIds: [crypto.randomUUID(), crypto.randomUUID(), crypto.randomUUID()], accountIds, images: [], avatars: [], createdAccounts: [],
     };
     const createdAccounts = createdAccountMarkers(journal.runId);
     journal.createdAccounts = Object.values(createdAccounts);
@@ -228,6 +232,7 @@ export async function inspectFixtureAuthentication(path: string, accountId: stri
 }
 
 interface OwnedImage { id: string; session_id: string; issue_id: string; original_path: string; thumbnail_path: string }
+interface OwnedAvatar { id: string; account_id: string }
 
 function ownedAccountIds(journal: Journal): string[] {
   return [...actors.map((actor) => journal.accountIds[actor]), ...journal.createdAccounts.flatMap((account) => account.id ? [account.id] : [])];
@@ -317,6 +322,14 @@ async function validateOwnership(db: D1Connection, journal: Journal): Promise<Ow
   return [...owned.values()];
 }
 
+/** Avatar rows belong to accounts. Every state can have a stored file, so all rows count. */
+async function ownedAvatars(db: D1Connection, journal: Journal): Promise<OwnedAvatar[]> {
+  const ids = ownedAccountIds(journal);
+  const rows = (await statement(db, `SELECT id, account_id FROM account_avatars WHERE account_id IN (${marks(ids.length)})`, ...ids)
+    .all<OwnedAvatar>()).results;
+  const owned = new Map([...journal.avatars, ...rows].map((avatar) => [avatar.id, { id: avatar.id, account_id: avatar.account_id }]));
+  return [...owned.values()];
+}
 
 async function maintain(platform: Platform, journal: Journal, phase: 'prepare' | 'finish'): Promise<void> {
   const response = await platform.env.MAINTENANCE.fetch('https://maintenance.internal/sessions', {
@@ -344,13 +357,16 @@ async function cleanupOnPlatform(path: string, platform: Platform, target: Fixtu
   ]);
   const images = await validateOwnership(db, journal);
   journal.images = images.map(({ id, session_id, issue_id }) => ({ id, session_id, issue_id }));
+  const avatars = await ownedAvatars(db, journal);
+  journal.avatars = avatars;
   // Keep exact object identities before removing their database metadata. A
   // lost cleanup response can then recover objects after a committed DB batch.
   const nextPath = `${path}.${crypto.randomUUID()}.next`;
   await writeFile(nextPath, JSON.stringify(journal), { flag: 'wx', mode: 0o600 });
   await rename(nextPath, path);
   await maintain(platform, journal, 'prepare');
-  const keys = images.flatMap((image) => [image.original_path, image.thumbnail_path]);
+  const keys = [...images.flatMap((image) => [image.original_path, image.thumbnail_path]),
+    ...avatars.map((avatar) => avatarKey(avatar.account_id, avatar.id))];
   // No list or prefix deletion can reach another fixture's objects.
   for (let index = 0; index < keys.length; index += 1000) await platform.env.IMAGES.delete(keys.slice(index, index + 1000));
   for (const key of keys) if (await platform.env.IMAGES.head(key)) throw new Error('Fixture image cleanup is incomplete.');
@@ -361,6 +377,7 @@ async function cleanupOnPlatform(path: string, platform: Platform, target: Fixtu
     statement(db, `DELETE FROM account_operations WHERE account_id IN (${marks(ids.length)}) OR actor IN (${marks(ids.length)})`, ...ids, ...ids),
     statement(db, `DELETE FROM ba_user WHERE id IN (${marks(ids.length)})`, ...ids),
     statement(db, `DELETE FROM authentication_limits WHERE key IN (${marks(rateKeys.length)})`, ...rateKeys),
+    statement(db, `DELETE FROM account_avatars WHERE account_id IN (${marks(ids.length)})`, ...ids),
     statement(db, `DELETE FROM accounts WHERE id IN (${marks(ids.length)})`, ...ids),
   ]);
   const checks: D1Statement[] = [
@@ -369,7 +386,7 @@ async function cleanupOnPlatform(path: string, platform: Platform, target: Fixtu
     ...['teams', 'issues', 'resolutions', 'awards', 'memberships', 'membership_roles', 'admin_audit', 'command_receipts', 'audience_sequences', 'notifications', 'session_issue_sequences', 'issue_images']
       .map((table) => statement(db, `SELECT count(*) AS count FROM ${table} WHERE session_id IN (?, ?)`, ...journal.sessionIds)),
     ...['accounts', 'ba_user'].map((table) => statement(db, `SELECT count(*) AS count FROM ${table} WHERE id IN (${marks(ids.length)})`, ...ids)),
-    statement(db, `SELECT count(*) AS count FROM logins WHERE account_id IN (${marks(ids.length)})`, ...ids),
+    ...['logins', 'account_avatars'].map((table) => statement(db, `SELECT count(*) AS count FROM ${table} WHERE account_id IN (${marks(ids.length)})`, ...ids)),
     ...['ba_session', 'ba_account'].map((table) => statement(db, `SELECT count(*) AS count FROM ${table} WHERE userId IN (${marks(ids.length)})`, ...ids)),
     statement(db, `SELECT count(*) AS count FROM account_operations WHERE account_id IN (${marks(ids.length)}) OR actor IN (${marks(ids.length)})`, ...ids, ...ids),
     statement(db, `SELECT count(*) AS count FROM authentication_limits WHERE key IN (${marks(rateKeys.length)})`, ...rateKeys),

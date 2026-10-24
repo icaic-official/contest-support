@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import type { D1Connection } from '../../src/server/adapters/d1/connection';
 import { passwordHasher, randomSecret } from '../../src/server/adapters/cloudflare/password';
+import { avatarKey } from '../../src/server/adapters/cloudflare/avatars';
 import { maintainFixtureSessions, type LiveEnvironment } from '../../src/server/adapters/cloudflare/live';
 import type { Actor, TestAccount } from '../providers/contracts';
 import type { UiFixture } from './ui-journey';
@@ -79,7 +80,10 @@ export async function createLocalUiFixture(env: LocalUiEnvironment, origin: stri
       await maintain('prepare');
       const images = (await write('SELECT original_path, thumbnail_path FROM issue_images WHERE session_id IN (?, ?)', ...sessionIds)
         .all<{ original_path: string; thumbnail_path: string }>()).results;
-      const keys = images.flatMap((image) => [image.original_path, image.thumbnail_path]);
+      const avatars = (await write(`SELECT id, account_id FROM account_avatars WHERE account_id IN (${marks})`, ...ids)
+        .all<{ id: string; account_id: string }>()).results;
+      const keys = [...images.flatMap((image) => [image.original_path, image.thumbnail_path]),
+        ...avatars.map((avatar) => avatarKey(avatar.account_id, avatar.id))];
       if (keys.length) await env.IMAGES.delete(keys);
       const rateKeys = Object.values(accounts).flatMap((account) => [`username:${account.username}`, `change:${account.id}`]);
       rateKeys.push(...['127.0.0.1', '::1', '198.51.100.17'].map((ip) => `ip:${createHash('sha256').update(`${secret}:${ip}`).digest('hex')}`));
@@ -88,6 +92,7 @@ export async function createLocalUiFixture(env: LocalUiEnvironment, origin: stri
         write(`DELETE FROM account_operations WHERE account_id IN (${marks}) OR actor IN (${marks})`, ...ids, ...ids),
         write(`DELETE FROM ba_user WHERE id IN (${marks})`, ...ids),
         write(`DELETE FROM authentication_limits WHERE key IN (${rateKeys.map(() => '?').join(',')})`, ...rateKeys),
+        write(`DELETE FROM account_avatars WHERE account_id IN (${marks})`, ...ids),
         write(`DELETE FROM accounts WHERE id IN (${marks})`, ...ids),
       ]);
       if (keys.length) await env.IMAGES.delete(keys);
@@ -95,7 +100,8 @@ export async function createLocalUiFixture(env: LocalUiEnvironment, origin: stri
       const expected: Record<string, number> = { accounts: 1, events: 1, sessions: 1, authentication_limits: 1 };
       const tables = ['accounts', 'events', 'sessions', 'authentication_limits', 'teams', 'issues', 'history', 'resolutions', 'awards',
         'memberships', 'membership_roles', 'admin_audit', 'command_receipts', 'audience_sequences', 'notifications', 'session_issue_sequences',
-        'issue_images', 'image_deletions', 'logins', 'ba_user', 'ba_account', 'ba_session', 'account_operations', 'installation'];
+        'issue_images', 'image_deletions', 'logins', 'ba_user', 'ba_account', 'ba_session', 'account_operations', 'installation',
+        'account_avatars'];
       for (const table of tables) {
         const row = await db.prepare(`SELECT count(*) AS count FROM ${table}`).first<{ count: number }>();
         if (row?.count !== (expected[table] ?? 0)) throw new Error(`Local UI cleanup left unexpected ${table} rows.`);

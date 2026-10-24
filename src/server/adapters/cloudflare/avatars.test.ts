@@ -167,6 +167,16 @@ describe('Cloudflare avatars with local D1 and R2 bindings', () => {
     await expect(avatars.download(staff, fixture.sessionId, teamAvatar.avatar_id)).rejects.toMatchObject({ validation: true });
   });
 
+  it('hides the avatar of a member who has no staff role or admin flag', async () => {
+    const staffAvatar = await upload(staff, png);
+    const specialistAvatar = await upload(specialist, jpeg);
+    await db.prepare('DELETE FROM membership_roles WHERE session_id = ? AND account_id = ?')
+      .bind(fixture.sessionId, specialist.accountId).run();
+    expect(await avatars.list(staff, fixture.sessionId)).toEqual([staffAvatar]);
+    await expect(avatars.download(staff, fixture.sessionId, specialistAvatar.avatar_id)).rejects.toMatchObject({ validation: true });
+    expect(await avatars.list(specialist, fixture.sessionId)).toEqual([specialistAvatar]);
+  });
+
   it('hides avatars from a person outside the session and after revoked access', async () => {
     const staffAvatar = await upload(staff, png);
     const specialistAvatar = await upload(specialist, jpeg);

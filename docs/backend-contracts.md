@@ -1,6 +1,6 @@
 # Backend contracts
 
-The browser uses `Backend` in [contracts.ts](../src/backend/contracts.ts) for accounts, workflows, administration, images, announcements, and live updates.
+The browser uses `Backend` in [contracts.ts](../src/backend/contracts.ts) for accounts, workflows, administration, images, announcements, avatars, and live updates.
 An adapter implements those operations for a provider.
 Cloudflare is the active development implementation.
 The Supabase adapter remains available for Supabase builds on a reader's own project and for isolated provider verification. The project operates no Supabase installation.
@@ -41,13 +41,13 @@ Use [Run the shared workflow check](run-provider-tests.md#run-the-shared-workflo
 [applicationWorker.ts](../src/server/adapters/cloudflare/applicationWorker.ts) serves the application and its API.
 The Worker obtains `Caller` from the maintained identity service. Request bodies cannot supply that identity.
 Mutation routes check the exact origin, current session, and request-protection token.
-JSON bodies are limited to 16 KiB, except announcement text, which allows 64 KiB. Image transfers require an exact length and an R2-verified SHA-256 checksum.
+JSON bodies are limited to 16 KiB, except announcement text, which allows 64 KiB. Image transfers require an exact length and an R2-verified SHA-256 checksum. An avatar transfer has at most 256 KiB.
 
 The [D1 store](../src/server/adapters/d1/store.ts) persists all nine `WorkflowService` commands.
 Its batches recheck credentials, generation, identity-session expiry, application-login expiry, current permissions, and captured state.
 One database timestamp supplies each workflow commit's ledger and history records.
 State, receipts, history, resolutions, awards, and audience notifications commit together.
-The complete schema adds migrations `0005` through `0010` to the authentication foundation.
+The complete schema adds migrations `0005` through `0011` to the authentication foundation.
 
 [D1ApplicationService](../src/server/adapters/cloudflare/application.ts) returns each authorized snapshot in one database statement.
 Snapshots preserve names, timestamps, history, awards, image metadata, limits, and administrator records.
@@ -79,11 +79,13 @@ See [installation](../site/src/content/docs/operators/installation.mdx), [provid
 | [supabase/images.ts](../src/backend/supabase/images.ts) | Calls the attachment function and private Storage bucket. |
 | [supabase/workflow.ts](../src/backend/supabase/workflow.ts) | Provides the opt-in Edge Function executor for shared workflow verification. |
 | [supabase/announcements.ts](../src/backend/supabase/announcements.ts) | Calls the announcement database functions, the announcement-images function, and the private bucket. |
+| [supabase/avatars.ts](../src/backend/supabase/avatars.ts) | Calls the avatar database functions, the avatars function, and the private bucket. |
 | [cloudflare/backend.ts](../src/backend/cloudflare/backend.ts) | Calls the same-origin API and manages independent live connections. |
 | [server/adapters/cloudflare/applicationWorker.ts](../src/server/adapters/cloudflare/applicationWorker.ts) | Constructs Cloudflare services and handles application and maintenance requests. |
 | [server/adapters/cloudflare/application.ts](../src/server/adapters/cloudflare/application.ts) | Reads authorized snapshots and commits guarded administration changes. |
 | [server/adapters/cloudflare/announcements.ts](../src/server/adapters/cloudflare/announcements.ts) | Reads announcement snapshots and commits guarded announcement commands. |
 | [server/adapters/cloudflare/announcementImages.ts](../src/server/adapters/cloudflare/announcementImages.ts) | Manages private announcement image reservations, transfers, publication, and cleanup. |
+| [server/adapters/cloudflare/avatars.ts](../src/server/adapters/cloudflare/avatars.ts) | Stores, lists, reads, and removes account avatars, and retries their file cleanup. |
 | [server/adapters/cloudflare/images.ts](../src/server/adapters/cloudflare/images.ts) | Manages private image reservations, transfers, publication, and cleanup. |
 | [server/adapters/cloudflare/live.ts](../src/server/adapters/cloudflare/live.ts) | Delivers audience-specific invalidations and manages current connection access. |
 | [server/workflow.ts](../src/server/workflow.ts) | Defines shared decisions, orchestration, and the operation-level persistence interface. |
@@ -200,6 +202,41 @@ Its `conflict` field is true when the announcement changed after the caller read
 Other failures leave the write outcome unknown, and the caller keeps the request ID for a retry.
 Image failures use `ImageRequestError`.
 
+## Avatars
+
+`Backend.avatars` reads and changes profile pictures. A picture belongs to an account, not to a session.
+No screen uses this group yet. A later frontend change adds the picture controls and their display.
+
+This visibility rule decides which pictures a caller can read:
+
+- Every account reads its own picture.
+- In one session, staff read the pictures of the other staff of that session. A staff membership has no team, and it has the admin flag or a role.
+- A team account reads only its own picture. No read gives a team account the pictures of staff.
+
+| Operation | Result |
+| --- | --- |
+| `list(sessionId)` | Returns a `PersonAvatar` for each picture that the caller can read in the session. A record has `person_id` and `avatar_id`. |
+| `upload({ requestId, file })` | Replaces the caller's picture and returns the new record. A repeated request ID returns its first result and stores no other picture. |
+| `remove()` | Removes the caller's picture. It succeeds when the caller has no picture. |
+| `download(sessionId, avatar)` | Returns a `Blob` after the provider checks the rule for that session again. |
+
+The server accepts a JPEG, PNG, or WebP file of up to `AVATAR_MAX_BYTES`, 262,144 bytes, from [imageFile.ts](../src/connected/imageFile.ts).
+It checks the file signature and stores that type. The declared content type does not change the result.
+The planned frontend crops the picture to a square and encodes it at no more than 512 by 512 pixels before upload. The new encoding removes EXIF and location metadata.
+Each stored picture has its own `avatar_id`, so a client can use it as a cache key.
+
+Failures use `ImageRequestError`. `validation` marks a rejected file or request. `restart` means that the upload expired. The caller then selects the picture again with a new request ID.
+
+The issue snapshot and its `members` list do not contain pictures.
+A picture change sends no live signal.
+The planned frontend reads `list()` again after each live signal and on the 10-second refresh. Other people then see a changed picture after their next refresh or signal.
+
+The providers differ in one check.
+A Supabase Storage object name has no session, so Storage allows a read in any session where both people are staff.
+Before that read, the Supabase adapter checks that `list(sessionId)` contains the picture.
+The Cloudflare route checks the given session before and after it reads R2.
+See [Cloudflare account avatars](cloudflare-backend-design.md#account-avatars-use-the-private-image-bucket) and [Supabase profile pictures](supabase-provider.md#profile-pictures).
+
 ## Images
 
 `Backend.images` implements `ImageTransport`.
@@ -260,7 +297,8 @@ It includes shared-service rules and Supabase persistence tests with embedded Po
 `npm run test:workflow:hosted` exercises the deployed opt-in Supabase function with the shared workflow scenarios and additional boundary checks.
 That runner requires an explicit isolated project in `MINSKY_TEST_PROJECT_REF`. It does not activate the replacement in the browser path.
 Hosted checks use isolated accounts and records through [the hosted Supabase checks](run-provider-tests.md#run-against-the-supabase-provider).
-The [shared provider suite](provider-test-contracts.md) checks these contracts through real browser adapters. It does not cover `announcements` yet.
+The [shared provider suite](provider-test-contracts.md) checks these contracts through real browser adapters. It does not cover `announcements` or `avatars` yet.
+`npm test` checks the avatar rule against local D1 and R2 and against the Supabase migration in embedded PostgreSQL. `npm run test:connector:runtime` sends avatar requests through a local HTTPS Worker.
 Supabase and Cloudflare have separate fixture implementations with the same scenario assertions.
 [Run the shared checks](run-provider-tests.md) separately from the provider-specific hosted UI suite.
 The latest observed results are in [run log](history/run-log.md).

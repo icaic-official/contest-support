@@ -2,6 +2,7 @@ import { Fragment, type ReactNode, useCallback, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router";
 import {
   Activity,
+  Camera,
   KeyRound,
   Layers,
   LifeBuoy,
@@ -31,15 +32,18 @@ import {
   accountKind,
   accountName,
   accountSections,
+  accountTitle,
   capabilities,
   capabilityInfo,
 } from "./accountModel";
+import { useAvatarEditor } from "./hooks/useAvatarEditor";
 import type { Membership, Snapshot } from "./model";
 import {
   focusRequest,
   requestedFocusId,
   workspacePaths,
 } from "./navigation";
+import { PictureEditor } from "./PictureEditor";
 import type { ShellProps } from "./shell";
 
 type SectionId = (typeof accountSections)[number]["id"];
@@ -117,12 +121,15 @@ export function AccountPage({
   const { hash } = useLocation();
   useSectionFocus();
   const kind = accountKind(state, member);
+  const picture = useAvatarEditor();
   const name = accountName(state, shell.user, shell.username);
-  const title = kind.kind === "team" ? kind.teamName : name;
+  const title = accountTitle(kind, name);
   const login = shell.username ?? shell.user.email ?? shell.user.id;
   const props = { shell, state, member, kind };
   const views: Record<SectionId, ReactNode> = {
-    profile: <ProfileSection {...props} name={name} />,
+    profile: (
+      <ProfileSection {...props} name={name} title={title} picture={picture} />
+    ),
     access: <AccessSection {...props} />,
     sessions: (
       <SessionsSection
@@ -151,11 +158,25 @@ export function AccountPage({
         </p>
       </div>
       <div className="flex flex-wrap items-center gap-4 rounded-xl border bg-card p-5 shadow-sm">
-        <PersonAvatar
-          name={title}
-          personId={shell.user.id}
-          className="size-16 text-xl"
-        />
+        <button
+          type="button"
+          aria-label="Change profile picture"
+          disabled={picture.busy}
+          onClick={picture.pick}
+          className="relative shrink-0 rounded-full outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:opacity-60"
+        >
+          <PersonAvatar
+            name={title}
+            personId={shell.user.id}
+            className="size-16 text-xl"
+          />
+          <span
+            aria-hidden="true"
+            className="absolute -right-1 -bottom-1 grid size-6 place-items-center rounded-full border bg-background text-muted-foreground"
+          >
+            <Camera className="size-3.5" />
+          </span>
+        </button>
         <div className="min-w-0 flex-1">
           <p className="truncate text-lg font-semibold">{title}</p>
           <p className="truncate font-mono text-sm text-muted-foreground">
@@ -189,6 +210,7 @@ export function AccountPage({
           Sign out
         </Button>
       </div>
+      <PictureEditor picture={picture} />
       <div className="grid gap-6 @3xl:grid-cols-[12rem_minmax(0,1fr)]">
         <nav
           aria-label="Account sections"

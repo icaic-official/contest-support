@@ -21,6 +21,8 @@ import type { SessionData } from "./hooks/useSessionSnapshot";
 interface AvatarContextValue {
   people: AvatarMap;
   images: AvatarImageCache;
+  /** True when the caller has a picture. It can still be loading. */
+  hasOwn: boolean;
   upload: (requestId: string, picture: Blob) => Promise<void>;
   remove: () => Promise<void>;
 }
@@ -126,9 +128,10 @@ export function AvatarProvider({
     });
   }, [sessionId, userId]);
 
+  const hasOwn = people.has(userId);
   const value = useMemo(
-    () => ({ people, images, upload, remove }),
-    [people, images, upload, remove],
+    () => ({ people, images, hasOwn, upload, remove }),
+    [people, images, hasOwn, upload, remove],
   );
   return <AvatarContext value={value}>{children}</AvatarContext>;
 }
@@ -157,7 +160,10 @@ export function useAvatarUrl(personId: string | undefined): string | undefined {
 }
 
 /** Replaces or removes the caller's own picture. Use it only under `AvatarProvider`. */
-export function useAvatarActions(): Pick<AvatarContextValue, "upload" | "remove"> {
+export function useAvatarActions(): Pick<
+  AvatarContextValue,
+  "hasOwn" | "upload" | "remove"
+> {
   const context = useContext(AvatarContext);
   if (!context) throw new Error("Avatar controls need an AvatarProvider.");
   return context;

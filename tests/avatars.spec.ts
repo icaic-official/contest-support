@@ -1,243 +1,22 @@
-import { expect, test, type Locator, type Page, type Request } from "@playwright/test";
-import { emptyAnnouncementSnapshot } from "./support/announcementSnapshot";
-import { blue, green, red, solid } from "./support/pictures";
-import type { Membership, Snapshot } from "../src/connected/model";
-
-const USER_ID = "00000000-0000-4000-8000-000000000001";
-const BEN_ID = "00000000-0000-4000-8000-000000000002";
-const SESSION_ID = "00000000-0000-4000-8000-000000000100";
-const TEAM_ID = "00000000-0000-4000-8000-000000000200";
-const ISSUE_ID = "00000000-0000-4000-8000-000000000300";
-const SERVER_TIME = "2026-10-17T00:00:00Z";
-
-const staff: Membership = {
-  session_id: SESSION_ID,
-  user_id: USER_ID,
-  team_id: null,
-  roles: ["volunteer"],
-  is_admin: false,
-};
-const team: Membership = { ...staff, roles: [], team_id: TEAM_ID };
-
-interface Picture {
-  id: string;
-  bytes: Buffer;
-}
-
-/** What the mocked server holds and what it was asked to do. */
-interface Server {
-  /** Pictures by person ID. */
-  pictures: Map<string, Picture>;
-  /** The avatar IDs of each list that the server returned. */
-  lists: string[][];
-  /** The avatar ID of each download. */
-  downloads: string[];
-  uploads: { requestId: string; bytes: Buffer }[];
-  removals: number;
-  /** The next upload answers with this body and status instead of storing a picture. */
-  failNextUpload?: { status: number; body: unknown } | "drop";
-}
-
-let pictureCount = 0;
-const nextId = () =>
-  `00000000-0000-4000-8000-${String(++pictureCount).padStart(12, "5")}`;
-
-function picture(bytes: Buffer): Picture {
-  return { id: nextId(), bytes };
-}
-
-/** The text fields and files of a multipart request body. */
-function formParts(request: Request): Map<string, Buffer> {
-  const boundary = /boundary=(.+)$/.exec(request.headers()["content-type"])?.[1];
-  const body = request.postDataBuffer();
-  if (!boundary || !body) throw new Error("Expected a multipart request.");
-  const delimiter = Buffer.from(`--${boundary}`);
-  const parts = new Map<string, Buffer>();
-  let start = body.indexOf(delimiter);
-  while (start !== -1) {
-    const next = body.indexOf(delimiter, start + delimiter.length);
-    if (next === -1) break;
-    const part = body.subarray(start + delimiter.length + 2, next - 2);
-    const split = part.indexOf("\r\n\r\n");
-    const name = /name="([^"]+)"/.exec(part.subarray(0, split).toString())?.[1];
-    if (name) parts.set(name, part.subarray(split + 4));
-    start = next;
-  }
-  return parts;
-}
-
-/** Signs in with isolated Auth, database, Storage and function responses. */
-async function openApp(
-  page: Page,
-  options: {
-    membership?: Membership;
-    pictures?: [string, Buffer][];
-    startPath?: string;
-  } = {},
-): Promise<Server> {
-  const membership = options.membership ?? staff;
-  const server: Server = {
-    pictures: new Map(
-      (options.pictures ?? []).map(([person, bytes]) => [person, picture(bytes)]),
-    ),
-    lists: [],
-    downloads: [],
-    uploads: [],
-    removals: 0,
-  };
-  const person = (id: string, name: string, username: string) => ({
-    membership: { ...staff, user_id: id },
-    person: { id, name, username },
-  });
-  const state: Snapshot = {
-    session: {
-      id: SESSION_ID,
-      event_id: "00000000-0000-4000-8000-000000000090",
-      name: "Picture session",
-      intake_open: true,
-      categories: ["Network"],
-      revision: 0,
-      max_image_bytes: 10 * 1024 * 1024,
-      max_images_per_issue: 20,
-      max_image_bytes_per_issue: 120 * 1024 * 1024,
-    },
-    event: {
-      id: "00000000-0000-4000-8000-000000000090",
-      name: "Picture event",
-      archived: false,
-    },
-    membership,
-    teams: [
-      { id: TEAM_ID, session_id: SESSION_ID, name: "Aurora", location: "Desk 12" },
-    ],
-    issues: membership.team_id
-      ? []
-      : [
-          {
-            id: ISSUE_ID,
-            number: 1,
-            session_id: SESSION_ID,
-            team_id: TEAM_ID,
-            reporter: BEN_ID,
-            reporter_name: "Ben Okoro",
-            category: "Network",
-            description: "The switch has no link light",
-            status: "claimed",
-            created_at: "2026-10-16T23:50:00Z",
-            first_assigned_at: "2026-10-16T23:52:00Z",
-            owner: BEN_ID,
-            owner_name: "Ben Okoro",
-            resolved_at: null,
-            revision: 0,
-          },
-        ],
-    resolutions: [],
-    history: [],
-    attachments: [],
-    pending_removals: [],
-    awards: [],
-    audit: [],
-    members: membership.team_id
-      ? []
-      : [
-          person(USER_ID, "Ada Lovelace", "ada"),
-          person(BEN_ID, "Ben Okoro", "ben"),
-        ],
-    server_time: SERVER_TIME,
-  };
-  const user = {
-    id: USER_ID,
-    aud: "authenticated",
-    role: "authenticated",
-    email: "ada@accounts.minsky.invalid",
-    app_metadata: { provider: "email", providers: ["email"] },
-    user_metadata: {},
-    created_at: SERVER_TIME,
-  };
-  await page.routeWebSocket(/supabase\.co/, (socket) => socket.close());
-  await page.route("https://example.supabase.co/**", async (route) => {
-    const request = route.request();
-    const path = new URL(request.url()).pathname;
-    const json = (body: unknown, status = 200) =>
-      route.fulfill({
-        status,
-        contentType: "application/json",
-        body: JSON.stringify(body),
-      });
-    const expires = Math.floor(Date.now() / 1000) + 3600;
-    const encode = (value: object) =>
-      Buffer.from(JSON.stringify(value)).toString("base64url");
-    if (path === "/rest/v1/rpc/avatar_list") {
-      // The server shows staff the pictures of staff. A team sees only its own.
-      const visible = [...server.pictures].filter(
-        ([owner]) => !membership.team_id || owner === USER_ID,
-      );
-      server.lists.push(visible.map(([, item]) => item.id));
-      return json(
-        visible.map(([owner, item]) => ({ person_id: owner, avatar_id: item.id })),
-      );
-    }
-    if (path.startsWith("/storage/v1/object/person-avatars/")) {
-      const [owner, id] = path.split("/").slice(-2);
-      const found = server.pictures.get(owner);
-      if (found?.id !== id) return json({ message: "Not found" }, 404);
-      server.downloads.push(id);
-      return route.fulfill({ status: 200, contentType: "image/png", body: found.bytes });
-    }
-    if (path === "/functions/v1/avatars") {
-      if (request.headers()["content-type"]?.startsWith("application/json")) {
-        server.removals += 1;
-        server.pictures.delete(USER_ID);
-        return json({});
-      }
-      const failure = server.failNextUpload;
-      server.failNextUpload = undefined;
-      if (failure === "drop") return route.abort("failed");
-      const parts = formParts(request);
-      const requestId = parts.get("request_id")!.toString();
-      const bytes = parts.get("image")!;
-      server.uploads.push({ requestId, bytes });
-      if (failure) return json(failure.body, failure.status);
-      const stored = picture(bytes);
-      server.pictures.set(USER_ID, stored);
-      return json({ person_id: USER_ID, avatar_id: stored.id });
-    }
-    const responses: Record<string, unknown> = {
-      "/auth/v1/token": {
-        access_token: `${encode({ alg: "HS256", typ: "JWT" })}.${encode({
-          sub: USER_ID,
-          exp: expires,
-          role: "authenticated",
-        })}.fixture`,
-        refresh_token: "picture-fixture",
-        expires_in: 3600,
-        expires_at: expires,
-        token_type: "bearer",
-        user,
-      },
-      "/auth/v1/user": user,
-      "/auth/v1/logout": null,
-      "/rest/v1/rpc/account_status": {
-        username: "ada",
-        must_change: false,
-        session_valid: true,
-      },
-      "/rest/v1/memberships": [membership],
-      "/rest/v1/sessions": [{ id: SESSION_ID, name: "Picture session" }],
-      "/rest/v1/rpc/session_snapshot": state,
-      "/rest/v1/rpc/announcement_snapshot": emptyAnnouncementSnapshot(),
-    };
-    if (!(path in responses)) throw new Error(`Unexpected request: ${path}`);
-    return json(responses[path]);
-  });
-  const startPath = options.startPath ?? "/";
-  await page.goto(startPath);
-  await page.getByLabel("Username", { exact: true }).fill("ada");
-  await page.getByLabel("Password", { exact: true }).fill("fixture-password");
-  await page.getByRole("button", { name: "Sign in", exact: true }).click();
-  await expect(page.locator("[data-ui]")).toBeVisible();
-  return server;
-}
+import { expect, test, type Locator, type Page } from "@playwright/test";
+import {
+  BEN_ID,
+  openApp,
+  picture,
+  SERVER_TIME,
+  team,
+  USER_ID,
+} from "./support/avatarServer";
+import {
+  blue,
+  green,
+  leftRedRightBlue,
+  noise,
+  png,
+  red,
+  solid,
+  withOrientation,
+} from "./support/pictures";
 
 /** The picture inside an avatar. The empty alt text hides it from role queries. */
 const shown = (scope: Locator) => scope.locator('img[src^="blob:"]');
@@ -262,7 +41,8 @@ test("staff see their own picture and a colleague's picture, and each downloads 
   await expect(page).toHaveURL("/account");
   const header = page.getByRole("heading", { name: "My account", exact: true });
   await expect(header).toBeFocused();
-  await expect(shown(page.locator("main"))).toHaveCount(2);
+  // The sidebar card, the page header and the Profile row.
+  await expect(shown(page.locator("main"))).toHaveCount(3);
   for (const image of await shown(page.locator("body")).all()) {
     expect(await image.evaluate((el: HTMLImageElement) => el.naturalWidth)).toBe(64);
   }
@@ -280,7 +60,8 @@ test("a team account reads and shows only its own picture", async ({ page }) => 
       [BEN_ID, solid(64, 64, red)],
     ],
   });
-  await expect(shown(page.locator('[data-ui="contestant"]'))).toBeVisible();
+  // The page header and the Profile row.
+  await expect(shown(page.locator('[data-ui="contestant"]'))).toHaveCount(2);
   expect(server.lists.at(-1)).toEqual([server.pictures.get(USER_ID)!.id]);
   expect(server.downloads).toEqual([server.pictures.get(USER_ID)!.id]);
 });
@@ -307,4 +88,326 @@ test("a changed picture replaces the old one and revokes its URL", async ({ page
       before!,
     ),
   ).toBe(false);
+});
+
+/** Decodes the bytes that the server received and reads the color at each point. */
+async function inspect(page: Page, bytes: Buffer, points: [number, number][]) {
+  return page.evaluate(
+    async ({ data, at }) => {
+      const bitmap = await createImageBitmap(new Blob([new Uint8Array(data)]));
+      const canvas = document.createElement("canvas");
+      canvas.width = bitmap.width;
+      canvas.height = bitmap.height;
+      const context = canvas.getContext("2d")!;
+      context.drawImage(bitmap, 0, 0);
+      return {
+        width: bitmap.width,
+        height: bitmap.height,
+        colors: at.map(([x, y]) => [...context.getImageData(x, y, 1, 1).data]),
+      };
+    },
+    { data: [...bytes], at: points },
+  );
+}
+
+const chooser = (page: Page) => page.getByLabel("Choose a profile picture");
+const changeButton = (page: Page) =>
+  page.getByRole("button", { name: "Change picture", exact: true });
+const removeButton = (page: Page) =>
+  page.getByRole("button", { name: "Remove picture", exact: true });
+const previewDialog = (page: Page) =>
+  page.getByRole("dialog", { name: "Use this picture?" });
+
+async function choose(page: Page, name: string, buffer: Buffer, mimeType = "image/png") {
+  await chooser(page).setInputFiles({ name, mimeType, buffer });
+}
+
+const isJpeg = (bytes: Buffer) => bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
+
+test("a staff account crops, previews and saves a picture, then sees it everywhere", async ({
+  page,
+}) => {
+  const server = await openApp(page, { startPath: "/account" });
+  await expect(shown(page.locator("main"))).toHaveCount(0);
+  await choose(page, "me.png", leftRedRightBlue(1200, 800));
+  const dialog = previewDialog(page);
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole("img", { name: /cropped to a square/ })).toBeVisible();
+  expect(server.uploads).toHaveLength(0);
+  await dialog.getByRole("button", { name: "Save picture", exact: true }).click();
+  await expect(page.getByText("Profile picture updated.")).toBeVisible();
+  await expect(dialog).toHaveCount(0);
+  // The header, the Profile row and the sidebar card show the new picture.
+  await expect(shown(page.locator("main"))).toHaveCount(3);
+  expect(server.uploads).toHaveLength(1);
+  expect(server.downloads).toEqual([]);
+
+  const [{ bytes }] = server.uploads;
+  expect(isJpeg(bytes)).toBe(true);
+  expect(bytes.length).toBeLessThanOrEqual(262144);
+  // The middle square of the 1200 by 800 image: red on the left, blue on the right.
+  const result = await inspect(page, bytes, [[64, 256], [448, 256]]);
+  expect([result.width, result.height]).toEqual([512, 512]);
+  expect(result.colors[0][0]).toBeGreaterThan(150);
+  expect(result.colors[0][2]).toBeLessThan(90);
+  expect(result.colors[1][2]).toBeGreaterThan(150);
+  expect(result.colors[1][0]).toBeLessThan(90);
+});
+
+test("the saved picture follows the EXIF orientation and carries no EXIF data", async ({
+  page,
+}) => {
+  const server = await openApp(page, { startPath: "/account" });
+  const raw = await page.evaluate(async () => {
+    const canvas = document.createElement("canvas");
+    canvas.width = 400;
+    canvas.height = 200;
+    const context = canvas.getContext("2d")!;
+    context.fillStyle = "rgb(220,30,30)";
+    context.fillRect(0, 0, 200, 200);
+    context.fillStyle = "rgb(30,30,220)";
+    context.fillRect(200, 0, 200, 200);
+    const blob = await new Promise<Blob | null>((done) => canvas.toBlob(done, "image/jpeg", 0.95));
+    return [...new Uint8Array(await blob!.arrayBuffer())];
+  });
+  // Orientation 6 turns the 400 by 200 image a quarter turn, so red ends on top.
+  const photo = withOrientation(Buffer.from(raw), 6);
+  expect(photo.includes(Buffer.from("Exif\0\0", "binary"))).toBe(true);
+  await choose(page, "phone.jpg", photo, "image/jpeg");
+  await previewDialog(page).getByRole("button", { name: "Save picture", exact: true }).click();
+  await expect(page.getByText("Profile picture updated.")).toBeVisible();
+  const [{ bytes }] = server.uploads;
+  expect(bytes.includes(Buffer.from("Exif\0\0", "binary"))).toBe(false);
+  const result = await inspect(page, bytes, [[100, 20], [100, 180]]);
+  expect([result.width, result.height]).toEqual([200, 200]);
+  expect(result.colors[0][0]).toBeGreaterThan(150);
+  expect(result.colors[1][2]).toBeGreaterThan(150);
+});
+
+test("a transparent picture gets a white background, not black", async ({ page }) => {
+  const server = await openApp(page, { startPath: "/account" });
+  await choose(page, "logo.png", png(300, 300, () => [0, 0, 0, 0]));
+  await previewDialog(page).getByRole("button", { name: "Save picture", exact: true }).click();
+  await expect(page.getByText("Profile picture updated.")).toBeVisible();
+  const result = await inspect(page, server.uploads[0].bytes, [[150, 150]]);
+  expect([result.width, result.height]).toEqual([300, 300]);
+  for (const channel of result.colors[0].slice(0, 3)) expect(channel).toBeGreaterThan(240);
+});
+
+test("a picture that is too detailed for one encoding still fits the size limit", async ({
+  page,
+}) => {
+  const server = await openApp(page, { startPath: "/account" });
+  const source = noise(512, 512);
+  expect(source.length).toBeLessThan(2 * 1024 * 1024);
+  await choose(page, "noise.png", source);
+  await previewDialog(page).getByRole("button", { name: "Save picture", exact: true }).click();
+  await expect(page.getByText("Profile picture updated.")).toBeVisible();
+  const [{ bytes }] = server.uploads;
+  expect(bytes.length).toBeLessThanOrEqual(262144);
+  const result = await inspect(page, bytes, []);
+  expect(result.width).toBeLessThanOrEqual(512);
+  expect(result.width).toBe(result.height);
+});
+
+for (const [label, file, message] of [
+  [
+    "a file over 2 MB",
+    { name: "huge.png", mimeType: "image/png", buffer: Buffer.concat([png(2, 2, () => red), Buffer.alloc(2 * 1024 * 1024)]) },
+    "Choose an image of up to 2 MB.",
+  ],
+  [
+    "a file that is not an image",
+    { name: "notes.png", mimeType: "image/png", buffer: Buffer.from("These are notes, not a picture.") },
+    "Choose a JPEG, PNG, or WebP image.",
+  ],
+  [
+    "a damaged image",
+    { name: "broken.png", mimeType: "image/png", buffer: Buffer.concat([png(40, 40, () => red).subarray(0, 40), Buffer.alloc(200, 7)]) },
+    "Choose a readable JPEG, PNG, or WebP image.",
+  ],
+] as const) {
+  test(`${label} shows an alert and uploads nothing`, async ({ page }) => {
+    const server = await openApp(page, { startPath: "/account" });
+    await chooser(page).setInputFiles(file);
+    await expect(page.getByRole("alert").filter({ hasText: message })).toBeVisible();
+    await expect(previewDialog(page)).toHaveCount(0);
+    expect(server.uploads).toHaveLength(0);
+    // A good file clears the alert.
+    await choose(page, "ok.png", solid(100, 100, green));
+    await expect(previewDialog(page)).toBeVisible();
+    await expect(page.getByRole("alert")).toHaveCount(0);
+  });
+}
+
+test("cancel leaves the picture as it was", async ({ page }) => {
+  const server = await openApp(page, {
+    startPath: "/account",
+    pictures: [[USER_ID, solid(64, 64, green)]],
+  });
+  await choose(page, "new.png", solid(100, 100, blue));
+  await previewDialog(page).getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(previewDialog(page)).toHaveCount(0);
+  expect(server.uploads).toHaveLength(0);
+  // The same file can be chosen again.
+  await choose(page, "new.png", solid(100, 100, blue));
+  await expect(previewDialog(page)).toBeVisible();
+});
+
+test("removing the picture asks first, then returns to initials", async ({ page }) => {
+  const server = await openApp(page, {
+    startPath: "/account",
+    pictures: [[USER_ID, solid(64, 64, green)]],
+  });
+  await expect(shown(sidebarCard(page))).toBeVisible();
+  await removeButton(page).click();
+  const question = page.getByRole("dialog", { name: "Remove your picture?" });
+  await question.getByRole("button", { name: "Cancel", exact: true }).click();
+  expect(server.removals).toBe(0);
+  await expect(shown(sidebarCard(page))).toBeVisible();
+  await removeButton(page).click();
+  await question.getByRole("button", { name: "Remove picture", exact: true }).click();
+  await expect(page.getByText("Profile picture removed.")).toBeVisible();
+  expect(server.removals).toBe(1);
+  await expect(shown(page.locator("main"))).toHaveCount(0);
+  await expect(sidebarCard(page)).toContainText("AL");
+  await expect(removeButton(page)).toHaveCount(0);
+  await expect(changeButton(page)).toBeFocused();
+});
+
+test("a lost upload response is retried with the same request, and the picture is stored once", async ({
+  page,
+}) => {
+  const server = await openApp(page, { startPath: "/account" });
+  server.failNextUpload = "drop";
+  await choose(page, "me.png", solid(200, 200, green));
+  const dialog = previewDialog(page);
+  await dialog.getByRole("button", { name: "Save picture", exact: true }).click();
+  await expect(dialog.getByRole("alert")).toContainText("Try again");
+  await dialog.getByRole("button", { name: "Try again", exact: true }).click();
+  await expect(page.getByText("Profile picture updated.")).toBeVisible();
+  expect(server.uploads).toHaveLength(2);
+  expect(server.uploads[1].requestId).toBe(server.uploads[0].requestId);
+  expect(server.uploads[1].bytes.equals(server.uploads[0].bytes)).toBe(true);
+  await expect(shown(sidebarCard(page))).toBeVisible();
+});
+
+for (const [kind, flag] of [
+  ["rejects the picture", { validation: true }],
+  ["says that the upload expired", { restart: true }],
+] as const) {
+  test(`when the server ${kind}, the person chooses again with a new request`, async ({
+    page,
+  }) => {
+    const server = await openApp(page, { startPath: "/account" });
+    server.failNextUpload = {
+      status: 400,
+      body: { error: "The server did not accept this picture.", ...flag },
+    };
+    await choose(page, "me.png", solid(200, 200, green));
+    await previewDialog(page).getByRole("button", { name: "Save picture", exact: true }).click();
+    await expect(previewDialog(page)).toHaveCount(0);
+    await expect(page.getByRole("alert")).toContainText("The server did not accept this picture.");
+    await choose(page, "me.png", solid(200, 200, green));
+    await previewDialog(page).getByRole("button", { name: "Save picture", exact: true }).click();
+    await expect(page.getByText("Profile picture updated.")).toBeVisible();
+    expect(server.uploads).toHaveLength(2);
+    expect(server.uploads[1].requestId).not.toBe(server.uploads[0].requestId);
+    await expect(page.getByRole("alert")).toHaveCount(0);
+  });
+}
+
+test("the whole flow works with the keyboard", async ({ page }) => {
+  const server = await openApp(page, { startPath: "/account" });
+  const heading = page.getByRole("heading", { name: "My account", exact: true });
+  await heading.focus();
+  await page.keyboard.press("Tab");
+  await expect(page.getByRole("button", { name: "Change profile picture" })).toBeFocused();
+  await changeButton(page).focus();
+  const picker = page.waitForEvent("filechooser");
+  await page.keyboard.press("Enter");
+  await (await picker).setFiles({
+    name: "me.png",
+    mimeType: "image/png",
+    buffer: solid(300, 300, green),
+  });
+  const dialog = previewDialog(page);
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "Save picture", exact: true })).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
+  await expect(changeButton(page)).toBeFocused();
+  const again = page.waitForEvent("filechooser");
+  await page.keyboard.press("Enter");
+  await (await again).setFiles({
+    name: "me.png",
+    mimeType: "image/png",
+    buffer: solid(300, 300, green),
+  });
+  await expect(dialog.getByRole("button", { name: "Save picture", exact: true })).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(page.getByText("Profile picture updated.")).toBeVisible();
+  expect(server.uploads).toHaveLength(1);
+  await expect(changeButton(page)).toBeFocused();
+
+  await page.keyboard.press("Tab");
+  await expect(removeButton(page)).toBeFocused();
+  await page.keyboard.press("Enter");
+  const question = page.getByRole("dialog", { name: "Remove your picture?" });
+  await expect(question).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(question).toHaveCount(0);
+  await expect(removeButton(page)).toBeFocused();
+  await page.keyboard.press("Enter");
+  await page.keyboard.press("Tab");
+  await expect(question.getByRole("button", { name: "Remove picture", exact: true })).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(page.getByText("Profile picture removed.")).toBeVisible();
+  expect(server.removals).toBe(1);
+  await expect(changeButton(page)).toBeFocused();
+});
+
+test("a team account changes its own picture on its account page", async ({ page }) => {
+  const server = await openApp(page, {
+    membership: team,
+    startPath: "/account",
+    pictures: [[BEN_ID, solid(64, 64, red)]],
+  });
+  const root = page.locator('[data-ui="contestant"]');
+  await expect(shown(root)).toHaveCount(0);
+  await choose(page, "team.png", solid(200, 200, blue));
+  await previewDialog(page).getByRole("button", { name: "Save picture", exact: true }).click();
+  await expect(page.getByText("Profile picture updated.")).toBeVisible();
+  await expect(shown(root)).toHaveCount(2);
+  // The staff picture stays hidden from the team, before and after the change.
+  const staffPicture = server.pictures.get(BEN_ID)!.id;
+  expect(server.lists.flat()).not.toContain(staffPicture);
+  expect(server.downloads).not.toContain(staffPicture);
+  expect(server.downloads).toEqual([]);
+});
+
+test("the phone Me tab changes and removes the picture", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const server = await openApp(page);
+  await page
+    .getByRole("navigation", { name: "Organiser sections" })
+    .getByRole("button", { name: "Me", exact: true })
+    .click();
+  await expect(page).toHaveURL("/account");
+  const phone = page.locator('[data-ui="organiser-phone"]');
+  await expect(shown(phone)).toHaveCount(0);
+  await choose(page, "me.png", solid(200, 200, green));
+  await previewDialog(page).getByRole("button", { name: "Save picture", exact: true }).click();
+  await expect(page.getByText("Profile picture updated.")).toBeVisible();
+  await expect(shown(phone)).toHaveCount(1);
+  expect(server.uploads).toHaveLength(1);
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+  );
+  expect(overflow).toBeLessThanOrEqual(0);
+  await removeButton(page).click();
+  await page.getByRole("dialog", { name: "Remove your picture?" })
+    .getByRole("button", { name: "Remove picture", exact: true }).click();
+  await expect(page.getByText("Profile picture removed.")).toBeVisible();
+  await expect(shown(phone)).toHaveCount(0);
 });

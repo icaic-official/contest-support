@@ -4,6 +4,7 @@ import {
   accountKind,
   accountName,
   accountSections,
+  accountTitle,
   capabilities,
   capabilityInfo,
 } from "./accountModel";
@@ -167,6 +168,13 @@ describe("accountName", () => {
       "p@example.test",
     );
     expect(accountName(snapshot(), { id: PRIYA }, null)).toBe("Your account");
+  });
+});
+
+describe("accountTitle", () => {
+  it("shows the team for a team account and the person for a staff account", () => {
+    expect(accountTitle(accountKind(snapshot(), team), "Team login")).toBe("Aurora");
+    expect(accountTitle(accountKind(snapshot(), staff), "Priya Raman")).toBe("Priya Raman");
   });
 });
 

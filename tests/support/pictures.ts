@@ -47,3 +47,29 @@ export function leftRedRightBlue(width: number, height: number): Buffer {
 export function solid(width: number, height: number, color: Pixel): Buffer {
   return png(width, height, () => color);
 }
+
+/** A picture of random-looking pixels. JPEG cannot compress it, so it needs the smaller encodings. */
+export function noise(width: number, height: number): Buffer {
+  let seed = 12345;
+  const next = () => {
+    seed = (seed + 0x6d2b79f5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) % 256;
+  };
+  return png(width, height, () => [next(), next(), next(), 255]);
+}
+
+/** Puts an EXIF block with this orientation behind the JPEG start marker. */
+export function withOrientation(jpeg: Buffer, orientation: number): Buffer {
+  const tiff = Buffer.from([
+    0x4d, 0x4d, 0x00, 0x2a, 0x00, 0x00, 0x00, 0x08, // big endian, first IFD at 8
+    0x00, 0x01, // one entry
+    0x01, 0x12, 0x00, 0x03, 0x00, 0x00, 0x00, 0x01, 0x00, orientation, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, // no next IFD
+  ]);
+  const body = Buffer.concat([Buffer.from("Exif\0\0", "binary"), tiff]);
+  const header = Buffer.from([0xff, 0xe1, 0, 0]);
+  header.writeUInt16BE(body.length + 2, 2);
+  return Buffer.concat([jpeg.subarray(0, 2), header, body, jpeg.subarray(2)]);
+}

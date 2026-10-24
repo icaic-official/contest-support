@@ -8,6 +8,7 @@ import {
 import { Archive } from "lucide-react";
 import { useLocation, useNavigate } from "react-router";
 import { AccountPage } from "@/connected/AccountPage";
+import { accountName } from "@/connected/accountModel";
 import {
   pageForPath,
   useRouteFocus,
@@ -209,12 +210,7 @@ export function OrganiserDesktopConsole({
   const issues = visibleIssues(state.issues, member);
   const archived = Boolean(state.event?.archived);
   const canReport = isSupport(member);
-  const personName =
-    state.members.find((item) => item.person.id === user.id)?.person.name ??
-    user.name ??
-    username ??
-    user.email ??
-    "Your account";
+  const personName = accountName(state, user, username);
   const counts = Object.fromEntries(
     pages.map((item) => [item, navCount(item, issues, state, member)]),
   );

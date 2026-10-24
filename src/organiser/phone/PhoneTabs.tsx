@@ -12,6 +12,7 @@ import {
 import { themeOptions } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { accountName } from "@/connected/accountModel";
 import type { WorkflowState } from "@/connected/hooks/useWorkflowState";
 import type { Issue, Membership, Snapshot } from "@/connected/model";
 import type { ShellProps } from "@/connected/shell";
@@ -495,12 +496,7 @@ export function MeTab(props: PhoneTabProps & { onSessionChange: () => void }) {
   const { user, username, data } = shell;
   const id = useId();
   const theme = useTheme();
-  const name =
-    state.members.find((item) => item.person.id === user.id)?.person.name ??
-    user.name ??
-    username ??
-    user.email ??
-    "Your account";
+  const name = accountName(state, user, username);
   const rowClass =
     "flex min-h-12 w-full items-center gap-3 p-3 text-left text-[15px] focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none";
   return (

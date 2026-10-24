@@ -1,7 +1,7 @@
+import { relativeAge } from "@/connected/labels";
 import { type Issue, type Resolution, unresolvedTime } from "@/connected/model";
 import { clockDuration } from "@/connected/ui";
 import { cn } from "@/lib/utils";
-import { relativeAge } from "./contestantView";
 import { StatusBadge } from "./StatusBadge";
 
 /** The team's reports in the left column, newest first. */

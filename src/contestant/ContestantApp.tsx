@@ -1,7 +1,7 @@
 import { CircleAlert, Plus, RotateCw } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocation } from "react-router";
-import { AccountPage } from "@/connected/AccountPage";
+import { AccountPage, useOpenPasswordChange } from "@/connected/AccountPage";
 import { useRouteFocus } from "@/connected/navigation";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -28,7 +28,8 @@ import { ReportList } from "./ReportList";
  * them again.
  */
 export function ContestantApp(props: ShellProps) {
-  const { user, username, data, changePassword, signOut } = props;
+  const { user, username, data, signOut } = props;
+  const openPasswordChange = useOpenPasswordChange();
   const workflow = useWorkflowState(data);
   const { command, selectedIssueId, selectIssue } = workflow;
   const now = useNow(data.clockOffset);
@@ -128,7 +129,7 @@ export function ContestantApp(props: ShellProps) {
           data.selectSession(sessionId);
           resetForSession();
         }}
-        changePassword={changePassword}
+        changePassword={openPasswordChange}
         signOut={signOut}
       />
       {accountPage && (

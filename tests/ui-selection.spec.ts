@@ -140,16 +140,19 @@ test("an account without a membership sees the session access screen", async ({
   ).toBeVisible();
 });
 
-test("the desktop account menu moves focus to the account heading", async ({
+test("the sidebar account card opens the account page and focuses its heading", async ({
   page,
 }) => {
   await signIn(page, { ...staff, roles: ["volunteer"] });
-  await page.getByRole("button", { name: /^Account menu/ }).click();
-  await page.getByRole("menuitem", { name: "My account", exact: true }).click();
+  const card = page.getByRole("button", { name: /^Account settings for/ });
+  await expect(card).not.toHaveAttribute("aria-current", "page");
+  await card.click();
   await expect(page).toHaveURL("/account");
   await expect(
     page.getByRole("heading", { name: "My account", exact: true }),
   ).toBeFocused();
+  await expect(card).toHaveAttribute("aria-current", "page");
+  await expect(page.getByRole("menu")).toHaveCount(0);
 });
 
 for (const [path, heading, membership] of [
@@ -385,4 +388,46 @@ test("a team account page shows the team and no staff content", async ({
   for (const role of ["Volunteer", "Specialist", "Jury", "Session admin"]) {
     await expect(page.getByText(role, { exact: true })).toHaveCount(0);
   }
+});
+
+test("the command palette opens the password form and focuses its first field", async ({
+  page,
+}) => {
+  await signIn(page, { ...staff, roles: ["volunteer"] });
+  const palette = page.getByRole("dialog", { name: "Command palette" });
+  const current = page.getByLabel("Current password", { exact: true });
+  const heading = page.getByRole("heading", { name: "My account", exact: true });
+  async function changePassword() {
+    await page.getByRole("button", { name: /^Search teams, issues/ }).click();
+    await expect(palette).toBeVisible();
+    await page.getByRole("option", { name: "Change password" }).click();
+    // Check focus only after the dialog has unmounted. Closing it must not
+    // take focus from the field.
+    await expect(palette).toBeHidden();
+    await expect(page).toHaveURL("/account#security");
+    await expect(current).toBeFocused();
+    await expect(current).toBeInViewport();
+  }
+
+  await expect(page.locator('[data-ui="organiser-desktop"]')).toBeVisible();
+  await changePassword();
+
+  // The same request on the account page moves focus back from the heading.
+  await heading.focus();
+  await page.locator("#profile").scrollIntoViewIfNeeded();
+  await expect(current).not.toBeInViewport();
+  await changePassword();
+});
+
+test("the contestant account menu opens the password form and focuses its first field", async ({
+  page,
+}) => {
+  await signIn(page, { ...staff, roles: [], team_id: TEAM_ID });
+  await page.getByRole("button", { name: /^Account menu for/ }).click();
+  await page.getByRole("menuitem", { name: "Change password" }).click();
+  await expect(page).toHaveURL("/account#security");
+  await expect(page.getByRole("menu")).toBeHidden();
+  await expect(
+    page.getByLabel("Current password", { exact: true }),
+  ).toBeFocused();
 });

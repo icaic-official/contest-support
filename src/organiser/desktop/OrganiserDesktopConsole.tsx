@@ -7,7 +7,7 @@ import {
 } from "react";
 import { Archive } from "lucide-react";
 import { useLocation, useNavigate } from "react-router";
-import { AccountPage } from "@/connected/AccountPage";
+import { AccountPage, useOpenPasswordChange } from "@/connected/AccountPage";
 import { accountName } from "@/connected/accountModel";
 import {
   pageForPath,
@@ -104,9 +104,9 @@ function SessionAdminScope({
  * The organiser desktop console for laptops and tablets
  * (mockup: design/redesign/a-console.html). A collapsible sidebar holds the
  * session switcher, the pages for the person's combined roles, the intake
- * switch for admins and the person menu. The top bar has the breadcrumb,
- * the ⌘K command palette, Live or Reconnecting and the theme menu. An issue
- * opens in a side sheet over the page.
+ * switch for admins and the person card, which opens the account page. The
+ * top bar has the breadcrumb, the ⌘K command palette, Live or Reconnecting
+ * and the theme menu. An issue opens in a side sheet over the page.
  *
  * The console keeps the page, the reply drafts and the team filters while
  * the snapshot is missing, so they survive a refresh error.
@@ -125,6 +125,7 @@ export function OrganiserDesktopConsole({
   const now = useNow(data.clockOffset);
   const { pathname } = useLocation();
   const navigateTo = useNavigate();
+  const openPasswordChange = useOpenPasswordChange();
   const page = pageForPath(pathname);
   const accountPage = page === "account";
   useRouteFocus(consoleHeadingId, Boolean(member));
@@ -327,7 +328,6 @@ export function OrganiserDesktopConsole({
               data={data}
               member={member}
               personName={personName}
-              account={username ?? user.email ?? ""}
               groups={groups}
               counts={counts}
               page={accountPage ? undefined : currentPage}
@@ -346,9 +346,8 @@ export function OrganiserDesktopConsole({
                     }
                   : undefined
               }
-              onChangePassword={shell.changePassword}
-              onAccount={() => void navigateTo("/account")}
-              onSignOut={signOut}
+              accountPage={accountPage}
+              onAccount={() => void navigateTo(workspacePaths.account)}
             />
             <div className="flex min-w-0 flex-1 flex-col">
               <ConsoleTopBar
@@ -513,7 +512,7 @@ export function OrganiserDesktopConsole({
               }}
               onPage={navigate}
               onReport={() => openReport()}
-              onChangePassword={shell.changePassword}
+              onChangePassword={openPasswordChange}
               onSignOut={signOut}
             />
           </div>

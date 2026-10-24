@@ -20,6 +20,23 @@
 - Use short sentences, active voice, and familiar words. Avoid unnecessary jargon.
 - When a technical term is necessary, explain it in plain language on first use. Keep code names and commands exact.
 
+## Contributions
+Pull requests are to be structured as follows:
+```
+<type>[optional scope]: <description>
+
+[optional body]
+
+[optional footer(s)] 
+```
+- The types of contributions proposed include, but are not limited to: `bugfix`, `build`, `feature`, `style`, `refactor`, `perf`, `test`, `ci`, `chore`.
+- Branches are to be written as such: `<type>/<title>`, regardless whether they intend to be attached to a PR or not. For example: `fix/race-request-fix`.
+- The title of the PR is to be written with a square bracket encapsulating the type of contribution, followed by a brief description of what the PR intends to address.
+The first letter of the `type` must be capitalized in the PR title.
+Reusing the example in the previous point, the title for that branch becomes: `[Fix] Prevent racing of requests`.
+  - If that PR addresses multiple contributions, the PR title may include multiple square brackets. For example, `[Fix] [Feat] Prevent racing of requests and add support for Chinese language`.
+  - Normal commit comments, with the exception of commits like merge, etc., are to follow the same convention as stated above. 
+
 ## Current scope
 
 On 2026-10-23 the owner selected Cloudflare as the live backend.
@@ -47,7 +64,6 @@ Those historical approvals do not authorize a new activation or deployment.
 Statements in those records that Supabase is the active backend are superseded by the 2026-10-23 decision.
 
 ## Code and documentation cleanup
-
 - Subtract before adding. Remove code that the current architecture no longer needs.
 - Use the current shared contracts and application paths. Remove obsolete proof modes, duplicate helpers, and unused stubs.
 - Keep one authoritative procedure or reference for each task. Update incoming links when you remove a duplicate page.

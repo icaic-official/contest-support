@@ -73,7 +73,7 @@ The Cloudflare development database, retained Supabase projects, and earlier D1 
 The committed Worker configuration requests a 1,000 ms CPU cap per request.
 Cloudflare requires Workers Paid for that setting.
 An earlier protected password-change request exceeded runtime resources.
-That result describes its recorded configuration. See [current state](current-state.md) for later Paid activation and hosted results.
+That result describes its recorded configuration. See [run log](history/run-log.md) for later Paid activation and hosted results.
 Before deploying the Worker, confirm that an authorized account owner activated Workers Paid for the configured account.
 On Free, deployment fails with error `100328`. Do not reduce password cost to bypass that requirement.
 
@@ -167,8 +167,8 @@ A credential-blocked run is not a pass.
 These earlier records remain:
 
 - The historical `cloud-test` allowlist included `main` and the exact T0018 branch. The T0019 branch remained outside it.
-- See [the run record](current-state.md#t0018-cloudflare-authentication-2026-10-18) for the initial rejection and later hosted resource limit.
-- The [PR #41 follow-up](current-state.md#pr-41-review-corrections-and-paid-authentication-2026-10-18) records the passing protected run on Workers Paid.
+- See [the run record](history/run-log.md#t0018-cloudflare-authentication-2026-10-18) for the initial rejection and later hosted resource limit.
+- The [PR #41 follow-up](history/run-log.md#pr-41-review-corrections-and-paid-authentication-2026-10-18) records the passing protected run on Workers Paid.
 
 ## Recover interrupted fixtures
 

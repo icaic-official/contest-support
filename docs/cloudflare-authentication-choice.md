@@ -2,7 +2,7 @@
 
 This page explains the identity choice for T0018.
 Cloudflare serves the development application through the complete connector.
-The complete connector, fresh installations, and approved stable deployment have separate [verification records](current-state.md).
+The complete connector, fresh installations, and approved stable deployment have separate [verification records](history/run-log.md).
 The [activation procedure](activate-cloudflare-development.md) records the separate owner approval and recovery rules.
 
 Better Auth is a free library under the [MIT licence](https://github.com/better-auth/better-auth/blob/main/LICENSE.md).
@@ -156,4 +156,4 @@ The isolated `minsky-auth-ci` Worker then accepted the 1,000 ms cap.
 The maintained password parameters remain unchanged.
 The local hosted HTTP suite passes on implementation `7abaf2e`, including password change and organizer-assisted recovery.
 Protected [run 39089988536](https://github.com/GiftedNovaHD/minsky/actions/runs/39089988536) also passes all 30 account cases and the complete HTTP case on merged `main`.
-See [current state](current-state.md) for exact deployment versions and separate protected GitHub evidence.
+See [run log](history/run-log.md) for exact deployment versions and separate protected GitHub evidence.

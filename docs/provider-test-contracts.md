@@ -4,7 +4,7 @@ The shared suite checks Minsky behavior through the browser `Backend` interface.
 Supabase and Cloudflare supply browser adapters and fixture drivers.
 The same 11 scenarios apply to both providers without weaker assertions.
 The three new cases cover account creation, image-limit boundaries, and reconnect recovery.
-See [current state](current-state.md) and [PR #43](https://github.com/GiftedNovaHD/minsky/pull/43) for source-specific hosted results.
+See [run log](history/run-log.md) and [PR #43](https://github.com/GiftedNovaHD/minsky/pull/43) for source-specific hosted results.
 Earlier eight-case results verify the recorded revisions only.
 The shared scenarios do not cover the `announcements` group. See [session announcements](session-announcements.md#verification).
 AWS, GCP, and Azure have no implementation.
@@ -12,7 +12,7 @@ AWS, GCP, and Azure have no implementation.
 The complete D1 suite checks `WorkflowPersistence` directly.
 Direct persistence and account suites use a D1-only database. Their records cannot enter the application's live delivery process.
 Complete application checks use separate Worker, D1, private R2, and Durable Object resources.
-See [current state](current-state.md#t0020-connector-implementation-2026-10-18) for source-specific evidence.
+See [run log](history/run-log.md#t0020-connector-implementation-2026-10-18) for source-specific evidence.
 
 T0019 reuses the workflow scenarios against the [shared server service](server-workflow.md).
 The focused [hosted Supabase suite](../tests/workflow/supabase.test.ts) replaces only the workflow executor in a real Supabase connection.
@@ -96,7 +96,7 @@ It does not prove delivery latency or the absence of arbitrarily delayed message
 The Cloudflare-specific suites additionally test current credential guards, atomic administration, concurrent image limits, partial storage failures, and live reconnect recovery.
 Local checks cover application reads, image limits and recovery, live updates, and the complete HTTPS runtime.
 Installation and tooling tests cover bootstrap, owner recovery, exact target selection, and credential handling.
-See [current state](current-state.md) for exact case counts and revisions.
+See [run log](history/run-log.md) for exact case counts and revisions.
 
 The existing SQL and function suites retain lower-level permission and failure cases.
 The hosted UI suite still checks the app's account journey and provider-specific integration.
@@ -142,7 +142,7 @@ The lost-response controls must discard committed workflow and account responses
 The reconnect control must interrupt the real subscription transport, hold reconnect attempts, then permit recovery.
 
 Cloudflare passed the earlier eight-case registry through its guarded hosted CLI runner.
-On 2026-10-19, protected runs at `2125875` passed the 11-case registry on both implementations. See [current state](current-state.md#final-pre-merge-and-merged-main-checks).
+On 2026-10-19, protected runs at `2125875` passed the 11-case registry on both implementations. See [run log](history/run-log.md#final-pre-merge-and-merged-main-checks).
 A later change to the registry or to an adapter needs fresh hosted verification.
 Every new provider must pass the same registry.
 A driver cannot skip a failing behavior because its database or identity provider differs.
@@ -177,4 +177,4 @@ The Supabase scenario retains its workflow hooks. Cloudflare supplies its real a
 Both providers use the same identity, temporary-password, password-change, logout, stale-password, and subscription-cleanup assertions.
 That earlier bounded reuse did not establish complete Cloudflare `Backend` conformance.
 T0020's complete driver then passed all eight unchanged scenarios against the hosted Cloudflare application.
-The former [protected connector job](current-state.md#final-protected-connector-verification) passed as a separate verification gate. GitHub Actions no longer runs it.
+The former [protected connector job](history/run-log.md#final-protected-connector-verification) passed as a separate verification gate. GitHub Actions no longer runs it.

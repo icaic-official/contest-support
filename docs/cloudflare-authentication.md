@@ -3,7 +3,7 @@
 The Cloudflare application uses maintained Better Auth identity operations and guarded D1 account records.
 Cloudflare serves the development application. Supabase remains available as a separate provider implementation.
 This reference describes the authentication API and its access rules.
-Use the [installation guide](../site/src/content/docs/operators/installation.mdx) for setup and [current state](current-state.md) for dated verification evidence.
+Use the [installation guide](../site/src/content/docs/operators/installation.mdx) for setup and [run log](history/run-log.md) for dated verification evidence.
 
 The [identity choice](cloudflare-authentication-choice.md) explains Better Auth, cryptographic components, limitations, and measured resource costs.
 The [verification guide](verify-cloudflare-authentication.md) gives exact test commands and fixture recovery steps.

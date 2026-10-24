@@ -22,7 +22,7 @@ The live development app is the Cloudflare Worker at https://minsky-dev.icaic-mi
 Use an organizer-provided username and password.
 Docker and persona switching are not required.
 For a separate Cloudflare installation, create the first admin through its bootstrap step.
-For the Supabase provider, follow [Supabase provider](cloud-onboarding.md).
+For the Supabase provider, follow [Supabase provider](supabase-provider.md).
 `npm run cloud:recover-admin` is that provider's administrator recovery.
 Use `npm run cloudflare:recover-admin` when the Cloudflare development admin cannot sign in.
 Use a separate browser or profile for each account: contestant, volunteer, specialist, jury, and admin.
@@ -388,9 +388,9 @@ Use isolated test accounts for these checks.
 The credential-free tests in `tests/workspace-refresh.spec.ts` cover these UI effects and exact write requests.
 The cleanup tests in `scripts/cloud-test.test.mjs` check a failed deletion, a successful retry, and the retained recovery file.
 They use mocked cloud responses and a local child process. They do not access hosted data.
-See [fixture recovery](cloud-onboarding.md#fixture-recovery) for failed cloud cleanup.
+See [fixture recovery](supabase-provider.md#fixture-recovery) for failed cloud cleanup.
 
-Record observed results in [current-state.md](current-state.md).
+Record observed results in [run log](history/run-log.md).
 Suggested manual checks are not completed checks.
 Browser automation does not establish results for real devices, assistive technology, or capacity.
 
@@ -441,12 +441,12 @@ See [frontend architecture](frontend-architecture.md#jury-award-lists).
     labels. No text or control should clip or cause horizontal overflow. Distinguish
     loading and read errors from valid empty lists. Failed reads must clear stale data.
 
-Record results and remaining limits in [current state](current-state.md#t0009-parallel-maintenance-2026-10-18).
+Record results and remaining limits in [run log](history/run-log.md#t0009-parallel-maintenance-2026-10-18).
 The credential-free browser harness exercises actual migrations and RLS with
 simulated hosted transport. It does not establish real Auth, Storage, Realtime,
 deployment, offline operation, or capacity results.
 
-For isolated hosted acceptance of the Supabase provider from a local CLI, follow the credential prerequisites in the [Supabase provider guide](cloud-onboarding.md#verification-and-hosted-cloud-checks).
+For isolated hosted acceptance of the Supabase provider from a local CLI, follow the credential prerequisites in the [Supabase provider guide](supabase-provider.md#verification-and-hosted-cloud-checks).
 Then run the current cloud suite against the explicit CI target:
 
 ```sh
@@ -454,7 +454,7 @@ MINSKY_TEST_PROJECT_REF=ghtztmovdkhuketcbjmq npm run test:cloud
 ```
 
 Do not apply unrelated remote migrations or change provider configuration for this test.
-If cleanup retains a recovery file, follow [fixture recovery](cloud-onboarding.md#fixture-recovery).
+If cleanup retains a recovery file, follow [fixture recovery](supabase-provider.md#fixture-recovery).
 Record local simulations and hosted-service CLI results separately.
 
 

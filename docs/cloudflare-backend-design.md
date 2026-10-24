@@ -11,7 +11,7 @@ Preserve application behavior and database rules. Create new accounts, IDs, and 
 Do not transfer Supabase accounts, passwords, issues, history, images, or IDs.
 Leave Supabase intact, including its existing trial data and resources.
 See [activation and recovery](activate-cloudflare-development.md) for the approved development switch and its operating procedure.
-See [backend contracts](backend-contracts.md) for the browser interface and [current state](current-state.md) for dated evidence.
+See [backend contracts](backend-contracts.md) for the browser interface and [run log](history/run-log.md) for dated evidence.
 
 ## Two different adapter boundaries
 
@@ -310,7 +310,7 @@ Untrusted branch previews receive no shared database write access or privileged 
 
 The installation procedure requires an empty isolated database and explicit provider targets.
 Use [Install an isolated Cloudflare instance](../site/src/content/docs/operators/installation.mdx) for configuration, bootstrap, and recovery.
-The [PR #21 component record](pr21-installation-disposition.md) preserves reuse decisions and the recommendation to close PR #21. The owner's closure decision remains pending.
+The [PR #21 component record](history/pr21-installation-disposition.md) preserves reuse decisions and the recommendation to close PR #21. The owner's closure decision remains pending.
 
 Data exports and migration tooling are outside the fresh-installation scope.
 The owner approved the concrete development switch separately from the PR #43 merge.

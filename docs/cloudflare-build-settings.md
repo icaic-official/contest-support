@@ -110,7 +110,7 @@ Both exceed the 20 minute Workers Builds timeout, so they cannot move into a bui
 
 Hosted Supabase checks need the isolated CI project and its private keys.
 Do not point them at development project `ovymmobupzowotvrywek`.
-Run them from the separate CI checkout in the [Supabase provider guide](cloud-onboarding.md#development-and-release-process), with `MINSKY_TEST_PROJECT_REF` set.
+Run them from the separate CI checkout in the [Supabase provider guide](supabase-provider.md#development-and-release-process), with `MINSKY_TEST_PROJECT_REF` set.
 Keep the primary checkout linked to development.
 
 ```sh

@@ -287,7 +287,7 @@ These rules apply:
 
 ## Jury award lists
 
-T0009 added a separate jury worklist on `main`. See [the worklist specification](jury-worklist.md).
+T0009 added a separate jury worklist on `main`. See [the worklist specification](history/t0009-jury-worklist.md).
 The step 5 merge moved its rules into the phone Awards tab (`AwardsTab` in `PhoneTabs.tsx`) and the desktop `AwardReviewPage`.
 
 `awardLists(state)` in `organiserModel.ts` uses `juryWorklists()` from `src/connected/jury.ts`. It gives three lists:
@@ -303,7 +303,7 @@ These rules apply:
   When the award resolution was reopened, it also shows "This award relates to an earlier resolution."
 - `openableIssues(state, member)` adds reopened issues with a pending award for a jury-only member. Thus that member can open the issue and confirm the application.
   The ordinary queue of a jury-only member still shows resolved issues only.
-- The T0015 design differs from `docs/jury-worklist.md` in two ways.
+- The T0015 design differs from the T0009 specification in two ways.
   The desktop award and confirmation forms stay on the Award review cards.
   There is no separate **Jury worklist** sidebar entry and no **Back to jury worklist** button. The Award review page and the Awards tab are the worklist.
 

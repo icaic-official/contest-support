@@ -4,7 +4,7 @@ T0019 extracted the existing issue decisions into [workflow.ts](../src/server/wo
 `WorkflowService` accepts all nine existing `Command` variants.
 Its rules contain no provider SDK, SQL, environment configuration, or provider selection.
 The [Supabase provider verification guide](verify-server-workflow.md) describes that provider's checks.
-[Current state](current-state.md) records observed results.
+[Run log](history/run-log.md) records observed results.
 
 Cloudflare is the active development backend. Its application Worker executes the shared service through guarded D1 batches.
 The Supabase browser adapter retains the guarded `public.workflow` RPC.
@@ -153,6 +153,6 @@ Hosted application journeys use separate complete connector resources.
 Use [the provider verification guide](run-provider-tests.md) for commands, target checks, and fixture recovery.
 
 The historical bounded proof is retired from current execution paths.
-Its [frozen guide](https://github.com/GiftedNovaHD/minsky/blob/88ea5020a0f9dfc34a32ed7fbd84dfea07423297/docs/d1-transaction-proof.md) and [dated evidence](current-state.md#t0017-d1-transaction-proof-2026-10-17) remain available.
+Its [frozen guide](https://github.com/GiftedNovaHD/minsky/blob/88ea5020a0f9dfc34a32ed7fbd84dfea07423297/docs/d1-transaction-proof.md) and [dated evidence](history/run-log.md#t0017-d1-transaction-proof-2026-10-17) remain available.
 Current verification covers the complete workflow through `WorkflowPersistence`.
-Record results in [current state](current-state.md#t0020-connector-implementation-2026-10-18), with local, hosted CLI, and protected runs kept separate.
+Record results in [run log](history/run-log.md#t0020-connector-implementation-2026-10-18), with local, hosted CLI, and protected runs kept separate.

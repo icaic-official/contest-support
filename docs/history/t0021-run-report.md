@@ -24,8 +24,8 @@ Kept one installation guide and one development activation procedure.
 
 Provisioned separate development and installation-verification resources after PR #42 merged.
 Both fresh installations pass bootstrap, the complete React journey, all eight shared scenarios, expiry, owner recovery, and scoped cleanup.
-The [current-state record](current-state.md#t0021-fresh-development-installation-2026-10-18) owns exact resources, versions, timestamps, and evidence.
-The [activation procedure](activate-cloudflare-development.md) owns the proposed switch, exact configuration, commands, and repair sequence.
+The [run log](run-log.md#t0021-fresh-development-installation-2026-10-18) owns exact resources, versions, timestamps, and evidence.
+The [activation procedure](../activate-cloudflare-development.md) owns the proposed switch, exact configuration, commands, and repair sequence.
 Candidate traffic and scheduled work must stop before stable publication, because the Workers would otherwise compete for shared notifications.
 
 Temporary disruption during activation is limited to the candidate URL while its routes and schedules stop.
@@ -203,7 +203,7 @@ The authorization/evidence commits change documentation only.
 The latest protected result is linked from PR #43. Local hosted results do not replace it.
 Activation and subsequent automated stable deployment are not run. Both remain behind the explicit activation approval.
 
-The later [connection diagnosis](current-state.md#local-verification-connection-diagnosis) identifies Wrangler's outgoing preview-proxy hop.
+The later [connection diagnosis](run-log.md#local-verification-connection-diagnosis) identifies Wrangler's outgoing preview-proxy hop.
 Five read-only remote calls fail while all 4,000 local D1 and local HTTP calls pass.
 A later unchanged 6,000-call remote comparison passes, so this remains an intermittent fault.
 The separate API semantic proof passes value binding, ordering, atomic rollback, metadata, and scoped cleanup.
@@ -290,7 +290,7 @@ Those results precede this fixture correction. PR #43 records fresh final-revisi
 ## Owner merge and approved activation, 2026-10-19
 
 This section records the later operational run. Earlier sections retain their recorded revisions, failures, and authorization limits.
-The [current activation record](current-state.md#t0021-approved-activation-2026-10-19) owns exact resources, versions, times, and separate verification results.
+The [activation record in the run log](run-log.md#t0021-approved-activation-2026-10-19) owns exact resources, versions, times, and separate verification results.
 
 1. **Summary of changes** — The owner merges PR #43 at `4e43739` and separately approves activation and repeat deployment. The existing fresh installation now serves the stable URL through Cloudflare. Both automated deployments pass their application checks. The candidate remains stopped. Supabase resources and accounts remain intact. No Supabase accounts, passwords, records, images, or IDs transfer.
 2. **Files changed** — `README.md`, `AGENTS.md`, `PLAN.md`, `docs/tickets.md`, `docs/current-state.md`, `docs/t0021-run-report.md`, `docs/activate-cloudflare-development.md`, `docs/backend-contracts.md`, `docs/cloud-onboarding.md`, `docs/cloudflare-authentication.md`, `docs/cloudflare-authentication-choice.md`, `docs/cloudflare-backend-design.md`, `docs/cloudflare-builds.md`, `docs/cloudflare-build-settings.md`, `docs/jury-worklist.md`, `docs/product-direction.md`, `docs/server-workflow.md`, `docs/verify-cloudflare-authentication.md`, `site/src/content/docs/operators/installation.md`, and `site/src/content/docs/reference/status.md`, `scripts/deploy-workers.mjs`, and `scripts/deploy-workers.test.mjs`. The publisher parser and one regression case change. Application runtime, generated config, workflows, and protected fixtures remain unchanged. Private operation scripts and recovery journals remain outside Git.
@@ -322,7 +322,7 @@ The final commit and fresh ordinary and protected run links belong in PR #45, wi
 This record preserves the deployment evidence previously held only in PR #45's description.
 It is historical evidence for `adff06c`, before the later retry fixes.
 
-1. **Summary of changes** — The owner explicitly requests manual publication before merge: "No go and manually deploy it to Cloudflare i need to see the change." At 2026-10-19 21:45:18 UTC, the full `minsky-dev` Worker publishes source `adff06cf59298ce94f8830c21de63044e336f0b9`. Version `71719a97-aa65-4b19-bcc7-3f6071288a04` replaces compatible version `9f3686bd-ffa8-46bf-977f-2d9554235d41`. The account, database, bucket, live namespace, six bindings, authentication secret, origin, cron, CPU cap, and asset fallback match the [approved installation](current-state.md#activation-sequence-and-exact-installation). No resource creation, migration, account reset, or Supabase mutation runs.
+1. **Summary of changes** — The owner explicitly requests manual publication before merge: "No go and manually deploy it to Cloudflare i need to see the change." At 2026-10-19 21:45:18 UTC, the full `minsky-dev` Worker publishes source `adff06cf59298ce94f8830c21de63044e336f0b9`. Version `71719a97-aa65-4b19-bcc7-3f6071288a04` replaces compatible version `9f3686bd-ffa8-46bf-977f-2d9554235d41`. The account, database, bucket, live namespace, six bindings, authentication secret, origin, cron, CPU cap, and asset fallback match the [approved installation](run-log.md#activation-sequence-and-exact-installation). No resource creation, migration, account reset, or Supabase mutation runs.
 2. **Files changed** — None solely to record publication or restart completed checks. The deployment uses `src/server/adapters/cloudflare/deploy/development.wrangler.jsonc`.
 3. **Commands run** — Pause publication with `CLOUDFLARE_DEPLOY_ENABLED=false`, confirm no active main publication job, check the exact account/database/migration names, run `VITE_BACKEND=cloudflare npm run build`, write the source/backend/resource marker, then run the complete Worker dry run and deployment. Restore publication to `true` after verification. No event, branch, deployment guard, or environment protection is fabricated or relaxed. Candidate routes, previews, and schedules remain disabled. R2 public access remains disabled.
 4. **Build/test results** — Public checks pass for the exact revision marker and HTTP 200 at `/issues`, `/administration`, `/account`, and `/jury`. Anonymous protected API calls return 401. `/.env` returns 404. The independent stable docs site remains available. Earlier [push CI](https://github.com/GiftedNovaHD/minsky/actions/runs/39325970878), [PR CI](https://github.com/GiftedNovaHD/minsky/actions/runs/39325978404), and [protected Cloudflare](https://github.com/GiftedNovaHD/minsky/actions/runs/39326006900) pass on `adff06c`. [Protected Supabase](https://github.com/GiftedNovaHD/minsky/actions/runs/39326130328) is pending at publication and later fails two hosted cases. The later retry record explains that result. Superseded `5ca804f` runs `39324869658`, `39324875562`, `39324916481`, and `39324966455` are canceled. No hosted fixture or provider step starts in the canceled protected runs.

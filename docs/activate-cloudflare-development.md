@@ -44,7 +44,7 @@ These targets exist in account `458ad6a930b0fb717796dfa19ca6a2b1`:
 The stable URL uses Cloudflare after the approved activation.
 `MINSKY_DEV_BACKEND=cloudflare` and the four exact target variables select the complete Worker.
 The candidate remains stopped, with its public and preview URLs disabled and its cron list empty.
-The separate installation-verification and CI resources are listed in [current state](current-state.md#t0021-fresh-development-installation-2026-10-18).
+The separate installation-verification and CI resources are listed in [run log](history/run-log.md#t0021-fresh-development-installation-2026-10-18).
 Do not substitute those resources for development.
 
 Existing Supabase records, accounts, passwords, images, and IDs do not appear in the fresh installation.
@@ -172,7 +172,7 @@ Require these results:
 
 Clean only UUID-owned fixtures and exact R2 keys. Retain a recovery journal if cleanup fails.
 Keep the candidate's routes and schedules disabled.
-Record code revisions, Worker versions, CLI results, and outstanding manual checks in current state.
+Record code revisions, Worker versions, CLI results, and outstanding manual checks in the [run log](history/run-log.md).
 Only then mark activation complete.
 
 ## Activation record, 19 October 2026
@@ -195,22 +195,62 @@ No assertion, timeout, or protection changed. The initial wait failure has no co
 | Subsequent automated publication | [Run 39252514749, attempt 4](https://github.com/GiftedNovaHD/minsky/actions/runs/39252514749/attempts/4), source `4e43739`. All five ordinary and publication jobs pass. |
 | Repeat verification and retained namespace | CLI stable verification passes 14/14 at 14:07:38 UTC, with clean owned-fixture removal. The live audit confirms namespace `71700338eed643d59185f4a777fcb7b2` and every binding match the first deployment. |
 
-The [current-state record](current-state.md) owns detailed verification results and remaining manual checks.
+The [run log](history/run-log.md) owns detailed verification results and remaining manual checks.
 Supabase resources and accounts remain intact. No Supabase data or identifiers transferred.
 
-## Recover the development admin password
+## Recover a Cloudflare admin password
 
 The development admin is `organizer`.
-When that admin cannot sign in, follow [Recover a Cloudflare admin password](cloud-onboarding.md#recover-a-cloudflare-admin-password).
-Run this command in a private terminal:
+
+`npm run cloud:recover-admin` changes a Supabase account only.
+Use `npm run cloudflare:recover-admin` when a Cloudflare admin cannot sign in.
+Run it in a private terminal on your computer.
+The command refuses CI.
+It also refuses a terminal whose output is redirected, because the temporary password must stay on that screen.
+
+The command reads the `DB` binding from a Wrangler configuration.
+The default file is `wrangler.jsonc`.
+That file does not name the development database.
+The development Worker binding is in `src/server/adapters/cloudflare/deploy/development.wrangler.jsonc`.
+Its database name is `minsky-development`.
+The command uses the remote database named by the selected file.
+It does not use a local database.
+
+Confirm the database name in the command output before you share the password.
+From the repository root, run:
 
 ```sh
 npm run cloudflare:recover-admin -- --config src/server/adapters/cloudflare/deploy/development.wrangler.jsonc --username organizer
 ```
 
-The command uses remote D1 database `minsky-development`.
-It prints the temporary password once in that terminal.
-It does not write the password to a file.
+Pass `--user ACCOUNT_ID` instead of `--username` when you know the account ID.
+Pass exactly one of those selectors.
+You can pass `--config` with another Wrangler file when the account is in a different remote `DB` binding.
+The binding must set `"remote": true`.
+The file must not define Wrangler environment overrides.
+
+The command checks that the account exists and is not disabled.
+The account must be an admin of an active event, or the installation owner.
+It then writes the same credential rows as **Reset password** in the application.
+It sets `must_change`, increases `credential_generation`, and database triggers increase `access_version`.
+It revokes every login and Better Auth session for that account.
+It records a completed `reset_password` row in `account_operations`.
+The actor on that row is the recovered account, because the maintainer has no Minsky account.
+All of those writes commit in one database batch.
+If the batch fails, the account keeps its previous password.
+
+The command prints the temporary password once on the terminal.
+It does not write the password to a file or a log.
+Copy the password from the terminal and share it through a secure channel.
+The admin must change the password at the next sign-in.
+
+Do not run this command in CI.
+Do not paste its output into chat or commit it.
+Do not run it against a database other than the one named in your selected configuration.
+
+The installation guide has a separate owner recovery command.
+That command requires the installation ID and writes a private result file.
+Use it when you are recovering a new installation and already have those IDs.
 
 ## Repair a failed activation
 

@@ -9,7 +9,7 @@ Use [deployment setup](cloudflare-builds.md) for automation and [activation](act
 Workers Builds runs ordinary checks and does not publish the application. Publication stays an explicit guarded command.
 Application previews remain disabled until independent preview resources exist.
 Backend migrations, bootstrap, secrets, and activation retain their explicit steps.
-The dated setup records below describe their recorded revisions.
+Earlier setup records are in [Supabase provider records](history/supabase-provider-records.md).
 
 This page covers the retained Supabase projects, their commands, and isolated Supabase checks.
 Supabase uses managed authentication, Postgres, Realtime, and private Storage.
@@ -27,8 +27,6 @@ The [identity choice](cloudflare-authentication-choice.md) records measured Work
 These resources contain fictional fixtures. They are separate from both the Cloudflare development installation and the Supabase projects below.
 
 ## Authentication decision (2026-10-02)
-
-The public documentation has separate hosting. See [documentation hosting](#documentation-hosting-t0011).
 
 The user replaced email invitations and email recovery with organizer-created **usernames and passwords**.
 SMTP and personal email addresses are not prerequisites.
@@ -112,85 +110,9 @@ T0003 does not require a sender, domain, or SMTP setup.
 ### Recover a Cloudflare admin password
 
 `npm run cloud:recover-admin` changes a Supabase account only.
-Use `npm run cloudflare:recover-admin` when a Cloudflare admin cannot sign in.
-Run it in a private terminal on your computer.
-The command refuses CI.
-It also refuses a terminal whose output is redirected, because the temporary password must stay on that screen.
-
-The command reads the `DB` binding from a Wrangler configuration.
-The default file is `wrangler.jsonc`.
-That file does not name the development database.
-The development Worker binding is in `src/server/adapters/cloudflare/deploy/development.wrangler.jsonc`.
-Its database name is `minsky-development`.
-The command uses the remote database named by the selected file.
-It does not use a local database.
-
-Confirm the database name in the command output before you share the password.
-From the repository root, run:
-
-```sh
-npm run cloudflare:recover-admin -- --config src/server/adapters/cloudflare/deploy/development.wrangler.jsonc --username organizer
-```
-
-Pass `--user ACCOUNT_ID` instead of `--username` when you know the account ID.
-Pass exactly one of those selectors.
-You can pass `--config` with another Wrangler file when the account is in a different remote `DB` binding.
-The binding must set `"remote": true`.
-The file must not define Wrangler environment overrides.
-
-The command checks that the account exists and is not disabled.
-The account must be an admin of an active event, or the installation owner.
-It then writes the same credential rows as **Reset password** in the application.
-It sets `must_change`, increases `credential_generation`, and database triggers increase `access_version`.
-It revokes every login and Better Auth session for that account.
-It records a completed `reset_password` row in `account_operations`.
-The actor on that row is the recovered account, because the maintainer has no Minsky account.
-All of those writes commit in one database batch.
-If the batch fails, the account keeps its previous password.
-
-The command prints the temporary password once on the terminal.
-It does not write the password to a file or a log.
-Copy the password from the terminal and share it through a secure channel.
-The admin must change the password at the next sign-in.
-
-Do not run this command in CI.
-Do not paste its output into chat or commit it.
-Do not run it against a database other than the one named in your selected configuration.
-
-The installation guide has a separate owner recovery command.
-That command requires the installation ID and writes a private result file.
-Use it when you are recovering a new installation and already have those IDs.
+For a Cloudflare admin, follow [Recover a Cloudflare admin password](activate-cloudflare-development.md#recover-a-cloudflare-admin-password).
 
 ## Ownership and costs
-
-### Documentation hosting (T0011)
-
-The documentation site uses a separate static Worker named `minsky-docs`.
-Its address is `https://minsky-docs.icaic-minsky.workers.dev`.
-Its configuration is `wrangler.docs.jsonc`, with `site/dist` as its only asset directory.
-The account is the existing Minsky development account, `458ad6a930b0fb717796dfa19ca6a2b1`.
-It has no backend binding, Supabase credential, or Worker request handler.
-No paid upgrade or purchased domain is required for this setup.
-
-Use Node.js 22.22 or later. From the repository root:
-
-```sh
-npm ci
-npm ci --prefix site
-npm run docs:build
-npm run docs:test
-npx wrangler whoami
-npx wrangler deploy --config wrangler.docs.jsonc --dry-run
-npm run docs:deploy
-```
-
-Confirm the account and Worker name before the final command.
-The user authorized the initial documentation deployment before merge on 2026-10-17.
-This was a T0011 exception for the docs Worker only.
-Workers Builds now publishes the docs from `main`. See [Publish the docs](cloudflare-builds.md#publish-the-docs).
-Use `npm run docs:deploy` only when Workers Builds cannot publish.
-The app's `npm run deploy` command is separate.
-See [the complete guide](../site/src/content/docs/contributing/documentation.mdx).
 
 ### Existing provider records
 
@@ -205,7 +127,7 @@ Provider access and Minsky app membership are separate.
 The user completes provider account verification and payment entry privately.
 Keep passwords, database credentials, recovery codes, and API secrets outside Git, chat, and public logs.
 
-Record these non-secret details in the completion record:
+Record these non-secret details in a dated record:
 
 - The organization or account owner and maintainer access.
 - The billing contact and selected plan for each provider.
@@ -262,15 +184,6 @@ Other members cannot see the uploader's cleanup record.
 This does not add a deletion job.
 New removal requests stop after archival.
 File cleanup for a removal already approved before archival can still finish.
-
-### Historical T0005 Worker preview
-
-The approved T0005 preview used `https://t0005-minsky-dev.icaic-minsky.workers.dev` with the `Minsky` Supabase accounts, database, and Storage.
-Its functions allowed that exact origin alongside the main and local origins.
-That frontend preview did not isolate backend changes or data.
-The old `deploy:preview` script was removed. Do not use an assets-only preview upload against the complete application Worker.
-Current app previews remain disabled until independent resources exist. Follow [deployment setup](cloudflare-builds.md).
-The attachment migration checks that Supabase already enabled Storage RLS rather than altering its managed table.
 
 ## Contributor setup
 
@@ -354,10 +267,10 @@ See [AGENTS.md](../AGENTS.md#cloud-development-and-deployment-workflow).
 
 **T0004 exception (2026-10-03):** the user's "Deploy first" instruction authorized frontend deployment to the existing `minsky-dev` Worker before merge.
 That deployment and all 12 hosted cases passed.
-[Current state](current-state.md#t0004-development-deployment-2026-10-03) records the revision, version, and asset checks.
+[Run log](history/run-log.md#t0004-development-deployment-2026-10-03) records the revision, version, and asset checks.
 No database migration or account-function deployment was necessary.
 The user merged [PR #9](https://github.com/notbowen/minsky/pull/9) on 2026-10-11 (SGT).
-The [merge record](current-state.md#t0004-merge-and-documentation-follow-up-2026-10-11) identifies its revision and exact timestamp.
+The [merge record](history/run-log.md#t0004-merge-and-documentation-follow-up-2026-10-11) identifies its revision and exact timestamp.
 
 Run CI project commands from a **separate checkout**.
 Link that checkout with `npx supabase link --project-ref ghtztmovdkhuketcbjmq`.
@@ -385,7 +298,7 @@ That preparation retained migration version `202610110002` from PR #20, which is
 Before you apply it to `Minsky CI`, inspect the CI database for announcement objects from PR #20.
 On 2026-10-17, `Minsky CI` also ran an `announcement-images` function from PR #20 (version 3).
 No record shows `202610240001` or the PR #62 version of that function in `Minsky CI`.
-See the [T0014 verification record](current-state.md#t0014-existing-backend-verification-2026-10-17) for the setup and recovery evidence.
+See the [T0014 verification record](history/run-log.md#t0014-existing-backend-verification-2026-10-17) for the setup and recovery evidence.
 The `cloud:link` and `cloud:functions` npm shortcuts target development.
 Use the explicit CI commands above in the separate checkout.
 
@@ -468,7 +381,7 @@ Do not remove a migration record while its database objects remain.
 
 Use [deployment setup](cloudflare-builds.md) for current publication settings and verification gates.
 Application previews currently skip. They must use independent resources before they can be enabled.
-See [preview behavior](cloudflare-preview-behavior.md).
+See [why app previews are disabled](cloudflare-builds.md#why-app-previews-are-disabled).
 
 ## Fixture recovery
 
@@ -482,19 +395,3 @@ Use the recorded IDs to identify the remaining fixtures in the selected test pro
 Delete only records and accounts from that test run.
 Remove the recovery file and its directory after cleanup succeeds.
 The file is local to the machine that ran the tests.
-
-## Initial completion record (2026-10-02)
-
-These notes describe the initial setup. Later verification records supersede their pending status claims.
-Use [current state](current-state.md) for current CI and deployment evidence.
-
-- Supabase project: `Minsky`, URL `https://ovymmobupzowotvrywek.supabase.co`, reference `ovymmobupzowotvrywek`, organization `gayymsuhfqsboksikzwx`, Singapore region `ap-southeast-1`, PostgreSQL 17. Provider access and CLI login/link were independently verified in the initial implementation.
-- Separate CI project: `Minsky CI`, URL `https://ghtztmovdkhuketcbjmq.supabase.co`, reference `ghtztmovdkhuketcbjmq`, organization `gayymsuhfqsboksikzwx`, Tokyo region `ap-northeast-1`, PostgreSQL 17. CLI verified `ACTIVE_HEALTHY`. All five migrations were applied without seeds; the admin function was deployed with server-side bundling and `ALLOWED_ORIGINS=http://127.0.0.1:4174`. Repository-owned Auth configuration was applied. No trial accounts or shared development records were copied.
-- CI project verification: all 11 local cloud workflow/Auth/authorization cases passed with fixture teardown. This is project preparation evidence, not a protected GitHub Actions run. Detailed outcomes and the initial configuration failure are recorded in [current state](current-state.md#separate-ci-project-and-development-workflow-2026-10-02).
-- Cloudflare account: `458ad6a930b0fb717796dfa19ca6a2b1`; Worker `minsky-dev` under `icaic-minsky.workers.dev`. Provider access and deployment were verified. Current deployment version and tests are in [current state](current-state.md).
-- Initial development account identifier: `1b8c9cb2-f84c-4d13-92f9-b70088db38f8`. Trusted bootstrap verified existence and assigned the initial development event/session/three teams. The user subsequently confirmed signing into the hosted app. Their password was never requested or inspected. Assign a username through the app without recreating this account.
-- Authentication settings: user reported Email enabled, public signup and anonymous sign-in disabled, email confirmation enabled and exact local/hosted redirects saved. Keep these settings; the trusted function confirms organizer-created internal identities.
-- Historical migrations `202610020001_cloud.sql` through `202610020003_private_signals.sql` and the first bootstrap were applied without seeds. Both username/password migrations were applied without seeds, the account function was deployed, and all eight final hosted cases passed. Current deployment/version and detailed verification are recorded in current-state.md.
-- SMTP: deliberately removed from T0003 requirements by the user. No sender domain or paid mail service was configured; prior SMTP blockers are historical.
-- Ownership/billing: selected plans, organization owner, billing contact, recurring charges and receipt handling remain unverified. They stay deferred and are not part of the T0005 issue-image ticket. No paid upgrade was selected or payment action performed by the agent.
-- Protected cloud CI (superseded on 2026-10-23, when the GitHub workflow was removed): remains in T0003. The separate test project is prepared; protected GitHub environment setup and the first protected cloud run remain pending, including owner access and default-branch workflow availability. Local runs against isolated fixtures are separate evidence.

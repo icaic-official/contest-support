@@ -7,7 +7,7 @@ For the suite's responsibilities and limits, see [the test contracts](provider-t
 Both drivers use the same 11 shared scenarios.
 On 2026-10-19, protected runs at `2125875` passed all 11 cases on both providers. A later change needs fresh hosted verification.
 Record local checks and CLI runs against hosted resources separately. Keep earlier protected GitHub runs as dated evidence.
-See [current state](current-state.md) for tested revisions, results, and cleanup evidence.
+See [run log](history/run-log.md) for tested revisions, results, and cleanup evidence.
 For a new implementation, complete [Add a backend provider](add-provider.md) before using this runner.
 The runner currently accepts only `supabase` and `cloudflare`.
 The commands below verify existing implementations. They do not register a provider or provision a new installation.
@@ -33,7 +33,7 @@ The command lists the cases without creating accounts, records, or a browser ses
 
 This run is a manual command. It is not part of `npm run ci`.
 
-1. Use a separate test project with the repository migrations and active `admin` and `attachments` functions.
+1. Use a separate test project with the repository migrations and active `admin`, `attachments`, and `announcement-images` functions.
 2. Set the function origin to `http://127.0.0.1:4174`.
 3. Supply the following variables through your private environment.
 
@@ -295,14 +295,14 @@ node src/server/adapters/cloudflare/tooling/test-ui.mjs \
 The required result is one hosted UI case with no failures, skips, or retries and verified fixture cleanup.
 The journey checks all nine commands, jury worklist transitions, images, live updates, and account administration.
 Follow [the installation guide](../site/src/content/docs/operators/installation.mdx) for the separate empty-installation procedure.
-Record the tested source revision and installation result in the current-state record.
+Record the tested source revision and installation result in the [run log](history/run-log.md).
 
 ## Run hosted checks on demand
 
 GitHub Actions no longer runs these checks.
 A maintainer or coding agent runs them against the isolated targets below.
 
-1. Confirm the target in [cloud onboarding](cloud-onboarding.md#verification-and-hosted-cloud-checks).
+1. Confirm the target in [Supabase provider guide](supabase-provider.md#verification-and-hosted-cloud-checks).
 2. Check out the reviewed revision.
 3. For Supabase, run the commands in [CI settings](cloudflare-build-settings.md#on-demand-checks).
 4. Record the revision, backend versions, results, and cleanup outcome.
@@ -310,7 +310,7 @@ A maintainer or coding agent runs them against the isolated targets below.
 Skip Supabase backend preparation when the change does not include migrations, functions, or configuration.
 The tests still create and delete fixtures. They do not check a fresh installation.
 Prepare the CI backend only when the remote migration history matches the intended revision.
-The [earlier CI preparation record](current-state.md#t0014-existing-backend-verification-2026-10-17) includes an extra announcement migration.
+The [earlier CI preparation record](history/run-log.md#t0014-existing-backend-verification-2026-10-17) includes an extra announcement migration.
 Inspect the live migration history before preparation rather than assuming it matches a clean checkout.
 
 For the complete Cloudflare connector, run the hosted commands in this guide on the reviewed revision.
@@ -318,7 +318,7 @@ Do not point them at the development database.
 The test commands do not migrate, deploy, or create resources.
 Before you run them, migrate the store and connector CI databases and deploy the isolated application Worker, as [Run against Cloudflare](#run-against-cloudflare) states.
 The private bucket, service activation, and initial Worker secret must exist before those commands can pass.
-Record the result and tested revision in [current state](current-state.md), separately from other hosted CLI results.
+Record the result and tested revision in [run log](history/run-log.md), separately from other hosted CLI results.
 Earlier authentication runs do not check this connector path.
 Record Supabase verification separately from Cloudflare CLI runs.
 

@@ -1,9 +1,8 @@
 import { randomUUID } from 'node:crypto';
-import { readFileSync, readdirSync } from 'node:fs';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { getPlatformProxy, unstable_splitSqlQuery as splitSqlQuery } from 'wrangler';
+import { getPlatformProxy } from 'wrangler';
 import type { D1Connection, D1Statement } from '../d1/connection';
-import { D1Fixture } from '../d1/testFixture';
+import { D1Fixture, applyMigrations } from '../d1/testFixture';
 import type { CurrentAccessRow } from './application';
 import { connectLive, dispatchNotifications, maintainFixtureSessions, SessionLiveCoordinator, type LiveEnvironment } from './live';
 
@@ -115,10 +114,7 @@ describe('outbox retry fairness with real local D1', () => {
     });
     db = platform.env.DB;
     dispose = platform.dispose;
-    const directory = 'src/server/adapters/d1/migrations';
-    for (const file of readdirSync(directory).filter((file) => file.endsWith('.sql')).sort()) {
-      await db.batch(splitSqlQuery(readFileSync(`${directory}/${file}`, 'utf8')).map((sql) => db.prepare(sql)));
-    }
+    await applyMigrations(db);
   }, 120_000);
   afterAll(async () => { if (dispose) await dispose(); }, 120_000);
 
@@ -444,10 +440,7 @@ describe('real local named maintenance service binding', () => {
       const application = harness.getWorker<LiveEnvironment>('minsky-maintenance-application-local');
       const client = harness.getWorker('minsky-maintenance-client-local');
       const env = await application.getEnv();
-      const migrationDirectory = 'src/server/adapters/d1/migrations';
-      for (const file of readdirSync(migrationDirectory).filter((file) => file.endsWith('.sql')).sort()) {
-        await env.DB.batch(splitSqlQuery(readFileSync(`${migrationDirectory}/${file}`, 'utf8')).map((sql) => env.DB.prepare(sql)));
-      }
+      await applyMigrations(env.DB);
       const eventId = randomUUID();
       const runId = randomUUID();
       const sessionIds = [randomUUID(), randomUUID()];

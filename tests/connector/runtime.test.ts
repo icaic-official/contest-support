@@ -1,16 +1,17 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { mkdtemp, readFile, readdir, rm, writeFile, mkdir } from 'node:fs/promises';
+import { mkdtemp, rm, writeFile, mkdir } from 'node:fs/promises';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { chromium, type Browser, type BrowserContext, type Page } from '@playwright/test';
 import { expect, it } from 'vitest';
-import { getPlatformProxy, unstable_dev, unstable_splitSqlQuery as splitSqlQuery } from 'wrangler';
+import { getPlatformProxy, unstable_dev } from 'wrangler';
 import { snapshotSchema, type Command, type Snapshot } from '../../src/connected/model';
 import type { D1Connection } from '../../src/server/adapters/d1/connection';
 import { bootstrapInstallation } from '../../src/server/adapters/cloudflare/installation';
 import { randomSecret } from '../../src/server/adapters/cloudflare/password';
 import type { AccountCommand, StartedImage } from '../../src/backend/contracts';
+import { applyMigrations } from '../../src/server/adapters/d1/testFixture';
 
 const imageBytes = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a7t0AAAAASUVORK5CYII=', 'base64');
 
@@ -205,10 +206,7 @@ it('runs the complete application through isolated HTTPS, D1, R2, and Durable Ob
     }));
     const setup = await proxy();
     try {
-      const migrations = resolve('src/server/adapters/d1/migrations');
-      for (const file of (await readdir(migrations)).filter((file) => file.endsWith('.sql')).sort()) {
-        await setup.env.DB.batch(splitSqlQuery(await readFile(join(migrations, file), 'utf8')).map((sql) => setup.env.DB.prepare(sql)));
-      }
+      await applyMigrations(setup.env.DB);
       installation = await bootstrapInstallation(setup.env.DB, { adminUsername: usernames[0], adminName: 'Fictional organizer',
         eventName: `runtime:${unique}`, sessionName: 'Fictional contest', categories: ['Devices', 'Other'],
         teams: [{ name: 'Fictional Alpha', location: 'Desk A' }, { name: 'Fictional Beta', location: 'Desk B' }] });

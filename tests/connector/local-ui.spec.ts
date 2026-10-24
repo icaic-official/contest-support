@@ -1,11 +1,11 @@
 import { randomUUID } from 'node:crypto';
-import { readFile, readdir } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { test, expect } from '@playwright/test';
-import { createTestHarness, unstable_splitSqlQuery as splitSqlQuery } from 'wrangler';
+import { createTestHarness } from 'wrangler';
 import { randomSecret } from '../../src/server/adapters/cloudflare/password';
 import { createLocalUiFixture, type LocalUiEnvironment } from './local-ui-fixture';
 import { runUiJourney } from './ui-journey';
+import { applyMigrations } from '../../src/server/adapters/d1/testFixture';
 
 test('complete local React UI journey uses real HTTPS, D1, R2, and Durable Objects', async ({ browser }) => {
   const directory = process.env.MINSKY_CF_LOCAL_UI_DIRECTORY;
@@ -40,10 +40,7 @@ test('complete local React UI journey uses real HTTPS, D1, R2, and Durable Objec
     phase = 'worker environment';
     const env = await harness.getWorker<LocalUiEnvironment>().getEnv();
     phase = 'database migrations';
-    const migrations = resolve('src/server/adapters/d1/migrations');
-    for (const file of (await readdir(migrations)).filter((name) => name.endsWith('.sql')).sort()) {
-      await env.DB.batch(splitSqlQuery(await readFile(join(migrations, file), 'utf8')).map((sql) => env.DB.prepare(sql)));
-    }
+    await applyMigrations(env.DB);
     phase = 'fictional account setup';
     fixture = await createLocalUiFixture(env, origin, secret);
     await runUiJourney(browser, fixture, { ignoreHTTPSErrors: true });

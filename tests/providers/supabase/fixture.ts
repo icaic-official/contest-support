@@ -2,6 +2,7 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { readFile, rename, unlink, writeFile } from 'node:fs/promises';
 import { z } from 'zod';
 import { createSupabaseBackend } from '../../../src/backend/supabase/backend';
+import { removeFixtureSessions } from '../../support/supabaseCleanup';
 import { createdAccountMarkers, type Actor, type ScenarioData, type TestAccount } from '../contracts';
 
 export interface SupabaseFixture extends ScenarioData {
@@ -336,45 +337,7 @@ export async function cleanupFixture(path: string): Promise<void> {
   // Save discovered UUIDs before any deletion. A lost create response needs no password for recovery.
   journal.accountIds = accountIds;
   await saveJournal(path, journal);
-  const attachments = await admin.from('attachments').select(
-    'id,session_id,issue_id',
-  ).in('session_id', journal.sessionIds);
-  checked(attachments.error, 'find fixture image objects');
-  const paths = (attachments.data ?? []).flatMap((image) =>
-    ['original', 'thumbnail'].map((kind) =>
-      `${image.session_id}/${image.issue_id}/${image.id}/${kind}`
-    )
-  );
-  if (paths.length) {
-    checked(
-      (await admin.storage.from('issue-attachments').remove(paths)).error,
-      'remove fixture image objects',
-    );
-  }
-  for (
-    const table of [
-      'attachments',
-      'admin_audit',
-      'history',
-      'awards',
-      'resolutions',
-      'issues',
-      'changes',
-      'staff_changes',
-      'memberships',
-      'teams',
-    ]
-  ) {
-    checked(
-      (await admin.from(table).delete().in('session_id', journal.sessionIds))
-        .error,
-      `remove fixture ${table}`,
-    );
-  }
-  checked(
-    (await admin.from('sessions').delete().in('id', journal.sessionIds)).error,
-    'remove fixture sessions',
-  );
+  await removeFixtureSessions(admin, journal.sessionIds);
   checked(
     (await admin.from('events').delete().eq('id', journal.eventId)).error,
     'remove fixture event',

@@ -193,7 +193,7 @@ describe('provider fixture recovery boundaries', () => {
     await writeFile(path, JSON.stringify(journal));
     controlPlane({ failDelete: true });
     await expect(cleanupFixture(path)).rejects.toThrow(
-      'remove fixture attachments',
+      'Fixture cleanup failed for announcement_images',
     );
     expect(JSON.parse(await readFile(path, 'utf8'))).toEqual(journal);
   });
@@ -207,7 +207,7 @@ describe('provider fixture recovery boundaries', () => {
     const setup = { users: [owned, foreign], memberships: [{ user_id: owned.id, session_id: journal.sessionIds[0] }],
       people: [{ id: owned.id, name: marker.name, username: marker.username }] };
     const failed = controlPlane({ ...setup, failDelete: true });
-    await expect(cleanupFixture(path)).rejects.toThrow('remove fixture attachments');
+    await expect(cleanupFixture(path)).rejects.toThrow('Fixture cleanup failed for announcement_images');
     const saved = JSON.parse(await readFile(path, 'utf8'));
     expect(saved.accountIds).toEqual([owned.id]);
     expect(saved.createdAccounts).toEqual([{ ...marker, id: owned.id }]);
@@ -245,7 +245,7 @@ describe('provider fixture recovery boundaries', () => {
     expect(Object.keys(recovery).sort()).toEqual(Object.keys(journal).sort());
     expect(recovery.accountIds).toEqual([]);
     expect(deletions).toEqual([{
-      table: 'attachments',
+      table: 'announcement_images',
       ids: recovery.sessionIds,
     }]);
     const contents = JSON.stringify(recovery);

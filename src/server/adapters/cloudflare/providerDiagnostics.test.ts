@@ -1,9 +1,9 @@
 import { randomUUID } from 'node:crypto';
-import { readFileSync, readdirSync } from 'node:fs';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { getPlatformProxy, unstable_splitSqlQuery as splitSqlQuery } from 'wrangler';
+import { getPlatformProxy } from 'wrangler';
 import type { D1Connection } from '../d1/connection';
 import { createDiagnostics, readD1AuthFlags, type AuthFlags } from '../../../../tests/providers/cloudflare/diagnostics';
+import { applyMigrations } from '../d1/testFixture';
 
 const flags: AuthFlags = { accountExists: true, accountDisabled: false, accountMustChange: false, accountReady: true,
   wrapperCount: 1, wrapperExists: true, wrapperRevoked: false, wrapperUnexpired: true, credentialGenerationMatches: true,
@@ -82,9 +82,7 @@ describe('fixture-owned authentication flags with real local D1', () => {
       persist: false, remoteBindings: false, envFiles: [] });
     db = platform.env.DB;
     dispose = platform.dispose;
-    for (const name of readdirSync('src/server/adapters/d1/migrations').filter(name => name.endsWith('.sql')).sort()) {
-      await db.batch(splitSqlQuery(readFileSync(`src/server/adapters/d1/migrations/${name}`, 'utf8')).map(sql => db.prepare(sql)));
-    }
+    await applyMigrations(db);
     await db.batch([
       db.prepare('INSERT INTO accounts (id, name, must_change) VALUES (?, ?, 0)').bind(accountId, 'Fictional diagnostic account'),
       db.prepare(`INSERT INTO ba_user (id, name, email, createdAt, updatedAt) VALUES (?, ?, ?, '2026-01-01', '2026-01-01')`)

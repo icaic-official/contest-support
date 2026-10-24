@@ -1,12 +1,12 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { PGlite } from "@electric-sql/pglite";
-import { readdirSync, readFileSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 import { snapshotSchema, unresolvedTime, type Snapshot } from "../../../connected/model";
 import type { Caller } from '../../authentication';
 import type { CommandResult } from '../../workflow';
 import { WorkflowService, type WorkflowPersistence } from "../../workflow";
 import { createSupabaseWorkflowPersistence } from "./store";
+import { migrateSupabaseTestDatabase } from '../../../../tests/support/supabaseDatabase';
 
 // Execute the repository migrations and database guards. Only Supabase Auth and
 // Storage infrastructure are supplied locally; workflow writes are never faked.
@@ -97,52 +97,7 @@ async function durableState() {
 }
 
 beforeAll(async () => {
-  await db.exec(
-    `create role anon; create role authenticated; create role service_role bypassrls;
-    create schema auth; create table auth.users(id uuid primary key, raw_user_meta_data jsonb default '{}', encrypted_password text default 'initial-hash', banned_until timestamptz, deleted_at timestamptz);
-    create table auth.sessions(id uuid primary key,user_id uuid,created_at timestamptz default clock_timestamp(),not_after timestamptz);
-    create function auth.jwt() returns jsonb language sql stable as $$ select coalesce(nullif(current_setting('request.jwt.claims',true),''),'{}')::jsonb $$;
-    create function auth.uid() returns uuid language sql stable as $$ select coalesce(nullif(current_setting('request.jwt.claims',true),'')::jsonb->>'sub',nullif(current_setting('request.jwt.claim.sub',true),''))::uuid $$;
-    grant usage on schema auth to authenticated; grant execute on function auth.uid() to authenticated;
-    create publication supabase_realtime;
-    create schema if not exists storage;
-    create table storage.buckets (
-      id text primary key,
-      name text not null,
-      public boolean default false,
-      file_size_limit bigint,
-      allowed_mime_types text[]
-    );
-    create table storage.objects (
-      id uuid primary key default gen_random_uuid(),
-      bucket_id text,
-      name text,
-      metadata jsonb
-    );
-    -- Match the managed Storage table's security before application migrations.
-    alter table storage.objects enable row level security;
-    create function storage.foldername(name text) returns text[] language plpgsql immutable as $$
-    declare parts text[];
-    begin
-      parts := string_to_array(name, '/');
-      return parts[1:array_length(parts,1)-1];
-    end $$;
-    create function storage.filename(name text) returns text language plpgsql immutable as $$
-    declare parts text[];
-    begin
-      parts := string_to_array(name, '/');
-      return parts[array_length(parts,1)];
-    end $$;
-    grant usage on schema storage to authenticated, service_role;
-    grant all on storage.buckets, storage.objects to authenticated, service_role;`,
-  );
-  for (
-    const file of readdirSync("supabase/migrations")
-      .filter((f) => f.endsWith(".sql"))
-      .sort()
-  ) {
-    await db.exec(readFileSync(`supabase/migrations/${file}`, "utf8"));
-  }
+  await migrateSupabaseTestDatabase(db);
   for (let n = 1; n <= 8; n++) {
     await db.query(
       "insert into auth.users(id,raw_user_meta_data) values($1,$2::jsonb)",

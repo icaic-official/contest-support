@@ -1,14 +1,14 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { getPlatformProxy, unstable_splitSqlQuery as splitSqlQuery } from 'wrangler';
+import { getPlatformProxy } from 'wrangler';
 import type { StartedImage } from '../../../backend/contracts';
 import { MIB, THUMBNAIL_BYTES } from '../../../connected/imageFile';
 import type { Caller } from '../../authentication';
 import type { D1Connection, D1Statement } from '../d1/connection';
-import { D1Fixture } from '../d1/testFixture';
+import { D1Fixture, applyMigrations } from '../d1/testFixture';
 import { D1ApplicationService } from './application';
 import { R2ImageService, type PrivateBucket } from './images';
 
@@ -54,10 +54,7 @@ describe('Cloudflare private images with local D1 and R2 bindings', () => {
     db = platform.env.DB;
     bucket = platform.env.IMAGES;
     dispose = platform.dispose;
-    const migrations = 'src/server/adapters/d1/migrations';
-    for (const file of readdirSync(migrations).filter((file) => file.endsWith('.sql')).sort()) {
-      await db.batch(splitSqlQuery(readFileSync(`${migrations}/${file}`, 'utf8')).map((sql) => db.prepare(sql)));
-    }
+    await applyMigrations(db);
   }, timeout);
 
   afterAll(async () => {

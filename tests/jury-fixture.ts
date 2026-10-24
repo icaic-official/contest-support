@@ -1,7 +1,7 @@
 import { PGlite } from "@electric-sql/pglite";
-import { readdirSync, readFileSync } from "node:fs";
 import type { BrowserContext, WebSocketRoute } from "@playwright/test";
 import type { Command, Snapshot } from "../src/connected/model";
+import { migrateSupabaseTestDatabase } from "./support/supabaseDatabase";
 
 // Uses actual migrations, RLS, snapshots, and workflow transactions. Only the
 // hosted Auth/HTTP/Realtime transport is simulated; this is not a cloud test.
@@ -34,29 +34,7 @@ export async function createJuryFixture({ seedIssues = true } = {}) {
   const channels = new Map<WebSocketRoute, Map<string, boolean>>();
   let loseResponse = false;
   let announcementDelay = 0;
-  await db.exec(`
-    create role anon; create role authenticated; create role service_role bypassrls;
-    create schema auth;
-    create table auth.users(id uuid primary key, raw_user_meta_data jsonb default '{}', encrypted_password text default 'initial-hash');
-    create table auth.sessions(id uuid primary key,user_id uuid,created_at timestamptz default clock_timestamp());
-    create function auth.jwt() returns jsonb language sql stable as $$ select coalesce(nullif(current_setting('request.jwt.claims',true),''),'{}')::jsonb $$;
-    create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$;
-    grant usage on schema auth to authenticated; grant execute on function auth.uid() to authenticated;
-    create publication supabase_realtime;
-    create schema storage;
-    create table storage.buckets(id text primary key,name text not null,public boolean default false,file_size_limit bigint,allowed_mime_types text[]);
-    create table storage.objects(id uuid primary key default gen_random_uuid(),bucket_id text,name text,metadata jsonb);
-    alter table storage.objects enable row level security;
-    create function storage.foldername(name text) returns text[] language sql immutable as $$ select (string_to_array(name,'/'))[1:array_length(string_to_array(name,'/'),1)-1] $$;
-    create function storage.filename(name text) returns text language sql immutable as $$ select (string_to_array(name,'/'))[array_length(string_to_array(name,'/'),1)] $$;
-    grant usage on schema storage to authenticated,service_role;
-    grant all on storage.buckets,storage.objects to authenticated,service_role;
-  `);
-  for (const file of readdirSync("supabase/migrations")
-    .filter((file) => file.endsWith(".sql"))
-    .sort()) {
-    await db.exec(readFileSync(`supabase/migrations/${file}`, "utf8"));
-  }
+  await migrateSupabaseTestDatabase(db);
   for (const name of names) {
     logins.set(users[name], crypto.randomUUID());
     await db.query(

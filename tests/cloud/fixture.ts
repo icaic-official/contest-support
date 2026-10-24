@@ -1,5 +1,6 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { removeFixtureSessions } from "../support/supabaseCleanup";
 
 export interface Fixture {
   event: string;
@@ -39,46 +40,7 @@ export async function account(name: string) {
 export async function cleanup(state: Fixture) {
   const admin = service();
   // Delete only rows belonging to this run's UUID sessions. Never reset the project.
-  if (state.sessions.length) {
-    const images = await admin.from("attachments")
-      .select("id,session_id,issue_id").in("session_id", state.sessions);
-    if (images.error) throw images.error;
-    const paths = (images.data ?? []).flatMap((image) =>
-      ["original", "thumbnail"].map((kind) =>
-        `${image.session_id}/${image.issue_id}/${image.id}/${kind}`,
-      ),
-    );
-    if (paths.length) {
-      const removed = await admin.storage.from("issue-attachments").remove(paths);
-      if (removed.error) throw removed.error;
-    }
-    for (const table of [
-      "attachments",
-      "admin_audit",
-      "history",
-      "awards",
-      "resolutions",
-      "issues",
-      "changes",
-      "staff_changes",
-      "memberships",
-      "teams",
-    ]) {
-      const { error } = await admin
-        .from(table)
-        .delete()
-        .in("session_id", state.sessions);
-      if (error)
-        throw new Error(
-          `Fixture cleanup failed for ${table}: ${error.message}`,
-        );
-    }
-    const { error } = await admin
-      .from("sessions")
-      .delete()
-      .in("id", state.sessions);
-    if (error) throw error;
-  }
+  await removeFixtureSessions(admin, state.sessions);
   if (state.event) {
     const { error } = await admin.from("events").delete().eq("id", state.event);
     if (error) throw error;

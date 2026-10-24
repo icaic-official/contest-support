@@ -5,7 +5,7 @@ Cloudflare is the live backend. Its checks are in the Cloudflare verification gu
 This Supabase run is a manual command. It is not part of `npm run ci`.
 Use fictional fixtures in the approved Minsky CI project, `ghtztmovdkhuketcbjmq`.
 The [workflow reference](server-workflow.md) defines the boundaries and compatibility rules.
-Record observed results in [current state](current-state.md).
+Record observed results in [run log](history/run-log.md).
 
 ## Run local checks
 

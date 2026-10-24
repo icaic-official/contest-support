@@ -73,7 +73,7 @@ The Cloudflare development database, retained Supabase projects, and earlier D1 
 The committed Worker configuration requests a 1,000 ms CPU cap per request.
 Cloudflare requires Workers Paid for that setting.
 An earlier protected password-change request exceeded runtime resources.
-That result describes its recorded configuration. See [current state](current-state.md) for later Paid activation and hosted results.
+That result describes its recorded configuration. See [run log](history/run-log.md) for later Paid activation and hosted results.
 Before deploying the Worker, confirm that an authorized account owner activated Workers Paid for the configured account.
 On Free, deployment fails with error `100328`. Do not reduce password cost to bypass that requirement.
 
@@ -151,30 +151,30 @@ It reports elapsed time and sampled CPU metrics without passwords, hashes, cooki
 Analytics can arrive late or omit samples. Preserve that uncertainty when recording results.
 Local elapsed time and hosted client time are not hosted CPU measurements.
 
-## Run protected CI
+## Run hosted checks on demand
 
-The GitHub `cloudflare_auth` job is removed.
-Repeat the hosted authentication checks with the commands in [CI settings](cloudflare-build-settings.md#on-demand-checks).
-Run them on the reviewed revision. They deploy only `minsky-auth-ci`.
-The historical `cloud-test` allowlist included `main` and the exact T0018 branch.
-The T0019 branch remained outside that allowlist. Its local hosted results do not replace a later hosted run on that revision.
-See [the run record](current-state.md#t0018-cloudflare-authentication-2026-10-18) for the initial rejection and later hosted resource limit.
-The [PR #41 follow-up](current-state.md#pr-41-review-corrections-and-paid-authentication-2026-10-18) records the passing protected run on Workers Paid.
-The existing `CLOUDFLARE_API_TOKEN` needs D1 access and deployment access to the isolated authentication Worker.
+The GitHub `cloudflare_auth` job is removed. No GitHub workflow runs these checks.
+Run the hosted authentication checks with the commands in [CI settings](cloudflare-build-settings.md#on-demand-checks).
+Run them on the reviewed revision. They migrate and deploy only `minsky-auth-ci`.
+They do not run Supabase migrations or deploy the application.
+Your Wrangler credentials need D1 access and deployment access to the isolated authentication Worker.
 The Worker must already have its private `AUTH_SECRET`.
-The job checks the target, applies CI migrations, deploys that revision, and runs both hosted suites.
-It does not run Supabase migrations or deploy the application.
 Ordinary checks run local browser security tests without hosted credentials.
 
-Record local tests, local CLI runs against hosted resources, and protected GitHub Actions results separately.
-A skipped or credential-blocked protected job is not a pass.
+Record local tests and local CLI runs against hosted resources separately.
+A credential-blocked run is not a pass.
+
+These earlier records remain:
+
+- The historical `cloud-test` allowlist included `main` and the exact T0018 branch. The T0019 branch remained outside it.
+- See [the run record](history/run-log.md#t0018-cloudflare-authentication-2026-10-18) for the initial rejection and later hosted resource limit.
+- The [PR #41 follow-up](history/run-log.md#pr-41-review-corrections-and-paid-authentication-2026-10-18) records the passing protected run on Workers Paid.
 
 ## Recover interrupted fixtures
 
 The D1 fixture records account, event, session, and login IDs before its first write.
 Its `/tmp/minsky-d1-proof-*/fixture.json` journal contains the exact authentication configuration and target without credentials.
 Verified cleanup removes the journal. Failed cleanup preserves it.
-The protected workflow retains remaining journals for seven days.
 Account-operation rows contain IDs, actions, states, and timestamps. They contain no passwords.
 
 Before manual cleanup, confirm the journal target and exact account markers.

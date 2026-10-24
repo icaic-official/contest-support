@@ -1,11 +1,11 @@
 # Backend contracts
 
-The browser uses `Backend` in [contracts.ts](../src/backend/contracts.ts) for accounts, workflows, administration, images, and live updates.
+The browser uses `Backend` in [contracts.ts](../src/backend/contracts.ts) for accounts, workflows, administration, images, announcements, and live updates.
 An adapter implements those operations for a provider.
 Cloudflare is the active development implementation.
 The Supabase adapter remains available for Supabase builds and isolated provider verification.
 Both implementations use the same contract.
-See [current state](current-state.md) for source-specific verification and deployment limits.
+See [run log](history/run-log.md) for source-specific verification and deployment limits.
 
 The contracts describe Minsky operations.
 They do not expose database queries, access tokens, provider clients, or channel objects.
@@ -66,7 +66,7 @@ Persisted audience cursors suppress old duplicate delivery. A reconnect signals 
 The outbox remains pending until the coordinator accepts delivery. Minutely maintenance retries delivery and image cleanup.
 
 Provider-owned [installation tooling](../src/server/adapters/cloudflare/tooling/install.mjs) checks exact targets and protects returned credentials.
-See [installation](../site/src/content/docs/operators/installation.mdx), [provider verification](run-provider-tests.md), and [current evidence](current-state.md).
+See [installation](../site/src/content/docs/operators/installation.mdx), [provider verification](run-provider-tests.md), and [current evidence](history/run-log.md).
 
 ## Module boundaries
 
@@ -252,15 +252,15 @@ The existing embedded PostgreSQL tests continue to check database rules.
 
 `npm run test:e2e` uses the application with mocked provider responses.
 It covers request-ID reuse after an uncertain write and a new request after a definitive rejection.
-The suite also covers the existing account, team-search, image, and refresh behavior.
+The suite also covers the existing account, team-search, image, refresh, and announcement behavior.
 
 Those mocked checks establish request and UI behavior. Hosted provider checks run separately.
 `npm test` also checks complete D1 persistence through `WorkflowPersistence`.
 It includes shared-service rules and Supabase persistence tests with embedded PostgreSQL.
 `npm run test:workflow:hosted` exercises the deployed opt-in Supabase function with the shared workflow scenarios and additional boundary checks.
 That runner permits only the approved Minsky CI project. It does not activate the replacement in development.
-Hosted checks use isolated accounts and records through [protected cloud CI](cloud-onboarding.md#verification-and-protected-cloud-ci).
-The [shared provider suite](provider-test-contracts.md) checks these contracts through real browser adapters.
+Hosted checks use isolated accounts and records through [on-demand hosted cloud checks](supabase-provider.md#verification-and-hosted-cloud-checks).
+The [shared provider suite](provider-test-contracts.md) checks these contracts through real browser adapters. It does not cover `announcements` yet.
 Supabase and Cloudflare have separate fixture implementations with the same scenario assertions.
 [Run the shared checks](run-provider-tests.md) separately from the provider-specific hosted UI suite.
-The latest observed results are in [current state](current-state.md).
+The latest observed results are in [run log](history/run-log.md).

@@ -3,15 +3,14 @@ import { readFileSync } from "node:fs";
 import { currentMigrationNames } from "../src/server/adapters/cloudflare/tooling/migrations.mjs";
 import { describe, expect, it, vi } from "vitest";
 import {
-  applicationBackend, assertStaticApplication, buildWorkers, confirmApplication,
+  applicationBackend, assertStaticApplication, buildWorkers, prepareApplication,
   deploymentPlan, deploymentTargets, deployWorkers, isCurrentRevision, previewAddress,
   validateBuildSettings, verifyApplicationDeployment, verifyRevision, wranglerArguments,
 } from "./deploy-workers.mjs";
 
 const sha = "a".repeat(40);
 const env = {
-  GITHUB_EVENT_NAME: "push", GITHUB_REPOSITORY: "GiftedNovaHD/minsky",
-  GITHUB_REF: "refs/heads/feature/docs", GITHUB_SHA: sha, GITHUB_ACTOR: "maintainer",
+  WORKERS_CI: "1", WORKERS_CI_BRANCH: "feature/docs", WORKERS_CI_COMMIT_SHA: sha,
   CLOUDFLARE_ACCOUNT_ID: "458ad6a930b0fb717796dfa19ca6a2b1",
   VITE_SUPABASE_URL: "https://ovymmobupzowotvrywek.supabase.co",
   VITE_SUPABASE_PUBLISHABLE_KEY: "sb_publishable_fixture", VITE_ENVIRONMENT: "development",
@@ -20,21 +19,20 @@ const env = {
 
 describe("deployment selection", () => {
   it.each([
-    { GITHUB_EVENT_NAME: "pull_request" }, { GITHUB_EVENT_NAME: "pull_request_target" },
-    { GITHUB_EVENT_NAME: "workflow_dispatch" }, { GITHUB_EVENT_NAME: "schedule" },
-    { GITHUB_REPOSITORY: "contributor/minsky" }, { GITHUB_ACTOR: "dependabot[bot]" },
-    { GITHUB_REF: "refs/tags/main" }, { GITHUB_REF: "refs/heads/" },
-    { GITHUB_SHA: "0".repeat(40) }, { GITHUB_SHA: "" },
-  ])("rejects unsupported events and revisions: %j", (change) => {
+    { WORKERS_CI_BRANCH: undefined }, { WORKERS_CI_BRANCH: "" }, { WORKERS_CI_BRANCH: "main\n" },
+    { WORKERS_CI_COMMIT_SHA: undefined }, { WORKERS_CI_COMMIT_SHA: "0".repeat(40) },
+    { WORKERS_CI_COMMIT_SHA: "" }, { WORKERS_CI_COMMIT_SHA: "A".repeat(40) },
+    { WORKERS_CI_COMMIT_SHA: "a".repeat(39) },
+  ])("rejects missing or invalid branches and revisions: %j", (change) => {
     expect(() => deploymentPlan({ ...env, ...change })).toThrow();
   });
 
   it("publishes main to the stable Worker and all other branches to previews", () => {
     const worker = { config: "wrangler.docs.jsonc" };
-    const main = deploymentPlan({ ...env, GITHUB_REF: "refs/heads/main" });
+    const main = deploymentPlan({ ...env, WORKERS_CI_BRANCH: "main" });
     expect(wranglerArguments(worker, main)).toEqual(["deploy", "--config", worker.config]);
     for (const branch of ["Main", "main-fix", "feature/docs", "release/1.0"]) {
-      const plan = deploymentPlan({ ...env, GITHUB_REF: `refs/heads/${branch}` });
+      const plan = deploymentPlan({ ...env, WORKERS_CI_BRANCH: branch });
       expect(plan.preview).toBe(true);
       expect(wranglerArguments(worker, plan)).toContain("preview");
       expect(wranglerArguments(worker, plan)).not.toContain("deploy");
@@ -44,9 +42,9 @@ describe("deployment selection", () => {
   it("keeps preview names stable, short, and distinct after normalization", () => {
     const names = ["feature/docs", "feature-docs", "Feature/docs", "文档", "a".repeat(200),
       "feature/$(touch${IFS}/tmp/never);echo", "a`id`"].map((branch) => {
-      const plan = deploymentPlan({ ...env, GITHUB_REF: `refs/heads/${branch}` });
+      const plan = deploymentPlan({ ...env, WORKERS_CI_BRANCH: branch });
       expect(plan.name).toMatch(/^[a-z0-9-]{1,63}$/);
-      expect(deploymentPlan({ ...env, GITHUB_REF: `refs/heads/${branch}` }).name).toBe(plan.name);
+      expect(deploymentPlan({ ...env, WORKERS_CI_BRANCH: branch }).name).toBe(plan.name);
       return plan.name;
     });
     expect(new Set(names).size).toBe(names.length);
@@ -78,17 +76,23 @@ describe("frontend settings", () => {
   });
 });
 
-it("skips stale and deleted branches, and stops on GitHub errors", async () => {
+it("skips stale and deleted branches, and stops on GitHub errors", () => {
   const plan = deploymentPlan(env);
-  const request = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ object: { sha } }) });
-  expect(await isCurrentRevision(plan, env, request)).toBe(true);
-  expect(request.mock.calls[0][0]).toContain("heads/feature%2Fdocs");
-  request.mockResolvedValue({ ok: true, json: async () => ({ object: { sha: "b".repeat(40) } }) });
-  expect(await isCurrentRevision(plan, env, request)).toBe(false);
-  request.mockResolvedValue({ status: 404 });
-  expect(await isCurrentRevision(plan, env, request)).toBe(false);
-  request.mockResolvedValue({ status: 403 });
-  await expect(isCurrentRevision(plan, env, request)).rejects.toThrow("HTTP 403");
+  const ref = "refs/heads/feature/docs";
+  const execute = vi.fn().mockReturnValue(`${sha}\t${ref}\n`);
+  expect(isCurrentRevision(plan, execute)).toBe(true);
+  expect(execute.mock.calls[0][0]).toBe("git");
+  expect(execute.mock.calls[0][1]).toEqual(["ls-remote", "--exit-code", "https://github.com/GiftedNovaHD/minsky.git", ref]);
+  expect(execute.mock.calls[0][2].env.GIT_TERMINAL_PROMPT).toBe("0");
+  execute.mockReturnValue(`${"b".repeat(40)}\t${ref}\n`);
+  expect(isCurrentRevision(plan, execute)).toBe(false);
+  // A longer ref that ends with the same path does not count as this branch.
+  execute.mockReturnValue(`${sha}\trefs/heads/other/${ref}\n`);
+  expect(isCurrentRevision(plan, execute)).toBe(false);
+  execute.mockImplementation(() => { throw Object.assign(new Error("no match"), { status: 2 }); });
+  expect(isCurrentRevision(plan, execute)).toBe(false);
+  execute.mockImplementation(() => { throw Object.assign(new Error("private network detail"), { status: 128 }); });
+  expect(() => isCurrentRevision(plan, execute)).toThrow("The GitHub branch lookup failed.");
 });
 
 it("uses Cloudflare's preview URL and rejects missing or unrelated URLs", () => {
@@ -152,7 +156,7 @@ function deploymentMocks() {
 
 it("publishes both exact build directories without passing GitHub credentials to Wrangler", async () => {
   const mocks = deploymentMocks();
-  await deployWorkers({ ...env, GITHUB_REF: "refs/heads/main", MINSKY_DEV_BACKEND: "supabase" }, mocks);
+  await deployWorkers({ ...env, WORKERS_CI_BRANCH: "main", MINSKY_DEV_BACKEND: "supabase" }, mocks);
   expect(mocks.write.mock.calls.map(([file]) => file)).toEqual([
     "dist/minsky-revision.json", "site/dist/minsky-revision.json",
   ]);
@@ -164,11 +168,11 @@ it("publishes both exact build directories without passing GitHub credentials to
 it("does not publish a stale revision or continue after a failed upload", async () => {
   const stale = deploymentMocks();
   stale.current.mockResolvedValue(false);
-  await deployWorkers({ ...env, GITHUB_REF: "refs/heads/main", MINSKY_DEV_BACKEND: "supabase" }, stale);
+  await deployWorkers({ ...env, WORKERS_CI_BRANCH: "main", MINSKY_DEV_BACKEND: "supabase" }, stale);
   expect(stale.execute).not.toHaveBeenCalled();
   const failed = deploymentMocks();
   failed.execute.mockImplementation(() => { throw new Error("Cloudflare rejected upload"); });
-  await expect(deployWorkers({ ...env, GITHUB_REF: "refs/heads/main", MINSKY_DEV_BACKEND: "supabase" }, failed)).rejects.toThrow("Provider output was withheld");
+  await expect(deployWorkers({ ...env, WORKERS_CI_BRANCH: "main", MINSKY_DEV_BACKEND: "supabase" }, failed)).rejects.toThrow("Provider output was withheld");
   expect(failed.execute).toHaveBeenCalledTimes(1);
   expect(failed.verify).not.toHaveBeenCalled();
 });
@@ -176,14 +180,14 @@ it("does not publish a stale revision or continue after a failed upload", async 
 it("checks the branch again between Workers and rejects changed targets before any upload", async () => {
   const moved = deploymentMocks();
   moved.current.mockResolvedValueOnce(true).mockResolvedValue(false);
-  await deployWorkers({ ...env, GITHUB_REF: "refs/heads/main", MINSKY_DEV_BACKEND: "supabase" }, moved);
+  await deployWorkers({ ...env, WORKERS_CI_BRANCH: "main", MINSKY_DEV_BACKEND: "supabase" }, moved);
   expect(moved.execute).toHaveBeenCalledTimes(1);
   const wrong = { ...deploymentMocks(), read: vi.fn().mockReturnValue('{"name":"other"}') };
-  await expect(deployWorkers({ ...env, GITHUB_REF: "refs/heads/main", MINSKY_DEV_BACKEND: "supabase" }, wrong)).rejects.toThrow(/Unexpected deployment target/);
+  await expect(deployWorkers({ ...env, WORKERS_CI_BRANCH: "main", MINSKY_DEV_BACKEND: "supabase" }, wrong)).rejects.toThrow(/Unexpected deployment target/);
   expect(wrong.execute).not.toHaveBeenCalled();
 });
 
-const development = { ...env, GITHUB_REF: "refs/heads/main" };
+const development = { ...env, WORKERS_CI_BRANCH: "main" };
 const settings = {
   accountId: env.CLOUDFLARE_ACCOUNT_ID, workerName: "minsky-dev",
   databaseName: "minsky-development", databaseId: "c26de6ab-c28d-4522-9b77-25b6b5034edb",
@@ -326,52 +330,62 @@ it("uses the complete generated configuration for Cloudflare uploads and confirm
   expect(mocks.execute).not.toHaveBeenCalled();
 });
 
-it("confirms live account, D1 identifiers, and authentication secret metadata before deployment", async () => {
+it("confirms the live target before it applies migrations and requires the checkout's schema", async () => {
   const worker = (await deploymentTargets(cloudflare, "app", { installation }))[0];
   const migrations = JSON.stringify([{ success: true, results: (await currentMigrationNames()).map((name) => ({ name })) }]);
-  const request = vi.fn(async (url) => ({ ok: true, json: async () => ({ success: true,
-    result: url.endsWith("/managed") ? { enabled: false } : url.endsWith("/custom")
-      ? { domains: [] } : { name: settings.bucketName },
-  }) }));
-  const execute = vi.fn((command, args) => {
-    if (args[0] === "d1" && args[1] === "execute") return migrations;
+  const bucket = (rejected) => async (url) => ({ ok: true, json: async () => ({ success: true,
+    result: url.endsWith("/managed") ? { enabled: rejected === "managed" }
+      : url.endsWith("/custom") ? { domains: rejected === "custom" ? [{ enabled: true }] : [] }
+        : { name: rejected === "bucket" ? "different-bucket" : settings.bucketName },
+  }) });
+  const request = vi.fn(bucket());
+  const provider = ({ secrets = [{ name: "AUTH_SECRET", type: "secret_text" }], applied = migrations,
+    apply = () => "Migrations applied" } = {}) => (command, args) => {
     if (args[0] === "whoami") return settings.accountId;
-    if (args[0] === "d1") return JSON.stringify({ uuid: settings.databaseId, name: settings.databaseName });
-    if (args[0] === "secret") return JSON.stringify([{ name: "AUTH_SECRET", type: "secret_text" }]);
+    if (args[0] === "d1" && args[1] === "info") return JSON.stringify({ uuid: settings.databaseId, name: settings.databaseName });
+    if (args[0] === "secret") return JSON.stringify(secrets);
+    if (args[0] === "d1" && args[1] === "migrations") return apply();
+    if (args[0] === "d1" && args[1] === "execute") return applied;
     throw new Error("Unexpected command");
-  });
-  await confirmApplication(worker, cloudflare, execute, request);
-  expect(execute).toHaveBeenCalledTimes(4);
+  };
+  const applies = (execute) => execute.mock.calls.filter(([, args]) => args[1] === "migrations");
+
+  const execute = vi.fn(provider());
+  await prepareApplication(worker, cloudflare, execute, request);
+  expect(execute.mock.calls.map(([, args]) => args.slice(0, 2).join(" "))).toEqual([
+    "whoami --config", "d1 info", "secret list", "d1 migrations", "d1 execute",
+  ]);
+  expect(applies(execute)[0][1]).toEqual(["d1", "migrations", "apply", settings.databaseName, "--remote",
+    "--config", worker.config]);
   expect(execute.mock.calls[0][2].stdio).toEqual(["ignore", "pipe", "pipe"]);
-  execute.mockImplementation(() => "private rejected provider detail");
-  await expect(confirmApplication(worker, cloudflare, execute, request)).rejects.toThrow(/could not be confirmed/);
-  execute.mockImplementation((command, args) => {
-    if (args[0] === "d1" && args[1] === "execute") return migrations;
-    if (args[0] === "whoami") return settings.accountId;
-    if (args[0] === "d1") return JSON.stringify({ uuid: settings.databaseId, name: settings.databaseName });
-    return "[]";
-  });
-  await expect(confirmApplication(worker, cloudflare, execute, request)).rejects.toThrow(/Confirm AUTH_SECRET/);
+  expect(execute.mock.calls[0][2].env.CI).toBe("true");
+
+  const unconfirmed = vi.fn(() => "private rejected provider detail");
+  await expect(prepareApplication(worker, cloudflare, unconfirmed, request)).rejects.toThrow(/could not be confirmed/);
+  expect(applies(unconfirmed)).toHaveLength(0);
+
+  const noSecret = vi.fn(provider({ secrets: [] }));
+  await expect(prepareApplication(worker, cloudflare, noSecret, request)).rejects.toThrow(/Confirm AUTH_SECRET/);
+  expect(applies(noSecret)).toHaveLength(0);
+
   for (const rejected of ["bucket", "managed", "custom"]) {
-    request.mockImplementation(async (url) => ({ ok: true, json: async () => ({ success: true,
-      result: url.endsWith("/managed") ? { enabled: rejected === "managed" }
-        : url.endsWith("/custom") ? { domains: rejected === "custom" ? [{ enabled: true }] : [] }
-          : { name: rejected === "bucket" ? "different-bucket" : settings.bucketName },
-    }) }));
-    await expect(confirmApplication(worker, cloudflare, execute, request)).rejects.toThrow(/R2 bucket could not be confirmed/);
+    const publicBucket = vi.fn(provider());
+    await expect(prepareApplication(worker, cloudflare, publicBucket, vi.fn(bucket(rejected))))
+      .rejects.toThrow(/R2 bucket could not be confirmed/);
+    expect(applies(publicBucket)).toHaveLength(0);
   }
-  execute.mockImplementation((command, args) => {
-    if (args[0] === "whoami") return settings.accountId;
-    if (args[0] === "d1" && args[1] === "execute") return JSON.stringify([{ success: true, results: [] }]);
-    return JSON.stringify({ uuid: settings.databaseId, name: settings.databaseName });
-  });
-  request.mockClear();
-  await expect(confirmApplication(worker, cloudflare, execute, request)).rejects.toThrow(/hosted migrations differ/);
-  expect(request).not.toHaveBeenCalled();
+
+  const failed = vi.fn(provider({ apply: () => { throw new Error("private migration detail"); } }));
+  await expect(prepareApplication(worker, cloudflare, failed, request)).rejects.toThrow(/migration outcome is unknown/);
+
+  // An older build after a newer migration sees extra hosted migrations and stops.
+  const ahead = vi.fn(provider({ applied: JSON.stringify([{ success: true, results: [
+    ...(await currentMigrationNames()), "9999_newer.sql"].map((name) => ({ name })) }]) }));
+  await expect(prepareApplication(worker, cloudflare, ahead, request)).rejects.toThrow(/hosted migrations differ/);
 });
 
 it("accepts the former preparation branch after its dependency merged while omitting its app preview", async () => {
-  const prepared = { ...env, GITHUB_REF: "refs/heads/feature/t0021-cloudflare-development-install" };
+  const prepared = { ...env, WORKERS_CI_BRANCH: "feature/t0021-cloudflare-development-install" };
   expect(deploymentPlan(prepared).preview).toBe(true);
   expect((await deploymentTargets(prepared)).map((target) => target.name)).toEqual(["minsky-docs"]);
 });

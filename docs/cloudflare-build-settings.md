@@ -2,6 +2,7 @@
 
 This reference describes `scripts/ci.mjs`, `wrangler.ci.jsonc`, and `scripts/deploy-workers.mjs`.
 The [setup guide](cloudflare-builds.md) owns the dashboard steps.
+The [application publication steps](cloudflare-builds.md#publish-the-application) own the `minsky-dev` trigger.
 The [activation guide](activate-cloudflare-development.md) owns the backend switch approval.
 
 ## Workers Builds
@@ -70,6 +71,26 @@ The `minsky-docs` Worker has these two triggers since 2026-10-24.
 | Build variable | `NODE_VERSION=22.23.2` | Same |
 | Build token and repository connection | Same as `minsky-ci` | Same |
 
+## Application Workers Builds
+
+The `minsky-dev` Worker has one trigger. The owner chose automatic publication of `main` on 2026-10-24.
+[Publish the application](cloudflare-builds.md#publish-the-application) explains the behavior and the dashboard steps.
+These settings are proposed. They take effect when the owner connects the trigger.
+
+| Setting | Value |
+| --- | --- |
+| Worker | `minsky-dev` |
+| Branches | `main` only. Builds for other branches are disabled. |
+| Build command | `npm run ci` |
+| Deploy command | `npm run deploy` |
+| Root directory | Repository root |
+| API token | User token with the permissions in [Prepare the deployment token](cloudflare-builds.md#prepare-the-deployment-token) |
+| Build variables | `SKIP_DEPENDENCY_INSTALL`, `NODE_VERSION`, `CLOUDFLARE_ACCOUNT_ID`, `VITE_ENVIRONMENT`, and the four `MINSKY_DEV_*` target values in [Repository settings](#repository-settings) |
+
+The build runs `npm run ci` once more on `main`, after `minsky-ci` has checked the same commit.
+That repeat makes the publication depend on checks in the same build. The deploy step cannot run after a failed check.
+The combined build time of checks and publication is not measured yet. It must stay under the 20 minute build limit.
+
 ## On-demand checks
 
 Coding agents run these commands. They are not part of `npm run ci`.
@@ -136,44 +157,45 @@ Run them only against the documented CI database names.
 The GitHub Actions jobs `checks`, `secrets`, `dependencies`, `deploy`, and `deploy-app` are removed.
 Protected `cloud-test` rules stay in GitHub. No workflow uses them.
 
-`scripts/deploy-workers.mjs` accepts a branch push only when these shell variables match:
+`scripts/deploy-workers.mjs` reads the pushed branch and commit from two variables:
 
-- `GITHUB_EVENT_NAME` is `push`.
-- `GITHUB_REPOSITORY` is `GiftedNovaHD/minsky`.
-- `GITHUB_REF` is `refs/heads/` followed by the branch name.
-- `GITHUB_SHA` is 40 lowercase hexadecimal characters and is not all zeros.
+- `WORKERS_CI_BRANCH` is the branch name. Workers Builds sets it.
+- `WORKERS_CI_COMMIT_SHA` is 40 lowercase hexadecimal characters and is not all zeros. Workers Builds sets it.
 
-Publication also requires `GH_TOKEN`, `CLOUDFLARE_API_TOKEN`, and `CLOUDFLARE_ACCOUNT_ID`.
-`GH_TOKEN` is the token for the branch revision check.
-`CLOUDFLARE_API_TOKEN` is the token for the upload.
+A manual run sets both variables itself. `main` selects the stable Worker. Other branches select a preview.
+Publication also requires `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`.
+`CLOUDFLARE_API_TOKEN` is the token for the target checks, the migrations, and the upload.
 `CLOUDFLARE_ACCOUNT_ID` must be `458ad6a930b0fb717796dfa19ca6a2b1`.
-`--check` and `--build` do not read `GH_TOKEN` or `CLOUDFLARE_API_TOKEN`.
+`--check` and `--build` do not read `CLOUDFLARE_API_TOKEN`.
 A stable app publication also reads the backend values in [Repository settings](#repository-settings).
-The script rejects `GITHUB_ACTOR` when the value is `dependabot[bot]`.
+The branch check uses `git ls-remote` on the public repository. It needs no GitHub token.
 
 ## Repository settings
 
-These names were GitHub Actions settings. No workflow reads them now.
-An explicit publication command needs the same values in its environment.
+The `minsky-dev` Workers Builds trigger sets these values as build variables.
+A manual publication command needs the same values in its environment.
+The [setup guide](cloudflare-builds.md#connect-the-worker) lists the exact values.
 
 | Kind | Name | Value |
 | --- | --- | --- |
-| Environment secret | `CLOUDFLARE_API_TOKEN` | Private account-scoped deployment token. |
-| Retired variable | `CLOUDFLARE_DEPLOY_ENABLED` | No workflow reads it. |
-| Actions variable | `MINSKY_DEV_BACKEND` | `cloudflare` is the live development selection and the default when the variable is absent. `supabase` selects static Supabase mode. The binding guard refuses that replacement after activation. |
-| Actions variable | `VITE_SUPABASE_URL` | `https://ovymmobupzowotvrywek.supabase.co`, required in Supabase mode. |
-| Actions variable | `VITE_SUPABASE_PUBLISHABLE_KEY` | Development public publishable key or legacy `anon` key, required in Supabase mode. |
-| Actions variable | `MINSKY_DEV_CLOUDFLARE_CONFIG` | Repository-relative generated Wrangler path, required in Cloudflare mode. |
-| Actions variable | `MINSKY_DEV_DATABASE_ID` | Exact approved development D1 UUID. |
-| Actions variable | `MINSKY_DEV_DATABASE_NAME` | Exact approved development D1 name. |
-| Actions variable | `MINSKY_DEV_BUCKET_NAME` | Exact approved private development bucket name. |
+| Build API token | `CLOUDFLARE_API_TOKEN` | Private user token limited to the account. |
+| Retired variable | `CLOUDFLARE_DEPLOY_ENABLED` | Nothing reads it. |
+| Build variable | `MINSKY_DEV_BACKEND` | `cloudflare` is the live development selection and the default when the variable is absent. `supabase` selects static Supabase mode. The binding guard refuses that replacement after activation. |
+| Build variable | `VITE_SUPABASE_URL` | `https://ovymmobupzowotvrywek.supabase.co`, required in Supabase mode. |
+| Build variable | `VITE_SUPABASE_PUBLISHABLE_KEY` | Development public publishable key or legacy `anon` key, required in Supabase mode. |
+| Build variable | `MINSKY_DEV_CLOUDFLARE_CONFIG` | Repository-relative generated Wrangler path, required in Cloudflare mode. |
+| Build variable | `MINSKY_DEV_DATABASE_ID` | Exact approved development D1 UUID. |
+| Build variable | `MINSKY_DEV_DATABASE_NAME` | Exact approved development D1 name. |
+| Build variable | `MINSKY_DEV_BUCKET_NAME` | Exact approved private development bucket name. |
 
 Set `CLOUDFLARE_ACCOUNT_ID` to `458ad6a930b0fb717796dfa19ca6a2b1` and `VITE_ENVIRONMENT` to `development`.
 The token needs Worker publication and settings inspection access.
-Cloudflare app checks also need D1 metadata and migration-query access, R2 bucket and public-domain metadata access, and Worker secret-name inspection.
+Cloudflare app checks also need D1 metadata, migration query, and migration apply access. They also need R2 bucket and public-domain metadata access and Worker secret-name inspection.
+The automatic Workers Builds token has no D1 access.
 Review these permissions against the exact account before activation. Do not grant access to another account.
 The deployment token never becomes a frontend variable. Its secret value reaches only the publishing step.
 The build child excludes Cloudflare, GitHub, and authentication secrets.
+`npm run ci` removes `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_API_KEY`, and `AUTH_SECRET` before it installs packages or runs checks.
 
 `AUTH_SECRET` is a private Worker secret, installed separately through the provider tool.
 It is not a repository variable, public config field, build input, or ordinary artifact.
@@ -191,7 +213,7 @@ Install the locked dependencies before these commands:
 | Validate, build, or publish docs | Use the same options with `--site=docs`. |
 | Guarded app build and publication | `npm run deploy` |
 
-These commands require the branch-push shell variables under [Publication commands](#publication-commands).
+These commands require the branch and commit variables under [Publication commands](#publication-commands).
 They are deployment commands, not substitutes for local `npm run build`.
 The removed `deploy:preview` command cannot upload an assets-only app version.
 
@@ -203,6 +225,7 @@ The removed `deploy:preview` command cannot upload an assets-only app version.
 
 The stable URLs are `https://minsky-dev.icaic-minsky.workers.dev` and `https://minsky-docs.icaic-minsky.workers.dev`.
 The app build always sets `VITE_BACKEND` from `MINSKY_DEV_BACKEND`.
+A missing Cloudflare configuration does not fall back to a static upload.
 Cloudflare mode omits Supabase public settings and uses same-origin cookie authentication.
 The selected Cloudflare config must have the exact stable name, origin, account, D1 UUID, database name, and bucket name.
 The script rejects CI, test, and installation resource names.
@@ -218,13 +241,16 @@ The config disables its preview URLs. Application previews receive no stable dat
 The upload requires those fields to match the selected deployment.
 Before a Supabase assets upload, the script reads the stable Worker's current bindings.
 Any D1, R2, or Durable Object binding blocks that upload. Failed or malformed metadata also blocks it.
-Before a Cloudflare upload, the script confirms current account access, D1 metadata and migration versions, private R2 settings, and `AUTH_SECRET` presence.
+Before a Cloudflare upload, the script confirms current account access, D1 metadata, private R2 settings, and `AUTH_SECRET` presence.
+Then it runs `wrangler d1 migrations apply` on the confirmed database.
+Then it requires the applied migrations to equal the checkout's migrations. More applied migrations mean that a newer build already ran, so the older build stops.
+Migrations must only add tables, columns, or indexes. A Worker rollback then still runs against the newer schema.
 The bucket must have its managed public domain disabled and no custom domain attached.
 Provider diagnostics and secret values are withheld.
 
 Each upload checks that the push revision is still the branch's current revision.
-GitHub errors fail the job. Deleted or outdated branches skip remaining uploads.
-Uploads for one push branch run in sequence across push runs.
+Lookup errors fail the build. Deleted or outdated branches skip remaining uploads.
+This check runs before the migrations.
 A newer push does not cancel an upload already in progress.
 
 For the app, `minsky-revision.json` records `sha`, `backend`, `databaseId`, `bucketName`, and `origin`.
@@ -232,7 +258,7 @@ Supabase mode uses null database and bucket values. Cloudflare mode records the 
 The docs record contains only `sha`.
 The HTTP check compares every expected field.
 It retries up to 12 times with five-second intervals and a ten-second request timeout.
-The summary records the URL and result.
+The build log records the URL and result.
 
 After a Cloudflare upload, the script checks the deployed `DB`, `IMAGES`, `LIVE_UPDATES`, `AUTH_ORIGIN`, and `AUTH_SECRET` bindings.
 The database UUID, bucket name, origin, and binding types must match the reviewed configuration.
@@ -247,4 +273,4 @@ The preview parser accepts asset-progress lines before the JSON response. Malfor
 The script runs `wrangler preview` with `--ignore-base-config`, the revision tag, and JSON output.
 Stable publication uses `wrangler deploy` with the reviewed configuration.
 Docs deployment never reads app backend variables or configuration.
-Development migrations, bootstrap, secret creation, and approved activation remain separate operations.
+A stable Cloudflare publication applies new development migrations. Bootstrap, secret creation, and approved activation remain separate operations.

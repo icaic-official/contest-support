@@ -27,7 +27,16 @@ The owner connects the repository. This change does not deploy or edit secrets.
 The removal of the GitHub Actions publisher had stopped all docs publication. The last docs deployment before this change was on 2026-10-21.
 The `minsky-docs` Worker has two Workers Builds triggers. A push to `main` runs `wrangler deploy`. A push to any other branch runs `wrangler versions upload`, which creates a preview version without traffic.
 The docs build does not wait for `minsky-ci`. The docs are static and contain no application data.
-`minsky-dev` stays disconnected from Workers Builds.
+`minsky-dev` stays disconnected from Workers Builds. The automatic application publication decision below supersedes this sentence.
+
+**Automatic application publication, 2026-10-24.** The owner chose automatic publication of `main` to `minsky-dev`.
+Before this decision, `minsky-dev` served `a25f9f1`, 108 commits behind `main`, and lacked D1 migration `0010_announcements.sql`.
+The `minsky-dev` Worker gets one Workers Builds trigger for `main`. Builds for other branches stay disabled.
+Its build command is `npm run ci`. Its deploy command is `npm run deploy`. A failed check stops publication.
+The deploy script reads `WORKERS_CI_BRANCH` and `WORKERS_CI_COMMIT_SHA`. It checks the branch head with `git ls-remote` and needs no GitHub token.
+After its read-only target checks, the script applies new D1 migrations to `minsky-development`. Migrations must stay additive so that a Worker rollback remains possible.
+The trigger needs a user API token with D1 access. The automatic build token has none. The owner creates the token and connects the trigger. This change does not.
+`minsky-dev` remains a development installation. A separate production Worker is deferred at the owner's request.
 
 **PR #45 update from main, 2026-10-23.** The owner requests current `main` and conflict resolution for the existing PR.
 Merge `origin/main` at `a938e6a`, which includes the merged T0015 frontend and T0022 CI change.

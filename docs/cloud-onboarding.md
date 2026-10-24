@@ -6,9 +6,9 @@ Its Worker is `minsky-dev` and its D1 database is `minsky-development`.
 The development app is https://minsky-dev.icaic-minsky.workers.dev.
 Use [Install Cloudflare](../site/src/content/docs/operators/installation.mdx) for that installation.
 Use [deployment setup](cloudflare-builds.md) for automation and [activation](activate-cloudflare-development.md) for the approved switch and recovery procedure.
-Workers Builds runs ordinary checks and does not publish the application. Publication stays an explicit guarded command.
+Workers Builds runs ordinary checks. For each push to `main`, a separate trigger checks and publishes the Cloudflare `minsky-dev` application. See [Publish the application](cloudflare-builds.md#publish-the-application).
 Application previews remain disabled until independent preview resources exist.
-Backend migrations, bootstrap, secrets, and activation retain their explicit steps.
+That trigger applies new D1 migrations. Supabase migrations, bootstrap, secrets, and activation retain their explicit steps.
 The dated setup records below describe their recorded revisions.
 
 This page covers the retained Supabase projects, their commands, and isolated Supabase checks.
@@ -343,7 +343,7 @@ For a Supabase provider change, use this sequence:
 5. Prepare the PR.
 6. Run cloud integration checks against the reviewed revision.
 7. Let the user review and merge.
-8. Workers Builds runs ordinary checks and does not publish the application. Coordinate migrations, bootstrap, and secrets separately.
+8. Workers Builds publishes the Cloudflare `minsky-dev` application from `main`. It does not change the Supabase project. Coordinate Supabase migrations, functions, bootstrap, and secrets separately.
 
 Automatic GitHub Actions publication is removed.
 Record any later publication separately from merge.

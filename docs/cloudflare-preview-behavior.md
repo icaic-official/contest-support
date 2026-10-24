@@ -1,8 +1,8 @@
 # Why deployment separates docs and application previews
 
 On `minsky-ci`, Workers Builds runs checks and does not publish the application.
-A Git build on `minsky-dev` could publish before checks finish or replace a full application with static assets.
-Keep that build disabled.
+On `minsky-dev`, one Workers Builds trigger publishes `main` only. It runs the checks and the guarded deploy script in the same build, so it cannot publish before the checks finish.
+Builds for other branches stay disabled on `minsky-dev`.
 The docs Worker `minsky-docs` is static and separate. Workers Builds publishes it from `main` and uploads preview versions for other branches.
 
 ## Why app previews are disabled

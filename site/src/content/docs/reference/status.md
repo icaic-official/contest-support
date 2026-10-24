@@ -16,7 +16,7 @@ Checked on **23 October 2026** against `main` at `21bfd6e`. This is a dated reco
 - Two backends behind one contract: Supabase and Cloudflare (T0020, [PR #42](https://github.com/GiftedNovaHD/minsky/pull/42)). Cloudflare is the live backend. Supabase stays a supported second provider ([PR #57](https://github.com/GiftedNovaHD/minsky/pull/57)).
 - A verified fresh Cloudflare development installation (T0021, [PR #43](https://github.com/GiftedNovaHD/minsky/pull/43)). The owner approved the development switch and a repeat deployment. No Supabase accounts, passwords, records, images, or IDs moved.
 - T0022 CI run deduplication ([PR #46](https://github.com/GiftedNovaHD/minsky/pull/46), merged).
-- Workers Builds runs `npm run ci` for branches in this repository ([PR #45](https://github.com/GiftedNovaHD/minsky/pull/45)). It does not publish the app. GitHub Actions checks are removed.
+- Workers Builds runs `npm run ci` for branches in this repository ([PR #45](https://github.com/GiftedNovaHD/minsky/pull/45)). A second trigger checks each push to `main` again and then publishes the development app. GitHub Actions checks are removed.
 
 ## Not in main
 

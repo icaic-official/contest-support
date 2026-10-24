@@ -52,7 +52,7 @@ Hosted test commands need isolated CI resources. Check their targets first, and 
 2. Implement, verify, and update the docs in the same change.
 3. Open a pull request. The owner reviews and merges.
 
-Workers Builds runs `npm run ci` for branches in this repository. It does not publish the app. A separate Workers Builds trigger publishes the docs from `main` and uploads a docs preview version for other branches.
+Workers Builds runs `npm run ci` for branches in this repository. For each push to `main`, a second trigger runs the checks again and then publishes the development app. A separate Workers Builds trigger publishes the docs from `main` and uploads a docs preview version for other branches.
 Migrations, bootstrap, and secrets are separate steps.
 
 To add a backend, follow the [provider guide](https://github.com/GiftedNovaHD/minsky/blob/main/docs/add-provider.md). New providers must pass the shared scenarios unchanged.

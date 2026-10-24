@@ -95,7 +95,7 @@ See [Supabase provider](docs/cloud-onboarding.md#contributor-setup) for access, 
 | --- | --- |
 | `npm run dev` | Start the local frontend. |
 | `npm run build` | Check types and create static assets in `dist/`. |
-| `npm run deploy` | Build and publish the selected app through guarded deployment tooling. Requires an eligible repository push context and approved activation settings. |
+| `npm run deploy` | Build the selected app, apply new D1 migrations, and publish it through guarded deployment tooling. Workers Builds runs it for each push to `main`. A manual run needs `WORKERS_CI_BRANCH`, `WORKERS_CI_COMMIT_SHA`, and the approved target settings. |
 | `node scripts/deploy-workers.mjs --check --site=app` | Validate the selected deployment target without provider changes. Use `--site=docs` for independent docs settings. |
 | `node scripts/deploy-workers.mjs --build --site=app` | Build the explicitly selected backend and record its revision before guarded publication. |
 | `npm run preview` | Serve built assets locally. |
@@ -148,7 +148,6 @@ These commands connect to provider accounts. Several of them change hosted data 
 | `npm run cloud:recover-admin` | Reset a Supabase provider administrator when that provider's only admin cannot sign in. |
 | `npm run cloudflare:recover-admin` | Reset the password of an existing Cloudflare admin. Prints the temporary password once in that terminal. |
 | `npm run cloud:hosting-login` | Sign in to Cloudflare with Wrangler. |
-| `npm run deploy` | Build and deploy the frontend Worker. Deploy only after an explicit request. |
 
 See [cloud onboarding](docs/cloud-onboarding.md) for the exact arguments.
 
@@ -185,10 +184,10 @@ npm run docs:dev
 The deployment configuration is `wrangler.docs.jsonc`.
 See [the writing and deployment guide](site/src/content/docs/contributing/documentation.mdx).
 The initial docs deployment is explicitly authorized in T0011 before merge.
-Workers Builds runs `npm run ci` for branches in this repository. It does not publish the application.
+Workers Builds runs `npm run ci` for branches in this repository. For each push to `main`, a second Workers Builds trigger runs the checks again and then publishes `minsky-dev`. See [Publish the application](docs/cloudflare-builds.md#publish-the-application).
 Workers Builds publishes the docs from `main` and uploads a docs preview version for other branches. See [Publish the docs](docs/cloudflare-builds.md#publish-the-docs).
 See [Workers Builds setup](docs/cloudflare-builds.md) for the dashboard steps and [CI settings](docs/cloudflare-build-settings.md) for on-demand browser and hosted commands.
-Automatic GitHub Actions publication is removed. App publication stays an explicit guarded command.
+Automatic GitHub Actions publication is removed.
 The fresh Cloudflare development candidate and a separate empty installation pass the complete application checks.
 The approved activation and a later automated deployment passed their recorded application checks. Those runs used the retired Actions publisher.
 The [T0021 activation record](docs/current-state.md#t0021-approved-activation-2026-10-19) separates protected checks from stable URL verification.
@@ -196,7 +195,7 @@ The [T0021 activation record](docs/current-state.md#t0021-approved-activation-20
 ### Repository records
 
 - [Writing guide](docs/writing-guide.md) gives the documentation structure and sentence rules.
-- [Workers Builds setup](docs/cloudflare-builds.md) explains the CI Worker, the owner checklist, and why application Workers stay disconnected.
+- [Workers Builds setup](docs/cloudflare-builds.md) explains the CI Worker, the owner checklist, and application publication from `main`.
 - [Documentation release plan](docs/documentation-release-plan.md) — public-reader requirements, specific gaps, and completion criteria.
 - [Development tickets](docs/tickets.md) — ticket scope, status, and acceptance criteria.
 - [Frontend architecture](docs/frontend-architecture.md) — UI selection, shells, data hooks, the jury award lists, and the Tailwind and shadcn/ui setup.

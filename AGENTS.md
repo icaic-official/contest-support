@@ -52,7 +52,7 @@ Preserve the Workers Builds move and the removed GitHub Actions workflow.
 Do not add an Actions job.
 Browser suites and hosted provider checks stay manual commands.
 `npm run ci` lists provider scenarios. It does not run the hosted Supabase provider suite.
-Do not connect `minsky-dev` to Workers Builds.
+On 2026-10-24 the owner chose automatic publication of `main` to `minsky-dev` through one Workers Builds trigger. That trigger runs `npm run ci` and then `npm run deploy`. Builds for other branches stay disabled on `minsky-dev`. Do not change the trigger or its token yourself.
 `minsky-docs` publishes through Workers Builds. A push to `main` publishes the docs. A push to another branch uploads a preview version that does not receive traffic.
 Do not deploy.
 The owner reviews and merges.
@@ -158,11 +158,11 @@ For each ticket, use this sequence:
 5. Prepare the PR.
 6. Run cloud integration checks on the reviewed revision.
 7. Let the user review and merge.
-8. Workers Builds runs ordinary checks. It does not publish the application.
-   A Cloudflare application deployment includes the complete Worker. Coordinate migrations, bootstrap, secrets, and activation separately.
+8. Workers Builds runs ordinary checks. After the merge, the `minsky-dev` trigger checks `main` again, applies new D1 migrations, and publishes the complete Worker.
+   Write D1 migrations that only add tables, columns, or indexes. Coordinate bootstrap, secrets, and activation separately.
 
-Automatic GitHub Actions publication is removed.
-Report any later publication separately from merge. Record its exact source revision.
+Automatic GitHub Actions publication is removed. Workers Builds publishes `minsky-dev` from `main`.
+Report a manual publication separately from merge. Record its exact source revision.
 Prepare compatible backend changes before a dependent frontend merges, or pause frontend deployment for that release.
 Hosted Supabase and Cloudflare checks are on-demand commands against isolated CI targets.
 Ordinary Workers Builds checks run without cloud credentials.

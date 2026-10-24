@@ -3,8 +3,8 @@
 On 2026-10-02, the user selected mandatory CI, a short PR review checklist, and scans for secrets and dependencies.
 These changes extend T0003.
 The user reviews and merges.
-Workers Builds does not publish the frontend.
-[Deployment activation](cloudflare-builds.md) requires separate account setup.
+Workers Builds publishes `main` to the `minsky-dev` development application after the checks pass in the same build.
+[Publish the application](cloudflare-builds.md#publish-the-application) describes that trigger.
 
 ## Automated checks
 
@@ -40,8 +40,8 @@ Gitleaks uses pinned release 8.30.1 and a verified SHA-256 checksum.
 Ordinary builds do not receive cloud credentials.
 Hosted Supabase and Cloudflare checks are on-demand commands against isolated CI targets.
 They are not required PR checks.
-Workers Builds does not publish `minsky-dev`.
-Keep that Worker disconnected from Git builds so a provider build cannot skip the checks or replace the complete application.
+The `minsky-dev` trigger runs `npm run ci` before `npm run deploy` in one build, so a failed check stops publication.
+`npm run ci` removes the deployment token before it installs packages or runs checks.
 Workers Builds publishes the static `minsky-docs` Worker from `main`. The docs contain no application data.
 
 Run the usual README checks locally.

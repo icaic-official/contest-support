@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { appendFileSync, readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { Buffer } from "node:buffer";
 import process from "node:process";
 import { setTimeout } from "node:timers/promises";
@@ -20,20 +20,19 @@ const staticWorkers = [
   { name: "minsky-docs", config: "wrangler.docs.jsonc", assets: "site/dist" },
 ];
 
+/** Workers Builds supplies the pushed branch and commit. A manual run sets the same two values. */
 export function deploymentPlan(env) {
-  if (env.GITHUB_EVENT_NAME !== "push" || env.GITHUB_REPOSITORY !== repository ||
-      env.GITHUB_ACTOR === "dependabot[bot]" ||
-      !env.GITHUB_REF?.startsWith("refs/heads/") ||
-      !/^[a-f0-9]{40}$/.test(env.GITHUB_SHA ?? "") || /^0+$/.test(env.GITHUB_SHA)) {
-    throw new Error("Deployment requires a branch push in the Minsky repository.");
+  const sha = env.WORKERS_CI_COMMIT_SHA ?? "";
+  if (!/^[a-f0-9]{40}$/.test(sha) || /^0+$/.test(sha)) {
+    throw new Error("Deployment requires the pushed commit in WORKERS_CI_COMMIT_SHA.");
   }
-  const branch = env.GITHUB_REF.slice("refs/heads/".length);
-  if (!branch || /[\r\n]/.test(branch)) throw new Error("Missing or invalid branch name.");
+  const branch = env.WORKERS_CI_BRANCH;
+  if (!branch || /[\r\n]/.test(branch)) throw new Error("Missing or invalid branch name in WORKERS_CI_BRANCH.");
   // A hash distinguishes branches that normalize to the same lowercase name.
   const suffix = createHash("sha256").update(branch).digest("hex").slice(0, 12);
   const slug = branch.toLowerCase().replace(/[^a-z0-9]+/g, "-")
     .slice(0, 24).replace(/^-+|-+$/g, "") || "branch";
-  return { branch, sha: env.GITHUB_SHA, preview: branch !== "main",
+  return { branch, sha, preview: branch !== "main",
     name: `branch-${slug}-${suffix}` };
 }
 
@@ -62,16 +61,21 @@ export function validateBuildSettings(env) {
   throw new Error("Use the development publishable key or legacy anon key. Privileged keys are forbidden.");
 }
 
-export async function isCurrentRevision(plan, env, request = globalThis.fetch) {
-  if (!env.GH_TOKEN) throw new Error("Missing GitHub token for the branch revision check.");
-  const response = await request(
-    `https://api.github.com/repos/${repository}/git/ref/heads/${encodeURIComponent(plan.branch)}`,
-    { headers: { Authorization: `Bearer ${env.GH_TOKEN}`, Accept: "application/vnd.github+json" },
-      signal: globalThis.AbortSignal.timeout(15_000) },
-  );
-  if (response.status === 404) return false;
-  if (!response.ok) throw new Error(`GitHub branch lookup failed with HTTP ${response.status}.`);
-  return (await response.json()).object?.sha === plan.sha;
+/** An older build must not replace a newer push. The public repository needs no token. */
+export function isCurrentRevision(plan, execute = execFileSync) {
+  const ref = `refs/heads/${plan.branch}`;
+  let output;
+  try {
+    output = execute("git", ["ls-remote", "--exit-code", `https://github.com/${repository}.git`, ref], {
+      encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], timeout: 30_000,
+      env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
+    });
+  } catch (error) {
+    // Exit status 2 means that no branch matched: the branch was deleted.
+    if (error?.status === 2) return false;
+    throw new Error("The GitHub branch lookup failed.", { cause: error });
+  }
+  return output.split("\n").includes(`${plan.sha}\t${ref}`);
 }
 
 export function wranglerArguments(worker, plan) {
@@ -119,9 +123,8 @@ export async function verifyRevision(url, expected, request = globalThis.fetch, 
   throw new Error(`The published source revision could not be verified at ${url}.`);
 }
 
-function summary(message, env) {
+function summary(message) {
   process.stdout.write(`${message}\n`);
-  if (env.GITHUB_STEP_SUMMARY) appendFileSync(env.GITHUB_STEP_SUMMARY, `${message}\n\n`);
 }
 
 /** Validate the full provider configuration instead of maintaining another generator. */
@@ -239,11 +242,13 @@ function applicationMarker(worker, sha) {
   };
 }
 
-export async function confirmApplication(worker, env, execute = execFileSync, request = globalThis.fetch) {
+/** Confirm the exact live target, then bring its schema to this checkout's migrations. */
+export async function prepareApplication(worker, env, execute = execFileSync, request = globalThis.fetch) {
   const runWrangler = (arguments_) => {
     try {
       return execute("node_modules/.bin/wrangler", [...arguments_, "--config", worker.config], {
-        env: safeWranglerEnvironment(env), encoding: "utf8", stdio: ["ignore", "pipe", "pipe"],
+        // CI lets the migration command proceed without an interactive confirmation.
+        env: { ...safeWranglerEnvironment(env), CI: "true" }, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"],
         maxBuffer: 2 * 1024 * 1024, timeout: 120_000,
       });
     } catch {
@@ -251,7 +256,6 @@ export async function confirmApplication(worker, env, execute = execFileSync, re
     }
   };
   await confirmTarget({ account, database: env.MINSKY_DEV_DATABASE_ID }, worker.settings, runWrangler);
-  await assertCurrentMigrations(worker.settings, runWrangler);
   try {
     const bucket = `https://api.cloudflare.com/client/v4/accounts/${account}/r2/buckets/${worker.settings.bucketName}`;
     const results = await Promise.all(["", "/domains/managed", "/domains/custom"].map(async (suffix) => {
@@ -278,6 +282,14 @@ export async function confirmApplication(worker, env, execute = execFileSync, re
   } catch {
     throw new Error("Confirm AUTH_SECRET on the selected Worker before deployment. Secret values were not requested.");
   }
+  // Apply only after every read-only check passes. Migrations must stay additive so that a
+  // Worker rollback still runs against the newer schema.
+  try {
+    await runWrangler(["d1", "migrations", "apply", worker.settings.databaseName, "--remote"]);
+  } catch {
+    throw new Error("The migration outcome is unknown. Provider output was withheld. Inspect applied versions before retrying.");
+  }
+  await assertCurrentMigrations(worker.settings, runWrangler);
 }
 
 /** The build and upload use the same backend and confirmed public configuration. */
@@ -305,23 +317,23 @@ export async function buildWorkers(env, {
 export async function deployWorkers(env, {
   site = "both", current = isCurrentRevision, execute = execFileSync, verify = verifyRevision,
   read = readFileSync, write = writeFileSync, report = summary, targets = deploymentTargets,
-  staticApplication = assertStaticApplication, application = confirmApplication,
+  staticApplication = assertStaticApplication, application = prepareApplication,
   deployedApplication = verifyApplicationDeployment,
 } = {}) {
   const plan = deploymentPlan(env);
   if (!env.CLOUDFLARE_API_TOKEN) throw new Error("Missing CLOUDFLARE_API_TOKEN.");
   const workers = await targets(env, site, { read });
   if (site !== "docs" && plan.preview) {
-    report("Skipped the application preview. Independent preview data is not configured.", env);
+    report("Skipped the application preview. Independent preview data is not configured.");
   }
   const childEnv = safeWranglerEnvironment(env);
   delete childEnv.GH_TOKEN;
   delete childEnv.GITHUB_TOKEN;
   delete childEnv.AUTH_SECRET;
-  report(plan.preview ? `Preview name: \`${plan.name}\`.` : "Target: stable development sites.", env);
+  report(plan.preview ? `Preview name: \`${plan.name}\`.` : "Target: stable development sites.");
   for (const worker of workers) {
-    if (!await current(plan, env)) {
-      report(`Skipped remaining uploads because ${plan.sha} is no longer the branch's current commit.`, env);
+    if (!await current(plan)) {
+      report(`Skipped remaining uploads because ${plan.sha} is no longer the branch's current commit.`);
       return;
     }
     if (worker.backend) {
@@ -345,10 +357,10 @@ export async function deployWorkers(env, {
       throw new Error("Worker publication failed. Provider output was withheld. Inspect the exact target before retrying.");
     }
     const url = plan.preview ? previewAddress(output) : `https://${worker.name}.icaic-minsky.workers.dev`;
-    report(`Published [${worker.name}](${url}) from \`${plan.sha}\`.`, env);
+    report(`Published ${worker.name} at ${url} from ${plan.sha}.`);
     await verify(url, marker);
     if (worker.settings) await deployedApplication(worker, childEnv);
-    report(`The revision and deployment checks passed for ${worker.name}.`, env);
+    report(`The revision and deployment checks passed for ${worker.name}.`);
   }
 }
 

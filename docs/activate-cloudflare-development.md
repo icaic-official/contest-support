@@ -157,9 +157,10 @@ gh variable set MINSKY_DEV_BUCKET_NAME --body "$MINSKY_DEV_BUCKET_NAME"
 
 Publish the approved revision with the guarded script in [deployment settings](cloudflare-build-settings.md#publication-commands).
 Confirm the script's revision matches the recorded approval before it uploads.
-The app command selects `VITE_BACKEND=cloudflare`, validates the exact hosted targets, and deploys the complete Worker.
-It does not migrate D1, bootstrap accounts, or rotate secrets.
-Publish docs with the same script and `--site=docs`. Do not use Workers Builds for either site.
+The app command selects `VITE_BACKEND=cloudflare`, validates the exact hosted targets, applies new D1 migrations, and deploys the complete Worker.
+It does not bootstrap accounts or rotate secrets.
+After activation, Workers Builds publishes each push to `main`. See [Publish the application](cloudflare-builds.md#publish-the-application).
+Workers Builds also publishes the docs. See [Publish the docs](cloudflare-builds.md#publish-the-docs).
 
 ## Verify activation and subsequent deployment
 

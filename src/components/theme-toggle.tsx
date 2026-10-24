@@ -9,14 +9,15 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { type ThemePreference, useTheme } from "@/lib/theme";
 
-const choices: Array<{
+/** The theme choices in display order. Every theme picker uses this table. */
+export const themeOptions: readonly {
   value: ThemePreference;
   label: string;
   icon: typeof Sun;
-}> = [
+}[] = [
+  { value: "system", label: "Device", icon: Monitor },
   { value: "light", label: "Light", icon: Sun },
   { value: "dark", label: "Dark", icon: Moon },
-  { value: "system", label: "Device setting", icon: Monitor },
 ];
 
 /** A menu button that sets the light or dark theme. */
@@ -35,7 +36,7 @@ export function ThemeToggle() {
           value={preference}
           onValueChange={(value) => setPreference(value as ThemePreference)}
         >
-          {choices.map(({ value, label, icon: Icon }) => (
+          {themeOptions.map(({ value, label, icon: Icon }) => (
             <DropdownMenuRadioItem key={value} value={value}>
               <Icon />
               {label}

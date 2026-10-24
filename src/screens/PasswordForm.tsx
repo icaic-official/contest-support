@@ -14,19 +14,122 @@ import { Label } from "@/components/ui/label";
 import { requireBackend } from "@/backend";
 import { errorMessage } from "@/backend/errors";
 
+/** The ID of the Current password field. The account page links to it. */
+export const currentPasswordFieldId = "password-current";
+
 const fields = [
   {
     name: "current",
+    id: currentPasswordFieldId,
     label: "Current password",
     autoComplete: "current-password",
   },
-  { name: "password", label: "New password", autoComplete: "new-password" },
-  { name: "confirm", label: "Confirm password", autoComplete: "new-password" },
+  {
+    name: "password",
+    id: "password-password",
+    label: "New password",
+    autoComplete: "new-password",
+  },
+  {
+    name: "confirm",
+    id: "password-confirm",
+    label: "Confirm password",
+    autoComplete: "new-password",
+  },
 ] as const;
 
 /**
- * Changes the password. When `required` is true the database blocks contest
- * data until the person replaces the temporary password.
+ * The password change fields and their checks, shared by the full-screen
+ * form and the account page. After a change it empties the fields. It shows
+ * `successMessage`, when given, until the person edits a field again.
+ */
+export function PasswordChangeForm({
+  onChanged,
+  successMessage,
+}: {
+  onChanged?: () => void;
+  successMessage?: string;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [changed, setChanged] = useState(false);
+  return (
+    <>
+      <form
+        onChange={() => setChanged(false)}
+        onSubmit={(event) => {
+          event.preventDefault();
+          // The event target is gone after the first await.
+          const form = event.currentTarget;
+          const data = new FormData(form);
+          const value = (name: string) => String(data.get(name) ?? "");
+          if (value("password") !== value("confirm")) {
+            setError("Passwords must match.");
+            return;
+          }
+          if (value("current") === value("password")) {
+            setError("Choose a different password.");
+            return;
+          }
+          setBusy(true);
+          setError("");
+          setChanged(false);
+          void (async () => {
+            try {
+              await requireBackend().auth.changePassword(
+                value("current"),
+                value("password"),
+              );
+              form.reset();
+              setChanged(true);
+              onChanged?.();
+            } catch (cause) {
+              setError(errorMessage(cause));
+            } finally {
+              setBusy(false);
+            }
+          })();
+        }}
+      >
+        <fieldset disabled={busy} className="grid gap-5">
+          <legend className="sr-only">New password</legend>
+          {fields.map((field) => (
+            <div key={field.name} className="grid gap-2">
+              <Label htmlFor={field.id}>{field.label}</Label>
+              <Input
+                id={field.id}
+                name={field.name}
+                type="password"
+                required
+                minLength={field.name === "current" ? undefined : 8}
+                autoComplete={field.autoComplete}
+                className="h-11"
+              />
+            </div>
+          ))}
+          <Button type="submit" className="h-11">
+            Save password
+          </Button>
+        </fieldset>
+      </form>
+      {error && (
+        <Alert variant="destructive" className="mt-5">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+      {changed && successMessage && (
+        <p role="status" className="mt-5 text-sm text-status-resolved">
+          {successMessage}
+        </p>
+      )}
+    </>
+  );
+}
+
+/**
+ * Changes the password on its own screen. When `required` is true the
+ * database blocks contest data until the person replaces the temporary
+ * password.
  */
 export function PasswordForm({
   done,
@@ -35,8 +138,6 @@ export function PasswordForm({
   done: () => void;
   required: boolean;
 }) {
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
   return (
     <Card className="w-full max-w-md">
       <CardHeader>
@@ -54,62 +155,7 @@ export function PasswordForm({
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <form
-          onSubmit={(event) => {
-            event.preventDefault();
-            const data = new FormData(event.currentTarget);
-            const value = (name: string) => String(data.get(name) ?? "");
-            if (value("password") !== value("confirm")) {
-              setError("Passwords must match.");
-              return;
-            }
-            if (value("current") === value("password")) {
-              setError("Choose a different password.");
-              return;
-            }
-            setBusy(true);
-            setError("");
-            void (async () => {
-              try {
-                await requireBackend().auth.changePassword(
-                  value("current"),
-                  value("password"),
-                );
-                done();
-              } catch (cause) {
-                setError(errorMessage(cause));
-              } finally {
-                setBusy(false);
-              }
-            })();
-          }}
-        >
-          <fieldset disabled={busy} className="grid gap-5">
-            <legend className="sr-only">New password</legend>
-            {fields.map((field) => (
-              <div key={field.name} className="grid gap-2">
-                <Label htmlFor={`password-${field.name}`}>{field.label}</Label>
-                <Input
-                  id={`password-${field.name}`}
-                  name={field.name}
-                  type="password"
-                  required
-                  minLength={field.name === "current" ? undefined : 8}
-                  autoComplete={field.autoComplete}
-                  className="h-11"
-                />
-              </div>
-            ))}
-            <Button type="submit" className="h-11">
-              Save password
-            </Button>
-          </fieldset>
-        </form>
-        {error && (
-          <Alert variant="destructive" className="mt-5">
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
+        <PasswordChangeForm onChanged={done} />
       </CardContent>
       {!required && (
         <CardFooter>

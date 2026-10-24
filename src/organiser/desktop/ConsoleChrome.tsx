@@ -58,6 +58,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import type { SessionData } from "@/connected/hooks/useSessionSnapshot";
 import type { Issue, Membership, Snapshot } from "@/connected/model";
 import { searchTeams, unresolvedLabel } from "@/connected/teamSearch";
+import { documentationUrl } from "@/lib/links";
 import { type ThemePreference, useTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 import {
@@ -84,8 +85,6 @@ const pageIcons: Record<ConsolePage, LucideIcon> = {
   accounts: Users,
   settings: Settings2,
 };
-
-const docsUrl = "https://minsky-docs.icaic-minsky.workers.dev";
 
 /**
  * The event and session at the top of the sidebar. With several sessions it
@@ -382,7 +381,7 @@ export function ConsoleSidebar({
                 Change password
               </DropdownMenuItem>
               <DropdownMenuItem asChild>
-                <a href={docsUrl} target="_blank" rel="noopener noreferrer">
+                <a href={documentationUrl} target="_blank" rel="noopener noreferrer">
                   <ExternalLink aria-hidden="true" />
                   Documentation
                   <span className="sr-only">(opens in a new tab)</span>

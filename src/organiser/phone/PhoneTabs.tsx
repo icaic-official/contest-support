@@ -7,18 +7,17 @@ import {
   Hand,
   KeyRound,
   LogOut,
-  Monitor,
-  Moon,
   Search,
-  Sun,
 } from "lucide-react";
+import { themeOptions } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { WorkflowState } from "@/connected/hooks/useWorkflowState";
 import type { Issue, Membership, Snapshot } from "@/connected/model";
 import type { ShellProps } from "@/connected/shell";
 import { searchTeams, unresolvedCount } from "@/connected/teamSearch";
-import { type ThemePreference, useTheme } from "@/lib/theme";
+import { documentationUrl } from "@/lib/links";
+import { useTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 import {
   AwardEvidence,
@@ -487,16 +486,6 @@ export function AwardsTab(props: PhoneTabProps) {
   );
 }
 
-const themeOptions: readonly {
-  value: ThemePreference;
-  label: string;
-  icon: typeof Sun;
-}[] = [
-  { value: "system", label: "Device", icon: Monitor },
-  { value: "light", label: "Light", icon: Sun },
-  { value: "dark", label: "Dark", icon: Moon },
-];
-
 /**
  * The person, their roles, the session switcher when they have several
  * sessions, password change, appearance and sign-out.
@@ -601,7 +590,7 @@ export function MeTab(props: PhoneTabProps & { onSessionChange: () => void }) {
         </fieldset>
         <a
           className={rowClass}
-          href="https://minsky-docs.icaic-minsky.workers.dev"
+          href={documentationUrl}
           target="_blank"
           rel="noopener noreferrer"
         >

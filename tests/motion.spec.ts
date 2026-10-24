@@ -16,10 +16,14 @@ function marker(list: Locator): Locator {
   return list.locator('[data-slot="sliding-indicator"]');
 }
 
-/** The largest difference between the indicator and the tab on the axes that the style fills. */
-async function gap(indicator: Locator, tab: Locator, axes: 'box' | 'horizontal'): Promise<number> {
+/**
+ * The largest difference between the indicator and the tab on the axes that
+ * the style fills. `centre` compares the horizontal centres only.
+ */
+async function gap(indicator: Locator, tab: Locator, axes: 'box' | 'horizontal' | 'centre'): Promise<number> {
   const [a, b] = await Promise.all([indicator.boundingBox(), tab.boundingBox()]);
   if (!a || !b) return Infinity;
+  if (axes === 'centre') return Math.abs(a.x + a.width / 2 - (b.x + b.width / 2));
   const horizontal = [a.x - b.x, a.width - b.width];
   const vertical = [a.y - b.y, a.height - b.height];
   return Math.max(...(axes === 'box' ? [...horizontal, ...vertical] : horizontal).map(Math.abs));
@@ -48,6 +52,34 @@ async function stopTrail(page: Page): Promise<number[]> {
   });
 }
 
+/**
+ * Stops the running transitions of an element halfway through. A test then
+ * reads the in-between state without a race against frame timing.
+ */
+async function freezeMidway(target: Locator): Promise<void> {
+  // Finding and pausing the transition in one page call keeps a slow machine
+  // from letting it end between the two steps.
+  await target.evaluate(async (element) => {
+    const deadline = Date.now() + 5000;
+    let running = element.getAnimations();
+    while (!running.length && Date.now() < deadline) {
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+      running = element.getAnimations();
+    }
+    if (!running.length) throw new Error('No transition started.');
+    for (const animation of running) {
+      animation.pause();
+      animation.currentTime = Number(animation.effect?.getComputedTiming().duration ?? 0) / 2;
+    }
+  });
+}
+
+async function finishAnimations(target: Locator): Promise<void> {
+  await target.evaluate((element) => {
+    for (const animation of element.getAnimations()) animation.finish();
+  });
+}
+
 /** Animations that last longer than a blink. Reduced motion must leave none. */
 function longAnimations(page: Page): Promise<number> {
   return page.evaluate(
@@ -66,20 +98,21 @@ test('queue tabs: the indicator starts under the selected tab and slides to the 
   const waiting = statusTab(page, 'Awaiting specialist');
 
   // First paint: already under Active, with no slide in from the corner.
-  expect(await gap(pill, active, 'box')).toBeLessThan(1.5);
+  await expect.poll(() => gap(pill, active, 'box')).toBeLessThan(1.5);
   expect(await pill.evaluate((element) => element.getAnimations().length)).toBe(0);
 
-  await startTrail(pill);
+  const from = await pill.boundingBox();
   await waiting.click();
   await expect(waiting).toHaveAttribute('aria-pressed', 'true');
+  await freezeMidway(pill);
+  const midway = await pill.boundingBox();
+  const target = await waiting.boundingBox();
+  if (!from || !midway || !target) throw new Error('Missing box.');
+  expect(midway.x, 'halfway between the old and the new tab').toBeGreaterThan(from.x + 5);
+  expect(midway.x).toBeLessThan(target.x - 5);
+  expect(midway.width, 'resizing on the way').toBeGreaterThan(Math.min(from.width, target.width));
+  await finishAnimations(pill);
   await expect.poll(() => gap(pill, waiting, 'box')).toBeLessThan(1.5);
-  const trail = await stopTrail(page);
-
-  const start = trail[0];
-  const end = trail[trail.length - 1];
-  expect(end).toBeGreaterThan(start + 100);
-  expect(trail.some((left) => left > start + 2 && left < end - 2), 'a frame shows the indicator on its way').toBe(true);
-  expect(trail, 'the indicator never moves back').toEqual([...trail].sort((a, b) => a - b));
 
   // A wider count in an earlier tab pushes the selected tab to the right. The
   // indicator moves with it in one frame, because the selection did not change.
@@ -175,30 +208,40 @@ test('contestant tracker: a step fills in over a moment when staff claim the rep
   });
   const progress = page.getByRole('list', { name: 'Progress' });
   const circle = progress.getByRole('listitem').nth(1).locator('span').first();
+  const fill = () => circle.evaluate((element) => getComputedStyle(element).backgroundColor);
   await expect(progress).toBeVisible();
-  const colors = await circle.evaluate((element) => {
-    const seen = new Set<string>();
-    const state = window as unknown as { watching: boolean; seen: Set<string> };
-    state.watching = true;
-    state.seen = seen;
-    const frame = () => {
-      seen.add(getComputedStyle(element).backgroundColor);
-      if (state.watching) requestAnimationFrame(frame);
-    };
-    requestAnimationFrame(frame);
-    return getComputedStyle(element).backgroundColor;
-  });
+  const before = await fill();
   fixture.setIssues([{ number: 4, status: 'claimed', minutesAgo: 3, team: 0 }]);
   await fixture.refresh();
-  await expect(progress.getByText('current step')).not.toHaveCount(0);
-  await expect.poll(() => circle.evaluate((element) => getComputedStyle(element).backgroundColor)).not.toBe(colors);
-  await page.waitForTimeout(300);
-  const seen = await page.evaluate(() => {
-    const state = window as unknown as { watching: boolean; seen: Set<string> };
-    state.watching = false;
-    return [...state.seen];
-  });
-  expect(seen.length, 'a color between the first and the last').toBeGreaterThan(2);
+  await freezeMidway(circle);
+  const midway = await fill();
+  await finishAnimations(circle);
+  const after = await fill();
+  expect(after).not.toBe(before);
+  expect(midway, 'a color between the old and the new').not.toBe(before);
+  expect(midway).not.toBe(after);
+});
+
+test('phone tab bar: the marker slides along the top edge to the selected tab', async ({ page }) => {
+  const fixture = await signInConsole(page, phone);
+  const nav = page.getByRole('navigation', { name: 'Organiser sections' });
+  const bar = marker(nav.locator('ul'));
+  const queue = nav.getByRole('button', { name: 'Queue', exact: true });
+  const find = nav.getByRole('button', { name: 'Find', exact: true });
+  await expect.poll(() => gap(bar, queue, 'centre')).toBeLessThan(1.5);
+
+  const from = await bar.boundingBox();
+  await find.click();
+  await expect(find).toHaveAttribute('aria-current', 'page');
+  await freezeMidway(bar);
+  const midway = await bar.boundingBox();
+  const target = await find.boundingBox();
+  if (!from || !midway || !target) throw new Error('Missing box.');
+  expect(midway.x).toBeGreaterThan(from.x + 5);
+  expect(midway.x).toBeLessThan(target.x + 16 - 5);
+  await finishAnimations(bar);
+  await expect.poll(() => gap(bar, find, 'centre')).toBeLessThan(1.5);
+  expect(fixture.errors).toEqual([]);
 });
 
 test.describe('reduced motion', () => {

@@ -79,6 +79,12 @@ export function ContestantApp(props: ShellProps) {
   const issue = issues.find((item) => item.id === selectedIssueId) ?? issues[0];
   const blocker = reportBlocker(state);
 
+  /** Clears the open report and the report form after the session changes. */
+  function resetForSession() {
+    selectIssue("");
+    setReporting(false);
+  }
+
   function openIssue(issueId: string) {
     setReporting(false);
     selectIssue(issueId);
@@ -120,14 +126,23 @@ export function ContestantApp(props: ShellProps) {
         account={username ?? user.email ?? undefined}
         onSelectSession={(sessionId) => {
           data.selectSession(sessionId);
-          selectIssue("");
-          setReporting(false);
+          resetForSession();
         }}
         changePassword={changePassword}
         signOut={signOut}
       />
       {accountPage && (
-        <AccountPage shell={props} member={membership} headingId={headingId} />
+        <div className="min-h-0 flex-1 overflow-y-auto p-8">
+          <AccountPage
+            shell={props}
+            state={state}
+            member={membership}
+            headingId={headingId}
+            now={now}
+            locked={command.locked}
+            onSessionChange={resetForSession}
+          />
+        </div>
       )}
       <div
         hidden={accountPage}

@@ -407,8 +407,12 @@ export function OrganiserDesktopConsole({
                   {accountPage ? (
                     <AccountPage
                       shell={shell}
+                      state={state}
                       member={member}
                       headingId={consoleHeadingId}
+                      now={now}
+                      locked={command.locked}
+                      onSessionChange={changeSession}
                     />
                   ) : (
                     <>

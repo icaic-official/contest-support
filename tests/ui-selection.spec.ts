@@ -77,6 +77,7 @@ async function signIn(
         user,
       },
       "/auth/v1/user": user,
+      "/auth/v1/logout": null,
       "/rest/v1/rpc/account_status": {
         username: "selection",
         must_change: false,
@@ -274,47 +275,114 @@ test("an unknown route retains its address and offers a route back to issues", a
   ).toBeVisible();
 });
 
-test("optional password changes and cancellation retain the account route", async ({
+test("the account page changes the password in place and keeps the route", async ({
   page,
 }) => {
   await signIn(page, staff, "/account");
-  const account = page.getByRole("heading", {
+  const heading = page.getByRole("heading", {
     level: 1,
     name: "My account",
     exact: true,
   });
-  await expect(account).toBeVisible();
-  await page
-    .getByRole("button", { name: "Change password", exact: true })
-    .click();
-  await expect(
-    page.getByRole("heading", { name: "Change your password", exact: true }),
-  ).toBeVisible();
-  await expect(page).toHaveURL("/account");
-  await page
-    .getByRole("button", { name: "Return to dashboard", exact: true })
-    .click();
-  await expect(account).toBeVisible();
-  await expect(page).toHaveURL("/account");
+  await expect(heading).toBeVisible();
+  const current = page.getByLabel("Current password", { exact: true });
+  const next = page.getByLabel("New password", { exact: true });
+  const confirm = page.getByLabel("Confirm password", { exact: true });
+  const save = page.getByRole("button", { name: "Save password", exact: true });
 
-  await page
-    .getByRole("button", { name: "Change password", exact: true })
-    .click();
-  await page
-    .getByLabel("Current password", { exact: true })
-    .fill("fixture-password");
-  await page
-    .getByLabel("New password", { exact: true })
-    .fill("replacement-password");
-  await page
-    .getByLabel("Confirm password", { exact: true })
-    .fill("replacement-password");
-  await page
-    .getByRole("button", { name: "Save password", exact: true })
-    .click();
-  await expect(account).toBeVisible();
+  await current.fill("fixture-password");
+  await next.fill("replacement-password");
+  await confirm.fill("another-password");
+  await save.click();
+  await expect(page.getByText("Passwords must match.")).toBeVisible();
+  await expect(current).toHaveValue("fixture-password");
+
+  await confirm.fill("replacement-password");
+  await save.click();
+  await expect(
+    page.getByRole("status").filter({ hasText: "Your password was changed." }),
+  ).toBeVisible();
+  for (const field of [current, next, confirm]) await expect(field).toHaveValue("");
+  await expect(page.getByText("Passwords must match.")).toHaveCount(0);
   await expect(page).toHaveURL("/account");
+  await expect(heading).toBeVisible();
+
   await page.reload();
-  await expect(account).toBeVisible();
+  await expect(heading).toBeVisible();
   await expect(page).toHaveURL("/account");
+});
+
+test("the organiser account page shows every section and signs out", async ({
+  page,
+}) => {
+  await signIn(page, { ...staff, roles: ["volunteer", "jury"], is_admin: true }, "/account");
+  await expect(
+    page.getByRole("heading", { level: 1, name: "My account", exact: true }),
+  ).toBeVisible();
+  for (const title of [
+    "Profile",
+    "Access in this session",
+    "Sessions",
+    "Security",
+    "Appearance",
+    "Activity",
+    "Help",
+  ]) {
+    await expect(
+      page.getByRole("heading", { level: 2, name: title, exact: true }),
+    ).toBeVisible();
+  }
+  const sections = page.getByRole("navigation", { name: "Account sections" });
+  await expect(sections.getByRole("link")).toHaveCount(7);
+  const access = page.locator("#access");
+  for (const role of ["Volunteer", "Jury", "Session admin"]) {
+    await expect(access.getByText(role, { exact: true })).toBeVisible();
+  }
+  await expect(
+    access.getByRole("link", { name: "Manage session accounts", exact: true }),
+  ).toHaveAttribute("href", "/administration/accounts");
+  await expect(
+    page.locator("#sessions").getByText("Current", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.locator("#help").getByRole("link", { name: /^Documentation/ }),
+  ).toHaveAttribute("target", "_blank");
+
+  await page.locator("#appearance").getByText("Dark", { exact: true }).click();
+  await expect(page.locator("html")).toHaveClass(/dark/);
+  await expect(
+    page.locator("#appearance").getByRole("radio", { name: "Dark" }),
+  ).toBeChecked();
+
+  await page.getByRole("button", { name: "Sign out", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "Sign in", exact: true }),
+  ).toBeVisible();
+});
+
+test("an address with a section fragment scrolls to that section", async ({
+  page,
+}) => {
+  await signIn(page, staff, "/account#security");
+  const security = page.locator("#security");
+  await expect(security).toBeFocused();
+  await expect(security).toBeInViewport();
+});
+
+test("a team account page shows the team and no staff content", async ({
+  page,
+}) => {
+  await signIn(page, { ...staff, roles: [], team_id: TEAM_ID }, "/account");
+  await expect(
+    page.getByRole("heading", { level: 1, name: "My account", exact: true }),
+  ).toBeVisible();
+  await expect(page.getByText("Team account").first()).toBeVisible();
+  await expect(page.locator("#profile").getByText("Aurora")).toBeVisible();
+  await expect(page.locator("#profile").getByText("Desk 12")).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "Manage session accounts" }),
+  ).toHaveCount(0);
+  for (const role of ["Volunteer", "Specialist", "Jury", "Session admin"]) {
+    await expect(page.getByText(role, { exact: true })).toHaveCount(0);
+  }
 });

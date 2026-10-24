@@ -152,8 +152,9 @@ Preserve existing Auth UUIDs, history, and permissions when you assign a usernam
 ## Backend migration direction
 
 On 2026-10-17, the user selected Cloudflare D1 with a SQLite rewrite and Durable Objects for live updates.
-Cloudflare is the active development backend after the separately approved T0021 switch.
-Supabase resources and accounts remain intact. No existing data or identifiers transferred.
+Cloudflare is the live development backend after the separately approved T0021 switch.
+The Worker is `minsky-dev` and the D1 database is `minsky-development`.
+Supabase is a supported second provider. Its resources and accounts remain intact. No existing data or identifiers transferred.
 The [backend design](cloudflare-backend-design.md) explains the current connector boundaries.
 The [dated verification record](current-state.md#t0020-connector-implementation-2026-10-18) records implementation evidence.
 

@@ -1,0 +1,76 @@
+---
+title: Write these docs
+description: Edit pages, add diagrams, and check the site before you submit.
+---
+
+import Diagram from '../../../components/Diagram.astro';
+
+The site uses [Astro Starlight](https://starlight.astro.build/guides/authoring-content/). Pages are Markdown in `site/src/content/docs/`.
+
+## Run the site
+
+```sh
+npm ci && npm ci --prefix site
+npm run docs:dev
+```
+
+## Write a page
+
+```md
+---
+title: Do the task
+description: One line about what the reader achieves.
+---
+
+## First step
+
+1. Action.
+2. Expected result.
+```
+
+Add the page to the sidebar in `site/astro.config.mjs`.
+
+- Keep it short. Give each page one purpose.
+- Use exact interface labels in **bold**.
+- Check every claim against the code. The code is the source of truth.
+- Link to the page that owns a topic instead of repeating it.
+- Mark planned or unverified features.
+
+## Add a diagram
+
+Diagrams are [Excalidraw](https://excalidraw.com) files. The build renders them to SVG, so pages load no extra JavaScript.
+
+1. Draw in Excalidraw and save the file as `site/src/diagrams/NAME.excalidraw`.
+2. Rename the page to `.mdx` if it is Markdown.
+3. Add the diagram:
+
+```mdx
+import Diagram from '../../../components/Diagram.astro';
+
+<Diagram name="NAME" alt="What the diagram shows, in one or two sentences." />
+```
+
+For example, `<Diagram name="award-flow" alt="…" />` shows:
+
+<Diagram name="award-flow" alt="Award flow. A resolved issue gets an award decision from the jury, then staff confirm that they applied it externally." />
+
+The renderer supports rectangles, diamonds, ellipses, lines, arrows, free drawing, and text.
+Arrows can have the open arrow or the filled triangle arrowhead.
+Text uses the site font. Text in Excalidraw's Code font uses the site's monospace font.
+Dark mode inverts the colours, as Excalidraw does.
+Images, frames, and other arrowheads are not supported; the build fails if a diagram uses them.
+To edit a diagram, open its file in Excalidraw.
+
+## Check before you submit
+
+```sh
+npm run docs:build   # also checks links and anchors
+npm run docs:test    # navigation, search, phone layout, 404
+```
+
+Check the page in light and dark mode and at phone width.
+Wait for `Workers Builds: minsky-ci` to pass. It runs `npm run ci` on every branch push. That builds the site and checks links, but does not run `docs:test`.
+A branch push also uploads a docs preview version. Its preview URL is in the `minsky-docs` build log.
+A merge to `main` publishes the docs to the stable URL.
+A fork pull request does not push a branch here, so it does not start a build.
+Manual publishing (`npm run docs:deploy`) is only for when Workers Builds cannot publish; see `docs/cloudflare-builds.md`.

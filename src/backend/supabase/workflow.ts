@@ -9,7 +9,7 @@ const resultSchema = z.discriminatedUnion('outcome', [
   z.object({ outcome: z.literal('unknown') }),
 ]);
 
-/** Opt-in server workflow transport. The active backend still uses the legacy RPC. */
+/** Opt-in server workflow transport. The Supabase browser adapter still uses the legacy RPC. */
 export function createServerWorkflowExecutor(client: SupabaseClient): Backend['workflows']['execute'] {
   return async (sessionId, requestId, command) => {
     const { data, error } = await client.functions.invoke('workflow', { body: { sessionId, requestId, command } });

@@ -1,5 +1,6 @@
 node_modules/
 dist/
+.verify-minsky/
 site/.astro/
 .wrangler/
 *.tsbuildinfo
@@ -10,3 +11,10 @@ test-results/
 supabase/.temp/
 supabase/.branches/
 .vitest/
+
+# Lapiz preview build output and local state
+.lapiz/build/
+.lapiz/dist/
+.lapiz/state/
+.lapiz/.dev.vars
+.lapiz/wrangler.preview.json

@@ -2,6 +2,12 @@
 
 These tickets describe development work, not contestant issues.
 
+On 2026-10-23 the owner selected Cloudflare as the live backend.
+The development Worker is `minsky-dev` and the development D1 database is `minsky-development`.
+Supabase stays a supported second provider.
+Older summaries that say to keep Supabase active describe that ticket's scope.
+The 2026-10-23 decision supersedes them.
+
 [PR #45](https://github.com/GiftedNovaHD/minsky/pull/45) remains the draft T0021 follow-up.
 The owner requests an update from current `main` and conflict resolution on 2026-10-23.
 Preserve its browser routes and retry protections alongside the merged frontend redesign and CI change.
@@ -259,7 +265,7 @@ Protected verification on `main` is recorded separately from the PR #41 hosted r
 
 Branch: `feature/t0018-cloudflare-authentication`, from updated `main` at `0c797ad` after PR #39 merged.
 Status: merged in [PR #40](https://github.com/GiftedNovaHD/minsky/pull/40) at `68e8642` on 2026-10-17 at 17:16:41 UTC. Local, hosted D1, and protected HTTP checks pass on Workers Paid. The PR #41 follow-up records the paid verification.
-Summary: Add Workers and D1 authentication, temporary passwords, account sessions, and organizer-assisted recovery. Keep Supabase active.
+Summary: Add Workers and D1 authentication, temporary passwords, account sessions, and organizer-assisted recovery. Keep Supabase active. Superseded on 2026-10-23.
 
 Better Auth `1.7.10` supplies username login and signed cookie sessions.
 D1 guards preserve current permissions and atomic credentials. The browser implements the existing `Authentication` interface.
@@ -1106,3 +1112,28 @@ If the T0006 and T0007 PRs are still open, they can change `src/connected/`. Whi
 - Remove the legacy rules in `src/styles.css` that the image preview page does not use, or restyle the preview page with Tailwind.
 - Split the main JavaScript chunk to remove the build warning.
 - Move the console sidebar out of the `main` landmark, so the skip link skips it. The local and cloud specs expect focus on `#main`, so they change too.
+
+
+## T0023 — Documentation site redesign and accuracy
+
+Branch: `feature/t0023-improving-docs`, from `main` at `a25f9f1`.
+Status: implemented and verified locally. The user opens the PR, reviews, and merges.
+
+The user requested a modern, minimal, easy-to-read docs site on 2026-10-22.
+The pages must match the code, with the code as the source of truth, and use as few words as possible.
+Excalidraw diagrams are allowed, with rendering support in the site.
+
+### Acceptance criteria
+
+- [x] The site uses the app's zinc palette and Inter font, in light and dark mode and at phone width.
+- [x] `.excalidraw` files in `site/src/diagrams/` render to inline SVG at build time with `<Diagram>`.
+- [x] Every public page is checked against the code. Wrong labels and stale status are corrected.
+- [x] The public pages shrink from about 7,700 to about 4,100 words.
+- [x] `npm run docs:build`, `npm run docs:test`, and `npm run lint` pass.
+
+The branch also adds a [Lapiz preview](../README.md#lapiz-preview) of the Cloudflare application.
+It runs with local emulation only. It prints the first admin's credentials in its start log, by the owner's choice for debugging.
+
+### Outside this ticket
+
+Application behavior, the `docs/` maintainer records beyond link updates, and deployment to hosted resources.

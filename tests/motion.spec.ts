@@ -188,6 +188,9 @@ test.describe('reduced motion', () => {
     await page.locator('[data-issue-row]').first().click();
     await expect(page.getByRole('dialog')).toBeVisible();
     expect(await longAnimations(page)).toBe(0);
+    await page.getByRole('tab', { name: /^Outcome/ }).click();
+    await expect(page.getByRole('tab', { name: /^Outcome/ })).toHaveAttribute('aria-selected', 'true');
+    expect(await longAnimations(page)).toBe(0);
     await page.keyboard.press('Escape');
     await expect(page.getByRole('dialog')).toBeHidden();
     expect(fixture.errors).toEqual([]);

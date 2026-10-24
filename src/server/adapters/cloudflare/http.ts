@@ -129,7 +129,12 @@ export function createApplicationHandler(services: ApplicationHttpServices, orig
       }
       if (url.pathname === '/api/announcement-images') {
         const command = announcementImageSchema.parse(body);
-        if (command.action === 'begin') return privateJson(await services.announcementImages.begin(caller, command));
+        if (command.action === 'begin') {
+          return privateJson(await services.announcementImages.begin(caller, {
+            sessionId: command.sessionId, requestId: command.requestId, announcementId: command.announcementId,
+            name: command.name, bytes: command.bytes,
+          }));
+        }
         if (command.action === 'finish') await services.announcementImages.finish(caller, command.sessionId, command.imageId);
         else await services.announcementImages.remove(caller, command.sessionId, command.imageId, command.action === 'abandon');
         return privateJson({});

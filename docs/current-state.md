@@ -39,10 +39,19 @@ Two existing tests had a 5-second default timeout and failed under load.
 `testMetrics.test.ts` and `provider-boundaries.test.mjs` now use longer limits.
 They failed intermittently under parallel load once this branch added more suites. I did not measure `main`.
 
+### Review fixes
+
+A review after the update from `main` found these defects. Each fix has a regression test unless stated.
+
+- The Cloudflare route passed `action` into the strict image reservation schema, so every announcement image upload failed. The route now passes only the reservation fields. The route test checks the exact service input.
+- The image view downloaded every image again on each poll and live change, because each snapshot parses new objects. It now downloads only when the image identity changes. No browser test covers this.
+- On Supabase, removing an image of a removed announcement changed that announcement's attribution and revision. Removal could also mark another uploader's pending image as removed while its file was still being stored. Removal now accepts only ready images and leaves a removed announcement unchanged, as D1 does.
+- The specification now states that managers can still remove the images of a removed announcement. The code and the Cloudflare tests already allowed it. The Supabase cleanup limit is now documented.
+
 ### Not verified
 
 - Hosted Supabase and hosted Cloudflare behavior, including R2 transfers and Durable Object delivery.
-- Image upload in a browser. Service, database, function, and adapter tests cover it.
+- Image upload in a browser. Service, database, function, and adapter tests cover its parts. No test runs the Cloudflare browser adapter, HTTP route, and image service together.
 - The shared provider test bridge. It reports that it does not cover announcements.
 - Other browsers, screen readers, 200% zoom, and physical devices. [Manual checks](manual-verification.md#15-session-announcements-t0006) list them.
 

@@ -214,12 +214,14 @@ begin
   select * into image from public.announcement_images where id=p_image and session_id=p_session for update;
   if image.id is null then raise exception 'Image unavailable.'; end if;
   if image.status='removed' then return p_session::text||'/'||image.announcement_id::text||'/'||image.id::text; end if;
+  -- A pending file belongs to its uploader's request, which can still store it.
+  if image.status<>'ready' then raise exception 'Image unavailable.'; end if;
   select name into who_name from public.people where id=who;
   update public.announcement_images set status='removed',removed_at=clock_timestamp(),removed_by=who where id=image.id;
-  if image.status='ready' then
-    update public.announcements set edited_at=clock_timestamp(),edited_by=who,edited_name=who_name,revision=revision+1 where id=image.announcement_id;
-    update public.sessions set revision=revision+1 where id=p_session;
-  end if;
+  -- A removed announcement keeps its final attribution and revision.
+  update public.announcements set edited_at=clock_timestamp(),edited_by=who,edited_name=who_name,revision=revision+1
+    where id=image.announcement_id and removed_at is null;
+  update public.sessions set revision=revision+1 where id=p_session;
   return p_session::text||'/'||image.announcement_id::text||'/'||image.id::text;
 end $$;
 

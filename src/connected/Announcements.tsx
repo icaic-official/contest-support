@@ -594,7 +594,9 @@ function useImageUrl(image: AnnouncementImage): { url: string; failed: boolean }
       active = false;
       if (created) URL.revokeObjectURL(created);
     };
-  }, [image]);
+    // A ready image never changes, and each snapshot parses new objects. Only its identity starts a download.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [image.session_id, image.announcement_id, image.id]);
   return state;
 }
 

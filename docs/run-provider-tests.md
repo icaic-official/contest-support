@@ -171,7 +171,7 @@ node src/server/adapters/cloudflare/tooling/store-target.mjs migrate \
 ```
 
 The helper checks the exact account, database name, UUID, and configuration before applying migrations.
-It applies all nine repository migrations to an empty target.
+It applies every repository migration to an empty target.
 It accepts an existing schema only when its migration history matches a reviewed prefix.
 Expected output is `Dedicated store CI migrations match this checkout.`
 The helper deploys no Worker and creates no R2 or Durable Object resources.

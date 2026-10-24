@@ -157,6 +157,9 @@ describe('Cloudflare application HTTP boundary', () => {
     expect(deps.images.upload).not.toHaveBeenCalled();
     const withoutLength = { Origin: origin, 'X-Minsky-Request': '1', 'X-CSRF-Token': identity.csrf };
     expect((await handle(new Request(`${origin}/api/announcement-image/path`, { method: 'PUT', headers: withoutLength }))).status).toBe(411);
+    const reservation = { sessionId, requestId, announcementId: requestId, name: 'notice.png', bytes: 3 };
+    await handle(post('/api/announcement-images', { action: 'begin', ...reservation }));
+    expect(deps.announcementImages.begin).toHaveBeenCalledWith(identity.caller, reservation);
     deps.announcementImages.finish.mockRejectedValueOnce(new ImageRequestError('Upload the image before finishing.', { incomplete: true }));
     const finish = await handle(post('/api/announcement-images', { action: 'finish', sessionId, imageId: requestId }));
     expect(await finish.json()).toMatchObject({ incomplete: true });

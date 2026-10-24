@@ -1314,5 +1314,16 @@ describe("session announcements", () => {
     await actor(jury);
     expect((await snapshot()).images.map((i) => i.id)).toEqual([second]);
     await expect(reserve(parent)).rejects.toThrow("Announcement unavailable");
+    const removed = (await snapshot()).announcements[0];
+    await db.query("select public.remove_announcement_image($1,$2)", [session, second]);
+    expect((await snapshot()).announcements[0]).toEqual(removed);
+    expect((await snapshot()).images).toEqual([]);
+  });
+
+  it("leaves a pending image to its uploader", async () => {
+    await actor(admin);
+    const pending = await reserve(await announce(publishAction()));
+    await actor(jury);
+    await expect(db.query("select public.remove_announcement_image($1,$2)", [session, pending.id])).rejects.toThrow("Image unavailable");
   });
 });

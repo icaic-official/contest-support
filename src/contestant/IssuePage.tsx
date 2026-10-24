@@ -67,7 +67,7 @@ function Tracker({ steps }: { steps: readonly TrackerStep[] }) {
             <div className="flex items-center gap-2" aria-hidden="true">
               <span
                 className={cn(
-                  "grid size-8 shrink-0 place-items-center rounded-full",
+                  "grid size-8 shrink-0 place-items-center rounded-full transition-colors duration-(--motion-base) ease-out",
                   step.done
                     ? "bg-primary text-primary-foreground"
                     : step.current
@@ -80,7 +80,7 @@ function Tracker({ steps }: { steps: readonly TrackerStep[] }) {
               {index < steps.length - 1 && (
                 <span
                   className={cn(
-                    "h-0.5 flex-1 rounded",
+                    "h-0.5 flex-1 rounded transition-colors duration-(--motion-base) ease-out",
                     step.done ? "bg-primary" : "bg-border",
                   )}
                 />
@@ -88,7 +88,7 @@ function Tracker({ steps }: { steps: readonly TrackerStep[] }) {
             </div>
             <p
               className={cn(
-                "mt-2 text-sm font-medium",
+                "mt-2 text-sm font-medium transition-colors duration-(--motion-base) ease-out",
                 !step.done && !step.current && "text-muted-foreground",
               )}
             >

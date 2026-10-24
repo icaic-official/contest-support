@@ -168,6 +168,39 @@ test('a held button presses in, and a held phone queue card shows its pressed st
   await expect.poll(() => card.evaluate((element) => getComputedStyle(element).backgroundColor)).toBe(resting);
 });
 
+test('contestant tracker: a step fills in over a moment when staff claim the report', async ({ page }) => {
+  const fixture = await signInConsole(page, desktop, {
+    contestant: true,
+    issues: [{ number: 4, status: 'open', minutesAgo: 3, team: 0 }],
+  });
+  const progress = page.getByRole('list', { name: 'Progress' });
+  const circle = progress.getByRole('listitem').nth(1).locator('span').first();
+  await expect(progress).toBeVisible();
+  const colors = await circle.evaluate((element) => {
+    const seen = new Set<string>();
+    const state = window as unknown as { watching: boolean; seen: Set<string> };
+    state.watching = true;
+    state.seen = seen;
+    const frame = () => {
+      seen.add(getComputedStyle(element).backgroundColor);
+      if (state.watching) requestAnimationFrame(frame);
+    };
+    requestAnimationFrame(frame);
+    return getComputedStyle(element).backgroundColor;
+  });
+  fixture.setIssues([{ number: 4, status: 'claimed', minutesAgo: 3, team: 0 }]);
+  await fixture.refresh();
+  await expect(progress.getByText('current step')).not.toHaveCount(0);
+  await expect.poll(() => circle.evaluate((element) => getComputedStyle(element).backgroundColor)).not.toBe(colors);
+  await page.waitForTimeout(300);
+  const seen = await page.evaluate(() => {
+    const state = window as unknown as { watching: boolean; seen: Set<string> };
+    state.watching = false;
+    return [...state.seen];
+  });
+  expect(seen.length, 'a color between the first and the last').toBeGreaterThan(2);
+});
+
 test.describe('reduced motion', () => {
   test.use({ reducedMotion: 'reduce' });
 

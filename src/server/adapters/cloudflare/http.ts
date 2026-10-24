@@ -1,13 +1,15 @@
 import { z } from 'zod';
 import { ImageRequestError } from '../../../backend/errors';
+import { AVATAR_MAX_BYTES } from '../../../connected/imageFile';
 import { roleSchema } from '../../../connected/model';
-import { readJsonBody } from '../../http';
+import { readBody, readJsonBody } from '../../http';
 import { AuthenticationError, type AuthenticationService, type Caller } from '../../authentication';
 import type { WorkflowService } from '../../workflow';
 import type { D1ApplicationService } from './application';
 import type { R2ImageService } from './images';
 import { AnnouncementCommandError, type D1AnnouncementService } from './announcements';
 import type { R2AnnouncementImageService } from './announcementImages';
+import type { R2AvatarService } from './avatars';
 
 const uuid = z.uuid();
 const member = z.strictObject({ teamId: uuid.nullable(), roles: z.array(roleSchema).max(3), isAdmin: z.boolean() });
@@ -30,6 +32,8 @@ const announcementImageSchema = z.discriminatedUnion('action', [
     name: z.string(), bytes: z.number() }),
   z.strictObject({ action: z.enum(['finish', 'remove', 'abandon']), sessionId: uuid, imageId: uuid }),
 ]);
+const avatarCommandSchema = z.strictObject({ action: z.literal('remove') });
+const avatarPathSchema = z.tuple([uuid, uuid]);
 // Announcement text can use 10,000 characters of up to four bytes each.
 const announcementBodyLimit = 65_536;
 
@@ -49,6 +53,7 @@ export interface ApplicationHttpServices {
   images: Pick<R2ImageService, 'begin' | 'upload' | 'finish' | 'remove' | 'download'>;
   announcements: Pick<D1AnnouncementService, 'snapshot' | 'execute'>;
   announcementImages: Pick<R2AnnouncementImageService, 'begin' | 'upload' | 'finish' | 'remove' | 'download'>;
+  avatars: Pick<R2AvatarService, 'list' | 'upload' | 'remove' | 'download'>;
   connect(request: Request, caller: Caller, sessionId: string): Promise<Response>;
 }
 
@@ -81,6 +86,14 @@ export function createApplicationHandler(services: ApplicationHttpServices, orig
         if (url.pathname === '/api/announcements') {
           return privateJson(await services.announcements.snapshot(caller, uuid.parse(url.searchParams.get('sessionId'))));
         }
+        if (url.pathname === '/api/avatars') {
+          return privateJson(await services.avatars.list(caller, uuid.parse(url.searchParams.get('sessionId'))));
+        }
+        if (url.pathname.startsWith('/api/avatar/')) {
+          const [sessionId, avatarId] = avatarPathSchema.parse(url.pathname.slice('/api/avatar/'.length).split('/'));
+          const image = await services.avatars.download(caller, sessionId, avatarId);
+          return new Response(image.body, { headers: { ...privateHeaders, 'Content-Type': image.contentType } });
+        }
         if (url.pathname.startsWith('/api/announcement-image/')) {
           const image = await services.announcementImages.download(caller, decodeURIComponent(url.pathname.slice('/api/announcement-image/'.length)));
           return new Response(image.body, { headers: { ...privateHeaders, 'Content-Type': image.contentType } });
@@ -96,10 +109,20 @@ export function createApplicationHandler(services: ApplicationHttpServices, orig
         throw new AuthenticationError(403, 'The request protection checks failed.');
       }
       if (request.method === 'PUT') {
+        const avatar = url.pathname.startsWith('/api/avatar/');
         const announcement = url.pathname.startsWith('/api/announcement-image/');
-        if (!announcement && !url.pathname.startsWith('/api/image/')) return privateJson({ error: 'The endpoint does not exist.' }, 404);
+        if (!avatar && !announcement && !url.pathname.startsWith('/api/image/')) return privateJson({ error: 'The endpoint does not exist.' }, 404);
         const lengthHeader = request.headers.get('Content-Length');
         if (lengthHeader === null || !/^[1-9][0-9]*$/.test(lengthHeader)) return privateJson({ error: 'An image transfer requires its exact length.' }, 411);
+        if (avatar) {
+          if (Number(lengthHeader) > AVATAR_MAX_BYTES) {
+            throw new ImageRequestError(`Choose a picture of up to ${AVATAR_MAX_BYTES / 1024} KB.`, { validation: true });
+          }
+          return privateJson(await services.avatars.upload(caller, {
+            requestId: uuid.parse(url.pathname.slice('/api/avatar/'.length)),
+            bytes: await readBody(request, AVATAR_MAX_BYTES), digest: request.headers.get('X-Minsky-Digest') ?? '',
+          }));
+        }
         const prefix = announcement ? '/api/announcement-image/' : '/api/image/';
         await (announcement ? services.announcementImages : services.images).upload(caller,
           decodeURIComponent(url.pathname.slice(prefix.length)), request.body,
@@ -137,6 +160,11 @@ export function createApplicationHandler(services: ApplicationHttpServices, orig
         }
         if (command.action === 'finish') await services.announcementImages.finish(caller, command.sessionId, command.imageId);
         else await services.announcementImages.remove(caller, command.sessionId, command.imageId, command.action === 'abandon');
+        return privateJson({});
+      }
+      if (url.pathname === '/api/avatars') {
+        avatarCommandSchema.parse(body);
+        await services.avatars.remove(caller);
         return privateJson({});
       }
       if (url.pathname === '/api/admin') {

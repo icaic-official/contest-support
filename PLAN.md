@@ -3,6 +3,11 @@
 This file records the current agreed scope, newest first.
 Earlier requests, approvals, branch exceptions, and the original demo plan are in the [planning log](docs/history/plan-log.md).
 
+**CI audit follow-up, 2026-10-24.** After a CI audit, the owner asked to add two safeguards to PR #67, because `main` now publishes automatically.
+`npm test` and the deploy reject a D1 migration that drops or renames schema, unless `reviewedDestructiveMigrations` records a reviewed exception. Data changes are not checked.
+Before it applies migrations, the deploy prints the D1 Time Travel bookmark and the restore command. If it cannot read the bookmark, no migration starts.
+The other audit findings stay with the owner or as candidate work: branch protection, Dependabot alerts, automatic browser checks, CI for fork PRs, and automatic rollback.
+
 **Retire the hosted Supabase setup, 2026-10-24.** The owner decided that the project no longer operates Supabase projects.
 The Supabase adapter stays as a working second implementation. Anyone can run it on their own Supabase project.
 Keep `supabase/`, `src/backend/supabase/`, `src/server/adapters/supabase/`, the embedded-PostgreSQL tests, the Deno function checks, `VITE_BACKEND=supabase`, the shared provider driver, and the mocked browser suite. Every local Supabase adapter test must keep passing.

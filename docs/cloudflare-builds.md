@@ -101,13 +101,15 @@ A failed step stops the build. Later steps do not run.
 
 The deploy command is `npm run deploy`. It runs these steps in order:
 
-1. Build the application for the backend that the build variables select.
+1. Build the Cloudflare application.
 2. Stop if the build's commit is no longer the head of `main`. A newer push then owns the publication.
-3. Confirm the account, the D1 database, the private R2 bucket, and the `AUTH_SECRET` name.
-4. Apply new D1 migrations with `wrangler d1 migrations apply minsky-development --remote`.
-5. Stop if the applied migrations differ from the checkout. An older build stops here after a newer build has migrated.
-6. Publish the complete Worker with `wrangler deploy`.
-7. Read `minsky-revision.json` and the live bindings. Confirm that an anonymous `/api/auth/session` request returns `401`.
+3. Stop if a D1 migration removes or renames schema. See [Change the D1 schema](#change-the-d1-schema).
+4. Confirm the account, the D1 database, the private R2 bucket, and the `AUTH_SECRET` name.
+5. Record the D1 Time Travel restore point. The build log prints it with the exact restore command. Stop if it cannot be read.
+6. Apply new D1 migrations with `wrangler d1 migrations apply minsky-development --remote`.
+7. Stop if the applied migrations differ from the checkout. An older build stops here after a newer build has migrated.
+8. Publish the complete Worker with `wrangler deploy`.
+9. Read `minsky-revision.json` and the live bindings. Confirm that an anonymous `/api/auth/session` request returns `401`.
 
 [Deployment settings](cloudflare-build-settings.md#publication-checks) describe each check.
 
@@ -186,7 +188,24 @@ Pause publication during a live contest. A merge then does not change the applic
 - If the build stops before `wrangler deploy`, the previous Worker keeps serving. Read the fixed error message. Provider output is withheld on purpose.
 - If the message says that the migration outcome is unknown, compare `SELECT name FROM d1_migrations` with `src/server/adapters/d1/migrations` before you retry.
 - If a published version is bad, roll back the Worker with `npx wrangler rollback --config src/server/adapters/cloudflare/deploy/development.wrangler.jsonc`. Write migrations that only add tables, columns, or indexes, so that the earlier Worker still runs against the newer schema.
-- If a migration damaged data, restore the database with [D1 Time Travel](https://developers.cloudflare.com/d1/reference/time-travel/).
+- If a migration damaged data, find `Restore point before migrations:` in the deploy log. Run the `npx wrangler d1 time-travel restore` command on that line. It returns `minsky-development` to its state before the migration and discards later writes. See [D1 Time Travel](https://developers.cloudflare.com/d1/reference/time-travel/).
+
+### Change the D1 schema
+
+Every merge to `main` applies its new D1 migrations automatically. A Worker rollback then runs the earlier code against the newer schema.
+So a migration may only add tables, columns, indexes, triggers, or views.
+It may also drop a trigger, index, or view and create it again with the same name in the same file.
+
+`npm test` runs this check on every migration in `src/server/adapters/d1/migrations`. The deploy runs it again before it changes anything.
+It fails on `DROP TABLE`, `DROP COLUMN`, `RENAME`, and a dropped trigger, index, or view that the file does not create again.
+It does not check data changes such as `UPDATE` or `DELETE`.
+
+To ship a migration that removes or renames schema:
+
+1. Pause publication, as [Pause publication](#pause-publication) describes.
+2. Add the file name and the reason to `reviewedDestructiveMigrations` in `src/server/adapters/cloudflare/tooling/migrations.mjs`, in the same PR.
+3. After the merge, apply the migration and publish by hand. Record the restore point first.
+4. Reconnect the trigger.
 
 To publish by hand, run `npm run deploy` from an updated `main` with the same variables, a token with the same permissions, `WORKERS_CI_BRANCH=main`, and `WORKERS_CI_COMMIT_SHA` set to the output of `git rev-parse HEAD`.
 

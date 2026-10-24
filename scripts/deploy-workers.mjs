@@ -7,7 +7,7 @@ import { pathToFileURL, URL } from "node:url";
 import { isAbsolute, relative, resolve } from "node:path";
 import { isDeepStrictEqual } from "node:util";
 import { readInstallationTarget } from "../src/server/adapters/cloudflare/tooling/configuration.mjs";
-import { assertCurrentMigrations } from "../src/server/adapters/cloudflare/tooling/migrations.mjs";
+import { assertAdditiveMigrations, assertCurrentMigrations } from "../src/server/adapters/cloudflare/tooling/migrations.mjs";
 import { confirmTarget } from "../src/server/adapters/cloudflare/tooling/operations.mjs";
 import { safeWranglerEnvironment } from "../src/server/adapters/cloudflare/tooling/safe-environment.mjs";
 
@@ -197,7 +197,8 @@ function applicationMarker(worker, sha) {
 }
 
 /** Confirm the exact live target, then bring its schema to this checkout's migrations. */
-export async function prepareApplication(worker, env, execute = execFileSync, request = globalThis.fetch) {
+export async function prepareApplication(worker, env, execute = execFileSync, request = globalThis.fetch, report = summary) {
+  await assertAdditiveMigrations();
   const runWrangler = (arguments_) => {
     try {
       return execute("node_modules/.bin/wrangler", [...arguments_, "--config", worker.config], {
@@ -236,8 +237,18 @@ export async function prepareApplication(worker, env, execute = execFileSync, re
   } catch {
     throw new Error("Confirm AUTH_SECRET on the selected Worker before deployment. Secret values were not requested.");
   }
-  // Apply only after every read-only check passes. Migrations must stay additive so that a
-  // Worker rollback still runs against the newer schema.
+  // Print the restore point first, so recovery from a damaged migration needs no lookup.
+  let bookmark;
+  try {
+    bookmark = JSON.parse(await runWrangler(["d1", "time-travel", "info", worker.settings.databaseName, "--json"])).bookmark;
+    if (typeof bookmark !== "string" || !/^[0-9a-f-]{16,128}$/.test(bookmark)) throw new Error("Invalid bookmark");
+  } catch {
+    throw new Error("The D1 restore point could not be recorded. No migration started.");
+  }
+  report(`Restore point before migrations: ${bookmark}. To restore it, run: npx wrangler d1 time-travel restore ` +
+    `${worker.settings.databaseName} --bookmark=${bookmark} --config ${worker.config}`);
+  // Apply only after every read-only check passes. assertAdditiveMigrations keeps a
+  // Worker rollback runnable against the newer schema.
   try {
     await runWrangler(["d1", "migrations", "apply", worker.settings.databaseName, "--remote"]);
   } catch {
@@ -294,7 +305,7 @@ export async function deployWorkers(env, {
       if (!isDeepStrictEqual(build, { ...applicationMarker(worker, plan.sha), config: worker.config })) {
         throw new Error("Build the selected backend and revision with the guarded deployment build command before upload.");
       }
-      await application(worker, childEnv, execute);
+      await application(worker, childEnv, execute, globalThis.fetch, report);
     }
     const marker = worker.backend ? applicationMarker(worker, plan.sha) : { sha: plan.sha };
     write(`${worker.assets}/minsky-revision.json`, `${JSON.stringify(marker)}\n`);

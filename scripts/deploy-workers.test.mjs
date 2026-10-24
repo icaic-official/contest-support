@@ -260,6 +260,7 @@ it("uses the complete generated configuration for Cloudflare uploads and confirm
     bucketName: settings.bucketName, origin: settings.origin });
   await deployWorkers(cloudflare, mocks);
   expect(mocks.application).toHaveBeenCalledTimes(1);
+  expect(mocks.application.mock.calls[0][4]).toBe(mocks.report);
   expect(mocks.deployedApplication).toHaveBeenCalledTimes(1);
   expect(mocks.verify.mock.calls[0][1]).toEqual({ sha, backend: "cloudflare", databaseId: settings.databaseId,
     bucketName: settings.bucketName, origin: settings.origin });
@@ -280,9 +281,11 @@ it("confirms the live target before it applies migrations and requires the check
         : { name: rejected === "bucket" ? "different-bucket" : settings.bucketName },
   }) });
   const request = vi.fn(bucket());
+  const bookmark = "00000085-0000024c-00004c6d-8e61117bf38d7adb71b934ebbf891683";
   const provider = ({ secrets = [{ name: "AUTH_SECRET", type: "secret_text" }], applied = migrations,
-    apply = () => "Migrations applied" } = {}) => (command, args) => {
+    apply = () => "Migrations applied", travel = () => JSON.stringify({ bookmark }) } = {}) => (command, args) => {
     if (args[0] === "whoami") return settings.accountId;
+    if (args[0] === "d1" && args[1] === "time-travel") return travel();
     if (args[0] === "d1" && args[1] === "info") return JSON.stringify({ uuid: settings.databaseId, name: settings.databaseName });
     if (args[0] === "secret") return JSON.stringify(secrets);
     if (args[0] === "d1" && args[1] === "migrations") return apply();
@@ -292,10 +295,15 @@ it("confirms the live target before it applies migrations and requires the check
   const applies = (execute) => execute.mock.calls.filter(([, args]) => args[1] === "migrations");
 
   const execute = vi.fn(provider());
-  await prepareApplication(worker, cloudflare, execute, request);
+  const report = vi.fn();
+  await prepareApplication(worker, cloudflare, execute, request, report);
   expect(execute.mock.calls.map(([, args]) => args.slice(0, 2).join(" "))).toEqual([
-    "whoami --config", "d1 info", "secret list", "d1 migrations", "d1 execute",
+    "whoami --config", "d1 info", "secret list", "d1 time-travel", "d1 migrations", "d1 execute",
   ]);
+  expect(execute.mock.calls[3][1]).toEqual(["d1", "time-travel", "info", settings.databaseName, "--json",
+    "--config", worker.config]);
+  expect(report).toHaveBeenCalledWith(`Restore point before migrations: ${bookmark}. To restore it, run: ` +
+    `npx wrangler d1 time-travel restore ${settings.databaseName} --bookmark=${bookmark} --config ${worker.config}`);
   expect(applies(execute)[0][1]).toEqual(["d1", "migrations", "apply", settings.databaseName, "--remote",
     "--config", worker.config]);
   expect(execute.mock.calls[0][2].stdio).toEqual(["ignore", "pipe", "pipe"]);
@@ -316,13 +324,22 @@ it("confirms the live target before it applies migrations and requires the check
     expect(applies(publicBucket)).toHaveLength(0);
   }
 
+  // Without a recorded restore point, no migration starts.
+  for (const travel of [() => { throw new Error("private provider detail"); }, () => "{}",
+    () => JSON.stringify({ bookmark: "$(touch /tmp/never)" })]) {
+    const unrecorded = vi.fn(provider({ travel }));
+    await expect(prepareApplication(worker, cloudflare, unrecorded, request, vi.fn()))
+      .rejects.toThrow("The D1 restore point could not be recorded. No migration started.");
+    expect(applies(unrecorded)).toHaveLength(0);
+  }
+
   const failed = vi.fn(provider({ apply: () => { throw new Error("private migration detail"); } }));
-  await expect(prepareApplication(worker, cloudflare, failed, request)).rejects.toThrow(/migration outcome is unknown/);
+  await expect(prepareApplication(worker, cloudflare, failed, request, vi.fn())).rejects.toThrow(/migration outcome is unknown/);
 
   // An older build after a newer migration sees extra hosted migrations and stops.
   const ahead = vi.fn(provider({ applied: JSON.stringify([{ success: true, results: [
     ...(await currentMigrationNames()), "9999_newer.sql"].map((name) => ({ name })) }]) }));
-  await expect(prepareApplication(worker, cloudflare, ahead, request)).rejects.toThrow(/hosted migrations differ/);
+  await expect(prepareApplication(worker, cloudflare, ahead, request, vi.fn())).rejects.toThrow(/hosted migrations differ/);
 });
 
 it("accepts the former preparation branch after its dependency merged while omitting its app preview", async () => {

@@ -158,7 +158,7 @@ For each ticket, use this sequence:
 6. Run cloud integration checks on the reviewed revision.
 7. Let the user review and merge.
 8. Workers Builds runs ordinary checks. After the merge, the `minsky-dev` trigger checks `main` again, applies new D1 migrations, and publishes the complete Worker.
-   Write D1 migrations that only add tables, columns, or indexes. Coordinate bootstrap, secrets, and activation separately.
+   Write D1 migrations that only add tables, columns, or indexes. `npm test` and the deploy reject a migration that drops or renames schema. Coordinate bootstrap, secrets, and activation separately.
 
 Automatic GitHub Actions publication is removed. Workers Builds publishes `minsky-dev` from `main`.
 Report a manual publication separately from merge. Record its exact source revision.

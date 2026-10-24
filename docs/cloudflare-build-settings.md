@@ -234,10 +234,12 @@ The config disables its preview URLs. Application previews receive no stable dat
 
 `dist/minsky-build.json` records the app build's revision, backend, config path, D1 UUID, bucket name, and origin.
 The upload requires those fields to match the selected deployment.
-Before a Cloudflare upload, the script confirms current account access, D1 metadata, private R2 settings, and `AUTH_SECRET` presence.
+Before a Cloudflare upload, the script checks that no unreviewed D1 migration removes or renames schema. This check is local and runs before any provider call.
+Then it confirms current account access, D1 metadata, private R2 settings, and `AUTH_SECRET` presence.
+Then it reads the database's current Time Travel bookmark with `wrangler d1 time-travel info --json`. It prints the bookmark and the matching restore command. If the bookmark cannot be read, no migration starts.
 Then it runs `wrangler d1 migrations apply` on the confirmed database.
 Then it requires the applied migrations to equal the checkout's migrations. More applied migrations mean that a newer build already ran, so the older build stops.
-Migrations must only add tables, columns, or indexes. A Worker rollback then still runs against the newer schema.
+Migrations must only add schema, so that a Worker rollback still runs against the newer schema. [Change the D1 schema](cloudflare-builds.md#change-the-d1-schema) describes the check and the exception procedure.
 The bucket must have its managed public domain disabled and no custom domain attached.
 Provider diagnostics and secret values are withheld.
 

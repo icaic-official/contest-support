@@ -1,9 +1,8 @@
 import { execFileSync } from "node:child_process";
-import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
 import process from "node:process";
 import { setTimeout } from "node:timers/promises";
-import { pathToFileURL, URL } from "node:url";
+import { pathToFileURL } from "node:url";
 import { isAbsolute, relative, resolve } from "node:path";
 import { isDeepStrictEqual } from "node:util";
 import { readInstallationTarget } from "../src/server/adapters/cloudflare/tooling/configuration.mjs";
@@ -15,11 +14,8 @@ const repository = "GiftedNovaHD/minsky";
 const account = "458ad6a930b0fb717796dfa19ca6a2b1";
 const docsWorker = { name: "minsky-docs", config: "wrangler.docs.jsonc", assets: "site/dist" };
 // Branch previews replace one shared Worker that binds only test resources.
-const previewWorker = {
-  name: "minsky-preview", config: "src/server/adapters/cloudflare/deploy/preview.wrangler.jsonc",
-  databaseName: "minsky-preview", bucketName: "minsky-preview-images",
-  origin: "https://minsky-preview.icaic-minsky.workers.dev",
-};
+const previewWorker = { name: "minsky-preview", config: "src/server/adapters/cloudflare/deploy/preview.wrangler.jsonc" };
+const workerOrigin = (name) => `https://${name}.icaic-minsky.workers.dev`;
 
 /** Workers Builds supplies the pushed branch and commit. A manual run sets the same two values. */
 export function deploymentPlan(env) {
@@ -29,12 +25,7 @@ export function deploymentPlan(env) {
   }
   const branch = env.WORKERS_CI_BRANCH;
   if (!branch || /[\r\n]/.test(branch)) throw new Error("Missing or invalid branch name in WORKERS_CI_BRANCH.");
-  // A hash distinguishes branches that normalize to the same lowercase name.
-  const suffix = createHash("sha256").update(branch).digest("hex").slice(0, 12);
-  const slug = branch.toLowerCase().replace(/[^a-z0-9]+/g, "-")
-    .slice(0, 24).replace(/^-+|-+$/g, "") || "branch";
-  return { branch, sha, preview: branch !== "main",
-    name: `branch-${slug}-${suffix}` };
+  return { branch, sha, preview: branch !== "main" };
 }
 
 export function validateBuildSettings(env) {
@@ -58,33 +49,6 @@ export function isCurrentRevision(plan, execute = execFileSync) {
     throw new Error("The GitHub branch lookup failed.", { cause: error });
   }
   return output.split("\n").includes(`${plan.sha}\t${ref}`);
-}
-
-export function wranglerArguments(worker, plan) {
-  if (!plan.preview || worker.backend) return ["deploy", "--config", worker.config];
-  return ["preview", "--config", worker.config, "--name", plan.name,
-    "--tag", plan.sha, "--ignore-base-config", "--json"];
-}
-
-export function previewAddress(output) {
-  let urls;
-  try {
-    // Wrangler's asset helper can print progress before its --json response.
-    const start = output.search(/^\s*\{/m);
-    if (start < 0) throw new Error();
-    urls = JSON.parse(output.slice(start)).preview?.urls;
-  } catch {
-    throw new Error("Cloudflare did not return valid preview JSON.");
-  }
-  const address = Array.isArray(urls) && urls.find((value) => {
-    try {
-      const url = new URL(value);
-      return url.protocol === "https:" && url.hostname.endsWith(".icaic-minsky.workers.dev") &&
-        !url.username && !url.password && !url.port && url.pathname === "/" && !url.search && !url.hash;
-    } catch { return false; }
-  });
-  if (!address) throw new Error("Cloudflare did not return a Minsky preview URL.");
-  return new URL(address).origin;
 }
 
 /** Return the commit that a Worker serves now, or null when it cannot be read. */
@@ -135,9 +99,11 @@ async function previewTarget(env, installation) {
     throw new Error("A preview build must not receive development target variables.");
   }
   const settings = await installation(previewWorker.config);
+  // Branch code can edit this file. Only the build variable fixes the exact database.
   if (settings.accountId !== account || settings.workerName !== previewWorker.name ||
-      settings.origin !== previewWorker.origin || settings.databaseName !== previewWorker.databaseName ||
-      settings.bucketName !== previewWorker.bucketName || settings.databaseId !== env.MINSKY_PREVIEW_DATABASE_ID) {
+      settings.origin !== workerOrigin(previewWorker.name) ||
+      [settings.databaseName, settings.bucketName].some((name) => !name?.startsWith("minsky-preview")) ||
+      settings.databaseId !== env.MINSKY_PREVIEW_DATABASE_ID) {
     throw new Error("Confirm the exact preview Worker, database, bucket, origin, and account.");
   }
   return { name: previewWorker.name, config: previewWorker.config, assets: "dist", backend: "cloudflare", settings };
@@ -165,7 +131,7 @@ export async function deploymentTargets(env, site = "both", {
     }
     const settings = await installation(path);
     if (settings.accountId !== account || settings.workerName !== "minsky-dev" ||
-        settings.origin !== "https://minsky-dev.icaic-minsky.workers.dev" ||
+        settings.origin !== workerOrigin("minsky-dev") ||
         settings.databaseId !== env.MINSKY_DEV_DATABASE_ID ||
         settings.databaseName !== env.MINSKY_DEV_DATABASE_NAME ||
         settings.bucketName !== env.MINSKY_DEV_BUCKET_NAME ||
@@ -174,7 +140,8 @@ export async function deploymentTargets(env, site = "both", {
     }
     targets.push({ name: "minsky-dev", config: path, assets: "dist", backend: "cloudflare", settings });
   }
-  if (site !== "app") {
+  // The minsky-docs build uploads docs previews for other branches itself.
+  if (site !== "app" && !plan.preview) {
     const config = JSON.parse(read(docsWorker.config, "utf8"));
     if (config.name !== docsWorker.name || config.account_id !== account ||
         config.assets?.directory !== `./${docsWorker.assets}` || config.main ||
@@ -335,18 +302,19 @@ export async function deployWorkers(env, {
   const plan = deploymentPlan(env);
   if (!env.CLOUDFLARE_API_TOKEN) throw new Error("Missing CLOUDFLARE_API_TOKEN.");
   const workers = await targets(env, site, { read });
-  if (site !== "docs" && !workers.some((worker) => worker.backend)) {
+  const app = workers.find((worker) => worker.backend);
+  if (site !== "docs" && !app) {
     report(plan.preview ? "Skipped the application preview. Only the minsky-preview build publishes it."
       : "Skipped the application. The minsky-dev build publishes main.");
   }
+  if (site !== "app" && plan.preview) report("Skipped the docs. The minsky-docs build uploads docs previews.");
   const childEnv = safeWranglerEnvironment(env);
   delete childEnv.GH_TOKEN;
   delete childEnv.GITHUB_TOKEN;
   delete childEnv.AUTH_SECRET;
   if (!workers.length) return;
-  report(!plan.preview ? "Target: stable development sites."
-    : workers.some((worker) => worker.backend) ? `Target: shared preview Worker \`${previewWorker.name}\`.`
-      : `Preview name: \`${plan.name}\`.`);
+  report(app?.name === previewWorker.name ? `Target: shared preview Worker \`${previewWorker.name}\`.`
+    : "Target: stable development sites.");
   for (const worker of workers) {
     if (!await current(plan)) {
       report(`Skipped remaining uploads because ${plan.sha} is no longer the branch's current commit.`);
@@ -363,19 +331,17 @@ export async function deployWorkers(env, {
     const marker = worker.backend ? applicationMarker(worker, plan.sha) : { sha: plan.sha };
     // All branches publish to the preview Worker. Record what it serves before this upload.
     const previous = worker.name === previewWorker.name
-      ? await revision(`https://${worker.name}.icaic-minsky.workers.dev`) : undefined;
+      ? await revision(workerOrigin(worker.name)) : undefined;
     write(`${worker.assets}/minsky-revision.json`, `${JSON.stringify(marker)}\n`);
-    let output;
     try {
-      output = execute("node_modules/.bin/wrangler", wranglerArguments(worker, plan), {
+      execute("node_modules/.bin/wrangler", ["deploy", "--config", worker.config], {
         env: childEnv, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], maxBuffer: 8 * 1024 * 1024,
         timeout: 300_000,
       });
     } catch {
       throw new Error("Worker publication failed. Provider output was withheld. Inspect the exact target before retrying.");
     }
-    const url = plan.preview && !worker.backend
-      ? previewAddress(output) : `https://${worker.name}.icaic-minsky.workers.dev`;
+    const url = workerOrigin(worker.name);
     report(`Published ${worker.name} at ${url} from ${plan.sha}.`);
     if (!await verify(url, marker, globalThis.fetch, setTimeout, previous)) {
       report(`Another build replaced ${worker.name} after this upload. That build verifies its own deployment.`);

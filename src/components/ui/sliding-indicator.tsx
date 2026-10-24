@@ -7,6 +7,7 @@ export const pillIndicator =
 
 const activeSelector = [
   '[data-state="active"]',
+  '[data-state="on"]',
   '[aria-selected="true"]',
   '[aria-pressed="true"]',
   '[aria-current="page"]',
@@ -16,7 +17,7 @@ const activeSelector = [
  * A decorative marker that sits behind the active item of its parent and
  * slides to the next one when the active item changes. Render it as the first
  * child of a container that has `relative isolate`. The active item is the
- * first descendant with `data-state="active"`, `aria-selected`,
+ * first descendant with `data-state="active"` or `"on"`, `aria-selected`,
  * `aria-pressed` or `aria-current="page"`. The component reads the DOM, so
  * it works with Radix Tabs and with plain buttons, and it changes no role or
  * aria attribute.
@@ -97,7 +98,7 @@ export function SlidingIndicator({ className }: { className?: string }) {
       aria-hidden="true"
       data-slot="sliding-indicator"
       className={cn(
-        "pointer-events-none absolute -z-10 opacity-0 data-[placed]:opacity-100 data-[slide=true]:transition-[translate,width,height] data-[slide=true]:duration-(--motion-base) data-[slide=true]:ease-out",
+        "pointer-events-none absolute -z-10 opacity-0 data-[placed]:opacity-100 data-[slide=true]:transition-[translate,width,height,background-color] data-[slide=true]:duration-(--motion-base) data-[slide=true]:ease-out",
         className
       )}
     />

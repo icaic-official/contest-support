@@ -222,6 +222,32 @@ test('contestant tracker: a step fills in over a moment when staff claim the rep
   expect(midway).not.toBe(after);
 });
 
+test('issue composer: the audience switch slides to Internal note and turns amber', async ({ page }) => {
+  const fixture = await signInConsole(page, desktop);
+  await page.locator('[data-issue-row]').first().click();
+  const audience = page.getByRole('group', { name: 'Audience' });
+  const pill = marker(audience);
+  const publicReply = audience.locator('label', { hasText: 'Public reply' });
+  const internalNote = audience.locator('label', { hasText: 'Internal note' });
+  const fill = () => pill.evaluate((element) => getComputedStyle(element).backgroundColor);
+  await expect.poll(() => gap(pill, publicReply, 'box')).toBeLessThan(1.5);
+  const white = await fill();
+
+  await internalNote.click();
+  await freezeMidway(pill);
+  const midway = await pill.boundingBox();
+  const target = await internalNote.boundingBox();
+  const from = await publicReply.boundingBox();
+  if (!midway || !target || !from) throw new Error('Missing box.');
+  expect(midway.x).toBeGreaterThan(from.x + 5);
+  expect(midway.x).toBeLessThan(target.x);
+  expect(await fill(), 'the color changes on the way').not.toBe(white);
+  await finishAnimations(pill);
+  await expect.poll(() => gap(pill, internalNote, 'box')).toBeLessThan(1.5);
+  await expect(page.getByRole('radio', { name: 'Internal note' })).toBeChecked();
+  expect(fixture.errors).toEqual([]);
+});
+
 test('phone tab bar: the marker slides along the top edge to the selected tab', async ({ page }) => {
   const fixture = await signInConsole(page, phone);
   const nav = page.getByRole('navigation', { name: 'Organiser sections' });

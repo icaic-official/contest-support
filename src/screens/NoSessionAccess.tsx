@@ -1,5 +1,6 @@
 import { LogOut, RefreshCw } from "lucide-react";
 import { BrandMark } from "@/components/brand";
+import { BuildId } from "@/components/build-id";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -132,6 +133,9 @@ export function NoSessionAccess({
           </Card>
         )}
       </div>
+      <p className="px-4 py-2 text-center text-xs text-muted-foreground">
+        <BuildId />
+      </p>
     </div>
   );
 }

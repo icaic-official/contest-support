@@ -78,6 +78,7 @@ test("a report travels from the contestant through support, the jury and externa
 
     // The contestant reports an issue on the desktop. The timer starts.
     const contestant = await signIn(browser, local, "contestant", desktop);
+    await expect(contestant.getByText(/^Build [0-9a-f]{7}$|^Build unknown$/)).toBeVisible();
     await contestant
       .getByRole("complementary", { name: "Your reports" })
       .getByRole("button", { name: "Report an issue" })

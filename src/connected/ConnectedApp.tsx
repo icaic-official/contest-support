@@ -1,6 +1,7 @@
 import { type MouseEvent, type ReactNode, useState } from "react";
 import { useNavigate } from "react-router";
 import { BrandMark } from "@/components/brand";
+import { BuildId } from "@/components/build-id";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -186,7 +187,8 @@ export function ConnectedApp() {
             >
               Documentation{" "}
               <span className="sr-only">(opens in a new tab)</span>↗
-            </a>
+            </a>{" "}
+            · <BuildId />
           </footer>
         )}
       </div>

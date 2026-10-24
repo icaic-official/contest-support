@@ -171,6 +171,7 @@ Then confirm all of the following:
 - The build log runs `npm run ci` and exits zero.
 - The deploy log prints `Published minsky-dev at https://minsky-dev.icaic-minsky.workers.dev` and `The revision and deployment checks passed for minsky-dev.`
 - `https://minsky-dev.icaic-minsky.workers.dev/minsky-revision.json` shows the commit of `main` and `"backend":"cloudflare"`.
+- The footer of every screen shows `Build` and the first seven characters of that commit. Hover over it to see the full hash.
 
 The first build applies every migration that `minsky-development` does not have yet.
 

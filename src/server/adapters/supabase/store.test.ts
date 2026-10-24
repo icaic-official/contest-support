@@ -164,7 +164,7 @@ beforeAll(async () => {
     "insert into public.teams(id,session_id,name,location) values($1,$4,'Aurora','A12'),($2,$4,'Cedar','A18'),($3,$5,'Other session','B01')",
     [aurora, cedar, id(203), session, secondSession],
   );
-}, 30000);
+});
 beforeEach(async () => {
   await db.exec("reset role");
   await db.exec(

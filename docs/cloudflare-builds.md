@@ -248,6 +248,8 @@ The configuration is `src/server/adapters/cloudflare/deploy/preview.wrangler.jso
 ### Prepare the preview token
 
 The `minsky-preview` Worker must exist before you can limit a token to it.
+It exists since 2026-10-24, with `AUTH_SECRET`, all migrations, and a test admin account.
+Until its first build, it serves a placeholder that returns `503`. A local `wrangler deploy` through an authenticating proxy cannot upload static assets, so the first full publication runs in Workers Builds.
 Create an account API token in **Manage Account > Account API Tokens > Create token > Custom token**:
 
 - **Workers**: **Editor**. Set the scope to **Specified Workers** and select only `minsky-preview`.

@@ -96,13 +96,13 @@ The combined build time of checks and publication is not measured yet. It must s
 ## Preview Workers Builds
 
 The `minsky-preview` Worker publishes branch previews. [Publish branch previews](cloudflare-builds.md#publish-branch-previews) explains the behavior and the dashboard steps.
-These settings take effect when the owner connects the trigger.
+The trigger is not connected yet. These settings take effect when the owner connects it.
 
 | Setting | Value |
 | --- | --- |
 | Worker | `minsky-preview` |
 | Branches | Production branch `main`, which builds but does not publish. Builds for other branches are enabled. Branches that match `dependabot/*` are excluded. |
-| Build command | `npm run ci` |
+| Build command | `env -u CLOUDFLARE_API_TOKEN -u CLOUDFLARE_API_KEY npm ci`. It installs dependencies without the token and runs no checks. |
 | Deploy command | `npm run deploy` for every branch |
 | Root directory | Repository root |
 | API token | Account token in [Prepare the preview token](cloudflare-builds.md#prepare-the-preview-token), limited to `minsky-preview` and `minsky-preview-images`. Never the `minsky-dev` token. |

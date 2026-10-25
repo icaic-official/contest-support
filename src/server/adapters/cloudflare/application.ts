@@ -91,6 +91,8 @@ interface AdminGate { id: string; caller: Caller; statements: D1Statement[] }
 // Each section reads the one `access` row once. As the inner table of a join,
 // it would be read again for every row of the section. The audit section takes
 // its key from `access`, so a caller who is not an admin reads no audit row.
+// A team member reads the own team by key. The memberships foreign key keeps
+// that team in the same session.
 export const snapshotSql = `WITH login AS (${currentReadyLoginSql}), access AS MATERIALIZED (${currentAccessSql}),
   visible_issues AS MATERIALIZED (
     SELECT i.* FROM access a CROSS JOIN issues i WHERE i.session_id = ? AND i.team_id = a.team_id
@@ -107,8 +109,9 @@ SELECT json_object(
   'membership', (SELECT json_object('session_id', ?, 'user_id', account_id,
     'team_id', team_id, 'roles', json(roles), 'is_admin', json(CASE WHEN is_admin THEN 'true' ELSE 'false' END)) FROM access),
   'teams', json(COALESCE((SELECT json_group_array(json(row)) FROM (
-    SELECT json_object('id', t.id, 'session_id', t.session_id, 'name', t.name, 'location', t.location) AS row
-    FROM teams t CROSS JOIN access a WHERE t.session_id = ? AND (a.staff = 1 OR t.id = a.team_id) ORDER BY t.name, t.id)), '[]')),
+    SELECT json_object('id', id, 'session_id', session_id, 'name', name, 'location', location) AS row FROM (
+      SELECT t.* FROM access a CROSS JOIN teams t WHERE a.staff = 1 AND t.session_id = ?
+      UNION ALL SELECT t.* FROM access a JOIN teams t ON t.id = a.team_id) ORDER BY name, id)), '[]')),
   'issues', json(COALESCE((SELECT json_group_array(json(row)) FROM (
     SELECT json_object('id', i.id, 'number', i.number, 'session_id', i.session_id,
       'team_id', i.team_id, 'reporter', i.reporter, 'reporter_name', i.reporter_name,

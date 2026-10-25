@@ -268,9 +268,7 @@ export function issueAbilities(
       issue.status === "escalated" &&
       member.roles.includes("specialist") &&
       issue.owner !== member.user_id,
-    resolve:
-      (issue.status === "claimed" || issue.status === "escalated") &&
-      (owner || member.is_admin),
+    resolve: active && (owner || member.is_admin),
     reopen: !active && (support || member.team_id === issue.team_id),
     reply: active && (support || jury),
     internalNotes: staff,

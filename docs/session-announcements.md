@@ -32,10 +32,15 @@ This page is the reference for the behavior.
 - Each announcement shows its publisher and the server publication time.
   After a change, it shows the latest editor and time.
 - Editing keeps the original publisher and time.
-- A removed or expired announcement leaves the readers' list.
-  Managers keep it with its text, attribution, the removal actor and time, and an **Active**, **Expired**, or **Removed** label.
+- An expired announcement leaves the readers' list. Managers keep it with an **Active** or **Expired** label.
 - Managers can edit an expired announcement. They activate it again by clearing or extending its expiry.
-  The text and attribution of a removed announcement are read-only. Managers can still remove its images.
+- **Remove** opens a prompt. The prompt says that the announcement leaves the strip for everyone, managers included, and that Minsky keeps the record for the contest log.
+  **Remove announcement** removes it. **Keep announcement** closes the prompt.
+  When the prompt opens, focus moves to **Keep announcement**. When the prompt closes, focus returns to **Remove**. After a removal, focus moves to **New announcement**.
+- A removed announcement leaves the strip for every member, managers included. Nobody can open its images in the app.
+- Minsky keeps the record of a removed announcement: its text, attribution, images, stored files, and the removal actor and time.
+  Nobody can edit it, add images to it, or remove its images.
+  A later export of the contest support log is future work.
 - An archived event stays readable and rejects every announcement and image write.
 - Outside this ticket: text history, read receipts, targeted audiences, scheduled publication, and push notifications.
 
@@ -47,7 +52,7 @@ The manager chooses **Keep my draft** or **Load latest text**.
 Keeping the draft preserves its title, details, and expiry, and accepts the reviewed version as the base of the next save.
 Loading the latest text replaces the draft only when the manager chooses it.
 Another change before the save needs another review.
-If the announcement was removed, the draft stays but cannot be saved.
+If another manager removes the announcement, the draft stays but cannot be saved.
 Adding or removing an image also changes the revision.
 
 ## Images
@@ -63,7 +68,7 @@ Adding or removing an image also changes the revision.
   A retry or an overlapping request can publish it. Pending files stay unreadable.
   Cleanup of expired reservations removes unused files. No failed request deletes a file that another request can still publish.
 - Removing an image deletes its stored file and keeps its metadata.
-  Removing or expiring an announcement keeps its images for managers.
+  Expiring an announcement keeps its images for managers. Removing an announcement keeps its images and files, but nobody can open them in the app.
 
 ## Backend and updates
 
@@ -98,7 +103,7 @@ Text of 10,000 characters can use up to 40,000 bytes in UTF-8.
 | Layer | Command | Covers |
 | --- | --- | --- |
 | Unit | `npm test` | The D1 and R2 services with local bindings. The browser adapter. Draft and expiry rules. |
-| Local browser | `npm run test:e2e` | Live titles, keyboard disclosure, a report draft during a live change, slow reads, removal, competing edits, the two-announcement list, hiding the strip, and a 390 px layout. The Worker announcement service runs on local D1. Identity and the live socket are simulated. |
+| Local browser | `npm run test:e2e` | Live titles, keyboard disclosure, a report draft during a live change, slow reads, removal with its prompt and focus, a draft during another manager's removal, competing edits, the two-announcement list, hiding the strip, and a 390 px layout. The Worker announcement service runs on local D1. Identity and the live socket are simulated. |
 
 These checks do not cover hosted Cloudflare, image transfers in a browser, other browsers, screen readers, or physical devices.
 The shared provider verification protocol does not cover announcements yet.

@@ -71,6 +71,7 @@ The Cloudflare implementations remain inside provider adapter modules.
 
 The application Worker constructs [D1 application access](../src/server/adapters/cloudflare/application.ts), [R2 images](../src/server/adapters/cloudflare/images.ts), [D1 announcements](../src/server/adapters/cloudflare/announcements.ts), [R2 announcement images](../src/server/adapters/cloudflare/announcementImages.ts), [R2 account avatars](../src/server/adapters/cloudflare/avatars.ts), and [live delivery](../src/server/adapters/cloudflare/live.ts).
 See [session announcements](session-announcements.md) for the announcement rules.
+Removal keeps the announcement row, its image rows, and their R2 objects for a future contest log export.
 The [browser adapter](../src/backend/cloudflare/backend.ts) implements every `Backend` group.
 Issue decisions remain shared. Other operations preserve their behavior in the corresponding provider server adapter.
 The [operator tooling](../src/server/adapters/cloudflare/tooling/install.mjs) owns Cloudflare configuration, target checks, bootstrap, and owner recovery.

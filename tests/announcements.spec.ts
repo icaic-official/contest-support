@@ -71,18 +71,48 @@ test("slow announcement reads never delay reporting", async ({ browser, local })
   await expect.poll(() => local.bodies("/api/workflow").length, { timeout: 3000 }).toBe(1);
 });
 
-test("removed announcements leave readers and stay with managers", async ({ browser, local }) => {
+test("a confirmed removal hides the announcement from everyone and keeps its record", async ({ browser, local }) => {
   const admin = await signIn(browser, local, "admin");
   const contestant = await signIn(browser, local, "contestant");
   await publish(admin, "Temporary notice", "Short lived.");
   await expect(contestant.getByRole("button", { name: "Temporary notice" })).toBeVisible();
   await admin.getByRole("button", { name: "Temporary notice" }).click();
-  await admin.getByRole("button", { name: "Remove", exact: true }).click();
-  await admin.getByRole("button", { name: "Confirm removal" }).click();
+  const remove = admin.getByRole("button", { name: "Remove", exact: true });
+  await remove.click();
+  const prompt = admin.getByRole("group", { name: /leaves the announcement strip for everyone/ });
+  await expect(prompt).toContainText("Minsky keeps the record for the contest log.");
+  const keep = prompt.getByRole("button", { name: "Keep announcement" });
+  await expect(keep).toBeFocused();
+  await keep.click();
+  await expect(prompt).toHaveCount(0);
+  await expect(remove).toBeFocused();
+
+  await remove.click();
+  await prompt.getByRole("button", { name: "Remove announcement" }).click();
+  await expect(admin.getByRole("button", { name: /Temporary notice/ })).toHaveCount(0);
   await expect(contestant.getByRole("button", { name: "Temporary notice" })).toHaveCount(0);
-  await expect(admin.getByRole("button", { name: /Temporary notice/ })).toContainText("Removed");
-  await expect(admin.getByText(/Removed by Test admin/)).toBeVisible();
-  await expect(admin.getByRole("button", { name: "Edit" })).toHaveCount(0);
+  await expect(admin.getByRole("button", { name: "New announcement" })).toBeFocused();
+  expect(await local.rows("SELECT details, removed_name, removed_at IS NOT NULL AS stamped FROM announcements WHERE title = ? AND session_id IN (?, ?)",
+    "Temporary notice", ...local.sessions)).toEqual([{ details: "Short lived.", removed_name: "Test admin", stamped: 1 }]);
+});
+
+test("an open edit keeps its draft when another manager removes the announcement", async ({ browser, local }) => {
+  const first = await signIn(browser, local, "admin");
+  const second = await signIn(browser, local, "jury");
+  await publish(first, "Schedule", "Original details.");
+  await first.getByRole("button", { name: "Schedule" }).click();
+  await first.getByRole("button", { name: "Edit", exact: true }).click();
+  const draft = first.locator("form").filter({ hasText: "Edit announcement" });
+  await draft.getByLabel("Details").fill("My unsent draft.");
+  await second.getByRole("button", { name: "Schedule" }).click();
+  await second.getByRole("button", { name: "Remove", exact: true }).click();
+  await second.getByRole("button", { name: "Remove announcement" }).click();
+
+  await expect(first.getByText("Another manager removed this announcement.", { exact: false })).toBeVisible();
+  await expect(draft.getByLabel("Details")).toHaveValue("My unsent draft.");
+  await expect(draft.getByRole("button", { name: "Save changes" })).toBeDisabled();
+  await draft.getByRole("button", { name: "Cancel edit" }).click();
+  await expect(draft).toHaveCount(0);
 });
 
 test("a competing edit asks for a review and never overwrites silently", async ({ browser, local }) => {

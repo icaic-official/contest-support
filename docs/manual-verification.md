@@ -523,7 +523,9 @@ Use two browser windows for the live checks. Run these checks after a reviewed d
 8. Remove one image. Check that readers lose it and the manager list shows one fewer.
 9. Set an expiry about one minute ahead. After it passes, check that readers lose the announcement within 15 seconds and the manager still sees **Expired**.
    Clear the expiry and check that readers see it again.
-10. Remove an announcement. Check that readers lose it, the manager sees **Removed** with the remover, and it has no **Edit** control.
+10. Use only the keyboard to select **Remove** on an announcement with an image. Check that the prompt says that the announcement leaves the strip for everyone and that Minsky keeps the record.
+    Check that focus is on **Keep announcement**. Select it and check that focus returns to **Remove**.
+    Select **Remove**, then **Remove announcement**. Check that every member, managers included, loses the announcement, and that focus moves to **New announcement**.
 11. Reload each window. Check that the state is unchanged and the reporting form never waited for announcements.
 12. At 320 px and 390 px wide, check that the announcement strip wraps, scrolls inside its area, and causes no horizontal page scroll.
     In a window about 1280 by 720 px, open **New announcement** and **Edit**. Check that every field and the **Publish** or **Save changes** button shows without scrolling inside the strip.

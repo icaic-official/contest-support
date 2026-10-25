@@ -67,7 +67,8 @@ export function Workspace({
   return (
     <AvatarProvider data={data} userId={props.user.id}>
       <div className="flex h-dvh flex-col">
-        <Announcements data={data} />
+        {/* Drafts and prompts belong to one session. */}
+        <Announcements key={data.sessionId} data={data} />
         {/* A crash in one UI keeps the announcements and build id visible. */}
         <div className="min-h-0 flex-1">
           <RenderErrorBoundary scope="region" resetKey={pathname}>

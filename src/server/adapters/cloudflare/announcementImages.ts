@@ -203,7 +203,9 @@ export class R2AnnouncementImageService {
       if (row.state !== (abandon ? 'pending' : 'ready')) throw new ImageRequestError('Image unavailable.', { validation: true });
       const guard = crypto.randomUUID();
       await this.batch(guard, caller, sessionId, [
-        announcementAssertion(this.db, `${guard}:state`, 'SELECT 1 FROM announcement_images WHERE id = ? AND state = ?', id, abandon ? 'pending' : 'ready'),
+        // A removed announcement keeps its images for the contest log. An unfinished upload can still be abandoned.
+        announcementAssertion(this.db, `${guard}:state`, `SELECT 1 FROM announcement_images x JOIN announcements a ON a.id = x.announcement_id
+          WHERE x.id = ? AND x.state = ? AND (? = 1 OR a.removed_at IS NULL)`, id, abandon ? 'pending' : 'ready', Number(abandon)),
         this.statement(`UPDATE announcement_images SET state = ?, deleted_by = ?, deleted_at = ${announcementNow} WHERE id = ?`,
           abandon ? 'abandoned' : 'deleting', caller.accountId, id),
         this.statement('INSERT INTO announcement_image_deletions (image_id) VALUES (?) ON CONFLICT DO NOTHING', id),
@@ -228,7 +230,7 @@ export class R2AnnouncementImageService {
     if (!parsed.success) throw new ImageRequestError('Image unavailable.', { validation: true });
     const [sessionId, , , id] = parsed.data;
     const allowed = (row: Image) => row.state === 'ready' && path === row.object_key && !!row.content_type &&
-      (row.manager || !row.announcement_removed && !row.announcement_expired);
+      !row.announcement_removed && (row.manager || !row.announcement_expired);
     const row = await this.image(caller, sessionId, id);
     if (!allowed(row)) throw new ImageRequestError('Image unavailable.', { validation: true });
     const object = await this.bucket.get(path);

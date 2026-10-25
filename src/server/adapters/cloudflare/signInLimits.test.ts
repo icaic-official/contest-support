@@ -7,8 +7,8 @@ import applicationWorker, { type ApplicationEnvironment } from './applicationWor
 import { signInFailureLimits } from './authentication';
 
 vi.mock('cloudflare:workers', () => ({ WorkerEntrypoint: class {} }));
-// The maintained scrypt hasher takes about 100 ms per password. These tests
-// sign in more than a thousand times, so they use a fast stand-in.
+// The maintained scrypt hasher takes about 100 ms per password. A fast
+// stand-in keeps these tests about limits, not hashing cost.
 vi.mock('./password', async (importOriginal) => {
   const hash = (password: string) => createHash('sha256').update(`fixture:${password}`).digest('hex');
   return {

@@ -37,17 +37,42 @@ export function canOpenPage(page: WorkspacePage, member: Membership): boolean {
   return true;
 }
 
-/** Moves focus after navigation, including browser Back and Forward. */
+/** Router state that asks the next page to focus one control. */
+interface FocusRequest {
+  focusId: string;
+}
+
+/** The state to pass to `navigate` so that the page focuses the control with this ID. */
+export function focusRequest(focusId: string): FocusRequest {
+  return { focusId };
+}
+
+/** The control that the location asks the page to focus, if any. */
+export function requestedFocusId(state: unknown): string | undefined {
+  if (typeof state !== "object" || state === null) return undefined;
+  const { focusId } = state as Partial<FocusRequest>;
+  return typeof focusId === "string" ? focusId : undefined;
+}
+
+/**
+ * Moves focus after navigation, including browser Back and Forward. An
+ * address with a fragment, such as `/account#security`, names a place inside
+ * the page. The page then moves focus itself.
+ */
 export function useRouteFocus(headingId: string, ready: boolean): void {
-  const { pathname } = useLocation();
+  const { pathname, hash } = useLocation();
   const previous = useRef<string | undefined>(undefined);
   useEffect(() => {
     if (!ready || previous.current === pathname) return;
+    if (hash) {
+      previous.current = pathname;
+      return;
+    }
     // Menus restore trigger focus when they close. Focus the new page afterward.
     const frame = window.requestAnimationFrame(() => {
       previous.current = pathname;
       document.getElementById(headingId)?.focus();
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [headingId, pathname, ready]);
+  }, [hash, headingId, pathname, ready]);
 }

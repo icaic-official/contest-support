@@ -1,9 +1,8 @@
-import { useId, useRef } from "react";
+import { useId } from "react";
 import {
   ChartNoAxesColumn,
   ChevronRight,
   ChevronsUpDown,
-  ExternalLink,
   Inbox,
   KeyRound,
   LogOut,
@@ -11,7 +10,6 @@ import {
   MapPin,
   Monitor,
   Moon,
-  MoreVertical,
   PanelLeft,
   Plus,
   Scale,
@@ -40,12 +38,9 @@ import {
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Switch } from "@/components/ui/switch";
@@ -84,8 +79,6 @@ const pageIcons: Record<ConsolePage, LucideIcon> = {
   accounts: Users,
   settings: Settings2,
 };
-
-const docsUrl = "https://minsky-docs.icaic-minsky.workers.dev";
 
 /**
  * The event and session at the top of the sidebar. With several sessions it
@@ -171,16 +164,15 @@ function SessionSwitcher({
 
 /**
  * The collapsible sidebar: the session switcher, navigation by combined
- * roles, the intake switch for admins and the person card with its menu.
- * When collapsed, the links show icons with tooltips and keep their names
- * for screen readers.
+ * roles, the intake switch for admins and the person card, which opens the
+ * account page. When collapsed, the links show icons with tooltips and keep
+ * their names for screen readers.
  */
 export function ConsoleSidebar({
   state,
   data,
   member,
   personName,
-  account,
   groups,
   counts,
   page,
@@ -189,15 +181,13 @@ export function ConsoleSidebar({
   locked,
   onSessionChange,
   intake,
-  onChangePassword,
+  accountPage,
   onAccount,
-  onSignOut,
 }: {
   state: Snapshot;
   data: SessionData;
   member: Membership;
   personName: string;
-  account: string;
   groups: readonly ConsoleNavGroup[];
   counts: Partial<Record<ConsolePage, number>>;
   page: ConsolePage | undefined;
@@ -211,12 +201,40 @@ export function ConsoleSidebar({
     disabled: boolean;
     onChange: (open: boolean) => void;
   };
-  onChangePassword: () => void;
+  /** True while the account page is open. */
+  accountPage: boolean;
   onAccount: () => void;
-  onSignOut: () => void;
 }) {
   const id = useId();
-  const openingAccount = useRef(false);
+  const accountButton = (
+    <button
+      type="button"
+      aria-label={`Account settings for ${personName}`}
+      aria-current={accountPage ? "page" : undefined}
+      onClick={onAccount}
+      className={cn(
+        "flex h-12 w-full items-center gap-2 rounded-md px-2 text-left outline-none focus-visible:ring-[3px] focus-visible:ring-sidebar-ring/50",
+        accountPage
+          ? "bg-sidebar-accent text-sidebar-accent-foreground"
+          : "hover:bg-sidebar-accent",
+        collapsed && "justify-center",
+      )}
+    >
+      <PersonAvatar name={personName} />
+      <span className={cn("min-w-0 flex-1", collapsed && "sr-only")}>
+        <span className="block truncate text-sm font-medium">{personName}</span>
+        <span className="block truncate text-xs text-muted-foreground">
+          {roleNames(member)}
+        </span>
+      </span>
+      {!collapsed && (
+        <ChevronRight
+          aria-hidden="true"
+          className="size-4 text-muted-foreground"
+        />
+      )}
+    </button>
+  );
   return (
     <aside
       aria-label="Console"
@@ -326,76 +344,16 @@ export function ConsoleSidebar({
         </div>
       )}
       <div className="border-t p-2">
-        <DropdownMenu>
-          <DropdownMenuTrigger
-            className={cn(
-              "flex h-12 w-full items-center gap-2 rounded-md px-2 text-left outline-none hover:bg-sidebar-accent focus-visible:ring-[3px] focus-visible:ring-sidebar-ring/50",
-              collapsed && "justify-center",
-            )}
-            aria-label={`Account menu for ${personName}`}
-          >
-            <PersonAvatar name={personName} />
-            <span className={cn("min-w-0 flex-1", collapsed && "sr-only")}>
-              <span className="block truncate text-sm font-medium">
-                {personName}
-              </span>
-              <span className="block truncate text-xs text-muted-foreground">
-                {roleNames(member)}
-              </span>
-            </span>
-            {!collapsed && (
-              <MoreVertical
-                aria-hidden="true"
-                className="size-4 text-muted-foreground"
-              />
-            )}
-          </DropdownMenuTrigger>
-          <DropdownMenuContent
-            side="top"
-            align="start"
-            className="w-60"
-            onCloseAutoFocus={(event) => {
-              if (!openingAccount.current) return;
-              event.preventDefault();
-              openingAccount.current = false;
-            }}
-          >
-            <DropdownMenuLabel className="font-normal">
-              <span className="block font-medium">{personName}</span>
-              <span className="block font-mono text-xs text-muted-foreground">
-                {account}
-              </span>
-            </DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuGroup>
-              <DropdownMenuItem
-                onSelect={() => {
-                  openingAccount.current = true;
-                  onAccount();
-                }}
-              >
-                <UserRoundCheck aria-hidden="true" />
-                My account
-              </DropdownMenuItem>
-              <DropdownMenuItem onSelect={onChangePassword}>
-                <KeyRound aria-hidden="true" />
-                Change password
-              </DropdownMenuItem>
-              <DropdownMenuItem asChild>
-                <a href={docsUrl} target="_blank" rel="noopener noreferrer">
-                  <ExternalLink aria-hidden="true" />
-                  Documentation
-                  <span className="sr-only">(opens in a new tab)</span>
-                </a>
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onSelect={onSignOut}>
-                <LogOut aria-hidden="true" />
-                Sign out
-              </DropdownMenuItem>
-            </DropdownMenuGroup>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        {collapsed ? (
+          <Tooltip>
+            <TooltipTrigger asChild>{accountButton}</TooltipTrigger>
+            <TooltipContent side="right">
+              {personName} · Account settings
+            </TooltipContent>
+          </Tooltip>
+        ) : (
+          accountButton
+        )}
       </div>
     </aside>
   );

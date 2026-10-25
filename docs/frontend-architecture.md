@@ -100,14 +100,14 @@ The same authorized snapshot selects the interface and checks route access.
 | `/administration` | Phone **Session** or desktop **Overview** for a current session administrator. |
 | `/administration/accounts` | Account administration for a current session administrator. |
 | `/administration/settings` | Session settings for a current session administrator. |
-| `/account` | Phone **Me**, desktop **My account**, or the contestant's account details. |
+| `/account` | Phone **Me**, or the **My account** settings page in the desktop console and the contestant app. `/account#security` opens the **Security** section and focuses **Current password**. |
 
 Navigation controls update the address and browser history.
 Direct paths remain through sign-in and required password changes.
 Reload retains the section and reads current session data.
 A full reload discards unsent drafts, queue filters, and uncertain requests.
 Browser Back and Forward restore the section.
-A voluntary password change opens from `/account`. Completion and cancellation retain that path.
+The desktop console and the contestant app change the password in place, in the **Security** section of `/account`. The phone **Me** tab opens a full-screen form instead. Completion and cancellation of that form retain `/account`.
 
 Route checks wait for a loaded snapshot with current membership.
 An unavailable section returns to `/issues`.
@@ -140,7 +140,7 @@ Each shell receives `ShellProps` from `src/connected/shell.ts`:
 | `user` | The `AccountIdentity` from `src/backend/contracts.ts`: `id`, with optional `email` and `name`. |
 | `username` | The organizer-assigned username, or `null` for an older email login. |
 | `data` | The `SessionData` from `useSessionSnapshot`. |
-| `changePassword()` | Opens the voluntary password change screen. |
+| `changePassword()` | Opens the full-screen password change. Only the phone **Me** tab uses it. The console and the contestant app change the password on the account page. |
 | `signOut()` | Signs out. |
 
 Each shell calls `useWorkflowState(data)` once. It calls it above any layout switch.
@@ -175,8 +175,8 @@ Use these values in every UI so that the text stays the same.
 
 | File | Content |
 | --- | --- |
-| `ContestantApp.tsx` | The shell. It holds the selected report, the open report form and the drafts of reports, replies and reopen reasons. Navigation moves focus to the main heading. Errors and **Retry last request** show at the top of the report area and stay in view during scrolling. |
-| `ContestantTopBar.tsx` | Event, session (a session menu when the team has more than one session), **Live** or **Reconnecting**, theme menu and the account menu with **Change password** and **Sign out**. |
+| `ContestantApp.tsx` | The shell. It holds the selected report, the open report form and the drafts of reports, replies and reopen reasons. Navigation moves focus to the main heading. Errors and **Retry last request** show at the top of the report area and stay in view during scrolling. On `/account` it shows the [account page](#account-page) in a scroll container of its own, under the top bar. |
+| `ContestantTopBar.tsx` | Event, session (a session menu when the team has more than one session), **Live** or **Reconnecting**, theme menu and the account menu with **My account**, **Change password** and **Sign out**. **Change password** opens `/account#security`. |
 | `ReportList.tsx` | The team's reports, newest first, with a status badge, timer, number, category and age. |
 | `IssuePage.tsx` | The headline, report, unresolved timer, tracker, resolution cards, reopen form, award card, messages, images and the reply box. |
 | `ReportForm.tsx` | Category tiles with one generic icon, the description (up to 2,000 characters) and the team's location. |
@@ -185,7 +185,7 @@ Use these values in every UI so that the text stays the same.
 These rules apply:
 
 - The contestant UI shows only public history and images with team visibility. The server already omits internal notes and staff-only images for team accounts. `publicHistory()` and `teamImages()` filter them a second time.
-- The history table has no type column. `conversation()` identifies workflow events by their fixed text, or by the timestamp of the related record when the text contains free input. All other entries show as chat messages.
+- The history table has no type column. `workflowEvent()` in `src/connected/historyEvents.ts` identifies workflow events by their fixed text, or by the timestamp of the related record when the text contains free input. `conversation()` shows all other entries as chat messages. The account page uses the same rule to count messages.
 - The timer uses `unresolvedTime()` from `model.ts`. It stops on resolution and continues on reopening. Resolved intervals are not counted.
 - **Report an issue** is disabled with a reason when contestant intake is closed or the event is archived. Reply and reopen are not available in an archived event.
 - The reply box sends with Enter and adds a line with Shift+Enter. The draft is cleared only when the server records the message, also after **Retry last request** (T0012).
@@ -253,7 +253,7 @@ It uses the same hooks, rules and forms as the phone app. It adds no workflow ru
 | File | Content |
 | --- | --- |
 | `OrganiserDesktopConsole.tsx` | The shell. It holds the page, the sidebar state, the sheet tab, the command palette, the report dialog, the queue team filter and the reply drafts. These stay in memory while the snapshot is missing. It also handles ⌘K or Ctrl+K and the J and K keys. |
-| `ConsoleChrome.tsx` | `ConsoleSidebar` (session switcher, pages by role, intake switch for admins, person menu with **Change password**, **Documentation** and **Sign out**), `ConsoleTopBar` (sidebar button, breadcrumb, palette button, **Live** or **Reconnecting**, theme menu) and `CommandPalette`. |
+| `ConsoleChrome.tsx` | `ConsoleSidebar` (session switcher, pages by role, intake switch for admins, and the person card that opens `/account`), `ConsoleTopBar` (sidebar button, breadcrumb, palette button, **Live** or **Reconnecting**, theme menu) and `CommandPalette`. |
 | `QueuePages.tsx` | `QueuePage` (status cards, status tabs with counts, T0008 team filter, issue table), `MinePage`, `HandoffsPage`, `TeamsPage` and the shared `PageHeader`. |
 | `IssueTable.tsx` | `IssueTable` (number, status with icon and label, report and category, team and location, owner, aging timer, **Claim** or **Accept**) and `StatCards`. |
 | `IssueSheet.tsx` | The issue side sheet: timer cards, owner, lifecycle steps with times, handoff banner, actions, the Activity, Images and Outcome & award tabs and the reply composer. |
@@ -284,6 +284,33 @@ These rules apply:
 - The command palette finds issues by number (`31`, `#31`, `ISS-31`) or by report text from three characters, teams and tables with the T0008 search, pages and actions. A team opens the queue with that team filter. A jury-only member goes to Teams & tables instead.
 - The intake switch in the sidebar and the admin pages share one `useSessionAdmin`, so one admin request runs at a time. Admin errors and notices show at the top of the page and in the open dialog.
 - The sidebar choice (expanded or collapsed) is kept in local storage under `minsky:console-sidebar`.
+
+## Account page
+
+`AccountPage` is the settings page at `/account` for the signed-in person in the selected session.
+The desktop console and the contestant app both render it. The caller provides the scroll container and the page padding.
+The phone app keeps its own **Me** tab.
+
+| File | Content |
+| --- | --- |
+| `src/connected/AccountPage.tsx` | The page header (avatar, name or team name, login, role badges and **Sign out**), the section nav, and the focus rules for `#section` addresses. It also exports `useOpenPasswordChange()`. |
+| `src/connected/AccountSections.tsx` | One component for each section: Profile, Access, Sessions, Security, Appearance, Activity and Help. |
+| `src/connected/accountModel.ts` | Pure rules: `accountKind()`, the role descriptions in `capabilityInfo`, the section list `accountSections`, `accountName()` and `accountActivity()`. `accountModel.test.ts` tests them. |
+| `src/connected/historyEvents.ts` | `workflowEvent()`, which tells a workflow step from a message that a person wrote. |
+| `src/screens/PasswordForm.tsx` | `PasswordChangeForm`, the password fields and their checks. The full-screen `PasswordForm` and the Security section both use it. |
+| `src/lib/links.ts` | `documentationUrl`, the one address of the published guides. |
+| `src/components/theme-toggle.tsx` | `themeOptions`, the one list of theme choices for every theme picker. |
+
+These rules apply:
+
+- The page shows only data that the account and the session snapshot already hold. It changes no profile data. The name, the username and the account ID cannot be edited.
+- `accountSections` gives the section order and the section nav. A team account has no staff roles. Its **Access** section describes what a team account can do. It shows no role badges and no link to **Accounts**.
+- A session admin sees **Manage session accounts**. The link goes to `/administration/accounts`. The backend still checks every request.
+- **Sessions** lists the sessions that the account can open. **Switch** is disabled while a workflow command runs. After the switch, the caller clears its own selection. The console passes `changeSession`. The contestant app passes `resetForSession`.
+- **Security** changes the password in place. On success the fields clear and a status message shows. The person stays on `/account` and stays signed in. The Supabase adapter keeps the current session. The Cloudflare adapter replaces the login cookie and checks the new session. Thus the page does not check the account status again.
+- An address with a fragment, such as `/account#security`, names a place inside the page. `useRouteFocus` then leaves focus to the page. `useSectionFocus` focuses and scrolls to the section. A router state from `focusRequest()` picks one control inside it. `useOpenPasswordChange()` uses this for **Change password** in the command palette and the contestant menu. It also works when the person is already on `/account`.
+- **Activity** counts open work, resolutions and messages from the snapshot that the person can see. For staff, open work means unresolved issues that the person owns. For a team account, it means unresolved team issues. The list shows the five newest replies, internal notes and resolutions of this person. A team account never sees internal notes.
+- The layout follows the width of the page, not of the window. The section nav stands beside the sections from 768 px of page width.
 
 ## Jury award lists
 

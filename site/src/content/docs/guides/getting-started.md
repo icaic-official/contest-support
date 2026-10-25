@@ -39,7 +39,8 @@ Your roles decide the tabs and pages. Several roles combine.
 | Jury | **Awards**, **Find**, **Me** | **Award review**, **Teams & tables** |
 | Session admin | adds **Session** | adds **Overview**, **Accounts**, **Session settings** |
 
-Sign out from the account menu (contestants, console) or the **Me** tab (phone).
+Open your account settings to change your password, switch session, choose a theme or sign out.
+In the console, select your name at the bottom of the sidebar. As a contestant, open the account menu at the top right and select **My account**. On a phone, use the **Me** tab.
 
 The queue is `/issues`, award review is `/jury`, administration is `/administration`, and account details are `/account`.
 You can bookmark a section or use Back and Forward.

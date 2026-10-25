@@ -22,3 +22,12 @@ export const awardMinutePresets = [0, 5, 10, 15, 30, 60];
 export function formatDate(value: string): string {
   return new Date(value).toLocaleString();
 }
+
+/** A short age such as "now", "9m ago" or "2h 5m ago". */
+export function relativeAge(value: string, now: number): string {
+  const minutes = Math.floor(Math.max(0, now - Date.parse(value)) / 60000);
+  if (minutes < 1) return "now";
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  return `${hours}h ${minutes % 60}m ago`;
+}

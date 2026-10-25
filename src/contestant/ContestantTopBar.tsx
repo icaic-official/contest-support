@@ -62,7 +62,10 @@ export function ContestantTopBar({
   changePassword: () => void;
   signOut: () => void;
 }) {
-  const openingAccount = useRef(false);
+  // Set when a menu item leaves for the account page. The menu returns focus
+  // to its button when it closes, so the page waits for that. Radix also
+  // keeps focus inside an open menu, so the page cannot take it earlier.
+  const afterClose = useRef<(() => void) | undefined>(undefined);
   return (
     <header className="flex h-14 shrink-0 items-center gap-4 border-b px-5">
       <BrandMark />
@@ -148,9 +151,11 @@ export function ContestantTopBar({
           align="end"
           className="w-60"
           onCloseAutoFocus={(event) => {
-            if (!openingAccount.current) return;
+            const next = afterClose.current;
+            if (!next) return;
+            afterClose.current = undefined;
             event.preventDefault();
-            openingAccount.current = false;
+            next();
           }}
         >
           <DropdownMenuLabel className="font-normal">
@@ -172,12 +177,16 @@ export function ContestantTopBar({
             <DropdownMenuItem
               asChild
               onSelect={() => {
-                openingAccount.current = true;
+                afterClose.current = () => undefined;
               }}
             >
               <Link to="/account">My account</Link>
             </DropdownMenuItem>
-            <DropdownMenuItem disabled={locked} onSelect={changePassword}>
+            <DropdownMenuItem
+              onSelect={() => {
+                afterClose.current = changePassword;
+              }}
+            >
               <KeyRound aria-hidden="true" />
               Change password
             </DropdownMenuItem>

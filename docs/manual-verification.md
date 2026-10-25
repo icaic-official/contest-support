@@ -7,7 +7,7 @@ For the published site, run `MINSKY_DOCS_URL=https://minsky-docs.icaic-minsky.wo
 These checks only read documentation.
 Check a direct guide URL after refresh, search by keyboard, phone navigation, and a missing page.
 Review light and dark themes at desktop and 320px widths.
-The sign-in footer, the **Documentation** item in the desktop console account menu and the documentation link in the phone **Me** tab open the guides in a new tab.
+The sign-in footer, the **Documentation** link in the **Help** section of the account page and the documentation link in the phone **Me** tab open the guides in a new tab.
 Those links reach the development app only after its separate frontend deployment.
 
 ## Cloudflare authentication
@@ -206,11 +206,30 @@ Sign in as the same accounts.
 
 Sign in as a contestant.
 
-1. Check the top bar: event, session, **Live** or **Reconnecting**, the theme menu and the account menu with **Change password** and **Sign out**.
+1. Check the top bar: event, session, **Live** or **Reconnecting**, the theme menu and the account menu with **My account**, **Change password** and **Sign out**.
 2. Open a report. Check the headline, the live unresolved timer, the four-step tracker, the resolution cards, the award card and the messages.
 3. Select **Report an issue**. Check the category tiles, the description limit of 2,000 characters and the team location.
 4. Send a reply with Enter. Add a line with Shift+Enter.
 5. Close contestant intake as admin. Check that **Report an issue** is disabled with a reason.
+
+### Account page (1280 × 800 and 1024 × 768)
+
+Do these checks as a staff account with several roles, as a session admin, and as a contestant.
+The desktop console and the contestant app show the page. The phone app keeps its **Me** tab.
+
+1. In the console, select the person card at the bottom of the sidebar. Check that the address is `/account`, that focus is on **My account** and that the card shows the open page. Collapse the sidebar. Check that the card shows only the avatar and that a tooltip shows its name.
+2. In the contestant app, open the account menu and select **My account**. Check the same address and focus.
+3. Select each link in the section nav. Check that the page scrolls to the section and that the nav stays in view on a wide window. Check that the layout has one column below 768 px of page width and no horizontal overflow.
+4. **Profile**: check the name, the username and the account ID. Select **Copy**. Check the message and paste the ID somewhere. A team account shows its team and location.
+5. **Access in this session**: check that each role has a badge and a description. Only a session admin sees **Manage session accounts**. A team account shows no role and no admin link. In an archived event, check the archived notice.
+6. **Sessions**: with two sessions, select **Switch** on the other one. Check that its data loads and that the open issue or report is cleared.
+7. **Security**: enter a wrong current password. Check the error. Enter two different new passwords. Check the message. Enter a valid change. Check the success message and the empty fields. Reload. Check that you are still signed in on `/account`. Sign out and sign in with the new password.
+8. **Appearance**: choose **Light** and **Dark**. Check that the theme changes at once and stays after a reload. Move between the options with the arrow keys.
+9. **Activity**: check the three counts against the issues of this account. Check that the recent list shows the five newest replies, internal notes and resolutions of this account only. A contestant sees no internal note.
+10. **Help**: check that **Documentation** opens the guides in a new tab and that the build ID shows.
+11. In the console, press ⌘K or Ctrl+K and run **Change password**. In the contestant app, run **Change password** in the account menu. Check that the address is `/account#security`, that **Current password** has focus and that the section is in view. Repeat while you are on `/account`.
+12. Select **Sign out** in the page header. Check that the sign-in page shows. Sign in again and select **Sign out of this device** in **Security**.
+13. Press Tab from the person card or the top bar through the page. Check that every control gets focus in reading order and that every focus ring is visible. Check the light and the dark theme.
 
 ### Refresh persistence
 
@@ -466,7 +485,7 @@ The [frontend architecture](frontend-architecture.md#browser-routes) lists paths
 1. Open `/jury` while signed out. Sign in as a jury member. Check that the award screen opens.
 2. Refresh the page. Check that the address remains `/jury` and current session data loads.
 3. Open the queue, award screen, and account screen. Use browser Back and Forward. Check each address and screen.
-4. Open **Change password**. Check cancellation and completion. Both must retain `/account`.
+4. In the phone app, open **Change password** from **Me**. Check cancellation and completion. Both must retain `/account`. In the console and the contestant app, change the password in the **Security** section. Check that the address stays `/account`.
 5. As support staff, open `/administration`. Check that the app returns to `/issues` without administration data.
 6. Remove a jury or administrator role in another isolated client. Refresh access. Check that the restricted section closes.
 7. Repeat navigation in the organiser phone layout. Check keyboard focus after a tab change and after a return from an issue.

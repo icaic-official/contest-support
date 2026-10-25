@@ -34,6 +34,26 @@ export class ImageRequestError extends Error {
   }
 }
 
+const rejectionMessages = {
+  state: 'This issue changed while you were working. Refresh and try again.',
+  access: 'You no longer have access to do this.',
+  input: 'Check what you entered and try again.',
+  request_id: 'This request was already used. Refresh and try again.',
+} as const;
+
+/** Why the server rejected a workflow command. */
+export type WorkflowRejectionReason = keyof typeof rejectionMessages;
+
+/**
+ * What a person reads after a rejection. `state` covers an issue that
+ * changed since the person loaded it, such as a stale revision or an issue
+ * that another person already claimed. `access` covers a closed intake, an
+ * archived event and a changed role.
+ */
+export function workflowRejectionMessage(reason: WorkflowRejectionReason): string {
+  return rejectionMessages[reason];
+}
+
 export function errorMessage(error: unknown): string {
   // fetch rejects with a TypeError when the request does not reach the server.
   // Its text differs by browser, for example "Failed to fetch" or "Load failed".

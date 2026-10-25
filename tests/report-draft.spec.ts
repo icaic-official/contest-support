@@ -16,7 +16,7 @@ const viewports = [
         .locator('[data-slot="drawer-overlay"]')
         .click({ position: { x: 10, y: 10 } }),
     switchToSecondary: async (page: Page) => {
-      const tabs = page.getByRole("navigation", { name: "Organiser sections" });
+      const tabs = page.getByRole("navigation", { name: "Organizer sections" });
       await tabs.getByRole("button", { name: "Me", exact: true }).click();
       await page.getByRole("radio", { name: "Secondary" }).check();
       await tabs.getByRole("button", { name: "Queue", exact: true }).click();

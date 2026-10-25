@@ -11,7 +11,7 @@ Its shared [backend contract](docs/backend-contracts.md) defines the provider bo
 The [development application](https://minsky-dev.icaic-minsky.workers.dev) runs Cloudflare. See [run log](docs/history/run-log.md) for its deployed source.
 The Cloudflare installation serves the frontend and API through Workers, with D1, private R2 images, and Durable Object live updates.
 
-The frontend separates contestant screens, organiser screens, and shared session hooks.
+The frontend separates contestant screens, organizer screens, and shared session hooks.
 `src/connected/` owns account checks, workspace state, browser routes, and workflow retry protection.
 See [frontend architecture](docs/frontend-architecture.md) for module responsibilities, browser paths, and access checks.
 
@@ -28,8 +28,8 @@ These are development installations that require connectivity. Live-contest read
 T0015 ([PR #44](https://github.com/GiftedNovaHD/minsky/pull/44), merged at `a25f9f1` on 2026-10-21) gives three UIs. After sign-in, the membership selects one:
 
 - **Contestant desktop app.** A membership with a team gets this app. It shows the team's reports, a live timer, a progress tracker, public messages, team-visible images and the report form. It has no phone layout and needs a window at least 1024 px wide.
-- **Organiser phone app.** Staff in a window narrower than 1024 px get bottom tabs by role: Queue, Mine, Find, Awards, Session and Me. Issues open in a full-screen view with an action bar and bottom sheets.
-- **Organiser desktop console.** Staff in a window 1024 px wide or wider get a sidebar, a queue table, an issue side sheet, a ⌘K command palette, Award review and the admin pages.
+- **Organizer phone app.** Staff in a window narrower than 1024 px get bottom tabs by role: Queue, Mine, Find, Awards, Session and Me. Issues open in a full-screen view with an action bar and bottom sheets.
+- **Organizer desktop console.** Staff in a window 1024 px wide or wider get a sidebar, a queue table, an issue side sheet, a ⌘K command palette, Award review and the admin pages.
 
 The jury award lists from T0009 are in the phone **Awards** tab and the desktop **Award review** page.
 All UIs use shadcn/ui, Tailwind CSS and the same data hooks, with light and dark themes.

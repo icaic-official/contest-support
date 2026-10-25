@@ -53,7 +53,7 @@ export function TabBar({
 }) {
   return (
     <nav
-      aria-label="Organiser sections"
+      aria-label="Organizer sections"
       className="shrink-0 border-t bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur"
     >
       <ul

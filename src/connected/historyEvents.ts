@@ -1,3 +1,4 @@
+import { awardMinutesLabel } from "./labels";
 import type { Issue, Resolution, Snapshot } from "./model";
 
 type HistoryEntry = Snapshot["history"][number];
@@ -15,6 +16,9 @@ export type WorkflowEvent =
   | { kind: "resolved" }
   | { kind: "reopened"; reason: string }
   | { kind: "awarded" };
+
+/** The start of the text that the server stores for an award. */
+const awardedText = /^(\d+) minutes awarded: /;
 
 function sameTime(a: string | null | undefined, b: string): boolean {
   return Boolean(a) && Date.parse(a ?? "") === Date.parse(b);
@@ -65,8 +69,25 @@ export function workflowEvent(
   ) {
     return { kind: "reopened", reason: value.slice("Reopened: ".length) };
   }
-  if (/^\d+ minutes awarded: /.test(value) && sameTime(award?.at, entry.at)) {
+  if (awardedText.test(value) && sameTime(award?.at, entry.at)) {
     return { kind: "awarded" };
   }
   return undefined;
+}
+
+/**
+ * The text that staff read for a history entry. The server stores every
+ * award as "N minutes awarded: ...". Staff read "1 minute awarded: ..." and
+ * "No time added: ..." instead. Other entries keep their stored text.
+ */
+export function historyText(
+  entry: HistoryEntry,
+  context: Parameters<typeof workflowEvent>[1],
+): string {
+  if (workflowEvent(entry, context)?.kind !== "awarded") return entry.text;
+  return entry.text.replace(awardedText, (_, minutes: string) =>
+    Number(minutes) === 0
+      ? "No time added: "
+      : `${awardMinutesLabel(Number(minutes))} awarded: `,
+  );
 }

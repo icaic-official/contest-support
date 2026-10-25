@@ -29,10 +29,10 @@ Work only in a clearly identified development or test session.
 T0015 replaced the earlier workspace with three UIs. The membership and the window width select the UI:
 
 - A contestant account gets the contestant desktop app. Use a window at least 1024 px wide, such as 1280 × 800.
-- A staff account below 1024 px gets the organiser phone app. Use 390 × 844, and 320 × 740 for the narrow check.
-- A staff account at 1024 px and wider gets the organiser desktop console. Use 1280 × 800.
+- A staff account below 1024 px gets the organizer phone app. Use 390 × 844, and 320 × 740 for the narrow check.
+- A staff account at 1024 px and wider gets the organizer desktop console. Use 1280 × 800.
 
-Unless a step names one UI, do the step in the organiser phone app and again in the organiser desktop console.
+Unless a step names one UI, do the step in the organizer phone app and again in the organizer desktop console.
 Section 7 lists the checks for each UI.
 
 ## 1. Login and session access
@@ -65,7 +65,7 @@ Section 7 lists the checks for each UI.
 
 Expected result: the app rejects removal of the last admin.
 
-Check the admin screens of T0015 in both organiser layouts:
+Check the admin screens of T0015 in both organizer layouts:
 
 1. In the phone **Session** tab, check the status counts, the intake switch and the image limits with the − and + buttons.
 2. Select **New account**. Create a staff account. Check that the sheet shows the username and the temporary password once, with copy buttons and **Done**.
@@ -185,7 +185,7 @@ Review the sign-in page at 1280 × 800, 390 × 844 and 320 × 740.
 4. Sign in with a member account. Disconnect the network and wait up to 10 seconds for the access screen. Check that it asks you to check the connection and does not mention an organizer. Select **Refresh access**. Check that the button stays disabled while the read runs. Connect again and select the button. Check that the workspace returns.
 5. Press Tab once after sign-in. Check that **Skip to main content** appears and moves focus to the main content.
 
-### Organiser phone app (390 × 844)
+### Organizer phone app (390 × 844)
 
 Sign in as a volunteer, a specialist, a jury member and an admin.
 
@@ -203,7 +203,7 @@ Sign in as a volunteer, a specialist, a jury member and an admin.
 12. In a long queue, scroll to a card far down. Make its claim fail, for example when another volunteer claims the issue first. Check that the error stays pinned to the top of the list. Do the same with a lost connection. Check that **Retry last request** stays in view.
 13. Select **Report**. Type a description and add a second team. Close the sheet with a swipe down or a tap on the dimmed page. Select **Report** again. Check that the description, the category and the teams are still there. Send the report. Check that the next report form is empty.
 
-### Organiser desktop console (1280 × 800)
+### Organizer desktop console (1280 × 800)
 
 Sign in as the same accounts.
 
@@ -511,7 +511,7 @@ The [frontend architecture](frontend-architecture.md#browser-routes) lists paths
 4. In the phone app, open **Change password** from **Me**. Check cancellation and completion. Both must retain `/account`. In the console and the contestant app, change the password in the **Security** section. Check that the address stays `/account`.
 5. As support staff, open `/administration`. Check that the app returns to `/issues` without administration data.
 6. Remove a jury or administrator role in another isolated client. Refresh access. Check that the restricted section closes.
-7. Repeat navigation in the organiser phone layout. Check keyboard focus after a tab change and after a return from an issue.
+7. Repeat navigation in the organizer phone layout. Check keyboard focus after a tab change and after a return from an issue.
 8. Use the existing fictional-response retry cases to interrupt a workflow response and account check.
    Check that protected content hides while the account check fails.
    After recovery, select **Retry last request**. Check that it reuses the original actor, session, request ID, and command.

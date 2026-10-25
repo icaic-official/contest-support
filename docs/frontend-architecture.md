@@ -1,7 +1,7 @@
 # Frontend architecture
 
 This reference describes the shared frontend, its three layouts, and its browser routes.
-T0015 provides the contestant desktop app, organiser phone app, and organiser desktop console.
+T0015 provides the contestant desktop app, organizer phone app, and organizer desktop console.
 PR #45 added browser routes and workflow retry protections to the redesigned shells.
 See [T0015](history/tickets.md#t0015--organiser-and-contestant-frontend-redesign) and [T0021](history/tickets.md#t0021-fresh-cloudflare-development-installation) for the recorded scope.
 
@@ -220,9 +220,11 @@ These rules apply:
 - The reply box sends with Enter and adds a line with Shift+Enter. The draft is cleared only when the server records the message, also after **Retry last request** (T0012).
 - `IssueImages` gets only the team-visible images, with `staff={false}`. It shows the image list and the preview dialog with Tailwind classes. It has no upload form. Staff upload through `OrganiserImages`.
 
-## Organiser phone app
+<a id="organiser-phone-app"></a>
 
-`OrganiserPhoneApp` (`src/organiser/phone/`) is the organiser UI below 1024 px. It follows `design/redesign/e-organiser-phone.html`.
+## Organizer phone app
+
+`OrganiserPhoneApp` (`src/organiser/phone/`) is the organizer UI below 1024 px. It follows `design/redesign/e-organiser-phone.html`.
 
 | File | Content |
 | --- | --- |
@@ -232,7 +234,7 @@ These rules apply:
 | `PhoneSessionTab.tsx` | The Session tab for admins. It puts the admin parts from `src/organiser/admin/` on one page, with one sheet for a new account or one account. |
 | `PhoneIssueView.tsx` | The full-screen issue view with the bottom action bar and its sheets. |
 
-Shared organiser parts are one level up, so the desktop console can use them:
+Shared organizer parts are one level up, so the desktop console can use them:
 
 | File | Content |
 | --- | --- |
@@ -278,9 +280,11 @@ These rules apply:
 
 `useIssueImages` (`src/connected/hooks/`) holds the upload, retry, preview and removal logic of the issue images. `OrganiserImages` uses all of it. `IssueImages` shows the images and the preview, and it uses the preview and removal logic.
 
-## Organiser desktop console
+<a id="organiser-desktop-console"></a>
 
-`OrganiserDesktopConsole` (`src/organiser/desktop/`) is the organiser UI at 1024 px and wider. It follows `design/redesign/a-console.html`.
+## Organizer desktop console
+
+`OrganiserDesktopConsole` (`src/organiser/desktop/`) is the organizer UI at 1024 px and wider. It follows `design/redesign/a-console.html`.
 It uses the same hooks, rules and forms as the phone app. It adds no workflow rules of its own.
 
 | File | Content |
@@ -418,7 +422,7 @@ The app has three boundaries:
 | Boundary | Where | What stays usable |
 | --- | --- | --- |
 | `app` | `src/main.tsx`, around the router | Nothing. This is the last resort. It shows the brand header and the card. |
-| `region` | `Workspace`, around the contestant or organiser UI | The announcement banner and the build ID. |
+| `region` | `Workspace`, around the contestant or organizer UI | The announcement banner and the build ID. |
 | `region` | The desktop console, around the page body | The sidebar and the top bar. |
 
 A region boundary clears its failure when its `resetKey` changes. The `Workspace` boundary uses the path. The console boundary uses the page. A person can leave a failed page without a reload.
@@ -430,7 +434,7 @@ The boundary writes the error and the component stack to the console. It sends n
 The root element of each layout has `data-ui="contestant"`, `data-ui="organiser-phone"` or `data-ui="organiser-desktop"`.
 `tests/ui-selection.spec.ts` uses this attribute to check the UI selection. Keep it on the root element of each layout.
 
-Put components that both organiser layouts use in `src/organiser/`.
+Put components that both organizer layouts use in `src/organiser/`.
 Keep `IssueImages`, `TeamSearch`, `teamSearch.ts`, `model.ts`, `jury.ts` and the image modules. Restyle them only.
 
 ## Local checks

@@ -1,6 +1,6 @@
 # Sign in
 
-Sign in opens the contest workspace for an organizer-created username. The account and the window width choose the contestant desktop, the organiser phone layout, or the organiser desktop console. Sign out returns to the sign-in form and clears the contest data from the page.
+Sign in opens the contest workspace for an organizer-created username. The account and the window width choose the contestant desktop, the organizer phone layout, or the organizer desktop console. Sign out returns to the sign-in form and clears the contest data from the page.
 
 ## Sub-features
 

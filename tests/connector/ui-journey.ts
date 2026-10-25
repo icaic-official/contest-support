@@ -61,7 +61,7 @@ async function choose(control: Locator, checked = true) {
 }
 
 function phoneTabs(page: Page): Locator {
-  return page.getByRole('navigation', { name: 'Organiser sections' });
+  return page.getByRole('navigation', { name: 'Organizer sections' });
 }
 
 async function phoneTab(page: Page, label: string) {
@@ -490,7 +490,7 @@ export async function runUiJourney(browser: Browser, fixture: UiFixture, options
     await expect(timeAward).toContainText('Decided by the jury');
     await expect(timeAward).toContainText('Not yet applied to your contest time');
     // A recorded award opens its issue. Back returns to the lists.
-    await expect(jury.page.getByRole('region', { name: 'Time award' })).toContainText('+5 min');
+    await expect(jury.page.getByRole('region', { name: 'Time award' })).toContainText('5 minutes');
     await jury.page.getByRole('button', { name: 'Back', exact: true }).click();
     await expect(jury.page.getByRole('heading', { level: 1, name: 'Awards', exact: true })).toBeFocused();
     await expect(juryRow('To decide')).toHaveCount(0);

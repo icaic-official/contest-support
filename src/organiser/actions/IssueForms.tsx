@@ -20,6 +20,7 @@ import { Textarea } from "@/components/ui/textarea";
 import type { CommandRunner } from "@/connected/hooks/useCommand";
 import {
   awardMinutePresets,
+  awardMinutesLabel,
   maxAwardMinutes,
   maxSummaryLength,
   noCommentSummary,
@@ -553,7 +554,9 @@ export function AwardForm({ issue, command, onDone }: IssueFormProps) {
         loading={isRunning(command.running, "award", issue.id)}
       >
         <Scale aria-hidden="true" />
-        {value === undefined ? "Record award" : `Record ${value} minutes`}
+        {value === undefined
+          ? "Record award"
+          : `Record ${value === 0 ? "no time added" : awardMinutesLabel(value)}`}
       </Button>
     </form>
   );

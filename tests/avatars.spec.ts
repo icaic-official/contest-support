@@ -398,7 +398,7 @@ test("the phone Me tab changes and removes the picture", async ({ page, api }) =
   await page.setViewportSize({ width: 390, height: 844 });
   const server = await openApp(page, api);
   await page
-    .getByRole("navigation", { name: "Organiser sections" })
+    .getByRole("navigation", { name: "Organizer sections" })
     .getByRole("button", { name: "Me", exact: true })
     .click();
   await expect(page).toHaveURL("/account");

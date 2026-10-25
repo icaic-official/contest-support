@@ -4,8 +4,8 @@ This document preserves the agreed direction from [PLAN.md](../PLAN.md).
 Only requirements listed in [run log](history/run-log.md) describe implemented behavior.
 The user selects later scope after feedback on the development installation.
 
-Interface decision (2026-10-17): organisers and contestants get different UIs. This is not one layout with parts hidden.
-Organisers mainly use phones, so they get a phone-first app. At 1024 px and wider, they get a separate desktop console.
+Interface decision (2026-10-17): organizers and contestants get different UIs. This is not one layout with parts hidden.
+Organizers mainly use phones, so they get a phone-first app. At 1024 px and wider, they get a separate desktop console.
 Contestants use computers and get a desktop app. There is no contestant phone layout.
 The membership selects the UI after sign-in. A membership with a team gets the contestant app.
 All UIs share one design system, shadcn/ui with Tailwind CSS, and the same data hooks.

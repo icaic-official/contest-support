@@ -68,6 +68,13 @@ test("a staff membership gets the organiser console on a laptop and the phone ap
   await expect(page.locator('[data-ui="organiser-desktop"]')).toBeVisible();
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(page.locator('[data-ui="organiser-phone"]')).toBeVisible();
+  await page
+    .getByRole("navigation", { name: "Organizer sections" })
+    .getByRole("button", { name: "Me", exact: true })
+    .click();
+  await expect(
+    page.getByText(/^Ask an organizer if your roles or team assignment need to change\./),
+  ).toBeVisible();
 });
 
 test("an account without a membership sees the session access screen", async ({
@@ -178,7 +185,7 @@ test("browser history restores the section and heading focus", async ({
   ).toBeVisible();
   await expect(page).toHaveURL("/jury");
   await page
-    .getByRole("navigation", { name: "Organiser sections" })
+    .getByRole("navigation", { name: "Organizer sections" })
     .getByRole("button", { name: "Me", exact: true })
     .click();
   await expect(page).toHaveURL("/account");

@@ -11,8 +11,15 @@ export const DEFAULT_DAYS = 30;
 export const MAX_DAYS = 90;
 const API = "https://api.cloudflare.com/client/v4";
 
-// A token with any of these permissions could widen its own access or change who controls the account.
-const FORBIDDEN_PERMISSION = /api tokens|member|billing|account settings|user details|memberships|organization/i;
+// Only the products Minsky runs on. Everything else, including tokens, members, billing, Access, Zero Trust,
+// Workers Admin, and Workers CI Write (build triggers), stays with the owner.
+const ALLOWED_PERMISSION = new RegExp([
+  String.raw`^Workers (Scripts|Routes|KV Storage|R2 Storage|R2 Storage Bucket Item|R2 Storage Metadata|Observability|Tail) (Read|Write)$`,
+  String.raw`^Workers (Editor|Metadata Read-Only|Content Read-Only|CI Read)$`,
+  String.raw`^D1 (Metadata Read|Read|Write)$`,
+  String.raw`^(Account Analytics|Zone|DNS) Read$`,
+  String.raw`^DNS Write$`,
+].join("|"));
 const ZONE_KEY = /^com\.cloudflare\.api\.account\.zone\.[0-9a-f]{32}$/;
 const R2_BUCKET_KEY = new RegExp(`^com\\.cloudflare\\.edge\\.r2\\.bucket\\.${ACCOUNT_ID}_default_[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$`);
 const ACCOUNT_KEY = `com.cloudflare.api.account.${ACCOUNT_ID}`;
@@ -40,7 +47,7 @@ export function tokenBody(request, groups, now = new Date()) {
       throw new Error("Each policy must list at least one permission.");
     }
     const permission_groups = policy.permissions.map((name) => {
-      if (FORBIDDEN_PERMISSION.test(name)) throw new Error(`Agents may not grant "${name}".`);
+      if (!ALLOWED_PERMISSION.test(name)) throw new Error(`Agents may not grant "${name}".`);
       const id = groupIds.get(name);
       if (!id) throw new Error(`Unknown permission group "${name}".`);
       return { id };

@@ -89,7 +89,7 @@ A token that can create tokens can grant itself any permission. So these rules a
 - Wrangler reads `CLOUDFLARE_API_TOKEN`. Never put the token-creation key there.
 - Grant only the permissions that the task needs. Limit each policy to the Minsky account, one zone, or one R2 bucket. Use the narrowest of these that Cloudflare supports for the permission. Never grant a permission on all accounts or all zones.
 - D1 permissions cover every database in the account. Grant D1 write only when the task must write through the API, and delete that token when the task ends.
-- Never grant permissions on API tokens, account members, billing, or account settings.
+- Grant only Workers, D1, R2, analytics, zone, and DNS permissions. The script refuses every other permission, including API tokens, account members, billing, account settings, Access, Zero Trust, Workers Admin, and Workers CI Write.
 - Name each token `minsky-agent-<purpose>-<YYYYMMDD>`.
 - Set an expiry. The default is 30 days. The maximum is 90 days.
 - Use the narrowest storage that works: the process environment of one command, a Cloudflare secret, or a Workers Builds variable. Never commit a token or print it in a log, a pull request, or a reply.

@@ -237,6 +237,11 @@ describe('Cloudflare authorized application and administration', () => {
     expect(await adminEffects()).toEqual(before);
   });
 
+  it('names the rule that an image cannot be larger than the issue total', async () => {
+    await expect(service.setImageLimits(fixture.staff, fixture.sessionId, { fileMegabytes: 2, count: 1, totalMegabytes: 1 }))
+      .rejects.toMatchObject({ status: 400, message: 'Choose valid image limits: 1 to 50 MB per image, 1 to 24 images, and 1 to 120 MB per issue. An image cannot be larger than the issue total.' });
+  });
+
   it.each(['admin', 'generation', 'must_change', 'disabled', 'pending', 'expired_identity', 'missing_identity', 'expired_login', 'revoked', 'archived'])(
     'rolls back all administration effects when %s changes before commit', async (restriction) => {
     const before = await adminEffects();

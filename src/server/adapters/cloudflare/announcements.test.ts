@@ -175,6 +175,21 @@ describe('Cloudflare session announcements with local D1 and R2 bindings', () =>
     expect((await read(admin)).announcements).toEqual([]);
   });
 
+  it('rejects a NUL character in a title or details as input, so no database check fails later', async () => {
+    const id = await publish();
+    const edit = { type: 'edit', id, revision: 0, title: 'Edited', details: 'Edited details.', expires_at: null };
+    for (const text of ['\u0000Fixture', 'Fix\u0000ture', 'Fixture\u0000']) {
+      for (const field of ['title', 'details']) {
+        await expect(publish(admin, { [field]: text })).rejects.toMatchObject({
+          reason: 'input', message: 'Check the announcement title, details, and expiry.',
+        });
+        await expect(service.execute(admin, fixture.sessionId, randomUUID(), { ...edit, [field]: text }))
+          .rejects.toMatchObject({ reason: 'input' });
+      }
+    }
+    expect((await read(admin)).announcements).toMatchObject([{ id, title: 'Fictional title', revision: 0 }]);
+  });
+
   it('repeats a request ID without a second write and rejects a different command', async () => {
     const requestId = randomUUID();
     const first = await service.execute(admin, fixture.sessionId, requestId, publishCommand());
@@ -186,6 +201,30 @@ describe('Cloudflare session announcements with local D1 and R2 bindings', () =>
     const results = await Promise.all([1, 2].map(() => service.execute(admin, fixture.sessionId, concurrent, publishCommand({ title: 'Once' }))));
     expect(results[0]).toBe(results[1]);
     expect((await read(admin)).announcements.filter((announcement) => announcement.title === 'Once')).toHaveLength(1);
+  });
+
+  const untilPassed = (iso: string) => new Promise((resolve) => setTimeout(resolve, Math.max(0, Date.parse(iso) - Date.now()) + 25));
+
+  it('replays a committed publish whose expiry passed before the retry, without a second announcement', async () => {
+    const requestId = randomUUID();
+    const expiresAt = new Date(Date.now() + 1500).toISOString();
+    const command = publishCommand({ title: 'Short notice', expires_at: expiresAt });
+    const id = await service.execute(admin, fixture.sessionId, requestId, command);
+    await untilPassed(expiresAt);
+    await expect(service.execute(admin, fixture.sessionId, requestId, command)).resolves.toBe(id);
+    expect((await read(admin)).announcements.filter((announcement) => announcement.title === 'Short notice')).toHaveLength(1);
+    await expect(service.execute(admin, fixture.sessionId, randomUUID(), command)).rejects.toMatchObject({ reason: 'input' });
+  });
+
+  it('replays a committed edit whose expiry passed before the retry, without a second revision', async () => {
+    const id = await publish();
+    const requestId = randomUUID();
+    const expiresAt = new Date(Date.now() + 1500).toISOString();
+    const edit = { type: 'edit', id, revision: 0, title: 'Short notice', details: 'Edited details.', expires_at: expiresAt };
+    await expect(service.execute(admin, fixture.sessionId, requestId, edit)).resolves.toBe(id);
+    await untilPassed(expiresAt);
+    await expect(service.execute(admin, fixture.sessionId, requestId, edit)).resolves.toBe(id);
+    expect((await read(admin)).announcements).toMatchObject([{ id, title: 'Short notice', revision: 1 }]);
   });
 
   it('edits with revisions, keeps publication attribution, and reports a competing edit as a conflict', async () => {

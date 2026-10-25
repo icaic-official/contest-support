@@ -239,7 +239,7 @@ See [Cloudflare account avatars](cloudflare-backend-design.md#account-avatars-us
 
 | Operation | Result |
 | --- | --- |
-| `begin(input)` | Reserves an image using the request ID, issue, visibility, name, and size. Returns the image ID and original and thumbnail paths. |
+| `begin(input)` | Reserves an image using the request ID, issue, visibility, name, and size. Returns the image ID and original and thumbnail paths. The server removes control characters, format characters, and path separators from the name and keeps its first 200 characters. |
 | `upload(path, body, contentType, onProgress)` | Uploads one object and reports the bytes sent. |
 | `finish(sessionId, attachmentId)` | Validates and publishes the reserved image. A repeat after a lost success response does not publish another image. |
 | `remove(sessionId, attachmentId)` | Removes the image through the authorized server operation. A failed file deletion remains retryable. |

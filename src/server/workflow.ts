@@ -58,8 +58,9 @@ const object = (value: unknown): value is Record<string, unknown> =>
 export function workflowText(value: string): string {
   return value.replace(/^ +| +$/g, '');
 }
+/** SQLite length() stops at U+0000, so a database length CHECK would fail with an error the store cannot classify. */
 function validText(value: unknown): value is string {
-  if (typeof value !== 'string') return false;
+  if (typeof value !== 'string' || value.includes('\u0000')) return false;
   const length = Array.from(workflowText(value)).length;
   return length >= 1 && length <= 2000;
 }

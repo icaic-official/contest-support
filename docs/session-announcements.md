@@ -82,6 +82,8 @@ A failed announcement read never disables reporting.
 Expiry uses server time. Readers see an expiry within 60 seconds while the live channel is connected, within 10 seconds while it is down, and after a refresh or reconnect.
 
 Request IDs make repeated commands safe. A repeated ID with the same command returns the first result.
+This holds also when the expiry of that command has passed by the time of the repeat.
+Only a new command needs a future expiry.
 The same ID with another command is rejected.
 
 ### Cloudflare

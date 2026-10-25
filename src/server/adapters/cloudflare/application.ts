@@ -268,7 +268,7 @@ export class D1ApplicationService {
   }): Promise<void> {
     this.validIds(sessionId);
     const parsed = limitsSchema.safeParse(input);
-    if (!parsed.success) throw new AuthenticationError(400, 'Choose valid image limits: 1 to 50 MB per image, 1 to 24 images, and 1 to 120 MB per issue.');
+    if (!parsed.success) throw new AuthenticationError(400, 'Choose valid image limits: 1 to 50 MB per image, 1 to 24 images, and 1 to 120 MB per issue. An image cannot be larger than the issue total.');
     const limits = parsed.data;
     const gate = await this.adminGate(caller, sessionId);
     await this.commit(gate, [

@@ -16,12 +16,25 @@ type Pixel = number[];
 /**
  * Reads the text color and the opaque background that the browser paints for
  * an element. A canvas resolves any CSS color syntax, and it blends a
- * translucent text color or background over the ones below it.
+ * translucent text color or background over the ones below it. A color that
+ * is still in a transition reads as a value between its ends, so the read
+ * waits for the transitions and animations that end.
  */
 async function paintedColors(
   locator: Locator,
 ): Promise<{ text: Pixel; background: Pixel }> {
-  return locator.evaluate((element) => {
+  return locator.evaluate(async (element) => {
+    const ending: Animation[] = [];
+    for (let node: Element | null = element; node; node = node.parentElement) {
+      ending.push(
+        ...node
+          .getAnimations()
+          .filter((animation) =>
+            Number.isFinite(Number(animation.effect?.getComputedTiming().endTime)),
+          ),
+      );
+    }
+    await Promise.allSettled(ending.map((animation) => animation.finished));
     const context = document
       .createElement("canvas")
       .getContext("2d", { willReadFrequently: true })!;

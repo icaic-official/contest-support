@@ -207,7 +207,6 @@ export function registerAuthenticationCases(group: AuthenticationCases) {
         const current = await service.current(headers);
         expect(current?.user.id).toBe(fixture.contestant.accountId);
         expect(current?.status).toMatchObject({ must_change: false, session_valid: true });
-        expect((await service.sessions(headers)).map((session) => session.id)).toEqual([fixture.sessionId]);
       });
 
       it.each(['expired_login', 'expired_identity', 'revoked', 'generation', 'disabled', 'pending'])(
@@ -480,7 +479,6 @@ export function registerAuthenticationCases(group: AuthenticationCases) {
 
       it('requires a live identity cookie rather than browser account data', async () => {
         expect(await service.current(new Headers())).toBeUndefined();
-        await expectFailure(service.sessions(new Headers({ 'X-Account-Id': fixture.staff.accountId }))).toMatchObject({ status: 401 });
       });
 
       it('blocks temporary passwords at session and application reads', async () => {
@@ -488,7 +486,6 @@ export function registerAuthenticationCases(group: AuthenticationCases) {
         const headers = await signIn();
         const current = await service.current(headers);
         expect(current?.status.must_change).toBe(true);
-        await expectFailure(service.sessions(headers)).toMatchObject({ status: 403 });
         // An auth-only target can retain the earlier schema. Check application
         // reads when the complete schema exists.
         if (fullApplication) {
@@ -512,8 +509,9 @@ export function registerAuthenticationCases(group: AuthenticationCases) {
         expect((await service.current(await signIn(username, replacement)))?.user.id).toBe(fixture.contestant.accountId);
       });
 
-      it('completes a password change after the last permitted username login', async () => {
+      it('does not count a successful sign-in or password change toward the username limit', async () => {
         const key = `username:${username}`;
+        const attempts = async () => (await stmt('SELECT attempts FROM authentication_limits WHERE key = ?', key).first<{ attempts: number }>())?.attempts;
         await db.batch([
           stmt('UPDATE accounts SET must_change = 1 WHERE id = ?', fixture.contestant.accountId),
           stmt('INSERT INTO authentication_limits (key, window_start, attempts) VALUES (?, unixepoch(), 9)', key),
@@ -524,13 +522,13 @@ export function registerAuthenticationCases(group: AuthenticationCases) {
         const fresh = new Headers({ cookie: changed.cookie.split(';')[0] });
 
         expect((await service.current(fresh))?.status).toMatchObject({ must_change: false, session_valid: true });
-        expect((await service.sessions(fresh)).map((session) => session.id)).toEqual([fixture.sessionId]);
         expect(await service.current(headers)).toBeUndefined();
-        expect((await stmt('SELECT attempts FROM authentication_limits WHERE key = ?', key).first<{ attempts: number }>())?.attempts).toBe(10);
-        // Replacing an authenticated login must not remove the public attempt limit.
+        expect(await attempts()).toBe(9);
+        // A failure is the tenth. The username then refuses even the correct password.
+        await expectFailure(signIn()).toMatchObject({ status: 401 });
+        expect(await attempts()).toBe(10);
         await expectFailure(signIn(username, replacement)).toMatchObject({ status: 429 });
         await stmt('UPDATE authentication_limits SET window_start = unixepoch() - 901 WHERE key = ?', key).run();
-        await expectFailure(signIn()).toMatchObject({ status: 401 });
         expect((await service.current(await signIn(username, replacement)))?.user.id).toBe(fixture.contestant.accountId);
       });
 
@@ -626,6 +624,9 @@ export function registerAuthenticationCases(group: AuthenticationCases) {
             .toEqual(before[key].filter((row) => String(row.audience).startsWith('team:')));
         }
         expect(after.notifications.filter((row) => row.audience === 'staff')).toHaveLength(fullApplication ? 2 : 1);
+        // The contestant has a login, so the reset still sends the account a revocation hint.
+        expect((await stmt('SELECT count(*) AS n FROM notifications WHERE audience = ?', `account:${fixture.contestant.accountId}`)
+          .first<{ n: number }>())!.n).toBeGreaterThan(0);
         expect((await stmt('SELECT team_id FROM memberships WHERE account_id = ?', fixture.contestant.accountId).first<{team_id: string}>())?.team_id).toBe(fixture.teamId);
         expect((await stmt("SELECT count(*) n FROM account_operations WHERE account_id = ? AND state = 'completed'", fixture.contestant.accountId).first<{n: number}>())?.n).toBe(1);
       });
@@ -639,9 +640,14 @@ export function registerAuthenticationCases(group: AuthenticationCases) {
 
       it('creates a temporary account with stable identity and restricted membership', async () => {
         const accountUsername = `new_${randomSecret().slice(0, 20)}`;
+        const signals = async (audience: string) => (await stmt('SELECT count(*) AS n FROM notifications WHERE session_id = ? AND audience = ?', fixture.sessionId, audience).first<{ n: number }>())!.n;
+        const staffBefore = await signals('staff');
         const result = await service.account(adminHeaders, fixture.sessionId, { action: 'create_account', username: accountUsername, name: `auth-fixture:${fixture.eventId}`, teamId: fixture.teamId, roles: [], isAdmin: false });
         const row = await stmt('SELECT id FROM accounts WHERE username = ?', accountUsername).first<{id: string}>();
         extraIds.push(row!.id);
+        // A new account has no login, so setup writes one staff notification and no account notification.
+        expect(await signals(`account:${row!.id}`)).toBe(0);
+        expect(await signals('staff')).toBe(staffBefore + (fullApplication ? 1 : 0));
         const current = await service.current(await signIn(accountUsername, result.temporaryPassword!));
         expect(current?.user.id).toBe(row!.id);
         expect(current?.status.must_change).toBe(true);
@@ -685,7 +691,7 @@ export function registerAuthenticationCases(group: AuthenticationCases) {
         await expectFailure(signIn(username, password, new D1AuthenticationService(db, racingIdentity, hasher))).toMatchObject({ status: 409 });
       });
 
-      it('passes the same temporary-authentication lifecycle used by the Supabase provider scenario', async () => {
+      it('passes the shared temporary-authentication lifecycle scenario', async () => {
         await stmt('UPDATE accounts SET must_change = 1 WHERE id = ?', fixture.contestant.accountId).run();
         const handle = createAuthenticationHandler(service, { origins: [origin] });
         let cookie = '';
@@ -702,8 +708,8 @@ export function registerAuthenticationCases(group: AuthenticationCases) {
           },
         });
         await verifyTemporaryAuthentication(auth, { id: fixture.contestant.accountId, username, password }, {
-          restricted: async () => { await expectFailure(auth.sessions()).toThrow(); },
-          ready: async () => { expect((await auth.sessions()).map((session) => session.id)).toEqual([fixture.sessionId]); },
+          restricted: async () => { expect((await auth.accountStatus()).must_change).toBe(true); },
+          ready: async () => { expect(await auth.accountStatus()).toMatchObject({ must_change: false, session_valid: true }); },
         });
       });
     }

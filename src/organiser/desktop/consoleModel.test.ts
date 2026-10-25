@@ -119,6 +119,7 @@ describe("consoleNavGroups", () => {
       "teams",
       "overview",
       "accounts",
+      "roster",
       "settings",
     ]);
   });
@@ -129,6 +130,7 @@ describe("consoleNavGroups", () => {
       "teams",
       "overview",
       "accounts",
+      "roster",
       "settings",
     ]);
     expect(consolePages(member({ roles: ["jury"], is_admin: true }))).toContain(

@@ -22,8 +22,6 @@ The live development app is the Cloudflare Worker at https://minsky-dev.icaic-mi
 Use an organizer-provided username and password.
 Docker and persona switching are not required.
 For a separate Cloudflare installation, create the first admin through its bootstrap step.
-For the Supabase adapter on your own project, follow [Run the Supabase adapter](supabase-provider.md).
-`npm run cloud:recover-admin` is that adapter's administrator recovery.
 Use `npm run cloudflare:recover-admin` when the Cloudflare development admin cannot sign in.
 Use a separate browser or profile for each account: contestant, volunteer, specialist, jury, and admin.
 Work only in a clearly identified development or test session.
@@ -135,7 +133,7 @@ Check submission retries through account-check failures:
 With isolated contestant memberships in two sessions, lose a submission response and remove the original session membership.
 Let the page select the remaining session. Retry the request and check that the server rejects access to the original session.
 Check that the remaining session contains no copy of the submitted issue.
-The cases in `tests/workflow-session-retry.spec.ts` exercise these session checks through the embedded PostgreSQL fixture.
+The cases in `tests/workflow-session-retry.spec.ts` exercise these session checks through the Cloudflare services on local D1.
 
 ## 5. Resolution and award
 
@@ -250,13 +248,13 @@ Do them as a staff account on the console, as a staff account on a phone, and as
 1. Turn on location for the phone camera. Take a photo in portrait and one in landscape. Copy them to the computer, or choose them from the phone gallery in the phone app. An iPhone saves HEIC by default, and Minsky accepts only JPEG, PNG and WebP. Export the photo as a JPEG before you copy it.
 2. Open **My account** in the console. Select **Change picture** in the **Profile** section and choose the portrait photo. Check that the preview is upright, that it shows the middle square of the photo, and that the circle shows the same part.
 3. Select **Save picture**. Check the message "Profile picture updated." Check that the new picture shows in the page header, the **Profile** section and the sidebar card at once, without a reload.
-4. Open the network panel and reload the page. Save the response of the request to `/api/avatar/` (Cloudflare) or the Storage download (Supabase adapter). Run `exiftool` on the file. Check that it has no GPS tags or camera model, that it is a JPEG of at most 512 × 512 pixels, and that it is under 256 KB.
+4. Open the network panel and reload the page. Save the response of the request to `/api/avatar/` (Cloudflare). Run `exiftool` on the file. Check that it has no GPS tags or camera model, that it is a JPEG of at most 512 × 512 pixels, and that it is under 256 KB.
 5. Choose the landscape photo and select **Cancel**. Check that the picture does not change and that focus returns to **Change picture**.
 6. Choose a file larger than 2 MB. Check the alert "Choose an image of up to 2 MB." and that no preview opens. Choose a text file with the name `notes.jpg`. Check the alert "Choose a JPEG, PNG, or WebP image."
 7. Choose a very detailed photo of 1 to 2 MB, such as a close photo of gravel. Check that it saves and that the stored file is under 256 KB.
 8. Choose a PNG with a transparent background. Check that the saved picture has a white background.
-9. With a second browser, sign in as another staff member of the same session. Check that the picture shows on an issue that the first account owns within 10 seconds. If that account is an admin, also check the administration account list. Sign in as a contestant. Check that no staff picture shows in any contestant screen.
-10. Select **Remove picture**. Select **Cancel** in the question. Check that the picture stays. Select **Remove picture** again and confirm. Check the message "Profile picture removed.", the initials in every place, and that focus is on **Change picture**. Check in the second browser that the initials return within 10 seconds.
+9. With a second browser, sign in as another staff member of the same session. Check that the picture shows on an issue that the first account owns within one minute. If that account is an admin, also check the administration account list. Sign in as a contestant. Check that no staff picture shows in any contestant screen.
+10. Select **Remove picture**. Select **Cancel** in the question. Check that the picture stays. Select **Remove picture** again and confirm. Check the message "Profile picture removed.", the initials in every place, and that focus is on **Change picture**. Check in the second browser that the initials return within one minute.
 11. Turn the network off. Select **Save picture**. Check the error in the dialog and that the button reads **Try again**. Turn the network on and select **Try again**. Check that the account has one picture.
 12. In the phone app, open **Me**. Check that **Change picture** and **Remove picture** work with the phone camera and gallery, and that the page has no horizontal scroll at 390 × 844.
 13. Use only the keyboard on the console. Press Tab to **Change picture** and Enter. Choose the file. Check that **Save picture** has focus in the dialog. Press Escape and check that focus returns to **Change picture**. Repeat and press Enter to save. Press Tab to **Remove picture** and Enter, then Escape. Check that focus returns to **Remove picture**.
@@ -317,11 +315,6 @@ Review the contestant, jury and admin views at 1280 × 800 and at 200% zoom.
 2. Compare two simultaneous awards.
 3. Check state after refresh and reconnect.
 4. Attempt unauthorized queries across teams and sessions.
-5. For the Supabase adapter, run `MINSKY_TEST_PROJECT_REF=<your-test-project-ref> npm run test:cloud` for repeatable checks with real accounts on your isolated test project.
-   The suite requires `MINSKY_TEST_PROJECT_REF`. It does not fall back to the linked project.
-
-The suite creates isolated test fixtures and deletes only those fixtures.
-It does not reset the project.
 
 ## 10. Issue images
 
@@ -436,9 +429,6 @@ Use isolated test accounts for these checks.
 10. Save the form. Check that it preserves the second administrator's change.
 
 The credential-free tests in `tests/workspace-refresh.spec.ts` cover these UI effects and exact write requests.
-The cleanup tests in `scripts/cloud-test.test.mjs` check a failed deletion, a successful retry, and the retained recovery file.
-They use mocked cloud responses and a local child process. They do not access hosted data.
-See [Recover test:cloud fixtures](run-provider-tests.md#recover-testcloud-fixtures) for failed cloud cleanup.
 
 Record observed results in [run log](history/run-log.md).
 Suggested manual checks are not completed checks.
@@ -492,21 +482,6 @@ See [frontend architecture](frontend-architecture.md#jury-award-lists).
     loading and read errors from valid empty lists. Failed reads must clear stale data.
 
 Record results and remaining limits in [run log](history/run-log.md#t0009-parallel-maintenance-2026-10-18).
-The credential-free browser harness exercises actual migrations and RLS with
-simulated hosted transport. It does not establish real Auth, Storage, Realtime,
-deployment, offline operation, or capacity results.
-
-For isolated hosted acceptance of the Supabase adapter from a local CLI, prepare your own test project and credentials as [Run against the Supabase provider](run-provider-tests.md#run-against-the-supabase-provider) states.
-Then run the current cloud suite against that explicit target:
-
-```sh
-MINSKY_TEST_PROJECT_REF=<your-test-project-ref> npm run test:cloud
-```
-
-Do not apply unrelated remote migrations or change provider configuration for this test.
-If cleanup retains a recovery file, follow [Recover test:cloud fixtures](run-provider-tests.md#recover-testcloud-fixtures).
-Record local simulations and hosted-service CLI results separately.
-
 
 ## 14. Browser routes and workflow retry recovery
 
@@ -553,4 +528,29 @@ Use two browser windows for the live checks. Run these checks after a reviewed d
 12. At 320 px and 390 px wide, check that the announcement strip wraps, scrolls inside its area, and causes no horizontal page scroll.
     In a window about 1280 by 720 px, open **New announcement** and **Edit**. Check that every field and the **Publish** or **Save changes** button shows without scrolling inside the strip.
 13. Archive the event. Check that announcements stay readable and every management control disappears.
-14. Repeat the checks on a Supabase build when you run the adapter on your own project.
+
+## 16. Motion and reduced motion
+
+Run these checks in a window of 1280 by 800 px, in the light and dark themes.
+Run the phone checks at 390 by 844 px.
+Use a development or test session with staff and contestant accounts.
+
+1. Open the issue queue in the desktop console. Select each status tab with the mouse.
+   Check that the white pill slides and resizes to the selected tab, with no jump.
+2. Reload the page. Check that the pill is already under **Active** and does not slide in from a corner.
+3. Press Tab until a status tab has focus. Press Space.
+   Check that the pill follows, the tab keeps `aria-pressed` and the focus ring is visible.
+4. Select a team in **Find a team**, then select **Resolved**. Check that the empty state offers **Show active issues**.
+   Select it. Check that the team filter clears, **Active** is selected and focus is on the **Active** tab.
+5. Open an issue. Press the right and left arrow keys on the sheet tabs.
+   Check that the selection moves, the underline slides with it and the panel fades in.
+   Select **Internal note** and **Public reply** in the composer. Check that the pill slides and is amber for the internal note.
+   As a jury member, open **Award review** and select each list. Check that the pill slides.
+6. Check that the side sheet opens in about a quarter of a second and closes faster.
+7. With a second account, report or claim an issue. Check that the row fades from a blue tint on the first screen.
+   Change the status tab and check that no row fades because of that.
+8. As a contestant, keep a report open. Claim it as staff. Check that the progress tracker changes color over a moment.
+9. In the phone app, select each bottom tab. Check that the bar along the top edge slides to the tab.
+   Press and hold a queue card and a button. Check that the card tints and the button shrinks a little.
+10. Turn on **Reduce motion** in the operating system, or set `prefers-reduced-motion: reduce` in the browser developer tools.
+    Repeat steps 1, 5, 7 and 9. Check that every change is instant and the **Live** dot does not pulse.

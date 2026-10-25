@@ -18,7 +18,6 @@ import { documentationUrl } from "@/lib/links";
 import { Landing } from "@/screens/Landing";
 import { PasswordForm } from "@/screens/PasswordForm";
 import { SignIn } from "@/screens/SignIn";
-import { backend, backendSetupMessage } from "@/backend";
 import { useAccountStatus } from "./hooks/useAccountStatus";
 import { useAuthSession } from "./hooks/useAuthSession";
 import { Workspace } from "./Workspace";
@@ -69,7 +68,8 @@ export function ConnectedApp() {
   const { pathname } = useLocation();
   const auth = useAuthSession();
   const { user } = auth;
-  const account = useAccountStatus(user?.id);
+  const [live, setLive] = useState(false);
+  const account = useAccountStatus(user?.id, live);
   const [passwordSetup, setPasswordSetup] = useState(false);
   // A voluntary password change ends when the person signs out.
   if (!user && passwordSetup) setPasswordSetup(false);
@@ -81,7 +81,7 @@ export function ConnectedApp() {
     !passwordSetup &&
     !account.error;
   // Every other signed-out path is a deep link and goes through sign-in.
-  const showLanding = !auth.loading && !!backend && !user && pathname === "/";
+  const showLanding = !auth.loading && !user && pathname === "/";
   const layout: Layout = dashboardReady
     ? "dashboard"
     : showLanding
@@ -90,12 +90,6 @@ export function ConnectedApp() {
   let content: ReactNode;
   if (auth.loading) {
     content = <StatusMessage>Restoring your session…</StatusMessage>;
-  } else if (!backend) {
-    content = (
-      <Alert variant="destructive" className="max-w-md">
-        <AlertDescription>{backendSetupMessage}</AlertDescription>
-      </Alert>
-    );
   } else if (showLanding) {
     content = <Landing />;
   } else if (!user) {
@@ -152,6 +146,7 @@ export function ConnectedApp() {
           setPasswordSetup(true);
         }}
         signOut={auth.signOut}
+        onLiveChange={setLive}
       />
     );
   }

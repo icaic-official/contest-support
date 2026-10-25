@@ -644,7 +644,7 @@ function isolatedEnv(directory: string): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = {};
   for (const [key, value] of Object.entries(process.env)) {
     if (value === undefined) continue;
-    if (key.startsWith('CLOUDFLARE_') || key.startsWith('CF_') || key.startsWith('SUPABASE_') || key.startsWith('VITE_')) continue;
+    if (key.startsWith('CLOUDFLARE_') || key.startsWith('CF_') || key.startsWith('VITE_')) continue;
     env[key] = value;
   }
   env.CI = 'true';
@@ -656,7 +656,6 @@ function isolatedEnv(directory: string): NodeJS.ProcessEnv {
   env.XDG_CACHE_HOME = path.join(directory, 'cache');
   env.XDG_DATA_HOME = path.join(directory, 'data');
   env.MINSKY_VERIFY_ENV_DIR = directory;
-  env.VITE_BACKEND = 'cloudflare';
   env.NODE_ENV = 'production';
   return env;
 }

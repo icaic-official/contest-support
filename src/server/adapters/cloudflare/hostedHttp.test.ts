@@ -147,11 +147,8 @@ describe('isolated hosted Cloudflare authentication HTTP', () => {
     expect(member.status('/api/auth/sign-in')).toBe(401);
     expect(await member.auth.currentUser()).toBeUndefined();
     await verifyTemporaryAuthentication(member.auth, { id: fixture.contestant.accountId, username, password }, {
-      restricted: async () => {
-        await expectFailure(member.auth.sessions()).toThrow();
-        expect(member.status('/api/auth/sessions')).toBe(403);
-      },
-      ready: async () => { expect((await member.auth.sessions()).map((session) => session.id)).toEqual([fixture.sessionId]); },
+      restricted: async () => { expect((await member.auth.accountStatus()).must_change).toBe(true); },
+      ready: async () => { expect(await member.auth.accountStatus()).toMatchObject({ must_change: false, session_valid: true }); },
     });
     expect(member.metadata()).toEqual({ secure: true, httpOnly: true, strict: true, hostOnly: true, root: true });
 
@@ -163,7 +160,6 @@ describe('isolated hosted Cloudflare authentication HTTP', () => {
     if (!recovered.temporaryPassword) throw new Error('The authorized reset returned no temporary password.');
     await member.auth.signIn(username, recovered.temporaryPassword);
     expect((await member.auth.accountStatus()).must_change).toBe(true);
-    await expectFailure(member.auth.sessions()).toThrow();
     const stale = member.capture();
     const reset = await admin.auth.account(fixture.sessionId, { action: 'reset_password', userId: fixture.contestant.accountId });
     expect((await stale('/api/auth/session')).status).toBe(401);

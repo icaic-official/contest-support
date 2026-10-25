@@ -9,7 +9,7 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
-import { requireBackend } from "@/backend";
+import { backend } from "@/backend";
 import {
   AvatarImageCache,
   type AvatarMap,
@@ -40,9 +40,10 @@ const noop = () => {};
 /**
  * Reads the pictures that the person can see in the selected session, and
  * keeps one downloaded copy of each for every avatar on screen. The list loads
- * like announcements do: when the session or a live signal changes, and every
- * 10 seconds. A picture change sends no live signal, so the poll shows other
- * people's changes. A failed read keeps the earlier pictures.
+ * like announcements do: when the session changes, and each time `updates`
+ * changes. That counts live signals and the session timer. A picture change
+ * sends no live signal, so the timer shows other people's changes. A failed
+ * read keeps the earlier pictures.
  */
 export function AvatarProvider({
   data,
@@ -69,7 +70,7 @@ export function AvatarProvider({
   const images = useMemo(
     () =>
       new AvatarImageCache((avatar) =>
-        requireBackend().avatars.download(sessionId, avatar),
+        backend.avatars.download(sessionId, avatar),
       ),
     [sessionId],
   );
@@ -81,7 +82,7 @@ export function AvatarProvider({
   const reload = useCallback(async () => {
     const run = ++newest.current;
     try {
-      const list = await requireBackend().avatars.list(sessionId);
+      const list = await backend.avatars.list(sessionId);
       if (run !== newest.current) return;
       setLoaded((previous) => ({
         sessionId,
@@ -98,13 +99,11 @@ export function AvatarProvider({
   useEffect(() => {
     if (!sessionId || !allowed) return;
     void reload();
-    const interval = window.setInterval(() => void reload(), 10000);
-    return () => window.clearInterval(interval);
   }, [reload, sessionId, allowed, updates]);
 
   const upload = useCallback(
     async (requestId: string, picture: Blob) => {
-      const avatar = await requireBackend().avatars.upload({
+      const avatar = await backend.avatars.upload({
         requestId,
         file: picture,
       });
@@ -119,7 +118,7 @@ export function AvatarProvider({
   );
 
   const remove = useCallback(async () => {
-    await requireBackend().avatars.remove();
+    await backend.avatars.remove();
     newest.current++;
     setLoaded((previous) => {
       const next = new Map(previous?.people);

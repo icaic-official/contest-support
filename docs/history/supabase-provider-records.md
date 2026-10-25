@@ -1,8 +1,8 @@
 # Supabase provider records
 
-These dated records moved from the [Supabase provider guide](../supabase-provider.md) and the former Supabase workflow verification guide on 2026-10-24.
+These dated records moved from the Supabase provider guide and the former Supabase workflow verification guide on 2026-10-24.
 They describe earlier setups. They are not current instructions.
-The current procedure for running the adapter on your own project is [Run the Supabase adapter](../supabase-provider.md).
+On 2026-10-25 the owner removed the Supabase implementation and its guide.
 
 ## Retirement of the project's Supabase projects, 2026-10-24
 

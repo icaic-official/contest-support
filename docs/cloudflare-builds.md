@@ -75,7 +75,7 @@ That command reads `wrangler.jsonc` and would publish `minsky-dev`.
 10. Add build variable `SKIP_DEPENDENCY_INSTALL` with value `1`.
     The check script installs the root and `site` lockfiles itself.
     Build variables are under **Settings > Build > Build variables and secrets**.
-11. Do not add `CLOUDFLARE_API_TOKEN`, Supabase keys, or `AUTH_SECRET` to this Worker.
+11. Do not add `CLOUDFLARE_API_TOKEN` or `AUTH_SECRET` to this Worker.
     Ordinary checks do not use those values.
 12. Leave **Settings > Build > Build watch paths** at the default, which includes every file.
 
@@ -186,7 +186,7 @@ You need access to Cloudflare account `458ad6a930b0fb717796dfa19ca6a2b1`.
 
    The deploy script compares the last four values with the committed configuration.
    A pull request that changes the configuration to another database or bucket fails until you also change these values.
-10. Do not add `MINSKY_DEV_BACKEND` or Supabase variables. The script always publishes the Cloudflare app.
+10. Do not add `MINSKY_DEV_BACKEND`. The script always publishes the Cloudflare app.
 11. Do not add `AUTH_SECRET`. That secret stays on the Worker and is never a build input.
 12. Leave **Build watch paths** at the default, which includes every file.
 
@@ -222,6 +222,35 @@ Pause publication during a live contest. A merge then does not change the applic
 - If a published version is bad, roll back the Worker with `npx wrangler rollback --config src/server/adapters/cloudflare/deploy/development.wrangler.jsonc`. Write migrations that only add tables, columns, or indexes, so that the earlier Worker still runs against the newer schema.
 - If a migration damaged data, find `Restore point before migrations:` in the deploy log. Run the `npx wrangler d1 time-travel restore` command on that line. It returns `minsky-development` to its state before the migration and discards later writes. See [D1 Time Travel](https://developers.cloudflare.com/d1/reference/time-travel/).
 
+### Read the Worker logs
+
+Workers Logs is on for `minsky-dev`. The next publication applies this setting.
+The Worker writes one JSON object for each failure. It does not log a successful request.
+
+To read the logs in the dashboard:
+
+1. Open **Workers & Pages > minsky-dev > Logs**.
+2. Filter on `level = error`, or on one `event` value from the table.
+
+To watch live from a terminal, run `npx wrangler tail minsky-dev --format json`.
+
+| Event | Meaning |
+| --- | --- |
+| `worker.unhandled_error` | A request to `/api` failed. The client got a 503. |
+| `http.unhandled_error` | An application route failed. The client got a 503. |
+| `authentication.unhandled_error` | Sign-in or account handling failed. The client got a 503. |
+| `live.coordinator_error` | The live-update Durable Object failed a request. |
+| `live.alarm_error` | The Durable Object alarm failed. |
+| `live.notify_error`, `live.notify_rejected` | One live notification was not delivered. The cron job retries it. |
+| `notifications.delivery_failed` | A delivery pass left notifications undelivered. |
+| `scheduled.task_failed` | One task of the every-minute cron job failed. The `task` field names it. This includes the image, announcement image, and avatar recovery steps. |
+| `scheduled.failed` | The cron job had at least one failed task. |
+
+Each event has `level` and `event`. It can also have `route`, `method`, `requestId`, `status`, `task`, counts, `errorName`, and `errorCode`.
+`requestId` is the `cf-ray` value of the request.
+The logs never contain passwords, cookies, tokens, IP addresses, request bodies, image data, message text, or error messages.
+A migration failure is not a Worker log. It appears in the Workers Builds log of the failed build.
+
 ### Change the D1 schema
 
 Every merge to `main` applies its new D1 migrations automatically. A Worker rollback then runs the earlier code against the newer schema.
@@ -241,7 +270,7 @@ To ship a migration that removes or renames schema:
 
 To publish by hand, run `npm run deploy` from an updated `main` with the same variables, a token with the same permissions, `WORKERS_CI_BRANCH=main`, and `WORKERS_CI_COMMIT_SHA` set to the output of `git rev-parse HEAD`.
 
-The script sets `VITE_BACKEND=cloudflare` and guards the complete Worker:
+The script guards the complete Worker:
 
 - The app needs its API code, D1 database, private R2 bucket, and live coordinator. The script has no assets-only upload path that could remove them.
 - It validates the generated configuration and exact hosted targets before upload. After upload, it checks the published targets, live bindings, and an anonymous rejection at the authentication API.
@@ -366,6 +395,6 @@ The reset discards all preview data written after that point, including test acc
 ## Checks that stay on demand
 
 Browser tests need Chromium libraries that the [build image](https://developers.cloudflare.com/workers/ci-cd/builds/build-image/) does not install.
-Hosted Supabase and Cloudflare suites also exceed the 20 minute build limit, or they change isolated CI resources.
+Hosted Cloudflare suites also exceed the 20 minute build limit, or they change isolated CI resources.
 Coding agents run those commands when the change needs them.
 The exact commands are in [deployment settings](cloudflare-build-settings.md#on-demand-checks).

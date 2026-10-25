@@ -1,30 +1,13 @@
-import {
-  expect,
-  test as base,
-  type Locator,
-  type Page,
-} from "@playwright/test";
-import { createJuryFixture } from "./jury-fixture";
+import type { Locator, Page } from "@playwright/test";
 import { snapshotSchema } from "../src/connected/model";
+import { appErrors } from "./support/worker";
+import { expect, test } from "./support/localWorker";
 
 // T0009 jury worklist checks for the T0015 organiser UIs. The phone Awards
 // tab (390 × 844) and the desktop Award review page (1280 × 800) are the
 // worklist: "To decide" is the old "Needs decision" list and "To apply" is
 // the old "Pending external application" list.
 
-const test = base.extend<{
-  local: Awaited<ReturnType<typeof createJuryFixture>>;
-}>({
-  local: async ({ context }, provide) => {
-    const local = await createJuryFixture();
-    await local.attach(context);
-    try {
-      await provide(local);
-    } finally {
-      await local.close();
-    }
-  },
-});
 test.describe.configure({ mode: "default" });
 
 const phone = { width: 390, height: 844 };
@@ -45,7 +28,8 @@ async function login(page: Page, name = "jury", viewport: Viewport = phone) {
       : viewport.width < 1024
         ? "organiser-phone"
         : "organiser-desktop";
-  await expect(page.locator(`[data-ui="${ui}"]`)).toBeVisible();
+  // The first snapshot comes from local D1, which can take several seconds on a busy machine.
+  await expect(page.locator(`[data-ui="${ui}"]`)).toBeVisible({ timeout: 15_000 });
   await expect(page.getByText("Live", { exact: true })).toBeVisible();
 }
 
@@ -364,7 +348,7 @@ test("two simulated Realtime clients refresh decisions and confirmations without
     // Match the other issue's award so an earlier or in-flight read cannot pass.
     const updatedSnapshot = page.waitForResponse(async (response) => {
       if (
-        !response.url().endsWith("/rpc/session_snapshot") ||
+        new URL(response.url()).pathname !== "/api/snapshot" ||
         !response.ok()
       )
         return false;
@@ -420,7 +404,7 @@ test("retry after a lost response uses the original transaction without duplicat
   const award = sheet(page, "Decide award");
   await chooseMinutes(award, 10);
   await award.getByLabel("Public award explanation").fill("Ten minutes reviewed");
-  local.loseNextResponse();
+  local.loseNext("/api/workflow", "response");
   await award.getByRole("button", { name: "Record 10 minutes" }).click();
   const retry = page.getByRole("button", { name: "Retry last request" });
   await expect(retry).toBeEnabled();
@@ -437,8 +421,8 @@ test("retry after a lost response uses the original transaction without duplicat
         item.text.startsWith("10 minutes awarded"),
     ),
   ).toHaveLength(1);
-  expect(local.workflowRequests).toHaveLength(2);
-  expect(local.workflowRequests[1]).toEqual(local.workflowRequests[0]);
+  expect(local.bodies("/api/workflow")).toHaveLength(2);
+  expect(local.bodies("/api/workflow")[1]).toEqual(local.bodies("/api/workflow")[0]);
   await page.getByRole("button", { name: "Back", exact: true }).click();
   await expectCounts(page, { decide: 1, apply: 3, done: 1 });
 });
@@ -455,7 +439,7 @@ test("retry after a lost confirmation response preserves one application and his
     .click();
   const apply = sheet(page, "Confirm external application");
   await apply.getByRole("checkbox").check();
-  local.loseNextResponse();
+  local.loseNext("/api/workflow", "response");
   await apply.getByRole("button", { name: "Confirm applied externally" }).click();
   const retry = page.getByRole("button", { name: "Retry last request" });
   await expect(retry).toBeEnabled();
@@ -474,8 +458,8 @@ test("retry after a lost confirmation response preserves one application and his
     state.history.filter((item) => item.issue_id === local.issues[3]);
   expect(history(retried)).toEqual(history(committed));
   expect(history(retried)).toHaveLength(1);
-  expect(local.workflowRequests).toHaveLength(2);
-  expect(local.workflowRequests[1]).toEqual(local.workflowRequests[0]);
+  expect(local.bodies("/api/workflow")).toHaveLength(2);
+  expect(local.bodies("/api/workflow")[1]).toEqual(local.bodies("/api/workflow")[0]);
   await expectCounts(page, { decide: 2, apply: 1, done: 1 });
 });
 
@@ -649,11 +633,12 @@ test("session and role changes clear selection and do not grant other roles a ju
   await sheet(page, "Decide award")
     .getByLabel("Public award explanation")
     .fill("Role change draft");
-  await local.db.query(
-    "update public.memberships set roles=array['volunteer'] where user_id=$1 and session_id=$2",
-    [local.users.jury, local.sessions[0]],
+  await local.run(
+    "UPDATE membership_roles SET role = 'volunteer' WHERE account_id = ? AND session_id = ?",
+    local.users.jury,
+    local.sessions[0],
   );
-  local.broadcast();
+  local.notify();
   // The award form closes because the person can no longer decide awards.
   await expect(sheet(page, "Decide award")).toHaveCount(0);
   await expect(page.getByLabel("Public award explanation")).toHaveCount(0);
@@ -664,9 +649,7 @@ test("session and role changes clear selection and do not grant other roles a ju
   await expect(
     phoneTabs(page).getByRole("button", { name: "Awards" }),
   ).toHaveCount(0);
-  await local.db.query("delete from public.memberships where user_id=$1", [
-    local.users.jury,
-  ]);
+  await local.run("DELETE FROM memberships WHERE account_id = ?", local.users.jury);
   await page.evaluate(() => window.dispatchEvent(new Event("focus")));
   await expect(
     page.getByRole("heading", { name: "Session access" }),
@@ -683,10 +666,8 @@ test("archived details remain readable, while failed reads cannot masquerade as 
   await expect(
     row(page, 1).getByRole("button", { name: "Record award" }),
   ).toBeVisible();
-  await local.db.query("update public.events set archived=true where id=$1", [
-    local.event,
-  ]);
-  local.broadcast();
+  await local.run("UPDATE events SET archived = 1 WHERE id = ?", local.event);
+  local.notify();
   await expect(
     page.getByText("This event is archived. Records are read only.").first(),
   ).toBeVisible();
@@ -714,10 +695,10 @@ test("archived details remain readable, while failed reads cannot masquerade as 
   await expect(page.getByText("This event is archived.", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Back", exact: true }).click();
 
-  await page.route("**/rpc/session_snapshot", (route) =>
+  await page.route(/\/api\/snapshot\?/, (route) =>
     route.fulfill({
       status: 503,
-      json: { message: "Verification read unavailable" },
+      json: { error: "Verification read unavailable" },
     }),
   );
   await page.evaluate(() => window.dispatchEvent(new Event("focus")));
@@ -732,12 +713,7 @@ test("refresh, empty states, desktop, phone layouts and zoom reflow remain usabl
   page,
   local,
 }, testInfo) => {
-  const errors: string[] = [];
-  page.on("pageerror", (error) => errors.push(error.message));
-  page.on("console", (message) => {
-    if (message.type() === "error" || message.type() === "warning")
-      errors.push(message.text());
-  });
+  const errors = appErrors(page, ["error", "warning"]);
   await login(page, "jury", desktop);
   await openAwards(page);
   await expect(page).toHaveTitle("Minsky");
@@ -830,4 +806,36 @@ test("refresh, empty states, desktop, phone layouts and zoom reflow remain usabl
   await showList(page, "To apply");
   await expect(page.getByText("Nothing in this list.")).toBeVisible();
   expect(errors).toEqual([]);
+});
+
+test("the desktop list switch slides its indicator to the selected list", async ({
+  page,
+  local,
+}) => {
+  void local;
+  await login(page, "jury", desktop);
+  await openAwards(page);
+  const group = page.getByRole("group", { name: "Award lists" });
+  const pill = group.locator('[data-slot="sliding-indicator"]');
+  const sitsUnder = async (list: Locator) => {
+    const [a, b] = await Promise.all([pill.boundingBox(), list.boundingBox()]);
+    if (!a || !b) return Infinity;
+    return Math.max(
+      Math.abs(a.x - b.x),
+      Math.abs(a.y - b.y),
+      Math.abs(a.width - b.width),
+      Math.abs(a.height - b.height),
+    );
+  };
+  await expect
+    .poll(() => sitsUnder(listButton(page, "To decide")))
+    .toBeLessThan(1.5);
+  await showList(page, "Applied");
+  await expect
+    .poll(() => sitsUnder(listButton(page, "Applied")))
+    .toBeLessThan(1.5);
+  await showList(page, "To apply");
+  await expect
+    .poll(() => sitsUnder(listButton(page, "To apply")))
+    .toBeLessThan(1.5);
 });

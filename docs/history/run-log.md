@@ -4,6 +4,67 @@ This file records dated runs, decisions, and verification evidence, newest first
 It was named `docs/current-state.md` until 2026-10-24.
 Each section describes its own date and revision. Check the repository, [development tickets](../tickets.md), and the public [feature status](../../site/src/content/docs/reference/status.md) for the current state.
 
+## Load test baseline, 2026-10-25
+
+An agent ran the new load harness ([Run a load test](../run-load-tests.md)) against a separate installation on 2026-10-25.
+The owner allows agents to create and manage Cloudflare resources whose names start with `minsky-preview`. The run used only such resources and the existing account token. It created no token and changed no development, CI, or production resource.
+[Scaling design](../scaling-design.md) explains the results.
+
+### Builds
+
+| Build | Source |
+| --- | --- |
+| Baseline | `5792530` with the uncommitted `bugfix/signin-failure-limits` changes to `worker.ts` and `authentication.ts` as a throwaway patch (SHA-256 `3e42da8e18ffa808c5c239a292227229f103b40837756dab458f9eb5c2f6a0ee` of the exported diff, taken 02:46 UTC). `main` allows 50 sign-ins per IP address in 15 minutes, which blocks 800 accounts from one machine. |
+| B2+B3 | Baseline, `c5137a7` (`perf/live-batched-access`), and `7a17502` (`perf/history-index`) |
+| Prototype | B2+B3 and `advanced: { database: { validateSchema: false } }` in `identity.ts` |
+
+None of these builds is on `main`. The patch and the prototype were not committed.
+
+### Resources
+
+Times are UTC.
+
+| Time | Action |
+| --- | --- |
+| 02:46 | Created D1 `minsky-preview-load`, location hint `apac`, UUID `f53132b4-4525-426b-bed2-f0270dc2ef2a`. |
+| 02:47 | Created private R2 bucket `minsky-preview-load-images`. |
+| 02:48 | Applied migrations 0001 to 0011 and deployed Worker `minsky-preview-load` (Baseline). |
+| 02:51 | Bootstrap committed 480 fictional teams and the owner `load-organizer`, but its private result stayed at `operation_started`. `cloudflare:install recover` issued a new owner password. `cloudflare:install secret` created the Worker's own `AUTH_SECRET`. |
+| 03:57 | Applied migration `0012_history_index.sql` from `7a17502` and deployed B2+B3. |
+| 04:15 | Deployed the prototype. |
+| 04:33 | Deleted the Worker, the R2 bucket (0 objects), and the D1 database. |
+| 04:34 | The account listed no D1 database, bucket, Worker, or Durable Object namespace for `minsky-preview-load`. The URL returned `404`. |
+
+### Commands
+
+```sh
+npm run load -- competition --teams=480
+npm run load -- setup --origin=https://minsky-preview-load.icaic-minsky.workers.dev --owner=… --fixtures=… --staff=240 --team-accounts=960
+npm run load -- run --fixtures=… --results=… --steps=50,100,200,400,800 --ramp-seconds=30 --step-seconds=90 --issues-per-team-hour=12 --threads=8
+npm run load -- analytics --results=… --account=458ad6a930b0fb717796dfa19ca6a2b1 --database=f53132b4-4525-426b-bed2-f0270dc2ef2a --worker=minsky-preview-load
+```
+
+### Results
+
+| Build | Last step that held | First step that stopped | Live updates within 3 s at 50 users | D1 queries per request |
+| --- | --- | --- | --- | --- |
+| Baseline | 50 users | 100 users: no new WebSocket opened | 56% | 39.8 |
+| B2+B3 | 100 users, 2.5% failed | 200 users: 19% failed, Worker `503` | 97% | 40.1 |
+| Prototype | 100 users, 0.6% failed | 200 users: WebSocket handshakes timed out | 99% | 4.2 |
+| Prototype, `--issues-per-team-hour=0`, steps 200, 400, 800 | None | 200 users: 50 of 200 sockets opened | Not measured | 4.2 |
+
+- Setup created 1,200 accounts in 7 minutes. It left 4,291 undelivered notifications, which took 49 minutes to deliver. A WebSocket upgrade hung for about 8 minutes after setup.
+- The first run started during that backlog. Its 50-user step stopped when 42 of 50 WebSocket handshakes timed out. The harness now checks the live channel before a run.
+- The static canary stayed at a median of 35 to 78 ms. The harness used at most 0.43 CPU cores and 3.1 MB per second.
+- Each build ran its step sequence once, in the order above, on the same growing database.
+- After the prototype runs, an accidental `run` against the prototype ran for about 100 seconds before it was stopped. Its results were not written or used.
+
+### Not verified
+
+- 400 and 800 users. No build held 200 users.
+- Image uploads, a redeploy during a contest, and sign-ins from many IP addresses.
+- A production configuration with the Worker placed next to the D1 primary.
+
 ## Live backend, 2026-10-23
 
 The owner selected Cloudflare as the live backend on 2026-10-23.
@@ -2073,7 +2134,7 @@ The user authorized this first migration step while the other pull requests rema
 8. Docs that need updating. None for the implemented extraction. Future hosted verification must add its result to this record.
 
 The [backend contracts](../backend-contracts.md) describe the interfaces and retry rules.
-The [cloud onboarding guide](../supabase-provider.md#verification-and-hosted-cloud-checks) lists the `cloud-test` environment configuration.
+The cloud onboarding guide (removed 2026-10-25) lists the `cloud-test` environment configuration.
 
 [Draft PR #32](https://github.com/GiftedNovaHD/minsky/pull/32) contains implementation commit `408dafa`.
 [GitHub Checks](https://github.com/GiftedNovaHD/minsky/actions/runs/39022916356) and the [secret and dependency checks](https://github.com/GiftedNovaHD/minsky/actions/runs/39022916361) passed for that commit.
@@ -2692,7 +2753,7 @@ The visible attachment ids are the dependency instead.
 Incoming reports preserve the displayed issue and its reply draft.
 Membership forms use the current saved roles, admin flag, and team. Unchanged membership values preserve local edits.
 Cloud test cleanup retains its recovery file on failure and removes it after success.
-See [fixture recovery](../supabase-provider.md#fixture-recovery) for the recovery steps.
+See fixture recovery (removed 2026-10-25) for the recovery steps.
 
 At `c785964`, all 33 unit/database tests and 11 browser tests passed on Node.js 24.19.0.
 Lint, type checking, the Deno function check, the production build, and whitespace checks also passed.
@@ -3086,6 +3147,6 @@ The demo uses one tab and one local dataset. It does not synchronize concurrent 
 
 Persona/filter selections reset on refresh. These checks establish no production security, offline operation, or 800-user capacity.
 
-T0002 retains one award per issue, even after reopening; award adjustments and role editors remain deferred. [T0003](../tickets.md#t0003--cloud-onboarding-and-authenticated-shared-product) now scopes cloud onboarding, authenticated shared workflows, role dashboards, minimal admin controls and contributor setup. Its planning changes were prepared on updated `main`; no application code or provider resources were changed. The [onboarding guide](../supabase-provider.md) distinguishes setup tasks from completed work.
+T0002 retains one award per issue, even after reopening; award adjustments and role editors remain deferred. [T0003](../tickets.md#t0003--cloud-onboarding-and-authenticated-shared-product) now scopes cloud onboarding, authenticated shared workflows, role dashboards, minimal admin controls and contributor setup. Its planning changes were prepared on updated `main`; no application code or provider resources were changed. The onboarding guide (removed 2026-10-25) distinguishes setup tasks from completed work.
 
 The user explicitly chose cloud features first and deferred outage/resilience work. Free tiers are preferred; necessary paid services are acceptable after identifying the cost and reason. Helpers' issue-linked images and configurable volunteer upload permissions are recorded for the next candidate alongside broader admin tools. Attachment visibility and setting scope/defaults remain undecided. No T0004 is created. UI redesign, notifications, CSV imports and shared incidents remain deferred.

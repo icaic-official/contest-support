@@ -22,8 +22,6 @@ export const commands = [
   ['npm', ['ci', '--prefix', 'site']],
   ['npm', ['run', 'build']],
   ['npm', ['run', 'lint']],
-  ['npm', ['run', 'check:functions']],
-  ['npm', ['run', 'test:functions']],
   ['npm', ['test']],
   ['npm', ['run', 'test:providers:list']],
   ['npm', ['run', 'docs:build']],

@@ -1,4 +1,5 @@
-import { expect, type Page, test } from "@playwright/test";
+import type { Page } from "@playwright/test";
+import { expect, test } from "./support/worker";
 import { documentationUrl } from "../src/lib/links";
 
 test("centered sign-in explains access and keeps unauthenticated users outside the workspace", async ({

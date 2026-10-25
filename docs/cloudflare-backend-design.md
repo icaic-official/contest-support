@@ -1,26 +1,24 @@
 # Cloudflare backend design
 
 This page explains the Cloudflare connector and its provider boundaries.
-The browser uses the same `Backend` contract for Supabase and Cloudflare.
+The browser uses the `Backend` contract.
 Issue decisions use one `WorkflowService`. Provider adapters supply persistence, authentication, images, and live delivery.
-Cloudflare is the active development backend. The Supabase adapter remains a separate implementation that readers run on their own projects.
+Cloudflare is the only backend.
 
 The user selected Workers, D1 with a SQLite rewrite, private R2, and Durable Objects.
 On 2026-10-18, the owner selected a fresh development installation instead of transferring existing trial data.
 Preserve application behavior and database rules. Create new accounts, IDs, and records through supported installation paths.
-Do not transfer Supabase accounts, passwords, issues, history, images, or IDs.
-T0021 left Supabase intact, including its existing trial data and resources.
+Do not transfer accounts, passwords, issues, history, images, or IDs from the earlier backend.
 See [activation and recovery](activate-cloudflare-development.md) for the approved development switch and its operating procedure.
 See [backend contracts](backend-contracts.md) for the browser interface and [run log](history/run-log.md) for dated evidence.
 
 ## Two different adapter boundaries
 
 `Backend` describes what the browser needs from Minsky.
-The existing Supabase adapter translates those operations into Supabase calls.
 The Cloudflare adapter translates the same operations into authenticated HTTP requests and live subscriptions.
 
 The server needs a separate boundary.
-Moving browser calls behind `Backend` does not make PostgreSQL functions portable.
+Moving browser calls behind `Backend` does not make a provider's database functions portable.
 The [shared workflow service](server-workflow.md) applies the existing issue decisions.
 The Cloudflare server reuses those decisions and enforces their commit conditions through its SQLite adapter.
 A future AWS, GCP, or Azure server can reuse the same service without importing Cloudflare bindings.
@@ -29,18 +27,12 @@ These providers have no implementation. See [Add a backend provider](add-provide
 ```mermaid
 flowchart TD
     UI[React application] --> Contract[Backend interface]
-    Contract --> SB[Supabase browser adapter]
     Contract --> CF[Cloudflare browser adapter]
-    SB --> Current[Existing Supabase services]
-    SB -.-> SF[Opt-in Supabase workflow function]
-    SF --> Domain
     CF --> API[Worker HTTP handlers]
     API --> Identity[Identity and login sessions]
     API --> Domain[Minsky command and access rules]
     Domain --> Persistence[WorkflowPersistence]
     Persistence --> D1[D1 adapter]
-    Persistence --> SP[Supabase persistence adapter]
-    SP --> PG[Guarded PostgreSQL commit]
     API --> Application[D1 application service]
     Application --> D1
     API --> Images[R2 image service]
@@ -57,13 +49,9 @@ flowchart TD
     Live --> CF
 ```
 
-The diagram includes the Cloudflare connector and the separate Supabase verification path.
-The opt-in Supabase function executes every issue command through the shared service.
 The D1 adapter persists all nine commands from that service.
 The complete [application Worker](../src/server/adapters/cloudflare/applicationWorker.ts) combines authenticated workflow, reads, administration, images, announcements, and live connections.
 It guards current identity sessions and credential generations inside workflow commits.
-The Supabase browser workflow retains its guarded SQL RPC.
-The dotted connection identifies the opt-in executor used for replacement verification.
 
 ## Modules have explicit responsibilities
 
@@ -145,8 +133,7 @@ See [D1 read replication](https://developers.cloudflare.com/d1/best-practices/re
 
 ## One workflow command has one database commit
 
-The existing [workflow function](../supabase/migrations/202610020003_private_signals.sql) commits state, history, signals, and the request receipt together.
-The SQLite implementation preserves that property.
+A workflow command commits state, history, signals, and the request receipt together.
 D1 `batch()` accepts prepared statements and rolls back the batch if a statement fails.
 It does not provide a JavaScript transaction callback around arbitrary asynchronous work.
 See [the D1 database API](https://developers.cloudflare.com/d1/worker-api/d1-database/).
@@ -195,18 +182,16 @@ The owner selected a new administrator through the supported bootstrap process o
 This decision replaces the earlier account-preservation requirement.
 The new installation creates its own identities and memberships.
 Users must change organizer-issued temporary passwords before contest access.
-No account, password, password hash, or account ID transfers from Supabase.
+No account, password, password hash, or account ID transfers from the earlier backend.
 
 The Cloudflare identity adapter uses maintained Better Auth.
 See [the implementation reference](cloudflare-authentication.md) and [choice with costs](cloudflare-authentication-choice.md).
-The active Cloudflare development application uses this identity boundary.
-Supabase builds retain Supabase authentication.
+The Cloudflare application uses this identity boundary.
 Minsky retains its username rules, organizer recovery, mandatory password changes, and cross-session authorization.
 
 The connector verifies current login state for each protected operation.
 A signed token alone does not prove that the login remains active.
-Supabase itself documents that issued tokens can outlive session deletion.
-See [Supabase session invalidation](https://supabase.com/docs/guides/auth/managing-user-data).
+Issued tokens can outlive session deletion at some identity providers.
 
 The Worker API uses a secure, HttpOnly session cookie and an opaque login identifier for same-origin application requests.
 The identity adapter owns expiry, rotation, and revocation. The browser receives no database credentials.
@@ -221,10 +206,8 @@ The authorization check, gate, account access version, and audit record commit t
 Only an administrator of every assigned session can reset the account or assign its initial username.
 An archived event in any assigned session prevents these account changes.
 The current behavior rejects replacement of an assigned username and directs self-resets to `changePassword()`.
-See [the account administration rules](../supabase/migrations/202610020004_usernames.sql).
 A credential update uses a persisted operation record with a guarded completion state.
 Failure leaves the account restricted instead of restoring an earlier valid login.
-The [current credential migration](../supabase/migrations/202610140001_attachment_fixes.sql) provides the behavior to preserve.
 
 ## Private R2 images use explicit lifecycle states
 
@@ -310,6 +293,19 @@ The connection coordinator is one Durable Object per contest session.
 The Worker attempts delivery after the database commit.
 A scheduled recovery scan retries pending rows if the Worker stops before delivery.
 The coordinator accepts repeated deliveries and ignores older duplicate sequences for the same audience.
+
+A dispatcher claims up to 500 pending rows with one `UPDATE … RETURNING` statement.
+The claim sets `claimed_until` to 30 seconds later, so a concurrent dispatcher does not take the same rows.
+The dispatcher sends one request to each session's coordinator.
+The request holds only the highest claimed sequence for each audience, so a burst of changes to one audience sends one hint.
+The dispatcher marks the rows delivered after the coordinator accepts the request.
+It repeats this until no rows remain or 10 seconds have passed.
+A failed or uncertain delivery keeps its claim until the claim expires. The next dispatcher then retries it. This delay prevents every new request from sending the same failing rows again.
+The index `notifications_claim_order` serves the claim order without a sort.
+
+An account without a login has no live connection.
+Account setup therefore writes only the `staff` notification for that account. A later first connection starts with a full refresh.
+
 Acknowledging delivery means that the coordinator accepted the invalidation. It does not prove that every browser received it.
 
 Team changes reach the affected team and staff.
@@ -317,7 +313,8 @@ Staff-only changes reach staff only.
 Private changes use separate sequences, so contestant notifications and counters cannot reveal their existence.
 Membership changes and password resets produce targeted access invalidations.
 The coordinator rechecks current authorization before each delivery, including duplicate hints, and closes invalid logins.
-An unavailable authorization service causes delivery to stop rather than reuse stale permissions.
+It reads the grants for all of its sockets before it sends a hint. It uses one D1 query for each group of up to 500 logins.
+An unavailable authorization service causes delivery to stop rather than reuse stale permissions. No socket receives that hint.
 
 The coordinator stores each socket's account ID, login ID, session ID, and expiry.
 Those values identify a connection. They do not replace current permission checks.
@@ -332,11 +329,39 @@ See [Durable Objects alarms](https://developers.cloudflare.com/durable-objects/a
 
 Every successful connection or reconnect triggers a fresh authorized snapshot.
 A missed invalidation cannot require the browser to reconstruct issue history from messages.
-The existing focus refresh and ten-second polling remain until tests justify a replacement.
+While the live channel is connected, the browser refreshes on live hints, on focus, when the tab becomes visible, and once every 60 seconds.
+The 60-second refresh is a safety net. It bounds the delay for changes that send no hint: a profile picture change, an announcement expiry, and a password reset.
+While the channel is down or reconnecting, the browser refreshes every 10 seconds as before.
+A drop or a reconnect starts a refresh at once.
+One timer in `useSessionSnapshot` drives the snapshot, announcement and picture reads.
+The account check in `useAccountStatus` uses the same schedule.
+`createCloudflareAuthentication` keeps its own 60-second session check.
 Closing a subscription stops callbacks immediately and releases the socket and timers.
 
 The healthy-connection target remains live updates within three seconds.
 Immediate delivery is the normal path. Recovery scans and polling handle missed messages but do not establish that latency target.
+
+## The Worker sets the security headers
+
+The Worker runs before static assets. Cloudflare does not apply a `_headers` file to responses from Worker code, so a `_headers` file would not work here. See [Workers static assets headers](https://developers.cloudflare.com/workers/static-assets/headers/).
+[securityHeaders.ts](../src/server/adapters/cloudflare/securityHeaders.ts) sets the headers on every asset response and on every API response.
+
+| Header | Applies to | Value |
+| --- | --- | --- |
+| `Content-Security-Policy` | HTML documents | Scripts, fonts, connections, and forms use only the same origin. No eval. No object, frame, or foreign base. `frame-ancestors 'none'`. |
+| `Content-Security-Policy` | API responses | `default-src 'none'; frame-ancestors 'none'` |
+| `Strict-Transport-Security` | Every response | `max-age=31536000` |
+| `X-Content-Type-Options` | Every response | `nosniff` |
+| `Referrer-Policy` | Every response | `no-referrer` |
+| `X-Frame-Options`, `Permissions-Policy` | HTML documents | `DENY`; camera, microphone, location, and payment off |
+
+The policy allows two things that a stricter policy would block:
+
+- `style-src 'unsafe-inline'`. Sonner, the Radix scroll lock, and the image cropper add `<style>` elements at run time. Script stays strict, so this does not allow script injection.
+- `font-src data:`. The build inlines one small font file as a `data:` URI.
+
+The browser app turns off Zod's code generation (`src/lib/zodConfig.ts`, the first import of `src/main.tsx`). Zod would otherwise call `new Function` once to test for eval. The policy blocks that call and the browser reports a violation.
+The local browser journey (`npm run test:connector:ui:local`) fails if any page reports a policy violation.
 
 ## Separate installation and activation
 
@@ -353,7 +378,6 @@ The [PR #21 component record](history/pr21-installation-disposition.md) preserve
 Data exports and migration tooling are outside the fresh-installation scope.
 The owner approved the concrete development switch separately from the PR #43 merge.
 On 2026-10-23 the owner selected Cloudflare as the live backend. The development Worker is `minsky-dev` and its D1 database is `minsky-development`.
-On 2026-10-24 the owner retired the project's own Supabase projects. The Supabase adapter stays as code. See [Run the Supabase adapter](supabase-provider.md).
 Future backend switches still require separate approval.
 Use the [activation procedure](activate-cloudflare-development.md) for exact targets, the reviewed revision, deployment commands, verification, and recovery.
 The separate documentation Worker retains its independent deployment.

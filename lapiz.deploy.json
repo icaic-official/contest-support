@@ -3,7 +3,7 @@
   "setupCommands": [
     "NODE_ENV=development npm ci --include=dev --no-audit --no-fund",
     "npx esbuild .lapiz/bootstrap.ts --bundle --platform=node --format=esm --packages=external --outfile=.lapiz/build/bootstrap.mjs --log-level=warning",
-    "NODE_ENV=production VITE_BACKEND=cloudflare npx vite build --outDir .lapiz/dist --emptyOutDir"
+    "NODE_ENV=production npx vite build --outDir .lapiz/dist --emptyOutDir"
   ],
   "setupTimeoutMinutes": 15,
   "startCommand": "node .lapiz/run.mjs && exec node_modules/.bin/wrangler dev --config .lapiz/wrangler.preview.json --persist-to .lapiz/state --ip 0.0.0.0 --port \"$PORT\" --show-interactive-dev-session=false",

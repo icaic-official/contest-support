@@ -119,7 +119,6 @@ describe('trusted Cloudflare installation and owner recovery', () => {
     const current = await authentication.current(headers);
     expect(current?.user.id).toBe(result.accountId);
     expect(current?.status.must_change).toBe(true);
-    await expectFailure(authentication.sessions(headers)).toMatchObject({ status: 403 });
     const changed = await authentication.changePassword(headers, result.temporaryPassword, randomSecret());
     expect(await authentication.current(headers)).toBeUndefined();
     const changedHeaders = new Headers({ cookie: changed.cookie.split(';')[0] });
@@ -129,7 +128,6 @@ describe('trusted Cloudflare installation and owner recovery', () => {
     const recoveryLogin = await authentication.signIn(recovered.adminUsername, recovered.temporaryPassword);
     const recoveryHeaders = new Headers({ cookie: recoveryLogin.cookie.split(';')[0] });
     expect((await authentication.current(recoveryHeaders))?.status.must_change).toBe(true);
-    await expectFailure(authentication.sessions(recoveryHeaders)).toMatchObject({ status: 403 });
     await expectFailure(bootstrap()).toThrow('The database is not empty.');
   }, 120_000);
 

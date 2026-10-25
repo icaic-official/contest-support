@@ -3,14 +3,14 @@ import type { Announcements, Avatars, Backend, LiveUpdates } from '../contracts'
 import { AnnouncementRejectedError, ImageRequestError, WorkflowRejectedError } from '../errors';
 import { announcementSnapshotSchema } from '../../connected/announcementModel';
 import { AVATAR_MAX_BYTES, imageKind } from '../../connected/imageFile';
-import { snapshotSchema } from '../../connected/model';
+import { type Command, snapshotSchema, type Snapshot } from '../../connected/model';
 import { createCloudflareAuthentication } from './authentication';
 
-const sessionSchema = z.object({ csrf: z.string().min(1) });
 const sessionsSchema = z.array(z.object({ id: z.uuid(), name: z.string() }));
 const startedSchema = z.object({ id: z.uuid(), original_path: z.string(), thumbnail_path: z.string() });
 const workflowSchema = z.discriminatedUnion('outcome', [
-  z.object({ outcome: z.literal('committed'), issueId: z.uuid() }),
+  // The snapshot is optional and checked apart, so a bad one never hides a committed command.
+  z.object({ outcome: z.literal('committed'), issueId: z.uuid(), snapshot: z.unknown().optional() }),
   z.object({ outcome: z.literal('rejected'), reason: z.enum(['input', 'access', 'state', 'request_id']) }),
   z.object({ outcome: z.literal('unknown') }),
 ]);
@@ -46,19 +46,14 @@ export function createCloudflareBackend(options: {
     });
   }
 
-  async function csrfHeaders(contentType: string): Promise<Headers> {
-    const response = await send('/api/auth/session');
-    if (response.status === 401) throw new Error('Sign in to continue.');
-    const current = sessionSchema.parse(await readJson(response));
-    return new Headers({
-      'Content-Type': contentType, 'X-Minsky-Request': '1', 'X-CSRF-Token': current.csrf,
-    });
+  function protectedHeaders(token: string, contentType: string): Headers {
+    return new Headers({ 'Content-Type': contentType, 'X-Minsky-Request': '1', 'X-CSRF-Token': token });
   }
 
   async function post(path: string, body: unknown): Promise<Response> {
-    return send(path, {
-      method: 'POST', headers: await csrfHeaders('application/json'), body: JSON.stringify(body),
-    });
+    return auth.withCsrf((token) => send(path, {
+      method: 'POST', headers: protectedHeaders(token, 'application/json'), body: JSON.stringify(body),
+    }));
   }
 
   async function readJson(response: Response): Promise<unknown> {
@@ -91,9 +86,12 @@ export function createCloudflareBackend(options: {
   /** The Worker requires the SHA-256 digest of the exact bytes, and R2 checks it again. */
   async function putImage(url: string, body: Blob, contentType: string, bytes: ArrayBuffer): Promise<unknown> {
     const digest = await crypto.subtle.digest('SHA-256', bytes);
-    const headers = await csrfHeaders(contentType);
-    headers.set('X-Minsky-Digest', Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join(''));
-    return imageResult(await send(url, { method: 'PUT', headers, body }));
+    const hex = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
+    return imageResult(await auth.withCsrf((token) => {
+      const headers = protectedHeaders(token, contentType);
+      headers.set('X-Minsky-Digest', hex);
+      return send(url, { method: 'PUT', headers, body });
+    }));
   }
 
   const announcements: Announcements = {
@@ -162,6 +160,20 @@ export function createCloudflareBackend(options: {
       return response.blob();
     },
   };
+
+  async function executeWorkflow(sessionId: string, requestId: string, command: Command): Promise<{ issueId: string; snapshot?: Snapshot }> {
+    const response = await post('/api/workflow', { sessionId, requestId, command });
+    const result = workflowSchema.safeParse(await response.json().catch(() => undefined));
+    // Only the endpoint's typed rejection confirms that no command committed.
+    if (result.success && result.data.outcome === 'rejected') {
+      throw new WorkflowRejectedError(`Workflow rejected: ${result.data.reason}.`);
+    }
+    if (!response.ok || !result.success || result.data.outcome !== 'committed') {
+      throw new Error('Workflow outcome is unknown. Retry the same request.');
+    }
+    const snapshot = snapshotSchema.safeParse(result.data.snapshot);
+    return { issueId: result.data.issueId, snapshot: snapshot.success ? snapshot.data : undefined };
+  }
 
   const updates: LiveUpdates = {
     subscribe(input) {
@@ -239,17 +251,9 @@ export function createCloudflareBackend(options: {
         return snapshotSchema.parse(await readJson(await send(`/api/snapshot?sessionId=${encodeURIComponent(sessionId)}`)));
       },
       async execute(sessionId, requestId, command) {
-        const response = await post('/api/workflow', { sessionId, requestId, command });
-        const result = workflowSchema.safeParse(await response.json().catch(() => undefined));
-        // Only the endpoint's typed rejection confirms that no command committed.
-        if (result.success && result.data.outcome === 'rejected') {
-          throw new WorkflowRejectedError(`Workflow rejected: ${result.data.reason}.`);
-        }
-        if (!response.ok || !result.success || result.data.outcome !== 'committed') {
-          throw new Error('Workflow outcome is unknown. Retry the same request.');
-        }
-        return result.data.issueId;
+        return (await executeWorkflow(sessionId, requestId, command)).issueId;
       },
+      executeAndRead: executeWorkflow,
     },
     admin: {
       account: auth.account,
@@ -257,6 +261,7 @@ export function createCloudflareBackend(options: {
       async setImageLimits(sessionId, limits) { await readJson(await post('/api/admin', { action: 'set_image_limits', sessionId, limits })); },
       async saveMember(sessionId, userId, member) { await readJson(await post('/api/admin', { action: 'save_member', sessionId, userId, member })); },
       async removeMember(sessionId, userId) { await readJson(await post('/api/admin', { action: 'remove_member', sessionId, userId })); },
+      async editRoster(sessionId, command) { await readJson(await post('/api/admin', { action: 'edit_roster', sessionId, command })); },
     },
     images: {
       async begin(input) { return startedSchema.parse(await imageResult(await post('/api/images', { action: 'begin', ...input }))); },

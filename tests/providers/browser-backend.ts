@@ -223,6 +223,8 @@ export async function createBrowserBackend(
         call({ type: 'saveMember', sessionId, userId, member }),
       removeMember: (sessionId, userId) =>
         call({ type: 'removeMember', sessionId, userId }),
+      editRoster: (sessionId, command) =>
+        call({ type: 'editRoster', sessionId, command }),
     },
     images: {
       begin: (input) => call({ type: 'beginImage', input }),

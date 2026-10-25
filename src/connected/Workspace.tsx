@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, Navigate, useLocation } from "react-router";
 import { BuildId } from "@/components/build-id";
+import { RenderErrorBoundary } from "@/components/render-error-boundary";
 import { Button } from "@/components/ui/button";
 import { ContestantApp } from "@/contestant/ContestantApp";
 import { OrganiserApp } from "@/organiser/OrganiserApp";
@@ -21,9 +22,20 @@ import { canOpenPage, isEntryPath, pageForPath } from "./navigation";
  * change removes the snapshot, so its forms and selection survive. The shell
  * then shows NoSessionAccess itself.
  */
-export function Workspace(props: Omit<ShellProps, "data">) {
+export function Workspace({
+  onLiveChange,
+  ...props
+}: Omit<ShellProps, "data"> & {
+  /** Reports whether the live update channel is connected. */
+  onLiveChange: (live: boolean) => void;
+}) {
   const { pathname } = useLocation();
   const data = useSessionSnapshot(props.user.id);
+  const { connected } = data;
+  useEffect(() => {
+    onLiveChange(connected);
+    return () => onLiveChange(false);
+  }, [connected, onLiveChange]);
   const membership = data.snapshot?.membership;
   const current = membership ? uiKindFor(membership) : undefined;
   const [kind, setKind] = useState<UiKind>();
@@ -56,7 +68,12 @@ export function Workspace(props: Omit<ShellProps, "data">) {
     <AvatarProvider data={data} userId={props.user.id}>
       <div className="flex h-dvh flex-col">
         <Announcements data={data} />
-        <div className="min-h-0 flex-1">{app}</div>
+        {/* A crash in one UI keeps the announcements and build id visible. */}
+        <div className="min-h-0 flex-1">
+          <RenderErrorBoundary scope="region" resetKey={pathname}>
+            {app}
+          </RenderErrorBoundary>
+        </div>
         <p className="px-4 py-0.5 text-right text-[11px] text-muted-foreground">
           <BuildId />
         </p>

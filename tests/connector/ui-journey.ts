@@ -5,7 +5,7 @@ import { leftRedRightBlue } from '../support/pictures';
 
 export interface UiFixture extends Pick<ScenarioData, 'sessionId' | 'otherSessionId' | 'teamId' | 'accounts'> { origin: string }
 
-interface Probe { ready: number; changes: number; closed: number; invalid: boolean }
+interface Probe { ready: number; changes: number; closed: number; invalid: boolean; violations: string[] }
 interface Workspace { page: Page; context: BrowserContext; probe: Probe }
 type Ui = 'contestant' | 'organiser-phone' | 'organiser-desktop';
 
@@ -137,7 +137,6 @@ async function upload(dialog: Locator, visibility: 'public' | 'internal') {
 export async function runUiJourney(browser: Browser, fixture: UiFixture, options: { ignoreHTTPSErrors?: boolean } = {}): Promise<void> {
   const workspaces: Workspace[] = [];
   const requests = new Set<string>();
-  let externalBackend = false;
   let phase = 'fixture setup';
 
   async function login(actor: Actor, password?: string): Promise<Workspace> {
@@ -147,13 +146,19 @@ export async function runUiJourney(browser: Browser, fixture: UiFixture, options
     const ui: Ui = contestant ? 'contestant' : onPhone ? 'organiser-phone' : 'organiser-desktop';
     const context = await browser.newContext({ viewport: onPhone ? phone : desktop, ignoreHTTPSErrors: options.ignoreHTTPSErrors ?? false });
     const page = await context.newPage();
-    const probe: Probe = { ready: 0, changes: 0, closed: 0, invalid: false };
+    const probe: Probe = { ready: 0, changes: 0, closed: 0, invalid: false, violations: [] };
+    // Record only the violated directive, never the blocked URL.
+    await page.exposeFunction('reportCspViolation', (directive: string) => { probe.violations.push(directive); });
+    await page.addInitScript(() => {
+      document.addEventListener('securitypolicyviolation', (event) => {
+        (window as unknown as { reportCspViolation(directive: string): void }).reportCspViolation(event.violatedDirective);
+      });
+    });
     const workspace = { page, context, probe };
     let currentOriginAuthentication = false;
     workspaces.push(workspace);
     page.on('request', (request) => {
       const url = new URL(request.url());
-      if (url.hostname.endsWith('.supabase.co')) externalBackend = true;
       if (url.origin === fixture.origin && url.pathname === '/api/auth/session') currentOriginAuthentication = true;
       if (url.origin === fixture.origin && url.pathname.startsWith('/api/')) requests.add(`${request.method()} ${url.pathname}`);
     });
@@ -174,7 +179,6 @@ export async function runUiJourney(browser: Browser, fixture: UiFixture, options
     // Establish the selected adapter before entering a fixture credential. A
     // frontend built for another provider must fail before any login attempt.
     await expect.poll(() => currentOriginAuthentication).toBe(true);
-    expect(externalBackend).toBe(false);
     await privateFill(page.getByLabel('Username', { exact: true }), fixture.accounts[actor].username);
     await privateFill(page.getByLabel('Password', { exact: true }), password ?? fixture.accounts[actor].password);
     await page.getByRole('button', { name: 'Sign in', exact: true }).click();
@@ -295,6 +299,38 @@ export async function runUiJourney(browser: Browser, fixture: UiFixture, options
     await admin.page.getByLabel('Images per issue', { exact: true }).fill('3');
     await admin.page.getByLabel('Total per issue (MB)', { exact: true }).fill('3');
     await adminAction(admin.page, admin.page.getByRole('button', { name: 'Save image limits', exact: true }));
+    phase = 'roster editors';
+    // Categories: add one from the keyboard, then see it in a contestant's open session.
+    const category = `Power ${crypto.randomUUID().slice(0, 8)}`;
+    const newCategory = admin.page.getByLabel('New category', { exact: true });
+    await newCategory.focus();
+    await admin.page.keyboard.type(category);
+    await admin.page.keyboard.press('Enter');
+    await adminRequest(admin.page, admin.page.getByRole('button', { name: 'Save categories', exact: true }), '/api/admin');
+    await expect(admin.page.getByRole('status').filter({ hasText: 'Categories saved.' })).toBeVisible();
+    // Teams: add one from the keyboard, rename it, and see that a team with an account stays.
+    await consolePage(admin.page, 'Roster');
+    await expect(admin.page).toHaveURL(new URL('/administration/roster', fixture.origin).href);
+    const extraTeam = `Roster ${crypto.randomUUID().slice(0, 8)}`;
+    await admin.page.getByLabel('Add teams', { exact: true }).focus();
+    await admin.page.keyboard.type(`${extraTeam}, Hall Z`);
+    const added = admin.page.waitForResponse((response) => response.url() === `${fixture.origin}/api/admin`
+      && response.request().method() === 'POST');
+    await admin.page.keyboard.press('Control+Enter');
+    expect((await added).status()).toBe(200);
+    await expect(admin.page.getByRole('status').filter({ hasText: 'Added 1 team.' })).toBeVisible();
+    await expect(admin.page.getByLabel('Add teams', { exact: true })).toBeFocused();
+    await expect(admin.page.getByRole('button', { name: `Edit ${extraTeam}`, exact: true })).toBeVisible();
+    await expect(admin.page.getByText(/^In use: 1 account\. This team stays\.$/).first()).toBeVisible();
+    await expect(admin.page.getByRole('button', { name: /^Delete /, disabled: true }).first()).toBeVisible();
+    const renamed = `${extraTeam} B`;
+    await admin.page.getByRole('button', { name: `Edit ${extraTeam}`, exact: true }).click();
+    await admin.page.getByLabel('Team name', { exact: true }).fill(renamed);
+    await adminRequest(admin.page, admin.page.getByRole('button', { name: 'Save', exact: true }), '/api/admin');
+    await expect(admin.page.getByRole('button', { name: `Edit ${renamed}`, exact: true })).toBeVisible();
+    await admin.page.getByRole('button', { name: `Delete ${renamed}`, exact: true }).click();
+    await adminRequest(admin.page, admin.page.getByRole('button', { name: 'Delete team', exact: true }), '/api/admin');
+    await expect(admin.page.getByRole('button', { name: `Edit ${renamed}`, exact: true })).toHaveCount(0);
     await consolePage(admin.page, 'Accounts');
     await expect(admin.page).toHaveURL(new URL('/administration/accounts', fixture.origin).href);
     let member = await manage(admin.page, 'volunteer');
@@ -329,6 +365,8 @@ export async function runUiJourney(browser: Browser, fixture: UiFixture, options
     let teamChanges = contestant.probe.changes;
     await reportButton.click();
     await expect(contestant.page.getByRole('heading', { name: 'Report an issue', exact: true })).toBeFocused();
+    // The category that the admin added reached this open session.
+    await expect(contestant.page.getByText(category, { exact: true })).toBeVisible();
     await contestant.page.getByText('Devices', { exact: true }).click();
     await contestant.page.getByLabel('What is happening?', { exact: true }).fill(description);
     await contestant.page.getByRole('button', { name: 'Send report', exact: true }).click();
@@ -538,13 +576,14 @@ export async function runUiJourney(browser: Browser, fixture: UiFixture, options
     await chooseReport(recovered.page, description);
     await expect(recovered.page.getByRole('region', { name: /^Time award\s*, 5 minutes$/ })).toContainText('Applied to your contest time');
     phase = 'final provider and notification assertions';
-    expect(externalBackend).toBe(false);
     expect(requests.has('POST /api/auth/sign-in')).toBe(true);
     expect(requests.has('POST /api/workflow')).toBe(true);
     expect(requests.has('POST /api/admin')).toBe(true);
     expect(requests.has('POST /api/accounts')).toBe(true);
     expect([...requests].some((request) => request.startsWith('PUT /api/image/'))).toBe(true);
     expect(workspaces.every(({ probe }) => !probe.invalid)).toBe(true);
+    // The Worker sends a Content-Security-Policy. The whole journey must not break it.
+    expect(workspaces.flatMap(({ probe }) => probe.violations)).toEqual([]);
   } catch (error) {
     // A code location helps repair a selector without emitting page contents or
     // Playwright call arguments, which can contain one-time credentials.

@@ -1,5 +1,6 @@
 import { z } from 'zod';
-import type { MembershipInput, SessionSummary } from '../../../backend/contracts';
+import type { MembershipInput, RosterCommand, SessionSummary } from '../../../backend/contracts';
+import { rosterCommandSchema, rosterKey } from '../../../connected/roster';
 import { snapshotSchema, type Snapshot } from '../../../connected/model';
 import type { Caller } from '../../authentication';
 import { AuthenticationError } from '../../authentication';
@@ -26,10 +27,9 @@ export interface CurrentAccessRow {
   roles: string;
 }
 
-// Bind accountId, loginId, sessionId in this order. Callers must come from the
-// trusted authentication service. Every use checks both identity-session and
-// application-login expiry against database time, including inside write batches.
-export const currentAccessSql = `SELECT a.id AS account_id, a.name AS account_name, l.id AS login_id,
+// Every use checks both identity-session and application-login expiry against
+// database time, including inside write batches.
+const accessSql = (selection: string) => `SELECT a.id AS account_id, a.name AS account_name, l.id AS login_id,
   l.expires_at AS login_expires_at, b.expiresAt AS identity_expires_at,
   a.access_version, a.credential_generation, l.version AS login_version,
   m.version AS membership_version, s.version AS session_version,
@@ -43,11 +43,19 @@ export const currentAccessSql = `SELECT a.id AS account_id, a.name AS account_na
   JOIN ba_session b ON b.id = l.identity_session_id AND b.userId = a.id
   JOIN memberships m ON m.account_id = a.id
   JOIN sessions s ON s.id = m.session_id JOIN events e ON e.id = s.event_id
-  WHERE a.id = ? AND l.id = ? AND m.session_id = ?
+  WHERE ${selection}
     AND a.disabled = 0 AND a.must_change = 0 AND a.credential_state = 'ready'
     AND l.revoked = 0 AND l.expires_at > unixepoch()
     AND l.credential_generation = a.credential_generation
     AND b.expiresAt > strftime('%Y-%m-%dT%H:%M:%fZ', 'now')`;
+
+// Bind accountId, loginId, sessionId in this order. Callers must come from the
+// trusted authentication service.
+export const currentAccessSql = accessSql('a.id = ? AND l.id = ? AND m.session_id = ?');
+
+// Bind sessionId, then a JSON array of login IDs. One JSON value stays under
+// D1's 100 bound-parameter limit. Match each row on account_id and login_id.
+export const currentAccessForLoginsSql = accessSql('m.session_id = ? AND l.id IN (SELECT value FROM json_each(?))');
 
 export function currentAccessBindings(caller: Caller, sessionId: string): BindValue[] {
   return [caller.accountId, caller.loginId, sessionId];
@@ -80,9 +88,10 @@ export function currentReadyLoginBindings(caller: Caller): BindValue[] {
 
 interface AdminGate { id: string; caller: Caller; statements: D1Statement[] }
 
-const snapshotSql = `WITH login AS (${currentReadyLoginSql}), access AS (${currentAccessSql}),
-  visible_issues AS (SELECT i.* FROM issues i CROSS JOIN access a
-    WHERE i.session_id = ? AND (a.staff = 1 OR i.team_id = a.team_id))
+export const snapshotSql = `WITH login AS (${currentReadyLoginSql}), access AS MATERIALIZED (${currentAccessSql}),
+  visible_issues AS MATERIALIZED (
+    SELECT i.* FROM access a CROSS JOIN issues i WHERE i.session_id = ? AND i.team_id = a.team_id
+    UNION ALL SELECT i.* FROM access a CROSS JOIN issues i WHERE a.staff = 1 AND i.session_id = ?)
 SELECT json_object(
   'session', (SELECT json_object('id', s.id, 'event_id', s.event_id, 'name', s.name,
     'intake_open', json(CASE WHEN s.intake_open THEN 'true' ELSE 'false' END),
@@ -125,8 +134,8 @@ SELECT json_object(
       'uploader_name', x.uploader_name, 'uploaded_at', x.uploaded_at,
       'visibility', x.visibility, 'byte_size', x.byte_size, 'content_type', x.content_type,
       'original_name', x.original_name) AS row
-    FROM issue_images x JOIN visible_issues i ON i.id = x.issue_id CROSS JOIN access a
-    WHERE x.state = 'ready' AND (x.visibility = 'public' OR a.staff = 1)
+    FROM visible_issues i CROSS JOIN issue_images x CROSS JOIN access a
+    WHERE x.issue_id = i.id AND x.state = 'ready' AND (x.visibility = 'public' OR a.staff = 1)
     ORDER BY x.uploaded_at, x.id)), '[]')),
   'pending_removals', json(COALESCE((SELECT json_group_array(json(row)) FROM (
     SELECT json_object('id', x.id, 'issue_id', x.issue_id, 'original_name', x.original_name) AS row
@@ -139,8 +148,8 @@ SELECT json_object(
         FROM membership_roles mr WHERE mr.session_id = m.session_id AND mr.account_id = m.account_id ORDER BY role))),
       'is_admin', json(CASE WHEN m.is_admin THEN 'true' ELSE 'false' END)),
       'person', json_object('id', p.id, 'name', p.name, 'username', p.username)) AS row
-    FROM memberships m JOIN accounts p ON p.id = m.account_id CROSS JOIN access a
-    WHERE m.session_id = ? AND a.is_admin = 1 ORDER BY p.name, p.id)), '[]')),
+    FROM access a CROSS JOIN memberships m JOIN accounts p ON p.id = m.account_id
+    WHERE a.is_admin = 1 AND m.session_id = ? ORDER BY p.name, p.id)), '[]')),
   'audit', json(COALESCE((SELECT json_group_array(json(row)) FROM (
     SELECT json_object('id', d.id, 'actor', d.actor, 'at', d.at, 'action', d.action, 'target', d.target) AS row
     FROM admin_audit d CROSS JOIN access a WHERE d.session_id = ? AND a.is_admin = 1
@@ -159,6 +168,16 @@ export function notificationStatements(db: D1Connection, sessionId: string, audi
   ]);
 }
 
+/** Bind accountId, loginId. */
+export const sessionsListSql = `SELECT s.id, s.name FROM sessions s
+  JOIN memberships m ON m.session_id = s.id JOIN accounts a ON a.id = m.account_id
+  JOIN logins l ON l.account_id = a.id
+  JOIN ba_session b ON b.id = l.identity_session_id AND b.userId = a.id
+  WHERE a.id = ? AND l.id = ? AND a.disabled = 0 AND a.must_change = 0
+    AND a.credential_state = 'ready' AND l.revoked = 0 AND l.expires_at > unixepoch()
+    AND l.credential_generation = a.credential_generation
+    AND b.expiresAt > strftime('%Y-%m-%dT%H:%M:%fZ', 'now') ORDER BY s.name, s.id`;
+
 /** D1 owns current access, consistent snapshots, and atomic administration. */
 export class D1ApplicationService {
   constructor(private readonly db: D1Connection) {}
@@ -175,22 +194,14 @@ export class D1ApplicationService {
   }
 
   async sessions(caller: Caller): Promise<SessionSummary[]> {
-    const result = await this.statement(`SELECT s.id, s.name FROM sessions s
-      JOIN memberships m ON m.session_id = s.id JOIN accounts a ON a.id = m.account_id
-      JOIN logins l ON l.account_id = a.id
-      JOIN ba_session b ON b.id = l.identity_session_id AND b.userId = a.id
-      WHERE a.id = ? AND l.id = ? AND a.disabled = 0 AND a.must_change = 0
-        AND a.credential_state = 'ready' AND l.revoked = 0 AND l.expires_at > unixepoch()
-        AND l.credential_generation = a.credential_generation
-        AND b.expiresAt > strftime('%Y-%m-%dT%H:%M:%fZ', 'now') ORDER BY s.name, s.id`,
-    caller.accountId, caller.loginId).all<SessionSummary>();
+    const result = await this.statement(sessionsListSql, caller.accountId, caller.loginId).all<SessionSummary>();
     return result.results;
   }
 
   async snapshot(caller: Caller, sessionId: string): Promise<Snapshot> {
     this.validIds(sessionId);
     const row = await this.statement(snapshotSql, caller.accountId, caller.loginId, ...currentAccessBindings(caller, sessionId),
-      ...Array<string>(8).fill(sessionId)).first<{ snapshot: string }>();
+      ...Array<string>(9).fill(sessionId)).first<{ snapshot: string }>();
     if (!row) throw new AuthenticationError(403, 'Sign in again or change your temporary password.');
     return snapshotSchema.parse(JSON.parse(row.snapshot));
   }
@@ -268,6 +279,129 @@ export class D1ApplicationService {
         { file_mb: limits.fileMegabytes, count: limits.count, total_mb: limits.totalMegabytes }),
       ...notificationStatements(this.db, sessionId, await this.sessionAudiences(sessionId)),
     ]);
+  }
+
+  /**
+   * Edits the teams and categories of a session. Every rule is checked twice.
+   * A read first gives a clear message. A guard inside the same batch then
+   * covers a write that lands between the read and the commit.
+   */
+  async editRoster(caller: Caller, sessionId: string, input: unknown): Promise<void> {
+    this.validIds(sessionId);
+    const parsed = rosterCommandSchema.safeParse(input);
+    if (!parsed.success) {
+      throw new AuthenticationError(400, 'Use different names of 1 to 200 characters. A team location can be empty.');
+    }
+    const command = parsed.data;
+    const gate = await this.adminGate(caller, sessionId);
+    const guardIds: string[] = [];
+    const guards = (...checks: Array<[string, ...BindValue[]]>) => checks.map(([sql, ...values]) => {
+      guardIds.push(crypto.randomUUID());
+      return this.assertion(guardIds.at(-1)!, sql, ...values);
+    });
+    const changes = await this.rosterChanges(sessionId, command, guards);
+    await this.commit(gate, [
+      ...changes.statements,
+      this.statement('DELETE FROM command_assertions WHERE id IN (SELECT value FROM json_each(?))', JSON.stringify(guardIds)),
+      this.audit(sessionId, caller.accountId, command.type, null, changes.detail),
+      ...notificationStatements(this.db, sessionId, changes.audiences ?? await this.sessionAudiences(sessionId)),
+    ]);
+  }
+
+  private async rosterChanges(
+    sessionId: string,
+    command: RosterCommand,
+    guards: (...checks: Array<[string, ...BindValue[]]>) => D1Statement[],
+  ): Promise<{ statements: D1Statement[]; detail: object; audiences?: string[] }> {
+    const teams = (await this.statement('SELECT id, name FROM teams WHERE session_id = ?', sessionId)
+      .all<{ id: string; name: string }>()).results;
+    const sameName = (name: string, exceptIds: ReadonlySet<string>) =>
+      teams.find((team) => !exceptIds.has(team.id) && rosterKey(team.name) === rosterKey(name));
+    const noClash = `SELECT 1 WHERE NOT EXISTS (SELECT 1 FROM teams a JOIN teams b ON b.session_id = a.session_id
+      AND b.id <> a.id AND lower(trim(b.name)) = lower(trim(a.name)) WHERE a.session_id = ? AND a.id IN (SELECT value FROM json_each(?)))`;
+    switch (command.type) {
+      case 'add_teams': {
+        const ids = new Set(command.teams.map((team) => team.id));
+        const clash = command.teams.find((team) => sameName(team.name, ids));
+        if (clash) throw new AuthenticationError(409, `A team named "${clash.name}" already exists.`);
+        const idList = JSON.stringify([...ids]);
+        return {
+          detail: { count: command.teams.length },
+          audiences: ['staff'],
+          statements: [
+            // A repeated request keeps its first rows. The guards below fail when an ID belongs to another session.
+            this.statement(`INSERT INTO teams (id, session_id, name, location)
+              SELECT json_extract(value, '$.id'), ?, json_extract(value, '$.name'), json_extract(value, '$.location')
+              FROM json_each(?) WHERE true ON CONFLICT(id) DO NOTHING`, sessionId, JSON.stringify(command.teams)),
+            ...guards(
+              ['SELECT 1 WHERE (SELECT count(*) FROM teams WHERE session_id = ? AND id IN (SELECT value FROM json_each(?))) = ?',
+                sessionId, idList, ids.size],
+              [noClash, sessionId, idList],
+            ),
+          ],
+        };
+      }
+      case 'update_team': {
+        const current = teams.find((team) => team.id === command.teamId);
+        if (!current) throw new AuthenticationError(409, 'That team no longer exists. Refresh the page.');
+        if (sameName(command.name, new Set([command.teamId]))) {
+          throw new AuthenticationError(409, `A team named "${command.name}" already exists.`);
+        }
+        return {
+          detail: { team: command.teamId, from: current.name, name: command.name, location: command.location },
+          audiences: ['staff', `team:${command.teamId}`],
+          statements: [
+            this.statement('UPDATE teams SET name = ?, location = ? WHERE id = ? AND session_id = ?',
+              command.name, command.location, command.teamId, sessionId),
+            ...guards(['SELECT 1 WHERE changes() = 1'], [noClash, sessionId, JSON.stringify([command.teamId])]),
+          ],
+        };
+      }
+      case 'delete_team': {
+        const current = teams.find((team) => team.id === command.teamId);
+        if (!current) throw new AuthenticationError(409, 'That team no longer exists. Refresh the page.');
+        const used = await this.statement(`SELECT
+          (SELECT count(*) FROM issues WHERE session_id = ?1 AND team_id = ?2) AS issues,
+          (SELECT count(*) FROM memberships WHERE session_id = ?1 AND team_id = ?2) AS accounts`, sessionId, command.teamId)
+          .first<{ issues: number; accounts: number }>();
+        if (used?.issues) {
+          throw new AuthenticationError(409, `${current.name} has ${used.issues} ${used.issues === 1 ? 'issue' : 'issues'} and stays in the roster.`);
+        }
+        if (used?.accounts) {
+          throw new AuthenticationError(409, `${used.accounts} ${used.accounts === 1 ? 'account belongs' : 'accounts belong'} to ${current.name}. Move or remove ${used.accounts === 1 ? 'it' : 'them'} first.`);
+        }
+        return {
+          detail: { team: command.teamId, name: current.name },
+          audiences: ['staff'],
+          statements: [
+            ...guards(['SELECT 1 WHERE NOT EXISTS (SELECT 1 FROM issues WHERE session_id = ? AND team_id = ?) AND NOT EXISTS (SELECT 1 FROM memberships WHERE session_id = ? AND team_id = ?)',
+              sessionId, command.teamId, sessionId, command.teamId]),
+            this.statement('DELETE FROM teams WHERE id = ? AND session_id = ?', command.teamId, sessionId),
+            ...guards(['SELECT 1 WHERE changes() = 1']),
+          ],
+        };
+      }
+      case 'set_categories': {
+        const kept = new Set(command.categories);
+        const used = (await this.statement(`SELECT category, count(*) AS issues FROM issues
+          WHERE session_id = ? AND category <> '' GROUP BY category ORDER BY category`, sessionId)
+          .all<{ category: string; issues: number }>()).results;
+        const stuck = used.filter((row) => !kept.has(row.category));
+        if (stuck.length) {
+          const [first] = stuck;
+          throw new AuthenticationError(409, `${first.category} has ${first.issues} ${first.issues === 1 ? 'issue' : 'issues'} and stays in the list.${
+            stuck.length > 1 ? ` ${stuck.length - 1} more ${stuck.length === 2 ? 'category stays' : 'categories stay'} too.` : ''}`);
+        }
+        return {
+          detail: { categories: command.categories },
+          statements: [
+            this.statement('UPDATE sessions SET categories = ? WHERE id = ?', JSON.stringify(command.categories), sessionId),
+            ...guards(['SELECT 1 WHERE NOT EXISTS (SELECT 1 FROM issues WHERE session_id = ? AND category <> \'\' AND category NOT IN (SELECT value FROM json_each(?)))',
+              sessionId, JSON.stringify(command.categories)]),
+          ],
+        };
+      }
+    }
   }
 
   async saveMember(caller: Caller, sessionId: string, userId: string, input: MembershipInput): Promise<void> {

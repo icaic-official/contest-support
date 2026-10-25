@@ -2,6 +2,7 @@ import * as React from "react"
 import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/lib/utils"
 import { Tabs as TabsPrimitive } from "radix-ui"
+import { pillIndicator, SlidingIndicator } from "@/components/ui/sliding-indicator"
 
 function Tabs({
   className,
@@ -23,7 +24,7 @@ function Tabs({
 }
 
 const tabsListVariants = cva(
-  "group/tabs-list inline-flex w-fit items-center justify-center rounded-lg p-[3px] text-muted-foreground group-data-[orientation=horizontal]/tabs:h-9 group-data-[orientation=vertical]/tabs:h-fit group-data-[orientation=vertical]/tabs:flex-col data-[variant=line]:rounded-none",
+  "group/tabs-list relative isolate inline-flex w-fit items-center justify-center rounded-lg p-[3px] text-muted-foreground group-data-[orientation=horizontal]/tabs:h-9 group-data-[orientation=vertical]/tabs:h-fit group-data-[orientation=vertical]/tabs:flex-col data-[variant=line]:rounded-none",
   {
     variants: {
       variant: {
@@ -37,9 +38,13 @@ const tabsListVariants = cva(
   }
 )
 
+const lineIndicator =
+  "bg-foreground group-data-[orientation=horizontal]/tabs:bottom-[-1px] group-data-[orientation=horizontal]/tabs:left-0 group-data-[orientation=horizontal]/tabs:h-0.5 group-data-[orientation=horizontal]/tabs:w-(--indicator-w) group-data-[orientation=horizontal]/tabs:translate-x-(--indicator-x) group-data-[orientation=vertical]/tabs:top-0 group-data-[orientation=vertical]/tabs:right-[-1px] group-data-[orientation=vertical]/tabs:h-(--indicator-h) group-data-[orientation=vertical]/tabs:w-0.5 group-data-[orientation=vertical]/tabs:translate-y-(--indicator-y)"
+
 function TabsList({
   className,
   variant = "default",
+  children,
   ...props
 }: React.ComponentProps<typeof TabsPrimitive.List> &
   VariantProps<typeof tabsListVariants>) {
@@ -49,7 +54,12 @@ function TabsList({
       data-variant={variant}
       className={cn(tabsListVariants({ variant }), className)}
       {...props}
-    />
+    >
+      <SlidingIndicator
+        className={variant === "line" ? lineIndicator : pillIndicator}
+      />
+      {children}
+    </TabsPrimitive.List>
   )
 }
 
@@ -61,10 +71,8 @@ function TabsTrigger({
     <TabsPrimitive.Trigger
       data-slot="tabs-trigger"
       className={cn(
-        "relative inline-flex h-[calc(100%-1px)] flex-1 items-center justify-center gap-1.5 rounded-md border border-transparent px-2 py-1 text-sm font-medium whitespace-nowrap text-foreground/60 transition-all group-data-[orientation=vertical]/tabs:w-full group-data-[orientation=vertical]/tabs:justify-start hover:text-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-1 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-50 group-data-[variant=default]/tabs-list:data-[state=active]:shadow-sm group-data-[variant=line]/tabs-list:data-[state=active]:shadow-none dark:text-muted-foreground dark:hover:text-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
-        "group-data-[variant=line]/tabs-list:bg-transparent group-data-[variant=line]/tabs-list:data-[state=active]:bg-transparent dark:group-data-[variant=line]/tabs-list:data-[state=active]:border-transparent dark:group-data-[variant=line]/tabs-list:data-[state=active]:bg-transparent",
-        "data-[state=active]:bg-background data-[state=active]:text-foreground dark:data-[state=active]:border-input dark:data-[state=active]:bg-input/30 dark:data-[state=active]:text-foreground",
-        "after:absolute after:bg-foreground after:opacity-0 after:transition-opacity group-data-[orientation=horizontal]/tabs:after:inset-x-0 group-data-[orientation=horizontal]/tabs:after:bottom-[-5px] group-data-[orientation=horizontal]/tabs:after:h-0.5 group-data-[orientation=vertical]/tabs:after:inset-y-0 group-data-[orientation=vertical]/tabs:after:-right-1 group-data-[orientation=vertical]/tabs:after:w-0.5 group-data-[variant=line]/tabs-list:data-[state=active]:after:opacity-100",
+        "relative inline-flex h-[calc(100%-1px)] flex-1 items-center justify-center gap-1.5 rounded-md border border-transparent px-2 py-1 text-sm font-medium whitespace-nowrap text-foreground/60 transition-colors duration-(--motion-base) ease-out group-data-[orientation=vertical]/tabs:w-full group-data-[orientation=vertical]/tabs:justify-start hover:text-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-1 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-50 dark:text-muted-foreground dark:hover:text-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+        "data-[state=active]:text-foreground dark:data-[state=active]:text-foreground",
         className
       )}
       {...props}
@@ -79,7 +87,10 @@ function TabsContent({
   return (
     <TabsPrimitive.Content
       data-slot="tabs-content"
-      className={cn("flex-1 outline-none", className)}
+      className={cn(
+        "flex-1 ease-out outline-none data-[state=active]:animate-in data-[state=active]:duration-(--motion-fast) data-[state=active]:fade-in-0",
+        className
+      )}
       {...props}
     />
   )

@@ -19,6 +19,7 @@ export type ConsolePage =
   | "awards"
   | "overview"
   | "accounts"
+  | "roster"
   | "settings";
 
 export const consolePageLabels: Record<ConsolePage, string> = {
@@ -29,6 +30,7 @@ export const consolePageLabels: Record<ConsolePage, string> = {
   awards: "Award review",
   overview: "Overview",
   accounts: "Accounts",
+  roster: "Roster",
   settings: "Session settings",
 };
 
@@ -41,7 +43,7 @@ export interface ConsoleNavGroup {
 /**
  * The sidebar groups that a person's combined roles give, in display order.
  * Volunteers and specialists get the support pages. Jury members get Award
- * review. Admins get Overview, Accounts and Session settings. Admins without
+ * review. Admins get Overview, Accounts, Roster and Session settings. Admins without
  * support roles still get Queue, as in the phone app. Every person gets
  * Teams & tables.
  */
@@ -53,7 +55,7 @@ export function consoleNavGroups(member: Membership): ConsoleNavGroup[] {
   work.push("teams");
   const groups: ConsoleNavGroup[] = [{ label: "Workspace", pages: work }];
   if (member.is_admin) {
-    groups.push({ label: "Admin", pages: ["overview", "accounts", "settings"] });
+    groups.push({ label: "Admin", pages: ["overview", "accounts", "roster", "settings"] });
   }
   return groups;
 }

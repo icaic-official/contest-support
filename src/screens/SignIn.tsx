@@ -6,7 +6,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { requireBackend } from "@/backend";
+import { backend } from "@/backend";
 import { errorMessage } from "@/backend/errors";
 
 /** The public sign-in page. Organizers create every account. */
@@ -44,7 +44,7 @@ export function SignIn() {
           setError("");
           void (async () => {
             try {
-              await requireBackend().auth.signIn(
+              await backend.auth.signIn(
                 String(data.get("username") ?? ""),
                 String(data.get("password") ?? ""),
               );

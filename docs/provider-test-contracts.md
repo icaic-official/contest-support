@@ -1,7 +1,7 @@
 # Shared provider test contracts
 
 The shared suite checks Minsky behavior through the browser `Backend` interface.
-Cloudflare supplies the browser adapter and fixture driver. On 2026-10-25 the owner removed the Supabase implementation.
+Cloudflare supplies the browser adapter and fixture driver.
 The 11 scenarios apply to any provider without weaker assertions.
 The three new cases cover account creation, image-limit boundaries, and reconnect recovery.
 See [run log](history/run-log.md) and [PR #43](https://github.com/GiftedNovaHD/minsky/pull/43) for source-specific hosted results.

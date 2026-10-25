@@ -2,8 +2,7 @@
 
 The browser uses `Backend` in [contracts.ts](../src/backend/contracts.ts) for accounts, workflows, administration, images, announcements, avatars, and live updates.
 An adapter implements those operations for a provider.
-Cloudflare is the only implementation.
-On 2026-10-25 the owner removed the Supabase implementation. The contract stays so that a later provider can implement it.
+Cloudflare is the only implementation. The contract stays so that a later provider can implement it.
 See [run log](history/run-log.md) for source-specific verification and deployment limits.
 
 The contracts describe Minsky operations.

@@ -65,7 +65,7 @@ The broader organizer tools below remain incomplete.
 
 [ROADMAP.md](../ROADMAP.md) owns the current and target technology stack.
 On 2026-10-23 the owner selected Cloudflare as the live backend. The development Worker is `minsky-dev` and its D1 database is `minsky-development`.
-On 2026-10-25 the owner removed the earlier Supabase implementation. Cloudflare is the only backend. The provider contracts stay for a later provider.
+Cloudflare is the only backend. The provider contracts stay for a later provider.
 [Cloudflare backend design](cloudflare-backend-design.md) explains the implemented boundaries. [Add a backend provider](add-provider.md) states what another provider must implement.
 A backend switch needs separate owner approval. Follow the [activation procedure](activate-cloudflare-development.md).
 

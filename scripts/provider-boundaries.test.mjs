@@ -13,7 +13,7 @@ async function boundaryErrors(code, filePath = 'src/connected/BoundaryCheck.tsx'
 
 test('UI static imports, re-exports, and literal dynamic imports reject provider SDKs and implementations', async () => {
   const modules = [
-    '@aws-sdk/client-s3', '@cloudflare/workers-types',
+    '@supabase/supabase-js', '@aws-sdk/client-s3', '@cloudflare/workers-types',
     '@google-cloud/storage', '@azure/storage-blob', 'cloudflare', 'cloudflare:workers',
     'wrangler', 'wrangler/api', 'miniflare', 'better-auth', 'better-auth/client',
     '../backend/cloudflare/backend',
@@ -25,7 +25,7 @@ test('UI static imports, re-exports, and literal dynamic imports reject provider
       assert.equal((await boundaryErrors(code)).length, 1, code);
     }
   }
-// Each of the 42 cases lints with type information. A busy runner can pass 5 seconds.
+// Each of the 45 cases lints with type information. A busy runner can pass 5 seconds.
 }, 60_000);
 
 test('UI uses shared contracts, errors, the selected backend, and ordinary lazy imports', async () => {

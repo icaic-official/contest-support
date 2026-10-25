@@ -3,7 +3,7 @@
 This page explains the Cloudflare connector and its provider boundaries.
 The browser uses the `Backend` contract.
 Issue decisions use one `WorkflowService`. Provider adapters supply persistence, authentication, images, and live delivery.
-Cloudflare is the only backend. On 2026-10-25 the owner removed the earlier Supabase implementation.
+Cloudflare is the only backend.
 
 The user selected Workers, D1 with a SQLite rewrite, private R2, and Durable Objects.
 On 2026-10-18, the owner selected a fresh development installation instead of transferring existing trial data.
@@ -336,7 +336,6 @@ The [PR #21 component record](history/pr21-installation-disposition.md) preserve
 Data exports and migration tooling are outside the fresh-installation scope.
 The owner approved the concrete development switch separately from the PR #43 merge.
 On 2026-10-23 the owner selected Cloudflare as the live backend. The development Worker is `minsky-dev` and its D1 database is `minsky-development`.
-On 2026-10-25 the owner removed the Supabase implementation. See [the history](history/supabase-provider-records.md).
 Future backend switches still require separate approval.
 Use the [activation procedure](activate-cloudflare-development.md) for exact targets, the reviewed revision, deployment commands, verification, and recovery.
 The separate documentation Worker retains its independent deployment.

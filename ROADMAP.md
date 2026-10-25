@@ -22,7 +22,7 @@ In general, we wish for the platform's model to operate in a similar fashion to 
 
 **Limitation**: each D1 database has a single primary, runs one query at a time, and is capped at 10 GB.
 
-On 2026-10-23 the owner selected Cloudflare as the live backend. On 2026-10-25 the owner removed the Supabase implementation. Cloudflare is the only backend, and the provider contracts stay for a later provider.
+On 2026-10-23 the owner selected Cloudflare as the live backend. Cloudflare is the only backend. The provider contracts stay for a later provider.
 This file owns the stack direction. [Product direction](docs/product-direction.md) owns product requirements.
 See [Cloudflare backend design](docs/cloudflare-backend-design.md) for the implemented boundaries.
 

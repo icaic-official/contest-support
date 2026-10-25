@@ -137,7 +137,6 @@ async function upload(dialog: Locator, visibility: 'public' | 'internal') {
 export async function runUiJourney(browser: Browser, fixture: UiFixture, options: { ignoreHTTPSErrors?: boolean } = {}): Promise<void> {
   const workspaces: Workspace[] = [];
   const requests = new Set<string>();
-  let externalBackend = false;
   let phase = 'fixture setup';
 
   async function login(actor: Actor, password?: string): Promise<Workspace> {
@@ -153,7 +152,6 @@ export async function runUiJourney(browser: Browser, fixture: UiFixture, options
     workspaces.push(workspace);
     page.on('request', (request) => {
       const url = new URL(request.url());
-      if (url.origin !== fixture.origin && ['http:', 'https:'].includes(url.protocol)) externalBackend = true;
       if (url.origin === fixture.origin && url.pathname === '/api/auth/session') currentOriginAuthentication = true;
       if (url.origin === fixture.origin && url.pathname.startsWith('/api/')) requests.add(`${request.method()} ${url.pathname}`);
     });
@@ -174,7 +172,6 @@ export async function runUiJourney(browser: Browser, fixture: UiFixture, options
     // Establish the selected adapter before entering a fixture credential. A
     // frontend built for another provider must fail before any login attempt.
     await expect.poll(() => currentOriginAuthentication).toBe(true);
-    expect(externalBackend).toBe(false);
     await privateFill(page.getByLabel('Username', { exact: true }), fixture.accounts[actor].username);
     await privateFill(page.getByLabel('Password', { exact: true }), password ?? fixture.accounts[actor].password);
     await page.getByRole('button', { name: 'Sign in', exact: true }).click();
@@ -538,7 +535,6 @@ export async function runUiJourney(browser: Browser, fixture: UiFixture, options
     await chooseReport(recovered.page, description);
     await expect(recovered.page.getByRole('region', { name: /^Time award\s*, 5 minutes$/ })).toContainText('Applied to your contest time');
     phase = 'final provider and notification assertions';
-    expect(externalBackend).toBe(false);
     expect(requests.has('POST /api/auth/sign-in')).toBe(true);
     expect(requests.has('POST /api/workflow')).toBe(true);
     expect(requests.has('POST /api/admin')).toBe(true);

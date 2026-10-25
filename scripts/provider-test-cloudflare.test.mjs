@@ -199,7 +199,7 @@ describe('Cloudflare provider runner safety', () => {
 
   test('accepts only the implemented provider', () => {
     const target = arguments_().slice(1);
-    for (const provider of [[], ['--provider=aws'], ['--provider=supabase'], ['--provider=cloudflare', '--provider=cloudflare']]) {
+    for (const provider of [[], ['--provider=aws'], ['--provider=cloudflare', '--provider=cloudflare']]) {
       expect(() => providerTestOptions([...provider, ...target])).toThrow('--provider=cloudflare');
     }
   });

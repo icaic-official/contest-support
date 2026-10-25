@@ -6,7 +6,6 @@ Its rules contain no provider SDK, SQL, environment configuration, or provider s
 [Run log](history/run-log.md) records observed results.
 
 Cloudflare is the only backend. Its application Worker executes the shared service through guarded D1 batches.
-On 2026-10-25 the owner removed the earlier Supabase implementation, which ran the same rules in PostgreSQL. See [the history](history/supabase-provider-records.md).
 
 ## Existing compatibility baseline
 

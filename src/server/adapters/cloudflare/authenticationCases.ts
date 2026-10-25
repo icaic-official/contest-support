@@ -628,6 +628,9 @@ export function registerAuthenticationCases(group: AuthenticationCases) {
             .toEqual(before[key].filter((row) => String(row.audience).startsWith('team:')));
         }
         expect(after.notifications.filter((row) => row.audience === 'staff')).toHaveLength(fullApplication ? 2 : 1);
+        // The contestant has a login, so the reset still sends the account a revocation hint.
+        expect((await stmt('SELECT count(*) AS n FROM notifications WHERE audience = ?', `account:${fixture.contestant.accountId}`)
+          .first<{ n: number }>())!.n).toBeGreaterThan(0);
         expect((await stmt('SELECT team_id FROM memberships WHERE account_id = ?', fixture.contestant.accountId).first<{team_id: string}>())?.team_id).toBe(fixture.teamId);
         expect((await stmt("SELECT count(*) n FROM account_operations WHERE account_id = ? AND state = 'completed'", fixture.contestant.accountId).first<{n: number}>())?.n).toBe(1);
       });

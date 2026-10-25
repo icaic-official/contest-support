@@ -218,7 +218,7 @@ These rules apply:
 - The timer uses `unresolvedTime()` from `model.ts`. It stops on resolution and continues on reopening. Resolved intervals are not counted.
 - **Report an issue** is disabled with a reason when contestant intake is closed or the event is archived. Reply and reopen are not available in an archived event.
 - The reply box sends with Enter and adds a line with Shift+Enter. The draft is cleared only when the server records the message, also after **Retry last request** (T0012).
-- `IssueImages` gets only the team-visible images, with `staff={false}` and `canUpload={false}`. Its image list and preview dialog use Tailwind classes. The upload form is not restyled yet. The organiser steps restyle it. The old class names, such as `image-thumb`, stay because tests use them.
+- `IssueImages` gets only the team-visible images, with `staff={false}`. It shows the image list and the preview dialog with Tailwind classes. It has no upload form. Staff upload through `OrganiserImages`.
 
 ## Organiser phone app
 
@@ -276,7 +276,7 @@ These rules apply:
 - The Session tab holds the **Teams** and **Categories** sections, which use the editors of the desktop pages. The **Add teams** box keeps its text until the server records it. A lost answer does not duplicate teams, because each new team carries an ID that the box keeps until the request succeeds.
 - In an archived event, every admin control is disabled. `PhoneStatus` shows the archived banner.
 
-`useIssueImages` (`src/connected/hooks/`) holds the upload, retry, preview and removal logic of `IssueImages`. `IssueImages` uses it with its existing markup.
+`useIssueImages` (`src/connected/hooks/`) holds the upload, retry, preview and removal logic of the issue images. `OrganiserImages` uses all of it. `IssueImages` shows the images and the preview, and it uses the preview and removal logic.
 
 ## Organiser desktop console
 

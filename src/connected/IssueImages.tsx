@@ -9,7 +9,6 @@ export function IssueImages({
   sessionId,
   issueId,
   archived,
-  canUpload,
   staff,
   userId,
   limits,
@@ -21,7 +20,6 @@ export function IssueImages({
   sessionId: string;
   issueId: string;
   archived: boolean;
-  canUpload: boolean;
   staff: boolean;
   userId: string;
   limits: ImageLimits;
@@ -30,10 +28,9 @@ export function IssueImages({
   onChanged: () => Promise<void>;
   transport?: ImageTransport;
 }) {
-  const inputId = useId();
+  const id = useId();
   const dialogRef = useRef<HTMLDialogElement>(null);
   const openerRef = useRef<HTMLButtonElement | null>(null);
-  const fileRef = useRef<HTMLInputElement>(null);
   const images = useIssueImages({
     sessionId,
     issueId,
@@ -46,20 +43,7 @@ export function IssueImages({
     isPreviewOpen: () => Boolean(dialogRef.current?.open),
     onPreviewClose: () => dialogRef.current?.close(),
   });
-  const {
-    shown,
-    thumbs,
-    removals,
-    visibility,
-    setVisibility,
-    progress,
-    message,
-    retry,
-    busy,
-    active,
-    fullUrl,
-    limitText,
-  } = images;
+  const { shown, thumbs, removals, message, busy, active, fullUrl } = images;
 
   function openPreview(item: Attachment, button: HTMLButtonElement) {
     openerRef.current = button;
@@ -70,16 +54,10 @@ export function IssueImages({
   const dismissPreview = images.closePreview;
   const remove = images.remove;
 
-  async function cancelUpload() {
-    if ((await images.cancelUpload()) && fileRef.current) {
-      fileRef.current.value = "";
-    }
-  }
-
   return (
-    <section className="images grid gap-3" aria-labelledby={`${inputId}-heading`}>
+    <section className="images grid gap-3" aria-labelledby={`${id}-heading`}>
       <div className="activity-heading flex items-baseline gap-2">
-        <h3 id={`${inputId}-heading`} className="text-sm font-medium">Images</h3>
+        <h3 id={`${id}-heading`} className="text-sm font-medium">Images</h3>
         <span className="text-xs text-muted-foreground">{shown.length}</span>
       </div>
       {shown.length === 0 && <p className="field-help text-sm text-muted-foreground">No images attached.</p>}
@@ -121,77 +99,6 @@ export function IssueImages({
           })}
         </ul>
       )}
-      {canUpload && (
-        <form
-          className="section-form"
-          onSubmit={(event) => {
-            event.preventDefault();
-            const selected = new FormData(event.currentTarget).get("image");
-            const file = retry?.file ?? (selected instanceof File ? selected : undefined);
-            if (!file || file.size === 0) {
-              images.setMessage("Choose a JPEG, PNG, or WebP image.");
-              return;
-            }
-            void images.send(file);
-          }}
-        >
-          <label>
-            Who can see this image
-            <select
-              name="visibility"
-              value={visibility}
-              disabled={busy || Boolean(retry)}
-              onChange={(event) => {
-                setVisibility(event.target.value === "public" ? "public" : "internal");
-              }}
-            >
-              <option value="internal">Staff only</option>
-              <option value="public">Visible to the team</option>
-            </select>
-          </label>
-          <label htmlFor={inputId}>
-            Image file
-            <input
-              id={inputId}
-              ref={fileRef}
-              name="image"
-              type="file"
-              accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
-              disabled={busy || Boolean(retry)}
-              onChange={() => images.clearRetry()}
-            />
-          </label>
-          <p className="field-help" id={`${inputId}-limits`}>{limitText}</p>
-          {progress !== undefined && (
-            <>
-              <p id={`${inputId}-progress`}>Uploading image, {progress}%.</p>
-              <progress
-                aria-labelledby={`${inputId}-progress`}
-                value={progress}
-                max={100}
-              />
-            </>
-          )}
-          {retry && <p className="field-help">The visibility choice stays fixed for this upload. Cancel the upload to change it.</p>}
-          <button type="submit" disabled={busy || archived || Boolean(retry)}>Add image</button>
-          {retry && !retry.cleanupOnly && (
-            <button
-              type="submit"
-              className="quiet"
-              disabled={busy}
-            >
-              Try the upload again
-            </button>
-          )}
-          {retry && (
-            <button type="button" className="quiet" disabled={busy} onClick={() => {
-              void cancelUpload();
-            }}>
-              Cancel upload
-            </button>
-          )}
-        </form>
-      )}
       {removals.map((item) => (
         <div className="image-removal-retry" key={item.id}>
           <p>The files for {item.original_name} still need to be deleted.</p>
@@ -209,7 +116,7 @@ export function IssueImages({
       <dialog
         ref={dialogRef}
         className="image-preview m-auto max-h-[calc(100%-2rem)] w-[min(960px,calc(100%-2rem))] overflow-auto rounded-xl border bg-background p-5 text-foreground backdrop:bg-black/70"
-        aria-labelledby={`${inputId}-preview`}
+        aria-labelledby={`${id}-preview`}
         onClose={(event) => {
           // A queued close event can arrive after another preview opens.
           if (event.currentTarget.open) return;
@@ -219,7 +126,7 @@ export function IssueImages({
       >
         {active && (
           <>
-            <h3 id={`${inputId}-preview`} className="font-medium">
+            <h3 id={`${id}-preview`} className="font-medium">
               Image uploaded by {active.uploader_name} on{" "}
               {new Date(active.uploaded_at).toLocaleString()}
             </h3>

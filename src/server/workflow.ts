@@ -11,6 +11,7 @@ export interface WorkflowState {
   membership: { team_id: string | null; roles: Role[]; is_admin: boolean };
   session: { id: string; intake_open: boolean; categories: string[] };
   archived: boolean;
+  /** The session's teams among the membership team and the team that a submit names. */
   teams: string[];
   issue: {
     id: string; team_id: string; status: 'open' | 'claimed' | 'escalated' | 'resolved';

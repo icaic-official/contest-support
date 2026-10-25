@@ -8,8 +8,10 @@ import { AVATAR_MAX_BYTES } from '../../../connected/imageFile';
 import type { Caller } from '../../authentication';
 import type { D1Connection } from '../d1/connection';
 import { D1Fixture, applyMigrations } from '../d1/testFixture';
+import { currentAccessBindings, currentAccessSql, currentReadyLoginBindings, currentReadyLoginSql } from './application';
 import { R2AvatarService, avatarKey } from './avatars';
 import type { PrivateBucket } from './images';
+import { openStoreDatabase } from './tooling/store-database.mjs';
 
 vi.setConfig({ testTimeout: 120_000, hookTimeout: 120_000 });
 const png = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
@@ -234,5 +236,131 @@ describe('Cloudflare avatars with local D1 and R2 bindings', () => {
     expect(await state(replaced.avatar_id)).toEqual({ state: 'retired', removed: 1 });
     expect(await bucket.get(avatarKey(specialist.accountId, replaced.avatar_id))).toBeNull();
     expect(await bytesOf(specialist, current.avatar_id)).toEqual({ type: 'image/jpeg', bytes: jpeg });
+  });
+});
+
+/**
+ * The avatar statement before 2026-10-26. It checks every ready avatar of the
+ * installation, and it is the reference for who can read whose avatar.
+ */
+const referenceVisibleSql = `WITH login AS (${currentReadyLoginSql}), access AS (${currentAccessSql})
+  SELECT v.account_id AS person_id, v.id AS avatar_id, v.content_type FROM account_avatars v CROSS JOIN login l
+  WHERE v.state = 'ready' AND (v.account_id = l.id OR EXISTS (SELECT 1 FROM access a JOIN memberships m
+    ON m.session_id = ? AND m.account_id = v.account_id AND m.team_id IS NULL AND (m.is_admin = 1 OR EXISTS (
+      SELECT 1 FROM membership_roles r WHERE r.session_id = m.session_id AND r.account_id = m.account_id))
+    WHERE a.staff = 1))`;
+
+describe('avatar reads match the reference rule for every caller, session, and avatar state', () => {
+  let db: D1Connection;
+  let dispose: () => Promise<void>;
+  const person = () => ({ accountId: randomUUID(), loginId: randomUUID() });
+  const people = {
+    admin: person(), volunteer: person(), jury: person(), contestant: person(), teammate: person(),
+    otherTeam: person(), plainMember: person(), staffAndContestant: person(), otherSessionStaff: person(),
+    archivedStaff: person(), noAvatar: person(), disabled: person(), mustChange: person(),
+    revokedLogin: person(), removedMember: person(),
+  };
+  const sessions = { main: randomUUID(), second: randomUUID(), archived: randomUUID(), unknown: randomUUID() };
+  const avatarIds: string[] = [];
+  const bucket: PrivateBucket = {
+    get: async () => ({ size: 1, body: new Response('x').body!, arrayBuffer: async () => new ArrayBuffer(1) }),
+    put: async () => null,
+    delete: async () => {},
+  };
+
+  beforeAll(async () => {
+    ({ db, dispose } = await openStoreDatabase({ configPath: 'src/server/adapters/cloudflare/deploy/connector-store-ci.wrangler.jsonc', remoteBindings: false }));
+    await applyMigrations(db);
+    const run = (sql: string, ...values: Array<string | number | null>) => db.prepare(sql).bind(...values).run();
+    const now = "strftime('%Y-%m-%dT%H:%M:%fZ', 'now')";
+    const [event, archivedEvent, mainTeam, otherTeam, secondTeam] = [randomUUID(), randomUUID(), randomUUID(), randomUUID(), randomUUID()];
+    await run('INSERT INTO events (id, archived) VALUES (?, 0), (?, 1)', event, archivedEvent);
+    await run('INSERT INTO sessions (id, event_id) VALUES (?, ?), (?, ?), (?, ?)',
+      sessions.main, event, sessions.second, event, sessions.archived, archivedEvent);
+    await run('INSERT INTO teams (id, session_id) VALUES (?, ?), (?, ?), (?, ?)',
+      mainTeam, sessions.main, otherTeam, sessions.main, secondTeam, sessions.second);
+    for (const [name, caller] of Object.entries(people)) {
+      await run('INSERT INTO accounts (id, name, must_change, disabled) VALUES (?, ?, ?, ?)', caller.accountId,
+        `Fictional ${name}`, Number(caller === people.mustChange), Number(caller === people.disabled));
+      await run(`INSERT INTO ba_user (id, name, email, createdAt, updatedAt) VALUES (?, ?, ?, ${now}, ${now})`,
+        caller.accountId, name, `${caller.accountId}@avatars.minsky.invalid`);
+      await run(`INSERT INTO ba_session (id, userId, token, expiresAt, createdAt, updatedAt)
+        VALUES (?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '+1 hour'), ${now}, ${now})`, caller.loginId, caller.accountId, randomUUID());
+      await run('INSERT INTO logins (id, account_id, expires_at, identity_session_id, revoked) VALUES (?, ?, unixepoch() + 3600, ?, ?)',
+        caller.loginId, caller.accountId, caller.loginId, Number(caller === people.revokedLogin));
+    }
+    const staff = (caller: Caller, session: string, role: string | null, isAdmin = 0) => [
+      run('INSERT INTO memberships (session_id, account_id, team_id, is_admin) VALUES (?, ?, NULL, ?)', session, caller.accountId, isAdmin),
+      ...(role ? [run('INSERT INTO membership_roles (session_id, account_id, role) VALUES (?, ?, ?)', session, caller.accountId, role)] : []),
+    ];
+    const contestant = (caller: Caller, session: string, team: string) =>
+      run('INSERT INTO memberships (session_id, account_id, team_id) VALUES (?, ?, ?)', session, caller.accountId, team);
+    for (const write of [
+      ...staff(people.admin, sessions.main, null, 1), ...staff(people.volunteer, sessions.main, 'volunteer'),
+      ...staff(people.jury, sessions.main, 'jury'), contestant(people.contestant, sessions.main, mainTeam),
+      contestant(people.teammate, sessions.main, mainTeam), contestant(people.otherTeam, sessions.main, otherTeam),
+      ...staff(people.plainMember, sessions.main, null), ...staff(people.staffAndContestant, sessions.main, 'volunteer'),
+      contestant(people.staffAndContestant, sessions.second, secondTeam), ...staff(people.noAvatar, sessions.main, 'specialist'),
+      ...staff(people.disabled, sessions.main, 'volunteer'), ...staff(people.mustChange, sessions.main, 'volunteer'),
+      ...staff(people.revokedLogin, sessions.main, 'volunteer'), ...staff(people.removedMember, sessions.main, 'volunteer'),
+      ...staff(people.admin, sessions.second, null, 1), ...staff(people.otherSessionStaff, sessions.second, 'volunteer'),
+      ...staff(people.archivedStaff, sessions.archived, 'volunteer'), ...staff(people.volunteer, sessions.archived, 'jury'),
+    ]) await write;
+    await run('DELETE FROM memberships WHERE session_id = ? AND account_id = ?', sessions.main, people.removedMember.accountId);
+    const avatar = async (caller: Caller, state: string) => {
+      const id = randomUUID();
+      avatarIds.push(id);
+      await run(`INSERT INTO account_avatars (id, account_id, request_id, byte_size, content_type, digest, state, ready_at, retired_at)
+        VALUES (?, ?, ?, 1, 'image/png', ?, ?, ${now}, CASE WHEN ? = 'retired' THEN ${now} END)`,
+      id, caller.accountId, randomUUID(), 'a'.repeat(64), state, state);
+    };
+    for (const caller of Object.values(people)) if (caller !== people.noAvatar) await avatar(caller, 'ready');
+    await avatar(people.volunteer, 'retired');
+    await avatar(people.jury, 'pending');
+    await avatar(people.contestant, 'expired');
+  });
+  afterAll(async () => { await dispose?.(); });
+
+  async function reference(caller: Caller, sessionId: string, avatarId?: string) {
+    const bindings = [...currentReadyLoginBindings(caller), ...currentAccessBindings(caller, sessionId), sessionId];
+    const statement = avatarId === undefined
+      ? db.prepare(`${referenceVisibleSql} ORDER BY v.account_id`).bind(...bindings)
+      : db.prepare(`${referenceVisibleSql} AND v.id = ?`).bind(...bindings, avatarId);
+    return (await statement.all<{ person_id: string; avatar_id: string; content_type: string }>()).results;
+  }
+
+  it('lists the same avatars as the reference for every caller and session', async () => {
+    const avatars = new R2AvatarService(db, bucket);
+    for (const [name, caller] of Object.entries(people)) {
+      for (const [session, sessionId] of Object.entries(sessions)) {
+        const expected = (await reference(caller, sessionId)).map(({ person_id, avatar_id }) => ({ person_id, avatar_id }));
+        expect(await avatars.list(caller, sessionId), `${name} in the ${session} session`).toEqual(expected);
+      }
+    }
+    const owners = async (caller: Caller, sessionId: string) =>
+      (await avatars.list(caller, sessionId)).map((avatar) => avatar.person_id).sort();
+    const mainStaff = [people.admin, people.volunteer, people.jury, people.staffAndContestant,
+      people.disabled, people.mustChange, people.revokedLogin].map((caller) => caller.accountId).sort();
+    expect(await owners(people.volunteer, sessions.main)).toEqual(mainStaff);
+    expect(await owners(people.contestant, sessions.main)).toEqual([people.contestant.accountId]);
+    expect(await owners(people.staffAndContestant, sessions.second)).toEqual([people.staffAndContestant.accountId]);
+    expect(await owners(people.archivedStaff, sessions.archived))
+      .toEqual([people.archivedStaff.accountId, people.volunteer.accountId].sort());
+    expect(await owners(people.disabled, sessions.main)).toEqual([]);
+  });
+
+  it('downloads exactly the avatars that the reference permits, in every avatar state', async () => {
+    const avatars = new R2AvatarService(db, bucket);
+    for (const [name, caller] of Object.entries(people)) {
+      for (const [session, sessionId] of Object.entries(sessions)) {
+        await Promise.all(avatarIds.map(async (avatarId) => {
+          const [expected] = await reference(caller, sessionId, avatarId);
+          const actual = await avatars.download(caller, sessionId, avatarId).then(
+            async (result) => { await result.body.cancel(); return result.contentType; },
+            (error: unknown) => { expect(error).toMatchObject({ validation: true }); return undefined; });
+          expect(actual, `${name} reads ${avatarId} in the ${session} session`).toBe(expected?.content_type);
+        }));
+      }
+    }
   });
 });

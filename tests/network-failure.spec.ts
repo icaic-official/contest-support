@@ -41,7 +41,7 @@ async function signInWithoutSnapshot(page: Page, api: FakeWorker) {
 test('a lost session read blames the connection, not the account', async ({ page, api }) => {
   await page.route(snapshotRequest, (route) => route.abort('failed'));
   await signInWithoutSnapshot(page, api);
-  await expect(page.getByText('Minsky could not load your session. Check your connection and try again.'))
+  await expect(page.getByText('Minsky could not load your session.'))
     .toBeVisible();
   await expect(page.getByText(/ask an organizer to assign your membership/)).toHaveCount(0);
 });

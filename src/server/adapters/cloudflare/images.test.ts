@@ -203,10 +203,16 @@ describe('Cloudflare private images with local D1 and R2 bindings', () => {
     }
   });
 
-  it('removes format characters so a file name cannot reverse its displayed order', async () => {
+  it('removes direction and spacing marks so a file name cannot reverse its displayed order', async () => {
     const image = await reserve({ name: 'photo\u202Egnp.png\u200B\uFEFF' });
     expect((await record(image.id))?.original_name).toBe('photognp.png');
     await expect(reserve({ name: '\u202E\u200B' })).rejects.toMatchObject({ validation: true });
+  });
+
+  it('keeps joiners that emoji sequences and some scripts need in a file name', async () => {
+    const name = 'family\u{1F468}\u200D\u{1F469}\u200Dx.png';
+    const image = await reserve({ name });
+    expect((await record(image.id))?.original_name).toBe(name);
   });
 
   it('says that the event is archived, and keeps the permission message for a person without permission', async () => {

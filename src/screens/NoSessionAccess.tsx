@@ -81,7 +81,7 @@ export function NoSessionAccess({
               </CardTitle>
               <CardDescription>
                 {refreshError
-                  ? "Minsky could not load your session. Check your connection and try again."
+                  ? "Minsky could not load your session."
                   : "No session data is available. If your account was just created, ask an organizer to assign your membership."}
               </CardDescription>
             </CardHeader>

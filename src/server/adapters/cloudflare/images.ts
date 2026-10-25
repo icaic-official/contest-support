@@ -53,11 +53,12 @@ const imageSql = `SELECT x.*, i.team_id, s.max_image_bytes, s.max_images_per_iss
   WHERE x.session_id = ? AND x.id = ?`;
 
 /**
- * Remove control and format characters and path separators from an uploaded file name,
- * and keep its first 200 characters. Format characters such as U+202E reverse the displayed order.
+ * Remove control characters, invisible direction and spacing marks, and path separators from an uploaded file name,
+ * and keep its first 200 characters. Direction marks such as U+202E reverse the displayed order.
+ * Joiners U+200C and U+200D stay, because some names and emoji need them.
  */
 export function cleanImageName(name: string): string {
-  return [...name.trim().replace(/[\p{Cc}\p{Cf}]/gu, '').replace(/[/\\]/g, '-')].slice(0, 200).join('');
+  return [...name.trim().replace(/[\p{Cc}\u061C\u200B\u200E\u200F\u202A-\u202E\u2066-\u2069\uFEFF]/gu, '').replace(/[/\\]/g, '-')].slice(0, 200).join('');
 }
 
 const archivedError = () => new ImageRequestError('This event is archived.', { validation: true });

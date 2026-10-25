@@ -28,18 +28,19 @@ interface WorkflowRow {
 
 // Each read uses one primary SQLite snapshot. A missing identity session always
 // denies access, including after password resets and identity-session removal.
+// `teams` holds only the membership team and the team that a submit names.
 const workflowSql = `SELECT a.name AS actor_name, m.team_id AS membership_team, m.is_admin,
     (SELECT json_group_array(r.role) FROM membership_roles r
       WHERE r.session_id = s.id AND r.account_id = a.id) AS roles,
     s.intake_open, s.categories, e.archived,
-    (SELECT json_group_array(t.id) FROM (SELECT id FROM teams WHERE session_id = s.id ORDER BY id) t) AS teams,
+    (SELECT json_group_array(t.id) FROM (SELECT id FROM teams WHERE session_id = s.id AND id IN (m.team_id, ?) ORDER BY id) t) AS teams,
     i.id AS issue_id, i.team_id, i.status, i.owner, i.public_revision,
     (SELECT id FROM resolutions WHERE issue_id = i.id AND reopened_at IS NULL) AS resolution_id,
     aw.id AS award_id, aw.applied_at,
     json_object('access', a.access_version, 'name', a.name, 'generation', a.credential_generation,
       'login', l.version, 'identity', b.id, 'expires', b.expiresAt,
       'membership', m.version, 'session', s.version, 'event', e.version,
-      'teams', (SELECT json_group_array(t.id) FROM (SELECT id FROM teams WHERE session_id = s.id ORDER BY id) t),
+      'teams', (SELECT json_group_array(t.id) FROM (SELECT id FROM teams WHERE session_id = s.id AND id IN (m.team_id, ?) ORDER BY id) t),
       'issue', i.write_version,
       'resolutions', (SELECT json_group_array(json_object('id', r.id, 'at', r.at, 'reopened_at', r.reopened_at,
         'reopened_by', r.reopened_by, 'summary', r.summary, 'reason', r.reason))
@@ -72,16 +73,15 @@ export class D1ApplicationStore implements WorkflowPersistence {
     return this.db.prepare(sql).bind(...values);
   }
 
-  private parameters(caller: Caller, sessionId: string, requestId: string, issueId: string | null) {
-    return [caller.loginId, sessionId, requestId, issueId, caller.accountId, issueId];
-  }
-
-  private row(caller: Caller, sessionId: string, requestId: string, issueId: string | null) {
-    return this.statement(workflowSql, ...this.parameters(caller, sessionId, requestId, issueId)).first<WorkflowRow>();
+  /** Bind values in statement order. Only a submit names a team and has no issue. */
+  private parameters(caller: Caller, sessionId: string, requestId: string, command: Command) {
+    const team = command.type === 'submit' ? command.team_id ?? null : null;
+    const issueId = command.type === 'submit' ? null : command.issue_id;
+    return [team, team, caller.loginId, sessionId, requestId, issueId, caller.accountId, issueId];
   }
 
   async read(caller: Caller, sessionId: string, requestId: string, command: Command): Promise<WorkflowRead | undefined> {
-    const row = await this.row(caller, sessionId, requestId, command.type === 'submit' ? null : command.issue_id);
+    const row = await this.statement(workflowSql, ...this.parameters(caller, sessionId, requestId, command)).first<WorkflowRow>();
     if (!row) return undefined;
     return {
       state: {
@@ -104,8 +104,7 @@ export class D1ApplicationStore implements WorkflowPersistence {
   async commit(caller: Caller, sessionId: string, requestId: string, command: Command,
     read: WorkflowRead, decision: WorkflowDecision): Promise<WorkflowCommitResult> {
     const assertionId = crypto.randomUUID();
-    const requestedIssue = command.type === 'submit' ? null : command.issue_id;
-    const parameters = this.parameters(caller, sessionId, requestId, requestedIssue);
+    const parameters = this.parameters(caller, sessionId, requestId, command);
     const assertion = (suffix: string, condition: string, ...values: Array<string | number | null>) =>
       this.statement(`INSERT INTO command_assertions (id, valid) VALUES (?, CASE WHEN ${condition} THEN 1 ELSE 0 END)`,
         `${assertionId}:${suffix}`, ...values);

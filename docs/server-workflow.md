@@ -3,30 +3,13 @@
 T0019 extracted the existing issue decisions into [workflow.ts](../src/server/workflow.ts).
 `WorkflowService` accepts all nine existing `Command` variants.
 Its rules contain no provider SDK, SQL, environment configuration, or provider selection.
-[Run the shared workflow check](run-provider-tests.md#run-the-shared-workflow-check) describes that provider's checks.
 [Run log](history/run-log.md) records observed results.
 
-Cloudflare is the active development backend. Its application Worker executes the shared service through guarded D1 batches.
-The Supabase browser adapter retains the guarded `public.workflow` RPC.
-The separate `workflow` Edge Function runs the shared service against Supabase for replacement verification.
-An opt-in [browser executor](../src/backend/supabase/workflow.ts) calls that function with the existing `Backend.workflows.execute` signature.
-Both provider implementations remain available. The development switch changed no workflow decision or transaction boundary.
+Cloudflare is the only backend. Its application Worker executes the shared service through guarded D1 batches.
 
 ## Existing compatibility baseline
 
 The browser [Command type](../src/connected/model.ts) defines the action names and fields.
-The effective PostgreSQL implementation comes from these migrations, in order:
-
-| Migration | Effective responsibility |
-| --- | --- |
-| `202610020001_cloud.sql` | Creates workflow tables, constraints, policies, and the original workflow. |
-| `202610020002_indexes.sql` | Adds indexes and the receipt actor relationship. |
-| `202610020003_private_signals.sql` | Replaces the workflow and separates internal activity from public revisions and notifications. |
-| `202610020004_usernames.sql` | Moves that implementation to `app_private.workflow_before_usernames`. Wraps it with the mandatory-password and login gate. |
-| `202610020005_admin_recovery.sql` | Adds restricted administrator recovery. Does not replace workflow. |
-| `202610110001_attachments.sql` | Adds image operations and snapshot fields. Does not replace workflow. |
-| `202610140001_attachment_fixes.sql` | Strengthens image and credential guards and replaces the snapshot. Does not replace workflow. |
-
 The shared rules retain these decisions:
 
 | Command | Access and transition | Recorded result |
@@ -44,11 +27,11 @@ The shared rules retain these decisions:
 Support means volunteer or specialist.
 Assigned roles combine capabilities.
 An administrator flag alone grants no support, jury, or conversation capability.
-Contestant membership and staff membership are mutually exclusive in the database.
+Contestant membership and staff membership are mutually exclusive.
 Staff can read every team in their session.
 Contestants can read only their own team.
 
-Text fields retain PostgreSQL `btrim(text)` behavior, which removes surrounding spaces.
+Text fields remove surrounding spaces.
 The 2,000-character limit counts Unicode code points.
 Every non-submit command supplies the expected public issue revision.
 Persisted resolution intervals determine unresolved time.
@@ -70,38 +53,6 @@ It exposes no arbitrary query API, generic table operations, or transaction call
 The adapter owns authoritative commit timestamps and generated record identifiers.
 The dependency value remains inside trusted server code.
 The browser cannot submit a decision or an account identity as proof of access.
-
-## Supabase execution path
-
-The opt-in execution path contains these components:
-
-1. [workflow/index.ts](../supabase/functions/workflow/index.ts) verifies the bearer token through Supabase Auth `getUser()`.
-2. [http.ts](../src/server/adapters/supabase/http.ts) accepts the command envelope and passes the verified account and login to the service.
-3. `WorkflowService` reads through [the Supabase adapter](../src/server/adapters/supabase/store.ts) and computes a decision.
-4. `shared_workflow_commit` checks current access and captured dependencies before writing the decision atomically.
-
-The function uses an explicit origin allowlist and does not cache responses.
-Its service key stays in the server environment.
-The browser receives no privileged database credential.
-
-The [T0019 migration](../supabase/migrations/202610180001_shared_workflow.sql) grants the read and commit RPCs only to `service_role`.
-It revokes PUBLIC, anonymous, and authenticated execution.
-Direct browser writes remain forbidden by the existing grants and policies.
-The RPCs accept trusted server decisions. They are not browser mutation APIs.
-
-PostgreSQL retains atomic writes, foreign keys, uniqueness, timestamp constraints, and current-access checks.
-The commit locks current dependencies and rejects a changed decision state.
-The [expiry correction](../supabase/migrations/202610180002_shared_workflow_expiry.sql) checks the current wall clock after lock waits.
-A login that expires during a wait cannot authorize a write or receipt replay.
-Captured dependencies include the session, event, membership, person, account, credentials, login, teams, issue, current resolution, and award.
-A private issue version also detects changes to history, resolutions, and awards.
-Triggers maintain that version for legacy writers while both paths exist.
-
-The legacy `public.workflow` and `app_private.workflow_before_usernames` remain during replacement verification.
-Their protective SQL checks remain intact.
-Administration, images, snapshots, and Realtime still use their existing Supabase implementations.
-Issue decisions share one application service.
-Other application operations retain their provider-specific adapters.
 
 ## Requests, conflicts, and visibility
 

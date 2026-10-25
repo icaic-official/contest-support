@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { requireBackend } from "@/backend";
+import { backend } from "@/backend";
 import { errorMessage } from "@/backend/errors";
 
 /** The ID of the Current password field. The account page links to it. */
@@ -76,7 +76,7 @@ export function PasswordChangeForm({
           setChanged(false);
           void (async () => {
             try {
-              await requireBackend().auth.changePassword(
+              await backend.auth.changePassword(
                 value("current"),
                 value("password"),
               );

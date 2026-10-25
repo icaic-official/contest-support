@@ -14,8 +14,6 @@ The [CI reference](cloudflare-build-settings.md#workers-builds) owns the command
 `npm run ci` fails on type errors, lint errors, test failures, a failed build, a docs link error, a high or critical `npm audit` advisory, or any Gitleaks finding.
 Its tests also fail on a D1 migration that drops or renames schema, because `main` publishes automatically. See [Change the D1 schema](cloudflare-builds.md#change-the-d1-schema).
 Browser suites and hosted provider suites are on-demand commands. They are not required PR checks.
-`npm run ci` keeps the Supabase adapter checks: Deno function checks and tests, and embedded-PostgreSQL migration and policy tests. They need no Supabase project.
-The project operates no Supabase project. Hosted Supabase suites run only against a project that the person running them owns.
 
 ## Dependency updates
 
@@ -65,8 +63,7 @@ Do not suppress whole secret classes or all historical findings.
 The browser fixture in commit `0e38d2b93eb9b066a4f4b45d9990c1f4d663199b`,
 `tests/support/announcementServer.ts:148`, constructs a mock Auth token with a
 fixed JWT header, a generated fixture payload, and a literal `.fixture` signature.
-Its mocked requests target `example.supabase.co`; it contains no provider credential
-or signing key. Scans of all fetched history include this announcements-branch commit,
+It contains no provider credential or signing key. Scans of all fetched history include this announcements-branch commit,
 even on dependency PRs. The exception covers only that commit, file, rule, and line.
 Other findings, including new findings in the same file, still fail the scan.
 
@@ -74,9 +71,8 @@ Other findings, including new findings in the same file, still fail the scan.
 
 Cursor runs `.cursor/install.sh` when a saved environment uses `.cursor/environment.json`.
 The script installs the root lockfile and the `site` lockfile with `npm ci`.
-When `deno` is missing from `PATH`, the script copies the Deno 2.9.6 binary from that locked package to `/usr/local/bin`.
 It then installs Playwright Chromium and the system libraries used by browser tests.
-Run the script again on a prepared machine. `npm ci` reinstalls from the lockfiles, and the Deno copy is skipped when `deno` already runs.
+Run the script again on a prepared machine. `npm ci` reinstalls from the lockfiles.
 The script does not start the app, deploy it, or read secrets.
 The machine must already have Node.js 22.22 or later, or Node.js 24. The script does not install Node.js.
 

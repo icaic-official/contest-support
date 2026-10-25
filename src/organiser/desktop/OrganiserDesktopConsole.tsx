@@ -7,6 +7,7 @@ import {
 } from "react";
 import { Archive } from "lucide-react";
 import { useLocation, useNavigate } from "react-router";
+import { RenderErrorBoundary } from "@/components/render-error-boundary";
 import { AccountPage, useOpenPasswordChange } from "@/connected/AccountPage";
 import { accountName } from "@/connected/accountModel";
 import {
@@ -36,7 +37,12 @@ import {
   visibleIssues,
 } from "../organiserModel";
 import { useLeftIssueNotice } from "../useLeftIssueNotice";
-import { AccountsPage, OverviewPage, SettingsPage } from "./AdminPages";
+import {
+  AccountsPage,
+  OverviewPage,
+  RosterPage,
+  SettingsPage,
+} from "./AdminPages";
 import { AwardReviewPage } from "./AwardReviewPage";
 import { CommandPalette, ConsoleSidebar, ConsoleTopBar } from "./ConsoleChrome";
 import {
@@ -79,7 +85,7 @@ function typingOrDialog(event: KeyboardEvent): boolean {
   const target = event.target instanceof Element ? event.target : null;
   return Boolean(
     target?.closest("input, textarea, select, [contenteditable='true']") ||
-      document.querySelector("[role='dialog']"),
+    document.querySelector("[role='dialog']"),
   );
 }
 
@@ -286,7 +292,9 @@ export function OrganiserDesktopConsole({
       .then((recorded) => {
         // The command does not open the issue. An issue the person opened
         // while it ran stays open. Otherwise focus returns to the row.
-        if (!inlineActionReturnsToList(recorded, mark, workflow.selectionMark())) {
+        if (
+          !inlineActionReturnsToList(recorded, mark, workflow.selectionMark())
+        ) {
           return;
         }
         workflow.selectIssue("");
@@ -403,55 +411,68 @@ export function OrganiserDesktopConsole({
                       />
                     )}
                   </div>
-                  {accountPage ? (
-                    <AccountPage
-                      shell={shell}
-                      state={state}
-                      member={member}
-                      headingId={consoleHeadingId}
-                      now={now}
-                      locked={command.locked}
-                      onSessionChange={changeSession}
-                    />
-                  ) : (
-                    <>
-                      {currentPage === "queue" && (
-                        <QueuePage
-                          props={pageProps}
-                          teamSelection={queueTeam}
-                          onTeamSelection={setQueueTeam}
-                          onReport={canReport ? () => openReport() : undefined}
-                        />
-                      )}
-                      {currentPage === "mine" && <MinePage props={pageProps} />}
-                      {currentPage === "handoffs" && (
-                        <HandoffsPage props={pageProps} />
-                      )}
-                      {currentPage === "teams" && (
-                        <TeamsPage
-                          props={pageProps}
-                          teamId={teamPageTeam}
-                          onTeam={(teamId) => {
-                            setTeamPageTeam(teamId);
-                            focusLater(consoleHeadingId);
-                          }}
-                          onReport={canReport ? openReport : undefined}
-                        />
-                      )}
-                      {currentPage === "awards" && (
-                        <AwardReviewPage props={pageProps} />
-                      )}
-                      {currentPage === "overview" && (
-                        <OverviewPage props={pageProps} />
-                      )}
-                      {currentPage === "accounts" && (
-                        <AccountsPage props={pageProps} admin={admin} />
-                      )}
-                      {currentPage === "settings" && (
-                        <SettingsPage props={pageProps} admin={admin} />
-                      )}
-                    </>
-                  )}
+                  {/* A failed page keeps the sidebar and top bar usable. */}
+                  <RenderErrorBoundary
+                    scope="region"
+                    resetKey={accountPage ? "account" : currentPage}
+                  >
+                    {accountPage ? (
+                      <AccountPage
+                        shell={shell}
+                        state={state}
+                        member={member}
+                        headingId={consoleHeadingId}
+                        now={now}
+                        locked={command.locked}
+                        onSessionChange={changeSession}
+                      />
+                    ) : (
+                      <>
+                        {currentPage === "queue" && (
+                          <QueuePage
+                            props={pageProps}
+                            teamSelection={queueTeam}
+                            onTeamSelection={setQueueTeam}
+                            onReport={
+                              canReport ? () => openReport() : undefined
+                            }
+                          />
+                        )}
+                        {currentPage === "mine" && (
+                          <MinePage props={pageProps} />
+                        )}
+                        {currentPage === "handoffs" && (
+                          <HandoffsPage props={pageProps} />
+                        )}
+                        {currentPage === "teams" && (
+                          <TeamsPage
+                            props={pageProps}
+                            teamId={teamPageTeam}
+                            onTeam={(teamId) => {
+                              setTeamPageTeam(teamId);
+                              focusLater(consoleHeadingId);
+                            }}
+                            onReport={canReport ? openReport : undefined}
+                          />
+                        )}
+                        {currentPage === "awards" && (
+                          <AwardReviewPage props={pageProps} />
+                        )}
+                        {currentPage === "overview" && (
+                          <OverviewPage props={pageProps} />
+                        )}
+                        {currentPage === "accounts" && (
+                          <AccountsPage props={pageProps} admin={admin} />
+                        )}
+                        {currentPage === "roster" && (
+                          <RosterPage props={pageProps} admin={admin} />
+                        )}
+                        {currentPage === "settings" && (
+                          <SettingsPage props={pageProps} admin={admin} />
+                        )}
+                      </>
+                    )}
+                  </RenderErrorBoundary>
                 </div>
               </div>
             </div>

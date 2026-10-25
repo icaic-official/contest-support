@@ -61,7 +61,6 @@ export function createAuthenticationHandler(
           if (!session) throw new AuthenticationError(401, 'Sign in to continue.');
           return json({ user: session.user, status: session.status, csrf: session.csrf });
         }
-        if (url.pathname === '/api/auth/sessions') return json(await service.sessions(request.headers));
         return json({ error: 'The endpoint does not exist.' }, 404);
       }
       if (request.method !== 'POST') return json({ error: 'The request method is not permitted.' }, 405);

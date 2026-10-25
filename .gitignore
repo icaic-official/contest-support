@@ -8,8 +8,6 @@ playwright-report/
 test-results/
 .env*
 !.env.example
-supabase/.temp/
-supabase/.branches/
 .vitest/
 
 # Lapiz preview build output and local state

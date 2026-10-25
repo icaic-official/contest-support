@@ -120,6 +120,8 @@ async function execute(request: Request): Promise<unknown> {
       );
     case 'removeMember':
       return backend.admin.removeMember(request.sessionId, request.userId);
+    case 'editRoster':
+      return backend.admin.editRoster(request.sessionId, request.command);
     case 'beginImage':
       return backend.images.begin(request.input);
     case 'uploadImage':

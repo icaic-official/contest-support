@@ -1,7 +1,7 @@
 # Cloudflare authentication reference
 
 The Cloudflare application uses maintained Better Auth identity operations and guarded D1 account records.
-Cloudflare serves the development application. Supabase remains available as a separate provider implementation.
+Cloudflare serves the development application.
 This reference describes the authentication API and its access rules.
 Use the [installation guide](../site/src/content/docs/operators/installation.mdx) for setup and [run log](history/run-log.md) for dated verification evidence.
 
@@ -17,11 +17,9 @@ The [verification guide](verify-cloudflare-authentication.md) gives exact test c
 The raw Better Auth router is not exposed.
 
 `createCloudflareAuthentication()` implements the existing browser `Authentication` contract.
-Its additional `account()` and `sessions()` methods support account administration and session reads.
+Its additional `account()` method supports account administration. The application route `GET /api/sessions` is the only contest list.
 The complete `createCloudflareBackend()` factory wraps this authentication adapter and supplies the remaining operation groups.
-The backend entry point defaults to Cloudflare when `VITE_BACKEND` is absent.
-Set `VITE_BACKEND=supabase` to select the Supabase provider.
-That provider keeps its own public settings. No automatic provider fallback occurs.
+The backend entry point always creates the Cloudflare client. No provider fallback occurs.
 
 ## HTTP endpoints
 
@@ -34,7 +32,6 @@ Authenticated endpoints read the HttpOnly cookie. Request bodies cannot supply a
 | `GET /api/auth/session` | Cookie | Returns `user`, `status`, and `csrf`. An absent or invalid login returns 401. |
 | `POST /api/auth/sign-out` | Empty object | Revokes the login, deletes its identity session, and clears the cookie. |
 | `POST /api/auth/change-password` | `currentPassword`, `newPassword` | Changes the password and replaces the cookie. Revokes every earlier login. |
-| `GET /api/auth/sessions` | Cookie | Returns the account's current contest-session memberships. Requires a completed password change. |
 | `POST /api/accounts` | `sessionId`, `command` | Performs `create_account`, `set_username`, or `reset_password`. Uses existing `AccountCommand` fields. |
 
 The historical authentication Worker uses the session ID as its summary name.
@@ -103,7 +100,9 @@ The token prevents cross-site request forgery, where another site attempts an ac
 POST requests with cross-site fetch metadata are rejected. No CORS access or preflight permission is exposed.
 Bodies are limited to 16 KiB. Redirected browser authentication requests fail.
 
-The browser adapter fetches a fresh CSRF token before each authenticated mutation.
+The browser adapter keeps the token from the last session read and reuses it for later mutations.
+The token belongs to one login. The adapter forgets it when a sign-in, sign-out or password change completes, and when a session read returns 401.
+A 403 reply means the server stopped before it ran the request. The adapter then reads the session again, and sends the request one more time only when the token changed.
 Subscriptions check session state every 60 seconds and on focus or page restoration.
 Callbacks run synchronously. Subscription cleanup is idempotent and stops later callbacks.
 Completed login, logout, and password-change requests invalidate earlier subscription reads, including reads started during the request.

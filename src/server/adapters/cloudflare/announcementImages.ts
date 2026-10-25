@@ -81,7 +81,7 @@ export class R2AnnouncementImageService {
     const parsed = beginSchema.safeParse(input);
     if (!parsed.success) throw new ImageRequestError(`Choose an image of up to ${megabytes(ANNOUNCEMENT_IMAGE_MAX_BYTES)} MB.`, { validation: true });
     const value = parsed.data;
-    // Keep the first 200 characters, as the Supabase provider does.
+    // Keep the first 200 characters of the name.
     const cleanName = [...cleanImageName(value.name)].slice(0, 200).join('');
     if (!cleanName.trim()) throw new ImageRequestError('Choose an image with a file name.', { validation: true });
     const repeat = async (): Promise<{ id: string; path: string } | undefined> => {

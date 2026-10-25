@@ -2134,7 +2134,7 @@ The user authorized this first migration step while the other pull requests rema
 8. Docs that need updating. None for the implemented extraction. Future hosted verification must add its result to this record.
 
 The [backend contracts](../backend-contracts.md) describe the interfaces and retry rules.
-The [cloud onboarding guide](../supabase-provider.md#verification-and-hosted-cloud-checks) lists the `cloud-test` environment configuration.
+The cloud onboarding guide (removed 2026-10-25) lists the `cloud-test` environment configuration.
 
 [Draft PR #32](https://github.com/GiftedNovaHD/minsky/pull/32) contains implementation commit `408dafa`.
 [GitHub Checks](https://github.com/GiftedNovaHD/minsky/actions/runs/39022916356) and the [secret and dependency checks](https://github.com/GiftedNovaHD/minsky/actions/runs/39022916361) passed for that commit.
@@ -2753,7 +2753,7 @@ The visible attachment ids are the dependency instead.
 Incoming reports preserve the displayed issue and its reply draft.
 Membership forms use the current saved roles, admin flag, and team. Unchanged membership values preserve local edits.
 Cloud test cleanup retains its recovery file on failure and removes it after success.
-See [fixture recovery](../supabase-provider.md#fixture-recovery) for the recovery steps.
+See fixture recovery (removed 2026-10-25) for the recovery steps.
 
 At `c785964`, all 33 unit/database tests and 11 browser tests passed on Node.js 24.19.0.
 Lint, type checking, the Deno function check, the production build, and whitespace checks also passed.
@@ -3147,6 +3147,6 @@ The demo uses one tab and one local dataset. It does not synchronize concurrent 
 
 Persona/filter selections reset on refresh. These checks establish no production security, offline operation, or 800-user capacity.
 
-T0002 retains one award per issue, even after reopening; award adjustments and role editors remain deferred. [T0003](../tickets.md#t0003--cloud-onboarding-and-authenticated-shared-product) now scopes cloud onboarding, authenticated shared workflows, role dashboards, minimal admin controls and contributor setup. Its planning changes were prepared on updated `main`; no application code or provider resources were changed. The [onboarding guide](../supabase-provider.md) distinguishes setup tasks from completed work.
+T0002 retains one award per issue, even after reopening; award adjustments and role editors remain deferred. [T0003](../tickets.md#t0003--cloud-onboarding-and-authenticated-shared-product) now scopes cloud onboarding, authenticated shared workflows, role dashboards, minimal admin controls and contributor setup. Its planning changes were prepared on updated `main`; no application code or provider resources were changed. The onboarding guide (removed 2026-10-25) distinguishes setup tasks from completed work.
 
 The user explicitly chose cloud features first and deferred outage/resilience work. Free tiers are preferred; necessary paid services are acceptable after identifying the cost and reason. Helpers' issue-linked images and configurable volunteer upload permissions are recorded for the next candidate alongside broader admin tools. Attachment visibility and setting scope/defaults remain undecided. No T0004 is created. UI redesign, notifications, CSV imports and shared incidents remain deferred.

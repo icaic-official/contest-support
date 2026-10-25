@@ -8,7 +8,7 @@ Update this map in the same change as any user-facing behavior change. Announcem
 
 - The repository root is the current directory.
 - `npm ci` and `npx playwright install chromium` have completed.
-- No `.env.local` is required. Do not log in to Cloudflare or Supabase for these journeys. The helper uses a fresh local D1 database.
+- No `.env.local` is required. Do not log in to Cloudflare for these journeys. The helper uses a fresh local D1 database.
 - One `serve` process is running and has printed `ready https://127.0.0.1:5199`.
 - `doctor` prints `"ok": true` for that same origin.
 - The viewport is `1280x800` unless the feature asks for the phone width.

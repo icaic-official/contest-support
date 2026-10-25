@@ -11,8 +11,7 @@ const sha = "a".repeat(40);
 const env = {
   WORKERS_CI: "1", WORKERS_CI_BRANCH: "feature/docs", WORKERS_CI_COMMIT_SHA: sha,
   CLOUDFLARE_ACCOUNT_ID: "458ad6a930b0fb717796dfa19ca6a2b1",
-  VITE_SUPABASE_URL: "https://abcdefghijklmnopqrst.supabase.co",
-  VITE_SUPABASE_PUBLISHABLE_KEY: "sb_publishable_fixture", VITE_ENVIRONMENT: "development",
+  VITE_ENVIRONMENT: "development",
   CLOUDFLARE_API_TOKEN: "fixture-token", GH_TOKEN: "fixture-github-token",
 };
 
@@ -182,17 +181,15 @@ it("keeps docs deployment independent and skips the app outside the preview buil
   expect(mocks.application).not.toHaveBeenCalled();
 });
 
-it("builds the Cloudflare backend without private tokens or Supabase settings and records the build revision", async () => {
+it("builds the Cloudflare backend without private tokens and records the build revision", async () => {
   const target = (await deploymentTargets(cloudflare, "app", { installation }))[0];
   const execute = vi.fn();
   const write = vi.fn();
-  await buildWorkers({ ...development, VITE_BACKEND: "supabase", AUTH_SECRET: "private-secret" }, {
+  await buildWorkers({ ...development, AUTH_SECRET: "private-secret" }, {
     execute, write, targets: async () => [target],
   });
   const buildEnv = execute.mock.calls[0][2].env;
-  expect(buildEnv.VITE_BACKEND).toBe("cloudflare");
-  for (const key of ["CLOUDFLARE_API_TOKEN", "GH_TOKEN", "GITHUB_TOKEN", "AUTH_SECRET",
-    "VITE_SUPABASE_URL", "VITE_SUPABASE_PUBLISHABLE_KEY"]) {
+  for (const key of ["CLOUDFLARE_API_TOKEN", "GH_TOKEN", "GITHUB_TOKEN", "AUTH_SECRET"]) {
     expect(buildEnv[key]).toBeUndefined();
   }
   expect(JSON.parse(write.mock.calls[0][1])).toEqual(build);
@@ -200,7 +197,7 @@ it("builds the Cloudflare backend without private tokens or Supabase settings an
 
 it("requires an exact build match before upload", async () => {
   for (const change of [
-    { sha: "old" }, { backend: "supabase" }, { config: "other.json" }, { databaseId: "other" }, { bucketName: "other" }, { origin: "https://wrong.example" },
+    { sha: "old" }, { backend: "other" }, { config: "other.json" }, { databaseId: "other" }, { bucketName: "other" }, { origin: "https://wrong.example" },
   ]) {
     const mocks = deploymentMocks();
     const read = mocks.read;
@@ -315,7 +312,7 @@ it("rejects an app marker with the right revision and the wrong backend or data 
   const request = vi.fn().mockResolvedValue({ ok: true, json: async () => expected });
   const pause = vi.fn();
   await verifyRevision(settings.origin, expected, request, pause);
-  for (const change of [{ backend: "supabase" }, { databaseId: "other" }, { bucketName: "other" },
+  for (const change of [{ backend: "other" }, { databaseId: "other" }, { bucketName: "other" },
     { origin: "https://wrong.example" }]) {
     request.mockResolvedValue({ ok: true, json: async () => ({ ...expected, ...change }) });
     await expect(verifyRevision(settings.origin, expected, request, pause)).rejects.toThrow(/could not be verified/);
@@ -364,7 +361,7 @@ it("verifies live application bindings and the anonymous API denial after upload
   }
 });
 
-it("selects the committed Cloudflare target and ignores a retired Supabase selection", async () => {
+it("selects the committed Cloudflare target and ignores a retired backend selection", async () => {
   const config = "src/server/adapters/cloudflare/deploy/development.wrangler.jsonc";
   const expected = {
     accountId: "458ad6a930b0fb717796dfa19ca6a2b1", workerName: "minsky-dev",
@@ -382,7 +379,7 @@ it("selects the committed Cloudflare target and ignores a retired Supabase selec
   expect(enabled[0].settings).toEqual(JSON.parse(readFileSync(
     "src/server/adapters/cloudflare/deploy/development.settings.json", "utf8",
   )));
-  expect(await deploymentTargets({ ...prepared, MINSKY_DEV_BACKEND: "supabase" }, "app")).toEqual(enabled);
+  expect(await deploymentTargets({ ...prepared, MINSKY_DEV_BACKEND: "other" }, "app")).toEqual(enabled);
 });
 
 const previewConfig = "src/server/adapters/cloudflare/deploy/preview.wrangler.jsonc";

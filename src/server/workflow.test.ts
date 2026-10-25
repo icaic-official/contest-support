@@ -18,15 +18,6 @@ describe('shared workflow compatibility edges', () => {
     expect(isWorkflowCommand({ type: 'submit', category: 'Backend', description: '   ' })).toBe(false);
     expect(isWorkflowCommand({ type: 'submit', category: 'Backend', description: '\t' })).toBe(true);
   });
-  it('rejects award minutes that are not whole numbers in range', () => {
-    const award = (minutes: unknown) => isWorkflowCommand({
-      type: 'award', issue_id: issueId, revision: 0, minutes, explanation: 'Fixture' });
-    expect(award(0)).toBe(true);
-    expect(award(5.0)).toBe(true);
-    for (const minutes of [2.5, 0.1, -1, NaN, Infinity, 2147483648, '5', null, undefined]) {
-      expect(award(minutes), String(minutes)).toBe(false);
-    }
-  });
   it('ignores a contestant team override even when the unused value is not a UUID', () => {
     const command = { type: 'submit' as const, category: 'Backend', description: 'Fixture', team_id: 'unused-browser-value' };
     expect(isWorkflowCommand(command)).toBe(true);

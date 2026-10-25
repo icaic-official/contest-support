@@ -18,15 +18,7 @@ import {
 } from "@/components/ui/sliding-indicator";
 import { Textarea } from "@/components/ui/textarea";
 import type { CommandRunner } from "@/connected/hooks/useCommand";
-import {
-  awardMinutePresets,
-  maxAwardMinutes,
-  maxSummaryLength,
-  noCommentSummary,
-  parseAwardMinutes,
-  resolutionPresets,
-  resolutionSummary,
-} from "@/connected/labels";
+import { awardMinutePresets, resolutionPresets } from "@/connected/labels";
 import { isRunning, type Issue } from "@/connected/model";
 import { cn } from "@/lib/utils";
 
@@ -270,18 +262,12 @@ export function ReplyForm({
   );
 }
 
-/**
- * Resolves an issue with a preset, which can take a comment, or a custom
- * summary. The timer stops.
- */
+/** Resolves an issue with a preset or a custom summary. The timer stops. */
 export function ResolveForm({ issue, command, onDone }: IssueFormProps) {
   const id = useId();
   const [choice, setChoice] = useState("");
   const [custom, setCustom] = useState("");
-  const [comment, setComment] = useState("");
-  const summary = resolutionSummary(choice, custom, comment);
-  const canComment =
-    choice !== "" && choice !== "custom" && choice !== noCommentSummary;
+  const summary = choice === "custom" ? custom.trim() : choice;
   return (
     <form
       className="space-y-3"
@@ -323,19 +309,6 @@ export function ResolveForm({ issue, command, onDone }: IssueFormProps) {
           Write a custom summary
         </ChoiceCard>
       </fieldset>
-      {canComment && (
-        <div className="space-y-1.5">
-          <Label htmlFor={`${id}-comment`}>Add a comment (optional)</Label>
-          <Textarea
-            id={`${id}-comment`}
-            value={comment}
-            onChange={(event) => setComment(event.target.value)}
-            maxLength={maxSummaryLength - choice.length - 2}
-            readOnly={command.locked}
-            className={cn("min-h-20", fieldClass)}
-          />
-        </div>
-      )}
       {choice === "custom" && (
         <div className="space-y-1.5">
           <Label htmlFor={`${id}-custom`}>Custom resolution summary</Label>
@@ -457,9 +430,11 @@ export function AwardForm({ issue, command, onDone }: IssueFormProps) {
   const [custom, setCustom] = useState("");
   const [explanation, setExplanation] = useState("");
   const value =
-    minutes === "custom" ? parseAwardMinutes(custom) : minutes;
-  const invalidCustom =
-    minutes === "custom" && custom.trim() !== "" && value === undefined;
+    minutes === "custom"
+      ? /^\d+$/u.test(custom)
+        ? Number(custom)
+        : undefined
+      : minutes;
   return (
     <form
       className="space-y-3"
@@ -517,21 +492,13 @@ export function AwardForm({ issue, command, onDone }: IssueFormProps) {
             inputMode="numeric"
             min={0}
             step={1}
-            max={maxAwardMinutes}
+            max={2147483647}
             required
             autoFocus
             value={custom}
             onChange={(event) => setCustom(event.target.value)}
-            aria-invalid={invalidCustom}
-            aria-describedby={invalidCustom ? `${id}-custom-error` : undefined}
             className={cn("h-11", fieldClass)}
           />
-          {invalidCustom && (
-            <p id={`${id}-custom-error`} className="text-sm text-destructive">
-              Enter whole minutes from 0 to {maxAwardMinutes}. Decimals are not
-              allowed.
-            </p>
-          )}
         </div>
       )}
       <div className="space-y-1.5">

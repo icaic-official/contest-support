@@ -137,10 +137,10 @@ The cases in `tests/workflow-session-retry.spec.ts` exercise these session check
 
 ## 5. Resolution and award
 
-1. Resolve the issue with a preset or **Custom** summary. A preset other than **Resolved without comment** shows an optional comment field. The team sees the preset followed by the comment.
+1. Resolve the issue with a preset or **Custom** summary.
 2. Check that the timer stops.
 3. Record an award as jury with a public explanation.
-4. Repeat the award check with zero, preset, and custom whole-minute values on suitable test issues. Enter `2.5` as a custom value. The form shows a message and keeps **Record** disabled.
+4. Repeat the award check with zero, preset, and custom whole-minute values on suitable test issues.
 5. Confirm external application as staff.
 
 Expected result: Minsky records application status without changing an external contest clock.

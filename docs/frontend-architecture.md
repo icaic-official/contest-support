@@ -392,3 +392,76 @@ npx playwright install chromium
 ```
 
 `npm run build` reports a warning: the main JavaScript chunk is about 511 kB, above the 500 kB warning limit. The build still passes. Code splitting is a follow-up.
+
+## Motion
+
+This section is a reference for the motion of the frontend and the rules for new motion.
+Every timing and the reduced-motion rule are in `src/index.css`.
+
+### Timing tokens
+
+| Token | Value | Use |
+| --- | --- | --- |
+| `--motion-fast` | 120 ms | Press feedback, exits, panel fades. |
+| `--motion-base` | 180 ms | Tab indicators, color changes, overlays, dialog entry, side sheet exit. |
+| `--motion-slow` | 250 ms | Side sheet entry. This is the longest transition. |
+| `--motion-highlight` | 1400 ms | The fade of a row that a live update changed. It is not a transition. The person must have time to see it. |
+
+Write a duration as `duration-(--motion-base)` with Tailwind's `ease-out` curve.
+Do not write a millisecond value in a component.
+
+### Reduced motion
+
+One `@media (prefers-reduced-motion: reduce)` rule in `src/index.css` sets every animation and transition to 0.01 ms and one iteration.
+It covers Tailwind transitions, tw-animate-css, Radix, vaul and the pulsing dots.
+The duration is not zero and the rule does not set `animation: none`. `animationend` still fires, so Radix removes a closing dialog.
+Do not add a reduced-motion class to a component. Do not start a motion with `element.animate()`, because the rule does not cover it.
+
+### Sliding indicator
+
+`SlidingIndicator` in `src/components/ui/sliding-indicator.tsx` is a decorative marker behind the active item of its parent.
+Render it as the first child of a container with `relative isolate`.
+The active item is the first descendant with `data-state="active"` or `data-state="on"`, `aria-selected="true"`, `aria-pressed="true"` or `aria-current="page"`.
+The component reads these attributes. It adds no role or attribute to the active item, so it works with Radix and with plain buttons.
+
+These rules apply:
+
+- The marker slides only when another item becomes active. A resize, a new font or a new count inside a tab moves it without animation.
+- The first placement does not animate.
+- The marker uses `offsetLeft`, `offsetTop`, `offsetWidth` and `offsetHeight`. A parent that scales in, such as a dialog, does not move it.
+- A `ResizeObserver` watches the container and each item. A `MutationObserver` watches the active attributes and the list of items.
+- The marker is `aria-hidden` and has `data-slot="sliding-indicator"`.
+
+Six places use it:
+
+| Place | Style |
+| --- | --- |
+| `TabsList` with the default variant in `src/components/ui/tabs.tsx` | The white pill (`pillIndicator`). No screen uses this variant yet. |
+| `TabsList` with the `line` variant, used by the tabs of the desktop issue sheet | A 2 px underline. |
+| The status filter of the desktop queue in `QueuePages.tsx` | The same pill. The filter keeps `role="group"` and `aria-pressed`. |
+| The award list switch of the desktop **Award review** page | The same pill. |
+| The audience switch of `ReplyForm` in `IssueForms.tsx` | The pill turns amber for **Internal note**. The labels carry `data-state="on"`, because radio buttons have no attribute for the checked item. |
+| The tab bar of the phone app in `PhoneParts.tsx` | A 3 px bar along the top edge. |
+
+`TabsContent` fades in over `--motion-fast` when its tab becomes active.
+
+### Highlight of live updates
+
+`IssueTable` highlights a row that a live update added or changed.
+`changedIssueIds()` in `organiserModel.ts` compares two issue lists by id, status and revision.
+`useChangedIssues()` in `src/organiser/useChangedIssues.ts` applies it to the whole session list, not to the filtered rows.
+A change of status tab, team filter or page highlights nothing. The first list of a session highlights nothing.
+A reply, a claim or a resolution that the person made also raises the revision, so it highlights the row.
+The row has `data-changed` and the `animate-row-flash` utility. The phone queue does not use the hook yet.
+
+The hook keeps the time at which each highlight began. `recentChanges()` drops entries older than `--motion-highlight` at each update, so ids from earlier updates never pile up.
+The page clock `now` advances once each second, so a row keeps `data-changed` for up to two seconds.
+A row that changes again during its highlight does not start the highlight again.
+A row that mounts during that time, for example after a change of status tab, shows the tint again.
+
+### Rules for new motion
+
+- Animate transform, opacity and color. Do not animate the layout of a list.
+- Do not delay input or focus.
+- Do not move text that a person can be reading. Fade it instead.
+- Keep a transition at 250 ms or less.

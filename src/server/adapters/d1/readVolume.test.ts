@@ -289,7 +289,8 @@ describe('rows read for a session with 1,200 accounts and 100 issues', () => {
   // Measured on 2026-10-26. While the list checked every ready avatar of the
   // installation, it read 6,015 rows for a contestant, 8,430 for the volunteer
   // and 7,229 for the admin. From the caller and the session staff, it read 12,
-  // 1,224 and 1,223. Staff still read 1 row for each session member. The two
+  // 1,224 and 1,223. Migration 0016 adds memberships_staff, so staff read the staff
+  // memberships of the session and not every member: about 28 rows. The two
   // checks of one download read 24 rows before and 32 after.
   it('lists avatars from the caller and the session staff, not from every avatar', async () => {
     const bucket: PrivateBucket = {
@@ -300,8 +301,8 @@ describe('rows read for a session with 1,200 accounts and 100 issues', () => {
     const staff = ['acc-1', 'acc-2', 'acc-3'];
     for (const [n, owners, ceiling] of [
       [callers.contestant, [`acc-${callers.contestant}`], 15],
-      [callers.volunteer, staff, 1_300],
-      [callers.admin, staff, 1_300],
+      [callers.volunteer, staff, 100],
+      [callers.admin, staff, 100],
     ] as const) {
       const { connection, usage } = metered(db);
       const avatars = new R2AvatarService(connection, bucket);

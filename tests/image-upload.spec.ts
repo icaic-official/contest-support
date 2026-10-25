@@ -102,3 +102,64 @@ test("a failed upload keeps its file for the retry, and the retry empties the fo
   await expect(file).toHaveValue("");
   expect(await images()).toHaveLength(1);
 });
+
+test("a file that is not an image is rejected before any upload starts", async ({
+  browser,
+  local,
+}) => {
+  const { file, add, status, images } = await openUploadSheet(browser, local);
+
+  await file.setInputFiles({ name: "notes.txt", mimeType: "text/plain", buffer: Buffer.from("hello") });
+  await add.click();
+  await expect(status).toHaveText("Choose a JPEG, PNG, or WebP image.");
+  expect(await images()).toHaveLength(0);
+});
+
+test("canceling a failed upload permits a new visibility choice", async ({
+  browser,
+  local,
+}) => {
+  const { sheet, file, add, status, images } = await openUploadSheet(browser, local);
+  const team = sheet.getByRole("radio", { name: /^Visible to the team/ });
+
+  await sheet.getByText("Visible to the team", { exact: true }).click();
+  local.loseNext("/api/image", "request");
+  await file.setInputFiles({ name: "retry.png", mimeType: "image/png", buffer: png });
+  await add.click();
+  await expect(status).toBeVisible();
+  await expect(sheet.getByRole("button", { name: "Try the upload again" })).toBeVisible();
+  await expect(team).toBeDisabled();
+  await expect(team).toBeChecked();
+
+  await sheet.getByRole("button", { name: "Cancel upload" }).click();
+  await expect(team).toBeEnabled();
+  await sheet.getByText("Staff only", { exact: true }).click();
+  await file.setInputFiles({ name: "new.png", mimeType: "image/png", buffer: png });
+  await add.click();
+  await expect(status).toHaveText("Image added.");
+  expect((await images()).map((item) => [item.original_name, item.visibility])).toEqual([
+    ["new.png", "internal"],
+  ]);
+});
+
+test("retrying a lost completion response does not attach the image twice", async ({
+  browser,
+  local,
+}) => {
+  const { page, sheet, file, add, status, images } = await openUploadSheet(browser, local);
+
+  page.on("request", (request) => {
+    // The completion request follows the thumbnail upload. The Worker records it, but the browser gets no answer.
+    if (request.method() === "PUT" && request.url().endsWith("/thumbnail")) {
+      local.loseNext("/api/images", "response");
+    }
+  });
+  await file.setInputFiles({ name: "finish.png", mimeType: "image/png", buffer: png });
+  await add.click();
+  await expect(status).toBeVisible();
+  expect(await images()).toHaveLength(1);
+
+  await sheet.getByRole("button", { name: "Try the upload again" }).click();
+  await expect(status).toHaveText("Image added.");
+  expect(await images()).toHaveLength(1);
+});

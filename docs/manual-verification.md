@@ -382,8 +382,10 @@ Check delayed previews with two different images, A and B, in an isolated test:
 It also checks that closing the preview releases its temporary browser URL.
 These tests do not access hosted data.
 
-`tests/image-upload.spec.ts` automates steps 37 to 39 on a phone with local storage.
+`tests/image-upload.spec.ts` automates steps 15, 27, and 37 to 39 on a phone with local storage.
 It also checks that a failed upload keeps its file for **Try the upload again**.
+It also checks that **Cancel upload** makes the visibility choice available again. It does not check that the unfinished files are deleted or that contestants cannot see the new image. Check those two results by hand (steps 28 and 29).
+It also checks that a lost completion response does not attach the image twice.
 
 ## 11. Team search
 

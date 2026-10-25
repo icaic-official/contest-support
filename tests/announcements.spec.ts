@@ -136,6 +136,13 @@ test("the announcement strip fits a phone without horizontal scrolling", async (
   await volunteer.getByRole("button", { name: /A long announcement title/ }).click();
   await expect(volunteer.getByText("Details.")).toBeVisible();
   await expect(volunteer.getByRole("button", { name: "New announcement" })).toHaveCount(0);
+
+  // A manager's header has more controls, so it must wrap instead of widening the strip.
+  const manager = await signIn(browser, local, "admin", phone);
+  const strip = manager.getByRole("region", { name: /^Announcements/ });
+  await expect(strip.getByRole("button", { name: "Hide announcements" })).toBeVisible();
+  await expect(strip.getByRole("button", { name: "New announcement" })).toBeVisible();
+  expect(await strip.evaluate((element) => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(0);
   await local.close();
 });
 
@@ -154,5 +161,113 @@ test("an open announcement form fits on a laptop screen without scrolling inside
   await admin.getByRole("button", { name: "Edit", exact: true }).click();
   const edit = admin.locator("form").filter({ hasText: "Edit announcement" });
   await expect(edit.getByRole("button", { name: "Save changes" })).toBeInViewport({ ratio: 1 });
+  await local.close();
+});
+
+test("the strip lists the two newest announcements and shows the rest on request", async ({ browser }) => {
+  const local = await createJuryFixture();
+  const admin = await signIn(browser, local, "admin");
+  await publish(admin, "First notice", "Oldest.");
+  await publish(admin, "Second notice", "Middle.");
+  await publish(admin, "Third notice", "Newest.");
+  const volunteer = await signIn(browser, local, "volunteer");
+  const oldest = volunteer.getByRole("button", { name: "First notice" });
+  await expect(volunteer.getByRole("button", { name: "Third notice" })).toBeVisible();
+  await expect(volunteer.getByRole("button", { name: "Second notice" })).toBeVisible();
+  await expect(oldest).toHaveCount(0);
+
+  const more = volunteer.getByRole("button", { name: "Show 1 more" });
+  await expect(more).toHaveAttribute("aria-expanded", "false");
+  await more.click();
+  await expect(oldest).toBeVisible();
+  const fewer = volunteer.getByRole("button", { name: "Show fewer" });
+  await expect(fewer).toHaveAttribute("aria-expanded", "true");
+  await fewer.click();
+  await expect(oldest).toHaveCount(0);
+  await expect(more).toBeVisible();
+  await local.close();
+});
+
+test("an announcement that a manager is editing stays listed when a new one pushes it down", async ({ browser }) => {
+  const local = await createJuryFixture();
+  const admin = await signIn(browser, local, "admin");
+  const jury = await signIn(browser, local, "jury");
+  await publish(admin, "First notice", "Oldest.");
+  await publish(admin, "Second notice", "Middle.");
+  await publish(admin, "Third notice", "Newest.");
+  await admin.getByRole("button", { name: "Second notice" }).click();
+  await admin.getByRole("button", { name: "Edit", exact: true }).click();
+  const draft = admin.locator("form").filter({ hasText: "Edit announcement" });
+  await draft.getByLabel("Details").fill("My unsent draft.");
+
+  await publish(jury, "Fourth notice", "Pushes the others down.");
+  await expect(admin.getByRole("button", { name: "Fourth notice" })).toBeVisible();
+  await expect(draft.getByLabel("Details")).toHaveValue("My unsent draft.");
+  await expect(admin.getByRole("button", { name: "Show fewer" })).toHaveCount(0);
+  await expect(admin.getByRole("button", { name: /Show \d+ more/ })).toHaveCount(0);
+
+  await draft.getByRole("button", { name: "Cancel edit" }).click();
+  await expect(admin.getByRole("button", { name: "Second notice" })).toHaveCount(0);
+  await expect(admin.getByRole("button", { name: "Show 2 more" })).toBeVisible();
+  await local.close();
+});
+
+test("a member hides the strip, it stays hidden after a refresh, and a new announcement shows it again", async ({ browser }) => {
+  const local = await createJuryFixture();
+  const admin = await signIn(browser, local, "admin");
+  await publish(admin, "Lunch moves", "Lunch is at noon.");
+  const volunteer = await signIn(browser, local, "volunteer");
+  const lunch = volunteer.getByRole("button", { name: "Lunch moves" });
+  await expect(lunch).toBeVisible();
+
+  const hide = volunteer.getByRole("button", { name: "Hide announcements", exact: true });
+  const show = volunteer.getByRole("button", { name: "Show announcements", exact: true });
+  await expect(hide).toHaveAttribute("aria-expanded", "true");
+  await hide.click();
+  await expect(show).toBeFocused();
+  await expect(show).toHaveAttribute("aria-expanded", "false");
+  await expect(volunteer.getByRole("heading", { name: "Announcements · 1" })).toBeVisible();
+  await expect(lunch).toBeHidden();
+
+  await volunteer.reload();
+  await expect(show).toBeVisible();
+  await expect(lunch).toBeHidden();
+
+  // The stored choice covers only the announcements that existed when it was made.
+  await publish(admin, "Room change", "Use room 2.");
+  await expect(volunteer.getByRole("button", { name: "Room change" })).toBeVisible({ timeout: 15000 });
+  await expect(hide).toBeVisible();
+  await expect(volunteer.getByRole("heading", { name: "Announcements", exact: true })).toBeVisible();
+
+  // Showing the strip again restores what the member had open.
+  await lunch.click();
+  await expect(volunteer.getByText("Lunch is at noon.")).toBeVisible();
+  await hide.click();
+  await expect(lunch).toBeHidden();
+  await show.click();
+  await expect(hide).toBeFocused();
+  await expect(volunteer.getByRole("button", { name: "Room change" })).toBeVisible();
+  await expect(lunch).toBeVisible();
+  await expect(lunch).toHaveAttribute("aria-expanded", "true");
+  await expect(volunteer.getByText("Lunch is at noon.")).toBeVisible();
+  await local.close();
+});
+
+test("a manager can hide the strip and keeps an unsent draft", async ({ browser }) => {
+  const local = await createJuryFixture();
+  const admin = await signIn(browser, local, "admin");
+  await publish(admin, "Room change", "Use room 2.");
+  await admin.getByRole("button", { name: "New announcement" }).click();
+  const create = admin.locator("form").filter({ hasText: "New announcement" });
+  await create.getByLabel("Title").fill("Unsent title");
+
+  await admin.getByRole("button", { name: "Hide announcements", exact: true }).click();
+  await expect(create).toBeHidden();
+  await expect(admin.getByRole("button", { name: "New announcement" })).toBeHidden();
+  await expect(admin.getByRole("heading", { name: "Announcements · 1" })).toBeVisible();
+
+  await admin.getByRole("button", { name: "Show announcements", exact: true }).click();
+  await expect(create.getByLabel("Title")).toHaveValue("Unsent title");
+  await expect(admin.getByRole("button", { name: /Room change/ })).toBeVisible();
   await local.close();
 });

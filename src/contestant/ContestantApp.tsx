@@ -133,7 +133,7 @@ export function ContestantApp(props: ShellProps) {
         signOut={signOut}
       />
       {accountPage && (
-        <div className="min-h-0 flex-1 overflow-y-auto p-8">
+        <div className="relative min-h-0 flex-1 overflow-y-auto p-8">
           <AccountPage
             shell={props}
             state={state}

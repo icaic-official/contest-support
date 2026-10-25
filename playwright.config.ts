@@ -9,6 +9,10 @@ const cloudflare = [
   "team-search.spec.ts",
   "workspace-refresh.spec.ts",
   "avatars.spec.ts",
+  "jury-worklist.spec.ts",
+  "workflow-session-retry.spec.ts",
+  "announcements.spec.ts",
+  "journey.spec.ts",
 ];
 
 const ignored = ["cloud/**", "providers/**", "auth/**", "workflow/**", "connector/**"];

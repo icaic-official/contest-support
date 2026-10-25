@@ -537,7 +537,8 @@ Use two browser windows for the live checks. Run these checks after a reviewed d
    Choose **Load latest text** and save.
 7. Add a JPEG, PNG, and WebP image. Check progress, the inline image, and download.
    Try a text file renamed to `.png`, an image above 10 MB, and a fifth image. Each must fail with a clear message and leave the text available.
-8. Remove one image. Check that readers lose it and the manager list shows one fewer.
+8. Select **Remove** on one image. Check that a prompt asks first and that **Keep image** closes it with focus on **Remove** and the image still listed.
+   Select **Remove**, then **Remove image**. Check that readers lose the image and the manager list shows one fewer.
 9. Set an expiry about one minute ahead. After it passes, check that readers lose the announcement within 15 seconds and the manager still sees **Expired**.
    Clear the expiry and check that readers see it again.
 10. Use only the keyboard to select **Remove** on an announcement with an image. Check that the prompt says that the announcement leaves the strip for everyone and that Minsky keeps the record.
@@ -545,6 +546,7 @@ Use two browser windows for the live checks. Run these checks after a reviewed d
     Select **Remove**, then **Remove announcement**. Check that every member, managers included, loses the announcement, and that focus moves to **New announcement**.
 11. Reload each window. Check that the state is unchanged and the reporting form never waited for announcements.
 12. At 320 px and 390 px wide, check that the announcement strip wraps, scrolls inside its area, and causes no horizontal page scroll.
+    Check that every button in the strip, including **Download** and **Remove** on an image, is at least 44 px high.
     In a window about 1280 by 720 px, open **New announcement** and **Edit**. Check that every field and the **Publish** or **Save changes** button shows without scrolling inside the strip.
 13. Publish at least three announcements. Check that every member sees the two newest, and that **Show 1 more** and **Show fewer** work with the keyboard.
     As a reader, select **Hide**. Check that focus stays on the button, which now reads **Show**, and that the bar shows the count.

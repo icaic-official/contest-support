@@ -3,7 +3,7 @@ import type { Issue, Membership, Snapshot } from "@/connected/model";
 import {
   accountKind,
   actorName,
-  auditActionText,
+  auditEntryText,
   createAccountCommand,
   draftOfMembership,
   imageLimitsInput,
@@ -248,11 +248,30 @@ describe("display helpers", () => {
   });
 
   it("describes audit entries", () => {
-    expect(auditActionText("reset_password")).toBe("reset password");
     const members = [
       { membership: member(), person: { id: userId, name: "Alex", username: null } },
     ];
     expect(actorName(members, userId)).toBe("Alex");
     expect(actorName(members, "someone")).toBe("someone");
+  });
+
+  it("names the person that an audit entry changed", () => {
+    const members = [
+      { membership: member(), person: { id: userId, name: "Alex", username: null } },
+    ];
+    expect(auditEntryText(members, { action: "reset_password", target: userId })).toBe(
+      "reset password for Alex",
+    );
+  });
+
+  it("shows no name when the person left the session or the action has no target", () => {
+    const members = [
+      { membership: member(), person: { id: userId, name: "Alex", username: null } },
+    ];
+    const gone = "00000000-0000-4000-8000-0000000000c9";
+    expect(auditEntryText(members, { action: "revoke_membership", target: gone })).toBe(
+      "revoke membership",
+    );
+    expect(auditEntryText([], { action: "set_intake", target: null })).toBe("set intake");
   });
 });

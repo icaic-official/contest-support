@@ -13,6 +13,23 @@ function environment(): ApplicationEnvironment {
     if (path === '/assets/app.js') {
       return new Response('console.log(1)', { headers: { 'Content-Type': 'text/javascript', ETag: '"x"' } });
     }
+    // Cloudflare answers the default Cache-Control for every static file. Vite names built files <name>-<hash>.<ext>.
+    const platformCache = 'public, max-age=0, must-revalidate';
+    if (path === '/assets/index--SUA_P84.js') {
+      return new Response('console.log(2)', { headers: { 'Content-Type': 'text/javascript', ETag: '"h"', 'Cache-Control': platformCache } });
+    }
+    if (path === '/assets/index-BTbW9TP5.css') {
+      return new Response('body{}', { headers: { 'Content-Type': 'text/css', 'Cache-Control': platformCache } });
+    }
+    if (path === '/assets/inter-latin-wght-normal-Dx4kXJAl.woff2') {
+      return new Response('font', { headers: { 'Content-Type': 'font/woff2', 'Cache-Control': platformCache } });
+    }
+    if (path === '/favicon.svg') {
+      return new Response('<svg/>', { headers: { 'Content-Type': 'image/svg+xml', 'Cache-Control': platformCache } });
+    }
+    if (path === '/assets/gone-AbCd1234.js') {
+      return new Response('Not found', { status: 404, headers: { 'Content-Type': 'text/plain' } });
+    }
     // The single-page-application fallback serves the shell for every other path.
     return new Response(html, { headers: { 'Content-Type': 'text/html', 'Cache-Control': 'public, max-age=0, must-revalidate' } });
   };
@@ -49,6 +66,51 @@ describe('Worker security headers', () => {
     expect(response.headers.get('Strict-Transport-Security')).toBe('max-age=31536000');
     expect(response.headers.get('X-Content-Type-Options')).toBe('nosniff');
     expect(response.headers.get('Content-Security-Policy')).toBeNull();
+  });
+
+  describe('asset caching', () => {
+    const immutable = 'public, max-age=31536000, immutable';
+    const revalidate = 'public, max-age=0, must-revalidate';
+
+    it.each([
+      '/assets/index--SUA_P84.js',
+      '/assets/index-BTbW9TP5.css',
+      '/assets/inter-latin-wght-normal-Dx4kXJAl.woff2',
+    ])('caches the hashed file %s for a year', async (path) => {
+      const response = await get(path);
+      expect(response.headers.get('Cache-Control')).toBe(immutable);
+      expect(response.headers.get('X-Content-Type-Options')).toBe('nosniff');
+    });
+
+    it('keeps the validators of a hashed file', async () => {
+      expect((await get('/assets/index--SUA_P84.js')).headers.get('ETag')).toBe('"h"');
+    });
+
+    it.each(['/', '/index.html', '/favicon.svg'])('keeps revalidating %s', async (path) => {
+      expect((await get(path)).headers.get('Cache-Control')).toBe(revalidate);
+    });
+
+    it('does not cache a file under /assets/ whose name has no hash', async () => {
+      expect((await get('/assets/app.js')).headers.get('Cache-Control') ?? '').not.toContain('immutable');
+    });
+
+    it('does not cache the app shell that the fallback serves for a hashed name that does not exist', async () => {
+      const response = await get('/assets/index-MISSING1.js');
+      expect(await response.text()).toBe(html);
+      expect(response.headers.get('Cache-Control')).toBe(revalidate);
+    });
+
+    it('does not cache an error response for a hashed name', async () => {
+      const response = await get('/assets/gone-AbCd1234.js');
+      expect(response.status).toBe(404);
+      expect(response.headers.get('Cache-Control') ?? '').not.toContain('immutable');
+    });
+
+    it('never caches an API response, even for a path that looks like a hashed file', async () => {
+      const response = await get('/api/assets/index-BTbW9TP5.css');
+      expect(response.headers.get('Cache-Control') ?? '').not.toContain('immutable');
+      expect(response.headers.get('Cache-Control')).toBe('private, no-store');
+    });
   });
 
   it('secures blocked paths', async () => {

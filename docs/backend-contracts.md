@@ -35,7 +35,7 @@ The [D1 store](../src/server/adapters/d1/store.ts) persists all nine `WorkflowSe
 Its batches recheck credentials, generation, identity-session expiry, application-login expiry, current permissions, and captured state.
 One database timestamp supplies each workflow commit's ledger and history records.
 State, receipts, history, resolutions, awards, and audience notifications commit together.
-The complete schema adds migrations `0005` through `0013` to the authentication foundation.
+The complete schema adds migrations `0005` through `0015` to the authentication foundation.
 
 [D1ApplicationService](../src/server/adapters/cloudflare/application.ts) returns each authorized snapshot in one database statement.
 Migration `0012` indexes `history(issue_id, at)`.
@@ -49,6 +49,11 @@ On 2026-10-26 a snapshot of that session read 122 rows for a contestant, 2,801 f
 The sessions list read 7 rows, where it read 1,205 before.
 [The query plan test](../src/server/adapters/d1/queryPlans.test.ts) fails if a snapshot query scans a table or loses these indexes.
 [The read volume test](../src/server/adapters/d1/readVolume.test.ts) fails if the rows read on that session grow again.
+The every-minute cron job also reads by state and expiry.
+Migration `0015` indexes the pending, expired, and removed rows of `issue_images` and `announcement_images`, `logins(expires_at)`, and `ba_session(expiresAt)`.
+Before it, one cron tick read 7,880 rows on a session with 1,200 accounts and 100 issues. Now it reads 24, which includes the 3 rows of the notification claim (measured with `npm run perf:reads`).
+[The cron read test](../src/server/adapters/d1/cronReads.test.ts) fails if a cron statement scans a table or reads more rows than the work needs.
+It allows one scan, of the password-attempt counters, which hold one row for each failed sign-in key of the last day.
 Snapshots preserve names, timestamps, history, awards, image metadata, limits, and administrator records.
 A valid login with removed membership receives an empty snapshot with null membership.
 An invalid login cannot authorize that read.

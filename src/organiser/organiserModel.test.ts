@@ -266,6 +266,22 @@ describe("issueAbilities and primaryAction", () => {
     ).toBe(false);
   });
 
+  it("lets an admin without a support role reply, write notes, and add images, but not claim", () => {
+    const admin = member({ roles: [], is_admin: true });
+    const can = issueAbilities(issue(), noAwards, admin);
+    expect(can).toMatchObject({
+      reply: true,
+      internalNotes: true,
+      upload: true,
+      claim: false,
+      escalate: false,
+      accept: false,
+    });
+    expect(primaryAction(can)).toBeUndefined();
+    const resolved = issueAbilities(issue({ status: "resolved" }), noAwards, admin);
+    expect(resolved.reply || resolved.reopen).toBe(false);
+  });
+
   it("keeps the owner during a handoff until another specialist accepts", () => {
     const escalated = issue({ status: "escalated", owner: me, owner_name: "Me" });
     const owner = issueAbilities(

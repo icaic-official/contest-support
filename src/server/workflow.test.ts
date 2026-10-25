@@ -106,4 +106,22 @@ describe('shared workflow compatibility edges', () => {
     expect(decideWorkflow({ ...state, actor: { id: 'other', name: 'Other Support' } },
       { type: 'resolve', issue_id: issueId, revision: 0, summary: 'Restored' })).toEqual({ outcome: 'rejected', reason: 'state' });
   });
+  it('lets an admin without a support or jury role reply and write internal notes, but not claim, hand off, or reopen', () => {
+    const admin = { ...state, actor: { id: 'admin', name: 'Fictional Admin' },
+      membership: { team_id: null, roles: [], is_admin: true } };
+    const at = (status: 'open' | 'claimed' | 'escalated' | 'resolved', owner: string | null) =>
+      ({ ...admin, issue: { ...state.issue!, status, owner } });
+    const target = { issue_id: issueId, revision: 0 };
+    for (const visibility of ['public', 'internal'] as const) {
+      expect(decideWorkflow(at('open', null), { type: 'message', ...target, text: ' On my way ', visibility }))
+        .toMatchObject({ type: 'message', history: { text: 'On my way', visibility } });
+      expect(decideWorkflow(at('resolved', 'person'), { type: 'message', ...target, text: 'Late', visibility }))
+        .toEqual({ outcome: 'rejected', reason: 'state' });
+    }
+    expect(decideWorkflow(at('open', null), { type: 'claim', ...target })).toEqual({ outcome: 'rejected', reason: 'state' });
+    expect(decideWorkflow(at('claimed', 'admin'), { type: 'escalate', ...target })).toEqual({ outcome: 'rejected', reason: 'state' });
+    expect(decideWorkflow(at('escalated', 'person'), { type: 'accept', ...target })).toEqual({ outcome: 'rejected', reason: 'state' });
+    expect(decideWorkflow(at('resolved', 'person'), { type: 'reopen', ...target, reason: 'Again' }))
+      .toEqual({ outcome: 'rejected', reason: 'state' });
+  });
 });

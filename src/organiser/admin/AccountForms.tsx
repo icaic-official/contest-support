@@ -259,7 +259,11 @@ export function CreateAccountForm({
             placeholder="team-aurora"
           />
         </Field>
-        <Button type="submit" className="h-12 w-full text-base">
+        <Button
+          type="submit"
+          className="h-12 w-full text-base"
+          loading={busy}
+        >
           {busy ? "Working…" : "Create account"}
         </Button>
       </fieldset>

@@ -157,6 +157,23 @@ export type Command =
       explanation: string;
     };
 
+/**
+ * True when `running` is a command of this type, and for this issue when
+ * `issueId` is given. A view uses it to show a spinner on the one control
+ * that started the command that runs now.
+ */
+export function isRunning(
+  running: Command | undefined,
+  type: Command["type"],
+  issueId?: string,
+): boolean {
+  if (running?.type !== type) return false;
+  return (
+    issueId === undefined ||
+    ("issue_id" in running && running.issue_id === issueId)
+  );
+}
+
 export function isSupport(member: Membership): boolean {
   return (
     member.roles.includes("volunteer") || member.roles.includes("specialist")

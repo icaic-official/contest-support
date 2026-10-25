@@ -5,7 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { TeamSearch } from "@/connected/TeamSearch";
 import type { CommandRunner } from "@/connected/hooks/useCommand";
-import type { Snapshot } from "@/connected/model";
+import { isRunning, type Snapshot } from "@/connected/model";
 import {
   initialTeamSelection,
   submitTeamId,
@@ -110,6 +110,7 @@ export function ReportForm({
         disabled={
           command.locked || !teamId || !category || !description.trim()
         }
+        loading={isRunning(command.running, "submit")}
       >
         <Send aria-hidden="true" />
         Submit issue

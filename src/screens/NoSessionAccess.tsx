@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Spinner } from "@/components/ui/spinner";
 import type { SessionData } from "@/connected/hooks/useSessionSnapshot";
 
 /**
@@ -58,7 +59,8 @@ export function NoSessionAccess({
         {!loaded ? (
           <Card className="w-full max-w-md" aria-busy="true">
             <CardHeader>
-              <p role="status" className="font-medium">
+              <p role="status" className="flex items-center gap-2 font-medium">
+                <Spinner className="size-4" />
                 Loading your contest session…
               </p>
             </CardHeader>

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { CircleAlert } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import { ConfirmDialog } from "@/organiser/admin/AccountAccess";
 import { ActionDialog } from "@/organiser/actions/ActionDialog";
 import type { AvatarDraft } from "./avatarPicture";
@@ -83,7 +84,11 @@ export function PictureEditor({ picture }: { picture: AvatarEditorControls }) {
           void picture.choose(file);
         }}
       />
-      <p role="status" className="text-sm text-muted-foreground empty:hidden">
+      <p
+        role="status"
+        className="flex items-center gap-2 text-sm text-muted-foreground empty:hidden"
+      >
+        {status ? <Spinner className="size-4" /> : null}
         {status}
       </p>
       {editor.phase === "idle" && error && (
@@ -114,6 +119,7 @@ export function PictureEditor({ picture }: { picture: AvatarEditorControls }) {
               type="button"
               className="h-11"
               disabled={uploading}
+              loading={uploading}
               onClick={() => void picture.save()}
             >
               {saveLabel}

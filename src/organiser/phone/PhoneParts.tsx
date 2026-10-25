@@ -16,7 +16,7 @@ import { Button } from "@/components/ui/button";
 import { SlidingIndicator } from "@/components/ui/sliding-indicator";
 import type { CommandRunner } from "@/connected/hooks/useCommand";
 import type { SessionData } from "@/connected/hooks/useSessionSnapshot";
-import type { Issue, Snapshot } from "@/connected/model";
+import { isRunning, type Issue, type Snapshot } from "@/connected/model";
 import { cn } from "@/lib/utils";
 import { CommandFeedback } from "../actions/ActionSheet";
 import {
@@ -184,7 +184,7 @@ export function IssueCard({
   issue,
   state,
   now,
-  locked,
+  command,
   action,
   onOpen,
   onAction,
@@ -192,7 +192,7 @@ export function IssueCard({
   issue: Issue;
   state: Snapshot;
   now: number;
-  locked: boolean;
+  command: CommandRunner;
   action?: CardAction;
   onOpen: () => void;
   onAction: (action: CardAction) => void;
@@ -247,7 +247,8 @@ export function IssueCard({
               <Button
                 type="button"
                 className="pointer-events-auto relative h-11"
-                disabled={locked}
+                disabled={command.locked}
+                loading={isRunning(command.running, action, issue.id)}
                 onClick={() => onAction(action)}
                 aria-label={`${action === "claim" ? "Claim" : "Accept handoff for"} ISS-${issue.number}`}
               >

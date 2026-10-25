@@ -14,7 +14,12 @@ import { Textarea } from "@/components/ui/textarea";
 import type { CommandRunner } from "@/connected/hooks/useCommand";
 import { IssueImages } from "@/connected/IssueImages";
 import { formatDate } from "@/connected/labels";
-import { type Issue, type Snapshot, unresolvedTime } from "@/connected/model";
+import {
+  isRunning,
+  type Issue,
+  type Snapshot,
+  unresolvedTime,
+} from "@/connected/model";
 import { clockDuration } from "@/connected/ui";
 import { cn } from "@/lib/utils";
 import {
@@ -275,6 +280,7 @@ export function IssuePage({
                     type="submit"
                     variant="outline"
                     disabled={locked || !reopenDraft.trim()}
+                    loading={isRunning(command.running, "reopen", issue.id)}
                   >
                     <RotateCcw aria-hidden="true" />
                     Reopen issue
@@ -520,6 +526,7 @@ export function IssuePage({
               type="submit"
               className="h-10"
               disabled={command.locked || !replyDraft.trim()}
+              loading={isRunning(command.running, "message", issue.id)}
             >
               <Send aria-hidden="true" />
               Send

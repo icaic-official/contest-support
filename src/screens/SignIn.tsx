@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Eye, EyeOff, LoaderCircle } from "lucide-react";
+import { Eye, EyeOff } from "lucide-react";
 import { Link } from "react-router";
 import { BrandMark } from "@/components/brand";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -97,8 +97,7 @@ export function SignIn() {
               </Button>
             </div>
           </div>
-          <Button type="submit" size="lg" className="h-11 w-full">
-            {busy && <LoaderCircle className="animate-spin" aria-hidden />}
+          <Button type="submit" size="lg" className="h-11 w-full" loading={busy}>
             {busy ? "Signing in…" : "Sign in"}
           </Button>
         </fieldset>

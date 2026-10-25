@@ -107,7 +107,7 @@ export function PasswordChangeForm({
               />
             </div>
           ))}
-          <Button type="submit" className="h-11">
+          <Button type="submit" className="h-11" loading={busy}>
             Save password
           </Button>
         </fieldset>

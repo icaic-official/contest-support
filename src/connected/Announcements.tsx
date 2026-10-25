@@ -16,6 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import {
   type AnnouncementDraft,
@@ -60,7 +61,7 @@ interface Edit {
  * ID, so Retry cannot publish twice. A confirmed rejection clears it.
  */
 function useAnnouncementCommand(list: AnnouncementData) {
-  const [busy, setBusy] = useState(false);
+  const [running, setRunning] = useState<AnnouncementCommand>();
   const [error, setError] = useState("");
   const [retryable, setRetryable] = useState(false);
   const pending = useRef<{ requestId: string; command: AnnouncementCommand }>(undefined);
@@ -71,7 +72,7 @@ function useAnnouncementCommand(list: AnnouncementData) {
       JSON.stringify(pending.current.command) === JSON.stringify(command);
     const requestId = same ? pending.current!.requestId : crypto.randomUUID();
     pending.current = { requestId, command };
-    setBusy(true);
+    setRunning(command);
     setError("");
     try {
       await list.execute(requestId, command);
@@ -90,12 +91,13 @@ function useAnnouncementCommand(list: AnnouncementData) {
       setError("The announcement may not have saved. Retry the same request.");
       return "unknown";
     } finally {
-      setBusy(false);
+      setRunning(undefined);
     }
   }
 
   return {
-    busy,
+    busy: running !== undefined,
+    running,
     error,
     retryable,
     run,
@@ -294,6 +296,12 @@ export function Announcements({ data }: { data: SessionData }) {
               </AlertDescription>
             </Alert>
           )}
+          {manager && !list.loaded && !list.error && (
+            <p role="status" className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Spinner className="size-4" />
+              Loading announcements…
+            </p>
+          )}
           {composing && canWrite && (
             <AnnouncementForm
               legend="New announcement"
@@ -302,6 +310,7 @@ export function Announcements({ data }: { data: SessionData }) {
               onDraft={setNewDraft}
               now={now}
               busy={command.busy}
+              saving={command.running?.type === "publish"}
               onSubmit={() => void publish()}
               onCancel={() => setComposing(false)}
             />
@@ -321,6 +330,7 @@ export function Announcements({ data }: { data: SessionData }) {
                 canWrite={canWrite}
                 now={now}
                 busy={command.busy}
+                running={command.running}
                 editing={edit?.id === item.id ? edit : undefined}
                 removing={removing === item.id}
                 onEdit={() => {
@@ -363,6 +373,8 @@ function AnnouncementItem(props: {
   canWrite: boolean;
   now: number;
   busy: boolean;
+  /** The command that runs now, so only its own control shows a spinner. */
+  running: AnnouncementCommand | undefined;
   editing: Edit | undefined;
   removing: boolean;
   onEdit: () => void;
@@ -374,7 +386,9 @@ function AnnouncementItem(props: {
   onRemove: () => void;
   list: AnnouncementData;
 }) {
-  const { item, expanded, manager, canWrite, now, busy, editing } = props;
+  const { item, expanded, manager, canWrite, now, busy, running, editing } = props;
+  const runsHere =
+    running !== undefined && "id" in running && running.id === item.id;
   const panelId = useId();
   const status = announcementStatus(item, now);
   const removed = status === "Removed";
@@ -445,6 +459,7 @@ function AnnouncementItem(props: {
                       size="sm"
                       variant="destructive"
                       disabled={busy}
+                      loading={runsHere && running.type === "remove"}
                       onClick={props.onRemove}
                     >
                       Confirm removal
@@ -469,6 +484,7 @@ function AnnouncementItem(props: {
             latest={item}
             now={now}
             busy={busy}
+            saving={runsHere && running.type === "edit"}
             onChange={props.onEditChange}
             onSave={props.onSave}
             onCancel={props.onCancelEdit}
@@ -489,6 +505,7 @@ function EditPanel({
   latest,
   now,
   busy,
+  saving,
   onChange,
   onSave,
   onCancel,
@@ -497,6 +514,7 @@ function EditPanel({
   latest: Announcement;
   now: number;
   busy: boolean;
+  saving: boolean;
   onChange: (edit: Edit) => void;
   onSave: (edit: Edit) => void;
   onCancel: () => void;
@@ -557,6 +575,7 @@ function EditPanel({
         onDraft={(draft) => onChange({ ...edit, draft })}
         now={now}
         busy={busy}
+        saving={saving}
         blocked={reviewing}
         onSubmit={() => onSave(edit)}
         onCancel={onCancel}
@@ -572,6 +591,7 @@ function AnnouncementForm({
   onDraft,
   now,
   busy,
+  saving,
   blocked = false,
   onSubmit,
   onCancel,
@@ -582,6 +602,8 @@ function AnnouncementForm({
   onDraft: (draft: AnnouncementDraft) => void;
   now: number;
   busy: boolean;
+  /** True while this form's own command runs. */
+  saving: boolean;
   /** True while a review or a removal prevents saving. */
   blocked?: boolean;
   onSubmit: () => void;
@@ -644,7 +666,7 @@ function AnnouncementForm({
         </p>
       )}
       <div className="flex flex-wrap gap-2">
-        <Button type="submit" size="sm" disabled={busy || blocked}>
+        <Button type="submit" size="sm" disabled={busy || blocked} loading={saving}>
           {submitLabel}
         </Button>
         <Button type="button" size="sm" variant="ghost" onClick={onCancel}>
@@ -701,7 +723,8 @@ function AnnouncementImageView({
       {url ? (
         <img src={url} alt={image.name} className="max-h-60 w-full rounded bg-muted object-contain" />
       ) : (
-        <span className="grid h-24 place-items-center rounded bg-muted text-xs text-muted-foreground">
+        <span className="flex h-24 items-center justify-center gap-2 rounded bg-muted text-xs text-muted-foreground">
+          {!failed && <Spinner className="size-3.5" />}
           {failed ? "This image could not be opened." : "Loading image…"}
         </span>
       )}
@@ -833,7 +856,13 @@ function AnnouncementImages({
               : `JPEG, PNG, or WebP. Up to ${ANNOUNCEMENT_IMAGE_MAX_COUNT} images, ${megabytes(ANNOUNCEMENT_IMAGE_MAX_BYTES)} MB each.`}
           </p>
           {progress !== undefined && (
-            <progress className="w-full" max={100} value={progress} aria-label="Upload progress" />
+            <>
+              <p className="flex items-center gap-2 text-xs text-muted-foreground">
+                <Spinner className="size-3.5" />
+                Uploading image…
+              </p>
+              <progress className="w-full" max={100} value={progress} aria-label="Upload progress" />
+            </>
           )}
           {retry && (
             <Button
@@ -841,6 +870,7 @@ function AnnouncementImages({
               variant="outline"
               className="w-fit"
               disabled={busy}
+              loading={progress !== undefined}
               onClick={() => void upload(retry.file, retry.requestId)}
             >
               <RotateCw aria-hidden="true" />

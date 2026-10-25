@@ -10,7 +10,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import type { Issue, Snapshot } from "@/connected/model";
+import { isRunning, type Issue, type Snapshot } from "@/connected/model";
 import { clockDuration } from "@/connected/ui";
 import { useChangedIssues } from "../useChangedIssues";
 import {
@@ -166,6 +166,11 @@ export function IssueTable({
                       size="sm"
                       variant="outline"
                       disabled={workflow.command.locked}
+                      loading={isRunning(
+                        workflow.command.running,
+                        action,
+                        issue.id,
+                      )}
                       onClick={(event) => {
                         event.stopPropagation();
                         props.runRowAction(issue, action);

@@ -22,6 +22,7 @@ export function ReportForm({
   location,
   blocker,
   locked,
+  sending,
   draft,
   onDraft,
   onCancel,
@@ -33,6 +34,8 @@ export function ReportForm({
   /** Why the team cannot report now, or undefined when it can. */
   blocker: string | undefined;
   locked: boolean;
+  /** True while this form's report is on its way to the server. */
+  sending: boolean;
   draft: ReportDraft;
   onDraft: (draft: ReportDraft) => void;
   onCancel: () => void;
@@ -151,6 +154,7 @@ export function ReportForm({
           <Button
             type="submit"
             disabled={Boolean(blocker) || locked || !draft.description.trim()}
+            loading={sending}
           >
             <Send aria-hidden="true" />
             Send report

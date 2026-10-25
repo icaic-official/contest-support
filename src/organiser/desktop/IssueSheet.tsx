@@ -21,7 +21,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import type { Issue } from "@/connected/model";
+import { isRunning, type Issue } from "@/connected/model";
 import { ActionDialog } from "../actions/ActionDialog";
 import { CommandFeedback } from "../actions/ActionSheet";
 import {
@@ -185,6 +185,7 @@ function IssueSheetBody({
       <Button
         variant={variant}
         disabled={disabled}
+        loading={isRunning(command.running, "accept", issue.id)}
         onClick={() => void command.act({ type: "accept", ...base })}
       >
         <Handshake aria-hidden="true" />
@@ -197,6 +198,7 @@ function IssueSheetBody({
       <Button
         variant={variant}
         disabled={disabled}
+        loading={isRunning(command.running, "claim", issue.id)}
         onClick={() => void command.act({ type: "claim", ...base })}
       >
         <Hand aria-hidden="true" />

@@ -20,7 +20,12 @@ import {
   useAvatarEditor,
 } from "@/connected/hooks/useAvatarEditor";
 import type { WorkflowState } from "@/connected/hooks/useWorkflowState";
-import type { Issue, Membership, Snapshot } from "@/connected/model";
+import {
+  isRunning,
+  type Issue,
+  type Membership,
+  type Snapshot,
+} from "@/connected/model";
 import { PictureEditor } from "@/connected/PictureEditor";
 import type { ShellProps } from "@/connected/shell";
 import { searchTeams, unresolvedCount } from "@/connected/teamSearch";
@@ -84,7 +89,7 @@ function IssueList({
           issue={issue}
           state={props.state}
           now={props.now}
-          locked={props.workflow.command.locked}
+          command={props.workflow.command}
           action={props.cardAction(issue)}
           onOpen={() => props.openIssue(issue.id)}
           onAction={(action) => props.runCardAction(issue, action)}
@@ -139,6 +144,7 @@ export function QueueTab(props: PhoneTabProps) {
             variant="secondary"
             className="mt-3 h-12 w-full text-base"
             disabled={workflow.command.locked}
+            loading={isRunning(workflow.command.running, "claim", oldest.id)}
             onClick={() => {
               void workflow.command.act({
                 type: "claim",

@@ -165,6 +165,16 @@ export function Announcements({ data }: { data: SessionData }) {
   const [edit, setEdit] = useState<Edit>();
   const [removing, setRemoving] = useState<string>();
   const newButton = useRef<HTMLButtonElement>(null);
+  const removedId = useRef<string>(undefined);
+  // The removed item takes its focused button with it. A live read can still
+  // list it when the command returns, and New announcement stays disabled while
+  // the command runs. So move focus once both have passed.
+  useEffect(() => {
+    if (command.busy || !removedId.current) return;
+    if (list.announcements.some((item) => item.id === removedId.current)) return;
+    removedId.current = undefined;
+    newButton.current?.focus();
+  }, [list.announcements, command.busy]);
 
   if (!member) return null;
   const canWrite = manager && !archived;
@@ -182,6 +192,9 @@ export function Announcements({ data }: { data: SessionData }) {
     items.findIndex((item) => item.id === edit?.id || item.id === removing) >=
     VISIBLE_ANNOUNCEMENTS;
   const shown = showAll || pinned ? items : items.slice(0, VISIBLE_ANNOUNCEMENTS);
+  // Another manager can remove the announcement under an open edit. Its draft stays readable.
+  const removedEdit =
+    edit && list.loaded && !items.some((item) => item.id === edit.id) ? edit : undefined;
 
   function toggle(id: string) {
     setOpen((current) => {
@@ -208,11 +221,13 @@ export function Announcements({ data }: { data: SessionData }) {
   }
 
   async function remove(item: Announcement) {
+    removedId.current = item.id;
     const outcome = await command.run({
       type: "remove",
       id: item.id,
       revision: item.revision,
     });
+    if (outcome !== "done") removedId.current = undefined;
     if (outcome !== "unknown") setRemoving(undefined);
   }
 
@@ -315,6 +330,19 @@ export function Announcements({ data }: { data: SessionData }) {
               onCancel={() => setComposing(false)}
             />
           )}
+          {removedEdit && canWrite && (
+            <div className="rounded-lg border bg-card p-3 text-sm">
+              <EditPanel
+                edit={removedEdit}
+                now={now}
+                busy={command.busy}
+                saving={false}
+                onChange={setEdit}
+                onSave={(current) => void save(current)}
+                onCancel={() => setEdit(undefined)}
+              />
+            </div>
+          )}
           {manager && list.loaded && items.length === 0 && !list.error && (
             <p className="text-sm text-muted-foreground">No announcements yet.</p>
           )}
@@ -386,12 +414,28 @@ function AnnouncementItem(props: {
   onRemove: () => void;
   list: AnnouncementData;
 }) {
-  const { item, expanded, manager, canWrite, now, busy, running, editing } = props;
+  const { item, expanded, manager, canWrite, now, busy, running, editing, removing } = props;
   const runsHere =
     running !== undefined && "id" in running && running.id === item.id;
   const panelId = useId();
+  const warningId = useId();
+  const removeButton = useRef<HTMLButtonElement>(null);
+  const prompt = useRef<HTMLDivElement>(null);
+  const keepButton = useRef<HTMLButtonElement>(null);
+  const wasPrompting = useRef(false);
   const status = announcementStatus(item, now);
-  const removed = status === "Removed";
+  // Show the whole prompt in the scrolling strip and focus its safe choice.
+  // When the closed prompt took focus with it, return focus to Remove. Opening
+  // another item's prompt closes this one, and focus stays in the new prompt.
+  useEffect(() => {
+    if (removing) {
+      prompt.current?.scrollIntoView({ block: "nearest" });
+      keepButton.current?.focus({ preventScroll: true });
+    } else if (wasPrompting.current && document.activeElement === document.body) {
+      removeButton.current?.focus();
+    }
+    wasPrompting.current = removing;
+  }, [removing]);
   return (
     <li className="rounded-lg border bg-card">
       <h3 className="text-sm">
@@ -433,47 +477,58 @@ function AnnouncementItem(props: {
                   <time dateTime={item.expires_at}>{formatDate(item.expires_at)}</time>
                 </>
               )}
-              {item.removed_at && item.removed_name && (
-                <>
-                  . Removed by {item.removed_name}{" "}
-                  <time dateTime={item.removed_at}>{formatDate(item.removed_at)}</time>
-                </>
-              )}
             </p>
             <AnnouncementImages
               announcement={item}
               images={props.images}
-              canAdd={canWrite && !removed}
+              canAdd={canWrite}
               canRemove={canWrite}
               list={props.list}
             />
-            {canWrite && !removed && !editing && (
+            {canWrite && !editing && !removing && (
               <div className="flex flex-wrap gap-2">
                 <Button size="sm" variant="outline" disabled={busy} onClick={props.onEdit}>
                   <Pencil aria-hidden="true" />
                   Edit
                 </Button>
-                {props.removing ? (
-                  <>
-                    <Button
-                      size="sm"
-                      variant="destructive"
-                      disabled={busy}
-                      loading={runsHere && running.type === "remove"}
-                      onClick={props.onRemove}
-                    >
-                      Confirm removal
-                    </Button>
-                    <Button size="sm" variant="ghost" onClick={props.onCancelRemove}>
-                      Keep announcement
-                    </Button>
-                  </>
-                ) : (
-                  <Button size="sm" variant="outline" disabled={busy} onClick={props.onAskRemove}>
-                    <Trash2 aria-hidden="true" />
-                    Remove
+                <Button
+                  ref={removeButton}
+                  size="sm"
+                  variant="outline"
+                  disabled={busy}
+                  onClick={props.onAskRemove}
+                >
+                  <Trash2 aria-hidden="true" />
+                  Remove
+                </Button>
+              </div>
+            )}
+            {canWrite && !editing && removing && (
+              <div
+                ref={prompt}
+                role="group"
+                aria-labelledby={warningId}
+                className="grid gap-2 rounded-md border border-destructive/50 bg-background p-3"
+              >
+                <p id={warningId} className="font-medium">
+                  Remove this announcement? It leaves the announcement strip for everyone,
+                  managers included. Minsky keeps the record for the contest log.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    disabled={busy}
+                    loading={runsHere && running.type === "remove"}
+                    aria-describedby={warningId}
+                    onClick={props.onRemove}
+                  >
+                    Remove announcement
                   </Button>
-                )}
+                  <Button ref={keepButton} size="sm" variant="ghost" onClick={props.onCancelRemove}>
+                    Keep announcement
+                  </Button>
+                </div>
               </div>
             )}
           </>
@@ -511,7 +566,7 @@ function EditPanel({
   onCancel,
 }: {
   edit: Edit;
-  latest: Announcement;
+  latest?: Announcement;
   now: number;
   busy: boolean;
   saving: boolean;
@@ -523,7 +578,7 @@ function EditPanel({
   const reviewing = review !== "current";
   return (
     <div className="grid gap-3">
-      {review === "review" && (
+      {review === "review" && latest && (
         <div role="group" aria-label="Review the latest version" className="grid gap-2 rounded-md border border-status-escalated/50 bg-muted p-3">
           <p className="font-medium">This announcement changed while you edited it.</p>
           <dl className="grid gap-1 text-xs">
@@ -565,7 +620,7 @@ function EditPanel({
       )}
       {review === "removed" && (
         <p role="alert" className="text-sm text-destructive">
-          This announcement was removed. Your draft is kept, but it cannot be saved.
+          Another manager removed this announcement. Your draft is kept, but it cannot be saved.
         </p>
       )}
       <AnnouncementForm

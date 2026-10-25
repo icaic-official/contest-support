@@ -78,7 +78,8 @@ interface AnnouncementRow { revision: number; removed_at: string | null }
 export const snapshotSql = `WITH access AS (${currentAccessSql}),
   manager AS (SELECT 1 FROM access WHERE ${announcementManager('access')}),
   visible AS (SELECT a.* FROM announcements a WHERE a.session_id = ? AND EXISTS (SELECT 1 FROM access)
-    AND (EXISTS (SELECT 1 FROM manager) OR (a.removed_at IS NULL AND (a.expires_at IS NULL OR a.expires_at > ${announcementNow}))))
+    AND a.removed_at IS NULL
+    AND (EXISTS (SELECT 1 FROM manager) OR a.expires_at IS NULL OR a.expires_at > ${announcementNow}))
 SELECT json_object(
   'announcements', json(COALESCE((SELECT json_group_array(json(row)) FROM (
     SELECT json_object('id', a.id, 'session_id', a.session_id, 'title', a.title, 'details', a.details,
@@ -102,7 +103,10 @@ export class D1AnnouncementService {
 
   private statement(sql: string, ...values: Value[]): D1Statement { return this.db.prepare(sql).bind(...values); }
 
-  /** Readers see active records. Managers also see expired and removed records. */
+  /**
+   * Readers see active records. Managers also see expired records. Nobody sees
+   * removed records here. Their rows stay for the contest log.
+   */
   async snapshot(caller: Caller, sessionId: string): Promise<AnnouncementSnapshot> {
     if (!uuid.safeParse(sessionId).success) throw new AuthenticationError(400, 'Invalid session.');
     const row = await this.statement(snapshotSql, ...currentAccessBindings(caller, sessionId), sessionId)

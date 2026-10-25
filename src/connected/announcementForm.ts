@@ -81,12 +81,13 @@ export function announcementCommand(
  * How an open edit relates to the stored record. `current` means the draft
  * starts from the latest revision. `review` means another change arrived, so
  * the manager must choose a draft before saving. `removed` keeps the draft
- * but cannot save.
+ * but cannot save. The strip lists no removed announcement, so a missing
+ * `latest` also means `removed`.
  */
 export function editReview(
   baseRevision: number,
-  latest: Announcement,
+  latest?: Announcement,
 ): "current" | "review" | "removed" {
-  if (latest.removed_at) return "removed";
+  if (!latest || latest.removed_at) return "removed";
   return latest.revision === baseRevision ? "current" : "review";
 }

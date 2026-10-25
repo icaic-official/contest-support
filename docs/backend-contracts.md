@@ -190,8 +190,8 @@ The browser adapter does not implement those checks.
 
 | Operation | Result |
 | --- | --- |
-| `snapshot(sessionId, signal?)` | Returns the announcements and ready images that the caller can read, with server time. Members read active records. Admins and jury also read expired and removed records. A newer read can abort an older one. |
-| `execute(sessionId, requestId, command)` | Publishes, edits, or removes one announcement and returns its ID. A repeated request ID with the same command does not repeat the write. |
+| `snapshot(sessionId, signal?)` | Returns the announcements and ready images that the caller can read, with server time. Members read active records. Admins and jury also read expired records. Nobody reads removed records through this call. A newer read can abort an older one. |
+| `execute(sessionId, requestId, command)` | Publishes, edits, or removes one announcement and returns its ID. Removal hides the announcement from every member and keeps its record, images, and files for a future contest log export. A repeated request ID with the same command does not repeat the write. |
 | `uploadImage(input)` | Reserves, transfers, and publishes one image. A repeated request ID does not add a second image. |
 | `removeImage(sessionId, imageId)` | Removes the image through the authorized server operation. A failed file deletion stays retryable. |
 | `downloadImage(image)` | Returns a `Blob` after the provider checks current access. |

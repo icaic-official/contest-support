@@ -77,5 +77,6 @@ describe("announcement drafts", () => {
     expect(editReview(2, { ...announcement, revision: 3 })).toBe("review");
     expect(editReview(3, { ...announcement, revision: 4 })).toBe("review");
     expect(editReview(2, { ...announcement, removed_at: "2026-10-24T00:30:00.000Z", revision: 3 })).toBe("removed");
+    expect(editReview(2, undefined)).toBe("removed");
   });
 });

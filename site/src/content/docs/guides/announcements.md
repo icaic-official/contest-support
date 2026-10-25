@@ -50,7 +50,10 @@ Select **Keep my draft** or **Load latest text**, then save again.
 
 - At its expiry time, an announcement leaves the readers' list.
   To show it again, edit it and clear or extend the expiry.
-- To remove it now, select **Remove**, then **Confirm removal**. Removal is final.
+- To remove it now, select **Remove**, then **Remove announcement**.
+  The announcement leaves the list for everyone, managers included. Minsky keeps the record for the contest log.
+  To stop, select **Keep announcement**.
 
-Managers still see expired and removed announcements with an **Active**, **Expired**, or **Removed** label.
+Managers still see expired announcements with an **Expired** label.
+If another manager removes an announcement while you edit it, your draft stays on screen, but you cannot save it.
 Archived events stay readable and reject every announcement change.

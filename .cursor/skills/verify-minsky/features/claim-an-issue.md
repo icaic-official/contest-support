@@ -11,7 +11,7 @@ A volunteer takes an open report from the queue. The report leaves the waiting s
 ## How to get to it (user POV)
 
 - Sign in as `volunteer` on a window at least 1024 px wide. The console opens on **Queue**. Choose **Claim ISS-1** on that row. The sidebar **Queue** button is the same page.
-- On a window narrower than 1024 px, open the **Queue** tab in **Organiser sections**. Choose **Claim and go** on the oldest waiting report, or **Claim ISS-1** on its card.
+- On a window narrower than 1024 px, open the **Queue** tab in **Organizer sections**. Choose **Claim and go** on the oldest waiting report, or **Claim ISS-1** on its card.
 
 ## Driving it with minsky-verify
 

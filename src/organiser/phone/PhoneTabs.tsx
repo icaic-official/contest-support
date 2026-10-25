@@ -644,7 +644,7 @@ export function MeTab(props: PhoneTabProps & { onSessionChange: () => void }) {
         </button>
       </div>
       <p className="px-1 text-xs text-muted-foreground">
-        Ask an organiser if your roles or team assignment need to change.
+        Ask an organizer if your roles or team assignment need to change.
         Development deployment.
       </p>
     </div>

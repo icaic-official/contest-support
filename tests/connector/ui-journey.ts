@@ -61,7 +61,7 @@ async function choose(control: Locator, checked = true) {
 }
 
 function phoneTabs(page: Page): Locator {
-  return page.getByRole('navigation', { name: 'Organiser sections' });
+  return page.getByRole('navigation', { name: 'Organizer sections' });
 }
 
 async function phoneTab(page: Page, label: string) {

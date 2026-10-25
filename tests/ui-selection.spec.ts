@@ -185,7 +185,7 @@ test("browser history restores the section and heading focus", async ({
   ).toBeVisible();
   await expect(page).toHaveURL("/jury");
   await page
-    .getByRole("navigation", { name: "Organiser sections" })
+    .getByRole("navigation", { name: "Organizer sections" })
     .getByRole("button", { name: "Me", exact: true })
     .click();
   await expect(page).toHaveURL("/account");

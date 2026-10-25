@@ -34,7 +34,7 @@ async function login(page: Page, name = "jury", viewport: Viewport = phone) {
 }
 
 function phoneTabs(page: Page) {
-  return page.getByRole("navigation", { name: "Organiser sections" });
+  return page.getByRole("navigation", { name: "Organizer sections" });
 }
 
 function consolePages(page: Page) {

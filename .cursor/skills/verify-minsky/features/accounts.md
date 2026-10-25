@@ -11,7 +11,7 @@ An administrator creates a team account and receives a temporary password once. 
 ## How to get to it (user POV)
 
 - Sign in as `admin` on a window at least 1024 px wide. Choose **Accounts** in **Console pages**, then **Create account**.
-- On a window narrower than 1024 px, open the **Session** tab in **Organiser sections** and choose **New account**.
+- On a window narrower than 1024 px, open the **Session** tab in **Organizer sections** and choose **New account**.
 
 ## Driving it with minsky-verify
 

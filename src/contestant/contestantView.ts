@@ -217,7 +217,7 @@ export function reportBlocker(
     return "This event is archived. Records are read only.";
   }
   if (!snapshot.session?.intake_open) {
-    return "Reporting is closed by the organisers.";
+    return "Reporting is closed by the organizers.";
   }
   return undefined;
 }

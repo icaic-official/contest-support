@@ -287,7 +287,7 @@ test('issue composer: the audience switch slides to Internal note and turns ambe
 
 test('phone tab bar: the marker slides along the top edge to the selected tab', async ({ page, api }) => {
   const fixture = await signInConsole(page, api, phone);
-  const nav = page.getByRole('navigation', { name: 'Organiser sections' });
+  const nav = page.getByRole('navigation', { name: 'Organizer sections' });
   const bar = marker(nav.locator('ul'));
   const queue = nav.getByRole('button', { name: 'Queue', exact: true });
   const find = nav.getByRole('button', { name: 'Find', exact: true });

@@ -11,6 +11,7 @@ import {
 } from "../admin/AccountAccess";
 import { AssignByIdForm, CreateAccountForm } from "../admin/AccountForms";
 import { CredentialReveal } from "../admin/CredentialReveal";
+import { CategoryEditor, TeamRosterEditor } from "../admin/RosterEditors";
 import {
   ImageLimitsForm,
   IntakeSwitch,
@@ -30,7 +31,7 @@ type AdminSheet =
 
 /**
  * Session administration for admins: status counts, contestant intake,
- * image limits and accounts. New accounts and password resets end on a
+ * image limits, accounts, teams and categories. New accounts and password resets end on a
  * one-time credential screen in the same sheet. In an archived event every
  * change is disabled. `PhoneStatus` above the tab shows the archived banner.
  */
@@ -136,6 +137,12 @@ export function SessionTab({ state, shell }: PhoneTabProps) {
           Open an account to update permissions or reset access.
         </p>
       </section>
+      <Collapsible title={`Teams · ${state.teams.length}`}>
+        <TeamRosterEditor state={state} admin={admin} titled={false} />
+      </Collapsible>
+      <Collapsible title="Categories">
+        <CategoryEditor state={state} admin={admin} />
+      </Collapsible>
       <Collapsible title="Assign an existing account by ID">
         <p className="mb-3 text-sm text-muted-foreground">
           For trusted provisioning and accounts that already exist.

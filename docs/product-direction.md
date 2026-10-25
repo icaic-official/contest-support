@@ -73,7 +73,7 @@ On 2026-10-02, the user prioritized working cloud features and deferred resilien
 Assume connectivity during development. Outage planning does not block backend work.
 Start with free tiers. Necessary paid services are acceptable after the need and cost are identified.
 A developer pilot and production capacity validation are separate milestones.
-Event, roster, and category editors remain future work.
+Session admins edit teams and categories in the app. Event editors remain future work.
 
 Production targets on a healthy venue connection are:
 

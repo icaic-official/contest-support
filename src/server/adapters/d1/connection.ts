@@ -2,7 +2,8 @@
 export interface D1Statement {
   bind(...values: Array<string | number | null>): D1Statement;
   first<T>(): Promise<T | null>;
-  all<T>(): Promise<{ results: T[] }>;
+  /** `meta.rows_read` is the number of rows D1 read, which D1 bills. */
+  all<T>(): Promise<{ results: T[]; meta?: { rows_read?: number } }>;
   run(): Promise<unknown>;
 }
 

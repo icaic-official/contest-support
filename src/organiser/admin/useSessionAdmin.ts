@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { backend } from "@/backend";
-import type { AccountCommand } from "@/backend/contracts";
+import type { AccountCommand, RosterCommand } from "@/backend/contracts";
 import { errorMessage } from "@/backend/errors";
 import type { Snapshot } from "@/connected/model";
 import {
@@ -13,6 +13,7 @@ import {
   resetPasswordCommand,
   setUsernameCommand,
 } from "./adminModel";
+import { rosterNotice } from "./rosterModel";
 
 /** A temporary password that the admin shares once with the account owner. */
 export interface Credentials {
@@ -39,6 +40,8 @@ export interface SessionAdmin {
   saveMembership: (userId: string, draft: MembershipDraft) => Promise<boolean>;
   resetPassword: (userId: string) => Promise<boolean>;
   revokeAccess: (userId: string) => Promise<boolean>;
+  /** Adds, renames or deletes teams, or replaces the category list. */
+  editRoster: (command: RosterCommand) => Promise<boolean>;
 }
 
 /**
@@ -62,6 +65,7 @@ export function useSessionAdmin(
 
   async function run(
     work: () => Promise<Credentials | void>,
+    done = "Administration action completed.",
   ): Promise<boolean> {
     if (guard.current) return false;
     guard.current = true;
@@ -73,7 +77,7 @@ export function useSessionAdmin(
     try {
       revealed = (await work()) ?? undefined;
       await refresh();
-      setNotice("Administration action completed.");
+      setNotice(done);
       return true;
     } catch (cause) {
       setError(errorMessage(cause));
@@ -151,5 +155,10 @@ export function useSessionAdmin(
       run(() => account(resetPasswordCommand(userId), usernameOf(userId))),
     revokeAccess: (userId) =>
       run(() => backend.admin.removeMember(sessionId, userId)),
+    editRoster: (command) =>
+      run(
+        () => backend.admin.editRoster(sessionId, command),
+        rosterNotice(command),
+      ),
   };
 }

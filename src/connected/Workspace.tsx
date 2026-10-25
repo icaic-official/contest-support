@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, Navigate, useLocation } from "react-router";
 import { BuildId } from "@/components/build-id";
 import { RenderErrorBoundary } from "@/components/render-error-boundary";
@@ -22,9 +22,20 @@ import { canOpenPage, pageForPath } from "./navigation";
  * change removes the snapshot, so its forms and selection survive. The shell
  * then shows NoSessionAccess itself.
  */
-export function Workspace(props: Omit<ShellProps, "data">) {
+export function Workspace({
+  onLiveChange,
+  ...props
+}: Omit<ShellProps, "data"> & {
+  /** Reports whether the live update channel is connected. */
+  onLiveChange: (live: boolean) => void;
+}) {
   const { pathname } = useLocation();
   const data = useSessionSnapshot(props.user.id);
+  const { connected } = data;
+  useEffect(() => {
+    onLiveChange(connected);
+    return () => onLiveChange(false);
+  }, [connected, onLiveChange]);
   const membership = data.snapshot?.membership;
   const current = membership ? uiKindFor(membership) : undefined;
   const [kind, setKind] = useState<UiKind>();

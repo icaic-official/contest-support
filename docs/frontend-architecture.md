@@ -69,7 +69,7 @@ These steps occur in sequence:
 
 1. `src/main.tsx` wraps `ConnectedApp` in `BrowserRouter`. `ConnectedApp` restores the session with `useAuthSession`.
 2. Without a user, it shows `SignIn` (`src/screens/SignIn.tsx`).
-3. `useAccountStatus` checks the account every 10 seconds and on window focus.
+3. `useAccountStatus` checks the account on the [refresh schedule](#refresh-schedule) and on window focus.
    If the password is temporary, `PasswordForm` (`src/screens/PasswordForm.tsx`) shows. The database also enforces this change.
 4. `Workspace` (`src/connected/Workspace.tsx`) loads session data with `useSessionSnapshot`. It wraps the UI in `AvatarProvider`, which loads [profile pictures](#profile-pictures). It selects the UI with `uiKindFor` from `model.ts`:
    - A membership with `team_id` gets `ContestantApp` (`src/contestant/ContestantApp.tsx`).
@@ -98,6 +98,7 @@ The same authorized snapshot selects the interface and checks route access.
 | `/jury` | Phone **Awards** or desktop **Award review** for a current jury member. |
 | `/administration` | Phone **Session** or desktop **Overview** for a current session administrator. |
 | `/administration/accounts` | Account administration for a current session administrator. |
+| `/administration/roster` | The team editor (desktop **Roster** page) for a current session administrator. The phone has no separate address. Its **Session** tab holds the editors. |
 | `/administration/settings` | Session settings for a current session administrator. |
 | `/account` | Phone **Me**, or the **My account** settings page in the desktop console and the contestant app. `/account#security` opens the **Security** section and focuses **Current password**. |
 
@@ -123,6 +124,11 @@ A transient account-check failure hides protected content and retains that metad
 Recovery does not automatically repeat a write. The person must select **Retry last request**.
 An explicit retry uses the original session even if access removal selects another session.
 The server checks access to that original session and can reject the retry.
+
+A recorded command shows its result from the command response. `useCommand` calls `executeAndRead`, and `useSessionSnapshot.applySnapshot` puts the returned snapshot in the same queue as the reads.
+An older snapshot never replaces a newer one, which the server time decides.
+The hook reads sessions and the snapshot again only when the response has no usable snapshot, or when the command is rejected or its result is unknown.
+The live hint that the commit sends still refreshes every open screen, the actor's too.
 
 A successful command or definitive server rejection clears the pending request.
 Signing out or changing the actor also clears it.
@@ -154,8 +160,8 @@ They call the `Backend` contracts through `backend`.
 | Hook | Responsibility |
 | --- | --- |
 | `useAuthSession()` | Uses `requireBackend().auth`. Restores the stored session and follows sign-in and sign-out. Returns `user`, `loading`, `error` and `signOut`. |
-| `useAccountStatus(userId)` | Reads `account_status` every 10 seconds and on focus. Returns `account`, `error` and `recheck()`. |
-| `useSessionSnapshot(userId)` | Loads memberships, the session list and the selected snapshot. Reads run in sequence. A generation counter discards responses for an earlier session. It refreshes on Realtime changes, every 10 seconds, on focus and when the browser is online again. It clears the snapshot after an error. It records the server clock offset. |
+| `useAccountStatus(userId, live)` | Reads `account_status` on the refresh schedule and on focus. `live` is true while the live channel is connected. Returns `account`, `error` and `recheck()`. |
+| `useSessionSnapshot(userId)` | Loads memberships, the session list and the selected snapshot. Reads run in sequence. A generation counter discards responses for an earlier session. It refreshes on live changes, on focus, when the tab becomes visible and when the browser is online again. Its timer runs every 10 seconds while the live channel is down and every 60 seconds while it is connected. Each tick also adds one to `SessionData.updates`, so announcements and pictures read again. It clears the snapshot after an error. It records the server clock offset. |
 | `useCommand({ sessionId, refresh, onRecorded })` | Runs one workflow command at a time. It uses the actor-bound request from `WorkflowRetryProvider`. An explicit retry retains the original session, request ID, and command. `onSuccess` clears the originating form before refresh while that form remains mounted. |
 | `useWorkflowState(data)` | Combines `useCommand` with the selected issue and the status filter. A recorded command selects its issue when the person did not choose an issue while it ran. An inline queue action does not select its issue. A reopened issue sets the filter to `claimed`. |
 | `useAvatarEditor()` | The steps of changing the caller's own profile picture: choose, preview, save and remove. See [Profile pictures](#profile-pictures). |
@@ -168,6 +174,18 @@ Show **Retry last request** while `command.pending` is set and `command.busy` is
 
 `src/connected/labels.ts` holds the status names, the resolution summaries and the award minute presets.
 Use these values in every UI so that the text stays the same.
+
+## Refresh schedule
+
+`startRefreshSchedule` (`src/connected/hooks/refreshSchedule.ts`) owns the timer for `useSessionSnapshot` and `useAccountStatus`.
+
+| Live channel | Timer | Also refreshes on |
+| --- | --- | --- |
+| Connected | Every 60 seconds | A live hint, window focus, the tab becoming visible, the browser coming online |
+| Down or reconnecting | Every 10 seconds | The same events, and at once when the channel drops or reconnects |
+
+The 60-second timer is a safety net for changes that send no hint: a picture change, an announcement expiry, and a password reset.
+The server also closes a socket when access is revoked, and the drop starts a refresh.
 
 ## Contestant app
 
@@ -215,8 +233,10 @@ Shared organiser parts are one level up, so the desktop console can use them:
 | `actions/OrganiserImages.tsx` | `ImageGallery`, `ImageUploadForm`, `ImagePreviewDialog` and `OrganiserImages`. They use `useIssueImages`. |
 | `actions/ActionSheet.tsx` | `ActionSheet` (a vaul bottom sheet with a **Cancel** button) and `CommandFeedback` (the command error and **Retry last request**). `showCancel` hides **Cancel** when the content has its own **Done** button. `onClosed` runs after the closing animation. |
 | `admin/adminModel.ts` | Pure admin rules: the username pattern, image limit bounds and steps, the membership draft (Staff or Team, roles, Admin), and the request inputs for the `Backend` admin contract. `createAccountCommand`, `setUsernameCommand` and `resetPasswordCommand` build an `AccountCommand`. `membershipInput` builds a `MembershipInput`. `imageLimitsInput` builds the image limits. `adminModel.test.ts` tests them. |
-| `admin/useSessionAdmin.ts` | The admin requests through `requireBackend().admin`: intake, image limits, create account, set username, membership, password reset and removal. One request runs at a time (a ref guard). It holds the error, the notice and the one-time credentials. A recorded request refreshes the snapshot. |
+| `admin/useSessionAdmin.ts` | The admin requests through `requireBackend().admin`: intake, image limits, create account, set username, membership, password reset, removal and roster edits. One request runs at a time (a ref guard). It holds the error, the notice and the one-time credentials. A recorded request refreshes the snapshot. |
 | `admin/SessionSettings.tsx` | `StatusCounts` (icon and label per status), `IntakeSwitch` and `ImageLimitsForm` (number fields with labelled − and + buttons). |
+| `admin/RosterEditors.tsx` | `TeamRosterEditor` (the **Add teams** box, the team filter, rows with **Edit** and **Delete**) and `CategoryEditor` (a draft list with move, remove and add, saved as a whole). The phone **Session** tab and the desktop pages share them. |
+| `admin/rosterModel.ts` | Pure roster rules: reading the **Add teams** lines, the issues and accounts that keep a team, the issues that keep a category, category checks and the `RosterCommand` inputs. `rosterModel.test.ts` tests them. |
 | `admin/AccountForms.tsx` | `MembershipFields`, `CreateAccountForm`, `UsernameForm`, `MembershipForm` and `AssignByIdForm`. |
 | `admin/CredentialReveal.tsx` | The one-time username and temporary password, with copy buttons and **Done**. |
 | `admin/AccountAccess.tsx` | `AccountList`, `MemberActions` (username, membership, password reset and removal, with `ConfirmDialog`), `AdminFeedback`, `Collapsible` and `AdminActivity`. |
@@ -241,6 +261,7 @@ These rules apply:
 - A password reset and a removal need confirmation in a dialog. The text keeps the meaning of the earlier `window.confirm` text.
 - A Team account needs a team. The form sends no staff roles and no Admin for it, as before.
 - An error from a page control stays at the top of the scroll area, so it is visible near the form that failed. An error inside the sheet shows in the sheet.
+- The Session tab holds the **Teams** and **Categories** sections, which use the editors of the desktop pages. The **Add teams** box keeps its text until the server records it. A lost answer does not duplicate teams, because each new team carries an ID that the box keeps until the request succeeds.
 - In an archived event, every admin control is disabled. `PhoneStatus` shows the archived banner.
 
 `useIssueImages` (`src/connected/hooks/`) holds the upload, retry, preview and removal logic of `IssueImages`. `IssueImages` uses it with its existing markup.
@@ -258,7 +279,7 @@ It uses the same hooks, rules and forms as the phone app. It adds no workflow ru
 | `IssueTable.tsx` | `IssueTable` (number, status with icon and label, report and category, team and location, owner, aging timer, **Claim** or **Accept**) and `StatCards`. |
 | `IssueSheet.tsx` | The issue side sheet: timer cards, owner, lifecycle steps with times, handoff banner, actions, the Activity, Images and Outcome & award tabs and the reply composer. |
 | `AwardReviewPage.tsx` | The lists from `awardLists()`: To decide, To apply and Applied. Each card shows `AwardEvidence` and has the award form or the confirmation form. |
-| `AdminPages.tsx` | `OverviewPage`, `AccountsPage` (table, filter, **Create account** and **Manage** dialogs with the one-time credentials) and `SettingsPage` (intake, image limits, categories). |
+| `AdminPages.tsx` | `OverviewPage`, `AccountsPage` (table, filter, **Create account** and **Manage** dialogs with the one-time credentials) and `RosterPage` (the team editor) and `SettingsPage` (intake, image limits, the category editor). |
 | `consoleModel.ts` | Pure rules: pages by role, sidebar counts, queue tabs, status card numbers, category counts, award totals, owner workload and palette search. `consoleModel.test.ts` tests them. |
 | `consoleProps.ts` | `ConsolePageProps`, which every page receives, and the heading id. |
 
@@ -271,7 +292,7 @@ Shared parts that the console added or changed:
 
 These rules apply:
 
-- The sidebar pages follow the combined roles. Volunteers and specialists get Queue, Assigned to me and Handoffs. Jury members get Award review. Every person gets Teams & tables. Admins also get Overview, Accounts and Session settings. Admins without support roles still get Queue. A jury-only member sees resolved issues only.
+- The sidebar pages follow the combined roles. Volunteers and specialists get Queue, Assigned to me and Handoffs. Jury members get Award review. Every person gets Teams & tables. Admins also get Overview, Accounts, Roster and Session settings. Admins without support roles still get Queue. A jury-only member sees resolved issues only.
 - The queue tabs use the shared status filter of `useWorkflowState`. Active is `all`, All is `everything` and the other tabs are statuses. The phone app shows All active for `everything`. A reopened issue sets `claimed`, so In progress shows it.
 - Rows are sorted by unresolved time, longest first. The timer colors are the same as in the phone app.
 - The issue number in each row is a button. Tab reaches it and Enter opens the sheet. A click on the row also opens it. J and K move focus between rows when no field or dialog has focus.
@@ -329,7 +350,7 @@ A picture belongs to an account, not to a session. The visibility rule is in [Av
 
 These rules apply:
 
-- The provider calls `avatars.list(sessionId)` when the session or `SessionData.updates` changes, and every 10 seconds. A picture change sends no live signal, so the poll shows the change of another person. A failed read keeps the earlier list. A session change or lost access drops the list. An unchanged list keeps the same map object, so the avatars do not render again.
+- The provider calls `avatars.list(sessionId)` when the session or `SessionData.updates` changes. `updates` counts live signals and session timer ticks. A picture change sends no live signal, so the timer shows the change of another person. A failed read keeps the earlier list. A session change or lost access drops the list. An unchanged list keeps the same map object, so the avatars do not render again.
 - Only the newest read or change sets the list. An upload and a removal set the list themselves. A read that started earlier then cannot bring back the old picture.
 - `PersonAvatar` takes an optional `personId`. It shows the picture through `useAvatarUrl`, and it shows initials when the person has no picture, when the caller cannot see it, or when the browser cannot decode it. The picture has an empty `alt`, because the name stands next to it. A call site that has no person ID shows initials.
 - `AvatarImageCache` downloads a picture when the first avatar on screen asks for it. Every other avatar of that picture shares its object URL. The avatar ID is the cache key. It changes on every upload, so a cached picture never goes stale. The cache revokes the URL of a picture that left the list, and all URLs when the session changes or the provider unmounts. After an upload the cache holds the encoded file, so the new picture needs no download.

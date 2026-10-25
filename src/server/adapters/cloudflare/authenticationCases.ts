@@ -207,7 +207,6 @@ export function registerAuthenticationCases(group: AuthenticationCases) {
         const current = await service.current(headers);
         expect(current?.user.id).toBe(fixture.contestant.accountId);
         expect(current?.status).toMatchObject({ must_change: false, session_valid: true });
-        expect((await service.sessions(headers)).map((session) => session.id)).toEqual([fixture.sessionId]);
       });
 
       it.each(['expired_login', 'expired_identity', 'revoked', 'generation', 'disabled', 'pending'])(
@@ -480,7 +479,6 @@ export function registerAuthenticationCases(group: AuthenticationCases) {
 
       it('requires a live identity cookie rather than browser account data', async () => {
         expect(await service.current(new Headers())).toBeUndefined();
-        await expectFailure(service.sessions(new Headers({ 'X-Account-Id': fixture.staff.accountId }))).toMatchObject({ status: 401 });
       });
 
       it('blocks temporary passwords at session and application reads', async () => {
@@ -488,7 +486,6 @@ export function registerAuthenticationCases(group: AuthenticationCases) {
         const headers = await signIn();
         const current = await service.current(headers);
         expect(current?.status.must_change).toBe(true);
-        await expectFailure(service.sessions(headers)).toMatchObject({ status: 403 });
         // An auth-only target can retain the earlier schema. Check application
         // reads when the complete schema exists.
         if (fullApplication) {
@@ -525,7 +522,6 @@ export function registerAuthenticationCases(group: AuthenticationCases) {
         const fresh = new Headers({ cookie: changed.cookie.split(';')[0] });
 
         expect((await service.current(fresh))?.status).toMatchObject({ must_change: false, session_valid: true });
-        expect((await service.sessions(fresh)).map((session) => session.id)).toEqual([fixture.sessionId]);
         expect(await service.current(headers)).toBeUndefined();
         expect(await attempts()).toBe(9);
         // A failure is the tenth. The username then refuses even the correct password.
@@ -712,8 +708,8 @@ export function registerAuthenticationCases(group: AuthenticationCases) {
           },
         });
         await verifyTemporaryAuthentication(auth, { id: fixture.contestant.accountId, username, password }, {
-          restricted: async () => { await expectFailure(auth.sessions()).toThrow(); },
-          ready: async () => { expect((await auth.sessions()).map((session) => session.id)).toEqual([fixture.sessionId]); },
+          restricted: async () => { expect((await auth.accountStatus()).must_change).toBe(true); },
+          ready: async () => { expect(await auth.accountStatus()).toMatchObject({ must_change: false, session_valid: true }); },
         });
       });
     }

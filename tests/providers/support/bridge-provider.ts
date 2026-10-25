@@ -85,6 +85,7 @@ export function createBrowserProvider(configuration: unknown): BrowserProvider {
       setImageLimits: async () => unsupported(),
       saveMember: async () => unsupported(),
       removeMember: async () => unsupported(),
+      editRoster: async () => unsupported(),
     },
     images: {
       begin: async () => unsupported(),

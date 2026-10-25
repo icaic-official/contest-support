@@ -9,7 +9,7 @@ const flagNames = [
 ] as const;
 
 export type AuthFlags = Record<typeof flagNames[number], boolean> & { wrapperCount: number };
-export type Endpoint = 'auth_session' | 'sign_in' | 'sign_out' | 'change_password' | 'auth_sessions' |
+export type Endpoint = 'auth_session' | 'sign_in' | 'sign_out' | 'change_password' |
   'accounts' | 'sessions' | 'snapshot' | 'workflow' | 'admin' | 'images' | 'image' | 'updates';
 type Method = 'GET' | 'POST' | 'PUT' | 'OTHER';
 
@@ -50,7 +50,7 @@ function endpoint(url: string): Endpoint | undefined {
   const paths: Record<string, Endpoint> = {
     '/api/auth/session': 'auth_session', '/api/auth/sign-in': 'sign_in',
     '/api/auth/sign-out': 'sign_out', '/api/auth/change-password': 'change_password',
-    '/api/auth/sessions': 'auth_sessions', '/api/accounts': 'accounts', '/api/sessions': 'sessions',
+    '/api/accounts': 'accounts', '/api/sessions': 'sessions',
     '/api/snapshot': 'snapshot', '/api/workflow': 'workflow', '/api/admin': 'admin',
     '/api/images': 'images', '/api/updates': 'updates',
   };

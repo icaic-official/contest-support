@@ -199,7 +199,7 @@ Sign in as a volunteer, a specialist, a jury member and an admin.
 8. Change the tab. Check that focus moves to the tab heading.
 9. Check that buttons are at least 44 px high.
 10. Repeat steps 3 to 8 at 320 × 740.
-11. Sign in as an admin without a support role. Open an open issue. Check that the bottom bar shows **Resolve** and no **Claim**, and that one muted line under the buttons says that claiming needs the Volunteer or Specialist role. Sign in as a volunteer. Check that the same issue shows **Claim** and no such line.
+11. Sign in as an admin without a support role. Open an open issue. Check that the bottom bar shows **Reply** and no **Claim**, and that one muted line under the buttons says that claiming needs the Volunteer or Specialist role and that you can still reply and add images. Sign in as a volunteer. Check that the same issue shows **Claim** and no such line.
 12. In a long queue, scroll to a card far down. Make its claim fail, for example when another volunteer claims the issue first. Check that the error stays pinned to the top of the list. Do the same with a lost connection. Check that **Retry last request** stays in view.
 13. Select **Report**. Type a description and add a second team. Close the sheet with a swipe down or a tap on the dimmed page. Select **Report** again. Check that the description, the category and the teams are still there. Send the report. Check that the next report form is empty.
 
@@ -216,7 +216,7 @@ Sign in as the same accounts.
 7. Open resolve, escalate and reopen from the sheet. Check that each opens a dialog and that **Cancel** closes it without an action.
 8. Check that the sheet shows one filled primary action. **Decide award** and **Confirm applied** open the **Outcome & award** tab and move focus to the heading of the award or application section. With a screen reader, check that it reads the heading.
 9. On a resolved issue without an award, open **Outcome & award** and choose **Other amount**. Type an amount and an explanation. Open **Activity**, then open **Outcome & award** again. Check that the amount and the explanation are still there.
-10. Sign in as an admin without a support role. Open an open issue. Check that the sheet shows **Resolve** and no **Claim**, and that one muted line under the buttons says that claiming needs the Volunteer or Specialist role.
+10. Sign in as an admin without a support role. Open an open issue. Check that the sheet shows **Add image** and the reply composer and no **Claim**, and that one muted line under the buttons says that claiming needs the Volunteer or Specialist role and that you can still reply and add images.
 11. In a long queue, scroll to a row far down. Make its claim fail, for example when another volunteer claims the issue first. Check that the error stays pinned to the top of the page. Do the same with a lost connection. Check that **Retry last request** stays in view.
 12. Select **Report for a team**. Type a description and add a second team. Press Escape. Open the dialog again. Check that the description, the category and the teams are still there. Send the report. Check that the next report form is empty.
 

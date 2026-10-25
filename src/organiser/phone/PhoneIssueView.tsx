@@ -277,7 +277,7 @@ export function PhoneIssueView({
               ? "This event is archived."
               : issue.owner_name
                 ? `${issue.owner_name} owns this issue.`
-                : "No action available."}
+                : "No one owns this issue."}
           </p>
         );
     }

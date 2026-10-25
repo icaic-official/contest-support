@@ -285,10 +285,11 @@ export function issueAbilities(
 }
 
 /**
- * A short sentence that tells a staff member why an action is missing, or
+ * A short text that tells a staff member why an action is missing, or
  * undefined when nothing needs explaining. Only people without a volunteer
- * or specialist role get one. They cannot claim an open issue. A non-admin
- * among them also cannot resolve a claimed or escalated issue.
+ * or specialist role get one. They cannot claim an open issue, but they can
+ * reply and add images. A non-admin among them also cannot resolve a claimed
+ * or escalated issue.
  */
 export function missingActionHint(
   issue: Issue,
@@ -301,7 +302,7 @@ export function missingActionHint(
     const fix = member.is_admin
       ? "Add the Volunteer role to your own account in Accounts to claim it."
       : "A session admin can add a role in Accounts.";
-    return `You cannot claim this issue. Claiming needs the Volunteer or Specialist role. ${fix}`;
+    return `You cannot claim this issue. Claiming needs the Volunteer or Specialist role. ${fix} You can still reply and add images.`;
   }
   return member.is_admin
     ? undefined

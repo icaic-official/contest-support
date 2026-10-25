@@ -121,7 +121,10 @@ export function OverviewPage({ props }: { props: ConsolePageProps }) {
           <dl className="grid grid-cols-2 gap-4 sm:grid-cols-4">
             {(
               [
-                [awards.minutes, "minutes decided"],
+                [
+                  awards.minutes,
+                  awards.minutes === 1 ? "minute decided" : "minutes decided",
+                ],
                 [awards.pending, "pending application"],
                 [awards.applied, "applied externally"],
                 [awards.undecided, "resolved, no decision"],

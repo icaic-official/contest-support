@@ -351,7 +351,7 @@ function DemoCard({ position }: { position: Position }) {
           >
             {index < steps.length - 1 && (
               // Joins this dot to the next one across the row gap.
-              <span className="absolute top-3.5 -bottom-4 left-[3.5px] w-px bg-border" />
+              <span className="absolute top-3.5 -bottom-4 left-[3.5px] w-px bg-muted-foreground/40" />
             )}
             <span
               className={cn(

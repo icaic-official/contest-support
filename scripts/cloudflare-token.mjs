@@ -5,7 +5,6 @@ import process from "node:process";
 import { pathToFileURL } from "node:url";
 import { parseEnv } from "node:util";
 
-export const ACCOUNT_ID = "458ad6a930b0fb717796dfa19ca6a2b1";
 export const TOKEN_PREFIX = "minsky-agent-";
 export const DEFAULT_DAYS = 30;
 export const MAX_DAYS = 90;
@@ -20,16 +19,17 @@ const ALLOWED_PERMISSION = new RegExp([
   String.raw`^(Account Analytics|Zone|DNS) Read$`,
   String.raw`^DNS Write$`,
 ].join("|"));
+const ACCOUNT = /^[0-9a-f]{32}$/;
 const ZONE_KEY = /^com\.cloudflare\.api\.account\.zone\.[0-9a-f]{32}$/;
-const R2_BUCKET_KEY = new RegExp(`^com\\.cloudflare\\.edge\\.r2\\.bucket\\.${ACCOUNT_ID}_default_[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$`);
-const ACCOUNT_KEY = `com.cloudflare.api.account.${ACCOUNT_ID}`;
+const R2_BUCKET_NAME = /^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$/;
 
 /**
  * Turns a token request into the body of POST /accounts/{account}/tokens.
  * A request is {purpose, days?, policies: [{permissions: [group names], resources: {key: "*"}}]}.
  * `groups` is the result of GET /accounts/{account}/tokens/permission_groups.
  */
-export function tokenBody(request, groups, now = new Date()) {
+export function tokenBody(request, groups, { accountId, now = new Date() }) {
+  if (!ACCOUNT.test(accountId ?? "")) throw new Error("accountId must be a 32-character Cloudflare account ID.");
   const purpose = String(request?.purpose ?? "");
   if (!/^[a-z0-9]+(-[a-z0-9]+)*$/.test(purpose) || purpose.length > 40) {
     throw new Error("purpose must be 1 to 40 lowercase letters, digits, and single hyphens.");
@@ -52,7 +52,7 @@ export function tokenBody(request, groups, now = new Date()) {
       if (!id) throw new Error(`Unknown permission group "${name}".`);
       return { id };
     });
-    return { effect: "allow", permission_groups, resources: checkedResources(policy.resources) };
+    return { effect: "allow", permission_groups, resources: checkedResources(policy.resources, accountId) };
   });
   const date = now.toISOString().slice(0, 10).replaceAll("-", "");
   const expires = new Date(now.getTime() + days * 86_400_000);
@@ -63,13 +63,16 @@ export function tokenBody(request, groups, now = new Date()) {
   };
 }
 
-function checkedResources(resources) {
+function checkedResources(resources, accountId) {
+  const accountKey = `com.cloudflare.api.account.${accountId}`;
+  const bucketPrefix = `com.cloudflare.edge.r2.bucket.${accountId}_default_`;
   const entries = Object.entries(resources ?? {});
   if (entries.length === 0) throw new Error("Each policy must name at least one resource.");
   for (const [key, value] of entries) {
     if (value !== "*") throw new Error(`Resource ${key} must map to "*". Nested and wildcard scopes are refused.`);
-    if (key !== ACCOUNT_KEY && !ZONE_KEY.test(key) && !R2_BUCKET_KEY.test(key)) {
-      throw new Error(`Resource ${key} is not the Minsky account, one zone, or one R2 bucket in the Minsky account.`);
+    const bucket = key.startsWith(bucketPrefix) && R2_BUCKET_NAME.test(key.slice(bucketPrefix.length));
+    if (key !== accountKey && !ZONE_KEY.test(key) && !bucket) {
+      throw new Error(`Resource ${key} is not this account, one zone, or one R2 bucket in this account.`);
     }
   }
   return Object.fromEntries(entries);
@@ -111,8 +114,20 @@ async function call(key, method, path, body) {
   return json.result;
 }
 
-async function listAgentTokens(key) {
-  const tokens = await call(key, "GET", `/accounts/${ACCOUNT_ID}/tokens?per_page=100`);
+/**
+ * The account comes from CLOUDFLARE_ACCOUNT_ID, or from the one account that the
+ * token-creation key can reach. The script never assumes a particular installation.
+ */
+export async function resolveAccount(key, env = process.env) {
+  const accounts = env.CLOUDFLARE_ACCOUNT_ID ? [{ id: env.CLOUDFLARE_ACCOUNT_ID }] : await call(key, "GET", "/accounts");
+  if (accounts.length !== 1 || !ACCOUNT.test(accounts[0].id)) {
+    throw new Error("Set CLOUDFLARE_ACCOUNT_ID. The token-creation key does not identify exactly one account.");
+  }
+  return accounts[0].id;
+}
+
+async function listAgentTokens(key, accountId) {
+  const tokens = await call(key, "GET", `/accounts/${accountId}/tokens?per_page=100`);
   return tokens.filter(isAgentToken);
 }
 
@@ -122,27 +137,28 @@ async function main([command, ...args]) {
     return index === -1 ? undefined : args[index + 1];
   };
   const key = readAdminKey();
+  const accountId = await resolveAccount(key);
   if (command === "create") {
     const requestFile = args[0];
     const out = option("--out");
     if (!requestFile || !out) throw new Error("Usage: npm run token:create -- <request.json> --out <file>");
     if (existsSync(out)) throw new Error(`${out} already exists. Choose a new file.`);
-    const groups = await call(key, "GET", `/accounts/${ACCOUNT_ID}/tokens/permission_groups?per_page=1000`);
-    const body = tokenBody(JSON.parse(readFileSync(requestFile, "utf8")), groups);
-    const token = await call(key, "POST", `/accounts/${ACCOUNT_ID}/tokens`, body);
+    const groups = await call(key, "GET", `/accounts/${accountId}/tokens/permission_groups?per_page=1000`);
+    const body = tokenBody(JSON.parse(readFileSync(requestFile, "utf8")), groups, { accountId });
+    const token = await call(key, "POST", `/accounts/${accountId}/tokens`, body);
     writeFileSync(out, `${token.value}\n`, { mode: 0o600, flag: "wx" });
     process.stdout.write(`Created ${token.name} (${token.id}), expires ${token.expires_on}. The value is in ${out}.\n`);
   } else if (command === "list") {
-    for (const token of await listAgentTokens(key)) {
+    for (const token of await listAgentTokens(key, accountId)) {
       const scopes = token.policies.map((policy) =>
         `${policy.permission_groups.map((group) => group.name).join(", ")} on ${Object.keys(policy.resources).join(", ")}`);
       process.stdout.write(`${token.name} ${token.id} ${token.status} expires ${token.expires_on}\n  ${scopes.join("\n  ")}\n`);
     }
   } else if (command === "delete") {
     const id = args[0];
-    const token = (await listAgentTokens(key)).find((candidate) => candidate.id === id);
+    const token = (await listAgentTokens(key, accountId)).find((candidate) => candidate.id === id);
     if (!token) throw new Error(`${id} is not a token that an agent created.`);
-    await call(key, "DELETE", `/accounts/${ACCOUNT_ID}/tokens/${id}`);
+    await call(key, "DELETE", `/accounts/${accountId}/tokens/${id}`);
     process.stdout.write(`Deleted ${token.name} (${id}).\n`);
   } else {
     throw new Error("Usage: npm run token:create|token:list|token:delete");

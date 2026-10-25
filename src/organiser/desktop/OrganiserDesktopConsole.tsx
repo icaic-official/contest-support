@@ -29,7 +29,7 @@ import { NoSessionAccess } from "@/screens/NoSessionAccess";
 import { ActionDialog } from "../actions/ActionDialog";
 import { CommandFeedback } from "../actions/ActionSheet";
 import { emptyReply, type ReplyDraft } from "../actions/IssueForms";
-import { ReportForm } from "../actions/ReportForm";
+import { emptyReport, ReportForm } from "../actions/ReportForm";
 import { AdminFeedback } from "../admin/AccountAccess";
 import { type SessionAdmin, useSessionAdmin } from "../admin/useSessionAdmin";
 import {
@@ -142,6 +142,7 @@ export function OrganiserDesktopConsole({
   const [paletteQuery, setPaletteQuery] = useState("");
   const [reportOpen, setReportOpen] = useState(false);
   const [reportTeam, setReportTeam] = useTeamSelection(data.sessionId, state);
+  const [reportDraft, setReportDraft] = useState(emptyReport);
   const [queueTeam, setQueueTeam] = useTeamSelection(data.sessionId, state);
   const [teamPageTeam, setTeamPageTeam] = useState<string>();
   const [replyDrafts, setReplyDrafts] = useState<Record<string, ReplyDraft>>(
@@ -308,6 +309,7 @@ export function OrganiserDesktopConsole({
     workflow.setStatusFilter("all");
     setQueueTeam(initialTeamSelection());
     setReportTeam(initialTeamSelection());
+    setReportDraft(emptyReport);
     setTeamPageTeam(undefined);
     setReportOpen(false);
     setReplyDrafts({});
@@ -516,6 +518,8 @@ export function OrganiserDesktopConsole({
                   command={command}
                   selection={reportTeam}
                   onSelection={setReportTeam}
+                  draft={reportDraft}
+                  onDraft={setReportDraft}
                   onDone={() => setReportOpen(false)}
                 />
               </ActionDialog>

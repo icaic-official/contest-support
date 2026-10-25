@@ -23,6 +23,7 @@ function services() {
       setImageLimits: vi.fn<ApplicationHttpServices['application']['setImageLimits']>(),
       saveMember: vi.fn<ApplicationHttpServices['application']['saveMember']>(),
       removeMember: vi.fn<ApplicationHttpServices['application']['removeMember']>(),
+      editRoster: vi.fn<ApplicationHttpServices['application']['editRoster']>(),
     },
     workflow: { execute: vi.fn<ApplicationHttpServices['workflow']['execute']>().mockResolvedValue({ outcome: 'committed', issueId: requestId }) },
     images: {
@@ -90,6 +91,19 @@ describe('Cloudflare application HTTP boundary', () => {
     deps.auth.current.mockResolvedValueOnce({ ...identity, status: { ...identity.status, must_change: true } });
     expect((await handle(post('/api/admin', body))).status).toBe(403);
     expect(deps.application.setIntake).not.toHaveBeenCalled();
+  });
+
+  it('passes a roster command to the service and accepts 300 teams in one request', async () => {
+    const deps = services();
+    const handle = createApplicationHandler(deps, origin);
+    const teams = Array.from({ length: 300 }, (_, index) => ({
+      id: crypto.randomUUID(), name: `Fictional team number ${index + 1}`, location: `Hall ${index % 7} · Table ${index + 1}` }));
+    const command = { type: 'add_teams', teams };
+    expect((await handle(post('/api/admin', { action: 'edit_roster', sessionId, command }))).status).toBe(200);
+    expect(deps.application.editRoster).toHaveBeenCalledWith(identity.caller, sessionId, command);
+    const invalid = await handle(post('/api/admin', { action: 'edit_roster', sessionId, command, extra: true }));
+    expect(invalid.status).toBe(400);
+    expect(deps.application.editRoster).toHaveBeenCalledTimes(1);
   });
 
   it('bounds UTF-8 JSON bodies before invoking a command', async () => {

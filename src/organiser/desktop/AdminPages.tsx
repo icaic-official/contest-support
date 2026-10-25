@@ -23,6 +23,7 @@ import {
 } from "../admin/AccountAccess";
 import { AssignByIdForm, CreateAccountForm } from "../admin/AccountForms";
 import { CredentialReveal } from "../admin/CredentialReveal";
+import { CategoryEditor, TeamRosterEditor } from "../admin/RosterEditors";
 import { ImageLimitsForm, IntakeSwitch } from "../admin/SessionSettings";
 import {
   accountKind,
@@ -454,16 +455,37 @@ export function SettingsPage({
       />
       <Panel
         title="Categories"
-        description="Contestants choose one of these when they report an issue. A category editor is not available yet."
+        description="Contestants choose one of these when they report an issue. A category that an issue uses stays."
       >
-        <div className="flex flex-wrap gap-2">
-          {session.categories.map((category) => (
-            <Badge key={category} variant="outline">
-              {category}
-            </Badge>
-          ))}
-        </div>
+        <CategoryEditor state={props.state} admin={admin} />
       </Panel>
+    </div>
+  );
+}
+
+/**
+ * The teams of the session. An admin adds many teams from pasted lines, then
+ * renames a team, changes its location or deletes a team that nothing uses.
+ */
+export function RosterPage({
+  props,
+  admin,
+}: {
+  props: ConsolePageProps;
+  admin: SessionAdmin;
+}) {
+  return (
+    <div className="max-w-3xl space-y-6">
+      <PageHeader
+        title="Roster"
+        description={`The teams of ${props.state.session?.name ?? "this session"}. Team accounts and issues use these teams.`}
+      />
+      {admin.archived && (
+        <p role="status" className="rounded-xl border bg-card p-4 text-sm">
+          This event is archived. The roster cannot change.
+        </p>
+      )}
+      <TeamRosterEditor state={props.state} admin={admin} />
     </div>
   );
 }

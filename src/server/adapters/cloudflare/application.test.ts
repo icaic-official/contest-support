@@ -363,8 +363,191 @@ describe('Cloudflare authorized application and administration', () => {
       () => service.setImageLimits(fixture.staff, fixture.sessionId, { fileMegabytes: 1, count: 1, totalMegabytes: 1 }),
       () => service.saveMember(fixture.staff, fixture.sessionId, fixture.specialist.accountId, { teamId: null, roles: ['jury'], isAdmin: false }),
       () => service.removeMember(fixture.staff, fixture.sessionId, fixture.specialist.accountId),
+      () => service.editRoster(fixture.staff, fixture.sessionId, { type: 'add_teams', teams: [{ id: randomUUID(), name: 'Late team', location: '' }] }),
+      () => service.editRoster(fixture.staff, fixture.sessionId, { type: 'update_team', teamId: fixture.teamId, name: 'Renamed', location: '' }),
+      () => service.editRoster(fixture.staff, fixture.sessionId, { type: 'delete_team', teamId: fixture.teamId }),
+      () => service.editRoster(fixture.staff, fixture.sessionId, { type: 'set_categories', categories: ['Only'] }),
     ];
     for (const operation of operations) await expect(operation()).rejects.toMatchObject({ status: 403 });
+  });
+
+  describe('roster editors', () => {
+    const teamRows = () => fixture.rows('SELECT id, name, location FROM teams WHERE session_id = ? ORDER BY id', fixture.sessionId);
+    const categories = async () => JSON.parse((await fixture.rows('SELECT categories FROM sessions WHERE id = ?', fixture.sessionId))[0].categories as string) as string[];
+    const rosterEffects = async () => [await teamRows(), await categories(), ...await adminEffects()];
+    const add = (name: string, location = '', id: string = randomUUID()) => ({ id, name, location });
+
+    it('adds teams in one batch, and a repeated request adds no second team', async () => {
+      const teams = [add('Zeta', 'Hall 1'), add('Eta', 'Hall 2')];
+      await service.editRoster(fixture.staff, fixture.sessionId, { type: 'add_teams', teams });
+      await service.editRoster(fixture.staff, fixture.sessionId, { type: 'add_teams', teams });
+      const view = await service.snapshot(fixture.staff, fixture.sessionId);
+      expect(view.teams.map((team) => [team.name, team.location])).toEqual([
+        ['Eta', 'Hall 2'], ['Fictional Alpha', 'Desk A'], ['Fictional Beta', 'Desk B'], ['Zeta', 'Hall 1']]);
+      expect(view.audit.filter((entry) => entry.action === 'add_teams')).toHaveLength(2);
+      const audiences = await fixture.rows(`SELECT DISTINCT audience FROM notifications WHERE session_id = ? AND audience NOT LIKE 'account:%'`, fixture.sessionId);
+      expect(audiences).toEqual([{ audience: 'staff' }]);
+      expect(await fixture.rows('SELECT * FROM command_assertions')).toEqual([]);
+    });
+
+    it('adds 300 teams in one command', async () => {
+      const teams = Array.from({ length: 300 }, (_, index) => add(`Team ${String(index + 1).padStart(3, '0')}`, `Table ${index + 1}`));
+      await service.editRoster(fixture.staff, fixture.sessionId, { type: 'add_teams', teams });
+      expect((await service.snapshot(fixture.staff, fixture.sessionId)).teams).toHaveLength(302);
+    });
+
+    it.each([
+      ['an existing name in another case', [{ name: '  fictional ALPHA ' }], 409],
+      ['a name twice in one request', [{ name: 'Same' }, { name: 'same' }], 400],
+    ])('rejects %s without effects', async (_label, names, status) => {
+      const before = await rosterEffects();
+      const teams = names.map(({ name }) => add(name));
+      await expect(service.editRoster(fixture.staff, fixture.sessionId, { type: 'add_teams', teams }))
+        .rejects.toMatchObject({ status });
+      expect(await rosterEffects()).toEqual(before);
+    });
+
+    it('rejects a duplicate that lands between the read and the commit', async () => {
+      const before = await teamRows();
+      const racing = competing(() => statement('INSERT INTO teams (id, session_id, name, location) VALUES (?, ?, ?, ?)',
+        randomUUID(), fixture.sessionId, 'Gamma', '').run());
+      await expect(racing.editRoster(fixture.staff, fixture.sessionId, { type: 'add_teams', teams: [add('gamma')] }))
+        .rejects.toMatchObject({ status: 409 });
+      expect((await teamRows()).length).toBe(before.length + 1);
+      expect(await fixture.rows("SELECT 1 FROM teams WHERE session_id = ? AND lower(name) = 'gamma'", fixture.sessionId)).toHaveLength(1);
+      expect(await fixture.rows('SELECT * FROM command_assertions')).toEqual([]);
+    });
+
+    it('rejects a team ID that belongs to another session', async () => {
+      const before = await rosterEffects();
+      await expect(service.editRoster(fixture.staff, fixture.sessionId,
+        { type: 'add_teams', teams: [add('Borrowed', '', fixture.secondSessionTeamId)] })).rejects.toMatchObject({ status: 409 });
+      expect(await rosterEffects()).toEqual(before);
+    });
+
+    it('renames a team and notifies its own contestants', async () => {
+      await service.editRoster(fixture.staff, fixture.sessionId,
+        { type: 'update_team', teamId: fixture.teamId, name: ' Alpha Prime ', location: 'Desk 9' });
+      expect((await service.snapshot(fixture.contestant, fixture.sessionId)).teams)
+        .toEqual([expect.objectContaining({ id: fixture.teamId, name: 'Alpha Prime', location: 'Desk 9' })]);
+      expect((await fixture.rows(`SELECT DISTINCT audience FROM notifications WHERE session_id = ? AND audience NOT LIKE 'account:%' ORDER BY audience`, fixture.sessionId))
+        .map((row) => row.audience)).toEqual(['staff', `team:${fixture.teamId}`].sort());
+      expect((await service.snapshot(fixture.staff, fixture.sessionId)).issues.every((issue) => issue.team_id)).toBe(true);
+    });
+
+    it('keeps a name when only its location changes, and rejects another team\'s name', async () => {
+      await service.editRoster(fixture.staff, fixture.sessionId,
+        { type: 'update_team', teamId: fixture.teamId, name: 'fictional alpha', location: 'Moved' });
+      const before = await rosterEffects();
+      await expect(service.editRoster(fixture.staff, fixture.sessionId,
+        { type: 'update_team', teamId: fixture.teamId, name: 'Fictional BETA', location: '' })).rejects.toMatchObject({ status: 409 });
+      await expect(service.editRoster(fixture.staff, fixture.sessionId,
+        { type: 'update_team', teamId: fixture.secondSessionTeamId, name: 'Elsewhere', location: '' })).rejects.toMatchObject({ status: 409 });
+      expect(await rosterEffects()).toEqual(before);
+    });
+
+    it('deletes a team that has no issue and no account', async () => {
+      const id = randomUUID();
+      await service.editRoster(fixture.staff, fixture.sessionId, { type: 'add_teams', teams: [add('Spare', '', id)] });
+      await service.editRoster(fixture.staff, fixture.sessionId, { type: 'delete_team', teamId: id });
+      expect((await service.snapshot(fixture.staff, fixture.sessionId)).teams.map((team) => team.id)).not.toContain(id);
+      expect(await fixture.rows('SELECT * FROM command_assertions')).toEqual([]);
+    });
+
+    it('keeps a team that has an issue or an account, and says why', async () => {
+      const before = await rosterEffects();
+      await expect(service.editRoster(fixture.staff, fixture.sessionId, { type: 'delete_team', teamId: fixture.teamId }))
+        .rejects.toMatchObject({ status: 409, message: 'Fictional Alpha has 1 issue and stays in the roster.' });
+      const quiet = randomUUID();
+      await service.editRoster(fixture.staff, fixture.sessionId, { type: 'add_teams', teams: [add('Quiet', '', quiet)] });
+      await service.saveMember(fixture.staff, fixture.sessionId, fixture.specialist.accountId, { teamId: quiet, roles: [], isAdmin: false });
+      await expect(service.editRoster(fixture.staff, fixture.sessionId, { type: 'delete_team', teamId: quiet }))
+        .rejects.toMatchObject({ status: 409, message: '1 account belongs to Quiet. Move or remove it first.' });
+      expect(await fixture.rows('SELECT 1 FROM teams WHERE id IN (?, ?)', fixture.teamId, quiet)).toHaveLength(2);
+      expect((await teamRows()).length).toBe(before[0].length + 1);
+    });
+
+    it('keeps a team that receives an issue between the read and the commit', async () => {
+      const id = randomUUID();
+      await service.editRoster(fixture.staff, fixture.sessionId, { type: 'add_teams', teams: [add('Racing', '', id)] });
+      const racing = competing(() => statement(`INSERT INTO issues (id, session_id, team_id, status) VALUES (?, ?, ?, 'open')`,
+        randomUUID(), fixture.sessionId, id).run());
+      await expect(racing.editRoster(fixture.staff, fixture.sessionId, { type: 'delete_team', teamId: id }))
+        .rejects.toMatchObject({ status: 409 });
+      expect(await fixture.rows('SELECT 1 FROM teams WHERE id = ?', id)).toHaveLength(1);
+      expect(await fixture.rows('SELECT 1 FROM issues WHERE team_id = ?', id)).toHaveLength(1);
+      expect(await fixture.rows('SELECT * FROM command_assertions')).toEqual([]);
+    });
+
+    it('replaces the category list, and every contestant is notified', async () => {
+      await service.editRoster(fixture.staff, fixture.sessionId,
+        { type: 'set_categories', categories: ['Other', ' Network ', 'Power'] });
+      expect(await categories()).toEqual(['Other', 'Network', 'Power']);
+      const view = await service.snapshot(fixture.contestant, fixture.sessionId);
+      expect(view.session?.categories).toEqual(['Other', 'Network', 'Power']);
+      expect(view.session?.revision).toBeGreaterThan(1);
+      expect((await fixture.rows(`SELECT DISTINCT audience FROM notifications WHERE session_id = ? AND audience NOT LIKE 'account:%'`, fixture.sessionId))
+        .map((row) => row.audience).sort()).toEqual(['staff', `team:${fixture.teamId}`, `team:${fixture.otherTeamId}`].sort());
+    });
+
+    it('keeps a category that an issue uses, and says why', async () => {
+      const before = await rosterEffects();
+      await expect(service.editRoster(fixture.staff, fixture.sessionId, { type: 'set_categories', categories: ['Devices', 'Backend'] }))
+        .rejects.toMatchObject({ status: 409, message: 'Other has 2 issues and stays in the list.' });
+      expect(await rosterEffects()).toEqual(before);
+    });
+
+    it('does not let a category-less legacy issue block an edit', async () => {
+      await statement("UPDATE issues SET category = '', write_version = write_version + 1 WHERE session_id = ?", fixture.sessionId).run();
+      await service.editRoster(fixture.staff, fixture.sessionId, { type: 'set_categories', categories: ['Only'] });
+      expect(await categories()).toEqual(['Only']);
+    });
+
+    it('keeps a category that an issue starts using between the read and the commit', async () => {
+      const before = await rosterEffects();
+      const racing = competing(() => statement("UPDATE issues SET category = 'Backend', write_version = write_version + 1 WHERE id = ?", fixture.issueId).run());
+      await expect(racing.editRoster(fixture.staff, fixture.sessionId, { type: 'set_categories', categories: ['Other', 'Devices'] }))
+        .rejects.toMatchObject({ status: 409 });
+      expect(await categories()).toEqual(before[1]);
+      expect(await fixture.rows("SELECT 1 FROM issues WHERE id = ? AND category = 'Backend'", fixture.issueId)).toHaveLength(1);
+      expect(await fixture.rows('SELECT * FROM command_assertions')).toEqual([]);
+    });
+
+    it.each([
+      ['an empty team name', { type: 'add_teams', teams: [{ id: randomUUID(), name: '   ', location: '' }] }],
+      ['a team name of 201 characters', { type: 'add_teams', teams: [{ id: randomUUID(), name: 'x'.repeat(201), location: '' }] }],
+      ['a control character', { type: 'add_teams', teams: [{ id: randomUUID(), name: 'Bad\u0000name', location: '' }] }],
+      ['no teams', { type: 'add_teams', teams: [] }],
+      ['301 teams', { type: 'add_teams', teams: Array.from({ length: 301 }, (_, index) => ({ id: randomUUID(), name: `T${index}`, location: '' })) }],
+      ['a team ID that is not a UUID', { type: 'add_teams', teams: [{ id: 'one', name: 'Ok', location: '' }] }],
+      ['an unknown field', { type: 'update_team', teamId: randomUUID(), name: 'Ok', location: '', extra: 1 }],
+      ['an unknown command', { type: 'drop_teams' }],
+      ['an empty category list', { type: 'set_categories', categories: [] }],
+      ['a blank category', { type: 'set_categories', categories: ['Ok', ' '] }],
+      ['categories that differ only by case', { type: 'set_categories', categories: ['Ok', 'ok'] }],
+      ['51 categories', { type: 'set_categories', categories: Array.from({ length: 51 }, (_, index) => `C${index}`) }],
+    ])('rejects %s without effects', async (_label, command) => {
+      const before = await rosterEffects();
+      await expect(service.editRoster(fixture.staff, fixture.sessionId, command)).rejects.toMatchObject({ status: 400 });
+      expect(await rosterEffects()).toEqual(before);
+    });
+
+    it('allows only an admin of this session', async () => {
+      const before = await rosterEffects();
+      const command = { type: 'set_categories', categories: ['Only'] } as const;
+      await expect(service.editRoster(fixture.specialist, fixture.sessionId, command)).rejects.toMatchObject({ status: 403 });
+      await expect(service.editRoster(fixture.contestant, fixture.sessionId, command)).rejects.toMatchObject({ status: 403 });
+      await expect(service.editRoster(fixture.staff, fixture.secondSessionId, command)).rejects.toMatchObject({ status: 403 });
+      expect(await rosterEffects()).toEqual(before);
+    });
+
+    it('rolls back when the admin loses access before the commit', async () => {
+      const before = await rosterEffects();
+      const racing = competing(() => statement('UPDATE memberships SET is_admin = 0 WHERE account_id = ?', fixture.staff.accountId).run());
+      await expect(racing.editRoster(fixture.staff, fixture.sessionId, { type: 'add_teams', teams: [add('Late')] }))
+        .rejects.toMatchObject({ status: 409 });
+      expect(await rosterEffects()).toEqual(before);
+    });
   });
 
   it('uses the trusted login owner instead of a caller account claim', async () => {

@@ -88,6 +88,7 @@ test("the sidebar account card opens the account page and focuses its heading", 
 for (const [path, heading, membership] of [
   ["/administration", "Overview", { ...staff, is_admin: true }],
   ["/administration/accounts", "Accounts", { ...staff, is_admin: true }],
+  ["/administration/roster", "Roster", { ...staff, is_admin: true }],
   [
     "/administration/settings",
     "Session settings",
@@ -191,7 +192,7 @@ test("protected links return an unauthorized member to their issue queue", async
     page
       .getByRole("navigation", { name: "Console pages" })
       .getByRole("button", {
-        name: /^(Award review|Overview|Accounts|Session settings)$/,
+        name: /^(Award review|Overview|Accounts|Roster|Session settings)$/,
       }),
   ).toHaveCount(0);
 });

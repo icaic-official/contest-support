@@ -7,6 +7,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { useNow } from "@/connected/hooks/useNow";
 import { useWorkflowState } from "@/connected/hooks/useWorkflowState";
+import { isRunning } from "@/connected/model";
 import type { ShellProps } from "@/connected/shell";
 import { NoSessionAccess } from "@/screens/NoSessionAccess";
 import { ContestantTopBar } from "./ContestantTopBar";
@@ -228,6 +229,7 @@ export function ContestantApp(props: ShellProps) {
               location={team?.location}
               blocker={blocker}
               locked={command.locked}
+              sending={isRunning(command.running, "submit")}
               draft={reportDraft}
               onDraft={setReportDraft}
               onCancel={closeReport}

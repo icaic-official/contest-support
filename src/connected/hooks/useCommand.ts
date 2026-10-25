@@ -32,6 +32,8 @@ export interface CommandRunner {
   act: Act;
   /** True while a command request runs. */
   busy: boolean;
+  /** The command that runs now, from its start until its refresh ends. */
+  running: Command | undefined;
   /** A command whose result is unknown after a transport failure. */
   pending: Command | undefined;
   /** True while a command runs or waits for a retry. Disable workflow controls. */
@@ -73,7 +75,7 @@ export function useCommand({
   ) => void;
 }): CommandRunner {
   const { actorId, pending: pendingRequest } = useWorkflowRetry();
-  const [busy, setBusy] = useState(false);
+  const [running, setRunning] = useState<Command>();
   const [pending, setPending] = useState(pendingRequest.current?.command);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState(
@@ -110,7 +112,6 @@ export function useCommand({
     if (retry && pendingRequest.current?.actorId !== actorId) return false;
     inFlight.current = true;
     onStart?.();
-    setBusy(true);
     setNotice("");
     setError("");
     const request =
@@ -125,6 +126,7 @@ export function useCommand({
             stayOnPage,
           };
     pendingRequest.current = request;
+    setRunning(request.command);
     setPending(request.command);
     try {
       const { workflows } = backend;
@@ -170,12 +172,14 @@ export function useCommand({
       return false;
     } finally {
       inFlight.current = false;
-      if (mounted.current) setBusy(false);
+      if (mounted.current) setRunning(undefined);
     }
   }
+  const busy = running !== undefined;
   return {
     act,
     busy,
+    running,
     pending,
     locked: busy || !!pending,
     retry: () => {

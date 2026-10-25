@@ -1,6 +1,7 @@
 import { useId, useRef } from "react";
 import { type ImageLimits, useIssueImages } from "./hooks/useIssueImages";
 import type { ImageTransport } from "@/backend/contracts";
+import { Spinner } from "@/components/ui/spinner";
 import type { Attachment, PendingRemoval } from "./model";
 import { Icon } from "./ui";
 
@@ -98,7 +99,13 @@ export function IssueImages({
                 >
                   {thumbs[item.id]
                     ? <img src={thumbs[item.id]} alt="" className="aspect-[4/3] w-full rounded-md bg-muted object-cover" />
-                    : <span className="image-fallback grid aspect-[4/3] w-full place-items-center rounded-md bg-muted text-xs text-muted-foreground">Preview unavailable</span>}
+                    : (
+                      <span className="image-fallback grid aspect-[4/3] w-full place-items-center rounded-md bg-muted text-xs text-muted-foreground">
+                        {thumbs[item.id] === undefined
+                          ? <Spinner className="size-5" />
+                          : "Preview unavailable"}
+                      </span>
+                    )}
                   <span className="image-caption grid min-w-0 gap-0.5 text-xs break-words text-muted-foreground">
                     {item.uploader_name}
                     <time dateTime={item.uploaded_at}>{when}</time>
@@ -227,7 +234,12 @@ export function IssueImages({
                   alt={`Image uploaded by ${active.uploader_name} on ${new Date(active.uploaded_at).toLocaleString()}`}
                 />
               )
-              : <p className="my-3 text-sm text-muted-foreground">Opening image.</p>}
+              : (
+                <p className="my-3 flex items-center gap-2 text-sm text-muted-foreground">
+                  <Spinner className="size-4" />
+                  Opening image.
+                </p>
+              )}
             <div className="image-preview-actions flex flex-wrap gap-3">
               {fullUrl && (
                 <a

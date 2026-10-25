@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   duration,
+  isRunning,
   isStaff,
   type Issue,
   isSupport,
@@ -81,5 +82,16 @@ describe("connected presentation", () => {
     expect(uiKindFor(staff)).toBe("organiser");
     expect(uiKindFor({ ...staff, roles: [], is_admin: true })).toBe("organiser");
     expect(uiKindFor({ ...staff, roles: [], team_id: "team" })).toBe("contestant");
+  });
+  it("shows a running command only on the control of its type and issue", () => {
+    const claim = { type: "claim", issue_id: "a", revision: 1 } as const;
+    expect(isRunning(undefined, "claim")).toBe(false);
+    expect(isRunning(claim, "claim")).toBe(true);
+    expect(isRunning(claim, "claim", "a")).toBe(true);
+    expect(isRunning(claim, "claim", "b")).toBe(false);
+    expect(isRunning(claim, "accept", "a")).toBe(false);
+    const submit = { type: "submit", category: "Backend", description: "x" } as const;
+    expect(isRunning(submit, "submit")).toBe(true);
+    expect(isRunning(submit, "submit", "a")).toBe(false);
   });
 });

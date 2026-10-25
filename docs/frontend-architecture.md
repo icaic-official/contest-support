@@ -171,7 +171,7 @@ They call the `Backend` contracts through `backend`.
 | `useAuthSession()` | Uses `requireBackend().auth`. Restores the stored session and follows sign-in and sign-out. Returns `user`, `loading`, `error` and `signOut`. |
 | `useAccountStatus(userId, live)` | Reads `account_status` on the refresh schedule and on focus. `live` is true while the live channel is connected. Returns `account`, `error` and `recheck()`. |
 | `useSessionSnapshot(userId)` | Loads memberships, the session list and the selected snapshot. Reads run in sequence. A generation counter discards responses for an earlier session. It refreshes on live changes, on focus, when the tab becomes visible and when the browser is online again. Its timer runs every 10 seconds while the live channel is down and every 60 seconds while it is connected. Each tick also adds one to `SessionData.updates`, so announcements and pictures read again. It clears the snapshot after an error. It records the server clock offset. |
-| `useCommand({ sessionId, refresh, onRecorded })` | Runs one workflow command at a time. It uses the actor-bound request from `WorkflowRetryProvider`. An explicit retry retains the original session, request ID, and command. `onSuccess` clears the originating form before refresh while that form remains mounted. |
+| `useCommand({ sessionId, refresh, onRecorded })` | Runs one workflow command at a time. It uses the actor-bound request from `WorkflowRetryProvider`. An explicit retry retains the original session, request ID, and command. `onSuccess` clears the originating form before refresh while that form remains mounted. `running` is the command that runs now, until its refresh ends, and `busy` is true while it is set. |
 | `useWorkflowState(data)` | Combines `useCommand` with the selected issue and the status filter. A recorded command selects its issue when the person did not choose an issue while it ran. An inline queue action does not select its issue. A reopened issue sets the filter to `claimed`. |
 | `useAvatarEditor()` | The steps of changing the caller's own profile picture: choose, preview, save and remove. See [Profile pictures](#profile-pictures). |
 | `useTeamSelection(sessionId, snapshot)` | Holds the team-search choice. A session change clears it. A snapshot without that team, or without staff access, also clears it. |
@@ -506,6 +506,22 @@ The hook keeps the time at which each highlight began. `recentChanges()` drops e
 The page clock `now` advances once each second, so a row keeps `data-changed` for up to two seconds.
 A row that changes again during its highlight does not start the highlight again.
 A row that mounts during that time, for example after a change of status tab, shows the tint again.
+
+### Spinner
+
+`Spinner` in `src/components/ui/spinner.tsx` is a spinning icon for a wait. It is decorative and has `aria-hidden`. Put the status text next to it.
+The reduced-motion rule above stops the spin, so the icon stays still and the text carries the state. The component has no reduced-motion class.
+The sign-in button and the Sonner loading toast use the same component.
+
+Two cases use it:
+
+- **A button whose action runs.** Set `loading` on `Button`. The button shows the spinner in place of its icon and sets `aria-busy`. It does not disable the button, so keep the `disabled` rule of the caller.
+  `loading` has no effect with `asChild`.
+  A workflow command has one flag, `command.busy`, for the whole session. Do not use it for `loading`, because every locked control would spin.
+  Use `isRunning(command.running, type, issueId)` from `src/connected/model.ts` instead. The spinner then shows only on the control that started the running command.
+- **A wait with no content yet.** Put the spinner before the status text, for example "Restoring your session…" in `ConnectedApp.tsx`, the session card in `NoSessionAccess.tsx`, "Loading announcements…" for a manager and "Opening image." in the image preview.
+
+Do not add hidden status text inside a button. A button exposes only its name to a screen reader, so a live region inside it is not announced, and a longer name breaks the exact names that the browser tests use.
 
 ### Rules for new motion
 

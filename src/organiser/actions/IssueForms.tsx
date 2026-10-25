@@ -19,7 +19,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import type { CommandRunner } from "@/connected/hooks/useCommand";
 import { awardMinutePresets, resolutionPresets } from "@/connected/labels";
-import type { Issue } from "@/connected/model";
+import { isRunning, type Issue } from "@/connected/model";
 import { cn } from "@/lib/utils";
 
 /** Props that every issue form shares. */
@@ -206,6 +206,7 @@ export function ReplyForm({
       type="submit"
       className={cn(composer ? "h-9" : "h-11 w-full")}
       disabled={command.locked || !draft.text.trim()}
+      loading={isRunning(command.running, "message", issue.id)}
     >
       {internal ? <Lock aria-hidden="true" /> : <Send aria-hidden="true" />}
       {internal
@@ -326,6 +327,7 @@ export function ResolveForm({ issue, command, onDone }: IssueFormProps) {
         type="submit"
         className="h-11 w-full"
         disabled={command.locked || !summary}
+        loading={isRunning(command.running, "resolve", issue.id)}
       >
         <Check aria-hidden="true" />
         Resolve issue
@@ -349,6 +351,7 @@ export function EscalateForm({ issue, command, onDone }: IssueFormProps) {
         type="button"
         className="h-11 w-full"
         disabled={command.locked}
+        loading={isRunning(command.running, "escalate", issue.id)}
         onClick={() => {
           void command.act(
             { type: "escalate", issue_id: issue.id, revision: issue.revision },
@@ -406,6 +409,7 @@ export function ReopenForm({ issue, command, onDone }: IssueFormProps) {
         type="submit"
         className="h-11 w-full"
         disabled={command.locked || !reason.trim()}
+        loading={isRunning(command.running, "reopen", issue.id)}
       >
         <RotateCcw aria-hidden="true" />
         Reopen issue
@@ -511,6 +515,7 @@ export function AwardForm({ issue, command, onDone }: IssueFormProps) {
         type="submit"
         className="h-11 w-full"
         disabled={command.locked || value === undefined || !explanation.trim()}
+        loading={isRunning(command.running, "award", issue.id)}
       >
         <Scale aria-hidden="true" />
         {value === undefined ? "Record award" : `Record ${value} minutes`}
@@ -559,6 +564,7 @@ export function ApplyForm({ issue, command, onDone }: IssueFormProps) {
         type="submit"
         className="h-11 w-full"
         disabled={command.locked || !confirmed}
+        loading={isRunning(command.running, "apply", issue.id)}
       >
         <CheckCheck aria-hidden="true" />
         Confirm applied externally

@@ -12,6 +12,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Spinner } from "@/components/ui/spinner";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { documentationUrl } from "@/lib/links";
@@ -210,7 +211,8 @@ export function ConnectedApp() {
 
 function StatusMessage({ children }: { children: ReactNode }) {
   return (
-    <p role="status" className="text-muted-foreground">
+    <p role="status" className="flex items-center gap-2 text-muted-foreground">
+      <Spinner className="size-4" />
       {children}
     </p>
   );

@@ -8,6 +8,7 @@ import {
   DialogDescription,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Spinner } from "@/components/ui/spinner";
 import {
   type IssueImagesState,
   useIssueImages,
@@ -52,6 +53,8 @@ export function ImageGallery({
               alt=""
               className="size-full object-cover"
             />
+          ) : images.thumbs[item.id] === undefined ? (
+            <Spinner className="size-5 text-muted-foreground" />
           ) : (
             <ImageOff aria-hidden="true" className="size-5 text-muted-foreground" />
           )}
@@ -166,7 +169,8 @@ export function ImageUploadForm({ images }: { images: IssueImagesState }) {
       </div>
       {images.progress !== undefined && (
         <div className="space-y-1">
-          <p id={`${id}-progress`} className="text-sm">
+          <p id={`${id}-progress`} className="flex items-center gap-2 text-sm">
+            <Spinner className="size-4" />
             Uploading image, {images.progress}%.
           </p>
           <progress
@@ -189,13 +193,23 @@ export function ImageUploadForm({ images }: { images: IssueImagesState }) {
         </p>
       )}
       {!retry && (
-        <Button type="submit" className="h-11 w-full" disabled={busy}>
+        <Button
+          type="submit"
+          className="h-11 w-full"
+          disabled={busy}
+          loading={images.progress !== undefined}
+        >
           <Camera aria-hidden="true" />
           Add image
         </Button>
       )}
       {retry && !retry.cleanupOnly && (
-        <Button type="submit" className="h-11 w-full" disabled={busy}>
+        <Button
+          type="submit"
+          className="h-11 w-full"
+          disabled={busy}
+          loading={images.progress !== undefined}
+        >
           Try the upload again
         </Button>
       )}
@@ -265,7 +279,8 @@ export function ImagePreviewDialog({
                 className="max-h-[60dvh] w-full rounded-lg object-contain"
               />
             ) : (
-              <p className="py-8 text-center text-sm text-muted-foreground">
+              <p className="flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground">
+                <Spinner className="size-4" />
                 Opening image.
               </p>
             )}

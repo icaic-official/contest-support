@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import type { Issue } from "@/connected/model";
+import { isRunning, type Issue } from "@/connected/model";
 import { ActionSheet, CommandFeedback } from "../actions/ActionSheet";
 import {
   ApplyForm,
@@ -204,6 +204,7 @@ export function PhoneIssueView({
           <Button
             className="h-12 flex-1 text-base"
             disabled={disabled}
+            loading={isRunning(command.running, "claim", issue.id)}
             onClick={() => void command.act({ type: "claim", ...base })}
           >
             <Hand aria-hidden="true" />
@@ -215,6 +216,7 @@ export function PhoneIssueView({
           <Button
             className="h-12 flex-1 text-base"
             disabled={disabled}
+            loading={isRunning(command.running, "accept", issue.id)}
             onClick={() => void command.act({ type: "accept", ...base })}
           >
             <Handshake aria-hidden="true" />

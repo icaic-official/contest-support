@@ -1,5 +1,8 @@
-import { describe, expect, it } from 'vitest';
-import { decideWorkflow, equalWorkflowJson, isWorkflowCommand, workflowText, type WorkflowState } from './workflow';
+import { describe, expect, it, vi } from 'vitest';
+import type { Caller } from './authentication';
+import {
+  decideWorkflow, equalWorkflowJson, isWorkflowCommand, workflowText, WorkflowService, type WorkflowPersistence, type WorkflowState,
+} from './workflow';
 
 const issueId = '00000000-0000-4000-8000-000000000001';
 const state: WorkflowState = {
@@ -17,6 +20,31 @@ describe('shared workflow compatibility edges', () => {
     expect(isWorkflowCommand({ type: 'submit', category: 'Backend', description: '😀'.repeat(2001) })).toBe(false);
     expect(isWorkflowCommand({ type: 'submit', category: 'Backend', description: '   ' })).toBe(false);
     expect(isWorkflowCommand({ type: 'submit', category: 'Backend', description: '\t' })).toBe(true);
+  });
+  it('rejects a NUL character anywhere in workflow text before reading the database', async () => {
+    const store = { read: vi.fn(), commit: vi.fn() } satisfies WorkflowPersistence;
+    const service = new WorkflowService(store);
+    const caller = { accountId: 'person' } as Caller;
+    const requestId = '00000000-0000-4000-8000-0000000000a1';
+    const sessionId = '00000000-0000-4000-8000-0000000000b1';
+    const target = { issue_id: issueId, revision: 0 };
+    const commands = (text: string) => [
+      { type: 'submit' as const, category: 'Backend', description: text },
+      { type: 'message' as const, ...target, text, visibility: 'public' as const },
+      { type: 'resolve' as const, ...target, summary: text },
+      { type: 'reopen' as const, ...target, reason: text },
+      { type: 'award' as const, ...target, minutes: 1, explanation: text },
+    ];
+    for (const text of ['\u0000Fixture', 'Fix\u0000ture', 'Fixture\u0000', '\u0000']) {
+      for (const command of commands(text)) {
+        expect(isWorkflowCommand(command)).toBe(false);
+        expect(await service.execute(caller, sessionId, requestId, command)).toEqual({ outcome: 'rejected', reason: 'input' });
+      }
+    }
+    expect(store.read).not.toHaveBeenCalled();
+  });
+  it('keeps other control characters valid because replies can use tabs and new lines', () => {
+    expect(isWorkflowCommand({ type: 'message', issue_id: issueId, revision: 0, text: 'a\tb\nc\u0001', visibility: 'public' })).toBe(true);
   });
   it('ignores a contestant team override even when the unused value is not a UUID', () => {
     const command = { type: 'submit' as const, category: 'Backend', description: 'Fixture', team_id: 'unused-browser-value' };

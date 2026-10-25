@@ -175,6 +175,21 @@ describe('Cloudflare session announcements with local D1 and R2 bindings', () =>
     expect((await read(admin)).announcements).toEqual([]);
   });
 
+  it('rejects a NUL character in a title or details as input, so no database check fails later', async () => {
+    const id = await publish();
+    const edit = { type: 'edit', id, revision: 0, title: 'Edited', details: 'Edited details.', expires_at: null };
+    for (const text of ['\u0000Fixture', 'Fix\u0000ture', 'Fixture\u0000']) {
+      for (const field of ['title', 'details']) {
+        await expect(publish(admin, { [field]: text })).rejects.toMatchObject({
+          reason: 'input', message: 'Check the announcement title, details, and expiry.',
+        });
+        await expect(service.execute(admin, fixture.sessionId, randomUUID(), { ...edit, [field]: text }))
+          .rejects.toMatchObject({ reason: 'input' });
+      }
+    }
+    expect((await read(admin)).announcements).toMatchObject([{ id, title: 'Fictional title', revision: 0 }]);
+  });
+
   it('repeats a request ID without a second write and rejects a different command', async () => {
     const requestId = randomUUID();
     const first = await service.execute(admin, fixture.sessionId, requestId, publishCommand());

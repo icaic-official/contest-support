@@ -525,6 +525,25 @@ describe("D1 workflow persistence", () => {
       await expectNoAssertions();
     });
 
+    it('rejects a NUL character in resolve, reopen, and award text, and accepts the next command', async () => {
+      await giveJury();
+      expect(await command(claim())).toEqual({ outcome: 'committed', issueId: fixture.issueId });
+      const rejected = { outcome: 'rejected', reason: 'input' };
+      for (const text of ['\u0000Fixed', 'Fi\u0000xed', 'Fixed\u0000']) {
+        expect(await command({ type: 'resolve', issue_id: fixture.issueId, revision: 2, summary: text })).toEqual(rejected);
+      }
+      expect(await command({ type: 'resolve', issue_id: fixture.issueId, revision: 2, summary: 'Fixed fixture' }))
+        .toEqual({ outcome: 'committed', issueId: fixture.issueId });
+      for (const text of ['\u0000Fixture delay', 'Fixture\u0000 delay']) {
+        expect(await command({ type: 'award', issue_id: fixture.issueId, revision: 3, minutes: 1, explanation: text })).toEqual(rejected);
+        expect(await command({ type: 'reopen', issue_id: fixture.issueId, revision: 3, reason: text })).toEqual(rejected);
+      }
+      expect(await fixture.rows('SELECT id FROM awards WHERE issue_id = ?', fixture.issueId)).toEqual([]);
+      expect(await command({ type: 'reopen', issue_id: fixture.issueId, revision: 3, reason: 'Fixture recurred' }))
+        .toEqual({ outcome: 'committed', issueId: fixture.issueId });
+      await expectNoAssertions();
+    });
+
     it('assigns unique persisted numbers to concurrent submissions and replays a lost submission response', async () => {
       await fixture.statement('UPDATE sessions SET intake_open = 1 WHERE id = ?', fixture.sessionId).run();
       const input: Command = { type: 'submit', category: 'Other', description: 'Fictional new issue' };

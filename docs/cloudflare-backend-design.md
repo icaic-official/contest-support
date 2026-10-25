@@ -355,6 +355,7 @@ The Worker runs before static assets. Cloudflare does not apply a `_headers` fil
 | `X-Content-Type-Options` | Every response | `nosniff` |
 | `Referrer-Policy` | Every response | `no-referrer` |
 | `X-Frame-Options`, `Permissions-Policy` | HTML documents | `DENY`; camera, microphone, location, and payment off |
+| `Cache-Control` | Built files named `/assets/<name>-<hash>.<extension>` | `public, max-age=31536000, immutable` |
 
 The policy allows two things that a stricter policy would block:
 
@@ -363,6 +364,11 @@ The policy allows two things that a stricter policy would block:
 
 The browser app turns off Zod's code generation (`src/lib/zodConfig.ts`, the first import of `src/main.tsx`). Zod would otherwise call `new Function` once to test for eval. The policy blocks that call and the browser reports a violation.
 The local browser journey (`npm run test:connector:ui:local`) fails if any page reports a policy violation.
+
+Vite puts a content hash in the name of every built file under `/assets/`, so a new build never reuses a URL. The Worker caches those files for a year.
+Every other asset keeps the `Cache-Control` value that Cloudflare sends, `public, max-age=0, must-revalidate`.
+This includes `/`, `/favicon.svg`, and the files in `/fonts/`.
+The single-page fallback answers a missing `/assets/` name with the HTML shell and status 200, so the Worker does not cache an HTML response or an error response for a year.
 
 ## Separate installation and activation
 

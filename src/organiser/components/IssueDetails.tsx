@@ -72,7 +72,12 @@ export function IssueTimers({
   );
 }
 
-const lifecycleSteps = ["Submitted", "Claimed", "Specialist", "Resolved"];
+const lifecycleSteps = [
+  { label: "Submitted" },
+  { label: "Claimed" },
+  { label: "Specialist", optional: true },
+  { label: "Resolved" },
+];
 const lifecycleIndex: Record<Issue["status"], number> = {
   open: 0,
   claimed: 1,
@@ -98,6 +103,10 @@ export function lifecycleDetails(issue: Issue): string[] {
 
 /**
  * Four steps from submission to resolution. The current step is marked.
+ * The specialist step is optional: an owner can resolve without a handoff.
+ * Status alone cannot show that a handoff happened, because accepting it
+ * returns the issue to "claimed". So the step is solid only while a handoff
+ * waits, and dashed otherwise.
  * `details` adds one line under each step label.
  */
 export function LifecycleBar({
@@ -110,33 +119,41 @@ export function LifecycleBar({
   const at = lifecycleIndex[status];
   return (
     <ol className="grid grid-cols-4 gap-1" aria-label="Issue progress">
-      {lifecycleSteps.map((label, index) => (
-        <li key={label} aria-current={index === at ? "step" : undefined}>
-          <div
-            className={cn(
-              "h-1.5 rounded-full",
-              index < at || (index === at && status === "resolved")
-                ? "bg-primary"
-                : index === at
-                  ? "bg-primary/50"
-                  : "bg-muted",
-            )}
-          />
-          <div
-            className={cn(
-              "mt-1 text-[11px]",
-              index <= at ? "font-medium" : "text-muted-foreground",
-            )}
-          >
-            {label}
-          </div>
-          {details && (
-            <div className="font-mono text-[11px] text-muted-foreground">
-              {details[index]}
+      {lifecycleSteps.map(({ label, optional }, index) => {
+        const skipped = optional && index !== at;
+        return (
+          <li key={label} aria-current={index === at ? "step" : undefined}>
+            <div
+              className={cn(
+                "h-1.5 rounded-full",
+                skipped
+                  ? "bg-[repeating-linear-gradient(90deg,var(--muted-foreground)_0_4px,transparent_4px_8px)] opacity-40"
+                  : index < at || (index === at && status === "resolved")
+                    ? "bg-primary"
+                    : index === at
+                      ? "bg-primary/50"
+                      : "bg-muted",
+              )}
+            />
+            <div
+              className={cn(
+                "mt-1 text-[11px]",
+                index <= at && !skipped ? "font-medium" : "text-muted-foreground",
+              )}
+            >
+              {label}
+              {optional && (
+                <span className="ml-1 text-[10px] font-normal">optional</span>
+              )}
             </div>
-          )}
-        </li>
-      ))}
+            {details && (
+              <div className="font-mono text-[11px] text-muted-foreground">
+                {details[index]}
+              </div>
+            )}
+          </li>
+        );
+      })}
     </ol>
   );
 }

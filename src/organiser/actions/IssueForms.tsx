@@ -342,8 +342,10 @@ export function EscalateForm({ issue, command, onDone }: IssueFormProps) {
   return (
     <div className="space-y-3">
       <p className="text-sm text-muted-foreground">
-        Specialists get a handoff request. You stay the owner until one
-        accepts. Add an internal note with Reply so they know what you tried.
+        Optional. If you can fix this yourself, resolve it instead. A
+        handoff sends a request to the specialists. You stay the owner until
+        one accepts. Add an internal note with Reply so they know what you
+        tried.
       </p>
       <Button
         type="button"

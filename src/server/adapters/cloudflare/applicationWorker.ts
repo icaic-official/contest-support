@@ -12,6 +12,7 @@ import { R2AnnouncementImageService } from './announcementImages';
 import { R2AvatarService } from './avatars';
 import { createApplicationHandler, privateJson } from './http';
 import { logEvent, requestFields } from './log';
+import { withSecurityHeaders } from './securityHeaders';
 import { connectLive, dispatchNotifications, maintainFixtureSessions, type LiveEnvironment } from './live';
 
 export { SessionLiveCoordinator } from './live';
@@ -51,9 +52,9 @@ export default {
     const path = new URL(request.url).pathname;
     if (path !== '/api' && !path.startsWith('/api/')) {
       if (/^\/(?:\.|src(?:\/|$)|supabase(?:\/|$)|scripts(?:\/|$)|node_modules(?:\/|$))/.test(path)) {
-        return new Response(null, { status: 404 });
+        return withSecurityHeaders(new Response(null, { status: 404 }), request.url);
       }
-      return env.ASSETS.fetch(request);
+      return withSecurityHeaders(await env.ASSETS.fetch(request), request.url);
     }
     try {
       let response: Response;

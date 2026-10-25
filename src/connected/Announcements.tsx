@@ -396,8 +396,8 @@ export function Announcements({ data }: { data: SessionData }) {
 /**
  * Focus for an inline confirmation. Opening it shows the whole prompt in the
  * scrolling strip and focuses its safe choice. When the closed prompt took
- * focus with it, focus returns to the control that opened it. Opening another
- * prompt closes this one, and focus stays in the new prompt.
+ * focus with it, focus returns to the control that opened it. Focus that has
+ * moved elsewhere, for example into another prompt, stays there.
  */
 function useConfirmFocus(confirming: boolean) {
   const trigger = useRef<HTMLButtonElement>(null);

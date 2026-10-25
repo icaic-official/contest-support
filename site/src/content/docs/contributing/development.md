@@ -42,7 +42,7 @@ See the repository's [frontend architecture](https://github.com/GiftedNovaHD/min
 | `npm run check:functions` | Supabase functions (Deno) |
 | `npm run test:functions` | Attachment and announcement image functions with fake clients |
 | `npm run build` | Production build |
-| `npm run test:e2e` | Browser UI with mocked Supabase responses. The suite sets `VITE_BACKEND=supabase`. |
+| `npm run test:e2e` | Browser UI with the Cloudflare client. The test process serves the real Worker routes with local data. Set `PLAYWRIGHT_PORT` to use a port other than 4173. |
 
 Run `npx playwright install chromium` once before browser tests.
 Hosted test commands need isolated CI resources. Check their targets first, and never point them at real data. See [README.md](https://github.com/GiftedNovaHD/minsky#checks-and-common-commands) for the full list.

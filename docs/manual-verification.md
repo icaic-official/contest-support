@@ -135,7 +135,7 @@ Check submission retries through account-check failures:
 With isolated contestant memberships in two sessions, lose a submission response and remove the original session membership.
 Let the page select the remaining session. Retry the request and check that the server rejects access to the original session.
 Check that the remaining session contains no copy of the submitted issue.
-The cases in `tests/workflow-session-retry.spec.ts` exercise these session checks through the embedded PostgreSQL fixture.
+The cases in `tests/workflow-session-retry.spec.ts` exercise these session checks through the Cloudflare services on local D1.
 
 ## 5. Resolution and award
 

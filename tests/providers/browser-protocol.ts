@@ -51,6 +51,7 @@ export type Request =
     member: MembershipInput;
   }
   | { type: 'removeMember'; sessionId: string; userId: string }
+  | { type: 'editRoster'; sessionId: string; command: Parameters<Backend['admin']['editRoster']>[1] }
   | { type: 'beginImage'; input: Parameters<Backend['images']['begin']>[0] }
   | {
     type: 'uploadImage';

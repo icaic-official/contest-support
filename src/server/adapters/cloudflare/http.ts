@@ -20,6 +20,7 @@ const adminSchema = z.discriminatedUnion('action', [
   z.strictObject({ action: z.literal('set_image_limits'), sessionId: uuid, limits: z.strictObject({ fileMegabytes: z.number(), count: z.number(), totalMegabytes: z.number() }) }),
   z.strictObject({ action: z.literal('save_member'), sessionId: uuid, userId: uuid, member }),
   z.strictObject({ action: z.literal('remove_member'), sessionId: uuid, userId: uuid }),
+  z.strictObject({ action: z.literal('edit_roster'), sessionId: uuid, command: z.unknown() }),
 ]);
 const workflowSchema = z.strictObject({ sessionId: uuid, requestId: uuid, command: z.unknown() });
 const imageSchema = z.discriminatedUnion('action', [
@@ -38,6 +39,8 @@ const avatarCommandSchema = z.strictObject({ action: z.literal('remove') });
 const avatarPathSchema = z.tuple([uuid, uuid]);
 // Announcement text can use 10,000 characters of up to four bytes each.
 const announcementBodyLimit = 65_536;
+// A roster command can add 300 teams in one request.
+const adminBodyLimit = 131_072;
 
 export const privateHeaders = {
   ...baseSecurityHeaders,
@@ -52,7 +55,7 @@ export function privateJson(body: unknown, status = 200): Response {
 
 export interface ApplicationHttpServices {
   auth: Pick<AuthenticationService, 'current'>;
-  application: Pick<D1ApplicationService, 'sessions' | 'snapshot' | 'setIntake' | 'setImageLimits' | 'saveMember' | 'removeMember'>;
+  application: Pick<D1ApplicationService, 'sessions' | 'snapshot' | 'setIntake' | 'setImageLimits' | 'saveMember' | 'removeMember' | 'editRoster'>;
   workflow: Pick<WorkflowService, 'execute'>;
   images: Pick<R2ImageService, 'begin' | 'upload' | 'finish' | 'remove' | 'download'>;
   announcements: Pick<D1AnnouncementService, 'snapshot' | 'execute'>;
@@ -78,7 +81,7 @@ export function createApplicationHandler(services: ApplicationHttpServices, orig
       if (current.status.must_change || !current.status.session_valid) throw new AuthenticationError(403, 'Change your temporary password first.');
       const caller = current.caller;
       if (request.method === 'GET') {
-        if (url.pathname === '/api/sessions' || url.pathname === '/api/auth/sessions') return privateJson(await services.application.sessions(caller));
+        if (url.pathname === '/api/sessions') return privateJson(await services.application.sessions(caller));
         if (url.pathname === '/api/snapshot' || url.pathname === '/api/updates') {
           const sessionId = uuid.parse(url.searchParams.get('sessionId'));
           if (url.pathname === '/api/snapshot') return privateJson(await services.application.snapshot(caller, sessionId));
@@ -136,7 +139,8 @@ export function createApplicationHandler(services: ApplicationHttpServices, orig
       if (request.headers.get('Content-Type')?.split(';')[0].trim().toLowerCase() !== 'application/json') {
         throw new AuthenticationError(400, 'A JSON request body is required.');
       }
-      const body = await readJsonBody(request, url.pathname === '/api/announcements' ? announcementBodyLimit : undefined);
+      const body = await readJsonBody(request, url.pathname === '/api/announcements' ? announcementBodyLimit
+        : url.pathname === '/api/admin' ? adminBodyLimit : undefined);
       if (url.pathname === '/api/workflow') {
         const parsed = workflowSchema.safeParse(body);
         if (!parsed.success) return privateJson({ outcome: 'rejected', reason: 'input' }, 400);
@@ -182,6 +186,7 @@ export function createApplicationHandler(services: ApplicationHttpServices, orig
           case 'set_image_limits': await services.application.setImageLimits(caller, command.sessionId, command.limits); break;
           case 'save_member': await services.application.saveMember(caller, command.sessionId, command.userId, command.member); break;
           case 'remove_member': await services.application.removeMember(caller, command.sessionId, command.userId); break;
+          case 'edit_roster': await services.application.editRoster(caller, command.sessionId, command.command); break;
         }
         return privateJson({});
       }

@@ -35,10 +35,18 @@ The [D1 store](../src/server/adapters/d1/store.ts) persists all nine `WorkflowSe
 Its batches recheck credentials, generation, identity-session expiry, application-login expiry, current permissions, and captured state.
 One database timestamp supplies each workflow commit's ledger and history records.
 State, receipts, history, resolutions, awards, and audience notifications commit together.
-The complete schema adds migrations `0005` through `0012` to the authentication foundation.
+The complete schema adds migrations `0005` through `0013` to the authentication foundation.
 
 [D1ApplicationService](../src/server/adapters/cloudflare/application.ts) returns each authorized snapshot in one database statement.
-Migration `0012` indexes `history(issue_id, at)`. [The query plan test](../src/server/adapters/d1/queryPlans.test.ts) fails if a snapshot query scans a table.
+Migration `0012` indexes `history(issue_id, at)`.
+Migration `0013` indexes `memberships(account_id, session_id)` and `issues(session_id, team_id)`.
+The snapshot evaluates the caller's access once, and finds a contestant's issues through the team index.
+It reads images from the visible issues, not from every image in the database.
+It reads the member list only for an administrator.
+For a session with 1,200 accounts and 100 issues, a contestant snapshot read 196 rows, where it read 9,712 before.
+The sessions list read 7 rows, where it read 1,205 before.
+[The query plan test](../src/server/adapters/d1/queryPlans.test.ts) fails if a snapshot query scans a table or loses these indexes.
+[The read volume test](../src/server/adapters/d1/readVolume.test.ts) fails if the rows read on that session grow again.
 Snapshots preserve names, timestamps, history, awards, image metadata, limits, and administrator records.
 A valid login with removed membership receives an empty snapshot with null membership.
 An invalid login cannot authorize that read.
@@ -160,6 +168,18 @@ The result contains `temporaryPassword` when the action creates replacement cred
 `setIntake()` changes contestant intake.
 `setImageLimits()` sets the file size, image count, and combined size.
 The size inputs use the existing UI convention of 1,048,576 bytes per MB.
+`editRoster(sessionId, command)` takes a `RosterCommand`:
+
+| Command | Effect |
+| --- | --- |
+| `add_teams` | Adds 1 to 300 teams. Each team carries a client ID, a name, and a location. A repeated ID adds no second team. |
+| `update_team` | Sets the name and the location of one team. |
+| `delete_team` | Deletes a team that has no issue and no account. |
+| `set_categories` | Replaces the ordered category list. |
+
+Only an admin of an active session edits its roster. Names are 1 to 200 characters. Two teams cannot share a name, and two categories cannot share a name. Minsky ignores capital letters, Unicode form, and spaces at the ends when it compares names.
+A team that has an issue or an account stays. A category that an issue uses stays. The rejection names the reason.
+The Worker checks each rule before the write for a clear message. It checks each rule again in the same batch as the write, so a change that lands in between rolls the batch back.
 
 Account resets and username changes require admin access to every affected session.
 The browser adapter does not implement those checks.
@@ -208,7 +228,7 @@ Failures use `ImageRequestError`. `validation` marks a rejected file or request.
 
 The issue snapshot and its `members` list do not contain pictures.
 A picture change sends no live signal.
-The frontend reads `list()` again after each live signal and every 10 seconds. Other people then see a changed picture after their next read.
+The frontend reads `list()` again after each live signal and on the session timer. The timer runs every 10 seconds while the live channel is down and every 60 seconds while it is connected. Other people then see a changed picture after their next read.
 
 The Cloudflare route checks the given session before and after it reads R2.
 See [Cloudflare account avatars](cloudflare-backend-design.md#account-avatars-use-the-private-image-bucket).

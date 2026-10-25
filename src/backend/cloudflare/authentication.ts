@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type {
   AccountCommand, AccountIdentity, AccountResult, Authentication,
-  SessionSummary, Unsubscribe,
+  Unsubscribe,
 } from '../contracts';
 
 const identitySchema = z.object({ id: z.uuid(), name: z.string().optional(), email: z.string().optional() });
@@ -10,13 +10,11 @@ const sessionSchema = z.object({
   status: z.object({ username: z.string().nullable(), must_change: z.boolean(), session_valid: z.boolean() }),
   csrf: z.string().min(1),
 });
-const sessionsSchema = z.array(z.object({ id: z.uuid(), name: z.string() }));
 const resultSchema = z.object({ temporaryPassword: z.string().optional() });
 const errorSchema = z.object({ error: z.string() });
 
 export interface CloudflareAuthentication extends Authentication {
   account(sessionId: string, command: AccountCommand): Promise<AccountResult>;
-  sessions(): Promise<SessionSummary[]>;
   /**
    * Sends a request with the login's CSRF token. The token comes from the
    * last session read and is reused until the login changes. A 403 reply
@@ -190,11 +188,6 @@ export function createCloudflareAuthentication(options: {
     },
     async account(sessionId, command) {
       return resultSchema.parse(await (await mutate('/api/accounts', { sessionId, command })).json());
-    },
-    async sessions() {
-      const response = await read('/api/auth/sessions');
-      if (response.status === 401) throw new Error('Sign in to continue.');
-      return sessionsSchema.parse(await response.json());
     },
   };
 }

@@ -3,7 +3,7 @@ import { WorkflowService } from '../../workflow';
 import { D1ApplicationStore } from '../d1/store';
 import authenticationWorker from './worker';
 import { D1AuthenticationService } from './authentication';
-import { createBetterAuthIdentity } from './identity';
+import { sharedBetterAuthIdentity } from './identity';
 import { passwordHasher } from './password';
 import { D1ApplicationService } from './application';
 import { R2ImageService, type PrivateBucket } from './images';
@@ -32,7 +32,7 @@ export interface ApplicationEnvironment extends LiveEnvironment {
 interface ExecutionContext { waitUntil(operation: Promise<unknown>): void }
 
 function authentication(env: ApplicationEnvironment) {
-  const identity = createBetterAuthIdentity(env.DB as Parameters<typeof createBetterAuthIdentity>[0], {
+  const identity = sharedBetterAuthIdentity(env.DB as Parameters<typeof sharedBetterAuthIdentity>[0], {
     origin: env.AUTH_ORIGIN, secret: env.AUTH_SECRET, secureCookies: true,
   });
   return new D1AuthenticationService(env.DB, identity, passwordHasher);
@@ -58,7 +58,7 @@ export default {
     }
     try {
       let response: Response;
-      if (path === '/api/accounts' || path.startsWith('/api/auth/') && path !== '/api/auth/sessions') {
+      if (path === '/api/accounts' || path.startsWith('/api/auth/')) {
         if (path === '/api/auth/sign-in' && request.method === 'POST' &&
             !(await env.DB.prepare('SELECT 1 FROM accounts LIMIT 1').first())) {
           // Public traffic must not create rate-limit rows that make an empty

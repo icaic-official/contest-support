@@ -293,12 +293,4 @@ describe('Cloudflare browser authentication transport', () => {
     } finally { first(); second(); }
   });
 
-  it('validates session lists and preserves server authorization rejection', async () => {
-    const allowed = setup(() => json([{ id: SESSION_ID, name: 'Fictional session' }]));
-    await expect(allowed.auth.sessions()).resolves.toEqual([{ id: SESSION_ID, name: 'Fictional session' }]);
-    const rejected = setup(() => json({ error: 'Change your password first.' }, 403));
-    await expect(rejected.auth.sessions()).rejects.toThrow('Change your password');
-    const malformed = setup(() => json([{ id: 'not-an-id', name: 'Test' }]));
-    await expect(malformed.auth.sessions()).rejects.toThrow();
-  });
 });

@@ -1,6 +1,7 @@
 import { test as base, expect, type BrowserContext, type Page, type WebSocketRoute } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
-import type { PersonAvatar } from '../../src/backend/contracts';
+import type { PersonAvatar, RosterCommand } from '../../src/backend/contracts';
+import { rosterCommandSchema } from '../../src/connected/roster';
 import type { AnnouncementSnapshot } from '../../src/connected/announcementModel';
 import type { Command, Membership, Snapshot } from '../../src/connected/model';
 import { AuthenticationError, type AuthenticationService, type AuthenticationSession } from '../../src/server/authentication';
@@ -64,15 +65,11 @@ class FixtureIdentity implements AuthenticationService {
   async account(): Promise<{ temporaryPassword?: string }> {
     return {};
   }
-
-  async sessions(): Promise<never> {
-    throw new AuthenticationError(403, 'The application routes list sessions.');
-  }
 }
 
 /** The request paths that the deployed Worker sends to its authentication handler. */
 function authenticationPath(path: string): boolean {
-  return path === '/api/accounts' || (path.startsWith('/api/auth/') && path !== '/api/auth/sessions');
+  return path === '/api/accounts' || path.startsWith('/api/auth/');
 }
 
 /**
@@ -253,6 +250,9 @@ export class FakeWorker extends FixtureWorker {
   workflow: (command: Command, requestId: string) => Promise<CommandResult> = async (command) =>
     ({ outcome: 'committed', issueId: 'issue_id' in command ? command.issue_id : randomUUID() });
 
+  /** Receives each roster command, parsed as the Worker parses it. Throw an AuthenticationError to reject. */
+  roster: (sessionId: string, command: RosterCommand) => Promise<void> = async () => {};
+
   protected accounts(): readonly FixtureAccount[] {
     return this.account ? [this.account] : [];
   }
@@ -272,6 +272,7 @@ export class FakeWorker extends FixtureWorker {
       setImageLimits: async () => {},
       saveMember: async () => {},
       removeMember: async () => {},
+      editRoster: async (_caller, sessionId, command) => this.roster(sessionId, rosterCommandSchema.parse(command)),
     },
     workflow: { execute: (_caller, _sessionId, requestId, command) => this.workflow(command as Command, requestId) },
     announcements: {

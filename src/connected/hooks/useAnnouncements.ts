@@ -73,13 +73,9 @@ export function useAnnouncements(
 
   useEffect(() => {
     if (!sessionId || !allowed) return;
+    // `updates` also counts the session timer, which applies server-side expiry.
     void refresh();
-    // The poll also applies server-side expiry after a refresh or reconnect.
-    const interval = window.setInterval(() => void refresh(), 10000);
-    return () => {
-      window.clearInterval(interval);
-      current.current?.abort();
-    };
+    return () => current.current?.abort();
   }, [refresh, sessionId, allowed, updates]);
 
   const execute = useCallback(

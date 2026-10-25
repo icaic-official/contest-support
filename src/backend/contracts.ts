@@ -83,6 +83,24 @@ export interface AccountResult {
   temporaryPassword?: string;
 }
 
+/** A team of a roster edit. The browser chooses the ID, so a retry adds no second team. */
+export interface NewTeam {
+  id: string;
+  name: string;
+  location: string;
+}
+
+/**
+ * One roster edit by a session admin. A team that has an issue or an account
+ * stays. A category that an issue uses stays. `set_categories` replaces the
+ * whole ordered list.
+ */
+export type RosterCommand =
+  | { type: 'add_teams'; teams: NewTeam[] }
+  | { type: 'update_team'; teamId: string; name: string; location: string }
+  | { type: 'delete_team'; teamId: string }
+  | { type: 'set_categories'; categories: string[] };
+
 export interface Administration {
   account(sessionId: string, command: AccountCommand): Promise<AccountResult>;
   setIntake(sessionId: string, open: boolean): Promise<void>;
@@ -96,6 +114,8 @@ export interface Administration {
     member: MembershipInput,
   ): Promise<void>;
   removeMember(sessionId: string, userId: string): Promise<void>;
+  /** Rejects with the reason when the edit would remove a team or category that is in use. */
+  editRoster(sessionId: string, command: RosterCommand): Promise<void>;
 }
 
 export interface StartedImage {

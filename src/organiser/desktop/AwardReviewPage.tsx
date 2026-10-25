@@ -1,4 +1,8 @@
 import { useState } from "react";
+import {
+  pillIndicator,
+  SlidingIndicator,
+} from "@/components/ui/sliding-indicator";
 import { cn } from "@/lib/utils";
 import { clockDuration } from "@/connected/ui";
 import { ApplyForm, AwardForm } from "../actions/IssueForms";
@@ -34,8 +38,9 @@ export function AwardReviewPage({ props }: { props: ConsolePageProps }) {
       <div
         role="group"
         aria-label="Award lists"
-        className="inline-flex gap-1 rounded-lg bg-muted p-1"
+        className="relative isolate inline-flex gap-1 rounded-lg bg-muted p-1"
       >
+        <SlidingIndicator className={pillIndicator} />
         {awardListOrder.map((value) => (
           <button
             key={value}
@@ -43,8 +48,8 @@ export function AwardReviewPage({ props }: { props: ConsolePageProps }) {
             aria-pressed={list === value}
             onClick={() => setList(value)}
             className={cn(
-              "h-8 rounded-md px-3 text-sm font-medium text-muted-foreground outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50",
-              list === value && "bg-background text-foreground shadow-sm",
+              "h-8 rounded-md px-3 text-sm font-medium text-muted-foreground outline-none transition-colors duration-(--motion-base) ease-out focus-visible:ring-[3px] focus-visible:ring-ring/50",
+              list === value && "text-foreground",
             )}
           >
             {awardListLabels[value]}{" "}

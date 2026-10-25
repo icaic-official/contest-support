@@ -1,48 +1,20 @@
 import { defineConfig } from "@playwright/test";
 
-// Specs that already run against the Cloudflare Worker fixture.
-const cloudflare = [
-  "landing.spec.ts",
-  "images.spec.ts",
-  "skip-link.spec.ts",
-  "ui-selection.spec.ts",
-  "team-search.spec.ts",
-  "workspace-refresh.spec.ts",
-  "avatars.spec.ts",
-  "jury-worklist.spec.ts",
-  "workflow-session-retry.spec.ts",
-  "announcements.spec.ts",
-  "journey.spec.ts",
-];
-
-const ignored = ["cloud/**", "providers/**", "auth/**", "workflow/**", "connector/**"];
+// Parallel checkouts can each run the suite. Give each one its own port.
+const port = Number(process.env.PLAYWRIGHT_PORT ?? 4173);
+const origin = `http://127.0.0.1:${port}`;
 
 export default defineConfig({
   testDir: "./tests",
-  testIgnore: ignored,
+  testIgnore: ["cloud/**", "providers/**", "auth/**", "workflow/**", "connector/**"],
   fullyParallel: true,
-  use: { trace: "retain-on-failure" },
-  projects: [
-    { name: "cloudflare", testMatch: cloudflare, use: { baseURL: "http://127.0.0.1:4176" } },
-    { name: "supabase", testIgnore: [...ignored, ...cloudflare], use: { baseURL: "http://127.0.0.1:4175" } },
-  ],
-  webServer: [
-    {
-      command: "npm run dev -- --port 4175 --strictPort",
-      url: "http://127.0.0.1:4175",
-      reuseExistingServer: !process.env.CI,
-      env: {
-        // This suite mocks the Supabase browser client. Select that provider explicitly.
-        VITE_BACKEND: "supabase",
-        VITE_SUPABASE_URL: "https://example.supabase.co",
-        VITE_SUPABASE_PUBLISHABLE_KEY: "public-test-key",
-      },
-    },
-    {
-      command: "npm run dev -- --port 4176 --strictPort",
-      url: "http://127.0.0.1:4176",
-      reuseExistingServer: !process.env.CI,
-      env: { VITE_BACKEND: "cloudflare" },
-    },
-  ],
+  use: { baseURL: origin, trace: "retain-on-failure" },
+  webServer: {
+    command: `npm run dev -- --port ${port} --strictPort`,
+    url: origin,
+    reuseExistingServer: !process.env.CI,
+    // The specs serve the Cloudflare Worker routes from tests/support/worker.ts.
+    // Process settings take precedence over .env.local.
+    env: { VITE_BACKEND: "cloudflare" },
+  },
 });

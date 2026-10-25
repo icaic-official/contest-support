@@ -220,7 +220,7 @@ export function Announcements({ data }: { data: SessionData }) {
       // Reading keeps the queue in view. An open form needs room for all its controls.
       className={`${composing || edit ? "max-h-[80dvh]" : "max-h-[40dvh]"} shrink-0 overflow-y-auto border-b bg-muted/40`}
     >
-      <div className="mx-auto grid max-w-4xl gap-2 px-4 py-2 sm:px-8">
+      <div className="mx-auto grid max-w-4xl grid-cols-1 gap-2 px-4 py-2 sm:px-8">
         <div className="flex flex-wrap items-center gap-2">
           <Megaphone aria-hidden="true" className="size-4 text-muted-foreground" />
           <h2 id={headingId} className="min-w-0 flex-1 truncate text-sm font-medium">

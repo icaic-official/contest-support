@@ -139,6 +139,10 @@ test("the announcement strip fits a phone without horizontal scrolling", async (
   await expect(strip.getByRole("button", { name: "Hide announcements" })).toBeVisible();
   await expect(strip.getByRole("button", { name: "New announcement" })).toBeVisible();
   expect(await strip.evaluate((element) => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(0);
+
+  // A hidden strip shows the newest title on one line, so a long title must not widen the page.
+  await strip.getByRole("button", { name: "Hide announcements" }).click();
+  expect(await manager.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
 });
 
 test("an open announcement form fits on a laptop screen without scrolling inside the strip", async ({ browser, local }) => {

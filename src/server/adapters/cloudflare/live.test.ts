@@ -4,7 +4,7 @@ import { getPlatformProxy } from 'wrangler';
 import type { D1Connection, D1Statement } from '../d1/connection';
 import { D1Fixture, applyMigrations } from '../d1/testFixture';
 import type { Caller } from '../../authentication';
-import { currentAccessBindings, currentAccessForLoginsSql, currentAccessSql, type CurrentAccessRow } from './application';
+import { currentAccessBindings, currentAccessForLoginsSql, currentAccessSql, notificationStatements, type CurrentAccessRow } from './application';
 import { connectLive, dispatchNotifications, maintainFixtureSessions, SessionLiveCoordinator, type LiveEnvironment } from './live';
 
 class FakeSocket {
@@ -40,19 +40,11 @@ class FakeState {
   getWebSockets() { return this.sockets.filter((socket) => !socket.closed); }
 }
 
-interface PendingSignal {
-  id: string; sessionId: string; audience: string; sequence: number;
-  delivered: number; attempts: number;
-  lastAttemptAt?: number;
-}
-
 class FakeDatabase implements D1Connection {
   access = new Map<string, CurrentAccessRow>();
   sessions = new Map<string, { eventId: string; runId: string }>();
-  pending: PendingSignal[] = [];
   reads = 0;
   unavailable = false;
-  failMark = false;
   prepare(sql: string): D1Statement {
     let values: Array<string | number | null> = [];
     return {
@@ -74,27 +66,10 @@ class FakeDatabase implements D1Connection {
           return { results: [...this.access].filter(([key, row]) => logins.has(row.login_id) &&
             key === [row.account_id, row.login_id, sessionId].join(':')).map(([, row]) => row) as T[] };
         }
-        return this.notifications<T>(Number(values[0]));
+        throw new Error(`Unexpected all: ${sql}`);
       },
-      run: async () => {
-        const signal = this.pending.find((item) => item.id === values[0]);
-        if (!signal) return;
-        if (sql.includes('attempts = attempts + 1')) {
-          signal.attempts++;
-          signal.lastAttemptAt = Math.floor(Date.now() / 1000);
-        }
-        if (sql.includes('delivered = 1')) {
-          if (this.failMark) { this.failMark = false; throw new Error('Commit response unavailable.'); }
-          signal.delivered = 1;
-        }
-      },
+      run: async () => { throw new Error(`Unexpected run: ${sql}`); },
     };
-  }
-  private notifications<T>(limit: number) {
-    return { results: this.pending.filter((signal) => !signal.delivered)
-      .sort((left, right) => (left.lastAttemptAt ?? 0) - (right.lastAttemptAt ?? 0) ||
-        left.sessionId.localeCompare(right.sessionId) || left.audience.localeCompare(right.audience) || left.sequence - right.sequence)
-      .slice(0, limit).map(({ id, sessionId, audience, sequence }) => ({ id, sessionId, audience, sequence })) as T[] };
   }
   async batch(): Promise<unknown[]> { throw new Error('Unexpected batch.'); }
 }
@@ -171,7 +146,7 @@ describe('outbox retry fairness with real local D1', () => {
         sessionId: fixture.sessionId, expiresAt: Date.now() + 60_000 });
       state.acceptWebSocket(mispaired);
       const signal = (audience: string, sequence: number) => coordinator.fetch(new Request('https://live.internal/notify', {
-        method: 'POST', body: JSON.stringify({ id: randomUUID(), sessionId: fixture.sessionId, audience, sequence }) }));
+        method: 'POST', body: JSON.stringify({ sessionId: fixture.sessionId, audiences: [{ audience, sequence }] }) }));
       reads = 0;
       expect((await signal(`team:${fixture.teamId}`, 1)).status).toBe(204);
       expect(reads).toBe(2);
@@ -185,7 +160,112 @@ describe('outbox retry fairness with real local D1', () => {
     } finally { await fixture.cleanup(); }
   }, 120_000);
 
-  it('delivers a later session while the first 100 records keep failing', async () => {
+  async function outbox(sessionId: string, audiences: string[]) {
+    for (const audience of audiences) await db.batch(notificationStatements(db, sessionId, [audience]));
+  }
+  const pendingRows = (fixture: D1Fixture) => fixture.rows(`SELECT audience, sequence, delivered, attempts FROM notifications
+    WHERE session_id IN (?, ?) ORDER BY audience, sequence`, fixture.sessionId, fixture.secondSessionId);
+  const expireClaims = (fixture: D1Fixture) => db.prepare(`UPDATE notifications SET claimed_until = unixepoch() - 1
+    WHERE session_id IN (?, ?) AND delivered = 0`).bind(fixture.sessionId, fixture.secondSessionId).run();
+
+  function recorder(respond: (sessionId: string) => Promise<number> = async () => 204) {
+    const requests: Array<{ sessionId: string; audiences: Array<{ audience: string; sequence: number }> }> = [];
+    const env: LiveEnvironment = { DB: db, LIVE_UPDATES: { idFromName: (name) => name, get: () => ({ fetch: async (request) => {
+      const body = await request.json() as typeof requests[number];
+      requests.push(body);
+      return new NativeResponse(null, { status: await respond(body.sessionId) });
+    } }) } };
+    return { env, requests };
+  }
+
+  it('claims each row for one dispatcher while several run at once', async () => {
+    const fixture = new D1Fixture(db, 'wrangler.auth-ci.jsonc');
+    await fixture.create();
+    try {
+      await outbox(fixture.sessionId, Array.from({ length: 6 }, (_, index) => `team:${index % 2 ? fixture.teamId : fixture.otherTeamId}`));
+      // A slow object keeps each claim open while the other dispatchers claim.
+      // Four dispatchers can claim 12 rows, so a missing claim resends some of the 6.
+      const { env, requests } = recorder(() => new Promise((done) => setTimeout(() => done(204), 20)));
+      const results = await Promise.all(Array.from({ length: 4 }, () => dispatchNotifications(env, 3)));
+      expect(results.reduce((sum, result) => sum + result.delivered, 0)).toBe(6);
+      expect(results.every((result) => result.failed === 0 && result.delivered < 6)).toBe(true);
+      expect((await pendingRows(fixture)).every((row) => row.delivered === 1 && row.attempts === 1)).toBe(true);
+      const sent = requests.flatMap((request) => request.audiences.map(({ audience, sequence }) => `${audience}:${sequence}`));
+      expect(new Set(sent).size).toBe(sent.length);
+    } finally { await fixture.cleanup(); }
+  }, 120_000);
+
+  it('sends one coalesced hint for a burst of writes to one audience', async () => {
+    const fixture = new D1Fixture(db, 'wrangler.auth-ci.jsonc', true);
+    await fixture.create();
+    try {
+      const state = new FakeState();
+      const coordinator = new SessionLiveCoordinator(state, { DB: db });
+      let objectRequests = 0;
+      const env: LiveEnvironment = { DB: db, LIVE_UPDATES: { idFromName: (name) => name,
+        get: () => ({ fetch: (request) => { objectRequests++; return coordinator.fetch(request); } }) } };
+      const connect = async (caller: Caller) => {
+        expect((await connectLive(new Request('https://example.invalid', { headers: { Upgrade: 'websocket' } }), env, caller, fixture.sessionId)).ok).toBe(true);
+        return state.sockets.at(-1)!;
+      };
+      const [staff, contestant] = [await connect(fixture.staff), await connect(fixture.contestant)];
+      await dispatchNotifications(env);
+      objectRequests = 0;
+      staff.messages.length = contestant.messages.length = 1;
+      await outbox(fixture.sessionId, Array<string>(50).fill('staff'));
+      expect(await dispatchNotifications(env)).toEqual({ delivered: 50, failed: 0 });
+      expect(objectRequests).toBe(1);
+      expect(staff.messages).toEqual(['{"type":"ready"}', '{"type":"change"}']);
+      expect(contestant.messages).toEqual(['{"type":"ready"}']);
+      await outbox(fixture.sessionId, ['staff', `team:${fixture.teamId}`, `team:${fixture.otherTeamId}`]);
+      expect(await dispatchNotifications(env)).toEqual({ delivered: 3, failed: 0 });
+      expect(objectRequests).toBe(2);
+      expect([staff, contestant].map((socket) => socket.messages.length)).toEqual([3, 2]);
+    } finally { await fixture.cleanup(); }
+  }, 120_000);
+
+  it('retries a crashed claim after its lease expires and sends no second hint', async () => {
+    const fixture = new D1Fixture(db, 'wrangler.auth-ci.jsonc', true);
+    await fixture.create();
+    try {
+      await outbox(fixture.sessionId, ['staff', 'staff']);
+      let release: () => void = () => undefined;
+      const hung = recorder(() => new Promise((done) => { release = () => done(503); }));
+      const crashed = dispatchNotifications(hung.env);
+      await vi.waitFor(() => expect(hung.requests).toHaveLength(1));
+      const healthy = recorder();
+      expect(await dispatchNotifications(healthy.env)).toEqual({ delivered: 0, failed: 0 });
+      expect(healthy.requests).toEqual([]);
+      await expireClaims(fixture);
+      expect(await dispatchNotifications(healthy.env)).toEqual({ delivered: 2, failed: 0 });
+      expect(healthy.requests).toEqual([{ sessionId: fixture.sessionId, audiences: [{ audience: 'staff', sequence: 2 }] }]);
+      release();
+      expect(await crashed).toEqual({ delivered: 0, failed: 2 });
+      expect((await pendingRows(fixture)).map((row) => [row.delivered, row.attempts])).toEqual([[1, 2], [1, 2]]);
+
+      // The object delivers, then the delivered mark fails. The retry after the
+      // lease reaches the object again, and its sequence cursor drops the hint.
+      const state = new FakeState();
+      const coordinator = new SessionLiveCoordinator(state, { DB: db });
+      let failMark = true;
+      const flaky: D1Connection = { batch: (statements) => db.batch(statements), prepare: (sql) => {
+        if (failMark && sql.includes('SET delivered = 1')) { failMark = false; throw new Error('Commit response unavailable.'); }
+        return db.prepare(sql);
+      } };
+      const env: LiveEnvironment = { DB: flaky, LIVE_UPDATES: { idFromName: (name) => name, get: () => ({ fetch: (request) => coordinator.fetch(request) }) } };
+      expect((await connectLive(new Request('https://example.invalid', { headers: { Upgrade: 'websocket' } }), env, fixture.staff, fixture.sessionId)).ok).toBe(true);
+      const socket = state.sockets[0];
+      await outbox(fixture.sessionId, ['staff']);
+      expect(await dispatchNotifications(env)).toEqual({ delivered: 0, failed: 1 });
+      expect(socket.messages).toHaveLength(2);
+      expect(await dispatchNotifications(env)).toEqual({ delivered: 0, failed: 0 });
+      await expireClaims(fixture);
+      expect(await dispatchNotifications(env)).toEqual({ delivered: 1, failed: 0 });
+      expect(socket.messages).toHaveLength(2);
+    } finally { await fixture.cleanup(); }
+  }, 120_000);
+
+  it('delivers a healthy session in the same call while another session keeps failing', async () => {
     const fixture = new D1Fixture(db, 'wrangler.auth-ci.jsonc');
     await fixture.create();
     try {
@@ -196,15 +276,13 @@ describe('outbox retry fairness with real local D1', () => {
           "INSERT INTO notifications (id, session_id, audience, sequence) VALUES (?, ?, 'staff', ?)", randomUUID(), unavailable, index + 1)),
         fixture.statement("INSERT INTO notifications (id, session_id, audience, sequence) VALUES (?, ?, 'staff', 1)", randomUUID(), healthy),
       ]);
-      const env: LiveEnvironment = { DB: db, LIVE_UPDATES: {
-        idFromName: (name) => name,
-        get: (id) => ({ fetch: async () => new NativeResponse(null, { status: id === healthy ? 204 : 503 }) }),
-      } };
-      expect(await dispatchNotifications(env)).toEqual({ delivered: 0, failed: 100 });
-      expect(await dispatchNotifications(env)).toEqual({ delivered: 1, failed: 99 });
-      expect(await fixture.rows('SELECT delivered, attempts FROM notifications WHERE session_id = ?', healthy))
-        .toEqual([{ delivered: 1, attempts: 1 }]);
-      expect(await fixture.rows('SELECT count(*) AS count FROM notifications WHERE session_id = ? AND delivered = 0', unavailable))
+      const { env, requests } = recorder(async (sessionId) => sessionId === healthy ? 204 : 503);
+      expect(await dispatchNotifications(env)).toEqual({ delivered: 1, failed: 100 });
+      expect(requests.map((request) => [request.sessionId, request.audiences])).toEqual(expect.arrayContaining([
+        [unavailable, [{ audience: 'staff', sequence: 100 }]], [healthy, [{ audience: 'staff', sequence: 1 }]]]));
+      // A failed claim waits for its lease, so a burst of writes does not resend it at once.
+      expect(await dispatchNotifications(env)).toEqual({ delivered: 0, failed: 0 });
+      expect(await fixture.rows('SELECT count(*) AS count FROM notifications WHERE session_id = ? AND delivered = 0 AND attempts = 1', unavailable))
         .toEqual([{ count: 100 }]);
     } finally { await fixture.cleanup(); }
   }, 120_000);
@@ -246,7 +324,7 @@ function fixture() {
     return state.sockets.at(-1)!;
   };
   const signal = async (audience: string, sequence = 1) => coordinator.fetch(new Request('https://live.internal/notify', {
-    method: 'POST', body: JSON.stringify({ id: randomUUID(), sessionId, audience, sequence }),
+    method: 'POST', body: JSON.stringify({ sessionId, audiences: [{ audience, sequence }] }),
   }));
   return { sessionId, eventId, runId, teamId, otherTeamId, staff, contestant, otherContestant, db, state, coordinator, env, connect, signal, account };
 }
@@ -309,7 +387,7 @@ describe('Durable Object live updates', () => {
     expect(socket.messages).toHaveLength(2);
     const resumed = new SessionLiveCoordinator(test.state, { DB: test.db });
     const notify = (sequence: number) => resumed.fetch(new Request('https://live.internal/notify', {
-      method: 'POST', body: JSON.stringify({ id: randomUUID(), sessionId: test.sessionId, audience: 'staff', sequence }),
+      method: 'POST', body: JSON.stringify({ sessionId: test.sessionId, audiences: [{ audience: 'staff', sequence }] }),
     }));
     await notify(2);
     expect(socket.messages).toHaveLength(2);
@@ -318,22 +396,6 @@ describe('Durable Object live updates', () => {
     test.db.access.clear();
     await notify(3);
     expect(socket.closed).toBe(true);
-  });
-
-  it('retains retryability during a database failure and recovers after an uncertain response', async () => {
-    const test = fixture();
-    const socket = await test.connect();
-    test.db.pending.push({ id: randomUUID(), sessionId: test.sessionId, audience: 'staff', sequence: 1, delivered: 0, attempts: 0 });
-    test.db.unavailable = true;
-    expect(await dispatchNotifications(test.env)).toEqual({ delivered: 0, failed: 1 });
-    expect(test.db.pending[0]).toMatchObject({ delivered: 0, attempts: 1 });
-    test.db.unavailable = false;
-    test.db.failMark = true;
-    expect(await dispatchNotifications(test.env)).toEqual({ delivered: 0, failed: 1 });
-    expect(socket.messages).toHaveLength(2);
-    expect(await dispatchNotifications(test.env)).toEqual({ delivered: 1, failed: 0 });
-    expect(test.db.pending[0]).toMatchObject({ delivered: 1, attempts: 3 });
-    expect(socket.messages).toHaveLength(2);
   });
 
   it('refreshes after reconnect and recovers revocation through an alarm if delivery was interrupted', async () => {
@@ -556,7 +618,7 @@ describe('real local named maintenance service binding', () => {
       ]);
       const signal = (sessionId: string) => env.LIVE_UPDATES.get(env.LIVE_UPDATES.idFromName(sessionId)).fetch(
         new Request('https://live.internal/notify', { method: 'POST',
-          body: JSON.stringify({ id: randomUUID(), sessionId, audience: 'staff', sequence: 1 }) }));
+          body: JSON.stringify({ sessionId, audiences: [{ audience: 'staff', sequence: 1 }] }) }));
       expect((await signal(sessionIds[0])).status).toBe(204);
       expect((await signal(controlSession)).status).toBe(204);
       const maintenance = (phase: string) => client.fetch('https://maintenance.internal/sessions', {

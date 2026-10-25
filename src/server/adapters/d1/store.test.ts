@@ -668,6 +668,34 @@ describe("D1 workflow persistence", () => {
       await fixture.statement('DELETE FROM account_operations WHERE id = ?', operationId).run();
     });
 
+    it('writes no account notification for an account that has no login', async () => {
+      const accountId = randomUUID();
+      const operationId = randomUUID();
+      const accountSignals = () => fixture.rows('SELECT audience FROM notifications WHERE audience = ?', `account:${accountId}`);
+      const staffSignals = async () => (await fixture.rows("SELECT audience FROM notifications WHERE session_id = ? AND audience = 'staff'", fixture.sessionId)).length;
+      const staffBefore = await staffSignals();
+      await db.batch([
+        fixture.statement("INSERT INTO accounts (id, name, credential_state) VALUES (?, 'Fictional new person', 'pending')", accountId),
+        fixture.statement('INSERT INTO memberships (session_id, account_id, team_id) VALUES (?, ?, ?)', fixture.sessionId, accountId, fixture.teamId),
+        fixture.statement(`INSERT INTO account_operations (id, account_id, actor, session_id, action, state)
+          VALUES (?, ?, ?, ?, 'create_account', 'pending')`, operationId, accountId, fixture.staff.accountId, fixture.sessionId),
+        fixture.statement("UPDATE accounts SET credential_state = 'ready', credential_generation = credential_generation + 1 WHERE id = ?", accountId),
+      ]);
+      try {
+        expect(await staffSignals()).toBe(staffBefore + 1);
+        expect(await accountSignals()).toEqual([]);
+        await fixture.statement('INSERT INTO logins (id, account_id, expires_at) VALUES (?, ?, unixepoch() + 3600)', randomUUID(), accountId).run();
+        await fixture.statement('UPDATE accounts SET disabled = 1 WHERE id = ?', accountId).run();
+        expect(await accountSignals()).toEqual([{ audience: `account:${accountId}` }]);
+      } finally {
+        await db.batch([
+          fixture.statement('DELETE FROM account_operations WHERE id = ?', operationId),
+          fixture.statement('DELETE FROM admin_audit WHERE id = ?', operationId),
+          fixture.statement('DELETE FROM accounts WHERE id = ?', accountId),
+        ]);
+      }
+    });
+
     it('rejects incomplete reopening and application records at the database boundary', async () => {
       await resolvedIssue();
       await giveJury();

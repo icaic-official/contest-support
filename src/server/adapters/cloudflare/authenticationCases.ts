@@ -624,6 +624,9 @@ export function registerAuthenticationCases(group: AuthenticationCases) {
             .toEqual(before[key].filter((row) => String(row.audience).startsWith('team:')));
         }
         expect(after.notifications.filter((row) => row.audience === 'staff')).toHaveLength(fullApplication ? 2 : 1);
+        // The contestant has a login, so the reset still sends the account a revocation hint.
+        expect((await stmt('SELECT count(*) AS n FROM notifications WHERE audience = ?', `account:${fixture.contestant.accountId}`)
+          .first<{ n: number }>())!.n).toBeGreaterThan(0);
         expect((await stmt('SELECT team_id FROM memberships WHERE account_id = ?', fixture.contestant.accountId).first<{team_id: string}>())?.team_id).toBe(fixture.teamId);
         expect((await stmt("SELECT count(*) n FROM account_operations WHERE account_id = ? AND state = 'completed'", fixture.contestant.accountId).first<{n: number}>())?.n).toBe(1);
       });
@@ -637,9 +640,14 @@ export function registerAuthenticationCases(group: AuthenticationCases) {
 
       it('creates a temporary account with stable identity and restricted membership', async () => {
         const accountUsername = `new_${randomSecret().slice(0, 20)}`;
+        const signals = async (audience: string) => (await stmt('SELECT count(*) AS n FROM notifications WHERE session_id = ? AND audience = ?', fixture.sessionId, audience).first<{ n: number }>())!.n;
+        const staffBefore = await signals('staff');
         const result = await service.account(adminHeaders, fixture.sessionId, { action: 'create_account', username: accountUsername, name: `auth-fixture:${fixture.eventId}`, teamId: fixture.teamId, roles: [], isAdmin: false });
         const row = await stmt('SELECT id FROM accounts WHERE username = ?', accountUsername).first<{id: string}>();
         extraIds.push(row!.id);
+        // A new account has no login, so setup writes one staff notification and no account notification.
+        expect(await signals(`account:${row!.id}`)).toBe(0);
+        expect(await signals('staff')).toBe(staffBefore + (fullApplication ? 1 : 0));
         const current = await service.current(await signIn(accountUsername, result.temporaryPassword!));
         expect(current?.user.id).toBe(row!.id);
         expect(current?.status.must_change).toBe(true);

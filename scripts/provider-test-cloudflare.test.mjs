@@ -421,7 +421,7 @@ describe('Cloudflare fixture setup and exact cleanup with real local D1/R2', () 
       statement('INSERT INTO sessions (id, event_id) VALUES (?, ?)', otherSession, otherEvent),
     ]);
     const notify = (sessionId) => liveObject(sessionId).coordinator.fetch(new globalThis.Request('https://live.internal/notify', {
-      method: 'POST', body: JSON.stringify({ id: randomUUID(), sessionId, audience: 'staff', sequence: 1 }),
+      method: 'POST', body: JSON.stringify({ sessionId, audiences: [{ audience: 'staff', sequence: 1 }] }),
     }));
     try {
       expect((await notify(fixture.sessionId)).status).toBe(204);

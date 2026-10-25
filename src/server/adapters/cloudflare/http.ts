@@ -11,6 +11,7 @@ import { AnnouncementCommandError, type D1AnnouncementService } from './announce
 import type { R2AnnouncementImageService } from './announcementImages';
 import type { R2AvatarService } from './avatars';
 import { logEvent, requestFields } from './log';
+import { baseSecurityHeaders } from './securityHeaders';
 
 const uuid = z.uuid();
 const member = z.strictObject({ teamId: uuid.nullable(), roles: z.array(roleSchema).max(3), isAdmin: z.boolean() });
@@ -39,8 +40,10 @@ const avatarPathSchema = z.tuple([uuid, uuid]);
 const announcementBodyLimit = 65_536;
 
 export const privateHeaders = {
-  'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff',
-  'Referrer-Policy': 'no-referrer', 'Vary': 'Origin, Cookie',
+  ...baseSecurityHeaders,
+  'Cache-Control': 'private, no-store', 'Vary': 'Origin, Cookie',
+  // API bodies are JSON or downloaded images. None may run script or load a resource.
+  'Content-Security-Policy': "default-src 'none'; frame-ancestors 'none'",
 };
 
 export function privateJson(body: unknown, status = 200): Response {

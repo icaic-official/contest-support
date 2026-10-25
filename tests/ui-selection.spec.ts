@@ -1,104 +1,30 @@
-import { expect, test, type Page } from "@playwright/test";
-import { emptyAnnouncementSnapshot } from "./support/announcementSnapshot";
-import type { Membership, Snapshot } from "../src/connected/model";
+import type { Page } from "@playwright/test";
+import type { Membership } from "../src/connected/model";
+import {
+  type FakeWorker,
+  SESSION_ID,
+  TEAM_ID,
+  USER_ID,
+  expect,
+  fixtureAccount,
+  sessionSnapshot,
+  test,
+} from "./support/worker";
 
-const USER_ID = "00000000-0000-4000-8000-000000000001";
-const SESSION_ID = "00000000-0000-4000-8000-000000000100";
-const TEAM_ID = "00000000-0000-4000-8000-000000000200";
-
-/** Signs in with isolated Auth and database responses for one membership. */
+/** Signs in with an isolated Worker fixture for one membership. */
 async function signIn(
   page: Page,
+  api: FakeWorker,
   membership: Membership | null,
   startPath = "/",
 ) {
-  const state: Snapshot = {
-    session: {
-      id: SESSION_ID,
-      event_id: "00000000-0000-4000-8000-000000000090",
-      name: "Selection session",
-      intake_open: true,
-      categories: ["Network"],
-      revision: 0,
-      max_image_bytes: 10 * 1024 * 1024,
-      max_images_per_issue: 20,
-      max_image_bytes_per_issue: 120 * 1024 * 1024,
-    },
-    event: {
-      id: "00000000-0000-4000-8000-000000000090",
-      name: "Selection event",
-      archived: false,
-    },
-    membership,
-    teams: [
-      {
-        id: TEAM_ID,
-        session_id: SESSION_ID,
-        name: "Aurora",
-        location: "Desk 12",
-      },
-    ],
-    issues: [],
-    resolutions: [],
-    history: [],
-    attachments: [],
-    pending_removals: [],
-    awards: [],
-    audit: [],
-    members: [],
-    server_time: "2026-10-17T00:00:00Z",
-  };
-  const user = {
-    id: USER_ID,
-    aud: "authenticated",
-    role: "authenticated",
-    email: "selection@accounts.minsky.invalid",
-    app_metadata: { provider: "email", providers: ["email"] },
-    user_metadata: {},
-    created_at: state.server_time,
-  };
-  await page.routeWebSocket(/supabase\.co/, (socket) => socket.close());
-  await page.route("https://example.supabase.co/**", async (route) => {
-    const path = new URL(route.request().url()).pathname;
-    const expires = Math.floor(Date.now() / 1000) + 3600;
-    const encode = (value: object) =>
-      Buffer.from(JSON.stringify(value)).toString("base64url");
-    const responses: Record<string, unknown> = {
-      "/auth/v1/token": {
-        access_token: `${encode({ alg: "HS256", typ: "JWT" })}.${encode({
-          sub: USER_ID,
-          exp: expires,
-          role: "authenticated",
-        })}.fixture`,
-        refresh_token: "selection-fixture",
-        expires_in: 3600,
-        expires_at: expires,
-        token_type: "bearer",
-        user,
-      },
-      "/auth/v1/user": user,
-      "/auth/v1/logout": null,
-      "/rest/v1/rpc/account_status": {
-        username: "selection",
-        must_change: false,
-        session_valid: true,
-      },
-      "/rest/v1/rpc/complete_password_change": null,
-      "/rest/v1/memberships": membership ? [membership] : [],
-      "/rest/v1/sessions": membership
-        ? [{ id: SESSION_ID, name: "Selection session" }]
-        : [],
-      "/rest/v1/rpc/session_snapshot": state,
-      "/rest/v1/rpc/announcement_snapshot": emptyAnnouncementSnapshot(),
-      "/rest/v1/rpc/avatar_list": [],
-    };
-    if (!(path in responses)) throw new Error(`Unexpected request: ${path}`);
-    await route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify(responses[path]),
-    });
-  });
+  api.account = fixtureAccount(USER_ID, "selection", "Selection fixture");
+  api.snapshots = () => [
+    sessionSnapshot(membership, {
+      session: { name: "Selection session" },
+      event: { id: "00000000-0000-4000-8000-000000000090", name: "Selection event", archived: false },
+    }),
+  ];
   await page.goto(startPath);
   await expect(page).toHaveURL(startPath);
   await page.getByLabel("Username", { exact: true }).fill("selection");
@@ -114,15 +40,16 @@ const staff: Membership = {
   is_admin: false,
 };
 
-test("a team membership gets the contestant UI", async ({ page }) => {
-  await signIn(page, { ...staff, roles: [], team_id: TEAM_ID });
+test("a team membership gets the contestant UI", async ({ page, api }) => {
+  await signIn(page, api, { ...staff, roles: [], team_id: TEAM_ID });
   await expect(page.locator('[data-ui="contestant"]')).toBeVisible();
 });
 
 test("a staff membership gets the organiser console on a laptop and the phone app on a phone", async ({
   page,
+  api,
 }) => {
-  await signIn(page, staff);
+  await signIn(page, api, staff);
   await expect(page.locator('[data-ui="organiser-desktop"]')).toBeVisible();
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(page.locator('[data-ui="organiser-phone"]')).toBeVisible();
@@ -130,8 +57,9 @@ test("a staff membership gets the organiser console on a laptop and the phone ap
 
 test("an account without a membership sees the session access screen", async ({
   page,
+  api,
 }) => {
-  await signIn(page, null);
+  await signIn(page, api, null);
   await expect(
     page.getByRole("heading", { name: "Session access", exact: true }),
   ).toBeVisible();
@@ -143,8 +71,9 @@ test("an account without a membership sees the session access screen", async ({
 
 test("the sidebar account card opens the account page and focuses its heading", async ({
   page,
+  api,
 }) => {
-  await signIn(page, { ...staff, roles: ["volunteer"] });
+  await signIn(page, api, { ...staff, roles: ["volunteer"] });
   const card = page.getByRole("button", { name: /^Account settings for/ });
   await expect(card).not.toHaveAttribute("aria-current", "page");
   await card.click();
@@ -168,8 +97,9 @@ for (const [path, heading, membership] of [
 ] as const) {
   test(`a direct ${path} link survives sign-in and reload`, async ({
     page,
+    api,
   }) => {
-    await signIn(page, membership, path);
+    await signIn(page, api, membership, path);
     await expect(
       page.getByRole("heading", { level: 1, name: heading, exact: true }),
     ).toBeVisible();
@@ -185,8 +115,9 @@ for (const [path, heading, membership] of [
 
 test("browser history restores the section and heading focus", async ({
   page,
+  api,
 }) => {
-  await signIn(page, {
+  await signIn(page, api, {
     ...staff,
     roles: ["volunteer", "jury"],
     is_admin: true,
@@ -237,8 +168,9 @@ test("browser history restores the section and heading focus", async ({
 
 test("protected links return an unauthorized member to their issue queue", async ({
   page,
+  api,
 }) => {
-  await signIn(page, { ...staff, roles: ["volunteer"] }, "/administration");
+  await signIn(page, api, { ...staff, roles: ["volunteer"] }, "/administration");
   await expect(page).toHaveURL("/issues");
   const queue = page.getByRole("heading", {
     level: 1,
@@ -266,8 +198,9 @@ test("protected links return an unauthorized member to their issue queue", async
 
 test("an unknown route retains its address and offers a route back to issues", async ({
   page,
+  api,
 }) => {
-  await signIn(page, { ...staff, roles: ["volunteer"] }, "/unknown-page");
+  await signIn(page, api, { ...staff, roles: ["volunteer"] }, "/unknown-page");
   await expect(
     page.getByRole("heading", { name: "Page not found", exact: true }),
   ).toBeVisible();
@@ -281,8 +214,9 @@ test("an unknown route retains its address and offers a route back to issues", a
 
 test("the account page changes the password in place and keeps the route", async ({
   page,
+  api,
 }) => {
-  await signIn(page, staff, "/account");
+  await signIn(page, api, staff, "/account");
   const heading = page.getByRole("heading", {
     level: 1,
     name: "My account",
@@ -318,8 +252,9 @@ test("the account page changes the password in place and keeps the route", async
 
 test("the organiser account page shows every section and signs out", async ({
   page,
+  api,
 }) => {
-  await signIn(page, { ...staff, roles: ["volunteer", "jury"], is_admin: true }, "/account");
+  await signIn(page, api, { ...staff, roles: ["volunteer", "jury"], is_admin: true }, "/account");
   await expect(
     page.getByRole("heading", { level: 1, name: "My account", exact: true }),
   ).toBeVisible();
@@ -366,8 +301,9 @@ test("the organiser account page shows every section and signs out", async ({
 
 test("the theme options work with the keyboard and stay in view", async ({
   page,
+  api,
 }) => {
-  await signIn(page, staff, "/account");
+  await signIn(page, api, staff, "/account");
   const options = page.locator("#appearance").getByRole("radio");
   await expect(options).toHaveCount(3);
   await options.first().focus();
@@ -382,8 +318,9 @@ test("the theme options work with the keyboard and stay in view", async ({
 
 test("an address with a section fragment scrolls to that section", async ({
   page,
+  api,
 }) => {
-  await signIn(page, staff, "/account#security");
+  await signIn(page, api, staff, "/account#security");
   const security = page.locator("#security");
   await expect(security).toBeFocused();
   await expect(security).toBeInViewport();
@@ -391,8 +328,9 @@ test("an address with a section fragment scrolls to that section", async ({
 
 test("a team account page shows the team and no staff content", async ({
   page,
+  api,
 }) => {
-  await signIn(page, { ...staff, roles: [], team_id: TEAM_ID }, "/account");
+  await signIn(page, api, { ...staff, roles: [], team_id: TEAM_ID }, "/account");
   await expect(
     page.getByRole("heading", { level: 1, name: "My account", exact: true }),
   ).toBeVisible();
@@ -409,8 +347,9 @@ test("a team account page shows the team and no staff content", async ({
 
 test("the command palette opens the password form and focuses its first field", async ({
   page,
+  api,
 }) => {
-  await signIn(page, { ...staff, roles: ["volunteer"] });
+  await signIn(page, api, { ...staff, roles: ["volunteer"] });
   const palette = page.getByRole("dialog", { name: "Command palette" });
   const current = page.getByLabel("Current password", { exact: true });
   const heading = page.getByRole("heading", { name: "My account", exact: true });
@@ -438,8 +377,9 @@ test("the command palette opens the password form and focuses its first field", 
 
 test("the contestant account menu opens the password form and focuses its first field", async ({
   page,
+  api,
 }) => {
-  await signIn(page, { ...staff, roles: [], team_id: TEAM_ID });
+  await signIn(page, api, { ...staff, roles: [], team_id: TEAM_ID });
   await page.getByRole("button", { name: /^Account menu for/ }).click();
   await page.getByRole("menuitem", { name: "Change password" }).click();
   await expect(page).toHaveURL("/account#security");

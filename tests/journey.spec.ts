@@ -1,20 +1,16 @@
-import {
-  type Browser,
-  expect,
-  test,
-  type Locator,
-  type Page,
-} from "@playwright/test";
-import { createJuryFixture } from "./jury-fixture";
+import type { Browser, Locator, Page } from "@playwright/test";
 import { unresolvedTime } from "../src/connected/model";
+import { type LocalWorker, expect, test } from "./support/localWorker";
 
 // One full local journey across authenticated test accounts. Each account
-// has its own browser context. The PGlite fixture runs the real migrations,
-// RLS and workflow transactions; only the hosted transport is simulated.
+// has its own browser context. The Worker routes, migrations and workflow
+// transactions run on local D1. Only the identity and live socket are simulated.
 
 const phone = { width: 390, height: 844 };
 const desktop = { width: 1280, height: 800 };
-type Local = Awaited<ReturnType<typeof createJuryFixture>>;
+type Local = LocalWorker;
+
+test.use({ seedIssues: false });
 
 async function signIn(
   browser: Browser,
@@ -62,9 +58,9 @@ async function timerSeconds(page: Page): Promise<number> {
 
 test("a report travels from the contestant through support, the jury and external application", async ({
   browser,
+  local,
 }) => {
   test.setTimeout(120_000);
-  const local = await createJuryFixture({ seedIssues: false });
   try {
     const issueFor = async () => {
       const state = await local.snapshot(local.users.admin);
@@ -342,8 +338,12 @@ test("a report travels from the contestant through support, the jury and externa
     expect(done.state.awards).toHaveLength(1);
     expect(done.state.awards[0]).toMatchObject({
       minutes: 5,
-      applied_by: local.users.specialist,
+      applied_name: "Test specialist",
     });
+    // The snapshot names the person. The stored award keeps the account ID.
+    expect(
+      await local.rows("SELECT applied_by FROM awards WHERE id = ?", done.state.awards[0].id),
+    ).toEqual([{ applied_by: local.users.specialist }]);
     expect(Date.parse(done.state.awards[0].applied_at!)).toBeGreaterThan(
       Date.parse(done.state.awards[0].at),
     );
@@ -353,6 +353,5 @@ test("a report travels from the contestant through support, the jury and externa
     await expect(contestant.getByText(/USB hub is faulty/)).toHaveCount(0);
   } finally {
     for (const context of browser.contexts()) await context.close();
-    await local.close();
   }
 });

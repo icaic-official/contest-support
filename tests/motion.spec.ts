@@ -1,4 +1,5 @@
-import { expect, test, type Locator, type Page } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
+import { expect, test } from './support/worker';
 import { defaultIssues, type FixtureIssue, signInConsole } from './support/consoleFixture';
 
 const desktop = { width: 1280, height: 800 };
@@ -124,8 +125,8 @@ function longAnimations(page: Page): Promise<number> {
   );
 }
 
-test('queue tabs: the indicator starts under the selected tab and slides to the next', async ({ page }) => {
-  const fixture = await signInConsole(page, desktop);
+test('queue tabs: the indicator starts under the selected tab and slides to the next', async ({ page, api }) => {
+  const fixture = await signInConsole(page, api, desktop);
   const pill = marker(statusGroup(page));
   const active = statusTab(page, 'Active');
   const waiting = statusTab(page, 'Awaiting specialist');
@@ -172,8 +173,8 @@ test('queue tabs: the indicator starts under the selected tab and slides to the 
   expect(fixture.errors).toEqual([]);
 });
 
-test('queue tabs: Tab and Space move the selection and the indicator follows', async ({ page }) => {
-  await signInConsole(page, desktop);
+test('queue tabs: Tab and Space move the selection and the indicator follows', async ({ page, api }) => {
+  await signInConsole(page, api, desktop);
   const pill = marker(statusGroup(page));
   const open = statusTab(page, 'Open');
   await statusTab(page, 'Active').focus();
@@ -185,8 +186,8 @@ test('queue tabs: Tab and Space move the selection and the indicator follows', a
   await expect.poll(() => gap(pill, open, 'box')).toBeLessThan(1.5);
 });
 
-test('issue sheet tabs: arrow keys move the selection and the underline follows', async ({ page }) => {
-  await signInConsole(page, desktop);
+test('issue sheet tabs: arrow keys move the selection and the underline follows', async ({ page, api }) => {
+  await signInConsole(page, api, desktop);
   await page.locator('[data-issue-row]').first().click();
   const sheet = page.getByRole('dialog');
   const tabs = sheet.getByRole('tablist');
@@ -212,8 +213,8 @@ test('issue sheet tabs: arrow keys move the selection and the underline follows'
   await expect.poll(() => gap(underline, activity, 'horizontal')).toBeLessThan(1.5);
 });
 
-test('a held button presses in, and a held phone queue card shows its pressed state', async ({ page }) => {
-  await signInConsole(page, desktop);
+test('a held button presses in, and a held phone queue card shows its pressed state', async ({ page, api }) => {
+  await signInConsole(page, api, desktop);
   const claim = page.getByRole('button', { name: 'Claim ISS-1', exact: true });
   await claim.hover();
   await page.mouse.down();
@@ -235,8 +236,8 @@ test('a held button presses in, and a held phone queue card shows its pressed st
   await expect.poll(() => card.evaluate((element) => getComputedStyle(element).backgroundColor)).toBe(resting);
 });
 
-test('contestant tracker: a step fills in over a moment when staff claim the report', async ({ page }) => {
-  const fixture = await signInConsole(page, desktop, {
+test('contestant tracker: a step fills in over a moment when staff claim the report', async ({ page, api }) => {
+  const fixture = await signInConsole(page, api, desktop, {
     contestant: true,
     issues: [{ number: 4, status: 'open', minutesAgo: 3, team: 0 }],
   });
@@ -257,8 +258,8 @@ test('contestant tracker: a step fills in over a moment when staff claim the rep
   expect(midway).not.toBe(after);
 });
 
-test('issue composer: the audience switch slides to Internal note and turns amber', async ({ page }) => {
-  const fixture = await signInConsole(page, desktop);
+test('issue composer: the audience switch slides to Internal note and turns amber', async ({ page, api }) => {
+  const fixture = await signInConsole(page, api, desktop);
   await page.locator('[data-issue-row]').first().click();
   const audience = page.getByRole('group', { name: 'Audience' });
   const pill = marker(audience);
@@ -284,8 +285,8 @@ test('issue composer: the audience switch slides to Internal note and turns ambe
   expect(fixture.errors).toEqual([]);
 });
 
-test('phone tab bar: the marker slides along the top edge to the selected tab', async ({ page }) => {
-  const fixture = await signInConsole(page, phone);
+test('phone tab bar: the marker slides along the top edge to the selected tab', async ({ page, api }) => {
+  const fixture = await signInConsole(page, api, phone);
   const nav = page.getByRole('navigation', { name: 'Organiser sections' });
   const bar = marker(nav.locator('ul'));
   const queue = nav.getByRole('button', { name: 'Queue', exact: true });
@@ -307,8 +308,8 @@ test('phone tab bar: the marker slides along the top edge to the selected tab', 
   expect(fixture.errors).toEqual([]);
 });
 
-test('queue rows: a live update highlights what is new or changed, not a filter change', async ({ page }) => {
-  const fixture = await signInConsole(page, desktop);
+test('queue rows: a live update highlights what is new or changed, not a filter change', async ({ page, api }) => {
+  const fixture = await signInConsole(page, api, desktop);
   await watchHighlights(page);
 
   // Rows that a filter reveals were already there. Nothing is new.
@@ -338,8 +339,8 @@ test('queue rows: a live update highlights what is new or changed, not a filter 
 test.describe('reduced motion', () => {
   test.use({ reducedMotion: 'reduce' });
 
-  test('the indicator and the sheet change state at once', async ({ page }) => {
-    const fixture = await signInConsole(page, desktop);
+  test('the indicator and the sheet change state at once', async ({ page, api }) => {
+    const fixture = await signInConsole(page, api, desktop);
     const pill = marker(statusGroup(page));
     const waiting = statusTab(page, 'Awaiting specialist');
     await startTrail(pill);

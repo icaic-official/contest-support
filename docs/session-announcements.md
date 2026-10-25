@@ -88,7 +88,7 @@ Text of 10,000 characters can use up to 40,000 bytes in UTF-8.
 | Layer | Command | Covers |
 | --- | --- | --- |
 | Unit | `npm test` | The D1 and R2 services with local bindings. The browser adapter. Draft and expiry rules. |
-| Local browser | `npm run test:e2e` | Live titles, keyboard disclosure, a report draft during a live change, slow reads, removal, competing edits, and a 390 px layout. Provider transport is simulated. |
+| Local browser | `npm run test:e2e` | Live titles, keyboard disclosure, a report draft during a live change, slow reads, removal, competing edits, and a 390 px layout. The Worker announcement service runs on local D1. Identity and the live socket are simulated. |
 
 These checks do not cover hosted Cloudflare, image transfers in a browser, other browsers, screen readers, or physical devices.
 The shared provider verification protocol does not cover announcements yet.

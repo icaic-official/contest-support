@@ -28,7 +28,8 @@ async function login(page: Page, name = "jury", viewport: Viewport = phone) {
       : viewport.width < 1024
         ? "organiser-phone"
         : "organiser-desktop";
-  await expect(page.locator(`[data-ui="${ui}"]`)).toBeVisible();
+  // The first snapshot comes from local D1, which can take several seconds on a busy machine.
+  await expect(page.locator(`[data-ui="${ui}"]`)).toBeVisible({ timeout: 15_000 });
   await expect(page.getByText("Live", { exact: true })).toBeVisible();
 }
 

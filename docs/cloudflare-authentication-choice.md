@@ -52,7 +52,19 @@ A hashing failure therefore leaves the current password and login available for 
 This approach couples the adapter to Better Auth's stored schema.
 Migration `0004_identity.sql` owns the `ba_user`, `ba_account`, `ba_session`, and `ba_verification` tables.
 Better Auth's SQLite adapter stores dates as ISO 8601 text.
+Better Auth can check its expected tables against the database before each request.
+The Worker turns that check off.
+With the check on, each request ran about 40 D1 queries instead of 4.
+The migrations own the schema instead.
+`identityStatements.test.ts` runs the real check against the migrated local D1 database.
+It fails when an upgrade expects a table or column that the migrations lack.
+It also fails when an authenticated API request sends the check's queries again.
 Before upgrading Better Auth, compare its schema and credential format, then rerun local and hosted authentication checks.
+
+The Worker reuses one Better Auth instance for each D1 binding, origin, and secret.
+Building an instance takes about 17 ms of CPU.
+The instance keeps no session state, so reuse is safe.
+A new secret builds a new instance, and cookies from the old secret stop working.
 
 ## Retain maintained cryptographic components
 
@@ -94,7 +106,6 @@ An identity login that races a password reset cannot gain access through an olde
 See [Better Auth security settings](https://better-auth.com/docs/reference/security).
 
 Untrusted previews must use isolated fictional data and a separate authentication deployment.
-Supabase frontend builds do not receive this identity adapter or its credentials.
 
 ## Resource evidence and deployment cost
 

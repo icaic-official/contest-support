@@ -1,18 +1,17 @@
 import { defineConfig } from "@playwright/test";
+
+// Parallel checkouts can each run the suite. Give each one its own port.
+const port = Number(process.env.PLAYWRIGHT_PORT ?? 4173);
+const origin = `http://127.0.0.1:${port}`;
+
 export default defineConfig({
   testDir: "./tests",
   testIgnore: ["cloud/**", "providers/**", "auth/**", "workflow/**", "connector/**"],
   fullyParallel: true,
-  use: { baseURL: "http://127.0.0.1:4173", trace: "retain-on-failure" },
+  use: { baseURL: origin, trace: "retain-on-failure" },
   webServer: {
-    command: "npm run dev -- --port 4173 --strictPort",
-    url: "http://127.0.0.1:4173",
+    command: `npm run dev -- --port ${port} --strictPort`,
+    url: origin,
     reuseExistingServer: !process.env.CI,
-    env: {
-      // This suite mocks the Supabase browser client. Select that provider explicitly.
-      VITE_BACKEND: "supabase",
-      VITE_SUPABASE_URL: "https://example.supabase.co",
-      VITE_SUPABASE_PUBLISHABLE_KEY: "public-test-key",
-    },
   },
 });

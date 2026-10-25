@@ -23,6 +23,7 @@ function services() {
       setImageLimits: vi.fn<ApplicationHttpServices['application']['setImageLimits']>(),
       saveMember: vi.fn<ApplicationHttpServices['application']['saveMember']>(),
       removeMember: vi.fn<ApplicationHttpServices['application']['removeMember']>(),
+      editRoster: vi.fn<ApplicationHttpServices['application']['editRoster']>(),
     },
     workflow: { execute: vi.fn<ApplicationHttpServices['workflow']['execute']>().mockResolvedValue({ outcome: 'committed', issueId: requestId }) },
     images: {
@@ -92,6 +93,19 @@ describe('Cloudflare application HTTP boundary', () => {
     expect(deps.application.setIntake).not.toHaveBeenCalled();
   });
 
+  it('passes a roster command to the service and accepts 300 teams in one request', async () => {
+    const deps = services();
+    const handle = createApplicationHandler(deps, origin);
+    const teams = Array.from({ length: 300 }, (_, index) => ({
+      id: crypto.randomUUID(), name: `Fictional team number ${index + 1}`, location: `Hall ${index % 7} · Table ${index + 1}` }));
+    const command = { type: 'add_teams', teams };
+    expect((await handle(post('/api/admin', { action: 'edit_roster', sessionId, command }))).status).toBe(200);
+    expect(deps.application.editRoster).toHaveBeenCalledWith(identity.caller, sessionId, command);
+    const invalid = await handle(post('/api/admin', { action: 'edit_roster', sessionId, command, extra: true }));
+    expect(invalid.status).toBe(400);
+    expect(deps.application.editRoster).toHaveBeenCalledTimes(1);
+  });
+
   it('bounds UTF-8 JSON bodies before invoking a command', async () => {
     const deps = services();
     const response = await createApplicationHandler(deps, origin)(post('/api/workflow', { text: 'x'.repeat(17_000) }));
@@ -109,6 +123,42 @@ describe('Cloudflare application HTTP boundary', () => {
     expect(await (await handle(post('/api/workflow', body))).json()).toEqual({ outcome: 'unknown' });
     deps.workflow.execute.mockRejectedValueOnce(new Error('Private SQL bound values.'));
     expect(await (await handle(post('/api/workflow', body))).text()).not.toContain('Private SQL');
+  });
+
+  describe('workflow response snapshot', () => {
+    const snapshot = { server_time: '2026-10-25T00:00:00Z' } as Awaited<ReturnType<ApplicationHttpServices['application']['snapshot']>>;
+    const body = { sessionId, requestId, command: {} };
+
+    it('returns the snapshot read after the commit, for the same caller and session', async () => {
+      const deps = services();
+      const order: string[] = [];
+      deps.workflow.execute.mockImplementation(async () => { order.push('commit'); return { outcome: 'committed', issueId: requestId }; });
+      deps.application.snapshot.mockImplementation(async () => { order.push('snapshot'); return snapshot; });
+      const response = await createApplicationHandler(deps, origin)(post('/api/workflow', body));
+      expect(await response.json()).toEqual({ outcome: 'committed', issueId: requestId, snapshot });
+      expect(order).toEqual(['commit', 'snapshot']);
+      expect(deps.application.snapshot).toHaveBeenCalledWith(identity.caller, sessionId);
+    });
+
+    it('keeps the commit when the snapshot read fails', async () => {
+      const deps = services();
+      deps.application.snapshot.mockRejectedValue(new Error('Private SQL bound values.'));
+      const response = await createApplicationHandler(deps, origin)(post('/api/workflow', body));
+      expect(response.status).toBe(200);
+      expect(await response.text()).not.toContain('Private SQL');
+      expect(JSON.parse(await createApplicationHandler(deps, origin)(post('/api/workflow', body)).then((r) => r.text())))
+        .toEqual({ outcome: 'committed', issueId: requestId });
+    });
+
+    it('reads nothing after a rejected or unknown command', async () => {
+      const deps = services();
+      const handle = createApplicationHandler(deps, origin);
+      deps.workflow.execute.mockResolvedValueOnce({ outcome: 'rejected', reason: 'state' });
+      await handle(post('/api/workflow', body));
+      deps.workflow.execute.mockResolvedValueOnce({ outcome: 'unknown' });
+      await handle(post('/api/workflow', body));
+      expect(deps.application.snapshot).not.toHaveBeenCalled();
+    });
   });
 
   it('requires same-origin WebSocket upgrades and does not accept a query identity', async () => {

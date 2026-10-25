@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { requireBackend } from "@/backend";
+import { backend } from "@/backend";
 import { errorMessage, WorkflowRejectedError } from "@/backend/errors";
-import type { Command } from "../model";
+import type { Command, Snapshot } from "../model";
 import { useWorkflowRetry } from "../WorkflowRetry";
 
 /** Options for one workflow command. */
@@ -52,11 +52,17 @@ export interface CommandRunner {
 export function useCommand({
   sessionId,
   refresh,
+  applySnapshot,
   onStart,
   onRecorded,
 }: {
   sessionId: string;
   refresh: () => Promise<void>;
+  /**
+   * Shows the snapshot that a recorded command returns, so no read follows.
+   * Resolves to false when the caller must read again.
+   */
+  applySnapshot?: (sessionId: string, snapshot: Snapshot) => Promise<boolean>;
   /** Runs when a command or a retry starts. */
   onStart?: () => void;
   /** Runs after the refresh that follows a recorded command. */
@@ -121,17 +127,30 @@ export function useCommand({
     pendingRequest.current = request;
     setPending(request.command);
     try {
-      const id = await requireBackend().workflows.execute(
-        request.sessionId,
-        request.request,
-        request.command,
-      );
+      const { workflows } = backend;
+      const { issueId: id, snapshot } = workflows.executeAndRead
+        ? await workflows.executeAndRead(
+            request.sessionId,
+            request.request,
+            request.command,
+          )
+        : {
+            issueId: await workflows.execute(
+              request.sessionId,
+              request.request,
+              request.command,
+            ),
+            snapshot: undefined,
+          };
       if (pendingRequest.current !== request || !mounted.current) return false;
       pendingRequest.current = undefined;
       setPending(undefined);
       // A retry must complete the original form's cleanup before enabling edits.
       if (request.sessionId === currentSessionId.current) request.onSuccess?.();
-      await refresh();
+      // The response already carries the changed snapshot, so one request is enough.
+      if (!snapshot || !(await applySnapshot?.(request.sessionId, snapshot))) {
+        await refresh();
+      }
       if (!mounted.current || request.sessionId !== currentSessionId.current)
         return false;
       onRecorded?.(id, request.command, { stayOnPage: request.stayOnPage });

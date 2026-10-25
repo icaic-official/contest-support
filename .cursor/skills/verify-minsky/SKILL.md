@@ -7,7 +7,7 @@ description: Drive the Minsky contest-support web app in a local browser and cap
 
 Minsky's primary surface is the web app. Contestants report issues. Staff claim and reply. Jury members record time awards. Administrators manage accounts. After sign-in, the membership and the window width select one of three layouts: the contestant desktop, the organiser phone layout below 1024 px, or the organiser desktop console at 1024 px and wider.
 
-This skill drives the local Cloudflare backend. D1 stores the rows. R2 is the local image bucket. A Durable Object serves live updates. The Supabase adapter stays as code that readers run on their own projects. This skill does not start it.
+This skill drives the local Cloudflare backend. D1 stores the rows. R2 is the local image bucket. A Durable Object serves live updates.
 
 This skill does not drive the documentation site, maintainer npm scripts, or a deployed Worker. Those are separate surfaces.
 
@@ -56,9 +56,9 @@ Do not start `npm run dev` for this skill. That command uses port 5173. This ski
 
 `serve` performs these steps inside the session directory:
 
-- Vite builds the frontend with `VITE_BACKEND=cloudflare`. The build reads environment files from the empty session directory, so it does not load `.env.local`.
+- Vite builds the frontend. The build reads environment files from the empty session directory, so it does not load `.env.local`.
 - Wrangler applies `src/server/adapters/d1/migrations` to a new local D1 database.
-- `bootstrapInstallation` creates the event, the Primary session, the two teams, and the admin account. It runs in a child process with the same environment as Wrangler: without `CLOUDFLARE_*`, `CF_*`, `SUPABASE_*`, or `VITE_*` variables, and with `HOME` set to the session directory. The password hash is Better Auth's hash. The operations log records the bootstrap. The local platform proxy prints a Durable Object warning because that proxy does not export `SessionLiveCoordinator`. The warning does not stop `wrangler dev`. The running Worker serves the **Live** badge.
+- `bootstrapInstallation` creates the event, the Primary session, the two teams, and the admin account. It runs in a child process with the same environment as Wrangler: without `CLOUDFLARE_*`, `CF_*`, or `VITE_*` variables, and with `HOME` set to the session directory. The password hash is Better Auth's hash. The operations log records the bootstrap. The local platform proxy prints a Durable Object warning because that proxy does not export `SessionLiveCoordinator`. The warning does not stop `wrangler dev`. The running Worker serves the **Live** badge.
 - The helper signs in as admin, changes the temporary password, opens intake, and creates the other accounts with `POST /api/accounts`. Each account then changes its temporary password through `POST /api/auth/change-password`.
 - `--seed jury` submits, claims, resolves, awards, applies, and reopens through `POST /api/workflow`. The helper does not insert auth rows or issue rows by hand.
 - `wrangler dev --local` serves the built app and the API on `https://127.0.0.1:5199`. The browser accepts the local certificate. Requests stay on the machine.

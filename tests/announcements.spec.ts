@@ -1,22 +1,28 @@
-import { type Browser, expect, type Page, test } from "@playwright/test";
-import { createJuryFixture } from "./jury-fixture";
+import type { Browser, Page } from "@playwright/test";
+import { type LocalWorker, expect, test } from "./support/localWorker";
 
-// Real announcement migration, RLS, and transactions in embedded PostgreSQL.
-// Only the hosted Auth, HTTP, and Realtime transport is simulated. Image
-// transfers are covered by the database, function, and Cloudflare service tests.
+// The real Worker announcement service and migrations on local D1. Only the
+// identity and the live socket are simulated. Image transfers are covered by
+// the Cloudflare service tests.
 
-type Local = Awaited<ReturnType<typeof createJuryFixture>>;
 const desktop = { width: 1280, height: 800 };
 const phone = { width: 390, height: 844 };
 
 async function signIn(
   browser: Browser,
-  local: Local,
+  local: LocalWorker,
   name: string,
   viewport = desktop,
+  announcementDelay = 0,
 ): Promise<Page> {
   const context = await browser.newContext({ viewport });
   await local.attach(context);
+  if (announcementDelay) {
+    await context.route(/\/api\/announcements\?/, async (route) => {
+      await new Promise((resolve) => setTimeout(resolve, announcementDelay));
+      await route.fallback();
+    });
+  }
   const page = await context.newPage();
   await page.goto("/");
   await page.getByLabel("Username", { exact: true }).fill(name);
@@ -35,8 +41,7 @@ async function publish(page: Page, title: string, details: string) {
   await expect(page.getByRole("button", { name: title })).toBeVisible();
 }
 
-test("members read published titles live and open details with the keyboard", async ({ browser }) => {
-  const local = await createJuryFixture();
+test("members read published titles live and open details with the keyboard", async ({ browser, local }) => {
   const admin = await signIn(browser, local, "admin");
   const contestant = await signIn(browser, local, "contestant");
   await expect(contestant.getByRole("heading", { name: "Announcements" })).toHaveCount(0);
@@ -55,23 +60,18 @@ test("members read published titles live and open details with the keyboard", as
   await expect(contestant.getByText(/Published by Test admin/)).toBeVisible();
   await expect(contestant.getByRole("button", { name: "Edit" })).toHaveCount(0);
   await expect(contestant.getByRole("button", { name: "New announcement" })).toHaveCount(0);
-  await local.close();
 });
 
-test("slow announcement reads never delay reporting", async ({ browser }) => {
-  const local = await createJuryFixture();
-  local.delayAnnouncements(4000);
-  const contestant = await signIn(browser, local, "contestant");
+test("slow announcement reads never delay reporting", async ({ browser, local }) => {
+  const contestant = await signIn(browser, local, "contestant", desktop, 4000);
   await contestant.getByRole("button", { name: "Report an issue" }).first().click();
   await contestant.getByLabel(/Describe|What/).first().fill("Reported while announcements load");
   const submit = contestant.getByRole("button", { name: /^(Send report|Submit|Report)/ }).last();
   await submit.click();
-  await expect.poll(() => local.workflowRequests.length, { timeout: 3000 }).toBe(1);
-  await local.close();
+  await expect.poll(() => local.bodies("/api/workflow").length, { timeout: 3000 }).toBe(1);
 });
 
-test("removed announcements leave readers and stay with managers", async ({ browser }) => {
-  const local = await createJuryFixture();
+test("removed announcements leave readers and stay with managers", async ({ browser, local }) => {
   const admin = await signIn(browser, local, "admin");
   const contestant = await signIn(browser, local, "contestant");
   await publish(admin, "Temporary notice", "Short lived.");
@@ -83,11 +83,9 @@ test("removed announcements leave readers and stay with managers", async ({ brow
   await expect(admin.getByRole("button", { name: /Temporary notice/ })).toContainText("Removed");
   await expect(admin.getByText(/Removed by Test admin/)).toBeVisible();
   await expect(admin.getByRole("button", { name: "Edit" })).toHaveCount(0);
-  await local.close();
 });
 
-test("a competing edit asks for a review and never overwrites silently", async ({ browser }) => {
-  const local = await createJuryFixture();
+test("a competing edit asks for a review and never overwrites silently", async ({ browser, local }) => {
   const first = await signIn(browser, local, "admin");
   const second = await signIn(browser, local, "jury");
   await publish(first, "Schedule", "Original details.");
@@ -122,11 +120,9 @@ test("a competing edit asks for a review and never overwrites silently", async (
   await draft.getByRole("button", { name: "Save changes" }).click();
   await expect(first.getByText("Reviewed final text.")).toBeVisible();
   await expect(second.getByText("Reviewed final text.")).toBeVisible();
-  await local.close();
 });
 
-test("the announcement strip fits a phone without horizontal scrolling", async ({ browser }) => {
-  const local = await createJuryFixture();
+test("the announcement strip fits a phone without horizontal scrolling", async ({ browser, local }) => {
   const admin = await signIn(browser, local, "admin", desktop);
   await publish(admin, "A long announcement title that wraps onto several lines on a narrow phone screen", "Details.");
   const volunteer = await signIn(browser, local, "volunteer", phone);
@@ -143,11 +139,9 @@ test("the announcement strip fits a phone without horizontal scrolling", async (
   await expect(strip.getByRole("button", { name: "Hide announcements" })).toBeVisible();
   await expect(strip.getByRole("button", { name: "New announcement" })).toBeVisible();
   expect(await strip.evaluate((element) => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(0);
-  await local.close();
 });
 
-test("an open announcement form fits on a laptop screen without scrolling inside the strip", async ({ browser }) => {
-  const local = await createJuryFixture();
+test("an open announcement form fits on a laptop screen without scrolling inside the strip", async ({ browser, local }) => {
   const admin = await signIn(browser, local, "admin", { width: 1280, height: 720 });
   await publish(admin, "Room change", "Use room 2.");
   await admin.getByRole("button", { name: "New announcement" }).click();
@@ -161,11 +155,9 @@ test("an open announcement form fits on a laptop screen without scrolling inside
   await admin.getByRole("button", { name: "Edit", exact: true }).click();
   const edit = admin.locator("form").filter({ hasText: "Edit announcement" });
   await expect(edit.getByRole("button", { name: "Save changes" })).toBeInViewport({ ratio: 1 });
-  await local.close();
 });
 
-test("the strip lists the two newest announcements and shows the rest on request", async ({ browser }) => {
-  const local = await createJuryFixture();
+test("the strip lists the two newest announcements and shows the rest on request", async ({ browser, local }) => {
   const admin = await signIn(browser, local, "admin");
   await publish(admin, "First notice", "Oldest.");
   await publish(admin, "Second notice", "Middle.");
@@ -185,11 +177,9 @@ test("the strip lists the two newest announcements and shows the rest on request
   await fewer.click();
   await expect(oldest).toHaveCount(0);
   await expect(more).toBeVisible();
-  await local.close();
 });
 
-test("an announcement that a manager is editing stays listed when a new one pushes it down", async ({ browser }) => {
-  const local = await createJuryFixture();
+test("an announcement that a manager is editing stays listed when a new one pushes it down", async ({ browser, local }) => {
   const admin = await signIn(browser, local, "admin");
   const jury = await signIn(browser, local, "jury");
   await publish(admin, "First notice", "Oldest.");
@@ -209,11 +199,9 @@ test("an announcement that a manager is editing stays listed when a new one push
   await draft.getByRole("button", { name: "Cancel edit" }).click();
   await expect(admin.getByRole("button", { name: "Second notice" })).toHaveCount(0);
   await expect(admin.getByRole("button", { name: "Show 2 more" })).toBeVisible();
-  await local.close();
 });
 
-test("a member hides the strip, it stays hidden after a refresh, and a new announcement shows it again", async ({ browser }) => {
-  const local = await createJuryFixture();
+test("a member hides the strip, it stays hidden after a refresh, and a new announcement shows it again", async ({ browser, local }) => {
   const admin = await signIn(browser, local, "admin");
   await publish(admin, "Lunch moves", "Lunch is at noon.");
   const volunteer = await signIn(browser, local, "volunteer");
@@ -250,11 +238,9 @@ test("a member hides the strip, it stays hidden after a refresh, and a new annou
   await expect(lunch).toBeVisible();
   await expect(lunch).toHaveAttribute("aria-expanded", "true");
   await expect(volunteer.getByText("Lunch is at noon.")).toBeVisible();
-  await local.close();
 });
 
-test("a manager can hide the strip and keeps an unsent draft", async ({ browser }) => {
-  const local = await createJuryFixture();
+test("a manager can hide the strip and keeps an unsent draft", async ({ browser, local }) => {
   const admin = await signIn(browser, local, "admin");
   await publish(admin, "Room change", "Use room 2.");
   await admin.getByRole("button", { name: "New announcement" }).click();
@@ -269,5 +255,4 @@ test("a manager can hide the strip and keeps an unsent draft", async ({ browser 
   await admin.getByRole("button", { name: "Show announcements", exact: true }).click();
   await expect(create.getByLabel("Title")).toHaveValue("Unsent title");
   await expect(admin.getByRole("button", { name: /Room change/ })).toBeVisible();
-  await local.close();
 });

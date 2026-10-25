@@ -17,7 +17,7 @@ The docs site's earlier build and browser checks passed. Those checks do not est
 
 The entries below record the original T0011 audit and its T0007 dependency.
 T0020 now owns complete Cloudflare installation verification and the [PR #21 component review](history/pr21-installation-disposition.md).
-T0020 merged in PR #42. Its authorization and limits are in [its ticket](tickets.md#t0020-complete-cloudflare-connector).
+T0020 merged in PR #42. Its authorization and limits are in [its ticket](history/tickets.md#t0020-complete-cloudflare-connector).
 This audit does not authorize repository publication or license selection.
 Capacity validation and outage features retain their existing scope and remain separate work.
 
@@ -69,7 +69,7 @@ Do not add a version selector before there are distinct versions worth maintaini
 ### 3. Remove the shared-development assumption
 
 **Observed:** [README setup](../README.md#local-development) and [contributor setup](../site/src/content/docs/contributing/development.md) assume the project's development backend.
-The root Wrangler configuration targets the original installation. On 2026-10-24 the Supabase retirement removed `cloud:link` and `cloud:functions`, which targeted the project's own Supabase project.
+The root Wrangler configuration targets the original installation.
 The public contributor guide omits the fork and clone steps.
 
 **Complete when:** a new contributor can clone a fork and run ordinary checks without provider access.
@@ -109,7 +109,7 @@ Resolve the ordering of the frontend hostname, backend redirect settings, and fi
 
 ### 6. Add a configuration reference
 
-**Observed:** `.env.example`, `supabase/config.toml`, Wrangler files, and installation prose each describe part of the configuration.
+**Observed:** `.env.example`, Wrangler files, and installation prose each describe part of the configuration.
 There is no public table of names, requirements, defaults, or when a changed value takes effect.
 
 **Complete when:** document the supported configuration values from the selected release.
@@ -122,7 +122,7 @@ Document T0007 configuration only for a revision that contains those files.
 ### 7. State exact workflow permissions
 
 **Observed:** [staff](../site/src/content/docs/guides/staff.md), [contestant](../site/src/content/docs/guides/contestants.md), and [jury](../site/src/content/docs/guides/jury.mdx) guides omit important action restrictions.
-The workflow implementation in `supabase/migrations/202610020003_private_signals.sql` requires the following:
+The shared workflow service in `src/server/workflow.ts` requires the following:
 
 - Only the current support owner can request a handoff or resolve the issue.
 - A different specialist must accept the handoff. An owner with specialist access cannot accept their own handoff.
@@ -140,7 +140,7 @@ Explain the difference between a reply, image upload, award decision, and extern
 
 **Observed:** [administration](../site/src/content/docs/guides/administration.md) omits username validation and account-wide permission restrictions.
 It omits what to do if the one-time credential response is lost.
-[Run the Supabase adapter](supabase-provider.md) contains more detail than the public guide.
+[Cloudflare authentication reference](cloudflare-authentication.md) contains more detail than the public guide.
 
 **Complete when:** document the 3–32 character username rule, lowercase storage, and required initial letter or digit.
 Explain the temporary credential display and recovery after a lost response.
@@ -153,7 +153,7 @@ Document the distinction between the current password and the new password durin
 
 **Observed:** [troubleshooting](../site/src/content/docs/operators/troubleshooting.md) sends users to an organizer for password recovery.
 It gives no public procedure for loss of the sole administrator account.
-The repository already contains `scripts/recover-admin.mjs` and a Supabase procedure in [Run the Supabase adapter](supabase-provider.md#recover-the-only-admin).
+The repository already contains `scripts/recover-cloudflare-admin.mjs` and the [owner recovery procedure](../site/src/content/docs/operators/installation.mdx#recover-the-owner).
 
 **Complete when:** publish a scoped operator procedure with the required provider access and explicit project check.
 Explain private handling of the generated password, prior-session invalidation, and the next required password change.
@@ -201,7 +201,7 @@ Do not present it as the destination for an unrelated competition.
 ### 13. Add a concise explanation of the system
 
 **Observed:** public pages explain tasks but provide no architecture page, shared glossary, or lifecycle diagram.
-**T0023 (2026-10-22):** Excalidraw diagrams now show the issue lifecycle with timer behavior, the award flow, and the Cloudflare architecture. A glossary and a Supabase architecture view remain open.
+**T0023 (2026-10-22):** Excalidraw diagrams now show the issue lifecycle with timer behavior, the award flow, and the Cloudflare architecture. A glossary remains open.
 
 **Complete when:** show how the browser, static host, Auth, database, Realtime, Storage, and privileged functions relate.
 Explain event, session, team, issue, owner, handoff, resolution, award, and external application.
@@ -315,7 +315,7 @@ These are existing behavior rules. The proposed fixes clarify the guides and int
 | Resolved issues reject replies and internal notes | Staff and contestant guides explain reopening. Jury guide explains its reopening limit. | Include the rule in the action/state table and check the closed-conversation explanation. |
 | Account-wide resets require admin access to all assigned sessions | Administrator guide states the permission requirement and archived-membership restriction. | Add a troubleshooting example for an admin who controls only one of the account's sessions. |
 
-Source: `supabase/migrations/202610020003_private_signals.sql` for issue actions and `supabase/migrations/202610020004_usernames.sql` for account administration.
+Source: `src/server/workflow.ts` for issue actions and `src/server/adapters/cloudflare/application.ts` for account administration.
 The broader permission table and account-guide work in findings 7 and 8 remain incomplete.
 
 ## Recommended order

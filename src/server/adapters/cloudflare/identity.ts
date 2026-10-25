@@ -23,6 +23,33 @@ export interface IdentityOptions {
   secureCookies: boolean;
   /** Defaults to the maintained Better Auth hasher. */
   hasher?: PasswordHasher;
+  /**
+   * Compares Better Auth's expected tables with the database before each
+   * request. The Worker leaves this off: every request builds a new instance,
+   * so the check cost about 36 D1 queries per request. The D1 migrations own
+   * the schema, and a test turns this on to compare them with Better Auth.
+   */
+  validateSchema?: boolean;
+}
+
+const instances = new WeakMap<object, { origin: string; secret: string; identity: IdentityProvider }>();
+
+/**
+ * Reuses one identity provider for each D1 binding, origin, and secret. Building
+ * a Better Auth instance takes about 17 ms of CPU, and a Worker used to build
+ * one for every request. The instance holds no per-request state: the cookie
+ * cache is off and every call reads its session from D1. A changed origin or
+ * secret builds a new instance, so an old cookie never outlives its secret.
+ */
+export function sharedBetterAuthIdentity(
+  database: NonNullable<BetterAuthOptions["database"]> & object,
+  options: IdentityOptions,
+): IdentityProvider {
+  const current = instances.get(database);
+  if (current && current.origin === options.origin && current.secret === options.secret) return current.identity;
+  const identity = createBetterAuthIdentity(database, options);
+  instances.set(database, { origin: options.origin, secret: options.secret, identity });
+  return identity;
 }
 
 /**
@@ -77,6 +104,7 @@ export function createBetterAuthIdentity(
       cookieCache: { enabled: false },
     },
     advanced: {
+      database: { validateSchema: options.validateSchema ?? false },
       // Better Auth otherwise adds its own __Secure- prefix before this exact
       // __Host- name. Secure remains explicit in the cookie attributes below.
       useSecureCookies: false,

@@ -25,14 +25,14 @@
 - Contribution types include, but are not limited to: `bugfix`, `build`, `feature`, `style`, `refactor`, `perf`, `test`, `ci`, `chore`, `docs`.
 - Name every branch `<type>/<title>`, whether or not it gets a PR. For example: `bugfix/race-request-fix` or `feature/session-announcements`.
 - Write each commit message in this form. Merge commits are exempt.
-
   ```
-  <type>[optional scope]: <description>
+  [Type]: <description>
 
   [optional body]
 
   [optional footer(s)]
   ```
+  - The first letter of the type is to be capitalized.
 
 - Write pull requests with [the PR template](.github/pull_request_template.md). It defines the PR title and description format.
 
@@ -40,32 +40,62 @@
 
 On 2026-10-23 the owner selected Cloudflare as the live backend.
 The development Worker is `minsky-dev`. The development D1 database is `minsky-development`.
-On 2026-10-24 the owner retired the project's hosted Supabase setup. The project no longer operates Supabase projects.
-The Supabase adapter stays as a second implementation behind the shared backend interfaces. Anyone can run it on their own Supabase project with [Run the Supabase adapter](docs/supabase-provider.md).
-Keep its adapter, migrations, functions, local tests, and provider test driver. Every local Supabase adapter test must keep passing.
-Do not describe it as the live backend, the default setup, or the development URL's backend.
-Do not change hosted Supabase or Cloudflare resources, secrets, or repository settings.
-Exception: preview resources. On 2026-10-24 the owner allowed agents to create and manage Cloudflare resources for branch previews.
-This includes their D1 migrations, test data, test accounts, and preview secrets.
-Give each preview resource a name that starts with `minsky-preview`.
-The exception does not cover development, CI, or production resources, API tokens, or account and repository settings.
+On 2026-10-25 the owner decided to remove the Supabase implementation. Cloudflare is the only backend.
+Build and test new features for Cloudflare only. Do not extend, run, or test the Supabase adapter. Do not add Supabase code to new features.
+Keep the shared backend contracts in `src/backend/contracts.ts`, so that a later provider can implement them.
+Do not add or test another provider adapter until the owner states that the codebase is complete.
+Until the removal pull request merges, existing Supabase tests can still run in `npm test`. Do not add to them.
+
+Do not change hosted Cloudflare resources, secrets, or repository settings, except as the rules below allow.
+
+- **Preview resources.** On 2026-10-24 the owner allowed agents to create and manage Cloudflare resources for branch previews.
+  This includes their D1 migrations, test data, test accounts, and preview secrets.
+  Give each preview resource a name that starts with `minsky-preview`.
+- **Production resources.** On 2026-10-25 the owner allowed agents to create the production resources: the Worker, its D1 database, its R2 bucket, and their secrets.
+  Give each production resource a name that starts with `minsky-prod`.
+  Each production deployment and each production D1 migration needs the owner's explicit approval for that release. Ask before each one.
+- **API tokens.** On 2026-10-25 the owner allowed agents to create and delete scoped Cloudflare API tokens. Follow [API tokens for agents](#api-tokens-for-agents).
+
+These rules do not cover development or CI resources, the `minsky-dev` trigger, account members, billing, or account and repository settings.
 
 Start new work from updated `main`. Open the result as a draft pull request into `main`.
 Preserve the Workers Builds move and the removed GitHub Actions workflow.
 Do not add an Actions job.
 Browser suites and hosted provider checks stay manual commands.
-`npm run ci` lists provider scenarios. It does not run the hosted Supabase provider suite.
+`npm run ci` runs no hosted provider suite.
 On 2026-10-24 the owner chose automatic publication of `main` to `minsky-dev` through one Workers Builds trigger. That trigger runs `npm run ci` and then `npm run deploy`. Builds for other branches stay disabled on `minsky-dev`. Do not change the trigger or its token yourself.
 `minsky-docs` publishes through Workers Builds. A push to `main` publishes the docs. A push to another branch uploads a preview version that does not receive traffic.
-Do not deploy.
+Do not deploy, except to preview resources. Production deployments need the owner's approval, as stated above.
 The owner reviews and merges.
 
 T0021's separately approved Cloudflare activation and repeat deployment retain their dated evidence in [run log](docs/history/run-log.md#t0021-approved-activation-2026-10-19).
-The retired Supabase projects `Minsky` and `Minsky CI` still exist until the owner deletes them. Do not use them. Development, CI, and installation-verification resources remain separate.
+The retired Supabase projects `Minsky` and `Minsky CI` and the `SUPABASE_*` repository secrets still exist until the owner deletes them. Do not use or change them. Development, CI, and installation-verification resources remain separate.
 Earlier provider permissions and exact protected branch limits remain in the [planning log](docs/history/plan-log.md) and dated run records.
 Those historical approvals do not authorize a new activation or deployment.
 Statements in those records that Supabase is the active backend are superseded by the 2026-10-23 decision.
 Statements that the project keeps or uses its own Supabase projects are superseded by the 2026-10-24 decision.
+Statements that the Supabase adapter stays as a second implementation are superseded by the 2026-10-25 decision.
+
+## API tokens for agents
+
+An API token is a secret key that lets a program call the Cloudflare API with a fixed set of permissions.
+On 2026-10-25 the owner allowed agents to create the tokens that their work needs. The owner also asked to keep the number of new tokens small.
+A token that can create tokens can grant itself any permission. So these rules are the limit. Follow each one.
+
+- Create a token only when no existing credential can do the task. Before you create one, run `npm run token:list` and reuse an agent token that already has the scope you need.
+- Create one token for each purpose, not one for each command. Keep it until its task ends.
+- Create tokens only with `npm run token:create`. The script enforces the rules below. It writes the token value to a new file that only you can read, and never prints it.
+- The script reads the token-creation key from `CLOUDFLARE_TOKEN_ADMIN` in `.env.local`. Never copy that key into another variable, file, command, or log.
+- Wrangler reads `CLOUDFLARE_API_TOKEN`. Never put the token-creation key there.
+- Grant only the permissions that the task needs. Limit each policy to the Minsky account, one zone, or one R2 bucket. Use the narrowest of these that Cloudflare supports for the permission. Never grant a permission on all accounts or all zones.
+- D1 permissions cover every database in the account. Grant D1 write only when the task must write through the API, and delete that token when the task ends.
+- Grant only Workers, D1, R2, analytics, zone, and DNS permissions. The script refuses every other permission, including API tokens, account members, billing, account settings, Access, Zero Trust, Workers Admin, and Workers CI Write.
+- Name each token `minsky-agent-<purpose>-<YYYYMMDD>`.
+- Set an expiry. The default is 30 days. The maximum is 90 days.
+- Use the narrowest storage that works: the process environment of one command, a Cloudflare secret, or a Workers Builds variable. Never commit a token or print it in a log, a pull request, or a reply.
+- Delete a token when its task ends, with `npm run token:delete -- <id>`. The script deletes only tokens that an agent created.
+- Do not create a token for the `minsky-dev` Workers Builds trigger. The owner manages that trigger and its token.
+- `npm run token:list` is the record of agent tokens. It shows each token's name, ID, status, expiry, permissions, and resources. Name the token in the pull request or report that uses it.
 
 ## Code and documentation cleanup
 - Subtract before adding. Remove code that the current architecture no longer needs.
@@ -151,14 +181,14 @@ The Cloudflare development resources are `minsky-development` and private bucket
 The Cloudflare preview resources are D1 database `minsky-preview` and private bucket `minsky-preview-images`. They hold only test data.
 Never point a preview at development, CI, or production resources.
 On-demand hosted Cloudflare checks use the separate connector and store CI targets.
-The project operates no Supabase project. Hosted Supabase checks run only against an isolated project that the person running them owns.
-No production project exists.
+The project operates no Supabase project.
+Production resources do not exist yet. Their names start with `minsky-prod`.
 
 For each ticket, use this sequence:
 
 1. Create the ticket branch from updated `main`.
 2. Develop against the Cloudflare development installation. Its Worker is `minsky-dev` and its D1 database is `minsky-development`.
-3. Add repository-owned migrations for the provider you change.
+3. Add repository-owned D1 migrations for the schema you change.
 4. Run fast checks.
 5. Prepare the PR.
 6. Run cloud integration checks on the reviewed revision.
@@ -169,7 +199,7 @@ For each ticket, use this sequence:
 Automatic GitHub Actions publication is removed. Workers Builds publishes `minsky-dev` from `main`.
 Report a manual publication separately from merge. Record its exact source revision.
 Prepare compatible backend changes before a dependent frontend merges, or pause frontend deployment for that release.
-Hosted Supabase and Cloudflare checks are on-demand commands against isolated targets.
+Hosted Cloudflare checks are on-demand commands against isolated targets.
 Ordinary Workers Builds checks run without cloud credentials.
 Record local cloud runs separately from earlier protected GitHub Actions runs.
 Neither replaces the other. GitHub Actions no longer runs those checks.
@@ -181,14 +211,12 @@ Never copy real accounts into CI.
 Never reset a shared project.
 Confirm the target before you apply migrations or deploy functions.
 
-After production is selected and provisioned, validate the approved revision on development and CI.
+For each production release, validate the approved revision on development and CI.
+Ask the owner to approve the release.
 Then apply its D1 migrations to production.
 Deploy the complete Worker, its bindings, and its static assets.
 Verify the production deployment afterward.
-The Supabase adapter keeps its own migration, function, and frontend order in [Run the Supabase adapter](docs/supabase-provider.md).
-Production setup remains future work.
 
-This future production work does not authorize provider resource creation or upgrades now.
 These operational items stay deferred:
 
 - Ownership and billing records.
@@ -243,7 +271,7 @@ Only the uploader can remove a ready image during that time.
 Session admins set the file size, image count, and combined size limits. There is no upload-disable control.
 Contestants can view only team-visible images on their own team's issues.
 
-Keep both provider implementations in the repository. Use embedded PostgreSQL for fast Supabase policy and transaction checks.
+Cloudflare is the only provider implementation. Test D1 rules and transactions with local D1 emulation.
 Docker is optional. Privileged credentials stay outside Git and frontend builds.
 Cloud CI uses isolated fictional fixtures. Provider access does not grant application membership.
 A free-tier pilot does not establish production capacity.

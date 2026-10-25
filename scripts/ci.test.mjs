@@ -9,15 +9,13 @@ describe('Workers Builds command list', () => {
       'npm ci --prefix site',
       'npm run build',
       'npm run lint',
-      'npm run check:functions',
-      'npm run test:functions',
       'npm test',
       'npm run test:providers:list',
       'npm run docs:build',
       'npm audit --package-lock-only --audit-level=high',
       'npm audit --prefix site --package-lock-only --audit-level=high',
     ]);
-    expect(flat.join('\n')).not.toMatch(/playwright|test:e2e|test:cloud|wrangler deploy|test:auth/);
+    expect(flat.join('\n')).not.toMatch(/playwright|test:e2e|wrangler deploy|test:auth/);
   });
 
   test('pins the retired workflow Gitleaks release', () => {

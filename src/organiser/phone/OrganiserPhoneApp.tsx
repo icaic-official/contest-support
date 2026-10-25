@@ -64,6 +64,7 @@ const pageTabs: Record<WorkspacePage, OrganiserTab> = {
   awards: "awards",
   overview: "session",
   accounts: "session",
+  roster: "session",
   settings: "session",
   account: "me",
 };
@@ -224,7 +225,7 @@ export function OrganiserPhoneApp({
               )
             }
           />
-          <div className="flex-1 space-y-4 overflow-y-auto px-4 pb-6">
+          <div className="relative flex-1 space-y-4 overflow-y-auto px-4 pb-6">
             <PhoneStatus state={state} data={data} command={command} />
             {leftNotice && (
               <p role="status" className="text-sm text-muted-foreground">

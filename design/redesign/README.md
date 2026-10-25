@@ -3,7 +3,7 @@
 Status: **direction chosen (2026-10-17) and implemented in T0015 (2026-10-18)**. [PR #44](https://github.com/GiftedNovaHD/minsky/pull/44) merged it on 2026-10-21. See [section 6](#6-chosen-direction-2026-10-17).
 This file is the design record. [Frontend architecture](../../docs/frontend-architecture.md) describes the implemented code.
 Sections 1 to 5 describe the app before T0015 and the proposals at that time.
-The mockups use fictional sample data. They do not connect to Supabase.
+The mockups use fictional sample data. They do not connect to a backend.
 
 ## 1. What the app does today
 
@@ -170,7 +170,7 @@ The step 5 integration also moved the T0009 jury worklist into the phone **Award
 
 ### Proposed implementation split
 
-The work is too large for one change. Proposed chats, all on one ticket branch. The work followed this split. The desktop console became an extra step 4 (step 2b), and integration became step 5. See [T0015](../../docs/tickets.md#t0015--organiser-and-contestant-frontend-redesign).
+The work is too large for one change. Proposed chats, all on one ticket branch. The work followed this split. The desktop console became an extra step 4 (step 2b), and integration became step 5. See [T0015](../../docs/history/tickets.md#t0015--organiser-and-contestant-frontend-redesign).
 
 1. **Foundation:** Tailwind v4, shadcn/ui setup, design tokens, split `ConnectedApp.tsx` into data hooks, sign-in and password screens, and selection of the UI by account type.
 2. **Organiser app:** tabs, queue, issue view, sheets, find, awards, session admin. This step can split further.

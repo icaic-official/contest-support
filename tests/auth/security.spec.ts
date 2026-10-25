@@ -69,7 +69,6 @@ test.describe('Worker authentication browser security', () => {
     expect(restored.status).toBe(200);
     expect(restored.body.user.id).toBe(fixture.id);
     expect(restored.body.status.must_change).toBe(true);
-    expect((await request(page, '/api/auth/sessions')).status).toBe(403);
 
     for (const csrf of ['missing', 'wrong'] as const) {
       expect((await request(page, '/api/auth/sign-out', {}, csrf)).status).toBe(403);
@@ -81,7 +80,6 @@ test.describe('Worker authentication browser security', () => {
       currentPassword: fixture.password, newPassword: password,
     })).status).toBe(200);
     expect((await request(page, '/api/auth/session')).body.status.must_change).toBe(false);
-    expect((await request(page, '/api/auth/sessions')).status).toBe(200);
     const priorCookies = await context.cookies();
     expect((await request(page, '/api/auth/sign-out', {})).status).toBe(200);
     expect((await request(page, '/api/auth/session')).status).toBe(401);

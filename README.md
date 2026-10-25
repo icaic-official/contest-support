@@ -7,10 +7,9 @@ Administrators manage accounts, roles, and contestant intake.
 Staff can attach images to issues and choose staff-only or team visibility.
 
 The app uses React, TypeScript, Vite, Tailwind CSS, and shadcn/ui.
-Its shared [backend contract](docs/backend-contracts.md) has Supabase and Cloudflare implementations.
+Its shared [backend contract](docs/backend-contracts.md) defines the provider boundary. Cloudflare is the only implementation.
 The [development application](https://minsky-dev.icaic-minsky.workers.dev) runs Cloudflare. See [run log](docs/history/run-log.md) for its deployed source.
 The Cloudflare installation serves the frontend and API through Workers, with D1, private R2 images, and Durable Object live updates.
-Both providers retain the shared workflow behavior. The project operates no Supabase project. You can run the Supabase adapter on your own project.
 
 The frontend separates contestant screens, organiser screens, and shared session hooks.
 `src/connected/` owns account checks, workspace state, browser routes, and workflow retry protection.
@@ -20,7 +19,7 @@ See [frontend architecture](docs/frontend-architecture.md) for module responsibi
 Use [the installation guide](site/src/content/docs/operators/installation.mdx) for an isolated Cloudflare instance.
 The owner merged T0021 in [PR #43](https://github.com/GiftedNovaHD/minsky/pull/43) at `4e43739` on 2026-10-19.
 The owner separately approved the Cloudflare switch and a repeat automated deployment.
-It transferred no Supabase accounts, passwords, records, images, or IDs.
+It transferred no accounts, passwords, records, images, or IDs from the earlier backend.
 See [run log](docs/history/run-log.md#t0021-approved-activation-2026-10-19) for the deployment results and [activation](docs/activate-cloudflare-development.md) for the procedure.
 These are development installations that require connectivity. Live-contest readiness and capacity for 800 simultaneous users remain unverified.
 
@@ -51,7 +50,6 @@ cp .env.example .env.local
 npm run dev
 ```
 
-`.env.example` sets `VITE_BACKEND=cloudflare`.
 Open [http://127.0.0.1:5173](http://127.0.0.1:5173).
 Sign-in on that Vite server fails because the API is absent.
 Use `npm run test:connector:ui:local` for a temporary local Cloudflare application.
@@ -60,20 +58,13 @@ Use the hosted development app for the shared development data.
 ### Lapiz preview
 
 [`lapiz.deploy.json`](lapiz.deploy.json) and [`.lapiz/`](.lapiz) run a preview of the Cloudflare application on a Lapiz host.
-The preview uses only local emulation of D1, R2, and Durable Objects in `.lapiz/state/`. It never connects to hosted Cloudflare or Supabase resources.
+The preview uses only local emulation of D1, R2, and Durable Objects in `.lapiz/state/`. It never connects to hosted Cloudflare resources.
 On the first start, `.lapiz/bootstrap.ts` bootstraps the installation from `src/server/adapters/cloudflare/tooling/competition.example.json`.
 
 The preview prints the first admin's username and temporary password in its start log on each start. This is deliberate, for debugging.
 Anyone who can read that log can sign in as that admin. Use only fictional data in the preview.
 
 `npm run typecheck` does not check `.lapiz/bootstrap.ts`. The preview setup bundles it with esbuild, which does not check types.
-
-### Supabase adapter
-
-The project does not operate a Supabase installation. The Supabase adapter stays as a second implementation that you can run on your own Supabase project.
-Set `VITE_BACKEND=supabase`, `VITE_SUPABASE_URL`, and `VITE_SUPABASE_PUBLISHABLE_KEY` in `.env.local` to select it.
-Never put a service credential in a `VITE_` variable.
-[Run the Supabase adapter](docs/supabase-provider.md) gives the complete procedure: create and link a project, apply the migrations, deploy the functions, make the first admin, and run the checks.
 
 ## Checks and common commands
 
@@ -88,9 +79,7 @@ Never put a service credential in a `VITE_` variable.
 | `npm run typecheck` | Check TypeScript. |
 | `npm run lint` | Run ESLint. |
 | `npm run ci` | Run the Workers Builds check: installs, type checking, lint, unit tests, both builds, audits, and the Gitleaks scan. |
-| `npm run check:functions` | Check the Supabase `admin`, `attachments`, `announcement-images`, `avatars`, and `workflow` functions with Deno. |
-| `npm run test:functions` | Test the attachment, announcement image, and avatar functions with fake clients. |
-| `npm test` | Run unit, script, and embedded database tests without cloud credentials. |
+| `npm test` | Run unit and script tests without cloud credentials. |
 | `npm run test:d1` | Run every D1 workflow case with local emulation and current identity guards. |
 | `npm run test:connector:runtime` | Run the complete connector through a temporary local HTTPS Worker, D1, R2, and Durable Objects. |
 | `npm run test:connector:ui:local` | Build a temporary Cloudflare frontend and run the complete React journey on local HTTPS and real emulated bindings. |
@@ -98,17 +87,15 @@ Never put a service credential in a `VITE_` variable.
 | `npm run test:connector:workflow:hosted -- --config=… --account=… --database=…` | Run every workflow case on the confirmed D1-only store CI target. |
 | `npm run test:connector:accounts:hosted -- --config=… --account=… --database=…` | Check account guards on the same D1-only store CI target. |
 | `npm run cloudflare:install -- plan --settings=… --config=…` | Inspect an independent Cloudflare installation plan without provider changes. See the [installation guide](site/src/content/docs/operators/installation.mdx). |
-| `npm run test:workflow:hosted` | Verify the shared workflow through the deployed Supabase `workflow` function on your isolated test project. Requires `MINSKY_TEST_PROJECT_REF`. See [the Supabase workflow check](docs/run-provider-tests.md#run-the-shared-workflow-check). |
 | `npm run test:auth` | Run Cloudflare account and permission tests on local D1. |
 | `npm run test:auth:browser` | Check cookies, origins, and request protection with a local HTTPS Worker and Chromium. |
 | `npm run test:auth:hosted -- --account=… --database=…` | Run account cases on the explicit isolated hosted authentication D1 target. |
 | `npm run test:auth:http -- --account=… --database=… --origin=…` | Check the isolated deployed authentication Worker. |
 | `npm run test:auth:hash` | Measure password cost in a temporary local Worker. |
+| `npm run load -- <command>` | Run a load test against an isolated installation: `competition`, `setup`, `run`, `analytics`, and `cleanup`. See [Run a load test](docs/run-load-tests.md). |
 | `npm run test:e2e:smoke` | Run the critical-path browser files `tests/landing.spec.ts` and `tests/journey.spec.ts`. |
-| `npm run test:e2e` | Run every mocked browser test, including the smoke files. |
-| `npm run test:cloud` | Run the Supabase browser suite with isolated fixtures on your test project. Requires `MINSKY_TEST_PROJECT_REF`. |
+| `npm run test:e2e` | Run every mocked browser test, including the smoke files. The specs use the Cloudflare client. They serve the real Worker routes from the test process. See [the browser suite](#the-mocked-browser-suite). |
 | `npm run test:providers:list` | List the shared provider scenarios without hosted credentials. |
-| `npm run test:providers -- --provider=supabase` | Run the shared contracts against your explicitly configured isolated Supabase project. |
 | `npm run test:providers -- --provider=cloudflare --config=… --account=… --database=… --origin=…` | Run the same contracts through the isolated Cloudflare browser adapter. |
 
 Install the Chromium build that matches the installed Playwright (1.64) before browser tests:
@@ -121,28 +108,36 @@ If the default browser folder is not writable, set `PLAYWRIGHT_BROWSERS_PATH` to
 If your shell sets `NODE_ENV=production`, unset it before `npm run dev` or `npm run test:e2e`. Otherwise the page stays blank.
 
 These commands connect to provider accounts. Several of them change hosted data or deployments. Confirm the target before you run them.
-`cloud:login`, `cloud:plan`, `cloud:migrate`, `cloud:bootstrap`, and `cloud:recover-admin` belong to the Supabase adapter. They act on the project that you linked with `npx supabase link --project-ref <your-project-ref>`.
 
 | Command | Purpose |
 | --- | --- |
-| `npm run cloud:login` | Sign in to the Supabase CLI. |
-| `npm run cloud:plan` | Show the migrations that `cloud:migrate` would apply. |
-| `npm run cloud:migrate` | Apply migrations to the linked project. |
-| `npm run cloud:bootstrap` | Make the first session admin. |
-| `npm run cloud:recover-admin` | Reset a Supabase provider administrator when that provider's only admin cannot sign in. |
 | `npm run cloudflare:recover-admin` | Reset the password of an existing Cloudflare admin. Prints the temporary password once in that terminal. |
 | `npm run cloud:hosting-login` | Sign in to Cloudflare with Wrangler. |
+| `npm run token:create -- <request.json> --out <file>` | Create a scoped Cloudflare API token for an agent task. Needs `CLOUDFLARE_TOKEN_ADMIN`. See [API tokens for agents](AGENTS.md#api-tokens-for-agents). |
+| `npm run token:list` | List the tokens that agents created, with their permissions and expiry. |
+| `npm run token:delete -- <id>` | Delete a token that an agent created. |
 
-See [Run the Supabase adapter](docs/supabase-provider.md) for the exact arguments and the `npx supabase functions deploy` commands.
-
-Deno and the provider CLIs are pinned npm dependencies.
-For the hosted Supabase commands, follow [Run against the Supabase provider](docs/run-provider-tests.md#run-against-the-supabase-provider).
 For shared adapter checks, follow [Run the shared provider tests](docs/run-provider-tests.md).
 The two hosted store commands accept the optional [D1 API transport](docs/run-provider-tests.md#use-the-d1-api-transport).
 Run those API commands in sequence. Default binding checks and protected CI keep their existing transport.
-`VITE_BACKEND` defaults to `cloudflare`. Set `VITE_BACKEND=supabase` to select the Supabase provider.
 Cloudflare cookies and API requests require the same origin. A plain Vite server does not supply that API.
 If a hosted fixture cleanup fails, follow [Recover an incomplete fixture](docs/run-provider-tests.md#recover-an-incomplete-fixture).
+
+### The mocked browser suite
+
+`npm run test:e2e` starts a Vite server.
+Playwright routes each `/api` request to the Worker HTTP handlers in `src/server`.
+UI specs use in-memory data from `tests/support/worker.ts`.
+Workflow specs use the real Cloudflare services on a local D1 database from `tests/support/localWorker.ts`.
+Identity and the live socket are simulated. No hosted provider is contacted. A test fails if a page requests another host.
+
+The server uses port 4173. Set `PLAYWRIGHT_PORT` to use another port, for example when two checkouts run the suite at the same time:
+
+```sh
+PLAYWRIGHT_PORT=4401 npm run test:e2e
+```
+
+Outside CI, Playwright reuses a server that already listens on the port. Give each checkout its own port so that a run does not test another checkout's server.
 
 ## Documentation
 
@@ -181,8 +176,9 @@ The [T0021 activation record](docs/history/run-log.md#t0021-approved-activation-
 Plans and rules:
 
 - [Contributor rules](AGENTS.md), the [planning record](PLAN.md), and the [roadmap](ROADMAP.md) for the technology stack.
+  [AGENTS.md](AGENTS.md#api-tokens-for-agents) also states which Cloudflare tokens and resources agents can create.
 - [Product direction](docs/product-direction.md) — agreed requirements and open decisions.
-- [Development tickets](docs/tickets.md) — ticket scope, status, and acceptance criteria.
+- [Development tickets](docs/history/tickets.md) — ticket scope, status, and acceptance criteria.
 - [Writing guide](docs/writing-guide.md) and [documentation release plan](docs/documentation-release-plan.md).
 - [Code quality](docs/code-quality.md) — CI summary, dependency policy, secret scanning, and review requirements.
 
@@ -197,9 +193,10 @@ Backend:
 - [Server workflow reference](docs/server-workflow.md) inventories existing rules and the shared service and persistence boundaries.
 - [Session announcements](docs/session-announcements.md) is the reference for announcement behavior on both providers.
 - [Cloudflare backend design](docs/cloudflare-backend-design.md) explains the implemented server boundaries.
+- [Scaling design](docs/scaling-design.md) explains where one installation saturates under load and ranks the changes that raise capacity.
+- [Multiple competitions per installation](docs/multi-competition-design.md) is a proposed design. It is not implemented.
 - [Cloudflare authentication reference](docs/cloudflare-authentication.md) and the [authentication choice](docs/cloudflare-authentication-choice.md).
 - [Add a backend provider](docs/add-provider.md) gives contributor interfaces, registration points, installation, cleanup, and required shared verification.
-- [Run the Supabase adapter](docs/supabase-provider.md) — run the second implementation on your own Supabase project.
 
 Operations:
 
@@ -212,6 +209,7 @@ Verification:
 - [Manual verification](docs/manual-verification.md) — workflow and interface checks.
 - [Run the shared provider tests](docs/run-provider-tests.md) and [shared provider test contracts](docs/provider-test-contracts.md).
 - [Verify Cloudflare authentication](docs/verify-cloudflare-authentication.md).
+- [Run a load test](docs/run-load-tests.md) against an isolated installation before a contest.
 
 History:
 

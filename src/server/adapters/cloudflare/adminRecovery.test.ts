@@ -111,7 +111,6 @@ describe('Cloudflare admin password recovery', () => {
     const next = await authentication.signIn(installed.adminUsername, password);
     const headers = new Headers({ cookie: next.cookie.split(';')[0] });
     expect((await authentication.current(headers))?.status.must_change).toBe(true);
-    await expectFailure(authentication.sessions(headers)).toMatchObject({ status: 403 });
     expect(await stmt('SELECT credential_generation, credential_state, must_change FROM accounts WHERE id = ?', installed.accountId).first()).toEqual({
       credential_generation: 2, credential_state: 'ready', must_change: 1,
     });

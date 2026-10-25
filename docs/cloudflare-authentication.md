@@ -1,7 +1,7 @@
 # Cloudflare authentication reference
 
 The Cloudflare application uses maintained Better Auth identity operations and guarded D1 account records.
-Cloudflare serves the development application. Supabase remains available as a separate provider implementation.
+Cloudflare serves the development application.
 This reference describes the authentication API and its access rules.
 Use the [installation guide](../site/src/content/docs/operators/installation.mdx) for setup and [run log](history/run-log.md) for dated verification evidence.
 
@@ -17,11 +17,9 @@ The [verification guide](verify-cloudflare-authentication.md) gives exact test c
 The raw Better Auth router is not exposed.
 
 `createCloudflareAuthentication()` implements the existing browser `Authentication` contract.
-Its additional `account()` and `sessions()` methods support account administration and session reads.
+Its additional `account()` method supports account administration. The application route `GET /api/sessions` is the only contest list.
 The complete `createCloudflareBackend()` factory wraps this authentication adapter and supplies the remaining operation groups.
-The backend entry point defaults to Cloudflare when `VITE_BACKEND` is absent.
-Set `VITE_BACKEND=supabase` to select the Supabase provider.
-That provider keeps its own public settings. No automatic provider fallback occurs.
+The backend entry point always creates the Cloudflare client. No provider fallback occurs.
 
 ## HTTP endpoints
 
@@ -34,7 +32,6 @@ Authenticated endpoints read the HttpOnly cookie. Request bodies cannot supply a
 | `GET /api/auth/session` | Cookie | Returns `user`, `status`, and `csrf`. An absent or invalid login returns 401. |
 | `POST /api/auth/sign-out` | Empty object | Revokes the login, deletes its identity session, and clears the cookie. |
 | `POST /api/auth/change-password` | `currentPassword`, `newPassword` | Changes the password and replaces the cookie. Revokes every earlier login. |
-| `GET /api/auth/sessions` | Cookie | Returns the account's current contest-session memberships. Requires a completed password change. |
 | `POST /api/accounts` | `sessionId`, `command` | Performs `create_account`, `set_username`, or `reset_password`. Uses existing `AccountCommand` fields. |
 
 The historical authentication Worker uses the session ID as its summary name.
@@ -51,7 +48,7 @@ Errors use fixed messages and these status codes:
 | 401 | Invalid credentials, expired login, revoked login, or restricted pending credentials. |
 | 403 | Mandatory password change, insufficient current permissions, archived account, or failed request protection. |
 | 409 | A guarded change failed or its commit outcome is unknown. Check account status before retrying. |
-| 429 | The password-attempt limit was reached. Retry after the fixed window expires. |
+| 429 | A failed-sign-in limit or the password-change limit was reached. Retry after the fixed window expires. |
 | 503 | Identity or database service is unavailable. A write response can have an unknown outcome. |
 
 ## Credentials and permissions
@@ -103,7 +100,9 @@ The token prevents cross-site request forgery, where another site attempts an ac
 POST requests with cross-site fetch metadata are rejected. No CORS access or preflight permission is exposed.
 Bodies are limited to 16 KiB. Redirected browser authentication requests fail.
 
-The browser adapter fetches a fresh CSRF token before each authenticated mutation.
+The browser adapter keeps the token from the last session read and reuses it for later mutations.
+The token belongs to one login. The adapter forgets it when a sign-in, sign-out or password change completes, and when a session read returns 401.
+A 403 reply means the server stopped before it ran the request. The adapter then reads the session again, and sends the request one more time only when the token changed.
 Subscriptions check session state every 60 seconds and on focus or page restoration.
 Callbacks run synchronously. Subscription cleanup is idempotent and stops later callbacks.
 Completed login, logout, and password-change requests invalidate earlier subscription reads, including reads started during the request.
@@ -139,10 +138,24 @@ Login creation also rechecks the captured credential generation and both current
 
 Scheduled maintenance removes password-attempt counters and expired login records after a one-day retention period.
 The application Worker runs it every minute. The isolated authentication CI Worker runs it daily.
-Login attempts allow ten attempts per normalized username per 15-minute window.
-Self password verification uses a separate ten-attempt account window.
-The replacement login after an authenticated password change does not consume a public username attempt.
+Sign-in limits count failed sign-ins only. A successful sign-in never counts toward any limit.
+The owner chose this policy on 2026-10-25, because all users at a venue can share one public IP address.
+Each limit uses a fixed 15-minute window that starts at its first failure:
+
+| Limit | Maximum failures | Effect at the maximum |
+| --- | --- | --- |
+| Normalized username | 10 | The Worker refuses that username with status 429. Other usernames are not affected. |
+| Source IP | 200 | The Worker refuses every sign-in from that IP with status 429, even with a correct password. |
+
+The Worker checks both counters before it verifies a password. It adds to them only after a rejected credential.
+A refused attempt does not add to a counter and does not extend the window.
+Requests that pass the check at the same time can all fail, so a count can pass its maximum.
+The excess is at most the number of requests in flight when the count reaches the maximum.
+The constants are in `signInFailureLimits` in `src/server/adapters/cloudflare/authentication.ts`.
+The hosted Worker stores a secret-salted IP digest rather than the address.
+One person who sends many failures can still lock one username for the rest of its window.
+A person at a shared address needs more than 200 failures in 15 minutes to block that address.
+
+Self password verification uses a separate ten-attempt account window. Every request counts, so this limit does not depend on the outcome.
+The replacement login after an authenticated password change does not count toward any sign-in limit.
 Password verification and credential-generation checks still apply to that replacement login.
-The hosted Worker also allows fifty login attempts per source IP per 15-minute window.
-It stores a secret-salted IP digest rather than the address.
-These pilot limits need later capacity review for venue networks that share an address.

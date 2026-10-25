@@ -9,7 +9,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
-import { requireBackend } from "@/backend";
+import { backend } from "@/backend";
 import { AnnouncementRejectedError, errorMessage } from "@/backend/errors";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -666,7 +666,7 @@ function useImageUrl(
   useEffect(() => {
     let active = true;
     let created = "";
-    requireBackend()
+    backend
       .announcements.downloadImage({ session_id, announcement_id, id })
       .then((blob) => {
         created = URL.createObjectURL(blob);
@@ -753,7 +753,7 @@ function AnnouncementImages({
     setMessage("");
     setProgress(0);
     try {
-      await requireBackend().announcements.uploadImage({
+      await backend.announcements.uploadImage({
         sessionId: announcement.session_id,
         announcementId: announcement.id,
         requestId,
@@ -789,7 +789,7 @@ function AnnouncementImages({
     setBusy(true);
     setMessage("");
     try {
-      await requireBackend().announcements.removeImage(image.session_id, image.id);
+      await backend.announcements.removeImage(image.session_id, image.id);
     } catch (cause) {
       setMessage(errorMessage(cause));
     } finally {

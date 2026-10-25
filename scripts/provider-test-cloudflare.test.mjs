@@ -177,7 +177,7 @@ function arguments_() {
   return ['--provider=cloudflare', `--account=${connectorTarget.accountId}`,
     `--database=${connectorTarget.databaseId}`, `--config=${config}`, `--origin=${connectorTarget.origin}`];
 }
-function options() { return providerTestOptions(arguments_(), {}); }
+function options() { return providerTestOptions(arguments_()); }
 function environment() {
   vi.stubEnv('MINSKY_CF_TEST_ACCOUNT', connectorTarget.accountId);
   vi.stubEnv('MINSKY_CF_TEST_DATABASE', connectorTarget.databaseId);
@@ -186,35 +186,42 @@ function environment() {
 }
 
 describe('Cloudflare provider runner safety', () => {
-  test('requires four explicit matching target fields without Supabase credentials', () => {
+  test('requires four explicit matching target fields', () => {
     expect(options()).toEqual({ provider: 'cloudflare', account: connectorTarget.accountId,
       database: connectorTarget.databaseId, config, origin: connectorTarget.origin,
       recoveryPath: undefined, arguments: [] });
     for (const field of ['account', 'database', 'config', 'origin']) {
       const retained = arguments_().filter((arg) => !arg.startsWith(`--${field}=`));
-      expect(() => providerTestOptions(retained, {})).toThrow();
-      expect(() => providerTestOptions([...arguments_(), `--${field}=duplicate`], {})).toThrow();
+      expect(() => providerTestOptions(retained)).toThrow();
+      expect(() => providerTestOptions([...arguments_(), `--${field}=duplicate`])).toThrow();
+    }
+  });
+
+  test('accepts only the implemented provider', () => {
+    const target = arguments_().slice(1);
+    for (const provider of [[], ['--provider=aws'], ['--provider=cloudflare', '--provider=cloudflare']]) {
+      expect(() => providerTestOptions([...provider, ...target])).toThrow('--provider=cloudflare');
     }
   });
 
   test('refuses development, old auth/proof resources, different accounts, and unreviewed origins', () => {
     for (const database of ['06560c1c-8907-47d6-b2b6-f22e129ebbe4', '5d746d29-0a66-4346-96a6-4974126685d7', randomUUID()]) {
-      expect(() => providerTestOptions(arguments_().map((arg) => arg.startsWith('--database=') ? `--database=${database}` : arg), {})).toThrow();
+      expect(() => providerTestOptions(arguments_().map((arg) => arg.startsWith('--database=') ? `--database=${database}` : arg))).toThrow();
     }
     for (const origin of ['https://minsky-dev.icaic-minsky.workers.dev', 'http://127.0.0.1:8788', `${connectorTarget.origin}/path`]) {
-      expect(() => providerTestOptions(arguments_().map((arg) => arg.startsWith('--origin=') ? `--origin=${origin}` : arg), {})).toThrow();
+      expect(() => providerTestOptions(arguments_().map((arg) => arg.startsWith('--origin=') ? `--origin=${origin}` : arg))).toThrow();
     }
-    expect(() => providerTestOptions(arguments_().map((arg) => arg.startsWith('--account=') ? '--account=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' : arg), {})).toThrow();
+    expect(() => providerTestOptions(arguments_().map((arg) => arg.startsWith('--account=') ? '--account=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' : arg))).toThrow();
   });
 
   test('retains runner isolation and permits only explicit journal recovery', () => {
     for (const override of ['--workers=2', '-j2', '--trace=on', '--reporter=html', '--output=/tmp/shared', '--retries=1', '--debug', '--token=private']) {
-      expect(() => providerTestOptions([...arguments_(), override], {})).toThrow();
+      expect(() => providerTestOptions([...arguments_(), override])).toThrow();
     }
-    expect(providerTestOptions([...arguments_(), '--recover=/tmp/fixture/recovery.json'], {}).recoveryPath).toBe('/tmp/fixture/recovery.json');
-    expect(() => providerTestOptions([...arguments_(), '--recover=relative.json'], {})).toThrow();
-    expect(() => providerTestOptions([...arguments_(), '--recover=/tmp/recovery.json', '--grep=workflow'], {})).toThrow();
-    expect(providerTestOptions([...arguments_(), '--grep', 'workflow'], {}).arguments).toEqual(['--grep', 'workflow']);
+    expect(providerTestOptions([...arguments_(), '--recover=/tmp/fixture/recovery.json']).recoveryPath).toBe('/tmp/fixture/recovery.json');
+    expect(() => providerTestOptions([...arguments_(), '--recover=relative.json'])).toThrow();
+    expect(() => providerTestOptions([...arguments_(), '--recover=/tmp/recovery.json', '--grep=workflow'])).toThrow();
+    expect(providerTestOptions([...arguments_(), '--grep', 'workflow']).arguments).toEqual(['--grep', 'workflow']);
   });
 
   test('rejects altered bindings and authentication-only entries before opening a provider client', async () => {
@@ -414,7 +421,7 @@ describe('Cloudflare fixture setup and exact cleanup with real local D1/R2', () 
       statement('INSERT INTO sessions (id, event_id) VALUES (?, ?)', otherSession, otherEvent),
     ]);
     const notify = (sessionId) => liveObject(sessionId).coordinator.fetch(new globalThis.Request('https://live.internal/notify', {
-      method: 'POST', body: JSON.stringify({ id: randomUUID(), sessionId, audience: 'staff', sequence: 1 }),
+      method: 'POST', body: JSON.stringify({ sessionId, audiences: [{ audience: 'staff', sequence: 1 }] }),
     }));
     try {
       expect((await notify(fixture.sessionId)).status).toBe(204);

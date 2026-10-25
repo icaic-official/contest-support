@@ -4,6 +4,8 @@ import type { Command } from '../../../connected/model';
 import { decideWorkflow } from '../../workflow';
 import { openStoreDatabase } from '../cloudflare/tooling/store-database.mjs';
 import { currentAccessBindings, currentAccessSql, currentReadyLoginSql, sessionsListSql, snapshotSql } from '../cloudflare/application';
+import { R2AvatarService } from '../cloudflare/avatars';
+import type { PrivateBucket } from '../cloudflare/images';
 import type { D1Connection, D1Statement } from './connection';
 import { D1ApplicationStore } from './store';
 import { applyMigrations } from './testFixture';
@@ -26,7 +28,8 @@ const callers = {
 
 /**
  * One session with 1,200 members, 100 issues, 300 images and 1,200 audit
- * rows, plus a second session with 1,500 images. Every id is fictional.
+ * rows, plus a second session with 1,500 images. Every account has a ready
+ * avatar. Every id is fictional.
  */
 async function seed(db: D1Connection, teamCount: number): Promise<void> {
   const people = accounts + 3;
@@ -77,6 +80,8 @@ async function seed(db: D1Connection, teamCount: number): Promise<void> {
   await run(`${series(50)} INSERT INTO issues (id, session_id, team_id, status, number, reporter, reporter_name, category, description, created_at)
     SELECT 'o-issue-' || i, 'sess-2', 'team-o', 'open', i, 'acc-2', 'Person', 'Devices', 'Other issue ' || i, ${now} FROM n`);
   await images('sess-2', 1500, `'o-issue-' || (1 + i % 50)`, 'o-', 'ready', 'NULL, NULL, NULL');
+  await run(`${series(people)} INSERT INTO account_avatars (id, account_id, request_id, byte_size, content_type, digest, state, ready_at)
+    SELECT 'avatar-' || i, 'acc-' || i, 'avatar-' || i, 1000, 'image/png', printf('%064d', i), 'ready', ${now} FROM n`);
 }
 
 /**
@@ -279,6 +284,36 @@ describe('rows read for a session with 1,200 accounts and 100 issues', () => {
     expect(body.pending_removals).toEqual([]);
     expect(body.audit).toHaveLength(50);
     expect(rowsRead).toBeLessThan(6_800);
+  });
+
+  // Measured on 2026-10-26. While the list checked every ready avatar of the
+  // installation, it read 6,015 rows for a contestant, 8,430 for the volunteer
+  // and 7,229 for the admin. From the caller and the session staff, it read 12,
+  // 1,224 and 1,223. Staff still read 1 row for each session member. The two
+  // checks of one download read 24 rows before and 32 after.
+  it('lists avatars from the caller and the session staff, not from every avatar', async () => {
+    const bucket: PrivateBucket = {
+      get: async () => ({ size: 1, body: new Response('x').body!, arrayBuffer: async () => new ArrayBuffer(1) }),
+      put: async () => null,
+      delete: async () => {},
+    };
+    const staff = ['acc-1', 'acc-2', 'acc-3'];
+    for (const [n, owners, ceiling] of [
+      [callers.contestant, [`acc-${callers.contestant}`], 15],
+      [callers.volunteer, staff, 1_300],
+      [callers.admin, staff, 1_300],
+    ] as const) {
+      const { connection, usage } = metered(db);
+      const avatars = new R2AvatarService(connection, bucket);
+      const list = await avatars.list({ accountId: `acc-${n}`, loginId: `login-${n}` }, 'sess-1');
+      expect(list.map((avatar) => avatar.person_id).sort()).toEqual([...owners].sort());
+      expect(usage.rowsRead, `account ${n}`).toBeLessThan(ceiling);
+    }
+    const { connection, usage } = metered(db);
+    const download = await new R2AvatarService(connection, bucket)
+      .download({ accountId: 'acc-2', loginId: 'login-2' }, 'sess-1', 'avatar-1');
+    await download.body.cancel();
+    expect(usage.rowsRead).toBeLessThan(36);
   });
 
   it('reads a handful of rows for the sessions list', async () => {

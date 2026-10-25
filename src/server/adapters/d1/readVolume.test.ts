@@ -24,7 +24,7 @@ const callers = {
  * One session with 1,200 members, 100 issues, 300 images and 1,200 audit
  * rows, plus a second session with 1,500 images. Every id is fictional.
  */
-async function seed(db: D1Connection): Promise<void> {
+async function seed(db: D1Connection, teamCount: number): Promise<void> {
   const people = accounts + 3;
   const series = (count: number) => `WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < ${count})`;
   const now = "strftime('%Y-%m-%dT%H:%M:%fZ', 'now')";
@@ -39,7 +39,7 @@ async function seed(db: D1Connection): Promise<void> {
       '${state}', '${prefix}o-' || i, '${prefix}t-' || i, ${removal} FROM n`);
   await run("INSERT INTO events (id, name) VALUES ('ev-1', 'Scale event')");
   await run("INSERT INTO sessions (id, event_id, name) VALUES ('sess-1', 'ev-1', 'Scale session'), ('sess-2', 'ev-1', 'Other session')");
-  await run(`${series(teams)} INSERT INTO teams (id, session_id, name, location) SELECT 'team-' || i, 'sess-1', 'Team ' || i, 'Table ' || i FROM n`);
+  await run(`${series(teamCount)} INSERT INTO teams (id, session_id, name, location) SELECT 'team-' || i, 'sess-1', 'Team ' || i, 'Table ' || i FROM n`);
   await run("INSERT INTO teams (id, session_id, name, location) VALUES ('team-o', 'sess-2', 'Other', 'x')");
   await run(`${series(people)} INSERT INTO accounts (id, name, username, must_change) SELECT 'acc-' || i, 'Person ' || i, 'user' || i, 0 FROM n`);
   await run(`${series(people)} INSERT INTO ba_user (id, name, email, emailVerified, createdAt, updatedAt, username)
@@ -49,13 +49,13 @@ async function seed(db: D1Connection): Promise<void> {
   await run(`${series(people)} INSERT INTO logins (id, account_id, expires_at, identity_session_id, revoked)
     SELECT 'login-' || i, 'acc-' || i, unixepoch() + 86400, 'ids-' || i, i = ${callers.revokedLogin} FROM n`);
   await run(`${series(accounts)} INSERT INTO memberships (session_id, account_id, team_id, is_admin)
-    SELECT 'sess-1', 'acc-' || i, CASE WHEN i IN (1, 2, 3) THEN NULL ELSE 'team-' || (1 + i % ${teams}) END, i = 1 FROM n`);
+    SELECT 'sess-1', 'acc-' || i, CASE WHEN i IN (1, 2, 3) THEN NULL ELSE 'team-' || (1 + i % ${teamCount}) END, i = 1 FROM n`);
   await run(`INSERT INTO memberships (session_id, account_id, team_id) VALUES
     ('sess-1', 'acc-${callers.plainMember}', NULL), ('sess-2', 'acc-${callers.otherSessionStaff}', NULL)`);
   await run(`INSERT INTO membership_roles (session_id, account_id, role) VALUES ('sess-1', 'acc-2', 'volunteer'),
     ('sess-1', 'acc-3', 'jury'), ('sess-2', 'acc-${callers.otherSessionStaff}', 'volunteer')`);
   await run(`${series(issues)} INSERT INTO issues (id, session_id, team_id, status, number, reporter, reporter_name, category, description, created_at)
-    SELECT 'issue-' || i, 'sess-1', 'team-' || (1 + i % ${teams}), 'open', i, 'acc-' || (1 + i), 'Person', 'Devices', 'Fictional issue ' || i, ${now} FROM n`);
+    SELECT 'issue-' || i, 'sess-1', 'team-' || (1 + i % ${teamCount}), 'open', i, 'acc-' || (1 + i), 'Person', 'Devices', 'Fictional issue ' || i, ${now} FROM n`);
   await run(`${series(issues * 5)} INSERT INTO history (id, issue_id, actor, at, text, visibility, actor_name)
     SELECT 'hist-' || i, 'issue-' || (1 + i % ${issues}), 'acc-1', ${now}, 'note ' || i,
       CASE WHEN (i / 100) % 2 THEN 'public' ELSE 'internal' END, 'Person 1' FROM n`);
@@ -149,50 +149,57 @@ SELECT json_object(
   'server_time', strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
 ) AS snapshot WHERE EXISTS (SELECT 1 FROM login)`;
 
+async function open(teamCount: number) {
+  const platform = await openStoreDatabase({ configPath, remoteBindings: false });
+  await applyMigrations(platform.db);
+  await seed(platform.db, teamCount);
+  return platform;
+}
+
+async function snapshot(db: D1Connection, n: number, sql = snapshotSql) {
+  const caller = { accountId: `acc-${n}`, loginId: `login-${n}` };
+  const result = await db.prepare(sql)
+    .bind(caller.accountId, caller.loginId, ...currentAccessBindings(caller, 'sess-1'), ...Array<string>(9).fill('sess-1'))
+    .all<{ snapshot: string }>();
+  const row = result.results[0];
+  const body = row ? JSON.parse(row.snapshot) : null;
+  if (body) delete body.server_time;
+  return { rowsRead: result.meta?.rows_read ?? Infinity, body };
+}
+
+async function expectReferenceSnapshots(db: D1Connection) {
+  for (const [name, n] of Object.entries(callers)) {
+    expect((await snapshot(db, n)).body, name).toEqual((await snapshot(db, n, referenceSnapshotSql)).body);
+  }
+}
+
 // Measured on this seed on 2026-10-26. While each section read `access` again
 // for every row, a snapshot read 7,377 rows for the admin, 4,841 for the
 // volunteer and 1,442 for a contestant, who also read all 1,200 audit rows.
-// After the change it read 6,509, 2,823 and 168. Each ceiling sits about 5%
-// above the later read.
+// After that change, and with a contestant's own team read by key, it read
+// 6,487, 2,801 and 122. Each ceiling sits about 5% above the later read.
 describe('rows read for a session with 1,200 accounts and 100 issues', () => {
   let db: D1Connection;
   let dispose: () => Promise<void>;
 
   beforeAll(async () => {
-    const platform = await openStoreDatabase({ configPath, remoteBindings: false });
-    db = platform.db;
-    dispose = platform.dispose;
-    await applyMigrations(db);
-    await seed(db);
+    ({ db, dispose } = await open(teams));
   });
   afterAll(async () => { await dispose?.(); });
 
-  async function snapshot(n: number, sql = snapshotSql) {
-    const caller = { accountId: `acc-${n}`, loginId: `login-${n}` };
-    const result = await db.prepare(sql)
-      .bind(caller.accountId, caller.loginId, ...currentAccessBindings(caller, 'sess-1'), ...Array<string>(9).fill('sess-1'))
-      .all<{ snapshot: string }>();
-    const row = result.results[0];
-    const body = row ? JSON.parse(row.snapshot) : null;
-    if (body) delete body.server_time;
-    return { rowsRead: result.meta?.rows_read ?? Infinity, body };
-  }
-
   it('returns the reference snapshot to every caller', async () => {
-    for (const [name, n] of Object.entries(callers)) {
-      expect((await snapshot(n)).body, name).toEqual((await snapshot(n, referenceSnapshotSql)).body);
-    }
-    expect((await snapshot(callers.revokedLogin)).body).toBeNull();
+    await expectReferenceSnapshots(db);
+    expect((await snapshot(db, callers.revokedLogin)).body).toBeNull();
     for (const n of [callers.outsider, callers.otherSessionStaff]) {
-      expect((await snapshot(n)).body).toMatchObject({ session: null, membership: null, teams: [], issues: [] });
+      expect((await snapshot(db, n)).body).toMatchObject({ session: null, membership: null, teams: [], issues: [] });
     }
-    expect((await snapshot(callers.plainMember)).body).toMatchObject({
+    expect((await snapshot(db, callers.plainMember)).body).toMatchObject({
       membership: { team_id: null, roles: [], is_admin: false }, teams: [], issues: [], history: [], audit: [],
     });
   });
 
   it('reads only the contestant team rows for a contestant snapshot', async () => {
-    const { rowsRead, body } = await snapshot(callers.contestant);
+    const { rowsRead, body } = await snapshot(db, callers.contestant);
     expect(body.teams.map((team: { id: string }) => team.id)).toEqual(['team-8']);
     expect(body.issues).toHaveLength(4);
     expect(body.history.length).toBeGreaterThan(0);
@@ -202,11 +209,11 @@ describe('rows read for a session with 1,200 accounts and 100 issues', () => {
     expect(body.pending_removals).toEqual([]);
     expect(body.members).toEqual([]);
     expect(body.audit).toEqual([]);
-    expect(rowsRead).toBeLessThan(175);
+    expect(rowsRead).toBeLessThan(130);
   });
 
   it('returns staff notes and only their own removals to a volunteer within a bounded read', async () => {
-    const { rowsRead, body } = await snapshot(callers.volunteer);
+    const { rowsRead, body } = await snapshot(db, callers.volunteer);
     expect(body.teams).toHaveLength(teams);
     expect(body.issues).toHaveLength(issues);
     expect(body.history).toHaveLength(issues * 5);
@@ -218,7 +225,7 @@ describe('rows read for a session with 1,200 accounts and 100 issues', () => {
   });
 
   it('returns every issue, member, image, and the latest audit to the admin within a bounded read', async () => {
-    const { rowsRead, body } = await snapshot(callers.admin);
+    const { rowsRead, body } = await snapshot(db, callers.admin);
     expect(body.issues).toHaveLength(issues);
     expect(body.members).toHaveLength(accounts + 1);
     expect(body.attachments).toHaveLength(300);
@@ -232,5 +239,25 @@ describe('rows read for a session with 1,200 accounts and 100 issues', () => {
       .all<{ id: string }>();
     expect(result.results).toEqual([{ id: 'sess-1', name: 'Scale session' }]);
     expect(result.meta?.rows_read ?? Infinity).toBeLessThan(30);
+  });
+});
+
+// Measured on 2026-10-26, a contestant snapshot in a session of 480 teams read
+// 1,014 rows while it read every team of the session, and 56 rows after.
+describe('rows read for a contestant in a session of 480 teams', () => {
+  let db: D1Connection;
+  let dispose: () => Promise<void>;
+
+  beforeAll(async () => {
+    ({ db, dispose } = await open(480));
+  });
+  afterAll(async () => { await dispose?.(); });
+
+  it('returns the reference snapshot to every caller and reads no other team', async () => {
+    await expectReferenceSnapshots(db);
+    const { rowsRead, body } = await snapshot(db, callers.contestant);
+    expect(body.teams.map((team: { id: string }) => team.id)).toEqual(['team-8']);
+    expect((await snapshot(db, callers.volunteer)).body.teams).toHaveLength(480);
+    expect(rowsRead).toBeLessThan(60);
   });
 });

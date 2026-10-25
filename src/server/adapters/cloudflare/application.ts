@@ -27,10 +27,9 @@ export interface CurrentAccessRow {
   roles: string;
 }
 
-// Bind accountId, loginId, sessionId in this order. Callers must come from the
-// trusted authentication service. Every use checks both identity-session and
-// application-login expiry against database time, including inside write batches.
-export const currentAccessSql = `SELECT a.id AS account_id, a.name AS account_name, l.id AS login_id,
+// Every use checks both identity-session and application-login expiry against
+// database time, including inside write batches.
+const accessSql = (selection: string) => `SELECT a.id AS account_id, a.name AS account_name, l.id AS login_id,
   l.expires_at AS login_expires_at, b.expiresAt AS identity_expires_at,
   a.access_version, a.credential_generation, l.version AS login_version,
   m.version AS membership_version, s.version AS session_version,
@@ -44,11 +43,19 @@ export const currentAccessSql = `SELECT a.id AS account_id, a.name AS account_na
   JOIN ba_session b ON b.id = l.identity_session_id AND b.userId = a.id
   JOIN memberships m ON m.account_id = a.id
   JOIN sessions s ON s.id = m.session_id JOIN events e ON e.id = s.event_id
-  WHERE a.id = ? AND l.id = ? AND m.session_id = ?
+  WHERE ${selection}
     AND a.disabled = 0 AND a.must_change = 0 AND a.credential_state = 'ready'
     AND l.revoked = 0 AND l.expires_at > unixepoch()
     AND l.credential_generation = a.credential_generation
     AND b.expiresAt > strftime('%Y-%m-%dT%H:%M:%fZ', 'now')`;
+
+// Bind accountId, loginId, sessionId in this order. Callers must come from the
+// trusted authentication service.
+export const currentAccessSql = accessSql('a.id = ? AND l.id = ? AND m.session_id = ?');
+
+// Bind sessionId, then a JSON array of login IDs. One JSON value stays under
+// D1's 100 bound-parameter limit. Match each row on account_id and login_id.
+export const currentAccessForLoginsSql = accessSql('m.session_id = ? AND l.id IN (SELECT value FROM json_each(?))');
 
 export function currentAccessBindings(caller: Caller, sessionId: string): BindValue[] {
   return [caller.accountId, caller.loginId, sessionId];
@@ -81,7 +88,7 @@ export function currentReadyLoginBindings(caller: Caller): BindValue[] {
 
 interface AdminGate { id: string; caller: Caller; statements: D1Statement[] }
 
-const snapshotSql = `WITH login AS (${currentReadyLoginSql}), access AS (${currentAccessSql}),
+export const snapshotSql = `WITH login AS (${currentReadyLoginSql}), access AS (${currentAccessSql}),
   visible_issues AS (SELECT i.* FROM issues i CROSS JOIN access a
     WHERE i.session_id = ? AND (a.staff = 1 OR i.team_id = a.team_id))
 SELECT json_object(

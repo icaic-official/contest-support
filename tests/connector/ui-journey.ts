@@ -5,7 +5,7 @@ import { leftRedRightBlue } from '../support/pictures';
 
 export interface UiFixture extends Pick<ScenarioData, 'sessionId' | 'otherSessionId' | 'teamId' | 'accounts'> { origin: string }
 
-interface Probe { ready: number; changes: number; closed: number; invalid: boolean }
+interface Probe { ready: number; changes: number; closed: number; invalid: boolean; violations: string[] }
 interface Workspace { page: Page; context: BrowserContext; probe: Probe }
 type Ui = 'contestant' | 'organiser-phone' | 'organiser-desktop';
 
@@ -146,7 +146,14 @@ export async function runUiJourney(browser: Browser, fixture: UiFixture, options
     const ui: Ui = contestant ? 'contestant' : onPhone ? 'organiser-phone' : 'organiser-desktop';
     const context = await browser.newContext({ viewport: onPhone ? phone : desktop, ignoreHTTPSErrors: options.ignoreHTTPSErrors ?? false });
     const page = await context.newPage();
-    const probe: Probe = { ready: 0, changes: 0, closed: 0, invalid: false };
+    const probe: Probe = { ready: 0, changes: 0, closed: 0, invalid: false, violations: [] };
+    // Record only the violated directive, never the blocked URL.
+    await page.exposeFunction('reportCspViolation', (directive: string) => { probe.violations.push(directive); });
+    await page.addInitScript(() => {
+      document.addEventListener('securitypolicyviolation', (event) => {
+        (window as unknown as { reportCspViolation(directive: string): void }).reportCspViolation(event.violatedDirective);
+      });
+    });
     const workspace = { page, context, probe };
     let currentOriginAuthentication = false;
     workspaces.push(workspace);
@@ -575,6 +582,8 @@ export async function runUiJourney(browser: Browser, fixture: UiFixture, options
     expect(requests.has('POST /api/accounts')).toBe(true);
     expect([...requests].some((request) => request.startsWith('PUT /api/image/'))).toBe(true);
     expect(workspaces.every(({ probe }) => !probe.invalid)).toBe(true);
+    // The Worker sends a Content-Security-Policy. The whole journey must not break it.
+    expect(workspaces.flatMap(({ probe }) => probe.violations)).toEqual([]);
   } catch (error) {
     // A code location helps repair a selector without emitting page contents or
     // Playwright call arguments, which can contain one-time credentials.

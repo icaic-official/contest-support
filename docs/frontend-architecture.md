@@ -374,6 +374,25 @@ These rules apply:
   The desktop award and confirmation forms stay on the Award review cards.
   There is no separate **Jury worklist** sidebar entry and no **Back to jury worklist** button. The Award review page and the Awards tab are the worklist.
 
+## Render errors
+
+A render error unmounts the React tree above it. Without a boundary, the page goes blank.
+`RenderErrorBoundary` (`src/components/render-error-boundary.tsx`) catches the error and shows a recovery card.
+The card says what happened, says that sent work is saved on the server, and has a **Reload** button.
+It uses no router, provider, or backend state, so it still works when those fail.
+
+The app has three boundaries:
+
+| Boundary | Where | What stays usable |
+| --- | --- | --- |
+| `app` | `src/main.tsx`, around the router | Nothing. This is the last resort. It shows the brand header and the card. |
+| `region` | `Workspace`, around the contestant or organiser UI | The announcement banner and the build ID. |
+| `region` | The desktop console, around the page body | The sidebar and the top bar. |
+
+A region boundary clears its failure when its `resetKey` changes. The `Workspace` boundary uses the path. The console boundary uses the page. A person can leave a failed page without a reload.
+The boundary writes the error and the component stack to the console. It sends nothing to the server.
+`tests/error-boundary.spec.ts` forces a render error and checks the card and **Reload**.
+
 ## Root elements
 
 The root element of each layout has `data-ui="contestant"`, `data-ui="organiser-phone"` or `data-ui="organiser-desktop"`.

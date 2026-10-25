@@ -60,7 +60,8 @@ describe('full Worker installation boundary with real local D1', () => {
     const signed = await signIn(installed.adminUsername, installed.temporaryPassword);
     expect(signed.status).toBe(200);
     expect(signed.headers.get('Set-Cookie')).toContain('__Host-minsky-session=');
-    expect((await db.prepare('SELECT count(*) AS count FROM authentication_limits').first<{ count: number }>())?.count).toBe(2);
+    // A successful sign-in does not count toward the username or IP limit.
+    expect((await db.prepare('SELECT count(*) AS count FROM authentication_limits').first<{ count: number }>())?.count).toBe(0);
     expect((await db.prepare('SELECT count(*) AS count FROM ba_session').first<{ count: number }>())?.count).toBe(1);
   }, timeout);
 });

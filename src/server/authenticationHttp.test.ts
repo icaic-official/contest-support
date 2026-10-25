@@ -19,7 +19,6 @@ function setup() {
     signOut: vi.fn<AuthenticationService['signOut']>().mockResolvedValue({ cookie: 'opaque=; Max-Age=0; Path=/' }),
     changePassword: vi.fn<AuthenticationService['changePassword']>().mockResolvedValue({ cookie: 'opaque=changed; Secure; HttpOnly; SameSite=Strict; Path=/' }),
     account: vi.fn<AuthenticationService['account']>().mockResolvedValue({ temporaryPassword: 'fictional-temporary-password' }),
-    sessions: vi.fn<AuthenticationService['sessions']>().mockResolvedValue([{ id: SESSION_ID, name: 'Fictional session' }]),
   };
   return { service, handle: createAuthenticationHandler(service, { origins: [ORIGIN] }) };
 }
@@ -153,10 +152,9 @@ describe('authentication HTTP boundary', () => {
     expect((await handle(post('/api/auth/sign-in', { username: 'helper', password: 'wrong' }))).status).toBe(401);
   });
 
-  it('passes session-list gating to the service and rejects unsupported routes and methods', async () => {
-    const { handle, service } = setup();
-    service.sessions.mockRejectedValue(new AuthenticationError(403, 'Change your password first.'));
-    expect((await handle(new Request(`${ORIGIN}/api/auth/sessions`))).status).toBe(403);
+  it('rejects unsupported routes and methods', async () => {
+    const { handle } = setup();
+    expect((await handle(new Request(`${ORIGIN}/api/auth/sessions`))).status).toBe(404);
     expect((await handle(new Request(`${ORIGIN}/api/unknown`))).status).toBe(404);
     expect((await handle(new Request(`${ORIGIN}/api/auth/session`, { method: 'DELETE' }))).status).toBe(405);
   });

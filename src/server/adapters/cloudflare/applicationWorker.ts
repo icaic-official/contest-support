@@ -58,7 +58,7 @@ export default {
     }
     try {
       let response: Response;
-      if (path === '/api/accounts' || path.startsWith('/api/auth/') && path !== '/api/auth/sessions') {
+      if (path === '/api/accounts' || path.startsWith('/api/auth/')) {
         if (path === '/api/auth/sign-in' && request.method === 'POST' &&
             !(await env.DB.prepare('SELECT 1 FROM accounts LIMIT 1').first())) {
           // Public traffic must not create rate-limit rows that make an empty

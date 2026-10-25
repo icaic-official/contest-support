@@ -64,15 +64,11 @@ class FixtureIdentity implements AuthenticationService {
   async account(): Promise<{ temporaryPassword?: string }> {
     return {};
   }
-
-  async sessions(): Promise<never> {
-    throw new AuthenticationError(403, 'The application routes list sessions.');
-  }
 }
 
 /** The request paths that the deployed Worker sends to its authentication handler. */
 function authenticationPath(path: string): boolean {
-  return path === '/api/accounts' || (path.startsWith('/api/auth/') && path !== '/api/auth/sessions');
+  return path === '/api/accounts' || path.startsWith('/api/auth/');
 }
 
 /**

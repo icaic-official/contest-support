@@ -78,7 +78,7 @@ export function createApplicationHandler(services: ApplicationHttpServices, orig
       if (current.status.must_change || !current.status.session_valid) throw new AuthenticationError(403, 'Change your temporary password first.');
       const caller = current.caller;
       if (request.method === 'GET') {
-        if (url.pathname === '/api/sessions' || url.pathname === '/api/auth/sessions') return privateJson(await services.application.sessions(caller));
+        if (url.pathname === '/api/sessions') return privateJson(await services.application.sessions(caller));
         if (url.pathname === '/api/snapshot' || url.pathname === '/api/updates') {
           const sessionId = uuid.parse(url.searchParams.get('sessionId'));
           if (url.pathname === '/api/snapshot') return privateJson(await services.application.snapshot(caller, sessionId));

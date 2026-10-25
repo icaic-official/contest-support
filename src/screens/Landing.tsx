@@ -186,10 +186,9 @@ export function Landing() {
           className="mx-auto grid w-full max-w-6xl items-center gap-12 px-4 pt-10 pb-12 sm:px-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,28rem)] lg:gap-16 lg:pt-14 lg:pb-16"
         >
           <div>
-            <Badge variant="secondary">Contest help desk</Badge>
             <h1
               id="landing-title"
-              className="mt-4 text-4xl font-semibold tracking-tight text-balance sm:text-5xl lg:text-6xl"
+              className="text-4xl font-semibold tracking-tight text-balance sm:text-5xl lg:text-6xl"
             >
               Contest problems, solved on the clock.
             </h1>
@@ -313,7 +312,7 @@ function DemoCard({ position }: { position: Position }) {
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex min-w-0 items-center gap-2">
             <span className="font-mono text-sm text-muted-foreground">
-              #0142
+              #0167
             </span>
             <Badge variant="secondary">Hardware</Badge>
           </div>
@@ -343,12 +342,17 @@ function DemoCard({ position }: { position: Position }) {
             key={step.status}
             className={cn(
               "flex gap-3",
+              "relative",
               index <= position.step
                 ? "motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-2"
                 : // Hidden entries keep their space, so the card never changes height.
                   "invisible",
             )}
           >
+            {index < steps.length - 1 && (
+              // Joins this dot to the next one across the row gap.
+              <span className="absolute top-3.5 -bottom-4 left-[3.5px] w-px bg-border" />
+            )}
             <span
               className={cn(
                 "mt-1.5 size-2 shrink-0 rounded-full",

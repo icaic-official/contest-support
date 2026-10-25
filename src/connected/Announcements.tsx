@@ -223,10 +223,10 @@ export function Announcements({ data }: { data: SessionData }) {
       <div className="mx-auto grid max-w-4xl gap-2 px-4 py-2 sm:px-8">
         <div className="flex flex-wrap items-center gap-2">
           <Megaphone aria-hidden="true" className="size-4 text-muted-foreground" />
-          <h2 id={headingId} className="flex-1 text-sm font-medium">
+          <h2 id={headingId} className="min-w-0 flex-1 truncate text-sm font-medium">
             Announcements
             {hidden && (
-              <span className="font-normal text-muted-foreground"> · {items.length}</span>
+              <span className="font-normal text-muted-foreground"> · {items[0].title}</span>
             )}
           </h2>
           {canWrite && !hidden && (

@@ -46,7 +46,7 @@ async function openActivity(
       .click();
   } else {
     await page
-      .getByRole("navigation", { name: "Organiser sections" })
+      .getByRole("navigation", { name: "Organizer sections" })
       .getByRole("button", { name: "Session", exact: true })
       .click();
   }

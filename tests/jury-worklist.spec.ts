@@ -115,13 +115,16 @@ function phoneIssueHeading(page: Page, number: number) {
   });
 }
 
-/** Picks award minutes. The radio is visually hidden inside its label. */
-async function chooseMinutes(scope: Locator, minutes: number) {
+/**
+ * Picks award minutes or the custom amount. The radio is visually hidden
+ * inside its label.
+ */
+async function chooseMinutes(scope: Locator, minutes: number | "Other amount") {
   await scope
     .locator("label")
     .filter({
       has: scope.page().getByRole("radio", {
-        name: `${minutes} min`,
+        name: minutes === "Other amount" ? minutes : `${minutes} min`,
         exact: true,
       }),
     })
@@ -316,6 +319,62 @@ test("jury-only members record an explicit zero and can confirm a reopened issue
   expect(
     current.issues.find((item) => item.id === local.issues[3])?.status,
   ).toBe("claimed");
+});
+
+test("staff read one-minute and zero awards in plain words", async ({
+  page,
+  local,
+}) => {
+  await login(page, "jury", desktop);
+  await openAwards(page);
+
+  const one = row(page, 1);
+  await chooseMinutes(one, "Other amount");
+  await one.getByLabel("Custom award minutes").fill("1");
+  await one.getByLabel("Public award explanation").fill("One minute lost");
+  await one.getByRole("button", { name: "Record 1 minute", exact: true }).click();
+  const first = sheet(page, "ISS-1: Issue 1 verification");
+  await expect(
+    first.getByRole("region", { name: "Time award" }).getByText("1 minute", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    first.getByText("1 minute awarded: One minute lost", { exact: true }),
+  ).toBeVisible();
+  await first.getByRole("button", { name: "Close issue" }).click();
+
+  const none = row(page, 2);
+  await chooseMinutes(none, 0);
+  await none.getByLabel("Public award explanation").fill("No change needed");
+  await none.getByRole("button", { name: "Record no time added", exact: true }).click();
+  const second = sheet(page, "ISS-2: Issue 2 verification");
+  await expect(
+    second.getByRole("region", { name: "Time award" }).getByText("No time added", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    second.getByText("No time added: No change needed", { exact: true }),
+  ).toBeVisible();
+  await second.getByRole("button", { name: "Close issue" }).click();
+
+  await showList(page, "To apply");
+  await expect(row(page, 1).getByText("1 minute", { exact: true })).toBeVisible();
+  await expect(row(page, 2).getByText("No time added", { exact: true })).toBeVisible();
+  await expect(row(page, 3).getByText("No time added", { exact: true })).toBeVisible();
+  await expect(row(page, 4).getByText("5 minutes", { exact: true })).toBeVisible();
+
+});
+
+test("the admin overview reads a one-minute total in the singular", async ({
+  page,
+  local,
+}) => {
+  await local.run(
+    "UPDATE awards SET minutes = CASE WHEN issue_id = ? THEN 1 ELSE 0 END",
+    local.issues[3],
+  );
+  await login(page, "admin", desktop);
+  await consolePages(page).getByRole("button", { name: "Overview" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Overview" })).toBeVisible();
+  await expect(page.getByText("minute decided", { exact: true })).toBeVisible();
 });
 
 test("two simulated Realtime clients refresh decisions and confirmations without losing an unrelated draft", async ({

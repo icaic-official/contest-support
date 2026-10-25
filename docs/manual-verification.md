@@ -197,6 +197,7 @@ Sign in as a volunteer, a specialist, a jury member and an admin.
 8. Change the tab. Check that focus moves to the tab heading.
 9. Check that buttons are at least 44 px high.
 10. Repeat steps 3 to 8 at 320 × 740.
+11. Sign in as an admin without a support role. Open an open issue. Check that the bottom bar shows **Resolve** and no **Claim**, and that one muted line under the buttons says that claiming needs the Volunteer or Specialist role. Sign in as a volunteer. Check that the same issue shows **Claim** and no such line.
 
 ### Organiser desktop console (1280 × 800)
 
@@ -211,6 +212,7 @@ Sign in as the same accounts.
 7. Open resolve, escalate and reopen from the sheet. Check that each opens a dialog and that **Cancel** closes it without an action.
 8. Check that the sheet shows one filled primary action. **Decide award** and **Confirm applied** open the **Outcome & award** tab.
 9. On a resolved issue without an award, open **Outcome & award** and choose **Other amount**. Type an amount and an explanation. Open **Activity**, then open **Outcome & award** again. Check that the amount and the explanation are still there.
+10. Sign in as an admin without a support role. Open an open issue. Check that the sheet shows **Resolve** and no **Claim**, and that one muted line under the buttons says that claiming needs the Volunteer or Specialist role.
 
 ### Contestant desktop app (1280 × 800)
 

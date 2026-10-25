@@ -283,6 +283,30 @@ export function issueAbilities(
 }
 
 /**
+ * A short sentence that tells a staff member why an action is missing, or
+ * undefined when nothing needs explaining. Only people without a volunteer
+ * or specialist role get one. They cannot claim an open issue. A non-admin
+ * among them also cannot resolve a claimed or escalated issue.
+ */
+export function missingActionHint(
+  issue: Issue,
+  member: Membership,
+  archived: boolean,
+): string | undefined {
+  if (archived || issue.status === "resolved") return undefined;
+  if (!isStaff(member) || isSupport(member)) return undefined;
+  if (issue.status === "open") {
+    const fix = member.is_admin
+      ? "Add the Volunteer role to your own account in Accounts to claim it."
+      : "A session admin can add a role in Accounts.";
+    return `You cannot claim this issue. Claiming needs the Volunteer or Specialist role. ${fix}`;
+  }
+  return member.is_admin
+    ? undefined
+    : "You cannot resolve this issue. Only its owner or a session admin can resolve it.";
+}
+
+/**
  * Picks the one primary action for the bottom bar. Jury work comes first on
  * resolved issues, because a reopen is rarer than an award decision.
  */

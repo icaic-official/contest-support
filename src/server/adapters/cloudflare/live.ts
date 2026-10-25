@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type { Caller } from '../../authentication';
 import type { D1Connection } from '../d1/connection';
-import { currentAccessBindings, currentAccessSql, type CurrentAccessRow } from './application';
+import { currentAccessForLoginsSql, type CurrentAccessRow } from './application';
 
 interface LiveSocket {
   readonly readyState: number;
@@ -56,6 +56,20 @@ type Signal = z.infer<typeof signalSchema>;
 type SocketAttachment = z.infer<typeof attachmentSchema>;
 
 type LiveAccess = CurrentAccessRow;
+type Grantee = Caller & { sessionId: string };
+
+interface Grant {
+  socket: LiveSocket;
+  attachment: SocketAttachment;
+  row: LiveAccess;
+}
+
+// 500 login IDs make a JSON value of about 20 KB, far below D1's 2 MB value limit.
+const accessBatchSize = 500;
+
+function grantKey({ sessionId, accountId, loginId }: Grantee): string {
+  return `${sessionId}:${accountId}:${loginId}`;
+}
 
 const cleanupSchema = z.object({ sessionId: uuid, eventId: uuid, runId: uuid }).strict();
 type CleanupTarget = z.infer<typeof cleanupSchema>;
@@ -81,9 +95,44 @@ export class SessionLiveCoordinator {
     return !!(await this.env.DB.prepare('SELECT id FROM sessions WHERE id = ?').bind(sessionId).first());
   }
 
-  private async access(caller: Caller, sessionId: string): Promise<LiveAccess | undefined> {
-    const row = await this.env.DB.prepare(currentAccessSql).bind(...currentAccessBindings(caller, sessionId)).first<LiveAccess>();
-    return row && (row.staff || row.team_id) ? row : undefined;
+  /** Read current grants with one D1 query for each session and batch of logins. */
+  private async access(grantees: Grantee[]): Promise<Map<string, LiveAccess>> {
+    const logins = new Map<string, Set<string>>();
+    for (const { sessionId, loginId } of grantees) {
+      logins.set(sessionId, (logins.get(sessionId) ?? new Set()).add(loginId));
+    }
+    const rows = new Map<string, LiveAccess>();
+    for (const [sessionId, ids] of logins) {
+      const list = [...ids];
+      for (let start = 0; start < list.length; start += accessBatchSize) {
+        const { results } = await this.env.DB.prepare(currentAccessForLoginsSql)
+          .bind(sessionId, JSON.stringify(list.slice(start, start + accessBatchSize))).all<LiveAccess>();
+        for (const row of results) {
+          if (row.staff || row.team_id) rows.set(grantKey({ sessionId, accountId: row.account_id, loginId: row.login_id }), row);
+        }
+      }
+    }
+    return rows;
+  }
+
+  /**
+   * Check every current session grant before every delivery, including a
+   * duplicate signal. Saved socket roles never grant later access. A failed
+   * read throws before any socket receives a hint.
+   */
+  private async grants(): Promise<Grant[]> {
+    const sockets = this.state.getWebSockets().flatMap((socket) => {
+      const attachment = this.attachment(socket);
+      if (!attachment) { close(socket); return []; }
+      return [{ socket, attachment }];
+    });
+    const rows = await this.access(sockets.map(({ attachment }) => attachment));
+    return sockets.flatMap(({ socket, attachment }) => {
+      const row = rows.get(grantKey(attachment));
+      if (!row) { close(socket); return []; }
+      socket.serializeAttachment({ ...attachment, expiresAt: this.expiry(row) });
+      return [{ socket, attachment, row }];
+    });
   }
 
   private attachment(socket: LiveSocket): SocketAttachment | undefined {
@@ -137,7 +186,7 @@ export class SessionLiveCoordinator {
       return new Response(null, { status: 400 });
     }
     if (await this.state.storage.get('fixtureCleanup')) return new Response(null, { status: 403 });
-    const row = await this.access(parsed.data, parsed.data.sessionId);
+    const row = (await this.access([parsed.data])).get(grantKey(parsed.data));
     if (!row) return new Response(null, { status: 403 });
     const pair = new WebSocketPair();
     const server = pair[1];
@@ -159,14 +208,7 @@ export class SessionLiveCoordinator {
     if (await this.state.storage.get('fixtureCleanup') || !await this.sessionExists(signal.sessionId)) return;
     const key = `sequence:${signal.sessionId}:${signal.audience}`;
     const prior = await this.state.storage.get<number>(key) ?? 0;
-    for (const socket of this.state.getWebSockets()) {
-      const attachment = this.attachment(socket);
-      if (!attachment) { close(socket); continue; }
-      // Check every current session grant before every delivery, including a
-      // duplicate signal. Saved socket roles never grant later access.
-      const row = await this.access(attachment, attachment.sessionId);
-      if (!row) { close(socket); continue; }
-      socket.serializeAttachment({ ...attachment, expiresAt: this.expiry(row) });
+    for (const { socket, attachment, row } of await this.grants()) {
       if (attachment.sessionId !== signal.sessionId || signal.sequence <= prior) continue;
       const audience = row.staff ? 'staff' : `team:${row.team_id}`;
       if (signal.audience !== audience && signal.audience !== `account:${row.account_id}`) continue;
@@ -182,13 +224,7 @@ export class SessionLiveCoordinator {
   async alarm(): Promise<void> {
     await this.serialize(async () => {
       if (await this.state.storage.get('fixtureCleanup')) return;
-      for (const socket of this.state.getWebSockets()) {
-        const attachment = this.attachment(socket);
-        if (!attachment) { close(socket); continue; }
-        const row = await this.access(attachment, attachment.sessionId);
-        if (!row) { close(socket); continue; }
-        socket.serializeAttachment({ ...attachment, expiresAt: this.expiry(row) });
-      }
+      await this.grants();
       await this.scheduleAlarm();
     });
   }

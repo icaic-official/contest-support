@@ -317,7 +317,8 @@ Staff-only changes reach staff only.
 Private changes use separate sequences, so contestant notifications and counters cannot reveal their existence.
 Membership changes and password resets produce targeted access invalidations.
 The coordinator rechecks current authorization before each delivery, including duplicate hints, and closes invalid logins.
-An unavailable authorization service causes delivery to stop rather than reuse stale permissions.
+It reads the grants for all of its sockets before it sends a hint. It uses one D1 query for each group of up to 500 logins.
+An unavailable authorization service causes delivery to stop rather than reuse stale permissions. No socket receives that hint.
 
 The coordinator stores each socket's account ID, login ID, session ID, and expiry.
 Those values identify a connection. They do not replace current permission checks.

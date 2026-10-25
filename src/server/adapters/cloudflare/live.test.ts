@@ -3,7 +3,8 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import { getPlatformProxy } from 'wrangler';
 import type { D1Connection, D1Statement } from '../d1/connection';
 import { D1Fixture, applyMigrations } from '../d1/testFixture';
-import type { CurrentAccessRow } from './application';
+import type { Caller } from '../../authentication';
+import { currentAccessBindings, currentAccessForLoginsSql, currentAccessSql, type CurrentAccessRow } from './application';
 import { connectLive, dispatchNotifications, maintainFixtureSessions, SessionLiveCoordinator, type LiveEnvironment } from './live';
 
 class FakeSocket {
@@ -63,13 +64,18 @@ class FakeDatabase implements D1Connection {
           const session = this.sessions.get(String(values[0]));
           return (session?.eventId === values[1] && `Provider contract ${session.runId}` === values[2] ? { owned: 1 } : null) as T | null;
         }
-        this.reads++;
-        return this.access.get(values.join(':')) as T ?? null;
+        throw new Error(`Unexpected first: ${sql}`);
       },
-      all: async <T>() => ({ results: this.pending.filter((signal) => !signal.delivered)
-        .sort((left, right) => (left.lastAttemptAt ?? 0) - (right.lastAttemptAt ?? 0) ||
-          left.sessionId.localeCompare(right.sessionId) || left.audience.localeCompare(right.audience) || left.sequence - right.sequence)
-        .slice(0, Number(values[0])).map(({ id, sessionId, audience, sequence }) => ({ id, sessionId, audience, sequence })) as T[] }),
+      all: async <T>() => {
+        if (sql === currentAccessForLoginsSql) {
+          if (this.unavailable) throw new Error('Database is unavailable.');
+          this.reads++;
+          const [sessionId, logins] = [String(values[0]), new Set(JSON.parse(String(values[1])) as string[])];
+          return { results: [...this.access].filter(([key, row]) => logins.has(row.login_id) &&
+            key === [row.account_id, row.login_id, sessionId].join(':')).map(([, row]) => row) as T[] };
+        }
+        return this.notifications<T>(Number(values[0]));
+      },
       run: async () => {
         const signal = this.pending.find((item) => item.id === values[0]);
         if (!signal) return;
@@ -83,6 +89,12 @@ class FakeDatabase implements D1Connection {
         }
       },
     };
+  }
+  private notifications<T>(limit: number) {
+    return { results: this.pending.filter((signal) => !signal.delivered)
+      .sort((left, right) => (left.lastAttemptAt ?? 0) - (right.lastAttemptAt ?? 0) ||
+        left.sessionId.localeCompare(right.sessionId) || left.audience.localeCompare(right.audience) || left.sequence - right.sequence)
+      .slice(0, limit).map(({ id, sessionId, audience, sequence }) => ({ id, sessionId, audience, sequence })) as T[] };
   }
   async batch(): Promise<unknown[]> { throw new Error('Unexpected batch.'); }
 }
@@ -117,6 +129,55 @@ describe('outbox retry fairness with real local D1', () => {
     await applyMigrations(db);
   }, 120_000);
   afterAll(async () => { if (dispose) await dispose(); }, 120_000);
+
+  it('reads the same grants in one batch as the single-caller check', async () => {
+    const fixture = new D1Fixture(db, 'wrangler.auth-ci.jsonc', true);
+    await fixture.create();
+    try {
+      await db.prepare('UPDATE logins SET revoked = 1 WHERE id = ?').bind(fixture.specialist.loginId).run();
+      const callers = [fixture.staff, fixture.specialist, fixture.contestant, fixture.otherContestant,
+        { accountId: fixture.staff.accountId, loginId: fixture.contestant.loginId }];
+      for (const sessionId of [fixture.sessionId, fixture.secondSessionId]) {
+        const single = (await Promise.all(callers.map((caller) => db.prepare(currentAccessSql)
+          .bind(...currentAccessBindings(caller, sessionId)).first<CurrentAccessRow>()))).filter((row) => row !== null);
+        const batched = await db.prepare(currentAccessForLoginsSql)
+          .bind(sessionId, JSON.stringify(callers.map((caller) => caller.loginId))).all<CurrentAccessRow>();
+        const byLogin = (rows: CurrentAccessRow[]) => [...rows].sort((left, right) => left.login_id.localeCompare(right.login_id));
+        expect(byLogin(batched.results)).toEqual(byLogin(single));
+        expect(single.length).toBe(sessionId === fixture.sessionId ? 3 : 1);
+      }
+
+      let reads = 0;
+      const counted: D1Connection = { batch: (statements) => db.batch(statements), prepare: (sql) => {
+        const statement = db.prepare(sql);
+        const wrap = (inner: D1Statement): D1Statement => ({
+          bind: (...values) => wrap(inner.bind(...values)),
+          first: () => { reads++; return inner.first(); },
+          all: () => { reads++; return inner.all(); },
+          run: () => { reads++; return inner.run(); },
+        });
+        return wrap(statement);
+      } };
+      const state = new FakeState();
+      const coordinator = new SessionLiveCoordinator(state, { DB: counted });
+      const env: LiveEnvironment = { DB: counted, LIVE_UPDATES: { idFromName: (name) => name, get: () => ({ fetch: (request) => coordinator.fetch(request) }) } };
+      const connect = async (caller: Caller) => {
+        expect((await connectLive(new Request('https://example.invalid', { headers: { Upgrade: 'websocket' } }), env, caller, fixture.sessionId)).ok).toBe(true);
+        return state.sockets.at(-1)!;
+      };
+      const [staff, contestant, other] = [await connect(fixture.staff), await connect(fixture.contestant), await connect(fixture.otherContestant)];
+      const signal = (audience: string, sequence: number) => coordinator.fetch(new Request('https://live.internal/notify', {
+        method: 'POST', body: JSON.stringify({ id: randomUUID(), sessionId: fixture.sessionId, audience, sequence }) }));
+      reads = 0;
+      expect((await signal(`team:${fixture.teamId}`, 1)).status).toBe(204);
+      expect(reads).toBe(2);
+      expect([staff, contestant, other].map((socket) => socket.messages.length)).toEqual([1, 2, 1]);
+      await db.prepare('UPDATE logins SET revoked = 1 WHERE id = ?').bind(fixture.staff.loginId).run();
+      expect((await signal('staff', 1)).status).toBe(204);
+      expect(staff.closed).toBe(true);
+      expect(staff.messages).toHaveLength(1);
+    } finally { await fixture.cleanup(); }
+  }, 120_000);
 
   it('delivers a later session while the first 100 records keep failing', async () => {
     const fixture = new D1Fixture(db, 'wrangler.auth-ci.jsonc');
@@ -181,7 +242,7 @@ function fixture() {
   const signal = async (audience: string, sequence = 1) => coordinator.fetch(new Request('https://live.internal/notify', {
     method: 'POST', body: JSON.stringify({ id: randomUUID(), sessionId, audience, sequence }),
   }));
-  return { sessionId, eventId, runId, teamId, otherTeamId, staff, contestant, otherContestant, db, state, coordinator, env, connect, signal };
+  return { sessionId, eventId, runId, teamId, otherTeamId, staff, contestant, otherContestant, db, state, coordinator, env, connect, signal, account };
 }
 
 describe('Durable Object live updates', () => {
@@ -212,7 +273,8 @@ describe('Durable Object live updates', () => {
     expect(other.messages).toHaveLength(1);
     await test.signal(`account:${test.otherContestant.accountId}`);
     expect(other.messages).toEqual(['{"type":"ready"}', '{"type":"change"}']);
-    expect(test.db.reads).toBe(12);
+    // One read for each connection and one batched read for each signal.
+    expect(test.db.reads).toBe(6);
   });
 
   it('closes revoked sessions before delivery and rechecks changed role and team grants', async () => {
@@ -303,6 +365,35 @@ describe('Durable Object live updates', () => {
     expect(replacement.messages).toEqual(['{"type":"ready"}']);
     test.coordinator.webSocketMessage(replacement);
     expect(replacement.closed).toBe(true);
+  });
+
+  it('checks 1,000 sockets with batched reads and still closes revoked members and separates teams', async () => {
+    const test = fixture();
+    const teams = [test.teamId, test.otherTeamId];
+    const callers = Array.from({ length: 1000 }, (_, index) => {
+      const team = index % 5 === 0 ? null : teams[index % 2];
+      const caller = test.account(team === null, team);
+      const socket = new FakeSocket();
+      socket.serializeAttachment({ ...caller, sessionId: test.sessionId, expiresAt: Date.now() + 60_000 });
+      test.state.acceptWebSocket(socket);
+      return { caller, team, socket };
+    });
+    const revoked = callers.find(({ team }) => team === test.teamId)!;
+    test.db.access.delete([revoked.caller.accountId, revoked.caller.loginId, test.sessionId].join(':'));
+    const changed = () => callers.filter(({ socket }) => socket.messages.length > 0);
+    test.db.reads = 0;
+    expect((await test.signal(`team:${test.teamId}`)).status).toBe(204);
+    expect(test.db.reads).toBe(2);
+    expect(revoked.socket.closed).toBe(true);
+    expect(changed().map(({ team }) => team)).toEqual(Array(399).fill(test.teamId));
+    test.db.reads = 0;
+    await test.coordinator.alarm();
+    expect(test.db.reads).toBe(2);
+    expect(test.state.getWebSockets()).toHaveLength(999);
+    test.db.unavailable = true;
+    expect((await test.signal('staff')).status).toBe(503);
+    expect(callers.filter(({ team, socket }) => team === null && socket.messages.length > 0)).toEqual([]);
+    expect(test.state.getWebSockets()).toHaveLength(999);
   });
 
   it('rejects malformed notifications and unsupported connection inputs', async () => {

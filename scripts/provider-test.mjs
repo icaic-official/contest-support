@@ -6,15 +6,11 @@ import { existsSync } from 'node:fs';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { checkCloudBackend } from './check-cloud-backend.mjs';
 import { providerTestOptions } from './provider-test-options.mjs';
 import { checkCloudflareBackend } from '../tests/providers/cloudflare/target.mjs';
 
-const options = providerTestOptions(process.argv.slice(2), process.env);
-const cloudflare = options.provider === 'cloudflare';
-if (cloudflare) {
-  if (!options.recoveryPath) await checkCloudflareBackend(options);
-} else if (!options.recoveryPath) await checkCloudBackend();
+const options = providerTestOptions(process.argv.slice(2));
+if (!options.recoveryPath) await checkCloudflareBackend(options);
 const directory = options.recoveryPath ? undefined : await mkdtemp(
   join(process.env.RUNNER_TEMP ?? tmpdir(), 'minsky-provider-test-'),
 );
@@ -31,12 +27,11 @@ try {
     stdio: 'inherit',
     env: {
       ...safeWranglerEnvironment(),
-      MINSKY_TEST_PROVIDER: cloudflare ? 'cloudflare' : 'supabase',
-      MINSKY_TEST_PROJECT_REF: cloudflare ? '' : options.project,
-      MINSKY_CF_TEST_ACCOUNT: cloudflare ? options.account : '',
-      MINSKY_CF_TEST_DATABASE: cloudflare ? options.database : '',
-      MINSKY_CF_TEST_CONFIG: cloudflare ? options.config : '',
-      MINSKY_CF_TEST_ORIGIN: cloudflare ? options.origin : '',
+      MINSKY_TEST_PROVIDER: options.provider,
+      MINSKY_CF_TEST_ACCOUNT: options.account,
+      MINSKY_CF_TEST_DATABASE: options.database,
+      MINSKY_CF_TEST_CONFIG: options.config,
+      MINSKY_CF_TEST_ORIGIN: options.origin,
       MINSKY_PROVIDER_JOURNAL: journal,
       MINSKY_PROVIDER_RECOVERY: options.recoveryPath ? 'true' : 'false',
       // Suppress debug modes that can record request headers or arguments.

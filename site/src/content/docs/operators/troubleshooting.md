@@ -11,7 +11,7 @@ Recovery goes through the organizer; there is no email reset.
 ## I see no contest data
 
 Ask an organizer to check your session membership, team, or roles.
-Cloudflare or Supabase access does not give app access.
+Cloudflare access does not give app access.
 If you have several sessions, [select the right one](/guides/getting-started/#choose-a-session).
 
 ## I cannot submit a report

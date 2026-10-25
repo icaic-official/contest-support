@@ -6,7 +6,7 @@ description: Install a new, isolated Minsky with its own accounts, database, ima
 import Diagram from '../../../components/Diagram.astro';
 
 This creates a fresh installation from a reviewed checkout. It imports no data from other installations.
-Cloudflare serves the project's development app. The owner approved that switch separately from PR #43. A future switch needs the owner's approval. The project operates no Supabase installation. The Supabase adapter stays as code that you can run on your own Supabase project.
+Cloudflare serves the project's development app. The owner approved that switch separately from PR #43. A future switch needs the owner's approval.
 
 <Diagram name="cloudflare-architecture" alt="Cloudflare architecture. The browser talks to one Worker on the same origin. The Worker serves the frontend and API, runs a cron every minute, and uses D1 for records and accounts, a private R2 bucket for images, and a Durable Object for live updates." />
 
@@ -111,7 +111,7 @@ npm run cloudflare:install -- migrate --config="$MINSKY_INSTALL_CONFIG" --accoun
 ## 5. Build and deploy
 
 ```sh
-VITE_BACKEND=cloudflare npm run build
+npm run build
 npx wrangler deploy --config="$MINSKY_INSTALL_CONFIG" --dry-run
 npx wrangler deploy --config="$MINSKY_INSTALL_CONFIG"
 ```

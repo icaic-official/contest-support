@@ -2,7 +2,7 @@
 
 Use this guide to add a provider without changing Minsky's application behavior.
 A provider supplies identity, persistence, private image storage, and live updates through the existing contracts.
-Supabase and Cloudflare have implementations. Cloudflare is the live backend. The project operates no Supabase installation; [Run the Supabase adapter](supabase-provider.md) shows how to run that adapter on your own project. AWS, GCP, and Azure remain future contributions.
+Cloudflare is the only implementation and the live backend. On 2026-10-25 the owner removed the earlier Supabase implementation. Its records are in [the history](history/supabase-provider-records.md). The contracts stay so that a later provider can implement them. AWS, GCP, and Azure remain future contributions.
 There is no generic database adapter or infrastructure provisioning interface.
 
 ## Prepare an isolated implementation
@@ -95,9 +95,8 @@ Supply one authoritative installation procedure with these parts:
 - Exact cleanup commands for disposable installation resources and UUID-owned test fixtures.
 
 Bootstrap is provider-owned. There is no common bootstrap interface.
-The existing Supabase `cloud:bootstrap` command requires an existing Supabase Auth UUID.
 The Cloudflare `cloudflare:install` command creates its installation and administrator through its own guarded tooling.
-Neither command is a universal installer.
+It is not a universal installer.
 Use the [Cloudflare installation procedure](../site/src/content/docs/operators/installation.mdx) as an implemented example.
 Keep passwords and privileged credentials in private files or memory.
 Exclude them from chat, logs, Git, browser storage, and ordinary CI artifacts.
@@ -144,8 +143,6 @@ Run the ordinary local checks from the repository root:
 ```sh
 npm run typecheck
 npm run lint
-npm run check:functions
-npm run test:functions
 npm test
 npm run build
 npx playwright install chromium
@@ -156,7 +153,7 @@ npm run test:providers:list
 Expected results are successful exits and the unchanged shared scenario names.
 Run the provider's local persistence, authentication, storage, and runtime checks too.
 Use [Run the shared provider tests](run-provider-tests.md) for current hosted commands and recovery.
-The current runner accepts only `supabase` and `cloudflare`.
+The current runner accepts only `cloudflare`.
 A new provider needs the registration changes above before it can use that runner.
 Document its exact target, environment variables, verification command, and recovery command in that guide.
 

@@ -3,7 +3,7 @@
 This reference describes the shared frontend, its three layouts, and its browser routes.
 T0015 provides the contestant desktop app, organiser phone app, and organiser desktop console.
 PR #45 added browser routes and workflow retry protections to the redesigned shells.
-See [T0015](tickets.md#t0015--organiser-and-contestant-frontend-redesign) and [T0021](tickets.md#t0021-fresh-cloudflare-development-installation) for the recorded scope.
+See [T0015](history/tickets.md#t0015--organiser-and-contestant-frontend-redesign) and [T0021](history/tickets.md#t0021-fresh-cloudflare-development-installation) for the recorded scope.
 
 ## Stack
 
@@ -25,7 +25,6 @@ To add a shadcn component, run this command:
 npx shadcn@latest add <component>
 ```
 
-The CLI finds `deno.lock` and can try to install packages with Deno. If it does, install the packages with npm.
 The CLI can also add the wrong `cn` import or the `next-themes` package.
 After you add a component, check that it imports `cn` from `@/lib/utils` and uses `useTheme` from `@/lib/theme`.
 
@@ -59,10 +58,10 @@ The removal is a follow-up. Before you remove a rule, check the preview page in 
 
 ## Backend access
 
-The frontend does not call Supabase directly.
-Hooks, `SignIn`, `PasswordForm`, `useSessionAdmin`, `useIssueImages` and `AvatarProvider` call `requireBackend()` from `src/backend/index.ts`.
-That function returns the `Backend` from `src/backend/contracts.ts`, or it throws the setup message when `.env.local` has no public connection settings.
-The implementations are in `src/backend/supabase/` and `src/backend/cloudflare/`. See [backend contracts](backend-contracts.md).
+The frontend does not call a provider directly.
+Hooks, `SignIn`, `PasswordForm`, `useSessionAdmin`, `useIssueImages` and `AvatarProvider` call `backend` from `src/backend/index.ts`.
+`backend` is the Cloudflare client. It implements the `Backend` contract from `src/backend/contracts.ts`.
+The implementation is in `src/backend/cloudflare/`. See [backend contracts](backend-contracts.md).
 
 ## From sign-in to a UI
 
@@ -150,7 +149,7 @@ Thus a pending request and the selected issue stay the same when the viewport ch
 
 All hooks are in `src/connected/hooks/`, except `useAvatarUrl` and `useAvatarActions`, which are in `src/connected/Avatars.tsx`.
 They share session data and workflow requests across the layouts.
-They call the `Backend` contracts through `requireBackend()`.
+They call the `Backend` contracts through `backend`.
 
 | Hook | Responsibility |
 | --- | --- |
@@ -308,7 +307,7 @@ These rules apply:
 - `accountSections` gives the section order and the section nav. A team account has no staff roles. Its **Access** section describes what a team account can do. It shows no role badges and no link to **Accounts**.
 - A session admin sees **Manage session accounts**. The link goes to `/administration/accounts`. The backend still checks every request.
 - **Sessions** lists the sessions that the account can open. **Switch** is disabled while a workflow command runs. After the switch, the caller clears its own selection. The console passes `changeSession`. The contestant app passes `resetForSession`.
-- **Security** changes the password in place. On success the fields clear and a status message shows. The person stays on `/account` and stays signed in. The Supabase adapter keeps the current session. The Cloudflare adapter replaces the login cookie and checks the new session. Thus the page does not check the account status again.
+- **Security** changes the password in place. On success the fields clear and a status message shows. The person stays on `/account` and stays signed in. The Cloudflare adapter replaces the login cookie and checks the new session. Thus the page does not check the account status again.
 - An address with a fragment, such as `/account#security`, names a place inside the page. `useRouteFocus` then leaves focus to the page. `useSectionFocus` focuses and scrolls to the section. A router state from `focusRequest()` picks one control inside it. `useOpenPasswordChange()` uses this for **Change password** in the command palette and the contestant menu. It also works when the person is already on `/account`.
 - **Activity** counts open work, resolutions and messages from the snapshot that the person can see. For staff, open work means unresolved issues that the person owns. For a team account, it means unresolved team issues. The list shows the five newest replies, internal notes and resolutions of this person. A team account never sees internal notes.
 - The layout follows the width of the page, not of the window. The section nav stands beside the sections from 768 px of page width.

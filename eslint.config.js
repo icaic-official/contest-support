@@ -6,10 +6,10 @@ import globals from "globals";
 // UI, shared server rules, and shared scenarios use the same provider boundary.
 // The selected backend and its contracts remain valid application imports.
 const providerImportPattern = [
-  "^(?:@supabase/|@aws-sdk/|@cloudflare/|@google-cloud/|@azure/|cloudflare(?::|/|$)|wrangler(?:/|$)|miniflare(?:/|$)|better-auth(?:/|$))",
+  "^(?:@aws-sdk/|@cloudflare/|@google-cloud/|@azure/|cloudflare(?::|/|$)|wrangler(?:/|$)|miniflare(?:/|$)|better-auth(?:/|$))",
   String.raw`(^|/)backend/(?!contracts(?:\.ts)?$|errors(?:\.ts)?$|index(?:\.ts)?$)`,
   String.raw`(^|/)adapters/`,
-  String.raw`^(?:\.\.?/)+(?:supabase|cloudflare|aws|gcp|azure)(?:/|$)`,
+  String.raw`^(?:\.\.?/)+(?:cloudflare|aws|gcp|azure)(?:/|$)`,
 ].join("|");
 const providerImportMessage = "Keep provider SDKs and implementations inside provider modules. Use the shared contracts.";
 
@@ -72,8 +72,8 @@ export default tseslint.config(
         patterns: [{ regex: providerImportPattern, message: providerImportMessage }, {
           group: [
             "**/backend/index", "**/backend/index.ts",
-            "**/providers/supabase/**", "**/providers/cloudflare/**", "**/providers/aws/**",
-            "../supabase/**", "../cloudflare/**", "../aws/**", "**/cloud/**",
+            "**/providers/cloudflare/**", "**/providers/aws/**",
+            "../cloudflare/**", "../aws/**", "**/cloud/**",
           ],
           message: "Shared provider scenarios use Backend and the test fixture contracts. Keep provider setup and SDK calls in provider fixtures.",
         }],

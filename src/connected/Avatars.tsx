@@ -9,7 +9,7 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
-import { requireBackend } from "@/backend";
+import { backend } from "@/backend";
 import {
   AvatarImageCache,
   type AvatarMap,
@@ -69,7 +69,7 @@ export function AvatarProvider({
   const images = useMemo(
     () =>
       new AvatarImageCache((avatar) =>
-        requireBackend().avatars.download(sessionId, avatar),
+        backend.avatars.download(sessionId, avatar),
       ),
     [sessionId],
   );
@@ -81,7 +81,7 @@ export function AvatarProvider({
   const reload = useCallback(async () => {
     const run = ++newest.current;
     try {
-      const list = await requireBackend().avatars.list(sessionId);
+      const list = await backend.avatars.list(sessionId);
       if (run !== newest.current) return;
       setLoaded((previous) => ({
         sessionId,
@@ -104,7 +104,7 @@ export function AvatarProvider({
 
   const upload = useCallback(
     async (requestId: string, picture: Blob) => {
-      const avatar = await requireBackend().avatars.upload({
+      const avatar = await backend.avatars.upload({
         requestId,
         file: picture,
       });
@@ -119,7 +119,7 @@ export function AvatarProvider({
   );
 
   const remove = useCallback(async () => {
-    await requireBackend().avatars.remove();
+    await backend.avatars.remove();
     newest.current++;
     setLoaded((previous) => {
       const next = new Map(previous?.people);

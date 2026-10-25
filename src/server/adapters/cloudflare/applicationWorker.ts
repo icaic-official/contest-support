@@ -51,7 +51,7 @@ export default {
   async fetch(request: Request, env: ApplicationEnvironment, context: ExecutionContext): Promise<Response> {
     const path = new URL(request.url).pathname;
     if (path !== '/api' && !path.startsWith('/api/')) {
-      if (/^\/(?:\.|src(?:\/|$)|supabase(?:\/|$)|scripts(?:\/|$)|node_modules(?:\/|$))/.test(path)) {
+      if (/^\/(?:\.|src(?:\/|$)|scripts(?:\/|$)|node_modules(?:\/|$))/.test(path)) {
         return withSecurityHeaders(new Response(null, { status: 404 }), request.url);
       }
       return withSecurityHeaders(await env.ASSETS.fetch(request), request.url);

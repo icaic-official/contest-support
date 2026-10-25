@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { requireBackend } from "@/backend";
+import { backend } from "@/backend";
 import type { ImageTransport, StartedImage } from "@/backend/contracts";
 import { ImageRequestError } from "@/backend/errors";
 import { attachmentPath, imageKind, imageRejection } from "../imageFile";
@@ -88,7 +88,7 @@ export function useIssueImages({
   attachments,
   pendingRemovals,
   onChanged,
-  transport = requireBackend().images,
+  transport = backend.images,
   isPreviewOpen,
   onPreviewClose,
 }: IssueImagesOptions): IssueImagesState {

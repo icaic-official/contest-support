@@ -2,9 +2,7 @@
 
 The browser uses `Backend` in [contracts.ts](../src/backend/contracts.ts) for accounts, workflows, administration, images, announcements, avatars, and live updates.
 An adapter implements those operations for a provider.
-Cloudflare is the active development implementation.
-The Supabase adapter remains available for Supabase builds on a reader's own project and for isolated provider verification. The project operates no Supabase installation.
-Both implementations use the same contract.
+Cloudflare is the only implementation. The contract stays so that a later provider can implement it.
 See [run log](history/run-log.md) for source-specific verification and deployment limits.
 
 The contracts describe Minsky operations.
@@ -22,18 +20,8 @@ The service validates input, applies the existing decisions, handles receipts, a
 Its operation-level methods expose no SQL or generic transaction callback.
 The [workflow reference](server-workflow.md) records the compatibility baseline and each responsibility.
 
-The opt-in [Supabase workflow function](../supabase/functions/workflow/index.ts) authenticates the bearer token through Auth `getUser()`.
-It constructs `Caller` from the verified account and login, then executes the shared service.
-Its [persistence adapter](../src/server/adapters/supabase/store.ts) calls service-only read and commit RPCs.
-PostgreSQL rechecks current access and captured dependencies before committing state, receipt, history, and notification counters together.
-Private versions detect concurrent changes without exposing private activity through public revisions.
-
-[createServerWorkflowExecutor()](../src/backend/supabase/workflow.ts) preserves the `Backend.workflows.execute` signature for replacement verification.
-The Supabase browser adapter calls the guarded `public.workflow` RPC.
-Its administration, snapshots, images, and live updates retain their existing Supabase paths.
-The active Cloudflare application executes workflow commands through the shared service and guarded D1 batches.
+The Cloudflare application executes workflow commands through the shared service and guarded D1 batches.
 Issue decisions use one shared service. Other operations remain inside their provider implementations.
-Use [Run the shared workflow check](run-provider-tests.md#run-the-shared-workflow-check) for that provider's isolated execution path and separate evidence categories.
 
 ## Complete Cloudflare implementation
 
@@ -75,12 +63,7 @@ See [installation](../site/src/content/docs/operators/installation.mdx), [provid
 | --- | --- |
 | [contracts.ts](../src/backend/contracts.ts) | Defines `Backend` and each group of operations. |
 | [errors.ts](../src/backend/errors.ts) | Defines workflow rejection, announcement rejection, and image retry errors. |
-| [index.ts](../src/backend/index.ts) | Creates the selected implementation from public configuration. |
-| [supabase/backend.ts](../src/backend/supabase/backend.ts) | Calls Supabase Auth, database functions, account administration, and Realtime. |
-| [supabase/images.ts](../src/backend/supabase/images.ts) | Calls the attachment function and private Storage bucket. |
-| [supabase/workflow.ts](../src/backend/supabase/workflow.ts) | Provides the opt-in Edge Function executor for shared workflow verification. |
-| [supabase/announcements.ts](../src/backend/supabase/announcements.ts) | Calls the announcement database functions, the announcement-images function, and the private bucket. |
-| [supabase/avatars.ts](../src/backend/supabase/avatars.ts) | Calls the avatar database functions, the avatars function, and the private bucket. |
+| [index.ts](../src/backend/index.ts) | Creates the backend from public configuration. |
 | [cloudflare/backend.ts](../src/backend/cloudflare/backend.ts) | Calls the same-origin API and manages independent live connections. |
 | [server/adapters/cloudflare/applicationWorker.ts](../src/server/adapters/cloudflare/applicationWorker.ts) | Constructs Cloudflare services and handles application and maintenance requests. |
 | [server/adapters/cloudflare/application.ts](../src/server/adapters/cloudflare/application.ts) | Reads authorized snapshots and commits guarded administration changes. |
@@ -90,18 +73,17 @@ See [installation](../site/src/content/docs/operators/installation.mdx), [provid
 | [server/adapters/cloudflare/images.ts](../src/server/adapters/cloudflare/images.ts) | Manages private image reservations, transfers, publication, and cleanup. |
 | [server/adapters/cloudflare/live.ts](../src/server/adapters/cloudflare/live.ts) | Delivers audience-specific invalidations and manages current connection access. |
 | [server/workflow.ts](../src/server/workflow.ts) | Defines shared decisions, orchestration, and the operation-level persistence interface. |
-| [server/adapters/supabase/store.ts](../src/server/adapters/supabase/store.ts) | Calls service-only guarded persistence RPCs from trusted server code. |
 | [model.ts](../src/connected/model.ts) | Defines workflow commands and validates snapshots. It has no provider imports. |
 | [imageFile.ts](../src/connected/imageFile.ts) | Defines file checks, attachment paths, and error classification shared with the attachment function. |
 
-The UI imports the contracts and `requireBackend()`.
+The UI imports the contracts and `backend`.
 ESLint restricts provider SDKs, browser implementations, and server adapters in shared application code.
-The UI can import the contracts, shared errors, and selected backend factory.
+The UI can import the contracts, shared errors, and `backend` client.
 The same provider pattern protects shared server rules and test scenarios.
 ESLint checks static imports, re-exports, and literal dynamic UI imports.
 ESLint rejects computed dynamic UI paths because it cannot determine their provider.
 Provider modules and the backend registration file retain access to their implementation dependencies.
-Both complete browser adapters have provider-owned fixture drivers.
+The complete browser adapter has a provider-owned fixture driver.
 
 `Backend` defines behavior without requiring a distinct browser transport for every hosting provider.
 The current Cloudflare browser transport uses HTTP, cookies, and WebSockets without Cloudflare SDKs.
@@ -109,12 +91,8 @@ A server with that same protocol can reuse it. Different protocols can implement
 Deployment bindings and provider secrets remain outside the shared application contracts.
 AWS, GCP, and Azure have no implementation or verified installation path.
 
-Supabase builds use `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY`.
-For a Supabase build, `backend` is `undefined` when either value is missing.
-`requireBackend()` then throws the setup message shown on the login page.
-`VITE_BACKEND` defaults to `cloudflare`. Set `supabase` to select the Supabase provider.
 The Cloudflare adapter calls the same origin.
-Other values fail configuration. There is no automatic fallback between providers.
+There is no automatic fallback between providers.
 
 ## Authentication
 
@@ -124,7 +102,7 @@ Other values fail configuration. There is no automatic fallback between provider
 | --- | --- |
 | `currentUser()` | Returns `AccountIdentity` or `undefined`. The identity contains `id`, optional `email`, and optional `name`. |
 | `subscribe(onChange)` | Reports the current account when authentication changes. Reports `undefined` after sign-out. Returns a cleanup function. |
-| `signIn(username, password)` | Signs in with organizer credentials. The Supabase implementation normalizes usernames and retains existing email login. |
+| `signIn(username, password)` | Signs in with organizer credentials. |
 | `signOut()` | Ends the login through the provider. |
 | `accountStatus()` | Returns `username`, `must_change`, and `session_valid`. |
 | `changePassword(currentPassword, newPassword)` | Updates the password, then completes the mandatory-password check. Resolves only when both operations succeed. |
@@ -165,11 +143,6 @@ Other failures leave the write outcome unknown.
 The UI retains the request ID and command for **Retry last request**.
 An invalid success response also leaves the outcome unknown because the write may have committed.
 
-The Supabase adapter maps a nonempty database error code to `WorkflowRejectedError`.
-It does not treat a transport error as a confirmed rejection.
-The opt-in Edge executor maps only a validated typed rejection to `WorkflowRejectedError`.
-Unexpected HTTP responses and malformed bodies retain an unknown outcome.
-
 ## Administration
 
 `Backend.admin.account(sessionId, command)` accepts `create_account`, `set_username`, or `reset_password`.
@@ -182,7 +155,6 @@ The result contains `temporaryPassword` when the action creates replacement cred
 `setImageLimits()` sets the file size, image count, and combined size.
 The size inputs use the existing UI convention of 1,048,576 bytes per MB.
 
-Supabase database functions and the account function retain their current authorization rules.
 Account resets and username changes require admin access to every affected session.
 The browser adapter does not implement those checks.
 
@@ -232,11 +204,8 @@ The issue snapshot and its `members` list do not contain pictures.
 A picture change sends no live signal.
 The frontend reads `list()` again after each live signal and every 10 seconds. Other people then see a changed picture after their next read.
 
-The providers differ in one check.
-A Supabase Storage object name has no session, so Storage allows a read in any session where both people are staff.
-Before that read, the Supabase adapter checks that `list(sessionId)` contains the picture.
 The Cloudflare route checks the given session before and after it reads R2.
-See [Cloudflare account avatars](cloudflare-backend-design.md#account-avatars-use-the-private-image-bucket) and [Supabase profile pictures](supabase-provider.md#profile-pictures).
+See [Cloudflare account avatars](cloudflare-backend-design.md#account-avatars-use-the-private-image-bucket).
 
 ## Images
 
@@ -252,8 +221,6 @@ See [Cloudflare account avatars](cloudflare-backend-design.md#account-avatars-us
 | `download(path)` | Returns a `Blob` after the storage service checks access. |
 
 Each download checks current access instead of reusing an earlier authorized response.
-The Supabase adapter uses a fresh `cacheNonce` and `cache: 'no-store'` for private image reads.
-The nonce bypasses the provider cache, as described in [Supabase's cache guidance](https://supabase.com/docs/guides/storage/cdn/smart-cdn#bypassing-cache).
 These checks cannot retract bytes that a user already received.
 
 `attachmentPath()` defines the common object key as `sessionId/issueId/attachmentId/original` or `sessionId/issueId/attachmentId/thumbnail`.
@@ -271,22 +238,16 @@ It does not inspect a provider's error text for that decision.
 `Backend.updates.subscribe()` accepts the session ID, user ID, `onChange`, and `onConnection`.
 `onChange()` signals that the current snapshot may be stale.
 It does not deliver issue bodies, staff notes, or membership records.
-`onConnection(true)` reports that the database subscription is ready to receive changes.
-The Supabase adapter sets `postgres_changes_options.wait` to `true` before it reports that state.
+`onConnection(true)` reports that the live connection is ready to receive changes.
 The UI fetches a new authorized snapshot when that connection opens or reconnects.
 
 The cleanup function can run more than once and stops subsequent callbacks.
 Subscriptions on the same `Backend` are independent, including when an earlier subscription is still closing.
-The Supabase adapter assigns each subscription a unique channel topic to prevent SDK channel reuse.
 The UI also refreshes every ten seconds and on focus or network restoration.
 Those reads detect revoked access even when the subscriber receives no more events.
 Live notifications do not authorize reads or writes.
 
 ## Verification coverage
-
-`npm test` includes Supabase adapter tests with controlled HTTP responses and subscription callbacks.
-Those tests cover request translation, response validation, write outcomes, password completion, image errors, and subscription cleanup.
-The existing embedded PostgreSQL tests continue to check database rules.
 
 `npm run test:e2e` uses the application with mocked provider responses.
 It covers request-ID reuse after an uncertain write and a new request after a definitive rejection.
@@ -294,12 +255,9 @@ The suite also covers the existing account, team-search, image, refresh, and ann
 
 Those mocked checks establish request and UI behavior. Hosted provider checks run separately.
 `npm test` also checks complete D1 persistence through `WorkflowPersistence`.
-It includes shared-service rules and Supabase persistence tests with embedded PostgreSQL.
-`npm run test:workflow:hosted` exercises the deployed opt-in Supabase function with the shared workflow scenarios and additional boundary checks.
-That runner requires an explicit isolated project in `MINSKY_TEST_PROJECT_REF`. It does not activate the replacement in the browser path.
-Hosted checks use isolated accounts and records through [the hosted Supabase checks](run-provider-tests.md#run-against-the-supabase-provider).
+It includes the shared-service rules.
+Hosted checks use isolated accounts and records through [the hosted Cloudflare checks](run-provider-tests.md).
 The [shared provider suite](provider-test-contracts.md) checks these contracts through real browser adapters. It does not cover `announcements` or `avatars` yet.
-`npm test` checks the avatar rule against local D1 and R2 and against the Supabase migration in embedded PostgreSQL. `npm run test:connector:runtime` sends avatar requests through a local HTTPS Worker.
-Supabase and Cloudflare have separate fixture implementations with the same scenario assertions.
+`npm test` checks the avatar rule against local D1 and R2. `npm run test:connector:runtime` sends avatar requests through a local HTTPS Worker.
 [Run the shared checks](run-provider-tests.md) separately from the provider-specific hosted UI suite.
 The latest observed results are in [run log](history/run-log.md).

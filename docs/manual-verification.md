@@ -22,8 +22,6 @@ The live development app is the Cloudflare Worker at https://minsky-dev.icaic-mi
 Use an organizer-provided username and password.
 Docker and persona switching are not required.
 For a separate Cloudflare installation, create the first admin through its bootstrap step.
-For the Supabase adapter on your own project, follow [Run the Supabase adapter](supabase-provider.md).
-`npm run cloud:recover-admin` is that adapter's administrator recovery.
 Use `npm run cloudflare:recover-admin` when the Cloudflare development admin cannot sign in.
 Use a separate browser or profile for each account: contestant, volunteer, specialist, jury, and admin.
 Work only in a clearly identified development or test session.
@@ -239,7 +237,7 @@ Do them as a staff account on the console, as a staff account on a phone, and as
 1. Turn on location for the phone camera. Take a photo in portrait and one in landscape. Copy them to the computer, or choose them from the phone gallery in the phone app. An iPhone saves HEIC by default, and Minsky accepts only JPEG, PNG and WebP. Export the photo as a JPEG before you copy it.
 2. Open **My account** in the console. Select **Change picture** in the **Profile** section and choose the portrait photo. Check that the preview is upright, that it shows the middle square of the photo, and that the circle shows the same part.
 3. Select **Save picture**. Check the message "Profile picture updated." Check that the new picture shows in the page header, the **Profile** section and the sidebar card at once, without a reload.
-4. Open the network panel and reload the page. Save the response of the request to `/api/avatar/` (Cloudflare) or the Storage download (Supabase adapter). Run `exiftool` on the file. Check that it has no GPS tags or camera model, that it is a JPEG of at most 512 × 512 pixels, and that it is under 256 KB.
+4. Open the network panel and reload the page. Save the response of the request to `/api/avatar/` (Cloudflare). Run `exiftool` on the file. Check that it has no GPS tags or camera model, that it is a JPEG of at most 512 × 512 pixels, and that it is under 256 KB.
 5. Choose the landscape photo and select **Cancel**. Check that the picture does not change and that focus returns to **Change picture**.
 6. Choose a file larger than 2 MB. Check the alert "Choose an image of up to 2 MB." and that no preview opens. Choose a text file with the name `notes.jpg`. Check the alert "Choose a JPEG, PNG, or WebP image."
 7. Choose a very detailed photo of 1 to 2 MB, such as a close photo of gravel. Check that it saves and that the stored file is under 256 KB.
@@ -306,11 +304,6 @@ Review the contestant, jury and admin views at 1280 × 800 and at 200% zoom.
 2. Compare two simultaneous awards.
 3. Check state after refresh and reconnect.
 4. Attempt unauthorized queries across teams and sessions.
-5. For the Supabase adapter, run `MINSKY_TEST_PROJECT_REF=<your-test-project-ref> npm run test:cloud` for repeatable checks with real accounts on your isolated test project.
-   The suite requires `MINSKY_TEST_PROJECT_REF`. It does not fall back to the linked project.
-
-The suite creates isolated test fixtures and deletes only those fixtures.
-It does not reset the project.
 
 ## 10. Issue images
 
@@ -425,9 +418,6 @@ Use isolated test accounts for these checks.
 10. Save the form. Check that it preserves the second administrator's change.
 
 The credential-free tests in `tests/workspace-refresh.spec.ts` cover these UI effects and exact write requests.
-The cleanup tests in `scripts/cloud-test.test.mjs` check a failed deletion, a successful retry, and the retained recovery file.
-They use mocked cloud responses and a local child process. They do not access hosted data.
-See [Recover test:cloud fixtures](run-provider-tests.md#recover-testcloud-fixtures) for failed cloud cleanup.
 
 Record observed results in [run log](history/run-log.md).
 Suggested manual checks are not completed checks.
@@ -481,21 +471,6 @@ See [frontend architecture](frontend-architecture.md#jury-award-lists).
     loading and read errors from valid empty lists. Failed reads must clear stale data.
 
 Record results and remaining limits in [run log](history/run-log.md#t0009-parallel-maintenance-2026-10-18).
-The credential-free browser harness exercises actual migrations and RLS with
-simulated hosted transport. It does not establish real Auth, Storage, Realtime,
-deployment, offline operation, or capacity results.
-
-For isolated hosted acceptance of the Supabase adapter from a local CLI, prepare your own test project and credentials as [Run against the Supabase provider](run-provider-tests.md#run-against-the-supabase-provider) states.
-Then run the current cloud suite against that explicit target:
-
-```sh
-MINSKY_TEST_PROJECT_REF=<your-test-project-ref> npm run test:cloud
-```
-
-Do not apply unrelated remote migrations or change provider configuration for this test.
-If cleanup retains a recovery file, follow [Recover test:cloud fixtures](run-provider-tests.md#recover-testcloud-fixtures).
-Record local simulations and hosted-service CLI results separately.
-
 
 ## 14. Browser routes and workflow retry recovery
 
@@ -542,7 +517,6 @@ Use two browser windows for the live checks. Run these checks after a reviewed d
 12. At 320 px and 390 px wide, check that the announcement strip wraps, scrolls inside its area, and causes no horizontal page scroll.
     In a window about 1280 by 720 px, open **New announcement** and **Edit**. Check that every field and the **Publish** or **Save changes** button shows without scrolling inside the strip.
 13. Archive the event. Check that announcements stay readable and every management control disappears.
-14. Repeat the checks on a Supabase build when you run the adapter on your own project.
 
 ## 16. Motion and reduced motion
 

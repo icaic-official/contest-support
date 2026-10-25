@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { backend, requireBackend } from "@/backend";
+import { backend } from "@/backend";
 import type { AccountIdentity } from "@/backend/contracts";
 import { errorMessage } from "@/backend/errors";
 
@@ -19,10 +19,6 @@ export function useAuthSession(): AuthSession {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   useEffect(() => {
-    if (!backend) {
-      setLoading(false);
-      return;
-    }
     let active = true;
     const unsubscribe = backend.auth.subscribe((nextUser) => {
       if (!active) return;
@@ -49,7 +45,7 @@ export function useAuthSession(): AuthSession {
     };
   }, []);
   function signOut() {
-    void requireBackend()
+    void backend
       .auth.signOut()
       .catch((cause: unknown) => {
         setError(errorMessage(cause));

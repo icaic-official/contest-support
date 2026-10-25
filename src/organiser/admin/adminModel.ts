@@ -199,9 +199,18 @@ export function statusCounts(
   }));
 }
 
-/** An audit action in words, for example "reset password". */
-export function auditActionText(action: string): string {
-  return action.replaceAll("_", " ");
+/**
+ * An audit entry in words, for example "reset password for Ben Okoro". The
+ * target is always an account. Its name is missing when the action has no
+ * target and when the person is no longer in the session. The ID never shows.
+ */
+export function auditEntryText(
+  members: readonly SessionMember[],
+  entry: Pick<Snapshot["audit"][number], "action" | "target">,
+): string {
+  const action = entry.action.replaceAll("_", " ");
+  const name = members.find((item) => item.person.id === entry.target)?.person.name;
+  return name ? `${action} for ${name}` : action;
 }
 
 /** The name of an audit actor, or the account ID when it left the session. */

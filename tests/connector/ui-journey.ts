@@ -549,8 +549,8 @@ export async function runUiJourney(browser: Browser, fixture: UiFixture, options
     await expect(other.page.getByRole('heading', { name: 'Session access', exact: true })).toBeVisible({ timeout: 30_000 });
     await expect(accountRow(admin.page, 'otherTeam')).toHaveCount(0);
     await admin.page.getByText('Assign an existing account by ID', { exact: true }).click();
-    const assign = admin.page.locator('form').filter({ has: admin.page.getByLabel('Auth user UUID', { exact: true }) });
-    await assign.getByLabel('Auth user UUID', { exact: true }).fill(fixture.accounts.otherTeam.id);
+    const assign = admin.page.locator('form').filter({ has: admin.page.getByLabel('Account ID', { exact: true }) });
+    await assign.getByLabel('Account ID', { exact: true }).fill(fixture.accounts.otherTeam.id);
     await choose(assign.getByRole('radio', { name: /^Team/ }));
     await assign.getByLabel('Contestant team', { exact: true }).selectOption({ label: 'Provider team 1 · Fixture desk 1' });
     await adminAction(admin.page, assign.getByRole('button', { name: 'Assign membership', exact: true }));

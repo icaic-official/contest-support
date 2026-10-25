@@ -268,7 +268,9 @@ export function issueAbilities(
       issue.status === "escalated" &&
       member.roles.includes("specialist") &&
       issue.owner !== member.user_id,
-    resolve: active && (owner || member.is_admin),
+    resolve:
+      (issue.status === "claimed" || issue.status === "escalated") &&
+      (owner || member.is_admin),
     reopen: !active && (support || member.team_id === issue.team_id),
     reply: active && (support || jury),
     internalNotes: staff,
@@ -280,6 +282,30 @@ export function issueAbilities(
   return Object.fromEntries(
     Object.keys(allowed).map((key) => [key, false]),
   ) as unknown as IssueAbilities;
+}
+
+/**
+ * A short sentence that tells a staff member why an action is missing, or
+ * undefined when nothing needs explaining. Only people without a volunteer
+ * or specialist role get one. They cannot claim an open issue. A non-admin
+ * among them also cannot resolve a claimed or escalated issue.
+ */
+export function missingActionHint(
+  issue: Issue,
+  member: Membership,
+  archived: boolean,
+): string | undefined {
+  if (archived || issue.status === "resolved") return undefined;
+  if (!isStaff(member) || isSupport(member)) return undefined;
+  if (issue.status === "open") {
+    const fix = member.is_admin
+      ? "Add the Volunteer role to your own account in Accounts to claim it."
+      : "A session admin can add a role in Accounts.";
+    return `You cannot claim this issue. Claiming needs the Volunteer or Specialist role. ${fix}`;
+  }
+  return member.is_admin
+    ? undefined
+    : "You cannot resolve this issue. Only its owner or a session admin can resolve it.";
 }
 
 /**

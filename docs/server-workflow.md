@@ -14,12 +14,12 @@ The shared rules retain these decisions:
 
 | Command | Access and transition | Recorded result |
 | --- | --- | --- |
-| `submit` | Contestants submit for their membership team while intake is open. Volunteers and specialists can submit for a roster team with closed intake. | Open issue, submission time, reporter, category, description, and public history. |
+| `submit` | Contestants submit for their membership team while intake is open. Any staff member can submit for a roster team, also when intake is closed. Staff means an admin or a person with a volunteer, specialist, or jury role. | Open issue, submission time, reporter, category, description, and public history. |
 | `claim` | A volunteer or specialist claims an open issue. | Owner, claimed status, and first assignment time. |
 | `escalate` | The current support owner escalates a claimed issue. | Escalated status. The owner remains assigned. |
 | `accept` | Another specialist accepts an escalated issue. | New owner and claimed status. The first assignment time remains unchanged. |
 | `message` | The affected team, support, or jury replies to an unresolved issue. Internal notes additionally require staff access. | Public reply or internal note with the authenticated actor. |
-| `resolve` | The current support owner or an admin resolves an unresolved issue. A specialist handoff is optional. The owner stays assigned when an admin resolves. An admin who resolves an open issue becomes its owner, and the first assignment time stays empty. | A new resolution summary, actor, and time. The timer stops. |
+| `resolve` | The current support owner or an admin resolves a claimed or escalated issue. The owner stays assigned when an admin resolves. | A new resolution summary, actor, and time. The timer stops. |
 | `reopen` | The affected team or support reopens a resolved issue. Intake state does not restrict reopening. | Reopening reason, actor, and time. Claimed status resumes with the prior owner. |
 | `award` | Jury awards nonnegative whole minutes to a resolved issue. Only one award can exist per issue. | Award linked to the current resolution, with an explanation and actor. Zero minutes is valid. |
 | `apply` | Support or jury confirms a pending award, including after reopening. | Separate application time and actor. Minsky changes no external clock. |

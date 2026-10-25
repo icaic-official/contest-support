@@ -38,6 +38,7 @@ import {
 import { PlaceTile, StatusBadge } from "../components/issueDisplay";
 import {
   issueAbilities,
+  missingActionHint,
   primaryAction,
   sheetAllowed,
 } from "../organiserModel";
@@ -130,6 +131,7 @@ export function PhoneIssueView({
   const teamName = team?.name ?? "the team";
   const can = issueAbilities(issue, state, member);
   const primary = primaryAction(can);
+  const hint = missingActionHint(issue, member, Boolean(state.event?.archived));
   const award = state.awards.find((item) => item.issue_id === issue.id);
   const close = () => setSheet(undefined);
   useEffect(() => {
@@ -367,29 +369,32 @@ export function PhoneIssueView({
         />
         <ActivityList issue={issue} state={state} />
       </div>
-      <div className="flex shrink-0 gap-2 border-t bg-background/95 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur">
-        {can.reply && (
-          <Button
-            variant="outline"
-            className="size-12"
-            aria-label="Reply"
-            disabled={command.locked && !command.pending}
-            onClick={() => setSheet("reply")}
-          >
-            <MessageSquarePlus aria-hidden="true" className="size-5" />
-          </Button>
-        )}
-        {primaryButton}
-        {moreItems.length > 0 && (
-          <Button
-            variant="outline"
-            className="size-12"
-            aria-label="More actions"
-            onClick={() => setSheet("more")}
-          >
-            <Ellipsis aria-hidden="true" className="size-5" />
-          </Button>
-        )}
+      <div className="shrink-0 space-y-2 border-t bg-background/95 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur">
+        <div className="flex gap-2">
+          {can.reply && (
+            <Button
+              variant="outline"
+              className="size-12"
+              aria-label="Reply"
+              disabled={command.locked && !command.pending}
+              onClick={() => setSheet("reply")}
+            >
+              <MessageSquarePlus aria-hidden="true" className="size-5" />
+            </Button>
+          )}
+          {primaryButton}
+          {moreItems.length > 0 && (
+            <Button
+              variant="outline"
+              className="size-12"
+              aria-label="More actions"
+              onClick={() => setSheet("more")}
+            >
+              <Ellipsis aria-hidden="true" className="size-5" />
+            </Button>
+          )}
+        </div>
+        {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
       </div>
       {sheet && sheet !== "image" && (
         <ActionSheet

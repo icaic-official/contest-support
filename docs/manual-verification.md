@@ -197,6 +197,7 @@ Sign in as a volunteer, a specialist, a jury member and an admin.
 8. Change the tab. Check that focus moves to the tab heading.
 9. Check that buttons are at least 44 px high.
 10. Repeat steps 3 to 8 at 320 × 740.
+11. Sign in as an admin without a support role. Open an open issue. Check that the bottom bar shows **Resolve** and no **Claim**, and that one muted line under the buttons says that claiming needs the Volunteer or Specialist role. Sign in as a volunteer. Check that the same issue shows **Claim** and no such line.
 
 ### Organiser desktop console (1280 × 800)
 
@@ -210,6 +211,8 @@ Sign in as the same accounts.
 6. Claim an issue in a row. Check that the page stays. Claim another issue in the side sheet. Check that the sheet stays open.
 7. Open resolve, escalate and reopen from the sheet. Check that each opens a dialog and that **Cancel** closes it without an action.
 8. Check that the sheet shows one filled primary action. **Decide award** and **Confirm applied** open the **Outcome & award** tab.
+9. On a resolved issue without an award, open **Outcome & award** and choose **Other amount**. Type an amount and an explanation. Open **Activity**, then open **Outcome & award** again. Check that the amount and the explanation are still there.
+10. Sign in as an admin without a support role. Open an open issue. Check that the sheet shows **Resolve** and no **Claim**, and that one muted line under the buttons says that claiming needs the Volunteer or Specialist role.
 
 ### Contestant desktop app (1280 × 800)
 
@@ -307,7 +310,7 @@ Review the contestant, jury and admin views at 1280 × 800 and at 200% zoom.
 19. Attempt a password reset as a non-admin.
 20. Check that the app rejects it.
 21. Assign a username to an existing development account.
-22. Check that its password and Auth UUID remain unchanged.
+22. Check that its password and account ID remain unchanged.
 
 ## 9. Concurrent actions and isolation
 
@@ -356,6 +359,9 @@ Use an active event unless a step says the event is archived.
 34. Repeat with a password reset and with event archival.
 35. Start two uploads, then lower the count limit to one. Check that only one can become attached.
 36. Try a file path with an extra folder. Check that Storage refuses it.
+37. After an upload succeeds, check that the file control shows no chosen file. Check that the visibility choice is the same as before.
+38. Select **Add image** again without a new file. Check that the app asks for an image and that no second image appears.
+39. Choose another file. Check that the "Image added." message goes away.
 
 Check delayed previews with two different images, A and B, in an isolated test:
 
@@ -369,6 +375,9 @@ Check delayed previews with two different images, A and B, in an isolated test:
 `tests/images.spec.ts` automates these response-order checks with the development image harness.
 It also checks that closing the preview releases its temporary browser URL.
 These tests do not access hosted data.
+
+`tests/image-upload.spec.ts` automates steps 37 to 39 on a phone with local storage.
+It also checks that a failed upload keeps its file for **Try the upload again**.
 
 ## 11. Team search
 

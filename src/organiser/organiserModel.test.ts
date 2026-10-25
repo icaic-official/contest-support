@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import type { Issue, Membership, Resolution, Snapshot } from "@/connected/model";
+import {
+  isStaff,
+  type Issue,
+  type Membership,
+  type Resolution,
+  type Snapshot,
+} from "@/connected/model";
 import {
   ageClass,
   ageTier,
@@ -13,6 +19,7 @@ import {
   issueThatLeft,
   liveChangeIds,
   matchesChip,
+  missingActionHint,
   openableIssues,
   organiserTabs,
   placeOf,
@@ -243,7 +250,7 @@ describe("issueAbilities and primaryAction", () => {
     expect(primaryAction(theirs)).toBeUndefined();
   });
 
-  it("lets an admin resolve an issue that someone else owns or nobody owns yet", () => {
+  it("lets an admin resolve an issue that someone else owns", () => {
     const admin = member({ roles: [], is_admin: true });
     const claimed = issue({ status: "claimed", owner: other, owner_name: "Other" });
     const can = issueAbilities(claimed, noAwards, admin);
@@ -253,10 +260,7 @@ describe("issueAbilities and primaryAction", () => {
     expect(
       issueAbilities({ ...claimed, status: "escalated" }, noAwards, admin).resolve,
     ).toBe(true);
-    expect(issueAbilities(issue(), noAwards, admin).resolve).toBe(true);
-    expect(
-      issueAbilities(issue(), noAwards, member({ roles: ["volunteer"] })).resolve,
-    ).toBe(false);
+    expect(issueAbilities(issue(), noAwards, admin).resolve).toBe(false);
     expect(
       issueAbilities({ ...claimed, status: "resolved" }, noAwards, admin).resolve,
     ).toBe(false);
@@ -327,6 +331,78 @@ describe("issueAbilities and primaryAction", () => {
       member({ roles: ["volunteer"], is_admin: true }),
     );
     expect(Object.values(can).some(Boolean)).toBe(false);
+  });
+});
+
+describe("missingActionHint", () => {
+  const admin = member({ is_admin: true });
+  const jury = member({ roles: ["jury"] });
+  const claimed = issue({ status: "claimed", owner: other, owner_name: "Other" });
+  const escalated = { ...claimed, status: "escalated" as const };
+  const adminOpen =
+    "You cannot claim this issue. Claiming needs the Volunteer or Specialist role. Add the Volunteer role to your own account in Accounts to claim it.";
+  const juryOpen =
+    "You cannot claim this issue. Claiming needs the Volunteer or Specialist role. A session admin can add a role in Accounts.";
+  const juryClaimed =
+    "You cannot resolve this issue. Only its owner or a session admin can resolve it.";
+
+  it("tells an admin without a support role to add the role to their own account", () => {
+    expect(missingActionHint(issue(), admin, false)).toBe(adminOpen);
+  });
+
+  it("tells a jury member to ask a session admin", () => {
+    expect(missingActionHint(issue(), jury, false)).toBe(juryOpen);
+    expect(
+      missingActionHint(issue(), member({ roles: ["jury"], is_admin: true }), false),
+    ).toBe(adminOpen);
+  });
+
+  it("says nothing to a volunteer or a specialist", () => {
+    for (const roles of [["volunteer"], ["specialist"], ["volunteer", "jury"]] as const) {
+      expect(missingActionHint(issue(), member({ roles: [...roles] }), false)).toBeUndefined();
+    }
+    expect(
+      missingActionHint(issue(), member({ is_admin: true, roles: ["volunteer"] }), false),
+    ).toBeUndefined();
+  });
+
+  it("says nothing to a contestant", () => {
+    expect(missingActionHint(issue(), member({ team_id: "team" }), false)).toBeUndefined();
+  });
+
+  it("says nothing on a resolved issue or in an archived event", () => {
+    expect(missingActionHint(issue({ status: "resolved" }), admin, false)).toBeUndefined();
+    expect(missingActionHint(issue({ status: "resolved" }), jury, false)).toBeUndefined();
+    expect(missingActionHint(issue(), admin, true)).toBeUndefined();
+    expect(missingActionHint(claimed, jury, true)).toBeUndefined();
+  });
+
+  it("says nothing to an admin on a claimed or escalated issue, because they can resolve it", () => {
+    expect(missingActionHint(claimed, admin, false)).toBeUndefined();
+    expect(missingActionHint(escalated, admin, false)).toBeUndefined();
+  });
+
+  it("tells a jury member that only the owner or an admin resolves a claimed or escalated issue", () => {
+    expect(missingActionHint(claimed, jury, false)).toBe(juryClaimed);
+    expect(missingActionHint(escalated, jury, false)).toBe(juryClaimed);
+  });
+
+  it("appears on an open issue exactly when the person cannot claim it", () => {
+    const people = [
+      member(),
+      admin,
+      jury,
+      member({ roles: ["jury"], is_admin: true }),
+      member({ roles: ["volunteer"] }),
+      member({ roles: ["specialist"], is_admin: true }),
+      member({ team_id: "team" }),
+    ];
+    for (const person of people) {
+      const can = issueAbilities(issue(), noAwards, person);
+      expect(missingActionHint(issue(), person, false) !== undefined).toBe(
+        isStaff(person) && !can.claim,
+      );
+    }
   });
 });
 

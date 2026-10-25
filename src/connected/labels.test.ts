@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  awardMinutesLabel,
   noCommentSummary,
   parseAwardMinutes,
   relativeAge,
@@ -50,4 +51,19 @@ describe("parseAwardMinutes", () => {
       expect(parseAwardMinutes(text)).toBeUndefined();
     },
   );
+});
+
+describe("awardMinutesLabel", () => {
+  it("names a zero-minute award as no time added", () => {
+    expect(awardMinutesLabel(0)).toBe("No time added");
+  });
+
+  it("uses the singular for one minute", () => {
+    expect(awardMinutesLabel(1)).toBe("1 minute");
+  });
+
+  it("uses the plural for other amounts", () => {
+    expect(awardMinutesLabel(5)).toBe("5 minutes");
+    expect(awardMinutesLabel(60)).toBe("60 minutes");
+  });
 });

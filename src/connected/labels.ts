@@ -55,6 +55,12 @@ export function parseAwardMinutes(text: string): number | undefined {
   return minutes <= maxAwardMinutes ? minutes : undefined;
 }
 
+/** A contestant-facing amount such as "No time added", "1 minute" or "5 minutes". */
+export function awardMinutesLabel(minutes: number): string {
+  if (minutes === 0) return "No time added";
+  return minutes === 1 ? "1 minute" : `${minutes} minutes`;
+}
+
 export function formatDate(value: string): string {
   return new Date(value).toLocaleString();
 }

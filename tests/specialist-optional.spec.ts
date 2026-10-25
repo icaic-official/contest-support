@@ -2,7 +2,7 @@ import { expect, test } from "./support/localWorker";
 
 test.use({ seedIssues: false });
 
-test("an admin without a support role resolves an open issue without a specialist", async ({
+test("a volunteer claims and resolves an issue without a specialist handoff", async ({
   browser,
   local,
 }) => {
@@ -18,7 +18,7 @@ test("an admin without a support role resolves an open issue without a specialis
   await local.attach(context);
   const page = await context.newPage();
   await page.goto("/sign-in");
-  await page.getByLabel("Username", { exact: true }).fill("admin");
+  await page.getByLabel("Username", { exact: true }).fill("volunteer");
   await page
     .getByLabel("Password", { exact: true })
     .fill(crypto.randomUUID());
@@ -29,23 +29,17 @@ test("an admin without a support role resolves an open issue without a specialis
   const progress = page.getByRole("list", { name: "Issue progress" });
   await expect(progress).toContainText("Specialist");
   await expect(progress).toContainText("optional");
-  await expect(page.getByRole("button", { name: "Claim" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Claim", exact: true }).click();
   await page.getByRole("button", { name: "Resolve", exact: true }).click();
-  await page.getByText("Write a custom summary").click();
-  await page
-    .getByLabel("Custom resolution summary")
-    .fill("Swapped the keyboard");
+  await page.getByText("Service restored").click();
   await page.getByRole("button", { name: "Resolve issue" }).click();
 
   await expect(
-    page.getByRole("button", { name: "Resolve", exact: true }),
-  ).toHaveCount(0);
-  const { issue } = await local.snapshot(local.users.admin).then((state) => ({
-    issue: state.issues.find((item) => item.id === issueId)!,
-  }));
-  expect(issue).toMatchObject({
+    page.getByRole("button", { name: "Reopen", exact: true }),
+  ).toBeVisible();
+  const state = await local.snapshot(local.users.volunteer);
+  expect(state.issues.find((item) => item.id === issueId)).toMatchObject({
     status: "resolved",
-    owner: local.users.admin,
-    first_assigned_at: null,
+    owner: local.users.volunteer,
   });
 });

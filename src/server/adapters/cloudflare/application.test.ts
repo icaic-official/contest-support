@@ -335,6 +335,13 @@ describe('Cloudflare authorized application and administration', () => {
     expect((await service.snapshot(fixture.staff, fixture.sessionId)).membership?.is_admin).toBe(true);
   });
 
+  it('lets the only admin give themselves staff roles while staying admin', async () => {
+    await service.saveMember(fixture.staff, fixture.sessionId, fixture.staff.accountId,
+      { teamId: null, roles: ['volunteer', 'jury'], isAdmin: true });
+    expect((await service.snapshot(fixture.staff, fixture.sessionId)).membership)
+      .toMatchObject({ roles: ['jury', 'volunteer'], is_admin: true });
+  });
+
   it('permits an admin to remove their own membership when another admin remains', async () => {
     await service.saveMember(fixture.staff, fixture.sessionId, fixture.specialist.accountId,
       { teamId: null, roles: ['specialist'], isAdmin: true });

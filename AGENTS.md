@@ -44,7 +44,6 @@ On 2026-10-25 the owner decided to remove the Supabase implementation. Cloudflar
 Build and test new features for Cloudflare only. Do not extend, run, or test the Supabase adapter. Do not add Supabase code to new features.
 Keep the shared backend contracts in `src/backend/contracts.ts`, so that a later provider can implement them.
 Do not add or test another provider adapter until the owner states that the codebase is complete.
-Until the removal pull request merges, existing Supabase tests can still run in `npm test`. Do not add to them.
 
 Do not change hosted Cloudflare resources, secrets, or repository settings, except as the rules below allow.
 

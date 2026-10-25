@@ -36,7 +36,12 @@ import {
   visibleIssues,
 } from "../organiserModel";
 import { useLeftIssueNotice } from "../useLeftIssueNotice";
-import { AccountsPage, OverviewPage, SettingsPage } from "./AdminPages";
+import {
+  AccountsPage,
+  OverviewPage,
+  RosterPage,
+  SettingsPage,
+} from "./AdminPages";
 import { AwardReviewPage } from "./AwardReviewPage";
 import { CommandPalette, ConsoleSidebar, ConsoleTopBar } from "./ConsoleChrome";
 import {
@@ -446,6 +451,9 @@ export function OrganiserDesktopConsole({
                       )}
                       {currentPage === "accounts" && (
                         <AccountsPage props={pageProps} admin={admin} />
+                      )}
+                      {currentPage === "roster" && (
+                        <RosterPage props={pageProps} admin={admin} />
                       )}
                       {currentPage === "settings" && (
                         <SettingsPage props={pageProps} admin={admin} />

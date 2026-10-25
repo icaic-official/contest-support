@@ -64,6 +64,7 @@ const pageTabs: Record<WorkspacePage, OrganiserTab> = {
   awards: "awards",
   overview: "session",
   accounts: "session",
+  roster: "session",
   settings: "session",
   account: "me",
 };

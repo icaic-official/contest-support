@@ -7,6 +7,7 @@ import {
   KeyRound,
   LogOut,
   type LucideIcon,
+  ListPlus,
   MapPin,
   Monitor,
   Moon,
@@ -77,6 +78,7 @@ const pageIcons: Record<ConsolePage, LucideIcon> = {
   awards: Scale,
   overview: ChartNoAxesColumn,
   accounts: Users,
+  roster: ListPlus,
   settings: Settings2,
 };
 

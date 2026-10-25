@@ -257,6 +257,7 @@ export function createCloudflareBackend(options: {
       async setImageLimits(sessionId, limits) { await readJson(await post('/api/admin', { action: 'set_image_limits', sessionId, limits })); },
       async saveMember(sessionId, userId, member) { await readJson(await post('/api/admin', { action: 'save_member', sessionId, userId, member })); },
       async removeMember(sessionId, userId) { await readJson(await post('/api/admin', { action: 'remove_member', sessionId, userId })); },
+      async editRoster(sessionId, command) { await readJson(await post('/api/admin', { action: 'edit_roster', sessionId, command })); },
     },
     images: {
       async begin(input) { return startedSchema.parse(await imageResult(await post('/api/images', { action: 'begin', ...input }))); },

@@ -11,6 +11,7 @@ export const workspacePaths = {
   awards: "/jury",
   overview: "/administration",
   accounts: "/administration/accounts",
+  roster: "/administration/roster",
   settings: "/administration/settings",
   account: "/account",
 } as const;
@@ -30,7 +31,12 @@ export function canOpenPage(page: WorkspacePage, member: Membership): boolean {
   if (page === "queue" || page === "account") return true;
   if (member.team_id) return false;
   if (page === "awards") return member.roles.includes("jury");
-  if (page === "overview" || page === "accounts" || page === "settings") {
+  if (
+    page === "overview" ||
+    page === "accounts" ||
+    page === "roster" ||
+    page === "settings"
+  ) {
     return member.is_admin;
   }
   if (page === "mine" || page === "handoffs") return isSupport(member);

@@ -98,6 +98,7 @@ The same authorized snapshot selects the interface and checks route access.
 | `/jury` | Phone **Awards** or desktop **Award review** for a current jury member. |
 | `/administration` | Phone **Session** or desktop **Overview** for a current session administrator. |
 | `/administration/accounts` | Account administration for a current session administrator. |
+| `/administration/roster` | The team editor (desktop **Roster** page) for a current session administrator. The phone has no separate address. Its **Session** tab holds the editors. |
 | `/administration/settings` | Session settings for a current session administrator. |
 | `/account` | Phone **Me**, or the **My account** settings page in the desktop console and the contestant app. `/account#security` opens the **Security** section and focuses **Current password**. |
 
@@ -215,8 +216,10 @@ Shared organiser parts are one level up, so the desktop console can use them:
 | `actions/OrganiserImages.tsx` | `ImageGallery`, `ImageUploadForm`, `ImagePreviewDialog` and `OrganiserImages`. They use `useIssueImages`. |
 | `actions/ActionSheet.tsx` | `ActionSheet` (a vaul bottom sheet with a **Cancel** button) and `CommandFeedback` (the command error and **Retry last request**). `showCancel` hides **Cancel** when the content has its own **Done** button. `onClosed` runs after the closing animation. |
 | `admin/adminModel.ts` | Pure admin rules: the username pattern, image limit bounds and steps, the membership draft (Staff or Team, roles, Admin), and the request inputs for the `Backend` admin contract. `createAccountCommand`, `setUsernameCommand` and `resetPasswordCommand` build an `AccountCommand`. `membershipInput` builds a `MembershipInput`. `imageLimitsInput` builds the image limits. `adminModel.test.ts` tests them. |
-| `admin/useSessionAdmin.ts` | The admin requests through `requireBackend().admin`: intake, image limits, create account, set username, membership, password reset and removal. One request runs at a time (a ref guard). It holds the error, the notice and the one-time credentials. A recorded request refreshes the snapshot. |
+| `admin/useSessionAdmin.ts` | The admin requests through `requireBackend().admin`: intake, image limits, create account, set username, membership, password reset, removal and roster edits. One request runs at a time (a ref guard). It holds the error, the notice and the one-time credentials. A recorded request refreshes the snapshot. |
 | `admin/SessionSettings.tsx` | `StatusCounts` (icon and label per status), `IntakeSwitch` and `ImageLimitsForm` (number fields with labelled − and + buttons). |
+| `admin/RosterEditors.tsx` | `TeamRosterEditor` (the **Add teams** box, the team filter, rows with **Edit** and **Delete**) and `CategoryEditor` (a draft list with move, remove and add, saved as a whole). The phone **Session** tab and the desktop pages share them. |
+| `admin/rosterModel.ts` | Pure roster rules: reading the **Add teams** lines, the issues and accounts that keep a team, the issues that keep a category, category checks and the `RosterCommand` inputs. `rosterModel.test.ts` tests them. |
 | `admin/AccountForms.tsx` | `MembershipFields`, `CreateAccountForm`, `UsernameForm`, `MembershipForm` and `AssignByIdForm`. |
 | `admin/CredentialReveal.tsx` | The one-time username and temporary password, with copy buttons and **Done**. |
 | `admin/AccountAccess.tsx` | `AccountList`, `MemberActions` (username, membership, password reset and removal, with `ConfirmDialog`), `AdminFeedback`, `Collapsible` and `AdminActivity`. |
@@ -241,6 +244,7 @@ These rules apply:
 - A password reset and a removal need confirmation in a dialog. The text keeps the meaning of the earlier `window.confirm` text.
 - A Team account needs a team. The form sends no staff roles and no Admin for it, as before.
 - An error from a page control stays at the top of the scroll area, so it is visible near the form that failed. An error inside the sheet shows in the sheet.
+- The Session tab holds the **Teams** and **Categories** sections, which use the editors of the desktop pages. The **Add teams** box keeps its text until the server records it. A lost answer does not duplicate teams, because each new team carries an ID that the box keeps until the request succeeds.
 - In an archived event, every admin control is disabled. `PhoneStatus` shows the archived banner.
 
 `useIssueImages` (`src/connected/hooks/`) holds the upload, retry, preview and removal logic of `IssueImages`. `IssueImages` uses it with its existing markup.
@@ -258,7 +262,7 @@ It uses the same hooks, rules and forms as the phone app. It adds no workflow ru
 | `IssueTable.tsx` | `IssueTable` (number, status with icon and label, report and category, team and location, owner, aging timer, **Claim** or **Accept**) and `StatCards`. |
 | `IssueSheet.tsx` | The issue side sheet: timer cards, owner, lifecycle steps with times, handoff banner, actions, the Activity, Images and Outcome & award tabs and the reply composer. |
 | `AwardReviewPage.tsx` | The lists from `awardLists()`: To decide, To apply and Applied. Each card shows `AwardEvidence` and has the award form or the confirmation form. |
-| `AdminPages.tsx` | `OverviewPage`, `AccountsPage` (table, filter, **Create account** and **Manage** dialogs with the one-time credentials) and `SettingsPage` (intake, image limits, categories). |
+| `AdminPages.tsx` | `OverviewPage`, `AccountsPage` (table, filter, **Create account** and **Manage** dialogs with the one-time credentials) and `RosterPage` (the team editor) and `SettingsPage` (intake, image limits, the category editor). |
 | `consoleModel.ts` | Pure rules: pages by role, sidebar counts, queue tabs, status card numbers, category counts, award totals, owner workload and palette search. `consoleModel.test.ts` tests them. |
 | `consoleProps.ts` | `ConsolePageProps`, which every page receives, and the heading id. |
 
@@ -271,7 +275,7 @@ Shared parts that the console added or changed:
 
 These rules apply:
 
-- The sidebar pages follow the combined roles. Volunteers and specialists get Queue, Assigned to me and Handoffs. Jury members get Award review. Every person gets Teams & tables. Admins also get Overview, Accounts and Session settings. Admins without support roles still get Queue. A jury-only member sees resolved issues only.
+- The sidebar pages follow the combined roles. Volunteers and specialists get Queue, Assigned to me and Handoffs. Jury members get Award review. Every person gets Teams & tables. Admins also get Overview, Accounts, Roster and Session settings. Admins without support roles still get Queue. A jury-only member sees resolved issues only.
 - The queue tabs use the shared status filter of `useWorkflowState`. Active is `all`, All is `everything` and the other tabs are statuses. The phone app shows All active for `everything`. A reopened issue sets `claimed`, so In progress shows it.
 - Rows are sorted by unresolved time, longest first. The timer colors are the same as in the phone app.
 - The issue number in each row is a button. Tab reaches it and Enter opens the sheet. A click on the row also opens it. J and K move focus between rows when no field or dialog has focus.

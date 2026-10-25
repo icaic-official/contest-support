@@ -1,5 +1,6 @@
 import { z } from 'zod';
-import type { MembershipInput, SessionSummary } from '../../../backend/contracts';
+import type { MembershipInput, RosterCommand, SessionSummary } from '../../../backend/contracts';
+import { rosterCommandSchema, rosterKey } from '../../../connected/roster';
 import { snapshotSchema, type Snapshot } from '../../../connected/model';
 import type { Caller } from '../../authentication';
 import { AuthenticationError } from '../../authentication';
@@ -268,6 +269,129 @@ export class D1ApplicationService {
         { file_mb: limits.fileMegabytes, count: limits.count, total_mb: limits.totalMegabytes }),
       ...notificationStatements(this.db, sessionId, await this.sessionAudiences(sessionId)),
     ]);
+  }
+
+  /**
+   * Edits the teams and categories of a session. Every rule is checked twice.
+   * A read first gives a clear message. A guard inside the same batch then
+   * covers a write that lands between the read and the commit.
+   */
+  async editRoster(caller: Caller, sessionId: string, input: unknown): Promise<void> {
+    this.validIds(sessionId);
+    const parsed = rosterCommandSchema.safeParse(input);
+    if (!parsed.success) {
+      throw new AuthenticationError(400, 'Use different names of 1 to 200 characters. A team location can be empty.');
+    }
+    const command = parsed.data;
+    const gate = await this.adminGate(caller, sessionId);
+    const guardIds: string[] = [];
+    const guards = (...checks: Array<[string, ...BindValue[]]>) => checks.map(([sql, ...values]) => {
+      guardIds.push(crypto.randomUUID());
+      return this.assertion(guardIds.at(-1)!, sql, ...values);
+    });
+    const changes = await this.rosterChanges(sessionId, command, guards);
+    await this.commit(gate, [
+      ...changes.statements,
+      this.statement('DELETE FROM command_assertions WHERE id IN (SELECT value FROM json_each(?))', JSON.stringify(guardIds)),
+      this.audit(sessionId, caller.accountId, command.type, null, changes.detail),
+      ...notificationStatements(this.db, sessionId, changes.audiences ?? await this.sessionAudiences(sessionId)),
+    ]);
+  }
+
+  private async rosterChanges(
+    sessionId: string,
+    command: RosterCommand,
+    guards: (...checks: Array<[string, ...BindValue[]]>) => D1Statement[],
+  ): Promise<{ statements: D1Statement[]; detail: object; audiences?: string[] }> {
+    const teams = (await this.statement('SELECT id, name FROM teams WHERE session_id = ?', sessionId)
+      .all<{ id: string; name: string }>()).results;
+    const sameName = (name: string, exceptIds: ReadonlySet<string>) =>
+      teams.find((team) => !exceptIds.has(team.id) && rosterKey(team.name) === rosterKey(name));
+    const noClash = `SELECT 1 WHERE NOT EXISTS (SELECT 1 FROM teams a JOIN teams b ON b.session_id = a.session_id
+      AND b.id <> a.id AND lower(trim(b.name)) = lower(trim(a.name)) WHERE a.session_id = ? AND a.id IN (SELECT value FROM json_each(?)))`;
+    switch (command.type) {
+      case 'add_teams': {
+        const ids = new Set(command.teams.map((team) => team.id));
+        const clash = command.teams.find((team) => sameName(team.name, ids));
+        if (clash) throw new AuthenticationError(409, `A team named "${clash.name}" already exists.`);
+        const idList = JSON.stringify([...ids]);
+        return {
+          detail: { count: command.teams.length },
+          audiences: ['staff'],
+          statements: [
+            // A repeated request keeps its first rows. The guards below fail when an ID belongs to another session.
+            this.statement(`INSERT INTO teams (id, session_id, name, location)
+              SELECT json_extract(value, '$.id'), ?, json_extract(value, '$.name'), json_extract(value, '$.location')
+              FROM json_each(?) WHERE true ON CONFLICT(id) DO NOTHING`, sessionId, JSON.stringify(command.teams)),
+            ...guards(
+              ['SELECT 1 WHERE (SELECT count(*) FROM teams WHERE session_id = ? AND id IN (SELECT value FROM json_each(?))) = ?',
+                sessionId, idList, ids.size],
+              [noClash, sessionId, idList],
+            ),
+          ],
+        };
+      }
+      case 'update_team': {
+        const current = teams.find((team) => team.id === command.teamId);
+        if (!current) throw new AuthenticationError(409, 'That team no longer exists. Refresh the page.');
+        if (sameName(command.name, new Set([command.teamId]))) {
+          throw new AuthenticationError(409, `A team named "${command.name}" already exists.`);
+        }
+        return {
+          detail: { team: command.teamId, from: current.name, name: command.name, location: command.location },
+          audiences: ['staff', `team:${command.teamId}`],
+          statements: [
+            this.statement('UPDATE teams SET name = ?, location = ? WHERE id = ? AND session_id = ?',
+              command.name, command.location, command.teamId, sessionId),
+            ...guards(['SELECT 1 WHERE changes() = 1'], [noClash, sessionId, JSON.stringify([command.teamId])]),
+          ],
+        };
+      }
+      case 'delete_team': {
+        const current = teams.find((team) => team.id === command.teamId);
+        if (!current) throw new AuthenticationError(409, 'That team no longer exists. Refresh the page.');
+        const used = await this.statement(`SELECT
+          (SELECT count(*) FROM issues WHERE session_id = ?1 AND team_id = ?2) AS issues,
+          (SELECT count(*) FROM memberships WHERE session_id = ?1 AND team_id = ?2) AS accounts`, sessionId, command.teamId)
+          .first<{ issues: number; accounts: number }>();
+        if (used?.issues) {
+          throw new AuthenticationError(409, `${current.name} has ${used.issues} ${used.issues === 1 ? 'issue' : 'issues'} and stays in the roster.`);
+        }
+        if (used?.accounts) {
+          throw new AuthenticationError(409, `${used.accounts} ${used.accounts === 1 ? 'account belongs' : 'accounts belong'} to ${current.name}. Move or remove ${used.accounts === 1 ? 'it' : 'them'} first.`);
+        }
+        return {
+          detail: { team: command.teamId, name: current.name },
+          audiences: ['staff'],
+          statements: [
+            ...guards(['SELECT 1 WHERE NOT EXISTS (SELECT 1 FROM issues WHERE session_id = ? AND team_id = ?) AND NOT EXISTS (SELECT 1 FROM memberships WHERE session_id = ? AND team_id = ?)',
+              sessionId, command.teamId, sessionId, command.teamId]),
+            this.statement('DELETE FROM teams WHERE id = ? AND session_id = ?', command.teamId, sessionId),
+            ...guards(['SELECT 1 WHERE changes() = 1']),
+          ],
+        };
+      }
+      case 'set_categories': {
+        const kept = new Set(command.categories);
+        const used = (await this.statement(`SELECT category, count(*) AS issues FROM issues
+          WHERE session_id = ? AND category <> '' GROUP BY category ORDER BY category`, sessionId)
+          .all<{ category: string; issues: number }>()).results;
+        const stuck = used.filter((row) => !kept.has(row.category));
+        if (stuck.length) {
+          const [first] = stuck;
+          throw new AuthenticationError(409, `${first.category} has ${first.issues} ${first.issues === 1 ? 'issue' : 'issues'} and stays in the list.${
+            stuck.length > 1 ? ` ${stuck.length - 1} more ${stuck.length === 2 ? 'category stays' : 'categories stay'} too.` : ''}`);
+        }
+        return {
+          detail: { categories: command.categories },
+          statements: [
+            this.statement('UPDATE sessions SET categories = ? WHERE id = ?', JSON.stringify(command.categories), sessionId),
+            ...guards(['SELECT 1 WHERE NOT EXISTS (SELECT 1 FROM issues WHERE session_id = ? AND category <> \'\' AND category NOT IN (SELECT value FROM json_each(?)))',
+              sessionId, JSON.stringify(command.categories)]),
+          ],
+        };
+      }
+    }
   }
 
   async saveMember(caller: Caller, sessionId: string, userId: string, input: MembershipInput): Promise<void> {

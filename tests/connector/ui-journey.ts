@@ -292,6 +292,38 @@ export async function runUiJourney(browser: Browser, fixture: UiFixture, options
     await admin.page.getByLabel('Images per issue', { exact: true }).fill('3');
     await admin.page.getByLabel('Total per issue (MB)', { exact: true }).fill('3');
     await adminAction(admin.page, admin.page.getByRole('button', { name: 'Save image limits', exact: true }));
+    phase = 'roster editors';
+    // Categories: add one from the keyboard, then see it in a contestant's open session.
+    const category = `Power ${crypto.randomUUID().slice(0, 8)}`;
+    const newCategory = admin.page.getByLabel('New category', { exact: true });
+    await newCategory.focus();
+    await admin.page.keyboard.type(category);
+    await admin.page.keyboard.press('Enter');
+    await adminRequest(admin.page, admin.page.getByRole('button', { name: 'Save categories', exact: true }), '/api/admin');
+    await expect(admin.page.getByRole('status').filter({ hasText: 'Categories saved.' })).toBeVisible();
+    // Teams: add one from the keyboard, rename it, and see that a team with an account stays.
+    await consolePage(admin.page, 'Roster');
+    await expect(admin.page).toHaveURL(new URL('/administration/roster', fixture.origin).href);
+    const extraTeam = `Roster ${crypto.randomUUID().slice(0, 8)}`;
+    await admin.page.getByLabel('Add teams', { exact: true }).focus();
+    await admin.page.keyboard.type(`${extraTeam}, Hall Z`);
+    const added = admin.page.waitForResponse((response) => response.url() === `${fixture.origin}/api/admin`
+      && response.request().method() === 'POST');
+    await admin.page.keyboard.press('Control+Enter');
+    expect((await added).status()).toBe(200);
+    await expect(admin.page.getByRole('status').filter({ hasText: 'Added 1 team.' })).toBeVisible();
+    await expect(admin.page.getByLabel('Add teams', { exact: true })).toBeFocused();
+    await expect(admin.page.getByRole('button', { name: `Edit ${extraTeam}`, exact: true })).toBeVisible();
+    await expect(admin.page.getByText(/^In use: 1 account\. This team stays\.$/).first()).toBeVisible();
+    await expect(admin.page.getByRole('button', { name: /^Delete /, disabled: true }).first()).toBeVisible();
+    const renamed = `${extraTeam} B`;
+    await admin.page.getByRole('button', { name: `Edit ${extraTeam}`, exact: true }).click();
+    await admin.page.getByLabel('Team name', { exact: true }).fill(renamed);
+    await adminRequest(admin.page, admin.page.getByRole('button', { name: 'Save', exact: true }), '/api/admin');
+    await expect(admin.page.getByRole('button', { name: `Edit ${renamed}`, exact: true })).toBeVisible();
+    await admin.page.getByRole('button', { name: `Delete ${renamed}`, exact: true }).click();
+    await adminRequest(admin.page, admin.page.getByRole('button', { name: 'Delete team', exact: true }), '/api/admin');
+    await expect(admin.page.getByRole('button', { name: `Edit ${renamed}`, exact: true })).toHaveCount(0);
     await consolePage(admin.page, 'Accounts');
     await expect(admin.page).toHaveURL(new URL('/administration/accounts', fixture.origin).href);
     let member = await manage(admin.page, 'volunteer');
@@ -326,6 +358,8 @@ export async function runUiJourney(browser: Browser, fixture: UiFixture, options
     let teamChanges = contestant.probe.changes;
     await reportButton.click();
     await expect(contestant.page.getByRole('heading', { name: 'Report an issue', exact: true })).toBeFocused();
+    // The category that the admin added reached this open session.
+    await expect(contestant.page.getByText(category, { exact: true })).toBeVisible();
     await contestant.page.getByText('Devices', { exact: true }).click();
     await contestant.page.getByLabel('What is happening?', { exact: true }).fill(description);
     await contestant.page.getByRole('button', { name: 'Send report', exact: true }).click();

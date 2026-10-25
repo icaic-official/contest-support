@@ -153,6 +153,18 @@ The result contains `temporaryPassword` when the action creates replacement cred
 `setIntake()` changes contestant intake.
 `setImageLimits()` sets the file size, image count, and combined size.
 The size inputs use the existing UI convention of 1,048,576 bytes per MB.
+`editRoster(sessionId, command)` takes a `RosterCommand`:
+
+| Command | Effect |
+| --- | --- |
+| `add_teams` | Adds 1 to 300 teams. Each team carries a client ID, a name, and a location. A repeated ID adds no second team. |
+| `update_team` | Sets the name and the location of one team. |
+| `delete_team` | Deletes a team that has no issue and no account. |
+| `set_categories` | Replaces the ordered category list. |
+
+Only an admin of an active session edits its roster. Names are 1 to 200 characters. Two teams cannot share a name, and two categories cannot share a name. Minsky ignores capital letters, Unicode form, and spaces at the ends when it compares names.
+A team that has an issue or an account stays. A category that an issue uses stays. The rejection names the reason.
+The Worker checks each rule before the write for a clear message. It checks each rule again in the same batch as the write, so a change that lands in between rolls the batch back.
 
 Account resets and username changes require admin access to every affected session.
 The browser adapter does not implement those checks.

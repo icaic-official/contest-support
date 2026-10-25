@@ -6,7 +6,7 @@ const origin = `http://127.0.0.1:${port}`;
 
 export default defineConfig({
   testDir: "./tests",
-  testIgnore: ["cloud/**", "providers/**", "auth/**", "workflow/**", "connector/**"],
+  testIgnore: ["providers/**", "auth/**", "connector/**"],
   fullyParallel: true,
   use: { baseURL: origin, trace: "retain-on-failure" },
   webServer: {

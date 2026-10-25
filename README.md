@@ -105,7 +105,7 @@ Never put a service credential in a `VITE_` variable.
 | `npm run test:auth:http -- --account=… --database=… --origin=…` | Check the isolated deployed authentication Worker. |
 | `npm run test:auth:hash` | Measure password cost in a temporary local Worker. |
 | `npm run test:e2e:smoke` | Run the critical-path browser files `tests/landing.spec.ts` and `tests/journey.spec.ts`. |
-| `npm run test:e2e` | Run every mocked browser test, including the smoke files. |
+| `npm run test:e2e` | Run every mocked browser test, including the smoke files. The specs use the Cloudflare client. They serve the real Worker routes from the test process. See [the browser suite](#the-mocked-browser-suite). |
 | `npm run test:cloud` | Run the Supabase browser suite with isolated fixtures on your test project. Requires `MINSKY_TEST_PROJECT_REF`. |
 | `npm run test:providers:list` | List the shared provider scenarios without hosted credentials. |
 | `npm run test:providers -- --provider=supabase` | Run the shared contracts against your explicitly configured isolated Supabase project. |
@@ -146,6 +146,22 @@ Run those API commands in sequence. Default binding checks and protected CI keep
 `VITE_BACKEND` defaults to `cloudflare`. Set `VITE_BACKEND=supabase` to select the Supabase provider.
 Cloudflare cookies and API requests require the same origin. A plain Vite server does not supply that API.
 If a hosted fixture cleanup fails, follow [Recover an incomplete fixture](docs/run-provider-tests.md#recover-an-incomplete-fixture).
+
+### The mocked browser suite
+
+`npm run test:e2e` starts a Vite server with `VITE_BACKEND=cloudflare`.
+Playwright routes each `/api` request to the Worker HTTP handlers in `src/server`.
+UI specs use in-memory data from `tests/support/worker.ts`.
+Workflow specs use the real Cloudflare services on a local D1 database from `tests/support/localWorker.ts`.
+Identity and the live socket are simulated. No hosted provider is contacted. A test fails if a page requests another host.
+
+The server uses port 4173. Set `PLAYWRIGHT_PORT` to use another port, for example when two checkouts run the suite at the same time:
+
+```sh
+PLAYWRIGHT_PORT=4401 npm run test:e2e
+```
+
+Outside CI, Playwright reuses a server that already listens on the port. Give each checkout its own port so that a run does not test another checkout's server.
 
 ## Documentation
 

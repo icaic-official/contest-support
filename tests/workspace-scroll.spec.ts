@@ -1,5 +1,6 @@
-import { expect, test, type Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
 import { openApp, staff, team } from "./support/avatarServer";
+import { expect, test } from "./support/worker";
 
 /**
  * Screen-reader-only controls are absolutely positioned. A scroll pane that
@@ -23,9 +24,9 @@ const accountPages = [
 ];
 
 for (const { name, membership, width, height } of accountPages) {
-  test(`the ${name} account page scrolls inside the shell`, async ({ page }) => {
+  test(`the ${name} account page scrolls inside the shell`, async ({ page, api }) => {
     await page.setViewportSize({ width, height });
-    await openApp(page, { membership, startPath: "/account" });
+    await openApp(page, api, { membership, startPath: "/account" });
     await expect(page.getByRole("radio", { name: "Device" })).toBeAttached();
     expect(await documentOverflow(page)).toBe(0);
   });

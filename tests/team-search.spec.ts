@@ -1,6 +1,6 @@
-import { emptyAnnouncementSnapshot } from './support/announcementSnapshot';
-import { expect, test, type Locator, type Page } from '@playwright/test';
-import type { Command, Issue, Membership, Snapshot } from '../src/connected/model';
+import type { Locator, Page } from '@playwright/test';
+import type { Command, Issue, Membership } from '../src/connected/model';
+import { type FakeWorker, appErrors, expect, fixtureAccount, sessionSnapshot, test } from './support/worker';
 
 const USER_ID = '00000000-0000-4000-8000-000000000001';
 const SESSION_ID = '00000000-0000-4000-8000-000000000002';
@@ -28,21 +28,12 @@ const sessionNames: Record<string, string> = {
 };
 
 /**
- * Intercepts Auth and session reads; every identity and record is fictional.
+ * Serves fictional session reads through the Worker fixture.
  * Session one has Aurora (issue 1 open, issue 2 resolved) and Cedar (issue 3
  * open). Session two has one team, Another, with all three issues.
  */
-async function signIn(page: Page, viewport: Viewport) {
+async function signIn(page: Page, api: FakeWorker, viewport: Viewport) {
   await page.setViewportSize(viewport);
-  const user = {
-    id: USER_ID,
-    aud: 'authenticated',
-    role: 'authenticated',
-    email: 'reviewer@accounts.minsky.invalid',
-    app_metadata: { provider: 'email', providers: ['email'] },
-    user_metadata: { name: 'Review fixture' },
-    created_at: '2026-10-01T00:00:00Z',
-  };
   let memberships: Membership[] = [SESSION_ID, SECOND_SESSION_ID].map(
     (sessionId) => ({
       session_id: sessionId,
@@ -53,118 +44,52 @@ async function signIn(page: Page, viewport: Viewport) {
     }),
   );
   let removedTeam: string | null = null;
-  const commands: Command[] = [];
-  const errors: string[] = [];
-  page.on('pageerror', (error) => {
-    errors.push(error.message);
-  });
-  page.on('console', (entry) => {
-    if (entry.type() === 'error') errors.push(entry.text());
-  });
-  // The fixture has no Realtime server and must never connect to a provider.
-  await page.routeWebSocket(/supabase\.co/, (socket) => {
-    socket.close();
-  });
-  await page.route('https://example.supabase.co/**', async (route) => {
-    const path = new URL(route.request().url()).pathname;
-    let result: unknown;
-    if (path === '/auth/v1/token') {
-      const now = Math.floor(Date.now() / 1000);
-      const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
-      const payload = Buffer.from(JSON.stringify({
-        sub: USER_ID,
-        aud: 'authenticated',
-        role: 'authenticated',
-        iat: now,
-        exp: now + 3600,
-      })).toString('base64url');
-      result = {
-        access_token: `${header}.${payload}.fixture`,
-        refresh_token: 'review-fixture',
-        expires_in: 3600,
-        expires_at: now + 3600,
-        token_type: 'bearer',
-        user,
-      };
-    } else if (path === '/auth/v1/user') {
-      result = user;
-    } else if (path === '/rest/v1/rpc/account_status') {
-      result = { username: 'reviewer', must_change: false, session_valid: true };
-    } else if (path === '/rest/v1/memberships') {
-      result = memberships;
-    } else if (path === '/rest/v1/sessions') {
-      result = memberships.map((member) => ({
-        id: member.session_id,
-        name: sessionNames[member.session_id],
-      }));
-    } else if (path === '/rest/v1/rpc/session_snapshot') {
-      const sessionId: string = route.request().postDataJSON().p_session;
-      const member = memberships.find((item) => item.session_id === sessionId);
-      if (!member) throw new Error('Unknown fixture membership.');
-      const teams = sessionId === SESSION_ID
-        ? [
-            { id: AURORA_ID, session_id: sessionId, name: 'Aurora', location: 'Hall A · Desk 12' },
-            { id: CEDAR_ID, session_id: sessionId, name: 'Cedar', location: 'Hall B · Desk 04' },
-          ]
-        : [{ id: SECOND_TEAM_ID, session_id: sessionId, name: 'Another', location: 'Hall C · Desk 1234' }];
-      const visibleTeams = teams.filter((team) =>
-        team.id !== removedTeam && (!member.team_id || team.id === member.team_id),
-      );
-      const snapshot: Snapshot = {
-        session: {
-          id: sessionId,
-          event_id: EVENT_ID,
-          name: sessionNames[sessionId],
-          intake_open: true,
-          categories: ['Network', 'Device'],
-          revision: 0,
-          max_image_bytes: 10 * 1048576,
-          max_images_per_issue: 12,
-          max_image_bytes_per_issue: 120 * 1048576,
-        },
-        event: { id: EVENT_ID, name: 'Review event', archived: false },
-        membership: member,
-        teams: visibleTeams,
-        issues: ISSUE_IDS.map((id, index): Issue => ({
-          id,
-          number: index + 1,
-          session_id: sessionId,
-          team_id: sessionId === SESSION_ID
-            ? (index < 2 ? AURORA_ID : CEDAR_ID)
-            : SECOND_TEAM_ID,
-          reporter: USER_ID,
-          reporter_name: 'Review fixture',
-          category: 'Network',
-          description: `Fixture issue ${index + 1}`,
-          status: index === 1 ? 'resolved' : 'open',
-          created_at: '2026-10-14T00:00:00Z',
-          first_assigned_at: index === 1 ? '2026-10-14T00:05:00Z' : null,
-          owner: index === 1 ? USER_ID : null,
-          owner_name: index === 1 ? 'Review fixture' : null,
-          resolved_at: index === 1 ? '2026-10-14T01:00:00Z' : null,
-          revision: 0,
-        })).filter((issue) => visibleTeams.some((team) => team.id === issue.team_id)),
-        resolutions: [],
-        history: [],
-        attachments: [],
-        pending_removals: [],
-        awards: [],
-        members: [{ membership: member, person: { id: USER_ID, name: 'Review fixture', username: 'reviewer' } }],
-        audit: [],
-        server_time: new Date().toISOString(),
-      };
-      result = snapshot;
-    } else if (path === '/rest/v1/rpc/announcement_snapshot') {
-      result = emptyAnnouncementSnapshot();
-    } else if (path === '/rest/v1/rpc/avatar_list') {
-      result = [];
-    } else if (path === '/rest/v1/rpc/workflow') {
-      commands.push(route.request().postDataJSON().p_action);
-      result = ISSUE_IDS[0];
-    } else {
-      throw new Error(`Unexpected fixture request: ${path}`);
-    }
-    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(result) });
+  const errors = appErrors(page);
+  api.account = fixtureAccount(USER_ID, 'reviewer', 'Review fixture');
+  api.snapshots = () => memberships.map((member) => {
+    const sessionId = member.session_id;
+    const teams = sessionId === SESSION_ID
+      ? [
+          { id: AURORA_ID, session_id: sessionId, name: 'Aurora', location: 'Hall A · Desk 12' },
+          { id: CEDAR_ID, session_id: sessionId, name: 'Cedar', location: 'Hall B · Desk 04' },
+        ]
+      : [{ id: SECOND_TEAM_ID, session_id: sessionId, name: 'Another', location: 'Hall C · Desk 1234' }];
+    const visibleTeams = teams.filter((team) =>
+      team.id !== removedTeam && (!member.team_id || team.id === member.team_id),
+    );
+    return sessionSnapshot(member, {
+      session: {
+        event_id: EVENT_ID,
+        name: sessionNames[sessionId],
+        categories: ['Network', 'Device'],
+        max_image_bytes: 10 * 1048576,
+        max_images_per_issue: 12,
+        max_image_bytes_per_issue: 120 * 1048576,
+      },
+      event: { id: EVENT_ID, name: 'Review event', archived: false },
+      teams: visibleTeams,
+      issues: ISSUE_IDS.map((id, index): Issue => ({
+        id,
+        number: index + 1,
+        session_id: sessionId,
+        team_id: sessionId === SESSION_ID
+          ? (index < 2 ? AURORA_ID : CEDAR_ID)
+          : SECOND_TEAM_ID,
+        reporter: USER_ID,
+        reporter_name: 'Review fixture',
+        category: 'Network',
+        description: `Fixture issue ${index + 1}`,
+        status: index === 1 ? 'resolved' : 'open',
+        created_at: '2026-10-14T00:00:00Z',
+        first_assigned_at: index === 1 ? '2026-10-14T00:05:00Z' : null,
+        owner: index === 1 ? USER_ID : null,
+        owner_name: index === 1 ? 'Review fixture' : null,
+        resolved_at: index === 1 ? '2026-10-14T01:00:00Z' : null,
+        revision: 0,
+      })).filter((issue) => visibleTeams.some((team) => team.id === issue.team_id)),
+      members: [{ membership: member, person: { id: USER_ID, name: 'Review fixture', username: 'reviewer' } }],
+      server_time: new Date().toISOString(),
+    });
   });
   await page.goto('/');
   await expect(page).toHaveTitle(/^Minsky\b/);
@@ -181,7 +106,7 @@ async function signIn(page: Page, viewport: Viewport) {
     await expect(page.locator('[id^="issue-card-"]')).toHaveCount(2);
   }
   return {
-    commands,
+    commands: () => api.bodies<{ command: Command }>('/api/workflow').map((body) => body.command),
     errors,
     assignContestant: () => {
       memberships = memberships.map((member) => member.session_id === SESSION_ID
@@ -225,8 +150,8 @@ async function openReport(page: Page): Promise<Locator> {
   return report;
 }
 
-test('desktop queue filter: Tab leaves open suggestions, and keyboard and pointer select a team', async ({ page }) => {
-  const fixture = await signIn(page, desktop);
+test('desktop queue filter: Tab leaves open suggestions, and keyboard and pointer select a team', async ({ page, api }) => {
+  const fixture = await signIn(page, api, desktop);
   const queue = page.locator('#queue-team-search');
   const options = page.getByRole('option');
   await queue.fill('aur');
@@ -265,15 +190,15 @@ test('desktop queue filter: Tab leaves open suggestions, and keyboard and pointe
   await expect(submit).toBeEnabled();
   await submit.click();
   await expect(report).toBeHidden();
-  await expect.poll(() => fixture.commands).toEqual([
+  await expect.poll(() => fixture.commands()).toEqual([
     { type: 'submit', team_id: CEDAR_ID, category: 'Network', description: 'Review submission' },
   ]);
   await expect(queue).toHaveValue('Aurora');
   expect(fixture.errors).toEqual([]);
 });
 
-test('phone report sheet: Tab leaves open suggestions, and keyboard and pointer select a team', async ({ page }) => {
-  const fixture = await signIn(page, phone);
+test('phone report sheet: Tab leaves open suggestions, and keyboard and pointer select a team', async ({ page, api }) => {
+  const fixture = await signIn(page, api, phone);
   const options = page.getByRole('option');
   const report = await openReport(page);
   const reportTeam = report.locator('#report-team-search');
@@ -294,14 +219,14 @@ test('phone report sheet: Tab leaves open suggestions, and keyboard and pointer 
   await expect(report.locator('#report-team-search-chosen')).toContainText('1 unresolved issue');
   await report.getByLabel('What’s happening?').fill('Phone submission');
   await submit.click();
-  await expect.poll(() => fixture.commands).toEqual([
+  await expect.poll(() => fixture.commands()).toEqual([
     { type: 'submit', team_id: AURORA_ID, category: 'Network', description: 'Phone submission' },
   ]);
   expect(fixture.errors).toEqual([]);
 });
 
-test('phone Find tab searches teams by name and location and opens a team', async ({ page }) => {
-  const fixture = await signIn(page, phone);
+test('phone Find tab searches teams by name and location and opens a team', async ({ page, api }) => {
+  const fixture = await signIn(page, api, phone);
   await page
     .getByRole('navigation', { name: 'Organiser sections' })
     .getByRole('button', { name: 'Find', exact: true })
@@ -363,8 +288,8 @@ async function clearReportTeam(page: Page, report: Locator, activation: string) 
   await expect(submit).toBeDisabled();
 }
 
-test('Clear team with Enter resets the desktop queue filter and the report team', async ({ page }) => {
-  const fixture = await signIn(page, desktop);
+test('Clear team with Enter resets the desktop queue filter and the report team', async ({ page, api }) => {
+  const fixture = await signIn(page, api, desktop);
   const queue = page.locator('#queue-team-search');
   const open = statusTab(page, 'Open');
   await open.click();
@@ -387,19 +312,19 @@ test('Clear team with Enter resets the desktop queue filter and the report team'
   await page.keyboard.press('Escape');
   await expect(queue).toHaveValue('');
   await expect(issueRows(page)).toHaveCount(2);
-  expect(fixture.commands).toEqual([]);
+  expect(fixture.commands()).toEqual([]);
   expect(fixture.errors).toEqual([]);
 });
 
-test('Clear team with Space resets the report team in a 320 px phone sheet', async ({ page }) => {
-  const fixture = await signIn(page, { width: 320, height: 844 });
+test('Clear team with Space resets the report team in a 320 px phone sheet', async ({ page, api }) => {
+  const fixture = await signIn(page, api, { width: 320, height: 844 });
   await clearReportTeam(page, await openReport(page), 'Space');
-  expect(fixture.commands).toEqual([]);
+  expect(fixture.commands()).toEqual([]);
   expect(fixture.errors).toEqual([]);
 });
 
-test('a refreshed contestant membership drops the hidden staff team filter', async ({ page }) => {
-  const fixture = await signIn(page, desktop);
+test('a refreshed contestant membership drops the hidden staff team filter', async ({ page, api }) => {
+  const fixture = await signIn(page, api, desktop);
   await page.locator('#queue-team-search').fill('ced');
   await page.getByRole('option').click();
   await expect(issueRows(page)).toHaveCount(1);
@@ -415,8 +340,8 @@ test('a refreshed contestant membership drops the hidden staff team filter', asy
   expect(fixture.errors).toEqual([]);
 });
 
-test('automatic session fallback drops the previous session’s desktop team selections', async ({ page }) => {
-  const fixture = await signIn(page, desktop);
+test('automatic session fallback drops the previous session’s desktop team selections', async ({ page, api }) => {
+  const fixture = await signIn(page, api, desktop);
   const queue = page.locator('#queue-team-search');
   await queue.fill('ced');
   await page.getByRole('option').click();
@@ -436,8 +361,8 @@ test('automatic session fallback drops the previous session’s desktop team sel
   expect(fixture.errors).toEqual([]);
 });
 
-test('automatic session fallback drops the previous session’s phone report team', async ({ page }) => {
-  const fixture = await signIn(page, phone);
+test('automatic session fallback drops the previous session’s phone report team', async ({ page, api }) => {
+  const fixture = await signIn(page, api, phone);
   const report = await openReport(page);
   await report.locator('#report-team-search').fill('ced');
   await page.getByRole('option').click();
@@ -450,8 +375,8 @@ test('automatic session fallback drops the previous session’s phone report tea
   expect(fixture.errors).toEqual([]);
 });
 
-test('a team removed from the snapshot cannot filter the desktop queue or receive a staff report', async ({ page }) => {
-  const fixture = await signIn(page, desktop);
+test('a team removed from the snapshot cannot filter the desktop queue or receive a staff report', async ({ page, api }) => {
+  const fixture = await signIn(page, api, desktop);
   const queue = page.locator('#queue-team-search');
   await queue.fill('ced');
   await page.getByRole('option').click();
@@ -471,12 +396,12 @@ test('a team removed from the snapshot cannot filter the desktop queue or receiv
   await expect(queue).toHaveValue('');
   await expect(issueRows(page)).toHaveCount(1);
   await expect(rowTeams(page)).toHaveText(['Aurora']);
-  expect(fixture.commands).toEqual([]);
+  expect(fixture.commands()).toEqual([]);
   expect(fixture.errors).toEqual([]);
 });
 
-test('an empty filtered queue offers a way back to the active issues', async ({ page }) => {
-  const fixture = await signIn(page, desktop);
+test('an empty filtered queue offers a way back to the active issues', async ({ page, api }) => {
+  const fixture = await signIn(page, api, desktop);
   const queue = page.locator('#queue-team-search');
   await queue.fill('ced');
   await page.getByRole('option').click();
@@ -488,12 +413,12 @@ test('an empty filtered queue offers a way back to the active issues', async ({ 
   await expect(statusTab(page, 'Active')).toBeFocused();
   await expect(queue).toHaveValue('');
   await expect(issueRows(page)).toHaveCount(2);
-  expect(fixture.commands).toEqual([]);
+  expect(fixture.commands()).toEqual([]);
   expect(fixture.errors).toEqual([]);
 });
 
-test('a team removed from the snapshot leaves the phone Find tab and report sheet', async ({ page }) => {
-  const fixture = await signIn(page, phone);
+test('a team removed from the snapshot leaves the phone Find tab and report sheet', async ({ page, api }) => {
+  const fixture = await signIn(page, api, phone);
   const report = await openReport(page);
   await report.locator('#report-team-search').fill('ced');
   await page.getByRole('option').click();
@@ -519,6 +444,6 @@ test('a team removed from the snapshot leaves the phone Find tab and report shee
   const reopened = await openReport(page);
   await expect(reopened.locator('#report-team-search')).toHaveValue('');
   await expect(reopened.getByRole('button', { name: 'Submit issue', exact: true })).toBeDisabled();
-  expect(fixture.commands).toEqual([]);
+  expect(fixture.commands()).toEqual([]);
   expect(fixture.errors).toEqual([]);
 });

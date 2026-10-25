@@ -1,4 +1,6 @@
-import { expect, test, type Locator, type Page } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
+import { ImageRequestError } from "../src/backend/errors";
+import { expect, test } from "./support/worker";
 import {
   BEN_ID,
   openApp,
@@ -26,8 +28,9 @@ const sidebarCard = (page: Page) =>
 
 test("staff see their own picture and a colleague's picture, and each downloads once", async ({
   page,
+  api,
 }) => {
-  const server = await openApp(page, {
+  const server = await openApp(page, api, {
     pictures: [
       [USER_ID, solid(64, 64, green)],
       [BEN_ID, solid(64, 64, red)],
@@ -51,8 +54,8 @@ test("staff see their own picture and a colleague's picture, and each downloads 
   expect([...server.downloads].sort()).toEqual([ours, theirs].sort());
 });
 
-test("a team account reads and shows only its own picture", async ({ page }) => {
-  const server = await openApp(page, {
+test("a team account reads and shows only its own picture", async ({ page, api }) => {
+  const server = await openApp(page, api, {
     membership: team,
     startPath: "/account",
     pictures: [
@@ -66,16 +69,16 @@ test("a team account reads and shows only its own picture", async ({ page }) => 
   expect(server.downloads).toEqual([server.pictures.get(USER_ID)!.id]);
 });
 
-test("a picture that cannot be decoded falls back to initials", async ({ page }) => {
-  await openApp(page, { pictures: [[USER_ID, Buffer.from("This is not an image.")]] });
+test("a picture that cannot be decoded falls back to initials", async ({ page, api }) => {
+  await openApp(page, api, { pictures: [[USER_ID, Buffer.from("This is not an image.")]] });
   const card = sidebarCard(page);
   await expect(card).toContainText("AL");
   await expect(shown(card)).toHaveCount(0);
 });
 
-test("a changed picture replaces the old one and revokes its URL", async ({ page }) => {
+test("a changed picture replaces the old one and revokes its URL", async ({ page, api }) => {
   await page.clock.install({ time: new Date(SERVER_TIME) });
-  const server = await openApp(page, { pictures: [[USER_ID, solid(64, 64, green)]] });
+  const server = await openApp(page, api, { pictures: [[USER_ID, solid(64, 64, green)]] });
   const image = shown(sidebarCard(page));
   await expect(image).toBeVisible();
   const before = await image.getAttribute("src");
@@ -126,8 +129,9 @@ const isJpeg = (bytes: Buffer) => bytes[0] === 0xff && bytes[1] === 0xd8 && byte
 
 test("a staff account crops, previews and saves a picture, then sees it everywhere", async ({
   page,
+  api,
 }) => {
-  const server = await openApp(page, { startPath: "/account" });
+  const server = await openApp(page, api, { startPath: "/account" });
   await expect(shown(page.locator("main"))).toHaveCount(0);
   await choose(page, "me.png", leftRedRightBlue(1200, 800));
   const dialog = previewDialog(page);
@@ -156,8 +160,9 @@ test("a staff account crops, previews and saves a picture, then sees it everywhe
 
 test("the saved picture follows the EXIF orientation and carries no EXIF data", async ({
   page,
+  api,
 }) => {
-  const server = await openApp(page, { startPath: "/account" });
+  const server = await openApp(page, api, { startPath: "/account" });
   const raw = await page.evaluate(async () => {
     const canvas = document.createElement("canvas");
     canvas.width = 400;
@@ -184,8 +189,8 @@ test("the saved picture follows the EXIF orientation and carries no EXIF data", 
   expect(result.colors[1][2]).toBeGreaterThan(150);
 });
 
-test("a transparent picture gets a white background, not black", async ({ page }) => {
-  const server = await openApp(page, { startPath: "/account" });
+test("a transparent picture gets a white background, not black", async ({ page, api }) => {
+  const server = await openApp(page, api, { startPath: "/account" });
   await choose(page, "logo.png", png(300, 300, () => [0, 0, 0, 0]));
   await previewDialog(page).getByRole("button", { name: "Save picture", exact: true }).click();
   await expect(page.getByText("Profile picture updated.")).toBeVisible();
@@ -196,8 +201,9 @@ test("a transparent picture gets a white background, not black", async ({ page }
 
 test("a picture that is too detailed for one encoding still fits the size limit", async ({
   page,
+  api,
 }) => {
-  const server = await openApp(page, { startPath: "/account" });
+  const server = await openApp(page, api, { startPath: "/account" });
   const source = noise(512, 512);
   expect(source.length).toBeLessThan(2 * 1024 * 1024);
   await choose(page, "noise.png", source);
@@ -227,8 +233,8 @@ for (const [label, file, message] of [
     "Choose a readable JPEG, PNG, or WebP image.",
   ],
 ] as const) {
-  test(`${label} shows an alert and uploads nothing`, async ({ page }) => {
-    const server = await openApp(page, { startPath: "/account" });
+  test(`${label} shows an alert and uploads nothing`, async ({ page, api }) => {
+    const server = await openApp(page, api, { startPath: "/account" });
     await chooser(page).setInputFiles(file);
     await expect(page.getByRole("alert").filter({ hasText: message })).toBeVisible();
     await expect(previewDialog(page)).toHaveCount(0);
@@ -240,8 +246,8 @@ for (const [label, file, message] of [
   });
 }
 
-test("cancel leaves the picture as it was", async ({ page }) => {
-  const server = await openApp(page, {
+test("cancel leaves the picture as it was", async ({ page, api }) => {
+  const server = await openApp(page, api, {
     startPath: "/account",
     pictures: [[USER_ID, solid(64, 64, green)]],
   });
@@ -254,8 +260,8 @@ test("cancel leaves the picture as it was", async ({ page }) => {
   await expect(previewDialog(page)).toBeVisible();
 });
 
-test("removing the picture asks first, then returns to initials", async ({ page }) => {
-  const server = await openApp(page, {
+test("removing the picture asks first, then returns to initials", async ({ page, api }) => {
+  const server = await openApp(page, api, {
     startPath: "/account",
     pictures: [[USER_ID, solid(64, 64, green)]],
   });
@@ -277,13 +283,16 @@ test("removing the picture asks first, then returns to initials", async ({ page 
 
 test("a lost upload response is retried with the same request, and the picture is stored once", async ({
   page,
+  api,
 }) => {
-  const server = await openApp(page, { startPath: "/account" });
-  server.failNextUpload = "drop";
+  const server = await openApp(page, api, { startPath: "/account" });
+  api.loseNext("/api/avatar", "response");
   await choose(page, "me.png", solid(200, 200, green));
   const dialog = previewDialog(page);
   await dialog.getByRole("button", { name: "Save picture", exact: true }).click();
-  await expect(dialog.getByRole("alert")).toContainText("Try again");
+  await expect(dialog.getByRole("alert")).toContainText(
+    "The picture may not have saved. Check your connection and try again.",
+  );
   await dialog.getByRole("button", { name: "Try again", exact: true }).click();
   await expect(page.getByText("Profile picture updated.")).toBeVisible();
   expect(server.uploads).toHaveLength(2);
@@ -298,12 +307,10 @@ for (const [kind, flag] of [
 ] as const) {
   test(`when the server ${kind}, the person chooses again with a new request`, async ({
     page,
+    api,
   }) => {
-    const server = await openApp(page, { startPath: "/account" });
-    server.failNextUpload = {
-      status: 400,
-      body: { error: "The server did not accept this picture.", ...flag },
-    };
+    const server = await openApp(page, api, { startPath: "/account" });
+    server.failNextUpload = new ImageRequestError("The server did not accept this picture.", flag);
     await choose(page, "me.png", solid(200, 200, green));
     await previewDialog(page).getByRole("button", { name: "Save picture", exact: true }).click();
     await expect(previewDialog(page)).toHaveCount(0);
@@ -317,8 +324,8 @@ for (const [kind, flag] of [
   });
 }
 
-test("the whole flow works with the keyboard", async ({ page }) => {
-  const server = await openApp(page, { startPath: "/account" });
+test("the whole flow works with the keyboard", async ({ page, api }) => {
+  const server = await openApp(page, api, { startPath: "/account" });
   const heading = page.getByRole("heading", { name: "My account", exact: true });
   await heading.focus();
   await page.keyboard.press("Tab");
@@ -367,8 +374,8 @@ test("the whole flow works with the keyboard", async ({ page }) => {
   await expect(changeButton(page)).toBeFocused();
 });
 
-test("a team account changes its own picture on its account page", async ({ page }) => {
-  const server = await openApp(page, {
+test("a team account changes its own picture on its account page", async ({ page, api }) => {
+  const server = await openApp(page, api, {
     membership: team,
     startPath: "/account",
     pictures: [[BEN_ID, solid(64, 64, red)]],
@@ -386,9 +393,9 @@ test("a team account changes its own picture on its account page", async ({ page
   expect(server.downloads).toEqual([]);
 });
 
-test("the phone Me tab changes and removes the picture", async ({ page }) => {
+test("the phone Me tab changes and removes the picture", async ({ page, api }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  const server = await openApp(page);
+  const server = await openApp(page, api);
   await page
     .getByRole("navigation", { name: "Organiser sections" })
     .getByRole("button", { name: "Me", exact: true })

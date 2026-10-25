@@ -1,6 +1,6 @@
-import { expect, type Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
 import type { Issue, Membership, Snapshot } from '../../src/connected/model';
-import { emptyAnnouncementSnapshot } from './announcementSnapshot';
+import { type FakeWorker, appErrors, expect, fixtureAccount, sessionSnapshot } from './worker';
 
 const USER_ID = '00000000-0000-4000-8000-000000000001';
 const SESSION_ID = '00000000-0000-4000-8000-000000000002';
@@ -38,32 +38,19 @@ export const defaultIssues: FixtureIssue[] = [
 ];
 
 /**
- * Intercepts every provider request, so no screen reaches a real project. All
- * names and records are fictional. The returned `setIssues` changes what the
+ * Signs in through the Worker fixture. All names and records are fictional. The returned `setIssues` changes what the
  * next session read returns, and `refresh` makes the app read it, as a
  * returning window does.
  */
 export async function signInConsole(
   page: Page,
+  api: FakeWorker,
   viewport: { width: number; height: number },
   options: { contestant?: boolean; issues?: FixtureIssue[] } = {},
 ) {
   await page.setViewportSize(viewport);
   let list = options.issues ?? defaultIssues;
-  const errors: string[] = [];
-  page.on('pageerror', (error) => { errors.push(error.message); });
-  page.on('console', (entry) => {
-    if (entry.type() === 'error') errors.push(entry.text());
-  });
-  const user = {
-    id: USER_ID,
-    aud: 'authenticated',
-    role: 'authenticated',
-    email: 'reviewer@accounts.minsky.invalid',
-    app_metadata: { provider: 'email', providers: ['email'] },
-    user_metadata: { name: 'Review fixture' },
-    created_at: '2026-10-01T00:00:00Z',
-  };
+  const errors = appErrors(page);
   const member: Membership = {
     session_id: SESSION_ID,
     user_id: USER_ID,
@@ -74,20 +61,16 @@ export async function signInConsole(
   const ago = (minutes: number) => new Date(Date.now() - minutes * 60_000).toISOString();
   const snapshot = (): Snapshot => {
     const visibleTeams = options.contestant ? teams.slice(0, 1) : teams;
-    return {
+    return sessionSnapshot(member, {
       session: {
-        id: SESSION_ID,
         event_id: EVENT_ID,
         name: 'Session one',
-        intake_open: true,
         categories: ['Network', 'Device'],
-        revision: 0,
         max_image_bytes: 10 * 1048576,
         max_images_per_issue: 12,
         max_image_bytes_per_issue: 120 * 1048576,
       },
       event: { id: EVENT_ID, name: 'Review event', archived: false },
-      membership: member,
       teams: visibleTeams,
       issues: list
         .map((item): Issue => ({
@@ -123,53 +106,12 @@ export async function signInConsole(
           reopened_name: null,
           reason: null,
         })),
-      history: [],
-      attachments: [],
-      pending_removals: [],
-      awards: [],
       members: [{ membership: member, person: { id: USER_ID, name: 'Review fixture', username: 'reviewer' } }],
-      audit: [],
       server_time: new Date().toISOString(),
-    };
+    });
   };
-  // The fixture has no Realtime server and must never connect to a provider.
-  await page.routeWebSocket(/supabase\.co/, (socket) => { socket.close(); });
-  await page.route('https://example.supabase.co/**', async (route) => {
-    const path = new URL(route.request().url()).pathname;
-    let result: unknown;
-    if (path === '/auth/v1/token') {
-      const now = Math.floor(Date.now() / 1000);
-      const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
-      const payload = Buffer.from(JSON.stringify({
-        sub: USER_ID, aud: 'authenticated', role: 'authenticated', iat: now, exp: now + 3600,
-      })).toString('base64url');
-      result = {
-        access_token: `${header}.${payload}.fixture`,
-        refresh_token: 'review-fixture',
-        expires_in: 3600,
-        expires_at: now + 3600,
-        token_type: 'bearer',
-        user,
-      };
-    } else if (path === '/auth/v1/user') {
-      result = user;
-    } else if (path === '/rest/v1/rpc/account_status') {
-      result = { username: 'reviewer', must_change: false, session_valid: true };
-    } else if (path === '/rest/v1/memberships') {
-      result = [member];
-    } else if (path === '/rest/v1/sessions') {
-      result = [{ id: SESSION_ID, name: 'Session one' }];
-    } else if (path === '/rest/v1/rpc/session_snapshot') {
-      result = snapshot();
-    } else if (path === '/rest/v1/rpc/announcement_snapshot') {
-      result = emptyAnnouncementSnapshot();
-    } else if (path === '/rest/v1/rpc/avatar_list') {
-      result = [];
-    } else {
-      throw new Error(`Unexpected fixture request: ${path}`);
-    }
-    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(result) });
-  });
+  api.account = fixtureAccount(USER_ID, 'reviewer', 'Review fixture');
+  api.snapshots = () => [snapshot()];
   await page.goto('/');
   await page.getByLabel('Username', { exact: true }).fill('reviewer');
   await page.getByLabel('Password', { exact: true }).fill('fixture-password');

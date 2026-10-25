@@ -1,25 +1,10 @@
-import { expect, test as base } from '@playwright/test';
 import type { Command } from '../src/connected/model';
-import { createJuryFixture } from './jury-fixture';
-
-const test = base.extend<{
-  local: Awaited<ReturnType<typeof createJuryFixture>>;
-}>({
-  local: async ({ context }, provide) => {
-    const local = await createJuryFixture();
-    await local.attach(context);
-    try {
-      await provide(local);
-    } finally {
-      await local.close();
-    }
-  },
-});
+import { expect, test } from './support/localWorker';
 
 interface WorkflowRequest {
-  p_session: string;
-  p_request: string;
-  p_action: Command;
+  sessionId: string;
+  requestId: string;
+  command: Command;
 }
 
 for (const committed of [false, true]) {
@@ -28,12 +13,12 @@ for (const committed of [false, true]) {
     local,
   }) => {
     const [originalSession, otherSession] = local.sessions;
-    await local.db.query(
-      'insert into public.memberships(session_id,user_id,team_id,roles) values($1,$2,$3,array[]::text[])',
-      [otherSession, local.users.contestant, local.teams[2]],
+    await local.run(
+      'INSERT INTO memberships (session_id, account_id, team_id) VALUES (?, ?, ?)',
+      otherSession, local.users.contestant, local.teams[2],
     );
     const requests: WorkflowRequest[] = [];
-    await page.route('**/rest/v1/rpc/workflow', async (route) => {
+    await page.route('**/api/workflow', async (route) => {
       const request: WorkflowRequest = route.request().postDataJSON();
       requests.push(request);
       if (requests.length > 1) {
@@ -43,14 +28,14 @@ for (const committed of [false, true]) {
       if (committed) {
         await local.act(
           local.users.contestant,
-          request.p_action,
-          request.p_request,
-          request.p_session,
+          request.command,
+          request.requestId,
+          request.sessionId,
         );
       }
-      await local.db.query(
-        'delete from public.memberships where session_id=$1 and user_id=$2',
-        [originalSession, local.users.contestant],
+      await local.run(
+        'DELETE FROM memberships WHERE session_id = ? AND account_id = ?',
+        originalSession, local.users.contestant,
       );
       await route.abort('failed');
     });
@@ -71,14 +56,13 @@ for (const committed of [false, true]) {
     await expect(retry).toHaveCount(0);
     expect(requests).toHaveLength(2);
     expect(requests[1]).toEqual(requests[0]);
-    expect(requests[0].p_session).toBe(originalSession);
+    expect(requests[0].sessionId).toBe(originalSession);
     // A retry still reaches the original server access check. It cannot create
     // the report under the contestant's membership in the other session.
-    const recorded = await local.db.query<{ session_id: string }>(
-      'select session_id from public.issues where reporter=$1',
-      [local.users.contestant],
+    const recorded = await local.rows<{ session_id: string }>(
+      'SELECT session_id FROM issues WHERE reporter = ?', local.users.contestant,
     );
-    expect(recorded.rows).toEqual(committed ? [{ session_id: originalSession }] : []);
+    expect(recorded).toEqual(committed ? [{ session_id: originalSession }] : []);
     await expect(page.getByRole('button', { name: 'Send report', exact: true })).toBeEnabled();
   });
 }
@@ -93,14 +77,14 @@ test('a response after the account gate remount keeps an explicit retry and does
   const responseReady = new Promise<void>((resolve) => {
     completeResponse = resolve;
   });
-  await page.route('**/rest/v1/rpc/account_status', async (route) => {
+  await page.route('**/api/auth/session', async (route) => {
     if (failAccountCheck) {
-      await route.fulfill({ status: 503, json: { message: 'Account check unavailable' } });
+      await route.fulfill({ status: 503, json: { error: 'Account check unavailable' } });
     } else {
       await route.fallback();
     }
   });
-  await page.route('**/rest/v1/rpc/workflow', async (route) => {
+  await page.route('**/api/workflow', async (route) => {
     const request: WorkflowRequest = route.request().postDataJSON();
     requests.push(request);
     if (requests.length > 1) {
@@ -109,12 +93,12 @@ test('a response after the account gate remount keeps an explicit retry and does
     }
     const id = await local.act(
       local.users.contestant,
-      request.p_action,
-      request.p_request,
-      request.p_session,
+      request.command,
+      request.requestId,
+      request.sessionId,
     );
     await responseReady;
-    await route.fulfill({ json: id });
+    await route.fulfill({ json: { outcome: 'committed', issueId: id } });
   });
 
   try {
@@ -127,7 +111,7 @@ test('a response after the account gate remount keeps an explicit retry and does
     await page.getByRole('button', { name: 'Send report', exact: true }).click();
     await expect.poll(() => requests.length).toBe(1);
     await expect.poll(async () =>
-      (await local.db.query('select id from public.issues where reporter=$1', [local.users.contestant])).rows.length,
+      (await local.rows('SELECT id FROM issues WHERE reporter = ?', local.users.contestant)).length,
     ).toBe(1);
 
     failAccountCheck = true;
@@ -140,7 +124,7 @@ test('a response after the account gate remount keeps an explicit retry and does
     await expect(retry).toBeVisible();
     const heading = page.getByRole('region', { name: 'Report details', exact: true });
     await heading.focus();
-    const response = page.waitForResponse('**/rest/v1/rpc/workflow');
+    const response = page.waitForResponse('**/api/workflow');
     completeResponse();
     await (await response).finished();
     await expect(heading).toBeFocused();
@@ -148,8 +132,8 @@ test('a response after the account gate remount keeps an explicit retry and does
     await retry.click();
     await expect(retry).toHaveCount(0);
     expect(requests).toEqual([requests[0], requests[0]]);
-    const recorded = await local.db.query('select id from public.issues where reporter=$1', [local.users.contestant]);
-    expect(recorded.rows).toHaveLength(1);
+    const recorded = await local.rows('SELECT id FROM issues WHERE reporter = ?', local.users.contestant);
+    expect(recorded).toHaveLength(1);
     await expect(page.getByRole('status').filter({ hasText: 'Action recorded in shared history.' })).toBeVisible();
   } finally {
     completeResponse();
@@ -161,16 +145,13 @@ test('the account gate preserves a retry after all session access is removed', a
   local,
 }) => {
   const requests: WorkflowRequest[] = [];
-  await page.route('**/rest/v1/rpc/workflow', async (route) => {
+  await page.route('**/api/workflow', async (route) => {
     requests.push(route.request().postDataJSON());
     if (requests.length > 1) {
       await route.fallback();
       return;
     }
-    await local.db.query(
-      'delete from public.memberships where user_id=$1',
-      [local.users.contestant],
-    );
+    await local.run('DELETE FROM memberships WHERE account_id = ?', local.users.contestant);
     await route.abort('failed');
   });
 
@@ -184,10 +165,10 @@ test('the account gate preserves a retry after all session access is removed', a
   const retry = page.getByRole('button', { name: 'Retry last request', exact: true });
   await expect(retry).toBeEnabled();
 
-  const accountStatus = '**/rest/v1/rpc/account_status';
+  const accountStatus = '**/api/auth/session';
   await page.route(accountStatus, (route) => route.fulfill({
     status: 503,
-    json: { message: 'Account check unavailable' },
+    json: { error: 'Account check unavailable' },
   }));
   await page.evaluate(() => window.dispatchEvent(new Event('focus')));
   const accountRetry = page.getByRole('button', { name: 'Retry account check', exact: true });
@@ -203,40 +184,37 @@ test('the account gate preserves a retry after all session access is removed', a
   await retry.click();
   await expect(retry).toHaveCount(0);
   expect(requests).toEqual([requests[0], requests[0]]);
-  expect(requests[0].p_session).toBe(local.sessions[0]);
-  const recorded = await local.db.query(
-    'select id from public.issues where reporter=$1',
-    [local.users.contestant],
-  );
-  expect(recorded.rows).toHaveLength(0);
+  expect(requests[0].sessionId).toBe(local.sessions[0]);
+  const recorded = await local.rows('SELECT id FROM issues WHERE reporter = ?', local.users.contestant);
+  expect(recorded).toHaveLength(0);
 });
 
 test('a late success in the original session preserves the current session form and focus', async ({
   page,
   local,
 }) => {
-  await local.db.query(
-    'insert into public.memberships(session_id,user_id,team_id,roles) values($1,$2,$3,array[]::text[])',
-    [local.sessions[1], local.users.contestant, local.teams[2]],
+  await local.run(
+    'INSERT INTO memberships (session_id, account_id, team_id) VALUES (?, ?, ?)',
+    local.sessions[1], local.users.contestant, local.teams[2],
   );
   let completeResponse = () => {};
   const responseReady = new Promise<void>((resolve) => {
     completeResponse = resolve;
   });
-  await page.route('**/rest/v1/rpc/workflow', async (route) => {
+  await page.route('**/api/workflow', async (route) => {
     const request: WorkflowRequest = route.request().postDataJSON();
     const id = await local.act(
       local.users.contestant,
-      request.p_action,
-      request.p_request,
-      request.p_session,
+      request.command,
+      request.requestId,
+      request.sessionId,
     );
-    await local.db.query(
-      'delete from public.memberships where session_id=$1 and user_id=$2',
-      [local.sessions[0], local.users.contestant],
+    await local.run(
+      'DELETE FROM memberships WHERE session_id = ? AND account_id = ?',
+      local.sessions[0], local.users.contestant,
     );
     await responseReady;
-    await route.fulfill({ json: id });
+    await route.fulfill({ json: { outcome: 'committed', issueId: id } });
   });
 
   try {
@@ -249,10 +227,7 @@ test('a late success in the original session preserves the current session form 
     await page.getByLabel('What is happening?', { exact: true }).fill(description);
     await page.getByRole('button', { name: 'Send report', exact: true }).click();
     await expect.poll(async () =>
-      (await local.db.query(
-        'select session_id from public.memberships where user_id=$1',
-        [local.users.contestant],
-      )).rows,
+      local.rows('SELECT session_id FROM memberships WHERE account_id = ?', local.users.contestant),
     ).toEqual([{ session_id: local.sessions[1] }]);
     await page.evaluate(() => window.dispatchEvent(new Event('focus')));
     await expect(page.getByText('Secondary', { exact: true })).toBeVisible();
@@ -260,7 +235,7 @@ test('a late success in the original session preserves the current session form 
     await expect(currentForm).toBeVisible();
     const region = page.getByRole('region', { name: 'Report details', exact: true });
     await region.focus();
-    const response = page.waitForResponse('**/rest/v1/rpc/workflow');
+    const response = page.waitForResponse('**/api/workflow');
     completeResponse();
     await (await response).finished();
 
@@ -268,11 +243,10 @@ test('a late success in the original session preserves the current session form 
     await expect(currentForm).toBeVisible();
     await expect(page.getByLabel('What is happening?', { exact: true })).toHaveValue(description);
     await expect(region).toBeFocused();
-    const recorded = await local.db.query<{ session_id: string }>(
-      'select session_id from public.issues where reporter=$1',
-      [local.users.contestant],
+    const recorded = await local.rows<{ session_id: string }>(
+      'SELECT session_id FROM issues WHERE reporter = ?', local.users.contestant,
     );
-    expect(recorded.rows).toEqual([{ session_id: local.sessions[0] }]);
+    expect(recorded).toEqual([{ session_id: local.sessions[0] }]);
   } finally {
     completeResponse();
   }

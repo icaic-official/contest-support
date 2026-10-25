@@ -155,6 +155,16 @@ describe('Cloudflare Backend transport', () => {
     });
   });
 
+  it.each([
+    ['state', 'This issue changed while you were working. Refresh and try again.'],
+    ['access', 'You no longer have access to do this.'],
+    ['input', 'Check what you entered and try again.'],
+    ['request_id', 'This request was already used. Refresh and try again.'],
+  ])('tells the person why the server rejected a command for %s', async (reason, message) => {
+    const backend = createCloudflareBackend({ origin, fetch: transport(() => Response.json({ outcome: 'rejected', reason }, { status: 409 })) });
+    await expect(backend.workflows.execute(sessionId, requestId, command)).rejects.toThrow(new WorkflowRejectedError(message));
+  });
+
   it('distinguishes a confirmed rejection from an unknown outcome', async () => {
     const rejected = createCloudflareBackend({ origin, fetch: transport(() => Response.json({ outcome: 'rejected', reason: 'state' }, { status: 409 })) });
     await expect(rejected.workflows.execute(sessionId, requestId, command)).rejects.toBeInstanceOf(WorkflowRejectedError);

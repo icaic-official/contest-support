@@ -203,6 +203,30 @@ describe('Cloudflare session announcements with local D1 and R2 bindings', () =>
     expect((await read(admin)).announcements.filter((announcement) => announcement.title === 'Once')).toHaveLength(1);
   });
 
+  const untilPassed = (iso: string) => new Promise((resolve) => setTimeout(resolve, Math.max(0, Date.parse(iso) - Date.now()) + 25));
+
+  it('replays a committed publish whose expiry passed before the retry, without a second announcement', async () => {
+    const requestId = randomUUID();
+    const expiresAt = new Date(Date.now() + 1500).toISOString();
+    const command = publishCommand({ title: 'Short notice', expires_at: expiresAt });
+    const id = await service.execute(admin, fixture.sessionId, requestId, command);
+    await untilPassed(expiresAt);
+    await expect(service.execute(admin, fixture.sessionId, requestId, command)).resolves.toBe(id);
+    expect((await read(admin)).announcements.filter((announcement) => announcement.title === 'Short notice')).toHaveLength(1);
+    await expect(service.execute(admin, fixture.sessionId, randomUUID(), command)).rejects.toMatchObject({ reason: 'input' });
+  });
+
+  it('replays a committed edit whose expiry passed before the retry, without a second revision', async () => {
+    const id = await publish();
+    const requestId = randomUUID();
+    const expiresAt = new Date(Date.now() + 1500).toISOString();
+    const edit = { type: 'edit', id, revision: 0, title: 'Short notice', details: 'Edited details.', expires_at: expiresAt };
+    await expect(service.execute(admin, fixture.sessionId, requestId, edit)).resolves.toBe(id);
+    await untilPassed(expiresAt);
+    await expect(service.execute(admin, fixture.sessionId, requestId, edit)).resolves.toBe(id);
+    expect((await read(admin)).announcements).toMatchObject([{ id, title: 'Short notice', revision: 1 }]);
+  });
+
   it('edits with revisions, keeps publication attribution, and reports a competing edit as a conflict', async () => {
     const id = await publish(admin);
     const edit = { type: 'edit', id, revision: 0, title: 'Edited', details: 'Edited details.', expires_at: null };

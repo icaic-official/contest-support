@@ -11,10 +11,15 @@ const requestId = '10e98b04-539e-4058-b8c5-c903a28b7005';
 const issueId = '2732b785-f5df-4db8-bdc7-873961c2a600';
 const command = { type: 'claim' as const, issue_id: issueId, revision: 1 };
 
+const sessionBody = {
+  user: { id: issueId }, csrf: 'fresh-token',
+  status: { username: 'fictional', must_change: false, session_valid: true },
+};
+
 function transport(result: () => Response | Promise<Response>) {
   return vi.fn<typeof fetch>(async (input) => {
     const url = new URL(String(input));
-    if (url.pathname === '/api/auth/session') return Response.json({ csrf: 'fresh-token' });
+    if (url.pathname === '/api/auth/session') return Response.json(sessionBody);
     return result();
   });
 }
@@ -62,7 +67,7 @@ describe('Cloudflare Backend transport', () => {
         reply: () => new Response(
           '<html>Unavailable</html>', { status: 503 },
         ),
-        message: 'The request could not be completed.',
+        message: 'The authentication request failed.',
       },
     ])('reports a $status $format failure without sending a mutation', async ({ reply, message }) => {
       const fetcher = vi.fn<typeof fetch>(async () => reply());
@@ -77,7 +82,7 @@ describe('Cloudflare Backend transport', () => {
     });
   });
 
-  it('preserves request identity and uses a fresh request-protection token', async () => {
+  it('preserves request identity and sends the request-protection token', async () => {
     const fetcher = transport(() => Response.json({ outcome: 'committed', issueId }));
     const backend = createCloudflareBackend({ origin, fetch: fetcher });
     expect(await backend.workflows.execute(sessionId, requestId, command)).toBe(issueId);
@@ -85,6 +90,69 @@ describe('Cloudflare Backend transport', () => {
     expect(JSON.parse(String(init?.body))).toEqual({ sessionId, requestId, command });
     expect(new Headers(init?.headers).get('X-CSRF-Token')).toBe('fresh-token');
     expect(init).toMatchObject({ credentials: 'same-origin', cache: 'no-store', redirect: 'error' });
+  });
+
+  describe('action round trips', () => {
+    const emptySnapshot = {
+      session: null, event: null, membership: null, teams: [], issues: [], resolutions: [], history: [],
+      awards: [], audit: [], members: [], server_time: '2026-10-25T00:00:00Z',
+    };
+
+    function counted(reply: (request: Request, index: number) => Response) {
+      const log: string[] = [];
+      let tokens = 0;
+      const fetcher = vi.fn<typeof fetch>(async (input, init) => {
+        const request = new Request(input, init);
+        const path = new URL(request.url).pathname;
+        log.push(`${request.method} ${path}${request.headers.get('X-CSRF-Token') ? ` ${request.headers.get('X-CSRF-Token')}` : ''}`);
+        if (path === '/api/auth/session') return Response.json({ ...sessionBody, csrf: `token-${++tokens}` });
+        return reply(request, log.length);
+      });
+      return { fetcher, log };
+    }
+
+    it('reads the request-protection token once for many actions', async () => {
+      const { fetcher, log } = counted(() => Response.json({ outcome: 'committed', issueId }));
+      const backend = createCloudflareBackend({ origin, fetch: fetcher });
+      for (let action = 0; action < 3; action++) await backend.workflows.execute(sessionId, crypto.randomUUID(), command);
+      expect(log).toEqual(['GET /api/auth/session', ...Array(3).fill('POST /api/workflow token-1')]);
+    });
+
+    it('returns the changed snapshot with the commit, and drops an invalid one', async () => {
+      const valid = counted(() => Response.json({ outcome: 'committed', issueId, snapshot: emptySnapshot }));
+      const read = await createCloudflareBackend({ origin, fetch: valid.fetcher }).workflows.executeAndRead!(sessionId, requestId, command);
+      expect(read).toMatchObject({ issueId, snapshot: { server_time: emptySnapshot.server_time } });
+      expect(valid.log).toHaveLength(2);
+      const invalid = counted(() => Response.json({ outcome: 'committed', issueId, snapshot: { issues: 'x' } }));
+      const dropped = await createCloudflareBackend({ origin, fetch: invalid.fetcher }).workflows.executeAndRead!(sessionId, requestId, command);
+      expect(dropped).toEqual({ issueId, snapshot: undefined });
+    });
+
+    it('retries once with a new token after a 403 and the same request ID', async () => {
+      const { fetcher, log } = counted((request) => request.headers.get('X-CSRF-Token') === 'token-1'
+        ? Response.json({ error: 'The request protection checks failed.' }, { status: 403 })
+        : Response.json({ outcome: 'committed', issueId }));
+      const backend = createCloudflareBackend({ origin, fetch: fetcher });
+      expect(await backend.workflows.execute(sessionId, requestId, command)).toBe(issueId);
+      expect(log).toEqual(['GET /api/auth/session', 'POST /api/workflow token-1', 'GET /api/auth/session', 'POST /api/workflow token-2']);
+      const bodies = fetcher.mock.calls.filter(([, init]) => init?.method === 'POST').map(([, init]) => String(init?.body));
+      expect(bodies[1]).toBe(bodies[0]);
+    });
+
+    it('does not send again when a 403 comes with an unchanged token', async () => {
+      let tokens = 0;
+      const log: string[] = [];
+      const fetcher = vi.fn<typeof fetch>(async (input, init) => {
+        const request = new Request(input, init);
+        log.push(`${request.method} ${new URL(request.url).pathname}`);
+        if (new URL(request.url).pathname === '/api/auth/session') { tokens++; return Response.json(sessionBody); }
+        return Response.json({ error: 'Change your temporary password first.' }, { status: 403 });
+      });
+      const backend = createCloudflareBackend({ origin, fetch: fetcher });
+      await expect(backend.workflows.execute(sessionId, requestId, command)).rejects.toThrow();
+      expect(tokens).toBe(2);
+      expect(log.filter((entry) => entry.startsWith('POST'))).toHaveLength(1);
+    });
   });
 
   it('distinguishes a confirmed rejection from an unknown outcome', async () => {
@@ -198,7 +266,7 @@ describe('Cloudflare Backend transport', () => {
       const fetcher = vi.fn<typeof fetch>(async (input, init) => {
         const url = new URL(String(input));
         calls.push({ method: init?.method ?? 'GET', path: url.pathname, headers: new Headers(init?.headers), body: init?.body });
-        if (url.pathname === '/api/auth/session') return Response.json({ csrf: 'fresh-token' });
+        if (url.pathname === '/api/auth/session') return Response.json(sessionBody);
         if (init?.method === 'PUT') return Response.json({});
         const body = JSON.parse(String(init?.body));
         return body.action === 'begin' ? Response.json({ id: imageId, path: `${sessionId}/announcements/${announcementId}/${imageId}` }) : Response.json({});

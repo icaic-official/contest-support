@@ -34,6 +34,11 @@ export interface SessionData {
   clockOffset: Readonly<RefObject<number>>;
   /** Reads the memberships, sessions and snapshot again, in order. */
   refresh: () => Promise<void>;
+  /**
+   * Shows a snapshot that a command response carried, in order with the reads.
+   * Resolves to false when the caller must call `refresh` instead.
+   */
+  applySnapshot: (sessionId: string, snapshot: Snapshot) => Promise<boolean>;
   /** Changes the session and discards data from the previous one. */
   selectSession: (sessionId: string) => void;
 }
@@ -52,6 +57,8 @@ export function useSessionSnapshot(userId: string): SessionData {
   const [connected, setConnected] = useState(false);
   const [updates, setUpdates] = useState(0);
   const clockOffset = useRef(0);
+  // Server time of the newest snapshot shown. An older snapshot never replaces it.
+  const shownAt = useRef(0);
   const generation = useRef(0);
   const refreshQueue = useRef<Promise<void>>(Promise.resolve());
   const refresh = useCallback(() => {
@@ -73,6 +80,7 @@ export function useSessionSnapshot(userId: string): SessionData {
         setState(next?.membership ? next : undefined);
         if (next) {
           clockOffset.current = Date.parse(next.server_time) - Date.now();
+          shownAt.current = Date.parse(next.server_time);
         }
         setRefreshError("");
       } catch (cause) {
@@ -86,6 +94,30 @@ export function useSessionSnapshot(userId: string): SessionData {
     refreshQueue.current = task;
     return task;
   }, [sessionId, userId]);
+  const applySnapshot = useCallback(
+    (forSession: string, next: Snapshot) => {
+      const run = generation.current;
+      const task = refreshQueue.current.then(() => {
+        if (run !== generation.current || forSession !== sessionId) return false;
+        if (!next.membership) return false;
+        const at = Date.parse(next.server_time);
+        // A read that finished first already includes this command.
+        if (at < shownAt.current) return true;
+        shownAt.current = at;
+        clockOffset.current = at - Date.now();
+        setState(next);
+        setRefreshError("");
+        setLoaded(true);
+        return true;
+      });
+      refreshQueue.current = task.then(
+        () => undefined,
+        () => undefined,
+      );
+      return task;
+    },
+    [sessionId],
+  );
   useEffect(() => {
     void refresh();
     setConnected(false);
@@ -142,6 +174,7 @@ export function useSessionSnapshot(userId: string): SessionData {
     updates,
     clockOffset,
     refresh,
+    applySnapshot,
     selectSession,
   };
 }

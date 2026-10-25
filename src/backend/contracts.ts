@@ -49,6 +49,17 @@ export interface Workflows {
     requestId: string,
     command: Command,
   ): Promise<string>;
+  /**
+   * Like execute, and also returns the session snapshot that the server read
+   * right after the commit. It saves the caller a second read. The snapshot is
+   * missing when the server could not read it. The caller then reads again.
+   * The same rules for request IDs and failures apply.
+   */
+  executeAndRead?(
+    sessionId: string,
+    requestId: string,
+    command: Command,
+  ): Promise<{ issueId: string; snapshot?: Snapshot }>;
 }
 
 export interface MembershipInput {

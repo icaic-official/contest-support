@@ -137,6 +137,12 @@ The request ID identifies one attempted action, including its retries.
 The adapter sends the ID and command unchanged.
 The server prevents a repeated request from creating another action.
 
+`executeAndRead(sessionId, requestId, command)` is optional. It follows the same rules and also returns the `Snapshot` that the server read right after the commit.
+The Cloudflare adapter implements it, and `POST /api/workflow` adds `snapshot` to a committed reply.
+The server returns the commit even when that read fails, and the reply then has no `snapshot`.
+The client shows the snapshot without another read. Without a snapshot it reads sessions and the snapshot, as before.
+The snapshot is the same data that `GET /api/snapshot` returns, so an action costs one request, not four.
+
 `WorkflowRejectedError` means that the server rejected the command.
 The UI can clear the pending request and accept a new command.
 Other failures leave the write outcome unknown.

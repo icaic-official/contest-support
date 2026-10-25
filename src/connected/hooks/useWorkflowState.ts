@@ -38,6 +38,7 @@ export function useWorkflowState(data: SessionData): WorkflowState {
   const command = useCommand({
     sessionId: data.sessionId,
     refresh: data.refresh,
+    applySnapshot: data.applySnapshot,
     onStart: () => {
       selectionsAtStart.current = selections.current;
     },

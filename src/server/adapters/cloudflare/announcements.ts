@@ -26,8 +26,10 @@ export class AnnouncementCommandError extends Error {
 
 const uuid = z.uuid();
 const expiry = z.iso.datetime({ offset: true }).nullable();
-const title = z.string().trim().min(1).max(ANNOUNCEMENT_TITLE_MAX);
-const details = z.string().trim().min(1).max(ANNOUNCEMENT_DETAILS_MAX);
+// SQLite length() stops at U+0000, so the length CHECK on stored text would fail with the wrong error.
+const noNul = (value: string) => !value.includes('\u0000');
+const title = z.string().trim().min(1).max(ANNOUNCEMENT_TITLE_MAX).refine(noNul);
+const details = z.string().trim().min(1).max(ANNOUNCEMENT_DETAILS_MAX).refine(noNul);
 const revision = z.number().int().min(0).max(Number.MAX_SAFE_INTEGER);
 const commandSchema = z.discriminatedUnion('type', [
   z.strictObject({ type: z.literal('publish'), title, details, expires_at: expiry }),

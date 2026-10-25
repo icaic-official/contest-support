@@ -6,6 +6,13 @@ import type { IdentityProvider } from './identity';
 import { beginCredentialReset, completeCredentialReset } from './credentialReset';
 import { randomSecret, type PasswordHasher } from './password';
 
+/**
+ * Owner decision, 2026-10-25. Only failed sign-ins count. A successful sign-in
+ * never counts toward any limit, so one venue IP can admit every user. The IP
+ * ceiling is 20 times the username limit, so one person cannot cheaply exhaust it.
+ */
+export const signInFailureLimits = { windowSeconds: 900, perIp: 200, perUsername: 10 } as const;
+
 const usernameSchema = z.string().trim().toLowerCase().regex(/^[a-z0-9][a-z0-9_-]{2,31}$/);
 const passwordSchema = z.string().min(12).max(128);
 const memberSchema = z.object({
@@ -106,10 +113,17 @@ export class D1AuthenticationService implements AuthenticationService {
     if (!parsed.success || typeof password !== 'string' || password.length > 128 || password.length < 1) {
       throw new AuthenticationError(401, 'Username or password is incorrect.');
     }
-    // Fixed windows bound expensive password verification, including nonexistent
-    // usernames. The HTTP Worker adds an IP limit before reaching this method.
-    await this.limit(`username:${parsed.data}`, 10);
-    return this.createLogin(parsed.data, password);
+    // Refuse before the expensive password check when the username already has
+    // its maximum failures. Only a failure adds to the count, so a correct
+    // password never uses an attempt. The HTTP Worker adds the IP limit.
+    const key = `username:${parsed.data}`;
+    await this.assertBelowLimit(key, signInFailureLimits.perUsername);
+    try {
+      return await this.createLogin(parsed.data, password);
+    } catch (error) {
+      if (error instanceof AuthenticationError && error.status === 401) await this.recordFailure(key);
+      throw error;
+    }
   }
 
   private async createLogin(username: string, password: string): Promise<{ cookie: string }> {
@@ -138,13 +152,29 @@ export class D1AuthenticationService implements AuthenticationService {
     return { cookie: signed.cookie };
   }
 
+  /** Counts one attempt in the key's fixed window, then refuses when the count passes the maximum. */
   async limit(key: string, maximum: number): Promise<void> {
+    if ((await this.recordFailure(key)) > maximum) throw new AuthenticationError(429, 'Too many attempts. Try again later.');
+  }
+
+  /** Refuses when the current window already holds the maximum. It does not count. */
+  async assertBelowLimit(key: string, maximum: number): Promise<void> {
+    const row = await this.statement(
+      'SELECT attempts FROM authentication_limits WHERE key = ? AND window_start > unixepoch() - ?',
+      key, signInFailureLimits.windowSeconds).first<{ attempts: number }>();
+    if (row && row.attempts >= maximum) throw new AuthenticationError(429, 'Too many attempts. Try again later.');
+  }
+
+  /** Adds one to the key's fixed window and returns the new count. */
+  async recordFailure(key: string): Promise<number> {
+    const window = signInFailureLimits.windowSeconds;
     const row = await this.statement(`INSERT INTO authentication_limits (key, window_start, attempts)
       VALUES (?, unixepoch(), 1) ON CONFLICT (key) DO UPDATE SET
-      attempts = CASE WHEN window_start <= unixepoch() - 900 THEN 1 ELSE attempts + 1 END,
-      window_start = CASE WHEN window_start <= unixepoch() - 900 THEN unixepoch() ELSE window_start END
-      RETURNING attempts`, key).first<{ attempts: number }>();
-    if (!row || row.attempts > maximum) throw new AuthenticationError(429, 'Too many attempts. Try again later.');
+      attempts = CASE WHEN window_start <= unixepoch() - ? THEN 1 ELSE attempts + 1 END,
+      window_start = CASE WHEN window_start <= unixepoch() - ? THEN unixepoch() ELSE window_start END
+      RETURNING attempts`, key, window, window).first<{ attempts: number }>();
+    if (!row) throw new AuthenticationError(429, 'Too many attempts. Try again later.');
+    return row.attempts;
   }
 
   async signOut(headers: Headers): Promise<{ cookie: string }> {

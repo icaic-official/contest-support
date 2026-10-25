@@ -42,13 +42,14 @@
   --sidebar-accent-foreground: hsl(240 5.9% 10%);
   --sidebar-border: hsl(240 5.9% 90%);
   --sidebar-ring: hsl(240 5% 64.9%);
-  /* Issue states and age tiers. Always pair a color with an icon or a label. */
+  /* Issue states and age tiers. Always pair a color with an icon or a label.
+   * The age colors are text. They keep 4.5 to 1 on the muted tint of an open queue row. */
   --status-open: #2563eb;
   --status-claimed: #7c3aed;
   --status-escalated: #b45309;
   --status-resolved: #047857;
-  --age-warn: #d97706;
-  --age-critical: #e11d48;
+  --age-warn: #b45309;
+  --age-critical: #be123c;
   --internal: rgb(245 158 11);
   /* The tint of a row that a live update added or changed. */
   --highlight: hsl(217 91% 52%);

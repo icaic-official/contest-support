@@ -21,13 +21,18 @@ export function avatarKey(accountId: string, avatarId: string): string {
 
 // Every account reads its own avatar. Staff of a session read the avatars of
 // the session's other staff. Team accounts read no one else's avatar. The owner
-// test repeats the staff test of currentAccessSql.
-const visibleSql = `WITH login AS (${currentReadyLoginSql}), access AS (${currentAccessSql})
-  SELECT v.account_id AS person_id, v.id AS avatar_id, v.content_type FROM account_avatars v CROSS JOIN login l
-  WHERE v.state = 'ready' AND (v.account_id = l.id OR EXISTS (SELECT 1 FROM access a JOIN memberships m
-    ON m.session_id = ? AND m.account_id = v.account_id AND m.team_id IS NULL AND (m.is_admin = 1 OR EXISTS (
-      SELECT 1 FROM membership_roles r WHERE r.session_id = m.session_id AND r.account_id = m.account_id))
-    WHERE a.staff = 1))`;
+// test repeats the staff test of currentAccessSql. Both branches start from the
+// caller, so the read does not grow with the avatars of other sessions.
+const visibleSql = `WITH login AS (${currentReadyLoginSql}), access AS (${currentAccessSql}),
+  visible AS (
+    SELECT v.account_id AS person_id, v.id AS avatar_id, v.content_type FROM login l
+      JOIN account_avatars v ON v.account_id = l.id AND v.state = 'ready'
+    UNION
+    SELECT v.account_id, v.id, v.content_type FROM access a JOIN memberships m ON m.session_id = ? AND m.team_id IS NULL
+      JOIN account_avatars v ON v.account_id = m.account_id AND v.state = 'ready'
+      WHERE a.staff = 1 AND (m.is_admin = 1 OR EXISTS (SELECT 1 FROM membership_roles r
+        WHERE r.session_id = m.session_id AND r.account_id = m.account_id)) AND EXISTS (SELECT 1 FROM login))
+  SELECT person_id, avatar_id, content_type FROM visible`;
 
 /** Profile pictures share the private image bucket under keys that start with the account ID. */
 export class R2AvatarService {
@@ -38,8 +43,8 @@ export class R2AvatarService {
   private visible(caller: Caller, sessionId: string, avatarId?: string): D1Statement {
     const bindings = [...currentReadyLoginBindings(caller), ...currentAccessBindings(caller, sessionId), sessionId];
     return avatarId === undefined
-      ? this.statement(`${visibleSql} ORDER BY v.account_id`, ...bindings)
-      : this.statement(`${visibleSql} AND v.id = ?`, ...bindings, avatarId);
+      ? this.statement(`${visibleSql} ORDER BY person_id`, ...bindings)
+      : this.statement(`${visibleSql} WHERE avatar_id = ?`, ...bindings, avatarId);
   }
 
   private assertion(id: string, sql: string, ...values: Value[]): D1Statement {

@@ -139,6 +139,10 @@ test("the announcement strip fits a phone without horizontal scrolling", async (
   await expect(strip.getByRole("button", { name: "Hide announcements" })).toBeVisible();
   await expect(strip.getByRole("button", { name: "New announcement" })).toBeVisible();
   expect(await strip.evaluate((element) => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(0);
+
+  // A hidden strip shows the newest title on one line, so a long title must not widen the page.
+  await strip.getByRole("button", { name: "Hide announcements" }).click();
+  expect(await manager.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
 });
 
 test("an open announcement form fits on a laptop screen without scrolling inside the strip", async ({ browser, local }) => {
@@ -214,7 +218,7 @@ test("a member hides the strip, it stays hidden after a refresh, and a new annou
   await hide.click();
   await expect(show).toBeFocused();
   await expect(show).toHaveAttribute("aria-expanded", "false");
-  await expect(volunteer.getByRole("heading", { name: "Announcements · 1" })).toBeVisible();
+  await expect(volunteer.getByRole("heading", { name: "Announcements · Lunch moves" })).toBeVisible();
   await expect(lunch).toBeHidden();
 
   await volunteer.reload();
@@ -250,7 +254,7 @@ test("a manager can hide the strip and keeps an unsent draft", async ({ browser,
   await admin.getByRole("button", { name: "Hide announcements", exact: true }).click();
   await expect(create).toBeHidden();
   await expect(admin.getByRole("button", { name: "New announcement" })).toBeHidden();
-  await expect(admin.getByRole("heading", { name: "Announcements · 1" })).toBeVisible();
+  await expect(admin.getByRole("heading", { name: "Announcements · Room change" })).toBeVisible();
 
   await admin.getByRole("button", { name: "Show announcements", exact: true }).click();
   await expect(create.getByLabel("Title")).toHaveValue("Unsent title");

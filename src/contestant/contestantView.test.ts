@@ -201,7 +201,20 @@ describe("trackerSteps", () => {
     ]);
     const steps = trackerSteps(resolved, award, time);
     expect(states(steps)).toEqual(["done", "done", "done", "done"]);
-    expect(steps[3].detail).toBe("+10 min decided");
+    expect(steps[3].detail).toBe("Decided · 10 minutes");
+  });
+
+  it("words a zero-minute and a one-minute award without a plus sign or a wrong plural", () => {
+    const resolved = issue({
+      status: "resolved",
+      owner_name: "Priya Raman",
+      first_assigned_at: "2026-10-17T10:02:00Z",
+      resolved_at: "2026-10-17T10:20:00Z",
+    });
+    const detail = (minutes: number) =>
+      trackerSteps(resolved, { ...award, minutes }, time)[3].detail;
+    expect(detail(0)).toBe("Decided · No time added");
+    expect(detail(1)).toBe("Decided · 1 minute");
   });
 
   it("keeps an award after reopening while resolution is pending", () => {

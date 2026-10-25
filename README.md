@@ -191,7 +191,7 @@ Backend:
 
 - [Backend contracts](docs/backend-contracts.md) describe the provider interfaces and their behavior.
 - [Server workflow reference](docs/server-workflow.md) inventories existing rules and the shared service and persistence boundaries.
-- [Session announcements](docs/session-announcements.md) is the reference for announcement behavior on both providers.
+- [Session announcements](docs/session-announcements.md) is the reference for announcement behavior in the Cloudflare implementation.
 - [Cloudflare backend design](docs/cloudflare-backend-design.md) explains the implemented server boundaries.
 - [Scaling design](docs/scaling-design.md) explains where one installation saturates under load and ranks the changes that raise capacity.
 - [Multiple competitions per installation](docs/multi-competition-design.md) is a proposed design. It is not implemented.

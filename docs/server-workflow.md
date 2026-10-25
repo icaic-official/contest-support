@@ -14,7 +14,7 @@ The shared rules retain these decisions:
 
 | Command | Access and transition | Recorded result |
 | --- | --- | --- |
-| `submit` | Contestants submit for their membership team while intake is open. Volunteers and specialists can submit for a roster team with closed intake. | Open issue, submission time, reporter, category, description, and public history. |
+| `submit` | Contestants submit for their membership team while intake is open. Any staff member can submit for a roster team, also when intake is closed. Staff means an admin or a person with a volunteer, specialist, or jury role. | Open issue, submission time, reporter, category, description, and public history. |
 | `claim` | A volunteer or specialist claims an open issue. | Owner, claimed status, and first assignment time. |
 | `escalate` | The current support owner escalates a claimed issue. | Escalated status. The owner remains assigned. |
 | `accept` | Another specialist accepts an escalated issue. | New owner and claimed status. The first assignment time remains unchanged. |

@@ -17,6 +17,12 @@ import { errorMessage } from "@/backend/errors";
 /** The ID of the Current password field. The account page links to it. */
 export const currentPasswordFieldId = "password-current";
 
+// The server rejects other lengths. Keep these in step with `passwordSchema`
+// in src/server/adapters/cloudflare/authentication.ts.
+const MIN_PASSWORD_LENGTH = 12;
+const MAX_PASSWORD_LENGTH = 128;
+const newPasswordHintId = "password-password-hint";
+
 const fields = [
   {
     name: "current",
@@ -93,20 +99,34 @@ export function PasswordChangeForm({
       >
         <fieldset disabled={busy} className="grid gap-5">
           <legend className="sr-only">New password</legend>
-          {fields.map((field) => (
-            <div key={field.name} className="grid gap-2">
-              <Label htmlFor={field.id}>{field.label}</Label>
-              <Input
-                id={field.id}
-                name={field.name}
-                type="password"
-                required
-                minLength={field.name === "current" ? undefined : 8}
-                autoComplete={field.autoComplete}
-                className="h-11"
-              />
-            </div>
-          ))}
+          {fields.map((field) => {
+            const isNew = field.name !== "current";
+            const hinted = field.name === "password";
+            return (
+              <div key={field.name} className="grid gap-2">
+                <Label htmlFor={field.id}>{field.label}</Label>
+                <Input
+                  id={field.id}
+                  name={field.name}
+                  type="password"
+                  required
+                  minLength={isNew ? MIN_PASSWORD_LENGTH : undefined}
+                  maxLength={isNew ? MAX_PASSWORD_LENGTH : undefined}
+                  aria-describedby={hinted ? newPasswordHintId : undefined}
+                  autoComplete={field.autoComplete}
+                  className="h-11"
+                />
+                {hinted && (
+                  <p
+                    id={newPasswordHintId}
+                    className="text-sm text-muted-foreground"
+                  >
+                    {`Use ${MIN_PASSWORD_LENGTH} to ${MAX_PASSWORD_LENGTH} characters.`}
+                  </p>
+                )}
+              </div>
+            );
+          })}
           <Button type="submit" className="h-11" loading={busy}>
             Save password
           </Button>

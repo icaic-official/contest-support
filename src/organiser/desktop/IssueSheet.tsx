@@ -45,7 +45,11 @@ import {
   ResolutionHistory,
 } from "../components/IssueDetails";
 import { StatusBadge } from "../components/issueDisplay";
-import { issueAbilities, primaryAction } from "../organiserModel";
+import {
+  issueAbilities,
+  missingActionHint,
+  primaryAction,
+} from "../organiserModel";
 import type { ConsolePageProps, SheetTab } from "./consoleProps";
 
 /** A task of the sheet that opens in a dialog. */
@@ -160,6 +164,7 @@ function IssueSheetBody({
   const teamName = team?.name ?? "the team";
   const can = issueAbilities(issue, state, member);
   const primary = primaryAction(can);
+  const hint = missingActionHint(issue, member, Boolean(state.event?.archived));
   const award = state.awards.find((item) => item.issue_id === issue.id);
   const historyCount = state.history.filter(
     (item) => item.issue_id === issue.id,
@@ -325,7 +330,10 @@ function IssueSheetBody({
           <LifecycleBar status={issue.status} details={lifecycleDetails(issue)} />
           <HandoffBanner issue={issue} />
           {actions.length > 0 ? (
-            <div className="flex flex-wrap gap-2">{actions}</div>
+            <>
+              <div className="flex flex-wrap gap-2">{actions}</div>
+              {hint && <p className="text-sm text-muted-foreground">{hint}</p>}
+            </>
           ) : (
             <p className="text-sm text-muted-foreground">
               {state.event?.archived
@@ -371,7 +379,13 @@ function IssueSheetBody({
               surface="dialog"
             />
           </TabsContent>
-          <TabsContent value="outcome" className="space-y-4 px-6 py-4">
+          {/* The forms stay mounted so a typed award draft survives another tab. */}
+          <TabsContent
+            value="outcome"
+            forceMount
+            hidden={tab !== "outcome"}
+            className="space-y-4 px-6 py-4"
+          >
             <ResolutionHistory issue={issue} state={state} />
             <AwardReceipt award={award} state={state} />
             {can.award && (

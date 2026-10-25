@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import type { CommandRunner } from "@/connected/hooks/useCommand";
 import { IssueImages } from "@/connected/IssueImages";
-import { formatDate } from "@/connected/labels";
+import { awardMinutesLabel, formatDate } from "@/connected/labels";
 import {
   isRunning,
   type Issue,
@@ -343,12 +343,19 @@ export function IssuePage({
           className="grid grid-cols-[auto_1fr] items-center gap-5 rounded-xl border bg-card p-5"
         >
           <div className="px-4 text-center" aria-hidden="true">
-            <p className="text-4xl font-bold tabular-nums">+{award.minutes}</p>
-            <p className="text-xs text-muted-foreground">minutes</p>
+            <p className="text-4xl font-bold tabular-nums">
+              {award.minutes === 0 ? "0" : `+${award.minutes}`}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {award.minutes === 1 ? "minute" : "minutes"}
+            </p>
           </div>
           <div>
             <h2 id={`${id}-award`} className="font-medium">
-              Time award<span className="sr-only">, {award.minutes} minutes</span>
+              Time award
+              <span className="sr-only">
+                , {awardMinutesLabel(award.minutes)}
+              </span>
             </h2>
             <p className="text-sm break-words text-muted-foreground">
               {award.explanation}

@@ -56,7 +56,7 @@ test('an account without a membership still gets the organizer hint', async ({ p
 
 test('the Refresh access button stays disabled while the read runs', async ({ page, api }) => {
   let release = () => {};
-  let hold: Promise<void> | undefined;
+  let hold = Promise.resolve();
   await page.route(snapshotRequest, async (route) => {
     await hold;
     await route.abort('failed');

@@ -35,6 +35,11 @@ export class ImageRequestError extends Error {
 }
 
 export function errorMessage(error: unknown): string {
+  // fetch rejects with a TypeError when the request does not reach the server.
+  // Its text differs by browser, for example "Failed to fetch" or "Load failed".
+  if (error instanceof TypeError) {
+    return 'Minsky could not reach the server. Check your connection and try again.';
+  }
   if (
     error &&
     typeof error === 'object' &&

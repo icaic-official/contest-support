@@ -68,7 +68,13 @@ export function ContestantTopBar({
   const afterClose = useRef<(() => void) | undefined>(undefined);
   return (
     <header className="flex h-14 shrink-0 items-center gap-4 border-b px-5">
-      <BrandMark />
+      <Link
+        to="/issues"
+        aria-label="Minsky, your reports"
+        className="-m-1 flex w-fit shrink-0 rounded-md p-1 outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+      >
+        <BrandMark />
+      </Link>
       <div className="min-w-0 leading-tight">
         <p className="truncate text-sm font-medium">
           {eventName ?? "Your contest"}
@@ -110,7 +116,7 @@ export function ContestantTopBar({
       <Badge
         variant="outline"
         role="status"
-        className={cn("gap-1.5", !connected && "text-age-warn")}
+        className={cn("gap-1.5", !connected && "text-status-escalated")}
       >
         <span
           aria-hidden="true"

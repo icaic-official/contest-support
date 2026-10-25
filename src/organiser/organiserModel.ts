@@ -245,9 +245,9 @@ export interface IssueAbilities {
 }
 
 /**
- * The actions that the membership allows on an issue. These are the same
- * rules as the workflow screens before T0015. The database enforces them
- * again.
+ * The actions that the membership allows on an issue. These are the rules of
+ * the server workflow, which enforces them again. Any staff member can reply,
+ * also an admin without other roles.
  */
 export function issueAbilities(
   issue: Issue,

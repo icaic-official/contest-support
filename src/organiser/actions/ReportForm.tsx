@@ -1,5 +1,5 @@
 import { useId, useState } from "react";
-import { Send } from "lucide-react";
+import { Plus, Send, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -14,8 +14,10 @@ import {
 import { cn } from "@/lib/utils";
 
 /**
- * Reports an issue for a team. Staff find the team with the T0008 fuzzy team
- * search. Staff can report while contestant intake is closed.
+ * Reports an issue for one or more teams. Staff find each team with the T0008
+ * fuzzy team search. Staff can report while contestant intake is closed.
+ * Each team gets its own issue, with its own timer, owner and award. The form
+ * sends one command per team, so a failure leaves only the unsent teams.
  */
 export function ReportForm({
   state,
@@ -34,23 +36,38 @@ export function ReportForm({
   const categories = state.session?.categories ?? [];
   const [category, setCategory] = useState(categories[0] ?? "");
   const [description, setDescription] = useState("");
+  const [added, setAdded] = useState<string[]>([]);
   const teamId = submitTeamId(selection);
+  const targets =
+    teamId && !added.includes(teamId) ? [...added, teamId] : added;
+  const teamName = (id: string) =>
+    state.teams.find((team) => team.id === id)?.name ?? id;
+
+  async function submit() {
+    for (const [index, target] of targets.entries()) {
+      const last = index === targets.length - 1;
+      const recorded = await command.act(
+        { type: "submit", category, description, team_id: target },
+        {
+          stayOnPage: !last,
+          onSuccess: () => {
+            if (target === teamId) onSelection(initialTeamSelection());
+            setAdded((current) => current.filter((id) => id !== target));
+          },
+        },
+      );
+      if (!recorded) return;
+    }
+    setDescription("");
+    onDone();
+  }
+
   return (
     <form
       className="space-y-4"
       onSubmit={(event) => {
         event.preventDefault();
-        if (!teamId) return;
-        void command.act(
-          { type: "submit", category, description, team_id: teamId },
-          {
-            onSuccess: () => {
-              setDescription("");
-              onSelection(initialTeamSelection());
-              onDone();
-            },
-          },
-        );
+        if (targets.length > 0) void submit();
       }}
     >
       <p className="text-sm text-muted-foreground">
@@ -67,6 +84,44 @@ export function ReportForm({
         onSelection={onSelection}
         variant="field"
       />
+      {targets.length > 0 && (
+        <ul aria-label="Teams to report" className="flex flex-wrap gap-2">
+          {targets.map((target) => (
+            <li
+              key={target}
+              className="flex h-9 items-center gap-1 rounded-full border pl-3 text-sm"
+            >
+              {teamName(target)}
+              <button
+                type="button"
+                aria-label={`Remove ${teamName(target)}`}
+                disabled={command.locked}
+                className="flex size-9 items-center justify-center rounded-full"
+                onClick={() => {
+                  if (target === teamId) onSelection(initialTeamSelection());
+                  setAdded((current) => current.filter((id) => id !== target));
+                }}
+              >
+                <X aria-hidden="true" className="size-4" />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <Button
+        type="button"
+        variant="outline"
+        className="h-11 w-full"
+        disabled={command.locked || !teamId || added.includes(teamId)}
+        onClick={() => {
+          if (!teamId) return;
+          setAdded((current) => [...current, teamId]);
+          onSelection(initialTeamSelection());
+        }}
+      >
+        <Plus aria-hidden="true" />
+        Add another team
+      </Button>
       <fieldset disabled={command.locked}>
         <legend className="pb-2 text-sm font-medium">Category</legend>
         <div className="flex flex-wrap gap-2">
@@ -108,12 +163,17 @@ export function ReportForm({
         type="submit"
         className="h-11 w-full"
         disabled={
-          command.locked || !teamId || !category || !description.trim()
+          command.locked ||
+          targets.length === 0 ||
+          !category ||
+          !description.trim()
         }
         loading={isRunning(command.running, "submit")}
       >
         <Send aria-hidden="true" />
-        Submit issue
+        {targets.length > 1
+          ? `Submit ${targets.length} issues`
+          : "Submit issue"}
       </Button>
     </form>
   );

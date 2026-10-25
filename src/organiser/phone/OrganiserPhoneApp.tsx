@@ -12,7 +12,7 @@ import { inlineActionReturnsToList } from "@/connected/hooks/inlineAction";
 import { useNow } from "@/connected/hooks/useNow";
 import { useTeamSelection } from "@/connected/hooks/useTeamSelection";
 import type { WorkflowState } from "@/connected/hooks/useWorkflowState";
-import { type Issue, isSupport } from "@/connected/model";
+import { type Issue, isStaff } from "@/connected/model";
 import type { ShellProps } from "@/connected/shell";
 import { initialTeamSelection } from "@/connected/teamSearch";
 import { NoSessionAccess } from "@/screens/NoSessionAccess";
@@ -139,7 +139,7 @@ export function OrganiserPhoneApp({
   const tabs = organiserTabs(member);
   const currentTab = tabs.includes(tab) ? tab : tabs[0];
   const archived = Boolean(state.event?.archived);
-  const canReport = isSupport(member);
+  const canReport = isStaff(member);
 
   function openIssue(issueId: string, sheet?: IssueSheet) {
     setPushSheet(sheet);
@@ -213,7 +213,8 @@ export function OrganiserPhoneApp({
             connected={data.connected}
             action={
               canReport &&
-              (currentTab === "queue" || currentTab === "mine") && (
+              currentTab !== "me" &&
+              currentTab !== "session" && (
                 <Button
                   className="h-11 rounded-full"
                   disabled={archived || command.locked}

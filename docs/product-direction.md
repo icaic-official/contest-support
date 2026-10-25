@@ -20,7 +20,7 @@ The active Cloudflare installation preserves the combined application. Verificat
 
 Team-search status (2026-10-15): [T0008](history/tickets.md#t0008--fuzzy-team-search) merged into `main` in PR #22.
 Staff search the current session's team names and locations from the issue queue.
-Volunteers and specialists use the same search to choose a team before they report an issue.
+Staff use the same search to choose a team before they report an issue.
 The T0005 branch includes the accepted search through a merge from `main`.
 Deployment waits for an explicit request after review.
 
@@ -50,7 +50,7 @@ The broader organizer tools below remain incomplete.
 
   T0002 first implemented this behavior in the retired local demo. The connected product keeps it. Volunteer and specialist roles confer support membership. Jury alone does not. Role and permission administration remain deferred.
 - Contestants and staff can report issues. Staff manually open and close contestant intake.
-- Volunteers, specialists, jury members, and session admins can search team names and locations in the current session. T0008 matches partial words, either word order, accents, small spelling mistakes, and whole table numbers. Suggestions show the unresolved-issue count. The queue filter combines with the status filter. Jury-only members still see resolved issues only. Only volunteers and specialists select the affected team for a new report, and that choice uses the team's database id. Team codes, aliases, and institutions are not part of this search.
+- Volunteers, specialists, jury members, and session admins can search team names and locations in the current session. T0008 matches partial words, either word order, accents, small spelling mistakes, and whole table numbers. Suggestions show the unresolved-issue count. The queue filter combines with the status filter. Jury-only members still see resolved issues only. Every staff member can report an issue for a team: volunteers, specialists, jury members, and session admins. The reporter can add several teams. Minsky then creates one issue per team, each with its own timer, owner, and award. The choice uses each team's database id. Team codes, aliases, and institutions are not part of this search.
 - The current owner retains ownership during escalation until a specialist accepts the handoff. Timers run continuously while an issue remains unresolved. After reopening, unresolved time excludes resolved intervals. Recurrences become linked new reports. Duplicates link to a canonical report.
 - Contestants and helpers must be able to reopen resolved issues. T0002 implements reopening on the same issue and retains its history. Reopening continues an issue whose resolution needs review. A separate recurrence may still use a linked new report in future work. Linked-report controls remain outside T0002. The ticket records the implemented rules for ownership, timing, and awards.
 - The user confirmed that reopening resumes accumulated unresolved time and excludes time spent resolved. First-assignment delay remains separate. Awards remain discretionary.

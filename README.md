@@ -1,7 +1,7 @@
 # Minsky
 
 Minsky helps contest teams and staff report, triage, resolve, and review technical problems.
-Contestants report issues; volunteers and specialists handle them through a shared queue.
+Contestants and staff report issues; volunteers and specialists handle them through a shared queue.
 Jury members record time awards, and staff confirm their application to the external contest clock.
 Administrators manage accounts, roles, and contestant intake.
 Staff can attach images to issues and choose staff-only or team visibility.

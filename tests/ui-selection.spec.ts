@@ -129,6 +129,16 @@ for (const [path, heading, membership] of [
   });
 }
 
+test("the assign-by-ID form names the field Account ID, as the account page does", async ({
+  page,
+  api,
+}) => {
+  await signIn(page, api, { ...staff, is_admin: true }, "/administration/accounts");
+  await page.getByText("Assign an existing account by ID", { exact: true }).click();
+  await expect(page.getByLabel("Account ID", { exact: true })).toBeVisible();
+  await expect(page.getByLabel("Auth user UUID")).toHaveCount(0);
+});
+
 test("browser history restores the section and heading focus", async ({
   page,
   api,

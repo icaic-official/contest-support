@@ -307,7 +307,7 @@ Review the contestant, jury and admin views at 1280 × 800 and at 200% zoom.
 19. Attempt a password reset as a non-admin.
 20. Check that the app rejects it.
 21. Assign a username to an existing development account.
-22. Check that its password and Auth UUID remain unchanged.
+22. Check that its password and account ID remain unchanged.
 
 ## 9. Concurrent actions and isolation
 

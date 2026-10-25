@@ -374,7 +374,7 @@ export function AssignByIdForm({
     >
       <fieldset disabled={disabled} className="space-y-3">
         <legend className="sr-only">Assign an existing account</legend>
-        <Field id={`${id}-user`} label="Auth user UUID">
+        <Field id={`${id}-user`} label="Account ID">
           <Input
             id={`${id}-user`}
             required

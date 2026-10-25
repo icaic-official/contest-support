@@ -104,6 +104,7 @@ Never put a service credential in a `VITE_` variable.
 | `npm run test:auth:hosted -- --account=… --database=…` | Run account cases on the explicit isolated hosted authentication D1 target. |
 | `npm run test:auth:http -- --account=… --database=… --origin=…` | Check the isolated deployed authentication Worker. |
 | `npm run test:auth:hash` | Measure password cost in a temporary local Worker. |
+| `npm run load -- <command>` | Run a load test against an isolated installation: `competition`, `setup`, `run`, `analytics`, and `cleanup`. See [Run a load test](docs/run-load-tests.md). |
 | `npm run test:e2e:smoke` | Run the critical-path browser files `tests/landing.spec.ts` and `tests/journey.spec.ts`. |
 | `npm run test:e2e` | Run every mocked browser test, including the smoke files. |
 | `npm run test:cloud` | Run the Supabase browser suite with isolated fixtures on your test project. Requires `MINSKY_TEST_PROJECT_REF`. |
@@ -201,6 +202,7 @@ Backend:
 - [Server workflow reference](docs/server-workflow.md) inventories existing rules and the shared service and persistence boundaries.
 - [Session announcements](docs/session-announcements.md) is the reference for announcement behavior on both providers.
 - [Cloudflare backend design](docs/cloudflare-backend-design.md) explains the implemented server boundaries.
+- [Scaling design](docs/scaling-design.md) explains where one installation saturates under load and ranks the changes that raise capacity.
 - [Cloudflare authentication reference](docs/cloudflare-authentication.md) and the [authentication choice](docs/cloudflare-authentication-choice.md).
 - [Add a backend provider](docs/add-provider.md) gives contributor interfaces, registration points, installation, cleanup, and required shared verification.
 - [Run the Supabase adapter](docs/supabase-provider.md) — run the second implementation on your own Supabase project.
@@ -216,6 +218,7 @@ Verification:
 - [Manual verification](docs/manual-verification.md) — workflow and interface checks.
 - [Run the shared provider tests](docs/run-provider-tests.md) and [shared provider test contracts](docs/provider-test-contracts.md).
 - [Verify Cloudflare authentication](docs/verify-cloudflare-authentication.md).
+- [Run a load test](docs/run-load-tests.md) against an isolated installation before a contest.
 
 History:
 

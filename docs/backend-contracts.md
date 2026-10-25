@@ -51,9 +51,9 @@ The sessions list read 7 rows, where it read 1,205 before.
 [The read volume test](../src/server/adapters/d1/readVolume.test.ts) fails if the rows read on that session grow again.
 The every-minute cron job also reads by state and expiry.
 Migration `0015` indexes the pending, expired, and removed rows of `issue_images` and `announcement_images`, `logins(expires_at)`, and `ba_session(expiresAt)`.
-Migration `0016` adds the partial index `memberships_staff`, which holds the memberships with no team. The avatar list of a staff member reads it, and `readVolume.test.ts` fails if that list reads the whole session again.
 Before it, one cron tick read 7,880 rows on a session with 1,200 accounts and 100 issues. Now it reads 24, which includes the 3 rows of the notification claim (measured with `npm run perf:reads`).
 [The cron read test](../src/server/adapters/d1/cronReads.test.ts) fails if a cron statement scans a table or reads more rows than the work needs.
+Migration `0016` adds the partial index `memberships_staff`, which holds the memberships with no team. The avatar list of a staff member reads it, and `readVolume.test.ts` fails if that list reads the whole session again.
 It allows one scan, of the password-attempt counters, which hold one row for each failed sign-in key of the last day.
 Snapshots preserve names, timestamps, history, awards, image metadata, limits, and administrator records.
 A valid login with removed membership receives an empty snapshot with null membership.

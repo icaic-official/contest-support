@@ -116,7 +116,7 @@ export function ContestantTopBar({
       <Badge
         variant="outline"
         role="status"
-        className={cn("gap-1.5", !connected && "text-age-warn")}
+        className={cn("gap-1.5", !connected && "text-status-escalated")}
       >
         <span
           aria-hidden="true"

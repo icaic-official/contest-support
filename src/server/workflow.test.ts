@@ -38,6 +38,17 @@ describe('shared workflow compatibility edges', () => {
       { type: 'award', issue_id: issueId, revision: 0, minutes: 0, explanation: 'No additional time' });
     expect(awarded).toMatchObject({ award: { minutes: 0, resolutionId: 'resolution' } });
   });
+  it('lets an admin resolve an open issue directly and become its owner', () => {
+    const open = { ...state.issue!, status: 'open' as const, owner: null };
+    const admin = { ...state, actor: { id: 'admin', name: 'Fictional Admin' },
+      membership: { team_id: null, roles: [], is_admin: true }, issue: open };
+    const command = { type: 'resolve' as const, issue_id: issueId, revision: 0, summary: 'Restored' };
+    expect(decideWorkflow(admin, command)).toMatchObject({
+      issue: { status: 'resolved', owner: 'admin' }, resolution: { summary: 'Restored' },
+    });
+    const volunteer = { ...state, membership: { team_id: null, roles: ['volunteer' as const], is_admin: false }, issue: open };
+    expect(decideWorkflow(volunteer, command)).toEqual({ outcome: 'rejected', reason: 'state' });
+  });
   it('describes a reopened award confirmation without changing the owner or timer', () => {
     const decision = decideWorkflow({ ...state, issue: { ...state.issue!, status: 'claimed' }, award: { id: 'award', applied_at: null } },
       { type: 'apply', issue_id: issueId, revision: 0 });
@@ -53,8 +64,6 @@ describe('shared workflow compatibility edges', () => {
       expect(decision).toMatchObject({ issue: { status: 'resolved' }, resolution: { summary: 'Restored' } });
       expect(decision).not.toHaveProperty('issue.owner');
     }
-    expect(decideWorkflow({ ...admin, issue: { ...state.issue!, status: 'open', owner: null } },
-      { type: 'resolve', issue_id: issueId, revision: 0, summary: 'Restored' })).toEqual({ outcome: 'rejected', reason: 'state' });
     expect(decideWorkflow({ ...state, actor: { id: 'other', name: 'Other Support' } },
       { type: 'resolve', issue_id: issueId, revision: 0, summary: 'Restored' })).toEqual({ outcome: 'rejected', reason: 'state' });
   });

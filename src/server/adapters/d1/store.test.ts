@@ -408,6 +408,19 @@ describe("D1 workflow persistence", () => {
     expect(await fixture.durableState()).toEqual(before);
   });
 
+  it("lets an admin without staff roles resolve an open issue and records them as its owner", async () => {
+    await db.batch([
+      fixture.statement("DELETE FROM membership_roles WHERE session_id = ? AND account_id = ?", fixture.sessionId, fixture.staff.accountId),
+      fixture.statement("UPDATE memberships SET is_admin = 1 WHERE session_id = ? AND account_id = ?", fixture.sessionId, fixture.staff.accountId),
+    ]);
+    expect(await execute({ type: "resolve", issue_id: fixture.issueId, revision: 1, summary: "Fixed on the spot" }))
+      .toEqual({ outcome: "committed", issueId: fixture.issueId });
+    expect((await application.snapshot(fixture.staff, fixture.sessionId)).issues.find((issue) => issue.id === fixture.issueId))
+      .toMatchObject({ status: "resolved", owner: fixture.staff.accountId, first_assigned_at: null });
+    expect(await fixture.rows("SELECT actor, summary FROM resolutions WHERE issue_id = ?", fixture.issueId))
+      .toEqual([{ actor: fixture.staff.accountId, summary: "Fixed on the spot" }]);
+  });
+
   it("rejects a claim after another command changes the issue state before its batch", async () => {
     workflow = workflowService(beforeBatch(db, async () => {
       expect(await workflowService(db).execute(fixture.specialist, fixture.sessionId, randomUUID(), claim()))

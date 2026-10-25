@@ -971,7 +971,7 @@ async function serve(root: string, seed: Seed, viewport: { width: number; height
     page.on('console', (message) => {
       if (message.type() === 'error') consoleErrors.push(message.text());
     });
-    await page.goto('/');
+    await page.goto('/sign-in');
     try {
       await page.getByRole('heading', { name: 'Sign in', exact: true }).waitFor({
         state: 'visible',

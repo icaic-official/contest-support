@@ -18,7 +18,7 @@ type ListName = "To decide" | "To apply" | "Applied";
 /** Signs in a fixture account and waits for its UI and Realtime. */
 async function login(page: Page, name = "jury", viewport: Viewport = phone) {
   await page.setViewportSize(viewport);
-  await page.goto("/");
+  await page.goto("/sign-in");
   await page.getByLabel("Username", { exact: true }).fill(name);
   await page.getByLabel("Password", { exact: true }).fill(crypto.randomUUID());
   await page.getByRole("button", { name: "Sign in", exact: true }).click();

@@ -21,7 +21,7 @@ async function signIn(
   api.snapshots = () => [
     sessionSnapshot(membership, { session: { name: "Selection session" } }),
   ];
-  await page.goto("/");
+  await page.goto("/sign-in");
   await page.getByLabel("Username", { exact: true }).fill("selection");
   await page.getByLabel("Password", { exact: true }).fill("fixture-password");
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
@@ -85,7 +85,7 @@ test("Enter on the landing skip link focuses the main landmark", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 320, height: 740 });
-  await page.goto("/");
+  await page.goto("/sign-in");
   await expect(page.getByRole("heading", { name: "Sign in", exact: true }))
     .toBeVisible();
   await focusHeadingAfterHash(page);

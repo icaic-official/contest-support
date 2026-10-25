@@ -50,7 +50,7 @@ cp .env.example .env.local
 npm run dev
 ```
 
-Open [http://127.0.0.1:5173](http://127.0.0.1:5173).
+Open [http://127.0.0.1:5173](http://127.0.0.1:5173). The landing page shows. Select **Sign in** to open the sign-in page.
 Sign-in on that Vite server fails because the API is absent.
 Use `npm run test:connector:ui:local` for a temporary local Cloudflare application.
 Use the hosted development app for the shared development data.

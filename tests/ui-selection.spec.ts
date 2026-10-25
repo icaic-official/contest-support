@@ -16,7 +16,7 @@ async function signIn(
   page: Page,
   api: FakeWorker,
   membership: Membership | null,
-  startPath = "/",
+  startPath = "/sign-in",
 ) {
   api.account = fixtureAccount(USER_ID, "selection", "Selection fixture");
   api.snapshots = () => [
@@ -43,6 +43,21 @@ const staff: Membership = {
 test("a team membership gets the contestant UI", async ({ page, api }) => {
   await signIn(page, api, { ...staff, roles: [], team_id: TEAM_ID });
   await expect(page.locator('[data-ui="contestant"]')).toBeVisible();
+});
+
+test("a signed-in person leaves the sign-in and entry addresses for the issue queue", async ({
+  page,
+  api,
+}) => {
+  await signIn(page, api, { ...staff, roles: ["volunteer"] });
+  await expect(page).toHaveURL("/issues");
+  for (const path of ["/", "/sign-in"]) {
+    await page.goto(path);
+    await expect(page).toHaveURL("/issues");
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Issue queue", exact: true }),
+    ).toBeVisible();
+  }
 });
 
 test("a staff membership gets the organiser console on a laptop and the phone app on a phone", async ({

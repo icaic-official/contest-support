@@ -7,7 +7,7 @@ For the published site, run `MINSKY_DOCS_URL=https://minsky-docs.icaic-minsky.wo
 These checks only read documentation.
 Check a direct guide URL after refresh, search by keyboard, phone navigation, and a missing page.
 Review light and dark themes at desktop and 320px widths.
-The sign-in footer, the **Documentation** link in the **Help** section of the account page and the documentation link in the phone **Me** tab open the guides in a new tab.
+The footer on the landing and sign-in pages, the **Documentation** link in the **Help** section of the account page and the documentation link in the phone **Me** tab open the guides in a new tab.
 Those links reach the development app only after its separate frontend deployment.
 
 ## Cloudflare authentication
@@ -162,6 +162,17 @@ Do these checks in the light theme and again in the dark theme.
 Change the theme with the theme menu. Check that the choice stays after a page reload.
 Check that each status shows an icon or a label, not only a color.
 Check that the page has no horizontal overflow and that focus is always visible.
+
+### Landing page
+
+Review the landing page at 1280 × 800, 390 × 844 and 320 × 740, in the light and dark themes.
+
+1. Check that the page has no horizontal overflow and that the **Sign in** and **Read the docs** buttons are at least 44 px tall.
+2. Select **Sign in**. Check that the sign-in page opens. Select **Minsky** above the heading. Check that the landing page returns.
+3. Select **Docs** and **Read the docs**. Check that the guides open in the same tab.
+4. Watch the example issue. Check that the status, the timer and the activity change from **Open** to **Resolved**, and that the timer stops on **Resolved**.
+5. Turn on the device setting that reduces motion. Reload. Check that the example issue shows the resolved state and does not change.
+6. Press Tab once. Check that **Skip to main content** appears and moves focus to the main content.
 
 ### Sign-in and session access
 

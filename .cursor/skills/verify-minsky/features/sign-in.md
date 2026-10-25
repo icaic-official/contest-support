@@ -11,7 +11,7 @@ Sign in opens the contest workspace for an organizer-created username. The accou
 
 ## How to get to it (user POV)
 
-- Open the app origin. The first screen is the sign-in form.
+- Open `/sign-in` on the app origin. The first screen is the sign-in form. The origin itself shows the landing page.
 - After sign-in, open **Account menu for Aurora** and choose **Sign out**.
 - Staff use **Account menu for Test volunteer**, **Account menu for Test specialist**, **Account menu for Test jury**, **Account menu for Test admin**, or **Account menu for Test combined**, then **Sign out**.
 

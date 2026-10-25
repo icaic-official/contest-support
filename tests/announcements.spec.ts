@@ -24,7 +24,7 @@ async function signIn(
     });
   }
   const page = await context.newPage();
-  await page.goto("/");
+  await page.goto("/sign-in");
   await page.getByLabel("Username", { exact: true }).fill(name);
   await page.getByLabel("Password", { exact: true }).fill(crypto.randomUUID());
   await page.getByRole("button", { name: "Sign in", exact: true }).click();

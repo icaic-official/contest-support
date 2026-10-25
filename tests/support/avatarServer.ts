@@ -142,7 +142,7 @@ export async function openApp(
       server.pictures.delete(USER_ID);
     },
   };
-  const startPath = options.startPath ?? "/";
+  const startPath = options.startPath ?? "/sign-in";
   await page.goto(startPath);
   await page.getByLabel("Username", { exact: true }).fill("ada");
   await page.getByLabel("Password", { exact: true }).fill("fixture-password");

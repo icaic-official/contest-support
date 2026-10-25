@@ -18,6 +18,15 @@ export const workspacePaths = {
 
 export type WorkspacePage = keyof typeof workspacePaths;
 
+/** The sign-in page. The landing page at `/` links here. */
+export const signInPath = "/sign-in";
+
+/** True for the signed-out entry addresses, which a signed-in person leaves for the queue. */
+export function isEntryPath(pathname: string): boolean {
+  const path = pathname.replace(/\/+$/u, "");
+  return path === "" || path === signInPath;
+}
+
 export function pageForPath(pathname: string): WorkspacePage | undefined {
   const path = pathname.replace(/\/+$/u, "");
   for (const page of Object.keys(workspacePaths) as WorkspacePage[]) {

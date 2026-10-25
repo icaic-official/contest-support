@@ -181,7 +181,7 @@ async function openWorkspace(
     committed.push(command);
     return { outcome: 'committed', issueId: 'issue_id' in command ? command.issue_id : ISSUE_ID };
   };
-  await page.goto('/');
+  await page.goto('/sign-in');
   await page.getByLabel('Username', { exact: true }).fill('reviewer');
   await page.getByLabel('Password', { exact: true }).fill('fixture-password');
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();

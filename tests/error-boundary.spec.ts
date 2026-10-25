@@ -24,7 +24,7 @@ async function signIn(page: Page, api: FakeWorker) {
       { session: { name: "Boundary session" } },
     ),
   ];
-  await page.goto("/");
+  await page.goto("/sign-in");
   await page.getByLabel("Username", { exact: true }).fill("boundary");
   await page.getByLabel("Password", { exact: true }).fill("fixture-password");
   await page.getByRole("button", { name: "Sign in", exact: true }).click();

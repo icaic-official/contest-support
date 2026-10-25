@@ -174,7 +174,7 @@ export async function runUiJourney(browser: Browser, fixture: UiFixture, options
       });
       socket.on('close', () => { probe.closed++; });
     });
-    await page.goto(fixture.origin);
+    await page.goto(new URL('/sign-in', fixture.origin).href);
     await expect(page.getByRole('heading', { name: 'Sign in', exact: true })).toBeVisible();
     // Establish the selected adapter before entering a fixture credential. A
     // frontend built for another provider must fail before any login attempt.

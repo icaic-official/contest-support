@@ -91,7 +91,7 @@ async function signIn(page: Page, api: FakeWorker, viewport: Viewport) {
       server_time: new Date().toISOString(),
     });
   });
-  await page.goto('/');
+  await page.goto('/sign-in');
   await expect(page).toHaveTitle(/^Minsky\b/);
   await page.getByLabel('Username', { exact: true }).fill('reviewer');
   await page.getByLabel('Password', { exact: true }).fill('fixture-password');

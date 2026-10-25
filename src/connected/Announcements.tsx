@@ -24,7 +24,6 @@ import {
   editReview,
   emptyAnnouncementDraft,
 } from "./announcementForm";
-import { checkAnnouncementImage } from "./announcementImage";
 import {
   ANNOUNCEMENT_DETAILS_MAX,
   ANNOUNCEMENT_IMAGE_MAX_BYTES,
@@ -39,6 +38,7 @@ import {
 import { type AnnouncementData, useAnnouncements } from "./hooks/useAnnouncements";
 import { useNow } from "./hooks/useNow";
 import type { SessionData } from "./hooks/useSessionSnapshot";
+import { checkImageFile } from "./imageCheck";
 import { megabytes } from "./imageFile";
 import { formatDate } from "./labels";
 
@@ -689,7 +689,7 @@ function AnnouncementImages({
   async function choose(file: File | undefined) {
     if (!file) return;
     setRetry(undefined);
-    const problem = await checkAnnouncementImage(file);
+    const problem = await checkImageFile(file, ANNOUNCEMENT_IMAGE_MAX_BYTES);
     if (problem) {
       setMessage(problem);
       if (input.current) input.current.value = "";

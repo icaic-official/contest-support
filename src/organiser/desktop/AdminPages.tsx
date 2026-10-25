@@ -141,7 +141,7 @@ export function OverviewPage({ props }: { props: ConsolePageProps }) {
                   key={entry.owner}
                   className="flex items-center gap-3 rounded-lg border p-3"
                 >
-                  <PersonAvatar name={entry.name} />
+                  <PersonAvatar name={entry.name} personId={entry.owner} />
                   <span className="min-w-0 flex-1 truncate font-medium">
                     {entry.name}
                   </span>
@@ -289,7 +289,7 @@ export function AccountsPage({
                 <TableRow key={item.person.id}>
                   <TableCell className="pl-4">
                     <div className="flex items-center gap-3">
-                      <PersonAvatar name={item.person.name} />
+                      <PersonAvatar name={item.person.name} personId={item.person.id} />
                       <span className="font-medium">{item.person.name}</span>
                     </div>
                   </TableCell>

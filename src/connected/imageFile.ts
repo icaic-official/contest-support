@@ -1,5 +1,7 @@
 export const MIB = 1048576;
 export const THUMBNAIL_BYTES = 524288;
+/** The profile picture limit for both providers. A 512 by 512 JPEG or WebP picture fits below it. */
+export const AVATAR_MAX_BYTES = 262144;
 
 export function imageKind(
   bytes: Uint8Array,

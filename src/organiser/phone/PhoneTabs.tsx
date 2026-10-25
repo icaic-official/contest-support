@@ -1,5 +1,6 @@
 import { useId, useState } from "react";
 import {
+  Camera,
   CheckCheck,
   ChevronLeft,
   ChevronRight,
@@ -8,13 +9,19 @@ import {
   KeyRound,
   LogOut,
   Search,
+  Trash2,
 } from "lucide-react";
 import { themeOptions } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { accountName } from "@/connected/accountModel";
+import {
+  changePictureButtonId,
+  useAvatarEditor,
+} from "@/connected/hooks/useAvatarEditor";
 import type { WorkflowState } from "@/connected/hooks/useWorkflowState";
 import type { Issue, Membership, Snapshot } from "@/connected/model";
+import { PictureEditor } from "@/connected/PictureEditor";
 import type { ShellProps } from "@/connected/shell";
 import { searchTeams, unresolvedCount } from "@/connected/teamSearch";
 import { documentationUrl } from "@/lib/links";
@@ -496,13 +503,18 @@ export function MeTab(props: PhoneTabProps & { onSessionChange: () => void }) {
   const { user, username, data } = shell;
   const id = useId();
   const theme = useTheme();
+  const picture = useAvatarEditor();
   const name = accountName(state, user, username);
   const rowClass =
     "flex min-h-12 w-full items-center gap-3 p-3 text-left text-[15px] focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none";
   return (
     <div className="space-y-5">
       <div className="flex items-center gap-4 p-1">
-        <PersonAvatar name={name} className="size-14 text-base" />
+        <PersonAvatar
+          name={name}
+          personId={user.id}
+          className="size-14 text-base"
+        />
         <div className="min-w-0">
           <div className="truncate text-lg font-semibold">{name}</div>
           <div className="text-sm text-muted-foreground">
@@ -513,6 +525,7 @@ export function MeTab(props: PhoneTabProps & { onSessionChange: () => void }) {
           </div>
         </div>
       </div>
+      <PictureEditor picture={picture} />
       <section aria-labelledby={`${id}-session`} className="space-y-2">
         <h2
           id={`${id}-session`}
@@ -550,6 +563,32 @@ export function MeTab(props: PhoneTabProps & { onSessionChange: () => void }) {
         )}
       </section>
       <div className="divide-y rounded-xl border bg-card">
+        <button
+          id={changePictureButtonId}
+          type="button"
+          className={rowClass}
+          disabled={picture.busy}
+          onClick={picture.pick}
+        >
+          <Camera aria-hidden="true" className="size-4 text-muted-foreground" />
+          <span className="flex-1">
+            Change picture
+            <span className="block text-xs text-muted-foreground">
+              Saving removes any location or camera data from the photo.
+            </span>
+          </span>
+        </button>
+        {picture.hasPicture && (
+          <button
+            type="button"
+            className={rowClass}
+            disabled={picture.busy}
+            onClick={picture.askRemove}
+          >
+            <Trash2 aria-hidden="true" className="size-4 text-muted-foreground" />
+            <span className="flex-1">Remove picture</span>
+          </button>
+        )}
         <button type="button" className={rowClass} onClick={shell.changePassword}>
           <KeyRound aria-hidden="true" className="size-4 text-muted-foreground" />
           <span className="flex-1">Change password</span>

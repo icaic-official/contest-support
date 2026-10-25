@@ -23,7 +23,7 @@ Use these interfaces and components:
 
 | Boundary | Required implementation or reusable component |
 | --- | --- |
-| [`Backend`](../src/backend/contracts.ts) | Supply all six groups: `auth`, `workflows`, `admin`, `images`, `announcements`, and `updates`. Preserve their types and error meanings. |
+| [`Backend`](../src/backend/contracts.ts) | Supply all seven groups: `auth`, `workflows`, `admin`, `images`, `announcements`, `avatars`, and `updates`. Preserve their types and error meanings. |
 | [`Command` and `snapshotSchema`](../src/connected/model.ts) | Reuse the existing commands, roles, and validated snapshot structure. The jury worklist consumes this same snapshot. |
 | [`WorkflowPersistence`](../src/server/workflow.ts) | Implement `read()` and `commit()` for `WorkflowService`. Keep database queries and transaction controls inside the adapter. |
 | [`Caller`](../src/server/authentication.ts) | Derive `accountId` and `loginId` from trusted authentication. Never accept a caller identity from a request body. |
@@ -161,7 +161,7 @@ A new provider needs the registration changes above before it can use that runne
 Document its exact target, environment variables, verification command, and recovery command in that guide.
 
 Every provider must pass the same shared behavior scenarios.
-The shared scenarios do not cover `announcements` yet. Use the [announcement reference](session-announcements.md) and its local tests for that group.
+The shared scenarios do not cover `announcements` or `avatars` yet. Use the [announcement reference](session-announcements.md), the [avatar contract](backend-contracts.md#avatars), and their local tests for those groups.
 Additional provider-specific checks must cover authorization, atomic commits, concurrent changes, identity expiry, revocation, and partial failures.
 Use the [additional check requirements](provider-test-contracts.md#requirements-for-another-provider) as the acceptance checklist.
 Verify a fresh installation, owner recovery, and the authenticated UI journey independently of fixture setup.

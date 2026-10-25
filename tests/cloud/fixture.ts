@@ -1,6 +1,6 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { removeFixtureSessions } from "../support/supabaseCleanup";
+import { removeFixtureAvatars, removeFixtureSessions } from "../support/supabaseCleanup";
 
 export interface Fixture {
   event: string;
@@ -45,6 +45,7 @@ export async function cleanup(state: Fixture) {
     const { error } = await admin.from("events").delete().eq("id", state.event);
     if (error) throw error;
   }
+  await removeFixtureAvatars(admin, Object.values(state.accounts).map((details) => details.id));
   for (const details of Object.values(state.accounts)) {
     const { error } = await admin.from("people").delete().eq("id", details.id);
     if (error) throw error;

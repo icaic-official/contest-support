@@ -142,6 +142,27 @@ export interface Announcements {
   ): Promise<Blob>;
 }
 
+/** An avatar ID changes on every upload, so it is a safe cache key. */
+export interface PersonAvatar {
+  person_id: string;
+  avatar_id: string;
+}
+
+/**
+ * Profile pictures belong to accounts, not sessions. Staff of a session see the
+ * avatars of its other staff. Every account sees its own avatar.
+ */
+export interface Avatars {
+  /** Avatars that the caller may see in the session. */
+  list(sessionId: string): Promise<PersonAvatar[]>;
+  /** Replaces the caller's avatar. Reusing a request ID must not store another avatar. */
+  upload(input: { requestId: string; file: Blob }): Promise<PersonAvatar>;
+  /** Removes the caller's avatar. Removing when none exists succeeds. */
+  remove(): Promise<void>;
+  /** The provider checks the visibility rule for this session again before it returns the bytes. */
+  download(sessionId: string, avatar: PersonAvatar): Promise<Blob>;
+}
+
 export interface LiveUpdates {
   /** Notifications invalidate a snapshot. They contain no issue or staff data. */
   subscribe(input: {
@@ -159,5 +180,6 @@ export interface Backend {
   admin: Administration;
   images: ImageTransport;
   announcements: Announcements;
+  avatars: Avatars;
   updates: LiveUpdates;
 }

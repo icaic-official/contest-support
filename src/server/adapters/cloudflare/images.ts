@@ -17,7 +17,7 @@ export interface PrivateObject {
 /** The private R2 binding stays inside the Cloudflare implementation. */
 export interface PrivateBucket {
   get(key: string, options?: { range: { offset: number; length: number } }): Promise<PrivateObject | null>;
-  put(key: string, body: ReadableStream<Uint8Array>, options: {
+  put(key: string, body: ReadableStream<Uint8Array> | Uint8Array, options: {
     onlyIf: { etagDoesNotMatch: string };
     sha256: string;
     httpMetadata: { contentType: string; cacheControl: string };
@@ -61,7 +61,7 @@ export function cleanImageName(name: string): string {
  * Store a transfer at most once and confirm that the stored object is this transfer.
  * R2 verifies SHA-256. A conditional retry never deletes a different, earlier object.
  */
-export async function putVerifiedImage(bucket: PrivateBucket, path: string, body: ReadableStream<Uint8Array>,
+export async function putVerifiedImage(bucket: PrivateBucket, path: string, body: ReadableStream<Uint8Array> | Uint8Array,
   file: { contentType: string; digest: string; length: number }, restart: string): Promise<void> {
   const object = await bucket.put(path, body, {
     onlyIf: { etagDoesNotMatch: '*' }, sha256: file.digest,

@@ -11,7 +11,8 @@ import type { D1Connection } from '../../src/server/adapters/d1/connection';
 import { applyMigrations } from '../../src/server/adapters/d1/testFixture';
 import { bootstrapInstallation } from '../../src/server/adapters/cloudflare/installation';
 import { randomSecret } from '../../src/server/adapters/cloudflare/password';
-import type { AccountCommand, StartedImage } from '../../src/backend/contracts';
+import { avatarKey } from '../../src/server/adapters/cloudflare/avatars';
+import type { AccountCommand, PersonAvatar, StartedImage } from '../../src/backend/contracts';
 
 const imageBytes = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a7t0AAAAASUVORK5CYII=', 'base64');
 
@@ -176,6 +177,19 @@ it('runs the complete application through isolated HTTPS, D1, R2, and Durable Ob
     if (response.status() !== 200) throw new Error(`Image transfer returned ${response.status()}.`);
   }
 
+  async function avatar(actor: Actor): Promise<PersonAvatar> {
+    const digest = createHash('sha256').update(imageBytes).digest('hex');
+    const response = await network(actor.context, `/api/avatar/${randomUUID()}`, { method: 'PUT', data: imageBytes,
+      headers: { Origin: origin, 'X-Minsky-Request': '1', 'X-CSRF-Token': actor.csrf,
+        'Content-Type': 'image/png', 'Content-Length': String(imageBytes.length), 'X-Minsky-Digest': digest } });
+    if (response.status() !== 200) throw new Error(`Avatar upload returned ${response.status()}.`);
+    return await response.json() as PersonAvatar;
+  }
+
+  async function avatars(actor: Actor): Promise<PersonAvatar[]> {
+    return json<PersonAvatar[]>(actor, `/api/avatars?sessionId=${installation!.sessionId}`);
+  }
+
   async function image(actor: Actor, issueId: string, visibility: 'public' | 'internal'): Promise<StartedImage> {
     const begin = { action: 'begin', sessionId: installation!.sessionId,
       requestId: randomUUID(), issueId, visibility, name: `fictional-${visibility}.png`, bytes: imageBytes.length };
@@ -305,6 +319,22 @@ it('runs the complete application through isolated HTTPS, D1, R2, and Durable Ob
     await json(organizer, '/api/images', { action: 'finish', sessionId: installation.sessionId, attachmentId: pending.id }, 409);
     await json(organizer, '/api/images', { action: 'abandon', sessionId: installation.sessionId, attachmentId: pending.id });
     expect((await snapshot(organizer)).attachments).toEqual([]);
+    const replacedAvatar = await avatar(organizer);
+    const organizerAvatar = await avatar(organizer);
+    const teamAvatar = await avatar(contestant);
+    expect(await avatars(specialist)).toEqual([organizerAvatar]);
+    expect(await avatars(contestant)).toEqual([teamAvatar]);
+    const avatarPath = (picture: PersonAvatar) => `/api/avatar/${installation!.sessionId}/${picture.avatar_id}`;
+    const avatarDownload = await network(specialist.context, avatarPath(organizerAvatar));
+    expect(avatarDownload.status()).toBe(200);
+    expect(avatarDownload.headers()).toMatchObject({ 'content-type': 'image/png', 'cache-control': 'private, no-store' });
+    expect(Buffer.from(await avatarDownload.body())).toEqual(imageBytes);
+    expect((await network(specialist.context, avatarPath(replacedAvatar))).status()).toBe(409);
+    expect((await network(contestant.context, avatarPath(organizerAvatar))).status()).toBe(409);
+    expect((await network(organizer.context, avatarPath(teamAvatar))).status()).toBe(409);
+    await json(specialist, '/api/avatars', { action: 'remove' });
+    await json(organizer, '/api/avatars', { action: 'remove' });
+    expect(await avatars(specialist)).toEqual([]);
     await admin(organizer, { action: 'set_intake', open: false });
     await json(contestant, '/api/workflow', { sessionId: installation.sessionId, requestId: randomUUID(),
       command: { type: 'submit', category: 'Devices', description: 'Closed fictional intake' } }, 409);
@@ -350,7 +380,11 @@ it('runs the complete application through isolated HTTPS, D1, R2, and Durable Ob
         const ownedAccounts = [...new Set([...accountIds, ...discovered.results.map((row) => row.id)])];
         const images = await db.prepare('SELECT original_path, thumbnail_path FROM issue_images WHERE session_id = ?').bind(installation.sessionId)
           .all<{ original_path: string; thumbnail_path: string }>();
-        const keys = images.results.flatMap((row) => [row.original_path, row.thumbnail_path]);
+        const ownedAvatars = await db.prepare(`SELECT id, account_id FROM account_avatars WHERE account_id IN (${ownedAccounts.map(() => '?').join(', ')})`)
+          .bind(...ownedAccounts).all<{ id: string; account_id: string }>();
+        if (scenarioCompleted) expect(ownedAvatars.results.length, 'The scenario must leave avatar rows for cleanup.').toBeGreaterThan(0);
+        const keys = [...images.results.flatMap((row) => [row.original_path, row.thumbnail_path]),
+          ...ownedAvatars.results.map((row) => avatarKey(row.account_id, row.id))];
         if (keys.length) await cleanup.env.IMAGES.delete(keys);
         const remainingObjects = await cleanup.env.IMAGES.list({ prefix: installation.sessionId });
         expect(remainingObjects.objects).toEqual([]);
@@ -363,6 +397,7 @@ it('runs the complete application through isolated HTTPS, D1, R2, and Durable Ob
           db.prepare('DELETE FROM events WHERE id = ? AND name = ?').bind(installation.eventId, `runtime:${unique}`),
           ...ownedAccounts.map((id) => db.prepare('DELETE FROM account_operations WHERE account_id = ?').bind(id)),
           ...ownedAccounts.map((id) => db.prepare('DELETE FROM ba_user WHERE id = ?').bind(id)),
+          ...ownedAccounts.map((id) => db.prepare('DELETE FROM account_avatars WHERE account_id = ?').bind(id)),
           ...ownedAccounts.map((id) => db.prepare('DELETE FROM accounts WHERE id = ?').bind(id)),
           ...ownedLimits.map(({ key }) => db.prepare('DELETE FROM authentication_limits WHERE key = ?').bind(key)),
         ]);
@@ -372,7 +407,8 @@ it('runs the complete application through isolated HTTPS, D1, R2, and Durable Ob
         expect(events.results).toEqual([{ id: sentinel.event, name: sentinel.name }]);
         const tables = ['installation', 'sessions', 'teams', 'memberships', 'membership_roles', 'logins', 'ba_user', 'ba_session', 'ba_account',
           'ba_verification', 'issues', 'history', 'resolutions', 'awards', 'issue_images', 'image_deletions', 'command_receipts',
-          'audience_sequences', 'notifications', 'admin_audit', 'account_operations', 'command_assertions', 'workflow_commit_times', 'session_issue_sequences'];
+          'audience_sequences', 'notifications', 'admin_audit', 'account_operations', 'command_assertions', 'workflow_commit_times', 'session_issue_sequences',
+          'account_avatars'];
         for (const table of tables) {
           const count = await db.prepare(`SELECT count(*) AS count FROM ${table}`).first<{ count: number }>();
           expect(count?.count, `Scoped cleanup must remove fixture records from ${table}.`).toBe(0);

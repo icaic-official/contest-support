@@ -90,6 +90,7 @@ async function signIn(
         : [],
       "/rest/v1/rpc/session_snapshot": state,
       "/rest/v1/rpc/announcement_snapshot": emptyAnnouncementSnapshot(),
+      "/rest/v1/rpc/avatar_list": [],
     };
     if (!(path in responses)) throw new Error(`Unexpected request: ${path}`);
     await route.fulfill({

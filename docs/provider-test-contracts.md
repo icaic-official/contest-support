@@ -6,7 +6,7 @@ The same 11 scenarios apply to both providers without weaker assertions.
 The three new cases cover account creation, image-limit boundaries, and reconnect recovery.
 See [run log](history/run-log.md) and [PR #43](https://github.com/GiftedNovaHD/minsky/pull/43) for source-specific hosted results.
 Earlier eight-case results verify the recorded revisions only.
-The shared scenarios do not cover the `announcements` group. See [session announcements](session-announcements.md#verification).
+The shared scenarios do not cover the `announcements` or `avatars` groups. See [session announcements](session-announcements.md#verification) and [avatar verification](backend-contracts.md#avatars).
 AWS, GCP, and Azure have no implementation.
 
 The complete D1 suite checks `WorkflowPersistence` directly.

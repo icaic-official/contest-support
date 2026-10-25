@@ -2,6 +2,7 @@ import { type ReactNode, useEffect, useId, useState } from "react";
 import { Link } from "react-router";
 import {
   Archive,
+  Camera,
   Check,
   CircleCheck,
   Copy,
@@ -9,6 +10,7 @@ import {
   Lock,
   LogOut,
   MessageSquare,
+  Trash2,
 } from "lucide-react";
 import { BuildId } from "@/components/build-id";
 import { themeOptions } from "@/components/theme-toggle";
@@ -26,6 +28,7 @@ import { Separator } from "@/components/ui/separator";
 import { documentationUrl } from "@/lib/links";
 import { useTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
+import { PersonAvatar } from "@/organiser/components/issueDisplay";
 import { PasswordChangeForm } from "@/screens/PasswordForm";
 import {
   type AccountActivityItem,
@@ -35,6 +38,9 @@ import {
   capabilityInfo,
   teamAccountDescription,
 } from "./accountModel";
+import { AVATAR_SOURCE_MAX_BYTES } from "./avatarPicture";
+import { type AvatarEditorControls, changePictureButtonId } from "./hooks/useAvatarEditor";
+import { megabytes } from "./imageFile";
 import { formatDate, relativeAge } from "./labels";
 import type { Membership, Snapshot } from "./model";
 import { canOpenPage, workspacePaths } from "./navigation";
@@ -147,7 +153,13 @@ export function ProfileSection({
   shell,
   kind,
   name,
-}: AccountSectionProps & { name: string }) {
+  title,
+  picture,
+}: AccountSectionProps & {
+  name: string;
+  title: string;
+  picture: AvatarEditorControls;
+}) {
   const { user, username } = shell;
   return (
     <Section
@@ -156,6 +168,46 @@ export function ProfileSection({
       description="How this account appears in Minsky."
     >
       <dl className="divide-y">
+        <Field label="Picture">
+          <div className="flex flex-wrap items-center gap-4">
+            <PersonAvatar
+              name={title}
+              personId={user.id}
+              className="size-16 text-xl"
+            />
+            <div className="grid min-w-0 gap-2">
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  id={changePictureButtonId}
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={picture.busy}
+                  onClick={picture.pick}
+                >
+                  <Camera aria-hidden="true" />
+                  Change picture
+                </Button>
+                {picture.hasPicture && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={picture.busy}
+                    onClick={picture.askRemove}
+                  >
+                    <Trash2 aria-hidden="true" />
+                    Remove picture
+                  </Button>
+                )}
+              </div>
+              <p className="text-muted-foreground">
+                JPEG, PNG or WebP, up to {megabytes(AVATAR_SOURCE_MAX_BYTES)} MB.
+                Saving removes any location or camera data from the photo.
+              </p>
+            </div>
+          </div>
+        </Field>
         {kind.kind === "team" ? (
           <>
             <Field label="Team">{kind.teamName}</Field>

@@ -1,7 +1,9 @@
+import { createHash } from 'node:crypto';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createCloudflareBackend } from './backend';
 import type { Backend } from '../contracts';
 import { AnnouncementRejectedError, ImageRequestError, WorkflowRejectedError } from '../errors';
+import { AVATAR_MAX_BYTES } from '../../connected/imageFile';
 
 const origin = 'https://connector.example';
 const sessionId = '49c15a39-79ec-4597-bad6-2b949cfe32b2';
@@ -230,6 +232,59 @@ describe('Cloudflare Backend transport', () => {
       expect(blob.size).toBe(png.byteLength);
       expect(String(fetcher.mock.calls.at(-1)![0])).toBe(
         `${origin}/api/announcement-image/${sessionId}/announcements/${announcementId}/${imageId}`);
+    });
+  });
+
+  describe('avatars', () => {
+    const avatar = { person_id: issueId, avatar_id: 'c4a9f6a2-7d6e-4a8e-9a43-6f1f5d3e2b10' };
+    const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3]);
+
+    it('transfers the exact bytes with their SHA-256 digest and returns the stored avatar', async () => {
+      const fetcher = transport(() => Response.json(avatar));
+      const stored = await createCloudflareBackend({ origin, fetch: fetcher }).avatars.upload({ requestId, file: new Blob([png]) });
+      expect(stored).toEqual(avatar);
+      const [input, init] = fetcher.mock.calls.at(-1)!;
+      expect(String(input)).toBe(`${origin}/api/avatar/${requestId}`);
+      expect(init?.method).toBe('PUT');
+      const headers = new Headers(init?.headers);
+      expect(headers.get('X-Minsky-Digest')).toBe(createHash('sha256').update(png).digest('hex'));
+      expect(headers.get('X-CSRF-Token')).toBe('fresh-token');
+      expect(headers.get('Content-Type')).toBe('image/png');
+      expect(new Uint8Array(await new Response(init?.body).arrayBuffer())).toEqual(png);
+    });
+
+    it('rejects a non-image or oversized picture before any request', async () => {
+      const fetcher = vi.fn<typeof fetch>();
+      const backend = createCloudflareBackend({ origin, fetch: fetcher });
+      const large = new Uint8Array(AVATAR_MAX_BYTES + 1);
+      large.set(png);
+      for (const bytes of [new Uint8Array(32), large]) {
+        await expect(backend.avatars.upload({ requestId, file: new Blob([bytes]) })).rejects.toMatchObject({ validation: true });
+      }
+      expect(fetcher).not.toHaveBeenCalled();
+    });
+
+    it('lists, removes, and downloads through the session route with typed failures', async () => {
+      const listed = transport(() => Response.json([avatar]));
+      expect(await createCloudflareBackend({ origin, fetch: listed }).avatars.list(sessionId)).toEqual([avatar]);
+      expect(String(listed.mock.calls.at(-1)![0])).toBe(`${origin}/api/avatars?sessionId=${sessionId}`);
+      const invalid = createCloudflareBackend({ origin, fetch: transport(() => Response.json([{ person_id: 'x' }])) });
+      await expect(invalid.avatars.list(sessionId)).rejects.toThrow();
+      const removed = transport(() => Response.json({}));
+      await createCloudflareBackend({ origin, fetch: removed }).avatars.remove();
+      const [removeInput, removeInit] = removed.mock.calls.at(-1)!;
+      expect(String(removeInput)).toBe(`${origin}/api/avatars`);
+      expect(JSON.parse(String(removeInit?.body))).toEqual({ action: 'remove' });
+      const downloaded = transport(() => new Response(png, { headers: { 'Content-Type': 'image/png' } }));
+      const blob = await createCloudflareBackend({ origin, fetch: downloaded }).avatars.download(sessionId, avatar);
+      expect(new Uint8Array(await blob.arrayBuffer())).toEqual(png);
+      expect(String(downloaded.mock.calls.at(-1)![0])).toBe(`${origin}/api/avatar/${sessionId}/${avatar.avatar_id}`);
+      expect(downloaded.mock.calls.at(-1)![1]).toMatchObject({ cache: 'no-store', credentials: 'same-origin' });
+      const denied = createCloudflareBackend({ origin, fetch: transport(() => Response.json(
+        { error: 'Picture unavailable.', validation: true }, { status: 409 })) });
+      const failure = denied.avatars.download(sessionId, avatar);
+      await expect(failure).rejects.toBeInstanceOf(ImageRequestError);
+      await expect(failure).rejects.toMatchObject({ validation: true });
     });
   });
 });

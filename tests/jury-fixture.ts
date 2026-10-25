@@ -352,6 +352,17 @@ export async function createJuryFixture({ seedIssues = true } = {}) {
                   )
                 ).rows[0].result,
             );
+          } else if (path === "/rest/v1/rpc/avatar_list") {
+            result = await run(
+              user,
+              async (tx) =>
+                (
+                  await tx.query<{ result: unknown }>(
+                    "select public.avatar_list($1) as result",
+                    [String(body?.p_session)],
+                  )
+                ).rows[0].result,
+            );
           } else if (path === "/rest/v1/rpc/announcement_command") {
             result = await run(
               user,

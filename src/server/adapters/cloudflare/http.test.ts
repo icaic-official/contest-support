@@ -43,6 +43,12 @@ function services() {
       remove: vi.fn<ApplicationHttpServices['announcementImages']['remove']>(),
       download: vi.fn<ApplicationHttpServices['announcementImages']['download']>(),
     },
+    avatars: {
+      list: vi.fn<ApplicationHttpServices['avatars']['list']>().mockResolvedValue([]),
+      upload: vi.fn<ApplicationHttpServices['avatars']['upload']>(),
+      remove: vi.fn<ApplicationHttpServices['avatars']['remove']>(),
+      download: vi.fn<ApplicationHttpServices['avatars']['download']>(),
+    },
     connect: vi.fn<ApplicationHttpServices['connect']>().mockResolvedValue(new Response(null)),
   } satisfies ApplicationHttpServices;
 }
@@ -163,5 +169,72 @@ describe('Cloudflare application HTTP boundary', () => {
     deps.announcementImages.finish.mockRejectedValueOnce(new ImageRequestError('Upload the image before finishing.', { incomplete: true }));
     const finish = await handle(post('/api/announcement-images', { action: 'finish', sessionId, imageId: requestId }));
     expect(await finish.json()).toMatchObject({ incomplete: true });
+  });
+
+  describe('avatars', () => {
+    const avatarId = 'c4a9f6a2-7d6e-4a8e-9a43-6f1f5d3e2b10';
+    const protection = { Origin: origin, 'X-Minsky-Request': '1', 'X-CSRF-Token': identity.csrf };
+    const upload = (headers: Record<string, string>, body = new Uint8Array([0xff, 0xd8, 0xff, 1])) =>
+      new Request(`${origin}/api/avatar/${requestId}`, { method: 'PUT', body,
+        headers: { 'Content-Length': String(body.byteLength), 'X-Minsky-Digest': 'a'.repeat(64), ...headers } });
+    const removal = (headers: Record<string, string>, body: unknown = { action: 'remove' }) =>
+      new Request(`${origin}/api/avatars`, { method: 'POST', body: JSON.stringify(body),
+        headers: { 'Content-Type': 'application/json', ...headers } });
+
+    it('uploads the exact bytes for the signed-in account and returns its avatar', async () => {
+      const deps = services();
+      deps.avatars.upload.mockResolvedValueOnce({ person_id: identity.caller.accountId, avatar_id: avatarId });
+      const response = await createApplicationHandler(deps, origin)(upload(protection));
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({ person_id: identity.caller.accountId, avatar_id: avatarId });
+      expect(deps.avatars.upload).toHaveBeenCalledWith(identity.caller,
+        { requestId, bytes: new Uint8Array([0xff, 0xd8, 0xff, 1]), digest: 'a'.repeat(64) });
+    });
+
+    it('requires the same origin and request protection to upload or remove', async () => {
+      const deps = services();
+      const handle = createApplicationHandler(deps, origin);
+      const rejected: Array<Record<string, string>> = [
+        { ...protection, Origin: 'https://attacker.example' }, { ...protection, 'X-CSRF-Token': 'stale' },
+        { ...protection, 'X-Minsky-Request': '' }, { ...protection, 'Sec-Fetch-Site': 'cross-site' },
+        { 'X-Minsky-Request': '1', 'X-CSRF-Token': identity.csrf },
+      ];
+      for (const headers of rejected) {
+        expect((await handle(upload(headers))).status).toBe(403);
+        expect((await handle(removal(headers))).status).toBe(403);
+      }
+      expect(deps.avatars.upload).not.toHaveBeenCalled();
+      expect(deps.avatars.remove).not.toHaveBeenCalled();
+      expect((await handle(removal(protection))).status).toBe(200);
+      expect(deps.avatars.remove).toHaveBeenCalledWith(identity.caller);
+      expect((await handle(removal(protection, { action: 'remove', accountId: requestId }))).status).toBe(400);
+      expect(deps.avatars.remove).toHaveBeenCalledTimes(1);
+    });
+
+    it('rejects a declared body over 256 KiB before reading it', async () => {
+      const deps = services();
+      const response = await createApplicationHandler(deps, origin)(upload({ ...protection, 'Content-Length': '262145' }));
+      expect(response.status).toBe(409);
+      expect(await response.json()).toMatchObject({ validation: true });
+      expect(deps.avatars.upload).not.toHaveBeenCalled();
+    });
+
+    it('lists and downloads for one session with private headers', async () => {
+      const deps = services();
+      const handle = createApplicationHandler(deps, origin);
+      const list = await handle(new Request(`${origin}/api/avatars?sessionId=${sessionId}`));
+      expect(list.headers.get('Cache-Control')).toBe('private, no-store');
+      expect(deps.avatars.list).toHaveBeenCalledWith(identity.caller, sessionId);
+      deps.avatars.download.mockResolvedValueOnce({ body: new Response('bytes').body!, contentType: 'image/webp' });
+      const download = await handle(new Request(`${origin}/api/avatar/${sessionId}/${avatarId}`));
+      expect(download.status).toBe(200);
+      expect(deps.avatars.download).toHaveBeenCalledWith(identity.caller, sessionId, avatarId);
+      expect(download.headers.get('Content-Type')).toBe('image/webp');
+      expect(download.headers.get('Cache-Control')).toBe('private, no-store');
+      expect(download.headers.get('X-Content-Type-Options')).toBe('nosniff');
+      expect((await handle(new Request(`${origin}/api/avatar/${sessionId}/not-an-avatar`))).status).toBe(400);
+      expect((await handle(new Request(`${origin}/api/avatar/${sessionId}/${avatarId}/extra`))).status).toBe(400);
+      expect(deps.avatars.download).toHaveBeenCalledTimes(1);
+    });
   });
 });

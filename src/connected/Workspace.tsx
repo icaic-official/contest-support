@@ -6,6 +6,7 @@ import { ContestantApp } from "@/contestant/ContestantApp";
 import { OrganiserApp } from "@/organiser/OrganiserApp";
 import { NoSessionAccess } from "@/screens/NoSessionAccess";
 import { Announcements } from "./Announcements";
+import { AvatarProvider } from "./Avatars";
 import { useCommand } from "./hooks/useCommand";
 import { useSessionSnapshot } from "./hooks/useSessionSnapshot";
 import { type UiKind, uiKindFor } from "./model";
@@ -50,15 +51,17 @@ export function Workspace(props: Omit<ShellProps, "data">) {
       <OrganiserApp {...props} data={data} />
     ) : undefined;
   if (!app) return <SessionAccess {...props} data={data} />;
-  // Announcements read independently, so the UI below never waits for them.
+  // Announcements and pictures read independently, so the UI below never waits for them.
   return (
-    <div className="flex h-dvh flex-col">
-      <Announcements data={data} />
-      <div className="min-h-0 flex-1">{app}</div>
-      <p className="px-4 py-0.5 text-right text-[11px] text-muted-foreground">
-        <BuildId />
-      </p>
-    </div>
+    <AvatarProvider data={data} userId={props.user.id}>
+      <div className="flex h-dvh flex-col">
+        <Announcements data={data} />
+        <div className="min-h-0 flex-1">{app}</div>
+        <p className="px-4 py-0.5 text-right text-[11px] text-muted-foreground">
+          <BuildId />
+        </p>
+      </div>
+    </AvatarProvider>
   );
 }
 

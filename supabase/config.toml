@@ -26,6 +26,8 @@ verify_jwt = false
 verify_jwt = false
 [functions.announcement-images]
 verify_jwt = false
+[functions.avatars]
+verify_jwt = false
 [functions.workflow]
 # The handler verifies the bearer token with Auth before using the service client.
 verify_jwt = false

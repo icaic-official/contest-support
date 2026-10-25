@@ -248,6 +248,9 @@ async function openWorkspace(
       case '/rest/v1/rpc/announcement_snapshot':
         result = emptyAnnouncementSnapshot();
         break;
+      case '/rest/v1/rpc/avatar_list':
+        result = [];
+        break;
       case '/rest/v1/rpc/manage_member':
         writes.push({ path, body: route.request().postDataJSON() });
         result = null;

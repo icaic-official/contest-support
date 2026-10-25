@@ -121,7 +121,11 @@ export function AccountList({
               onClick={() => onOpen(person.id)}
               className="flex min-h-14 w-full items-center gap-3 p-3 text-left focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
             >
-              <PersonAvatar name={person.name} className="size-9" />
+              <PersonAvatar
+                name={person.name}
+                personId={person.id}
+                className="size-9"
+              />
               <span className="min-w-0 flex-1">
                 <span className="block truncate font-medium">{person.name}</span>
                 <span

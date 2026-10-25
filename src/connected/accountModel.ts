@@ -85,6 +85,11 @@ export function accountName(
   );
 }
 
+/** The name that the account page shows for the account: the team for a team account. */
+export function accountTitle(kind: AccountKind, name: string): string {
+  return kind.kind === "team" ? kind.teamName : name;
+}
+
 export interface AccountActivityItem {
   id: string;
   at: string;

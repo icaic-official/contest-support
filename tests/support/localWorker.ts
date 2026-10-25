@@ -72,7 +72,7 @@ export class LocalWorker extends FixtureWorker {
       application: new D1ApplicationService(db),
       workflow: this.workflow,
       announcements: new D1AnnouncementService(db),
-      announcementImages: new R2AnnouncementImageService(db, bucket),
+      announcementImages: new R2AnnouncementImageService(db, knownLength(bucket)),
       images: new R2ImageService(db, knownLength(bucket)),
       avatars: new R2AvatarService(db, bucket),
     };

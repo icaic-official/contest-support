@@ -49,7 +49,7 @@ Errors use fixed messages and these status codes:
 | 401 | Invalid credentials, expired login, revoked login, or restricted pending credentials. |
 | 403 | Mandatory password change, insufficient current permissions, archived account, or failed request protection. |
 | 409 | A guarded change failed or its commit outcome is unknown. Check account status before retrying. |
-| 429 | The password-attempt limit was reached. Retry after the fixed window expires. |
+| 429 | A failed-sign-in limit or the password-change limit was reached. Retry after the fixed window expires. |
 | 503 | Identity or database service is unavailable. A write response can have an unknown outcome. |
 
 ## Credentials and permissions
@@ -137,10 +137,24 @@ Login creation also rechecks the captured credential generation and both current
 
 Scheduled maintenance removes password-attempt counters and expired login records after a one-day retention period.
 The application Worker runs it every minute. The isolated authentication CI Worker runs it daily.
-Login attempts allow ten attempts per normalized username per 15-minute window.
-Self password verification uses a separate ten-attempt account window.
-The replacement login after an authenticated password change does not consume a public username attempt.
+Sign-in limits count failed sign-ins only. A successful sign-in never counts toward any limit.
+The owner chose this policy on 2026-10-25, because all users at a venue can share one public IP address.
+Each limit uses a fixed 15-minute window that starts at its first failure:
+
+| Limit | Maximum failures | Effect at the maximum |
+| --- | --- | --- |
+| Normalized username | 10 | The Worker refuses that username with status 429. Other usernames are not affected. |
+| Source IP | 200 | The Worker refuses every sign-in from that IP with status 429, even with a correct password. |
+
+The Worker checks both counters before it verifies a password. It adds to them only after a rejected credential.
+A refused attempt does not add to a counter and does not extend the window.
+Requests that pass the check at the same time can all fail, so a count can pass its maximum.
+The excess is at most the number of requests in flight when the count reaches the maximum.
+The constants are in `signInFailureLimits` in `src/server/adapters/cloudflare/authentication.ts`.
+The hosted Worker stores a secret-salted IP digest rather than the address.
+One person who sends many failures can still lock one username for the rest of its window.
+A person at a shared address needs more than 200 failures in 15 minutes to block that address.
+
+Self password verification uses a separate ten-attempt account window. Every request counts, so this limit does not depend on the outcome.
+The replacement login after an authenticated password change does not count toward any sign-in limit.
 Password verification and credential-generation checks still apply to that replacement login.
-The hosted Worker also allows fifty login attempts per source IP per 15-minute window.
-It stores a secret-salted IP digest rather than the address.
-These pilot limits need later capacity review for venue networks that share an address.

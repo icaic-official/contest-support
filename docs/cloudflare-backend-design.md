@@ -321,6 +321,28 @@ Closing a subscription stops callbacks immediately and releases the socket and t
 The healthy-connection target remains live updates within three seconds.
 Immediate delivery is the normal path. Recovery scans and polling handle missed messages but do not establish that latency target.
 
+## The Worker sets the security headers
+
+The Worker runs before static assets. Cloudflare does not apply a `_headers` file to responses from Worker code, so a `_headers` file would not work here. See [Workers static assets headers](https://developers.cloudflare.com/workers/static-assets/headers/).
+[securityHeaders.ts](../src/server/adapters/cloudflare/securityHeaders.ts) sets the headers on every asset response and on every API response.
+
+| Header | Applies to | Value |
+| --- | --- | --- |
+| `Content-Security-Policy` | HTML documents | Scripts, fonts, connections, and forms use only the same origin. No eval. No object, frame, or foreign base. `frame-ancestors 'none'`. |
+| `Content-Security-Policy` | API responses | `default-src 'none'; frame-ancestors 'none'` |
+| `Strict-Transport-Security` | Every response | `max-age=31536000` |
+| `X-Content-Type-Options` | Every response | `nosniff` |
+| `Referrer-Policy` | Every response | `no-referrer` |
+| `X-Frame-Options`, `Permissions-Policy` | HTML documents | `DENY`; camera, microphone, location, and payment off |
+
+The policy allows two things that a stricter policy would block:
+
+- `style-src 'unsafe-inline'`. Sonner, the Radix scroll lock, and the image cropper add `<style>` elements at run time. Script stays strict, so this does not allow script injection.
+- `font-src data:`. The build inlines one small font file as a `data:` URI.
+
+The browser app turns off Zod's code generation (`src/lib/zodConfig.ts`, the first import of `src/main.tsx`). Zod would otherwise call `new Function` once to test for eval. The policy blocks that call and the browser reports a violation.
+The local browser journey (`npm run test:connector:ui:local`) fails if any page reports a policy violation.
+
 ## Separate installation and activation
 
 The documentation Worker remains a static site with no application data bindings.

@@ -74,7 +74,7 @@ export function renderWranglerConfiguration(input, configPath, { allowLocal = fa
     preview_urls: false,
     placement: settings.placementRegion ? { region: settings.placementRegion } : { mode: 'smart' },
     limits: { cpu_ms: 1000 },
-    observability: { enabled: false },
+    observability: { enabled: true },
     triggers: { crons: ['* * * * *'] },
     vars: { AUTH_ORIGIN: settings.origin },
     assets: {

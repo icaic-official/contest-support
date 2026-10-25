@@ -512,8 +512,9 @@ export function registerAuthenticationCases(group: AuthenticationCases) {
         expect((await service.current(await signIn(username, replacement)))?.user.id).toBe(fixture.contestant.accountId);
       });
 
-      it('completes a password change after the last permitted username login', async () => {
+      it('does not count a successful sign-in or password change toward the username limit', async () => {
         const key = `username:${username}`;
+        const attempts = async () => (await stmt('SELECT attempts FROM authentication_limits WHERE key = ?', key).first<{ attempts: number }>())?.attempts;
         await db.batch([
           stmt('UPDATE accounts SET must_change = 1 WHERE id = ?', fixture.contestant.accountId),
           stmt('INSERT INTO authentication_limits (key, window_start, attempts) VALUES (?, unixepoch(), 9)', key),
@@ -526,11 +527,12 @@ export function registerAuthenticationCases(group: AuthenticationCases) {
         expect((await service.current(fresh))?.status).toMatchObject({ must_change: false, session_valid: true });
         expect((await service.sessions(fresh)).map((session) => session.id)).toEqual([fixture.sessionId]);
         expect(await service.current(headers)).toBeUndefined();
-        expect((await stmt('SELECT attempts FROM authentication_limits WHERE key = ?', key).first<{ attempts: number }>())?.attempts).toBe(10);
-        // Replacing an authenticated login must not remove the public attempt limit.
+        expect(await attempts()).toBe(9);
+        // A failure is the tenth. The username then refuses even the correct password.
+        await expectFailure(signIn()).toMatchObject({ status: 401 });
+        expect(await attempts()).toBe(10);
         await expectFailure(signIn(username, replacement)).toMatchObject({ status: 429 });
         await stmt('UPDATE authentication_limits SET window_start = unixepoch() - 901 WHERE key = ?', key).run();
-        await expectFailure(signIn()).toMatchObject({ status: 401 });
         expect((await service.current(await signIn(username, replacement)))?.user.id).toBe(fixture.contestant.accountId);
       });
 

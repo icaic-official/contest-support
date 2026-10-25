@@ -41,6 +41,7 @@ test('configuration contains only public independent settings and complete Cloud
   assert.deepEqual(config.r2_buckets, [{ binding: 'IMAGES', bucket_name: settings.bucketName, remote: true }]);
   assert.deepEqual(config.durable_objects.bindings, [{ name: 'LIVE_UPDATES', class_name: 'SessionLiveCoordinator' }]);
   assert.deepEqual(config.migrations, [{ tag: 'v1', new_sqlite_classes: ['SessionLiveCoordinator'] }]);
+  assert.deepEqual(config.observability, { enabled: true });
   assert.equal(config.assets.run_worker_first, true);
   assert.equal(config.preview_urls, false);
   assert.deepEqual(config.placement, { mode: 'smart' });

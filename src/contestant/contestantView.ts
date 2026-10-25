@@ -1,4 +1,5 @@
 import { type WorkflowEvent, workflowEvent } from "@/connected/historyEvents";
+import { awardMinutesLabel } from "@/connected/labels";
 import type { Attachment, Issue, Resolution, Snapshot } from "@/connected/model";
 
 /** The id of the main heading. Navigation moves focus to it. */
@@ -197,7 +198,7 @@ export function trackerSteps(
       id: "award",
       label: "Time award",
       detail: award
-        ? `+${award.minutes} min decided`
+        ? `Decided · ${awardMinutesLabel(award.minutes)}`
         : resolved
           ? "The jury can decide an award"
           : "After resolution",

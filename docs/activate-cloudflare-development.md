@@ -139,7 +139,7 @@ Reconfirm candidate shutdown, exact targets, and the preserved stable secret.
 Run the build and dry run:
 
 ```sh
-VITE_BACKEND=cloudflare npm run build
+npm run build
 npx wrangler deploy --config="$MINSKY_DEV_CLOUDFLARE_CONFIG" --dry-run
 ```
 
@@ -153,7 +153,7 @@ export MINSKY_DEV_CLOUDFLARE_CONFIG MINSKY_DEV_DATABASE_ID MINSKY_DEV_DATABASE_N
 
 Publish the approved revision with the guarded script in [deployment settings](cloudflare-build-settings.md#publication-commands).
 Confirm the script's revision matches the recorded approval before it uploads.
-The app command selects `VITE_BACKEND=cloudflare`, validates the exact hosted targets, applies new D1 migrations, and deploys the complete Worker.
+The app command validates the exact hosted targets, applies new D1 migrations, and deploys the complete Worker.
 It does not bootstrap accounts or rotate secrets.
 After activation, Workers Builds publishes each push to `main`. See [Publish the application](cloudflare-builds.md#publish-the-application).
 Workers Builds also publishes the docs. See [Publish the docs](cloudflare-builds.md#publish-the-docs).
@@ -270,7 +270,7 @@ Run the provider generator and publish the repair code:
 
 ```sh
 npm run cloudflare:install -- configure --settings="$MINSKY_APPROVED_SETTINGS" --config="$MINSKY_REPAIR_CONFIG"
-VITE_BACKEND=cloudflare npm run build
+npm run build
 npx wrangler deploy --config="$MINSKY_REPAIR_CONFIG" --dry-run
 npx wrangler deploy --config="$MINSKY_REPAIR_CONFIG"
 ```

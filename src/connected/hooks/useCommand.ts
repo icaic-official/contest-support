@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { requireBackend } from "@/backend";
+import { backend } from "@/backend";
 import { errorMessage, WorkflowRejectedError } from "@/backend/errors";
 import type { Command } from "../model";
 import { useWorkflowRetry } from "../WorkflowRetry";
@@ -121,7 +121,7 @@ export function useCommand({
     pendingRequest.current = request;
     setPending(request.command);
     try {
-      const id = await requireBackend().workflows.execute(
+      const id = await backend.workflows.execute(
         request.sessionId,
         request.request,
         request.command,

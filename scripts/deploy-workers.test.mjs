@@ -185,11 +185,10 @@ it("builds the Cloudflare backend without private tokens and records the build r
   const target = (await deploymentTargets(cloudflare, "app", { installation }))[0];
   const execute = vi.fn();
   const write = vi.fn();
-  await buildWorkers({ ...development, VITE_BACKEND: "other", AUTH_SECRET: "private-secret" }, {
+  await buildWorkers({ ...development, AUTH_SECRET: "private-secret" }, {
     execute, write, targets: async () => [target],
   });
   const buildEnv = execute.mock.calls[0][2].env;
-  expect(buildEnv.VITE_BACKEND).toBe("cloudflare");
   for (const key of ["CLOUDFLARE_API_TOKEN", "GH_TOKEN", "GITHUB_TOKEN", "AUTH_SECRET"]) {
     expect(buildEnv[key]).toBeUndefined();
   }

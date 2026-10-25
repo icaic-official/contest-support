@@ -111,7 +111,7 @@ npm run cloudflare:install -- migrate --config="$MINSKY_INSTALL_CONFIG" --accoun
 ## 5. Build and deploy
 
 ```sh
-VITE_BACKEND=cloudflare npm run build
+npm run build
 npx wrangler deploy --config="$MINSKY_INSTALL_CONFIG" --dry-run
 npx wrangler deploy --config="$MINSKY_INSTALL_CONFIG"
 ```

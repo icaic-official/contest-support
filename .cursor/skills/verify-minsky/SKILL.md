@@ -56,7 +56,7 @@ Do not start `npm run dev` for this skill. That command uses port 5173. This ski
 
 `serve` performs these steps inside the session directory:
 
-- Vite builds the frontend with `VITE_BACKEND=cloudflare`. The build reads environment files from the empty session directory, so it does not load `.env.local`.
+- Vite builds the frontend. The build reads environment files from the empty session directory, so it does not load `.env.local`.
 - Wrangler applies `src/server/adapters/d1/migrations` to a new local D1 database.
 - `bootstrapInstallation` creates the event, the Primary session, the two teams, and the admin account. It runs in a child process with the same environment as Wrangler: without `CLOUDFLARE_*`, `CF_*`, or `VITE_*` variables, and with `HOME` set to the session directory. The password hash is Better Auth's hash. The operations log records the bootstrap. The local platform proxy prints a Durable Object warning because that proxy does not export `SessionLiveCoordinator`. The warning does not stop `wrangler dev`. The running Worker serves the **Live** badge.
 - The helper signs in as admin, changes the temporary password, opens intake, and creates the other accounts with `POST /api/accounts`. Each account then changes its temporary password through `POST /api/auth/change-password`.

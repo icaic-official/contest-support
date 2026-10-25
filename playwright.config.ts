@@ -13,8 +13,5 @@ export default defineConfig({
     command: `npm run dev -- --port ${port} --strictPort`,
     url: origin,
     reuseExistingServer: !process.env.CI,
-    // The specs serve the Cloudflare Worker routes from tests/support/worker.ts.
-    // Process settings take precedence over .env.local.
-    env: { VITE_BACKEND: "cloudflare" },
   },
 });

@@ -5,7 +5,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { requireBackend } from "@/backend";
+import { backend } from "@/backend";
 import type { SessionSummary } from "@/backend/contracts";
 import { errorMessage } from "@/backend/errors";
 import type { Snapshot } from "../model";
@@ -60,12 +60,12 @@ export function useSessionSnapshot(userId: string): SessionData {
     // revision. A write waits for its own refresh before enabling controls.
     const task = refreshQueue.current.then(async () => {
       try {
-        const list = await requireBackend().workflows.sessions(userId);
+        const list = await backend.workflows.sessions(userId);
         const nextSession = list.some((s) => s.id === sessionId)
           ? sessionId
           : (list[0]?.id ?? "");
         const next = nextSession
-          ? await requireBackend().workflows.snapshot(nextSession)
+          ? await backend.workflows.snapshot(nextSession)
           : undefined;
         if (run !== generation.current) return;
         setSessions(list);
@@ -91,7 +91,7 @@ export function useSessionSnapshot(userId: string): SessionData {
     setConnected(false);
     // The first refresh selects a session. Empty IDs produce invalid live filters.
     const unsubscribe = sessionId
-      ? requireBackend().updates.subscribe({
+      ? backend.updates.subscribe({
           sessionId,
           userId,
           onChange: () => {

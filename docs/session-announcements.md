@@ -1,6 +1,6 @@
 # Session announcements
 
-Ticket status and verification evidence are in the [T0006 ticket](tickets.md#t0006--session-announcements).
+Ticket status and verification evidence are in the [T0006 ticket](history/tickets.md#t0006--session-announcements).
 
 An announcement is a short message for one contest session.
 Admins and jury publish it. Every current member of the session reads it.

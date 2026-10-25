@@ -9,7 +9,7 @@ Organisers mainly use phones, so they get a phone-first app. At 1024 px and wide
 Contestants use computers and get a desktop app. There is no contestant phone layout.
 The membership selects the UI after sign-in. A membership with a team gets the contestant app.
 All UIs share one design system, shadcn/ui with Tailwind CSS, and the same data hooks.
-[T0015](tickets.md#t0015--organiser-and-contestant-frontend-redesign) implements this decision. It replaces the sidebar workspace from the 2026-10-02 decision below.
+[T0015](history/tickets.md#t0015--organiser-and-contestant-frontend-redesign) implements this decision. It replaces the sidebar workspace from the 2026-10-02 decision below.
 The T0015 jury award lists replace the separate T0009 worklist screen.
 Mockup items that need new data stay out of scope: helper zones, quick replies, a floor map, configurable aging thresholds, and category icons.
 
@@ -18,13 +18,13 @@ It uses authorized `Backend` snapshots and existing workflow actions for decisio
 Its maintenance ran in a separate worktree alongside T0020.
 The active Cloudflare installation preserves the combined application. Verification applies only to its recorded source and provider.
 
-Team-search status (2026-10-15): [T0008](tickets.md#t0008--fuzzy-team-search) merged into `main` in PR #22.
+Team-search status (2026-10-15): [T0008](history/tickets.md#t0008--fuzzy-team-search) merged into `main` in PR #22.
 Staff search the current session's team names and locations from the issue queue.
 Volunteers and specialists use the same search to choose a team before they report an issue.
 The T0005 branch includes the accepted search through a merge from `main`.
 Deployment waits for an explicit request after review.
 
-Issue-image decision (2026-10-11): [T0005](tickets.md#t0005--issue-images) adds issue images.
+Issue-image decision (2026-10-11): [T0005](history/tickets.md#t0005--issue-images) adds issue images.
 Staff attach JPEG, PNG, and WebP images to an issue.
 The uploader chooses team-visible or staff-only visibility at upload.
 The default is staff-only, and the choice stays fixed.

@@ -17,7 +17,7 @@ The docs site's earlier build and browser checks passed. Those checks do not est
 
 The entries below record the original T0011 audit and its T0007 dependency.
 T0020 now owns complete Cloudflare installation verification and the [PR #21 component review](history/pr21-installation-disposition.md).
-T0020 merged in PR #42. Its authorization and limits are in [its ticket](tickets.md#t0020-complete-cloudflare-connector).
+T0020 merged in PR #42. Its authorization and limits are in [its ticket](history/tickets.md#t0020-complete-cloudflare-connector).
 This audit does not authorize repository publication or license selection.
 Capacity validation and outage features retain their existing scope and remain separate work.
 

@@ -231,7 +231,7 @@ The removed `deploy:preview` command cannot upload an assets-only app version.
 | Docs | `wrangler.docs.jsonc` | `minsky-docs` | `site/dist` |
 
 The stable URLs are `https://minsky-dev.icaic-minsky.workers.dev` and `https://minsky-docs.icaic-minsky.workers.dev`.
-The app build always sets `VITE_BACKEND=cloudflare`. It uses same-origin cookie authentication.
+The app build uses same-origin cookie authentication.
 A missing Cloudflare configuration stops the app publication. There is no static upload path.
 The selected Cloudflare config must have the exact stable name, origin, account, D1 UUID, database name, and bucket name.
 The script rejects CI, test, and installation resource names.

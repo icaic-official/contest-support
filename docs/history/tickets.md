@@ -43,8 +43,8 @@ T0009 merged into `main` with a separate **Jury worklist** screen. The T0015 int
 Its rules moved into the phone **Awards** tab and the desktop **Award review** page, through `awardLists()`, `openableIssues()` and `AwardEvidence`.
 The lists are To decide, To apply and Applied. They keep the T0009 eligibility and order rules, including zero-minute awards and pending awards on reopened issues.
 A jury-only member can open a reopened issue that has a pending award.
-The design differs from [the T0009 specification](history/t0009-jury-worklist.md) in two ways: the desktop award and confirmation forms stay on the Award review cards, and there is no **Jury worklist** sidebar entry or **Back to jury worklist** button.
-See [frontend architecture](frontend-architecture.md#jury-award-lists).
+The design differs from [the T0009 specification](t0009-jury-worklist.md) in two ways: the desktop award and confirmation forms stay on the Award review cards, and there is no **Jury worklist** sidebar entry or **Back to jury worklist** button.
+See [frontend architecture](../frontend-architecture.md#jury-award-lists).
 
 ### Acceptance criteria
 
@@ -100,7 +100,7 @@ Cloudflare CI migration remains candidate work. This ticket does not change prov
 
 ### Verification
 
-The [dated record](history/run-log.md#t0022-ci-routing-verification-2026-10-20) separates local expression validation from GitHub evidence in the PR.
+The [dated record](run-log.md#t0022-ci-routing-verification-2026-10-20) separates local expression validation from GitHub evidence in the PR.
 Fork, schedule, and protected-dispatch behavior use local routing assertions. No live run of those events is part of this ticket.
 
 ## T0021 Fresh Cloudflare development installation
@@ -119,7 +119,7 @@ The budget is the existing $5 plan. Billing access returns `403`; the owner repo
 Run bounded required verification. Add no paid services or optional stress tests.
 Protected branch entry `63467138` preserves all six earlier entries and protection rule `69128862`.
 This ticket authorizes no broader allowlist or protection change.
-The [activation record in the run log](history/run-log.md#t0021-approved-activation-2026-10-19) records actual operational results.
+The [activation record in the run log](run-log.md#t0021-approved-activation-2026-10-19) records actual operational results.
 
 ### Acceptance criteria
 
@@ -141,15 +141,15 @@ The [activation record in the run log](history/run-log.md#t0021-approved-activat
 
 ### Verification
 
-See [the activation record in the run log](history/run-log.md#t0021-approved-activation-2026-10-19) for tested revisions and separate verification sources.
-See [the run report](history/t0021-run-report.md#owner-merge-and-approved-activation-2026-10-19) for the final operational report.
+See [the activation record in the run log](run-log.md#t0021-approved-activation-2026-10-19) for tested revisions and separate verification sources.
+See [the run report](t0021-run-report.md#owner-merge-and-approved-activation-2026-10-19) for the final operational report.
 The owner merged PR #43 and separately approved the concrete activation. No activation or repeat-deployment gate remains.
 [PR #45](https://github.com/GiftedNovaHD/minsky/pull/45) records the results and fixes a confirmed docs-preview output parser failure.
 On 2026-10-20, the owner adds separate frontend feature modules and browser routes to that PR.
 The follow-up preserves shared session state, workflow rules, both providers, configuration, and all target guards.
 Fresh verification and owner review cover the expanded diff. The owner merges it.
 The owner's later review requests session-bound retries and retention of uncertain request IDs through transient account-check failures.
-Those fixes require fresh verification. See [the frontend reference](frontend-architecture.md) for the request lifetime and retry behavior.
+Those fixes require fresh verification. See [the frontend reference](../frontend-architecture.md) for the request lifetime and retry behavior.
 
 ## T0020 Complete Cloudflare connector
 
@@ -209,10 +209,10 @@ Remove the retired bounded proof path and duplicate store runners.
 Use the current `WorkflowPersistence` and consolidate the installation procedure and reference material.
 Preserve the merged jury worklist, earlier installation resources, and unique historical evidence.
 
-The [dated verification record](history/run-log.md#t0020-connector-implementation-2026-10-18) preserves earlier local, hosted CLI, protected, and empty-installation results.
+The [dated verification record](run-log.md#t0020-connector-implementation-2026-10-18) preserves earlier local, hosted CLI, protected, and empty-installation results.
 Those runs do not verify later review fixes.
 Fresh checks and scoped cleanup pass on executable source `2b6f6f0`.
-The [review verification record](history/run-log.md#pr-42-review-fixes-and-cleanup-2026-10-18) separates the first Supabase failure, its passing unchanged repeats, protected Cloudflare results, and the new empty installation.
+The [review verification record](run-log.md#pr-42-review-fixes-and-cleanup-2026-10-18) separates the first Supabase failure, its passing unchanged repeats, protected Cloudflare results, and the new empty installation.
 
 ## T0019 Shared server workflow
 
@@ -248,8 +248,8 @@ Bounded subagent work is authorized.
 
 ### Verification
 
-The [workflow reference](server-workflow.md) records the existing behavior and implemented boundaries.
-[Run log](history/run-log.md) records observed results.
+The [workflow reference](../server-workflow.md) records the existing behavior and implemented boundaries.
+[Run log](run-log.md) records observed results.
 An interface or an uncalled rule module does not complete this extraction.
 
 The PR #41 review found a login-expiry race after lock waits.
@@ -267,9 +267,9 @@ Summary: Add Workers and D1 authentication, temporary passwords, account session
 
 Better Auth `1.7.10` supplies username login and signed cookie sessions.
 D1 guards preserve current permissions and atomic credentials. The browser implements the existing `Authentication` interface.
-The [reference](cloudflare-authentication.md) defines endpoints, cookie scope, lifetime, request protection, and account restrictions.
-The [identity choice](cloudflare-authentication-choice.md) records maintained crypto, schema coupling, Worker measurements, and cost.
-Use the [verification guide](verify-cloudflare-authentication.md) for local and isolated hosted checks.
+The [reference](../cloudflare-authentication.md) defines endpoints, cookie scope, lifetime, request protection, and account restrictions.
+The [identity choice](../cloudflare-authentication-choice.md) records maintained crypto, schema coupling, Worker measurements, and cost.
+Use the [verification guide](../verify-cloudflare-authentication.md) for local and isolated hosted checks.
 
 The isolated `minsky-auth-ci` database and Worker use confirmed account `458ad6a930b0fb717796dfa19ca6a2b1`.
 Development databases remain local and separate. No real accounts, real-data exports, or backend switch are included.
@@ -293,8 +293,8 @@ The remaining workflow connector, R2, Durable Object delivery, migration tooling
 
 ### Verification
 
-See [the run log](history/run-log.md#t0018-cloudflare-authentication-2026-10-18) for separate local, hosted D1, Worker HTTP, and protected CI results.
-The newer [PR #41 follow-up](history/run-log.md#pr-41-review-corrections-and-paid-authentication-2026-10-18) records the passing paid-plan verification.
+See [the run log](run-log.md#t0018-cloudflare-authentication-2026-10-18) for separate local, hosted D1, Worker HTTP, and protected CI results.
+The newer [PR #41 follow-up](run-log.md#pr-41-review-corrections-and-paid-authentication-2026-10-18) records the passing paid-plan verification.
 
 ## T0017 D1 transaction proof
 
@@ -326,9 +326,9 @@ AWS adapters and Terraform remain deferred. Bounded subagent work is authorized.
 ### Verification
 
 The [historical D1 proof guide](https://github.com/GiftedNovaHD/minsky/blob/88ea5020a0f9dfc34a32ed7fbd84dfea07423297/docs/d1-transaction-proof.md) preserves the recorded commands and recovery procedure.
-Current D1 verification uses the complete workflow suite in [Run the provider tests](run-provider-tests.md).
+Current D1 verification uses the complete workflow suite in [Run the provider tests](../run-provider-tests.md).
 The [store reference](https://github.com/GiftedNovaHD/minsky/blob/88ea5020a0f9dfc34a32ed7fbd84dfea07423297/docs/backend-contracts.md#bounded-d1-application-store) defines its bounded interface.
-The [run log](history/run-log.md#t0017-d1-transaction-proof-2026-10-17) separates local and hosted evidence.
+The [run log](run-log.md#t0017-d1-transaction-proof-2026-10-17) separates local and hosted evidence.
 All 42 focused cases pass locally and on hosted D1 at `edb4bd0`. Ordinary CI passes on that implementation revision.
 That bounded proof did not implement the complete connector. [T0020](#t0020-complete-cloudflare-connector) supplies the later implementation.
 
@@ -399,7 +399,7 @@ The app releases each temporary browser URL when its preview closes, changes, or
 
 ### Verification
 
-Results are recorded in [run log](history/run-log.md#t0013-image-preview-request-handling-2026-10-17).
+Results are recorded in [run log](run-log.md#t0013-image-preview-request-handling-2026-10-17).
 No schema or function change is required. Deployment remains a separate step.
 
 ## T0001 — Local workflow demo and project guidance
@@ -501,7 +501,7 @@ Requested for T0002 on 2026-10-02. “Helper” means any staff member with a su
 
 ### Verification
 
-Results are recorded in [run log](history/run-log.md).
+Results are recorded in [run log](run-log.md).
 
 ### Review refinements — 2026-10-02
 
@@ -513,7 +513,7 @@ The user requested these refinements on the open shared PR, within T0002:
 
 ### Verification
 
-Results are recorded in [run log](history/run-log.md).
+Results are recorded in [run log](run-log.md).
 
 ## T0003 — Cloud onboarding and authenticated shared product
 
@@ -528,9 +528,9 @@ Updated authentication decision (2026-10-02): organizer-created usernames/passwo
 
 Updated contributor decision (2026-10-02): contributors may be assumed to have full cloud credential access. Docker is optional, not required for development, migrations, function deployment or the embedded database checks. Cloud integration CI uses a protected isolated test project; untrusted PR checks run without provider credentials. This supersedes the local-stack prerequisite below; the connected workflow and authorization requirements remain in scope.
 
-Selected quality improvements (2026-10-02): require CI and independent review before merging, add a short PR review checklist, and scan secrets/dependencies with routine update PRs. Implementation and owner setup are described in [code-quality.md](code-quality.md). Remote merge rules and vulnerability alerts require repository administration access; they are not inferred from committed workflow files.
+Selected quality improvements (2026-10-02): require CI and independent review before merging, add a short PR review checklist, and scan secrets/dependencies with routine update PRs. Implementation and owner setup are described in [code-quality.md](../code-quality.md). Remote merge rules and vulnerability alerts require repository administration access; they are not inferred from committed workflow files.
 
-Selected interface refinement (2026-10-02): the user requested temporarily installing Anthropic's `frontend-design` skill, applying it to the repository, pushing the changes and deploying the frontend to Cloudflare, then removing the skill. This refinement stays on the active T0003 branch and covers sign-in, shared styles, responsive reporting/queue/detail layouts and administration. It preserves existing workflow and authorization rules; no new backend features are included. Verification and deployment evidence are recorded in [run log](history/run-log.md).
+Selected interface refinement (2026-10-02): the user requested temporarily installing Anthropic's `frontend-design` skill, applying it to the repository, pushing the changes and deploying the frontend to Cloudflare, then removing the skill. This refinement stays on the active T0003 branch and covers sign-in, shared styles, responsive reporting/queue/detail layouts and administration. It preserves existing workflow and authorization rules; no new backend features are included. Verification and deployment evidence are recorded in [run log](run-log.md).
 
 Selected navigation/demo retirement (2026-10-02): the user requested a main login landing page and sidebar, then explicitly requested removing the old local demo and unnecessary old tests and pushing the changes. This remains a T0003 refinement. Retain real-account journey/authorization checks and credential-free connected landing/login checks. Remove demo runtime, personas/reset/storage migration, demo-only tests/fixtures, command and walkthrough/specification. Historical T0001/T0002 records below/above refer to their original commits.
 
@@ -599,7 +599,7 @@ The branch started from updated `origin/main` after T0003 merged in PR #2 on 202
 
 Status: implemented and merged in [PR #9](https://github.com/notbowen/minsky/pull/9) on 2026-10-11 (SGT).
 Merge commit: `52ff99133bd727626b3589b40a507ab438f508da`.
-[The merge record](history/run-log.md#t0004-merge-and-documentation-follow-up-2026-10-11) gives the exact UTC timestamp and reviewed revision.
+[The merge record](run-log.md#t0004-merge-and-documentation-follow-up-2026-10-11) gives the exact UTC timestamp and reviewed revision.
 [PR #13](https://github.com/notbowen/minsky/pull/13) merged the documentation rewrite on 2026-10-11 (SGT).
 Summary: Redesigned the connected workspace and sign-in experience while preserving workflow and authorization behavior.
 
@@ -608,8 +608,8 @@ The user explicitly requested "Deploy first".
 All 12 hosted cases passed, and fixture deletion completed.
 
 The user selected the two attached visual references on 2026-10-03.
-[Run log](history/run-log.md#t0004-ui-makeover-2026-10-03) records implementation.
-The [deployment record](history/run-log.md#t0004-development-deployment-2026-10-03) contains the hosted evidence.
+[Run log](run-log.md#t0004-ui-makeover-2026-10-03) records implementation.
+The [deployment record](run-log.md#t0004-development-deployment-2026-10-03) contains the hosted evidence.
 That development deployment preceded merge under the user's exception for T0004.
 
 ### Scope
@@ -642,12 +642,12 @@ Status: merged in [PR #19](https://github.com/GiftedNovaHD/minsky/pull/19) on 20
 Summary: Added private issue images with uploader-selected visibility, session limits, and active-event removal rules.
 The following dated records describe implementation and preview verification.
 The 2026-10-14 review fixes add current-access checks, fixed visibility during retry, exact file paths, saved removal retries, and completion-time count checks.
-See the [review-fix record](history/run-log.md#t0005-review-fixes-2026-10-14) for local verification and cloud-test limits.
+See the [review-fix record](run-log.md#t0005-review-fixes-2026-10-14) for local verification and cloud-test limits.
 Review pull request: [PR #19](https://github.com/notbowen/minsky/pull/19).
 On 2026-10-11, the user requested a Cloudflare preview before merge and approved using the existing development backend.
 The migration and account/attachment functions are deployed to `Minsky` development.
 The frontend preview is uploaded at https://t0005-minsky-dev.icaic-minsky.workers.dev.
-See the [preview record](history/run-log.md#t0005-development-preview-2026-10-11) for verification.
+See the [preview record](run-log.md#t0005-development-preview-2026-10-11) for verification.
 `Minsky CI` and the main Worker deployment remain unchanged.
 The user reviews and merges.
 Deployment is a separate explicit step.
@@ -719,7 +719,7 @@ Status: merged in [PR #62](https://github.com/GiftedNovaHD/minsky/pull/62) at `6
 This ticket ports the T0006 scope from PR #20 to the current provider architecture.
 PR #20 added a Supabase-only implementation on an older `main`.
 This port adds `Backend.announcements`, a Cloudflare D1 and R2 implementation, the Supabase adapter, and the redesigned interface.
-The specification and both implementations are in [session announcements](session-announcements.md).
+The specification and both implementations are in [session announcements](../session-announcements.md).
 
 Three corrections from the PR #20 review stay:
 
@@ -835,10 +835,10 @@ The user accepted the design by merging PR #36. This did not authorize Cloudflar
 
 ### Verification
 
-The [design](cloudflare-backend-design.md) explains the decisions.
+The [design](../cloudflare-backend-design.md) explains the decisions.
 The [historical implementation plan](https://github.com/GiftedNovaHD/minsky/blob/88ea5020a0f9dfc34a32ed7fbd84dfea07423297/docs/cloudflare-implementation-plan.md) records the accepted implementation phases.
-T0021 later completes the fresh installation and separately approved development switch. Real-data migration tooling remains deferred. See [the activation procedure](activate-cloudflare-development.md).
-The [verification record](history/run-log.md#t0016-cloudflare-backend-design-2026-10-17) identifies this documentation-only change.
+T0021 later completes the fresh installation and separately approved development switch. Real-data migration tooling remains deferred. See [the activation procedure](../activate-cloudflare-development.md).
+The [verification record](run-log.md#t0016-cloudflare-backend-design-2026-10-17) identifies this documentation-only change.
 Supabase was active during T0016. That design ticket created no credentials, provider resources, or data migration.
 
 ## T0014 backend adapters
@@ -867,8 +867,8 @@ The browser continues to use the existing Auth service, database functions, acco
 
 ### Verification
 
-The [backend reference](backend-contracts.md) defines the interfaces.
-[Run log](history/run-log.md#t0014-existing-backend-verification-2026-10-17) records the verification results.
+The [backend reference](../backend-contracts.md) defines the interfaces.
+[Run log](run-log.md#t0014-existing-backend-verification-2026-10-17) records the verification results.
 
 The Cloudflare backend, D1 schema rewrite, account migration, R2 copy, and Durable Objects implementation remain later work.
 [T0015](#t0015-shared-provider-tests) implements the shared hosted verification suite before the second provider implementation.
@@ -884,7 +884,7 @@ Status: the initial site is implemented, deployed, and verified locally and on t
 The later CI workflow passes local checks and awaits account setup and its first automatic deployments.
 The user merged [PR #29](https://github.com/GiftedNovaHD/minsky/pull/29) on 2026-10-17 at 10:36:06 UTC, commit `aaa6bbc`.
 The GitHub deployment switch remains off. Automatic deployment remains unverified.
-See [deployment evidence](history/run-log.md#t0011-documentation-site-2026-10-17).
+See [deployment evidence](run-log.md#t0011-documentation-site-2026-10-17).
 Summary: Built and deployed the documentation site, then added CI deployment workflows for the frontend and docs. The first automatic deployments remain unverified.
 
 The user requested a documentation site to accompany T0007, including written content and Workers deployment.
@@ -920,7 +920,7 @@ The later automation decision below extends the original static-site scope to pr
 
 The user requires release-quality documentation for readers outside the project.
 The initial site acceptance above remains complete. Public release readiness remains incomplete.
-Use the [documentation release plan and audit](documentation-release-plan.md) for exact findings and completion criteria.
+Use the [documentation release plan and audit](../documentation-release-plan.md) for exact findings and completion criteria.
 
 - [x] Record the reader structure, quality rules, source audit, and release gaps.
 - [x] Remove the obsolete demo-command comment and correct current maintenance command repository paths.
@@ -935,7 +935,7 @@ These items do not authorize merging T0007, changing repository visibility, sele
 
 The user requested branch previews and stable deployment after merges to `main`.
 The later CI requirement makes GitHub Actions publish only after `checks`, `secrets`, and `dependencies` pass.
-The branch includes both Worker configurations, deployment validation, focused tests, and exact [setup instructions](cloudflare-builds.md).
+The branch includes both Worker configurations, deployment validation, focused tests, and exact [setup instructions](../cloudflare-builds.md).
 The setup covers `minsky-dev` and `minsky-docs` and replaces repeated frontend deployment approval after activation.
 Independent Cloudflare Git builds must remain disabled.
 The user requested the workflow and setup steps before adding credentials.
@@ -944,7 +944,7 @@ Migrations and functions remain explicit backend work.
 Full app preview operation also needs approved browser origins for the development functions.
 
 The four reported permission rules now appear in the public guides.
-The [audit](documentation-release-plan.md#permission-documentation-fixes) maps each correction and its remaining proposed work.
+The [audit](../documentation-release-plan.md#permission-documentation-fixes) maps each correction and its remaining proposed work.
 
 ## T0012 — Reply retry cleanup
 
@@ -967,7 +967,7 @@ The request ID stays the same across retries, so the server can recognize an alr
 - [x] Browser regression tests reproduce the original failure and pass with the fix. Required local checks pass.
 - [x] The user merged PR #30.
 
-Verification is recorded in [run log](history/run-log.md#t0012-reply-retry-cleanup-2026-10-17).
+Verification is recorded in [run log](run-log.md#t0012-reply-retry-cleanup-2026-10-17).
 Deployment remains a separate step.
 
 ## T0009 — Jury worklist
@@ -981,7 +981,7 @@ Summary: Provide separate outstanding decision and external-application lists th
 The first implementation and local checks date from 2026-10-15.
 Those results are historical and do not establish compatibility with current `main`.
 The owner reviews and merges. This task does not authorize deployment.
-The [jury worklist specification](history/t0009-jury-worklist.md) defines the behavior.
+The [jury worklist specification](t0009-jury-worklist.md) defines the behavior.
 T0020 remains the separate active connector goal. Do not edit its checkout.
 No schema, backend feature, provider implementation, or runtime dependency is part of T0009 maintenance.
 
@@ -1020,13 +1020,13 @@ This ticket is different from [T0015 shared provider tests](#t0015-shared-provid
 
 ### Progress
 
-- [x] **Step 1, foundation (2026-10-17).** Tailwind CSS v4, shadcn/ui components and zinc tokens. The data layer moved from `ConnectedApp.tsx` into hooks. Sign-in, password change and session access screens use shadcn/ui. The membership selects `ContestantApp` or `OrganiserApp`. `OrganiserApp` selects the phone or desktop layout by viewport. All three layouts render the existing workflow UI as placeholders. See [frontend architecture](frontend-architecture.md).
-- [x] **Step 2a, organiser phone app (2026-10-17).** `OrganiserPhoneApp` no longer uses the legacy workspace. It has bottom tabs by role, the queue with **Claim and go**, chips and aging timers, a full-screen issue view with a bottom action bar and sheets, Find, Awards and Me with the session switcher. The action forms are reusable for the desktop console. See [frontend architecture](frontend-architecture.md#organiser-phone-app). The Playwright test `team-search.spec.ts` "Clear team with Space" uses a 320 px viewport and still expects the old selectors. Step 5 updates it.
-- [x] **Step 2a follow-up, redesigned Session tab (2026-10-18).** The admin Session tab uses shadcn/ui. It has status counts, the intake switch, image limits with steppers, the account list, a new account sheet with the one-time credential screen, and an account sheet for the username, membership, password reset and access removal. Reset and removal need confirmation. The request logic is in `useSessionAdmin` and the forms are in `src/organiser/admin/`, so the desktop console can use them. See [frontend architecture](frontend-architecture.md#organiser-phone-app).
-- [x] **Step 3, contestant desktop app (2026-10-17).** `ContestantApp` no longer uses the legacy workspace. It has a top bar, the team's reports, an issue page with a live timer and a four-step tracker, an inline reopen form, an award card, chat messages, team-visible images and a report form with category tiles. See [frontend architecture](frontend-architecture.md#contestant-app). The Playwright test `team-search.spec.ts` "a refreshed contestant membership drops the hidden staff team filter" and the cloud specs `journey.spec.ts` and `attachments.spec.ts` still use the old contestant selectors. Step 5 updates them.
-- [x] **Step 4 (step 2b), organiser desktop console (2026-10-18).** `OrganiserDesktopConsole` no longer uses the legacy workspace. It has a collapsible sidebar with the session switcher, pages by role, the intake switch and the person menu. The top bar has the breadcrumb, the ⌘K command palette, **Live** or **Reconnecting** and the theme menu. It has the queue with status cards, tabs, the team filter and a data table, an issue side sheet with a two-mode composer, Award review, Overview, Accounts and Session settings. `src/connected/legacy/` is deleted. See [frontend architecture](frontend-architecture.md#organiser-desktop-console). With this step, 11 local Playwright tests fail because they use the old desktop selectors (`.issue-list .issue-card`, the old reply and membership forms): all 6 tests in `team-search.spec.ts` and all 5 tests in `workspace-refresh.spec.ts`. The cloud specs `journey.spec.ts` and `attachments.spec.ts` use the old desktop selectors too. Step 5 updates them.
+- [x] **Step 1, foundation (2026-10-17).** Tailwind CSS v4, shadcn/ui components and zinc tokens. The data layer moved from `ConnectedApp.tsx` into hooks. Sign-in, password change and session access screens use shadcn/ui. The membership selects `ContestantApp` or `OrganiserApp`. `OrganiserApp` selects the phone or desktop layout by viewport. All three layouts render the existing workflow UI as placeholders. See [frontend architecture](../frontend-architecture.md).
+- [x] **Step 2a, organiser phone app (2026-10-17).** `OrganiserPhoneApp` no longer uses the legacy workspace. It has bottom tabs by role, the queue with **Claim and go**, chips and aging timers, a full-screen issue view with a bottom action bar and sheets, Find, Awards and Me with the session switcher. The action forms are reusable for the desktop console. See [frontend architecture](../frontend-architecture.md#organiser-phone-app). The Playwright test `team-search.spec.ts` "Clear team with Space" uses a 320 px viewport and still expects the old selectors. Step 5 updates it.
+- [x] **Step 2a follow-up, redesigned Session tab (2026-10-18).** The admin Session tab uses shadcn/ui. It has status counts, the intake switch, image limits with steppers, the account list, a new account sheet with the one-time credential screen, and an account sheet for the username, membership, password reset and access removal. Reset and removal need confirmation. The request logic is in `useSessionAdmin` and the forms are in `src/organiser/admin/`, so the desktop console can use them. See [frontend architecture](../frontend-architecture.md#organiser-phone-app).
+- [x] **Step 3, contestant desktop app (2026-10-17).** `ContestantApp` no longer uses the legacy workspace. It has a top bar, the team's reports, an issue page with a live timer and a four-step tracker, an inline reopen form, an award card, chat messages, team-visible images and a report form with category tiles. See [frontend architecture](../frontend-architecture.md#contestant-app). The Playwright test `team-search.spec.ts` "a refreshed contestant membership drops the hidden staff team filter" and the cloud specs `journey.spec.ts` and `attachments.spec.ts` still use the old contestant selectors. Step 5 updates them.
+- [x] **Step 4 (step 2b), organiser desktop console (2026-10-18).** `OrganiserDesktopConsole` no longer uses the legacy workspace. It has a collapsible sidebar with the session switcher, pages by role, the intake switch and the person menu. The top bar has the breadcrumb, the ⌘K command palette, **Live** or **Reconnecting** and the theme menu. It has the queue with status cards, tabs, the team filter and a data table, an issue side sheet with a two-mode composer, Award review, Overview, Accounts and Session settings. `src/connected/legacy/` is deleted. See [frontend architecture](../frontend-architecture.md#organiser-desktop-console). With this step, 11 local Playwright tests fail because they use the old desktop selectors (`.issue-list .issue-card`, the old reply and membership forms): all 6 tests in `team-search.spec.ts` and all 5 tests in `workspace-refresh.spec.ts`. The cloud specs `journey.spec.ts` and `attachments.spec.ts` use the old desktop selectors too. Step 5 updates them.
 - [x] **Step 5, integration (2026-10-18).** Parallel chats shared the ticket branch:
-  - [x] Merge of `main` at `069b249`. The UI uses `requireBackend()` and the `Backend` contracts. `src/connected/client.ts` was removed on `main`. The T0009 rules are in the phone Awards tab and the desktop Award review page. Local lint, type checking, build, `npm run check:functions` and 346 unit and database tests passed. 27 mocked browser tests passed and 20 failed on old selectors. See [run log](history/run-log.md#t0015-frontend-redesign-integration-2026-10-18).
+  - [x] Merge of `main` at `069b249`. The UI uses `requireBackend()` and the `Backend` contracts. `src/connected/client.ts` was removed on `main`. The T0009 rules are in the phone Awards tab and the desktop Award review page. Local lint, type checking, build, `npm run check:functions` and 346 unit and database tests passed. 27 mocked browser tests passed and 20 failed on old selectors. See [run log](run-log.md#t0015-frontend-redesign-integration-2026-10-18).
   - [x] Documentation for the redesigned UIs (2026-10-18): README, frontend architecture, current state, manual verification, product direction, the design record and the T0009 note.
   - [x] Organiser issue views close with "ISS-N is no longer in your lists." when the open issue leaves the person's lists. Phone sheets close when their action is no longer allowed. The desktop sheet returns focus to the control that opened it (`00119f3`).
   - [x] Playwright selector updates: the jury specs and a new local full journey (`7ec7f79`), the team search and refresh specs (`e160cf6`), and the cloud specs (`23ccfa7`, `0d304bd`). The cloud specs are updated but not run.
@@ -1034,7 +1034,7 @@ This ticket is different from [T0015 shared provider tests](#t0015-shared-provid
   - [x] Connector UI journey port (2026-10-18). `tests/connector/ui-journey.ts` drives the T0015 UIs (`1df20d8`). The UI needed no change.
 
 The user requested a complete frontend redesign on 2026-10-17.
-They reviewed four mockup directions in [`design/redesign/`](../design/redesign/README.md).
+They reviewed four mockup directions in [`design/redesign/`](../../design/redesign/README.md).
 They chose direction A (shadcn/ui console) combined with direction D (phone-first field mode).
 
 ### Decisions (2026-10-17)
@@ -1042,10 +1042,10 @@ They chose direction A (shadcn/ui console) combined with direction D (phone-firs
 - Organisers and contestants get **different UIs**. This is not one layout with parts hidden.
 - After sign-in, the membership selects the UI. A membership with `team_id` gets the contestant UI. Every other membership gets the organiser UI.
 - **Organisers** (volunteers, specialists, jury members, session admins) mainly use phones in a browser.
-  - On phones they get the phone-first app from [`e-organiser-phone.html`](../design/redesign/e-organiser-phone.html).
-  - On laptops and tablets they get a **separate desktop console** in the style of [`a-console.html`](../design/redesign/a-console.html), with a sidebar, a queue table, an issue side sheet and admin pages.
+  - On phones they get the phone-first app from [`e-organiser-phone.html`](../../design/redesign/e-organiser-phone.html).
+  - On laptops and tablets they get a **separate desktop console** in the style of [`a-console.html`](../../design/redesign/a-console.html), with a sidebar, a queue table, an issue side sheet and admin pages.
   - Both organiser layouts use the same data hooks and action components.
-- **Contestants** use computers in a browser and get the desktop app from [`f-contestant-desktop.html`](../design/redesign/f-contestant-desktop.html). There is **no phone layout** for contestants.
+- **Contestants** use computers in a browser and get the desktop app from [`f-contestant-desktop.html`](../../design/redesign/f-contestant-desktop.html). There is **no phone layout** for contestants.
 - Contestant category tiles show the category name and one generic icon. No category data changes.
 - The UI uses Tailwind CSS v4 and shadcn/ui components copied into the repository, with Radix primitives and lucide icons.
 - These items stay out of scope because the schema has no data for them: "Near me" or helper zones, quick replies, a floor map, configurable aging thresholds, and category icons or descriptions.
@@ -1099,7 +1099,7 @@ The final visual pass used the browser tool, the Vite dev server and a temporary
 - Refresh: after a reload, the session, the internal note and the running timer stayed. The timer continued from the saved timestamps.
 - Contestant desktop app at 1280 × 800 in light and dark themes: the report showed the public reply. It did not show the internal note. Resolved reports showed the award and the external application as separate steps.
 
-The user should still check the admin Accounts and image upload screens against a real backend, and run the remaining steps of [manual verification](manual-verification.md).
+The user should still check the admin Accounts and image upload screens against a real backend, and run the remaining steps of [manual verification](../manual-verification.md).
 
 ### Risk
 
@@ -1130,7 +1130,7 @@ Excalidraw diagrams are allowed, with rendering support in the site.
 - [x] The public pages shrink from about 7,700 to about 4,100 words.
 - [x] `npm run docs:build`, `npm run docs:test`, and `npm run lint` pass.
 
-The branch also adds a [Lapiz preview](../README.md#lapiz-preview) of the Cloudflare application.
+The branch also adds a [Lapiz preview](../../README.md#lapiz-preview) of the Cloudflare application.
 It runs with local emulation only. It prints the first admin's credentials in its start log, by the owner's choice for debugging.
 
 ### Outside this ticket

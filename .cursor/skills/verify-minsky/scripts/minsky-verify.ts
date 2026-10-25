@@ -656,7 +656,6 @@ function isolatedEnv(directory: string): NodeJS.ProcessEnv {
   env.XDG_CACHE_HOME = path.join(directory, 'cache');
   env.XDG_DATA_HOME = path.join(directory, 'data');
   env.MINSKY_VERIFY_ENV_DIR = directory;
-  env.VITE_BACKEND = 'cloudflare';
   env.NODE_ENV = 'production';
   return env;
 }

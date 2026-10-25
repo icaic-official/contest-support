@@ -6,7 +6,7 @@ import globals from "globals";
 // UI, shared server rules, and shared scenarios use the same provider boundary.
 // The selected backend and its contracts remain valid application imports.
 const providerImportPattern = [
-  "^(?:@supabase/|@aws-sdk/|@cloudflare/|@google-cloud/|@azure/|cloudflare(?::|/|$)|wrangler(?:/|$)|miniflare(?:/|$)|better-auth(?:/|$))",
+  "^(?:@aws-sdk/|@cloudflare/|@google-cloud/|@azure/|cloudflare(?::|/|$)|wrangler(?:/|$)|miniflare(?:/|$)|better-auth(?:/|$))",
   String.raw`(^|/)backend/(?!contracts(?:\.ts)?$|errors(?:\.ts)?$|index(?:\.ts)?$)`,
   String.raw`(^|/)adapters/`,
   String.raw`^(?:\.\.?/)+(?:cloudflare|aws|gcp|azure)(?:/|$)`,

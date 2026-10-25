@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { requireBackend } from "@/backend";
+import { backend } from "@/backend";
 import type { AccountStatus } from "@/backend/contracts";
 import { errorMessage } from "@/backend/errors";
 
@@ -26,7 +26,7 @@ export function useAccountStatus(userId: string | undefined): AccountState {
     setAccount(undefined);
     async function refreshAccount() {
       try {
-        const next = await requireBackend().auth.accountStatus();
+        const next = await backend.auth.accountStatus();
         if (!active) return;
         setAccount(next);
         setError("");

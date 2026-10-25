@@ -17,7 +17,6 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { documentationUrl } from "@/lib/links";
 import { PasswordForm } from "@/screens/PasswordForm";
 import { SignIn } from "@/screens/SignIn";
-import { backend, backendSetupMessage } from "@/backend";
 import { useAccountStatus } from "./hooks/useAccountStatus";
 import { useAuthSession } from "./hooks/useAuthSession";
 import { Workspace } from "./Workspace";
@@ -71,12 +70,6 @@ export function ConnectedApp() {
   let content: ReactNode;
   if (auth.loading) {
     content = <StatusMessage>Restoring your session…</StatusMessage>;
-  } else if (!backend) {
-    content = (
-      <Alert variant="destructive" className="max-w-md">
-        <AlertDescription>{backendSetupMessage}</AlertDescription>
-      </Alert>
-    );
   } else if (!user) {
     content = <SignIn />;
   } else if (account.error) {

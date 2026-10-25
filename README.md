@@ -50,7 +50,6 @@ cp .env.example .env.local
 npm run dev
 ```
 
-`.env.example` sets `VITE_BACKEND=cloudflare`.
 Open [http://127.0.0.1:5173](http://127.0.0.1:5173).
 Sign-in on that Vite server fails because the API is absent.
 Use `npm run test:connector:ui:local` for a temporary local Cloudflare application.
@@ -122,7 +121,7 @@ If a hosted fixture cleanup fails, follow [Recover an incomplete fixture](docs/r
 
 ### The mocked browser suite
 
-`npm run test:e2e` starts a Vite server with `VITE_BACKEND=cloudflare`.
+`npm run test:e2e` starts a Vite server.
 Playwright routes each `/api` request to the Worker HTTP handlers in `src/server`.
 UI specs use in-memory data from `tests/support/worker.ts`.
 Workflow specs use the real Cloudflare services on a local D1 database from `tests/support/localWorker.ts`.
@@ -174,7 +173,7 @@ Plans and rules:
 
 - [Contributor rules](AGENTS.md), the [planning record](PLAN.md), and the [roadmap](ROADMAP.md) for the technology stack.
 - [Product direction](docs/product-direction.md) — agreed requirements and open decisions.
-- [Development tickets](docs/tickets.md) — ticket scope, status, and acceptance criteria.
+- [Development tickets](docs/history/tickets.md) — ticket scope, status, and acceptance criteria.
 - [Writing guide](docs/writing-guide.md) and [documentation release plan](docs/documentation-release-plan.md).
 - [Code quality](docs/code-quality.md) — CI summary, dependency policy, secret scanning, and review requirements.
 

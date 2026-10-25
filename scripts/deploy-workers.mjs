@@ -281,7 +281,6 @@ export async function buildWorkers(env, {
   for (const worker of await targets(env, site)) {
     const childEnv = { ...env };
     for (const key of ["CLOUDFLARE_API_TOKEN", "GH_TOKEN", "GITHUB_TOKEN", "AUTH_SECRET"]) delete childEnv[key];
-    if (worker.backend) childEnv.VITE_BACKEND = worker.backend;
     execute("npm", ["run", worker.backend ? "build" : "docs:build"], { env: childEnv, stdio: "inherit" });
     if (worker.backend) write("dist/minsky-build.json", JSON.stringify({
       ...applicationMarker(worker, plan.sha), config: worker.config,

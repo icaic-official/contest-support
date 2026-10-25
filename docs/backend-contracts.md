@@ -75,9 +75,9 @@ See [installation](../site/src/content/docs/operators/installation.mdx), [provid
 | [model.ts](../src/connected/model.ts) | Defines workflow commands and validates snapshots. It has no provider imports. |
 | [imageFile.ts](../src/connected/imageFile.ts) | Defines file checks, attachment paths, and error classification shared with the attachment function. |
 
-The UI imports the contracts and `requireBackend()`.
+The UI imports the contracts and `backend`.
 ESLint restricts provider SDKs, browser implementations, and server adapters in shared application code.
-The UI can import the contracts, shared errors, and selected backend factory.
+The UI can import the contracts, shared errors, and `backend` client.
 The same provider pattern protects shared server rules and test scenarios.
 ESLint checks static imports, re-exports, and literal dynamic UI imports.
 ESLint rejects computed dynamic UI paths because it cannot determine their provider.

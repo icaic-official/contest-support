@@ -3,7 +3,7 @@
 This reference describes the shared frontend, its three layouts, and its browser routes.
 T0015 provides the contestant desktop app, organiser phone app, and organiser desktop console.
 PR #45 added browser routes and workflow retry protections to the redesigned shells.
-See [T0015](tickets.md#t0015--organiser-and-contestant-frontend-redesign) and [T0021](tickets.md#t0021-fresh-cloudflare-development-installation) for the recorded scope.
+See [T0015](history/tickets.md#t0015--organiser-and-contestant-frontend-redesign) and [T0021](history/tickets.md#t0021-fresh-cloudflare-development-installation) for the recorded scope.
 
 ## Stack
 
@@ -59,8 +59,8 @@ The removal is a follow-up. Before you remove a rule, check the preview page in 
 ## Backend access
 
 The frontend does not call a provider directly.
-Hooks, `SignIn`, `PasswordForm`, `useSessionAdmin`, `useIssueImages` and `AvatarProvider` call `requireBackend()` from `src/backend/index.ts`.
-That function returns the `Backend` from `src/backend/contracts.ts`, or it throws the setup message when `.env.local` has no public connection settings.
+Hooks, `SignIn`, `PasswordForm`, `useSessionAdmin`, `useIssueImages` and `AvatarProvider` call `backend` from `src/backend/index.ts`.
+`backend` is the Cloudflare client. It implements the `Backend` contract from `src/backend/contracts.ts`.
 The implementation is in `src/backend/cloudflare/`. See [backend contracts](backend-contracts.md).
 
 ## From sign-in to a UI
@@ -149,7 +149,7 @@ Thus a pending request and the selected issue stay the same when the viewport ch
 
 All hooks are in `src/connected/hooks/`, except `useAvatarUrl` and `useAvatarActions`, which are in `src/connected/Avatars.tsx`.
 They share session data and workflow requests across the layouts.
-They call the `Backend` contracts through `requireBackend()`.
+They call the `Backend` contracts through `backend`.
 
 | Hook | Responsibility |
 | --- | --- |

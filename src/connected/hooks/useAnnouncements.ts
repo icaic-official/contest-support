@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { requireBackend } from "@/backend";
+import { backend } from "@/backend";
 import { errorMessage } from "@/backend/errors";
 import type {
   Announcement,
@@ -56,7 +56,7 @@ export function useAnnouncements(
     const controller = new AbortController();
     current.current = controller;
     try {
-      const snapshot = await requireBackend().announcements.snapshot(
+      const snapshot = await backend.announcements.snapshot(
         sessionId,
         controller.signal,
       );
@@ -84,7 +84,7 @@ export function useAnnouncements(
 
   const execute = useCallback(
     async (requestId: string, command: AnnouncementCommand) => {
-      await requireBackend().announcements.execute(
+      await backend.announcements.execute(
         sessionId,
         requestId,
         command,

@@ -170,7 +170,7 @@ The step 5 integration also moved the T0009 jury worklist into the phone **Award
 
 ### Proposed implementation split
 
-The work is too large for one change. Proposed chats, all on one ticket branch. The work followed this split. The desktop console became an extra step 4 (step 2b), and integration became step 5. See [T0015](../../docs/tickets.md#t0015--organiser-and-contestant-frontend-redesign).
+The work is too large for one change. Proposed chats, all on one ticket branch. The work followed this split. The desktop console became an extra step 4 (step 2b), and integration became step 5. See [T0015](../../docs/history/tickets.md#t0015--organiser-and-contestant-frontend-redesign).
 
 1. **Foundation:** Tailwind v4, shadcn/ui setup, design tokens, split `ConnectedApp.tsx` into data hooks, sign-in and password screens, and selection of the UI by account type.
 2. **Organiser app:** tabs, queue, issue view, sheets, find, awards, session admin. This step can split further.

@@ -241,7 +241,7 @@ To ship a migration that removes or renames schema:
 
 To publish by hand, run `npm run deploy` from an updated `main` with the same variables, a token with the same permissions, `WORKERS_CI_BRANCH=main`, and `WORKERS_CI_COMMIT_SHA` set to the output of `git rev-parse HEAD`.
 
-The script sets `VITE_BACKEND=cloudflare` and guards the complete Worker:
+The script guards the complete Worker:
 
 - The app needs its API code, D1 database, private R2 bucket, and live coordinator. The script has no assets-only upload path that could remove them.
 - It validates the generated configuration and exact hosted targets before upload. After upload, it checks the published targets, live bindings, and an anonymous rejection at the authentication API.

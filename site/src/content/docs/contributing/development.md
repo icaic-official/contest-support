@@ -13,7 +13,7 @@ cp .env.example .env.local
 npm run dev                  # http://127.0.0.1:5173
 ```
 
-`VITE_BACKEND` defaults to `cloudflare`. A plain Vite server has no Cloudflare API, so sign-in fails there.
+A plain Vite server has no Cloudflare API, so sign-in fails there.
 Use `npm run test:connector:ui:local` for a temporary local Cloudflare app, or the [development app](https://minsky-dev.icaic-minsky.workers.dev). Its Worker is `minsky-dev` and its D1 database is `minsky-development`.
 
 An admin must add your account to a session. Use `npm run cloudflare:recover-admin` to recover a Cloudflare admin.

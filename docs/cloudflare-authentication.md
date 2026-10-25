@@ -19,7 +19,7 @@ The raw Better Auth router is not exposed.
 `createCloudflareAuthentication()` implements the existing browser `Authentication` contract.
 Its additional `account()` and `sessions()` methods support account administration and session reads.
 The complete `createCloudflareBackend()` factory wraps this authentication adapter and supplies the remaining operation groups.
-The backend entry point defaults to Cloudflare when `VITE_BACKEND` is absent. No automatic provider fallback occurs.
+The backend entry point always creates the Cloudflare client. No provider fallback occurs.
 
 ## HTTP endpoints
 

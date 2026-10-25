@@ -11,7 +11,7 @@ if (process.argv.length !== 2) {
   process.exit(1);
 }
 const directory = await mkdtemp(join(tmpdir(), 'minsky-connector-react-local-'));
-const environment = { ...safeWranglerEnvironment(), VITE_BACKEND: 'cloudflare',
+const environment = { ...safeWranglerEnvironment(), 
   MINSKY_CF_LOCAL_UI: '1', MINSKY_CF_LOCAL_UI_DIRECTORY: directory, MINSKY_CF_UI_OUTPUT: join(directory, 'artifacts'),
   DEBUG: '', PWDEBUG: '', PW_TEST_HTML_REPORT_OPEN: 'never', PLAYWRIGHT_NO_COPY_PROMPT: '1',
 };

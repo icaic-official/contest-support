@@ -1,3 +1,4 @@
+import { type WorkflowEvent, workflowEvent } from "@/connected/historyEvents";
 import type { Attachment, Issue, Resolution, Snapshot } from "@/connected/model";
 
 /** The id of the main heading. Navigation moves focus to it. */
@@ -60,14 +61,9 @@ export type ConversationItem =
   | { kind: "message"; entry: HistoryEntry; mine: boolean }
   | { kind: "event"; entry: HistoryEntry; text: string };
 
-function sameTime(a: string | null | undefined, b: string): boolean {
-  return Boolean(a) && Date.parse(a ?? "") === Date.parse(b);
-}
-
 /**
  * Sorts the public activity into chat messages and workflow events. The
- * history table does not store a type, so events are found by their fixed
- * text and, where the text contains free input, by the record timestamp.
+ * history table does not store a type, so `workflowEvent` tells them apart.
  */
 export function conversation(
   entries: readonly HistoryEntry[],
@@ -79,52 +75,39 @@ export function conversation(
     userId: string;
   },
 ): ConversationItem[] {
-  const { issue, resolutions, award, userId } = context;
+  const { userId } = context;
   return entries.map((entry): ConversationItem => {
     const who = entry.actor === userId ? "You" : entry.actor_name;
-    const event = (text: string): ConversationItem => ({
-      kind: "event",
-      entry,
-      text,
-    });
-    const value = entry.text;
-    if (value === "Issue claimed.") return event(`${who} took the report`);
-    if (value === "Specialist handoff requested. Current owner retained.") {
-      return event(`${who} asked a specialist for help`);
-    }
-    if (value === "Specialist accepted ownership.") {
-      return event(`${who} took over as specialist`);
-    }
-    if (value === "Image added.") return event(`${who} added an image`);
-    if (value === "Image removed.") return event(`${who} removed an image`);
-    if (value.startsWith("External application confirmed.")) {
-      return event("The time award was applied to your contest time");
-    }
-    if (
-      value.startsWith("Issue submitted: ") &&
-      sameTime(issue.created_at, entry.at)
-    ) {
-      return event(`${who} sent the report`);
-    }
-    if (
-      value.startsWith("Resolved: ") &&
-      resolutions.some((r) => sameTime(r.at, entry.at))
-    ) {
-      return event(`${who} resolved the issue`);
-    }
-    if (
-      value.startsWith("Reopened: ") &&
-      resolutions.some((r) => sameTime(r.reopened_at, entry.at))
-    ) {
-      return event(
-        `${who} reopened the issue: ${value.slice("Reopened: ".length)}`,
-      );
-    }
-    if (/^\d+ minutes awarded: /.test(value) && sameTime(award?.at, entry.at)) {
-      return event("The jury decided a time award");
-    }
-    return { kind: "message", entry, mine: entry.actor === userId };
+    const event = workflowEvent(entry, context);
+    if (!event) return { kind: "message", entry, mine: entry.actor === userId };
+    return { kind: "event", entry, text: eventText(event, who) };
   });
+}
+
+/** The sentence that the report timeline shows for a workflow event. */
+function eventText(event: WorkflowEvent, who: string): string {
+  switch (event.kind) {
+    case "submitted":
+      return `${who} sent the report`;
+    case "claimed":
+      return `${who} took the report`;
+    case "handoff":
+      return `${who} asked a specialist for help`;
+    case "accepted":
+      return `${who} took over as specialist`;
+    case "image-added":
+      return `${who} added an image`;
+    case "image-removed":
+      return `${who} removed an image`;
+    case "applied":
+      return "The time award was applied to your contest time";
+    case "resolved":
+      return `${who} resolved the issue`;
+    case "reopened":
+      return `${who} reopened the issue: ${event.reason}`;
+    case "awarded":
+      return "The jury decided a time award";
+  }
 }
 
 /** The first word of a name, for a friendly headline. */
@@ -223,15 +206,6 @@ export function trackerSteps(
   ];
   const current = steps.findIndex((step) => !step.done);
   return steps.map((step, index) => ({ ...step, current: index === current }));
-}
-
-/** A short age such as "now", "9m ago" or "2h 5m ago". */
-export function relativeAge(value: string, now: number): string {
-  const minutes = Math.floor(Math.max(0, now - Date.parse(value)) / 60000);
-  if (minutes < 1) return "now";
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  return `${hours}h ${minutes % 60}m ago`;
 }
 
 /** Why the team cannot send a report now, or undefined when it can. */

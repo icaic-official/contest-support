@@ -4,7 +4,6 @@ import {
   conversation,
   issueHeadline,
   publicHistory,
-  relativeAge,
   reportBlocker,
   teamImages,
   teamIssues,
@@ -284,14 +283,5 @@ describe("reportBlocker", () => {
     expect(
       reportBlocker({ session, event: { ...event, archived: true } }),
     ).toBe("This event is archived. Records are read only.");
-  });
-});
-
-describe("relativeAge", () => {
-  it("formats minutes and hours", () => {
-    const start = "2026-10-17T10:00:00Z";
-    expect(relativeAge(start, Date.parse("2026-10-17T10:00:30Z"))).toBe("now");
-    expect(relativeAge(start, Date.parse("2026-10-17T10:09:00Z"))).toBe("9m ago");
-    expect(relativeAge(start, Date.parse("2026-10-17T12:05:00Z"))).toBe("2h 5m ago");
   });
 });

@@ -1,5 +1,6 @@
 import { useId, useState } from "react";
 import {
+  Camera,
   CheckCheck,
   ChevronLeft,
   ChevronRight,
@@ -7,18 +8,24 @@ import {
   Hand,
   KeyRound,
   LogOut,
-  Monitor,
-  Moon,
   Search,
-  Sun,
+  Trash2,
 } from "lucide-react";
+import { themeOptions } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { accountName } from "@/connected/accountModel";
+import {
+  changePictureButtonId,
+  useAvatarEditor,
+} from "@/connected/hooks/useAvatarEditor";
 import type { WorkflowState } from "@/connected/hooks/useWorkflowState";
 import type { Issue, Membership, Snapshot } from "@/connected/model";
+import { PictureEditor } from "@/connected/PictureEditor";
 import type { ShellProps } from "@/connected/shell";
 import { searchTeams, unresolvedCount } from "@/connected/teamSearch";
-import { type ThemePreference, useTheme } from "@/lib/theme";
+import { documentationUrl } from "@/lib/links";
+import { useTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 import {
   AwardEvidence,
@@ -487,16 +494,6 @@ export function AwardsTab(props: PhoneTabProps) {
   );
 }
 
-const themeOptions: readonly {
-  value: ThemePreference;
-  label: string;
-  icon: typeof Sun;
-}[] = [
-  { value: "system", label: "Device", icon: Monitor },
-  { value: "light", label: "Light", icon: Sun },
-  { value: "dark", label: "Dark", icon: Moon },
-];
-
 /**
  * The person, their roles, the session switcher when they have several
  * sessions, password change, appearance and sign-out.
@@ -506,18 +503,18 @@ export function MeTab(props: PhoneTabProps & { onSessionChange: () => void }) {
   const { user, username, data } = shell;
   const id = useId();
   const theme = useTheme();
-  const name =
-    state.members.find((item) => item.person.id === user.id)?.person.name ??
-    user.name ??
-    username ??
-    user.email ??
-    "Your account";
+  const picture = useAvatarEditor();
+  const name = accountName(state, user, username);
   const rowClass =
     "flex min-h-12 w-full items-center gap-3 p-3 text-left text-[15px] focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none";
   return (
     <div className="space-y-5">
       <div className="flex items-center gap-4 p-1">
-        <PersonAvatar name={name} className="size-14 text-base" />
+        <PersonAvatar
+          name={name}
+          personId={user.id}
+          className="size-14 text-base"
+        />
         <div className="min-w-0">
           <div className="truncate text-lg font-semibold">{name}</div>
           <div className="text-sm text-muted-foreground">
@@ -528,6 +525,7 @@ export function MeTab(props: PhoneTabProps & { onSessionChange: () => void }) {
           </div>
         </div>
       </div>
+      <PictureEditor picture={picture} />
       <section aria-labelledby={`${id}-session`} className="space-y-2">
         <h2
           id={`${id}-session`}
@@ -565,6 +563,32 @@ export function MeTab(props: PhoneTabProps & { onSessionChange: () => void }) {
         )}
       </section>
       <div className="divide-y rounded-xl border bg-card">
+        <button
+          id={changePictureButtonId}
+          type="button"
+          className={rowClass}
+          disabled={picture.busy}
+          onClick={picture.pick}
+        >
+          <Camera aria-hidden="true" className="size-4 text-muted-foreground" />
+          <span className="flex-1">
+            Change picture
+            <span className="block text-xs text-muted-foreground">
+              Saving removes any location or camera data from the photo.
+            </span>
+          </span>
+        </button>
+        {picture.hasPicture && (
+          <button
+            type="button"
+            className={rowClass}
+            disabled={picture.busy}
+            onClick={picture.askRemove}
+          >
+            <Trash2 aria-hidden="true" className="size-4 text-muted-foreground" />
+            <span className="flex-1">Remove picture</span>
+          </button>
+        )}
         <button type="button" className={rowClass} onClick={shell.changePassword}>
           <KeyRound aria-hidden="true" className="size-4 text-muted-foreground" />
           <span className="flex-1">Change password</span>
@@ -601,7 +625,7 @@ export function MeTab(props: PhoneTabProps & { onSessionChange: () => void }) {
         </fieldset>
         <a
           className={rowClass}
-          href="https://minsky-docs.icaic-minsky.workers.dev"
+          href={documentationUrl}
           target="_blank"
           rel="noopener noreferrer"
         >

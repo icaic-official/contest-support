@@ -60,7 +60,7 @@ The removal is a follow-up. Before you remove a rule, check the preview page in 
 ## Backend access
 
 The frontend does not call Supabase directly.
-Hooks, `SignIn`, `PasswordForm`, `useSessionAdmin` and `useIssueImages` call `requireBackend()` from `src/backend/index.ts`.
+Hooks, `SignIn`, `PasswordForm`, `useSessionAdmin`, `useIssueImages` and `AvatarProvider` call `requireBackend()` from `src/backend/index.ts`.
 That function returns the `Backend` from `src/backend/contracts.ts`, or it throws the setup message when `.env.local` has no public connection settings.
 The implementations are in `src/backend/supabase/` and `src/backend/cloudflare/`. See [backend contracts](backend-contracts.md).
 
@@ -72,7 +72,7 @@ These steps occur in sequence:
 2. Without a user, it shows `SignIn` (`src/screens/SignIn.tsx`).
 3. `useAccountStatus` checks the account every 10 seconds and on window focus.
    If the password is temporary, `PasswordForm` (`src/screens/PasswordForm.tsx`) shows. The database also enforces this change.
-4. `Workspace` (`src/connected/Workspace.tsx`) loads session data with `useSessionSnapshot` and selects the UI with `uiKindFor` from `model.ts`:
+4. `Workspace` (`src/connected/Workspace.tsx`) loads session data with `useSessionSnapshot`. It wraps the UI in `AvatarProvider`, which loads [profile pictures](#profile-pictures). It selects the UI with `uiKindFor` from `model.ts`:
    - A membership with `team_id` gets `ContestantApp` (`src/contestant/ContestantApp.tsx`).
    - Every other membership gets `OrganiserApp` (`src/organiser/OrganiserApp.tsx`).
 5. `OrganiserApp` uses `useMediaQuery(organiserDesktopQuery)`. At 1024 px and wider it shows `OrganiserDesktopConsole`. Below 1024 px it shows `OrganiserPhoneApp`.
@@ -100,14 +100,14 @@ The same authorized snapshot selects the interface and checks route access.
 | `/administration` | Phone **Session** or desktop **Overview** for a current session administrator. |
 | `/administration/accounts` | Account administration for a current session administrator. |
 | `/administration/settings` | Session settings for a current session administrator. |
-| `/account` | Phone **Me**, desktop **My account**, or the contestant's account details. |
+| `/account` | Phone **Me**, or the **My account** settings page in the desktop console and the contestant app. `/account#security` opens the **Security** section and focuses **Current password**. |
 
 Navigation controls update the address and browser history.
 Direct paths remain through sign-in and required password changes.
 Reload retains the section and reads current session data.
 A full reload discards unsent drafts, queue filters, and uncertain requests.
 Browser Back and Forward restore the section.
-A voluntary password change opens from `/account`. Completion and cancellation retain that path.
+The desktop console and the contestant app change the password in place, in the **Security** section of `/account`. The phone **Me** tab opens a full-screen form instead. Completion and cancellation of that form retain `/account`.
 
 Route checks wait for a loaded snapshot with current membership.
 An unavailable section returns to `/issues`.
@@ -140,7 +140,7 @@ Each shell receives `ShellProps` from `src/connected/shell.ts`:
 | `user` | The `AccountIdentity` from `src/backend/contracts.ts`: `id`, with optional `email` and `name`. |
 | `username` | The organizer-assigned username, or `null` for an older email login. |
 | `data` | The `SessionData` from `useSessionSnapshot`. |
-| `changePassword()` | Opens the voluntary password change screen. |
+| `changePassword()` | Opens the full-screen password change. Only the phone **Me** tab uses it. The console and the contestant app change the password on the account page. |
 | `signOut()` | Signs out. |
 
 Each shell calls `useWorkflowState(data)` once. It calls it above any layout switch.
@@ -148,7 +148,7 @@ Thus a pending request and the selected issue stay the same when the viewport ch
 
 ## Data hooks
 
-All hooks are in `src/connected/hooks/`.
+All hooks are in `src/connected/hooks/`, except `useAvatarUrl` and `useAvatarActions`, which are in `src/connected/Avatars.tsx`.
 They share session data and workflow requests across the layouts.
 They call the `Backend` contracts through `requireBackend()`.
 
@@ -159,6 +159,7 @@ They call the `Backend` contracts through `requireBackend()`.
 | `useSessionSnapshot(userId)` | Loads memberships, the session list and the selected snapshot. Reads run in sequence. A generation counter discards responses for an earlier session. It refreshes on Realtime changes, every 10 seconds, on focus and when the browser is online again. It clears the snapshot after an error. It records the server clock offset. |
 | `useCommand({ sessionId, refresh, onRecorded })` | Runs one workflow command at a time. It uses the actor-bound request from `WorkflowRetryProvider`. An explicit retry retains the original session, request ID, and command. `onSuccess` clears the originating form before refresh while that form remains mounted. |
 | `useWorkflowState(data)` | Combines `useCommand` with the selected issue and the status filter. A recorded command selects its issue when the person did not choose an issue while it ran. An inline queue action does not select its issue. A reopened issue sets the filter to `claimed`. |
+| `useAvatarEditor()` | The steps of changing the caller's own profile picture: choose, preview, save and remove. See [Profile pictures](#profile-pictures). |
 | `useTeamSelection(sessionId, snapshot)` | Holds the team-search choice. A session change clears it. A snapshot without that team, or without staff access, also clears it. |
 | `useNow(clockOffset)` | Returns the server-adjusted time every second for live timers. |
 | `useMediaQuery(query)` | Returns whether a CSS media query matches. |
@@ -175,8 +176,8 @@ Use these values in every UI so that the text stays the same.
 
 | File | Content |
 | --- | --- |
-| `ContestantApp.tsx` | The shell. It holds the selected report, the open report form and the drafts of reports, replies and reopen reasons. Navigation moves focus to the main heading. Errors and **Retry last request** show at the top of the report area and stay in view during scrolling. |
-| `ContestantTopBar.tsx` | Event, session (a session menu when the team has more than one session), **Live** or **Reconnecting**, theme menu and the account menu with **Change password** and **Sign out**. |
+| `ContestantApp.tsx` | The shell. It holds the selected report, the open report form and the drafts of reports, replies and reopen reasons. Navigation moves focus to the main heading. Errors and **Retry last request** show at the top of the report area and stay in view during scrolling. On `/account` it shows the [account page](#account-page) in a scroll container of its own, under the top bar. |
+| `ContestantTopBar.tsx` | Event, session (a session menu when the team has more than one session), **Live** or **Reconnecting**, theme menu and the account menu with **My account**, **Change password** and **Sign out**. **Change password** opens `/account#security`. |
 | `ReportList.tsx` | The team's reports, newest first, with a status badge, timer, number, category and age. |
 | `IssuePage.tsx` | The headline, report, unresolved timer, tracker, resolution cards, reopen form, award card, messages, images and the reply box. |
 | `ReportForm.tsx` | Category tiles with one generic icon, the description (up to 2,000 characters) and the team's location. |
@@ -185,7 +186,7 @@ Use these values in every UI so that the text stays the same.
 These rules apply:
 
 - The contestant UI shows only public history and images with team visibility. The server already omits internal notes and staff-only images for team accounts. `publicHistory()` and `teamImages()` filter them a second time.
-- The history table has no type column. `conversation()` identifies workflow events by their fixed text, or by the timestamp of the related record when the text contains free input. All other entries show as chat messages.
+- The history table has no type column. `workflowEvent()` in `src/connected/historyEvents.ts` identifies workflow events by their fixed text, or by the timestamp of the related record when the text contains free input. `conversation()` shows all other entries as chat messages. The account page uses the same rule to count messages.
 - The timer uses `unresolvedTime()` from `model.ts`. It stops on resolution and continues on reopening. Resolved intervals are not counted.
 - **Report an issue** is disabled with a reason when contestant intake is closed or the event is archived. Reply and reopen are not available in an archived event.
 - The reply box sends with Enter and adds a line with Shift+Enter. The draft is cleared only when the server records the message, also after **Retry last request** (T0012).
@@ -199,7 +200,7 @@ These rules apply:
 | --- | --- |
 | `OrganiserPhoneApp.tsx` | The shell. It holds the tab, the open issue, the report sheet and the reply drafts. The drafts stay in memory while the snapshot is missing. |
 | `PhoneParts.tsx` | Tab bar, tab header with **Live** or **Reconnecting** and the intake state, the status banners and the queue card. |
-| `PhoneTabs.tsx` | The Queue, Mine, Find, Awards and Me tabs. |
+| `PhoneTabs.tsx` | The Queue, Mine, Find, Awards and Me tabs. The Me tab has the [profile picture](#profile-pictures) controls. |
 | `PhoneSessionTab.tsx` | The Session tab for admins. It puts the admin parts from `src/organiser/admin/` on one page, with one sheet for a new account or one account. |
 | `PhoneIssueView.tsx` | The full-screen issue view with the bottom action bar and its sheets. |
 
@@ -253,7 +254,7 @@ It uses the same hooks, rules and forms as the phone app. It adds no workflow ru
 | File | Content |
 | --- | --- |
 | `OrganiserDesktopConsole.tsx` | The shell. It holds the page, the sidebar state, the sheet tab, the command palette, the report dialog, the queue team filter and the reply drafts. These stay in memory while the snapshot is missing. It also handles ⌘K or Ctrl+K and the J and K keys. |
-| `ConsoleChrome.tsx` | `ConsoleSidebar` (session switcher, pages by role, intake switch for admins, person menu with **Change password**, **Documentation** and **Sign out**), `ConsoleTopBar` (sidebar button, breadcrumb, palette button, **Live** or **Reconnecting**, theme menu) and `CommandPalette`. |
+| `ConsoleChrome.tsx` | `ConsoleSidebar` (session switcher, pages by role, intake switch for admins, and the person card that opens `/account`), `ConsoleTopBar` (sidebar button, breadcrumb, palette button, **Live** or **Reconnecting**, theme menu) and `CommandPalette`. |
 | `QueuePages.tsx` | `QueuePage` (status cards, status tabs with counts, T0008 team filter, issue table), `MinePage`, `HandoffsPage`, `TeamsPage` and the shared `PageHeader`. |
 | `IssueTable.tsx` | `IssueTable` (number, status with icon and label, report and category, team and location, owner, aging timer, **Claim** or **Accept**) and `StatCards`. |
 | `IssueSheet.tsx` | The issue side sheet: timer cards, owner, lifecycle steps with times, handoff banner, actions, the Activity, Images and Outcome & award tabs and the reply composer. |
@@ -284,6 +285,69 @@ These rules apply:
 - The command palette finds issues by number (`31`, `#31`, `ISS-31`) or by report text from three characters, teams and tables with the T0008 search, pages and actions. A team opens the queue with that team filter. A jury-only member goes to Teams & tables instead.
 - The intake switch in the sidebar and the admin pages share one `useSessionAdmin`, so one admin request runs at a time. Admin errors and notices show at the top of the page and in the open dialog.
 - The sidebar choice (expanded or collapsed) is kept in local storage under `minsky:console-sidebar`.
+
+## Account page
+
+`AccountPage` is the settings page at `/account` for the signed-in person in the selected session.
+The desktop console and the contestant app both render it. The caller provides the scroll container and the page padding.
+The phone app keeps its own **Me** tab.
+
+| File | Content |
+| --- | --- |
+| `src/connected/AccountPage.tsx` | The page header (avatar, name or team name, login, role badges and **Sign out**), the section nav, and the focus rules for `#section` addresses. It also exports `useOpenPasswordChange()`. |
+| `src/connected/AccountSections.tsx` | One component for each section: Profile, Access, Sessions, Security, Appearance, Activity and Help. |
+| `src/connected/accountModel.ts` | Pure rules: `accountKind()`, the role descriptions in `capabilityInfo`, the section list `accountSections`, `accountName()` and `accountActivity()`. `accountModel.test.ts` tests them. |
+| `src/connected/historyEvents.ts` | `workflowEvent()`, which tells a workflow step from a message that a person wrote. |
+| `src/screens/PasswordForm.tsx` | `PasswordChangeForm`, the password fields and their checks. The full-screen `PasswordForm` and the Security section both use it. |
+| `src/lib/links.ts` | `documentationUrl`, the one address of the published guides. |
+| `src/components/theme-toggle.tsx` | `themeOptions`, the one list of theme choices for every theme picker. |
+
+These rules apply:
+
+- The page shows only data that the account and the session snapshot already hold. It changes no profile data except the [picture](#profile-pictures). The name, the username and the account ID cannot be edited.
+- `accountSections` gives the section order and the section nav. A team account has no staff roles. Its **Access** section describes what a team account can do. It shows no role badges and no link to **Accounts**.
+- A session admin sees **Manage session accounts**. The link goes to `/administration/accounts`. The backend still checks every request.
+- **Sessions** lists the sessions that the account can open. **Switch** is disabled while a workflow command runs. After the switch, the caller clears its own selection. The console passes `changeSession`. The contestant app passes `resetForSession`.
+- **Security** changes the password in place. On success the fields clear and a status message shows. The person stays on `/account` and stays signed in. The Supabase adapter keeps the current session. The Cloudflare adapter replaces the login cookie and checks the new session. Thus the page does not check the account status again.
+- An address with a fragment, such as `/account#security`, names a place inside the page. `useRouteFocus` then leaves focus to the page. `useSectionFocus` focuses and scrolls to the section. A router state from `focusRequest()` picks one control inside it. `useOpenPasswordChange()` uses this for **Change password** in the command palette and the contestant menu. It also works when the person is already on `/account`.
+- **Activity** counts open work, resolutions and messages from the snapshot that the person can see. For staff, open work means unresolved issues that the person owns. For a team account, it means unresolved team issues. The list shows the five newest replies, internal notes and resolutions of this person. A team account never sees internal notes.
+- The layout follows the width of the page, not of the window. The section nav stands beside the sections from 768 px of page width.
+
+## Profile pictures
+
+A picture belongs to an account, not to a session. The visibility rule is in [Avatars](backend-contracts.md#avatars). The server enforces it. The frontend shows what the server returns.
+
+`Workspace` wraps both apps in `AvatarProvider`. The provider reads the pictures that the caller can see in the selected session and keeps one downloaded copy of each.
+
+| File | Content |
+| --- | --- |
+| `src/connected/Avatars.tsx` | `AvatarProvider`, `useAvatarUrl(personId)` and `useAvatarActions()`. |
+| `src/connected/avatarImages.ts` | `avatarMap()`, which maps each person ID to a picture, and `AvatarImageCache`. Neither uses React. `avatarImages.test.ts` tests them. |
+| `src/connected/avatarPicture.ts` | Pure rules: the centered square, the encodings to try, the editor states and the state after a failed upload. `avatarPicture.test.ts` tests them. |
+| `src/connected/imageUpload.ts` | `avatarBlob()`, which crops and encodes a chosen file in the browser. |
+| `src/connected/hooks/useAvatarEditor.ts` | The editor state and its steps. |
+| `src/connected/PictureEditor.tsx` | The file input, the preview dialog, the removal question, the status line and the alert. |
+
+These rules apply:
+
+- The provider calls `avatars.list(sessionId)` when the session or `SessionData.updates` changes, and every 10 seconds. A picture change sends no live signal, so the poll shows the change of another person. A failed read keeps the earlier list. A session change or lost access drops the list. An unchanged list keeps the same map object, so the avatars do not render again.
+- Only the newest read or change sets the list. An upload and a removal set the list themselves. A read that started earlier then cannot bring back the old picture.
+- `PersonAvatar` takes an optional `personId`. It shows the picture through `useAvatarUrl`, and it shows initials when the person has no picture, when the caller cannot see it, or when the browser cannot decode it. The picture has an empty `alt`, because the name stands next to it. A call site that has no person ID shows initials.
+- `AvatarImageCache` downloads a picture when the first avatar on screen asks for it. Every other avatar of that picture shares its object URL. The avatar ID is the cache key. It changes on every upload, so a cached picture never goes stale. The cache revokes the URL of a picture that left the list, and all URLs when the session changes or the provider unmounts. After an upload the cache holds the encoded file, so the new picture needs no download.
+- Pictures show in the account page header and **Profile** section, the console sidebar card, the phone **Me** tab, the issue owner in the queue table, the phone queue cards and the issue owner card, the activity entries, and the administration account lists and owner workload. The contestant app shows the picture of the team account on its account page only. The server never returns staff pictures to a team account. The top bar menu of the contestant app shows initials.
+- An avatar belongs to the account, so the controls work in an archived event too.
+
+The steps of a change are in `useAvatarEditor`. The state is one of `idle`, `preparing`, `preview`, `uploading`, `confirmRemoval` and `removing`.
+
+1. **Change picture** opens the file picker. It is in the **Profile** section, on the header avatar and in the phone **Me** tab. The input accepts JPEG, PNG and WebP.
+2. The browser checks the file with `checkImageFile`: the signature, a size of up to 2 MB and a successful decode. A failure shows an alert.
+3. `avatarBlob` crops the middle square and encodes it as a JPEG of at most 512 by 512 pixels. It lowers the quality and then the size until the file fits `AVATAR_MAX_BYTES`. It fills the canvas with white first, because JPEG has no transparency. Decoding follows the EXIF orientation. The canvas keeps no metadata, so the new file has no EXIF or location data.
+4. A dialog shows the encoded square and how it looks as a circle. **Save picture** uploads it.
+5. Each chosen file gets one request ID. After an unknown outcome, such as a lost response, **Try again** sends the same bytes with the same ID, so the server stores one picture. A rejected or expired upload ends the attempt. The person then chooses the file again.
+6. A success shows the toast "Profile picture updated." and shows the new picture at once.
+7. **Remove picture** asks first. A success shows the toast "Profile picture removed." and returns to initials.
+
+Controls are disabled while a step runs. After each step, focus returns to the control that began it. After a removal it goes to **Change picture**, because the **Remove picture** button is gone.
 
 ## Jury award lists
 
@@ -328,3 +392,76 @@ npx playwright install chromium
 ```
 
 `npm run build` reports a warning: the main JavaScript chunk is about 511 kB, above the 500 kB warning limit. The build still passes. Code splitting is a follow-up.
+
+## Motion
+
+This section is a reference for the motion of the frontend and the rules for new motion.
+Every timing and the reduced-motion rule are in `src/index.css`.
+
+### Timing tokens
+
+| Token | Value | Use |
+| --- | --- | --- |
+| `--motion-fast` | 120 ms | Press feedback, exits, panel fades. |
+| `--motion-base` | 180 ms | Tab indicators, color changes, overlays, dialog entry, side sheet exit. |
+| `--motion-slow` | 250 ms | Side sheet entry. This is the longest transition. |
+| `--motion-highlight` | 1400 ms | The fade of a row that a live update changed. It is not a transition. The person must have time to see it. |
+
+Write a duration as `duration-(--motion-base)` with Tailwind's `ease-out` curve.
+Do not write a millisecond value in a component.
+
+### Reduced motion
+
+One `@media (prefers-reduced-motion: reduce)` rule in `src/index.css` sets every animation and transition to 0.01 ms and one iteration.
+It covers Tailwind transitions, tw-animate-css, Radix, vaul and the pulsing dots.
+The duration is not zero and the rule does not set `animation: none`. `animationend` still fires, so Radix removes a closing dialog.
+Do not add a reduced-motion class to a component. Do not start a motion with `element.animate()`, because the rule does not cover it.
+
+### Sliding indicator
+
+`SlidingIndicator` in `src/components/ui/sliding-indicator.tsx` is a decorative marker behind the active item of its parent.
+Render it as the first child of a container with `relative isolate`.
+The active item is the first descendant with `data-state="active"` or `data-state="on"`, `aria-selected="true"`, `aria-pressed="true"` or `aria-current="page"`.
+The component reads these attributes. It adds no role or attribute to the active item, so it works with Radix and with plain buttons.
+
+These rules apply:
+
+- The marker slides only when another item becomes active. A resize, a new font or a new count inside a tab moves it without animation.
+- The first placement does not animate.
+- The marker uses `offsetLeft`, `offsetTop`, `offsetWidth` and `offsetHeight`. A parent that scales in, such as a dialog, does not move it.
+- A `ResizeObserver` watches the container and each item. A `MutationObserver` watches the active attributes and the list of items.
+- The marker is `aria-hidden` and has `data-slot="sliding-indicator"`.
+
+Six places use it:
+
+| Place | Style |
+| --- | --- |
+| `TabsList` with the default variant in `src/components/ui/tabs.tsx` | The white pill (`pillIndicator`). No screen uses this variant yet. |
+| `TabsList` with the `line` variant, used by the tabs of the desktop issue sheet | A 2 px underline. |
+| The status filter of the desktop queue in `QueuePages.tsx` | The same pill. The filter keeps `role="group"` and `aria-pressed`. |
+| The award list switch of the desktop **Award review** page | The same pill. |
+| The audience switch of `ReplyForm` in `IssueForms.tsx` | The pill turns amber for **Internal note**. The labels carry `data-state="on"`, because radio buttons have no attribute for the checked item. |
+| The tab bar of the phone app in `PhoneParts.tsx` | A 3 px bar along the top edge. |
+
+`TabsContent` fades in over `--motion-fast` when its tab becomes active.
+
+### Highlight of live updates
+
+`IssueTable` highlights a row that a live update added or changed.
+`changedIssueIds()` in `organiserModel.ts` compares two issue lists by id, status and revision.
+`useChangedIssues()` in `src/organiser/useChangedIssues.ts` applies it to the whole session list, not to the filtered rows.
+A change of status tab, team filter or page highlights nothing. The first list of a session highlights nothing.
+A reply, a claim or a resolution that the person made also raises the revision, so it highlights the row.
+The row has `data-changed` and the `animate-row-flash` utility. The phone queue does not use the hook yet.
+
+The hook keeps the time at which each highlight began. `recentChanges()` drops entries older than `--motion-highlight` at each update, so ids from earlier updates never pile up.
+The page clock `now` advances once each second, so a row keeps `data-changed` for up to two seconds.
+A row that changes again during its highlight does not start the highlight again.
+A row that mounts during that time, for example after a change of status tab, shows the tint again.
+
+### Rules for new motion
+
+- Animate transform, opacity and color. Do not animate the layout of a list.
+- Do not delay input or focus.
+- Do not move text that a person can be reading. Fade it instead.
+- Keep a transition at 250 ms or less.

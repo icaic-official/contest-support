@@ -12,6 +12,10 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  pillIndicator,
+  SlidingIndicator,
+} from "@/components/ui/sliding-indicator";
 import { Textarea } from "@/components/ui/textarea";
 import type { CommandRunner } from "@/connected/hooks/useCommand";
 import { awardMinutePresets, resolutionPresets } from "@/connected/labels";
@@ -110,11 +114,18 @@ export function ReplyForm({
     <fieldset className={cn(composer && "shrink-0")}>
       <legend className="sr-only">Audience</legend>
       <div
+        data-audience={draft.visibility}
         className={cn(
-          "grid grid-cols-2 gap-1 rounded-lg bg-muted p-1",
+          "group/audience relative isolate grid grid-cols-2 gap-1 rounded-lg bg-muted p-1",
           composer && "gap-0.5",
         )}
       >
+        <SlidingIndicator
+          className={cn(
+            pillIndicator,
+            "group-data-[audience=internal]/audience:bg-amber-500",
+          )}
+        />
         {(
           [
             ["public", composer ? "Public reply" : "To the team", Eye],
@@ -123,13 +134,11 @@ export function ReplyForm({
         ).map(([value, label, Icon]) => (
           <label
             key={value}
+            data-state={draft.visibility === value ? "on" : "off"}
             className={cn(
-              "flex cursor-pointer items-center justify-center gap-1.5 rounded-md text-sm font-medium has-[:focus-visible]:ring-[3px] has-[:focus-visible]:ring-ring/50",
+              "flex cursor-pointer items-center justify-center gap-1.5 rounded-md text-sm font-medium transition-colors duration-(--motion-base) ease-out has-[:focus-visible]:ring-[3px] has-[:focus-visible]:ring-ring/50",
               composer ? "h-9 px-3" : "h-11",
-              draft.visibility === value &&
-                (value === "internal"
-                  ? "bg-amber-500 text-white"
-                  : "bg-background shadow-sm"),
+              draft.visibility === value && value === "internal" && "text-white",
             )}
           >
             <input

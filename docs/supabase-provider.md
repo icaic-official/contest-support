@@ -73,17 +73,18 @@ npm run cloud:plan
 npm run cloud:migrate
 ```
 
-Migrations create the schema, policies, and the private `issue-attachments` Storage bucket. They add no seed data.
+Migrations create the schema, policies, and the private Storage buckets `issue-attachments`, `announcement-images`, and `person-avatars`. They add no seed data.
 Apply migrations before you deploy functions that depend on them.
 
 ## Deploy the functions
 
-Deploy the three functions that the browser uses:
+Deploy the four functions that the browser uses:
 
 ```sh
 npx supabase functions deploy admin --project-ref <your-project-ref> --use-api
 npx supabase functions deploy attachments --project-ref <your-project-ref> --use-api
 npx supabase functions deploy announcement-images --project-ref <your-project-ref> --use-api
+npx supabase functions deploy avatars --project-ref <your-project-ref> --use-api
 ```
 
 The `workflow` function is the opt-in server path for workflow commands. The default browser path does not use it.
@@ -210,8 +211,8 @@ npm run build
 Expect each command to exit with code zero. `npm run ci` runs all of them.
 
 - `npm test` runs the migrations and policies in embedded PostgreSQL, with stubs for Auth context, sessions, and password hashes. It does not prove managed Auth behavior.
-- `npm run check:functions` type-checks the four functions with Deno.
-- `npm run test:functions` tests the attachment and announcement image handlers with fake Auth, database, and Storage clients.
+- `npm run check:functions` type-checks the five functions with Deno.
+- `npm run test:functions` tests the attachment, announcement image, and avatar handlers with fake Auth, database, and Storage clients.
 - `npm run test:e2e` runs the browser tests against mocked Supabase responses. Install Chromium first with `npx playwright install chromium`.
 
 ## Run the hosted checks on your test project
@@ -219,7 +220,7 @@ Expect each command to exit with code zero. `npm run ci` runs all of them.
 These commands create real temporary accounts and records in a Supabase project. Run them only against your separate test project.
 They are manual commands. `npm run ci` does not run them.
 
-Prepare the test project with this guide: link it, apply the settings and migrations, deploy all four functions, and allow origin `http://127.0.0.1:4174`. You do not need to make a first admin.
+Prepare the test project with this guide: link it, apply the settings and migrations, deploy all five functions, and allow origin `http://127.0.0.1:4174`. You do not need to make a first admin.
 
 Set these values in your private shell only:
 
@@ -268,6 +269,16 @@ Other members cannot see that record. New removal requests stop after archival.
 
 The Supabase Free plan includes 1 GB of file storage. At the default 120 MB issue total, about eight full issues use 1 GB.
 A free plan does not establish capacity for a live contest. See [Supabase pricing](https://supabase.com/pricing).
+
+## Profile pictures
+
+Migration `202610250001_person_avatars.sql` creates the private Storage bucket `person-avatars`.
+It accepts JPEG, PNG, and WebP files up to 256 KB (262,144 bytes). Each object is `{person}/{avatar}`.
+The `avatars` function is the only writer. Deploy it before a frontend that uses profile pictures.
+
+The adapter has no scheduled cleanup. Each upload and each removal deletes the caller's replaced and expired files, then confirms the deletion in the database.
+If a deletion fails, the next upload or removal by the same person tries again. Until then, the file stays in the bucket, and nobody can read it.
+An abandoned upload expires after 15 minutes. Its file stays until the same person uploads or removes a picture again.
 
 ## Update an installation
 

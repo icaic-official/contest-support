@@ -99,7 +99,7 @@ beforeAll(async () => {
 beforeEach(async () => {
   await db.exec("reset role");
   await db.exec(
-    "truncate public.attachments,public.admin_audit,public.history,public.awards,public.resolutions,public.issues,public.changes,public.staff_changes,app_private.receipts,public.announcements,public.memberships,storage.objects cascade",
+    "truncate public.attachments,public.admin_audit,public.history,public.awards,public.resolutions,public.issues,public.changes,public.staff_changes,app_private.receipts,public.announcements,public.person_avatars,public.memberships,storage.objects cascade",
   );
   await db.exec("truncate app_private.account_credentials,auth.sessions");
   await db.query("update public.people set username=null");
@@ -1290,5 +1290,137 @@ describe("session announcements", () => {
     const pending = await reserve(await announce(publishAction()));
     await actor(jury);
     await expect(db.query("select public.remove_announcement_image($1,$2)", [session, pending.id])).rejects.toThrow("Image unavailable");
+  });
+});
+
+describe("person avatars", () => {
+  const digest = "b".repeat(64);
+  type Avatar = { person_id: string; avatar_id: string };
+  async function begin(bytes = 12, requestId = id(++request + 3000), type = "image/png") {
+    return (await db.query<{ started: { id: string; status: string; path: string } }>(
+      "select public.begin_avatar($1,$2,$3,$4) as started",
+      [requestId, bytes, type, digest],
+    )).rows[0].started;
+  }
+  async function store(path: string, size = 12) {
+    await db.exec("reset role");
+    await db.query(
+      "insert into storage.objects(bucket_id,name,metadata) values('person-avatars',$1,$2::jsonb)",
+      [path, JSON.stringify({ size, mimetype: "image/png" })],
+    );
+  }
+  async function complete(avatarId: string) {
+    return (await db.query<{ finished: { status: string; cleanup: string[] } }>(
+      "select public.complete_avatar($1) as finished",
+      [avatarId],
+    )).rows[0].finished;
+  }
+  async function readyAvatar(user: string, requestId?: string) {
+    await actor(user);
+    const started = await begin(12, requestId);
+    await store(started.path);
+    await actor(user);
+    const finished = await complete(started.id);
+    return { avatar: { person_id: user, avatar_id: started.id }, path: started.path, cleanup: finished.cleanup };
+  }
+  async function list(user: string, s = session) {
+    await actor(user);
+    return (await db.query<{ avatars: Avatar[] }>("select public.avatar_list($1) as avatars", [s])).rows[0].avatars;
+  }
+  async function readable(user: string) {
+    await actor(user);
+    return (await db.query<{ name: string }>(
+      "select name from storage.objects where bucket_id='person-avatars' order by name",
+    )).rows.map((row) => row.name);
+  }
+
+  it("shows staff avatars to the session's staff and a team account only its own", async () => {
+    const volunteerAvatar = await readyAvatar(volunteer);
+    const specialistAvatar = await readyAvatar(specialist);
+    const teamAvatar = await readyAvatar(contestant);
+    const staffAvatars = [volunteerAvatar.avatar, specialistAvatar.avatar];
+    expect(await list(specialist)).toEqual(staffAvatars);
+    expect(await list(admin)).toEqual(staffAvatars);
+    expect(await list(contestant)).toEqual([teamAvatar.avatar]);
+    expect(await list(id(7))).toEqual([]);
+    expect(await readable(admin)).toEqual([volunteerAvatar.path, specialistAvatar.path].sort());
+    expect(await readable(contestant)).toEqual([teamAvatar.path]);
+    expect(await readable(id(7))).toEqual([]);
+    // The specialist has no membership in the second session. Its list there has only its own avatar.
+    expect(await list(specialist, secondSession)).toEqual([specialistAvatar.avatar]);
+    expect(await list(id(8), secondSession)).toEqual([]);
+    expect(await readable(id(8))).toEqual([]);
+    await db.exec("reset role");
+    await db.query("delete from public.memberships where session_id=$1 and user_id=$2", [session, volunteer]);
+    expect(await list(specialist)).toEqual([specialistAvatar.avatar]);
+    expect(await readable(specialist)).toEqual([specialistAvatar.path]);
+  });
+
+  it("replaces the avatar once per request ID and lists replaced files until the function confirms deletion", async () => {
+    const first = await readyAvatar(volunteer);
+    const requestId = id(3900);
+    const second = await readyAvatar(volunteer, requestId);
+    expect(second.cleanup).toEqual([first.path]);
+    expect(await list(volunteer)).toEqual([second.avatar]);
+    expect(await readable(specialist)).toEqual([second.path]);
+    await actor(volunteer);
+    expect(await begin(12, requestId)).toEqual({ id: second.avatar.avatar_id, status: "ready", path: second.path });
+    await expect(begin(13, requestId)).rejects.toMatchObject({ code: "MN422", message: expect.stringContaining("different content") });
+    await expect(db.query("select public.avatar_files_removed($1)", [[first.path]])).rejects.toThrow("permission denied");
+    await db.exec("reset role; set role service_role");
+    await db.query("select public.avatar_files_removed($1)", [[first.path]]);
+    await actor(volunteer);
+    const removed = (await db.query<{ removed: { cleanup: string[] } }>("select public.remove_avatar() as removed")).rows[0].removed;
+    expect(removed.cleanup).toEqual([second.path]);
+    expect((await db.query<{ removed: { cleanup: string[] } }>("select public.remove_avatar() as removed")).rows[0].removed.cleanup)
+      .toEqual([second.path]);
+    expect(await list(volunteer)).toEqual([]);
+    expect(await readable(volunteer)).toEqual([]);
+  });
+
+  it("denies direct table access and object writes", async () => {
+    const own = await readyAvatar(volunteer);
+    await actor(volunteer);
+    await expect(db.query("select * from public.person_avatars")).rejects.toThrow("permission denied");
+    await expect(db.query(
+      "insert into public.person_avatars(person_id,request_id,bytes,content_type,digest) values($1,$2,12,'image/png',$3)",
+      [volunteer, id(3901), digest],
+    )).rejects.toThrow("permission denied");
+    await expect(db.query(
+      "insert into storage.objects(bucket_id,name,metadata) values('person-avatars',$1,'{}'::jsonb)",
+      [`${volunteer}/${id(3902)}`],
+    )).rejects.toThrow("row-level security");
+    await expect(db.query("update storage.objects set metadata='{}'::jsonb where name=$1", [own.path])).resolves.toMatchObject({ affectedRows: 0 });
+    await db.exec("set role anon");
+    await expect(db.query("select public.avatar_list($1)", [session])).rejects.toThrow("permission denied");
+  });
+
+  it("rejects invalid files, unfinished or expired uploads, and temporary passwords", async () => {
+    await actor(volunteer);
+    await expect(begin(262145)).rejects.toMatchObject({ code: "MN422", message: expect.stringContaining("256 KB") });
+    await expect(begin(12, undefined, "image/gif")).rejects.toMatchObject({ code: "MN422" });
+    const requestId = id(3903);
+    const started = await begin(12, requestId);
+    await expect(complete(started.id)).rejects.toThrow("Upload the picture before finishing");
+    await store(started.path, 13);
+    await actor(volunteer);
+    await expect(complete(started.id)).rejects.toThrow("Upload the picture before finishing");
+    await actor(specialist);
+    await expect(complete(started.id)).rejects.toThrow("Picture unavailable");
+    await db.exec("reset role");
+    await db.query("update public.person_avatars set created_at=created_at-interval '16 minutes' where id=$1", [started.id]);
+    await actor(volunteer);
+    expect(await complete(started.id)).toEqual({ status: "expired", cleanup: [started.path] });
+    await expect(begin(12, requestId)).rejects.toMatchObject({ code: "MN410", message: expect.stringContaining("expired") });
+    expect(await list(volunteer)).toEqual([]);
+    const ready = await readyAvatar(volunteer);
+    await db.exec("reset role");
+    await db.query("select public.initialize_account($1,'avatar-volunteer')", [volunteer]);
+    await actor(volunteer);
+    await expect(begin()).rejects.toThrow("Sign in first");
+    await expect(db.query("select public.remove_avatar()")).rejects.toThrow("Sign in first");
+    expect(await list(volunteer)).toEqual([]);
+    expect(await readable(volunteer)).toEqual([]);
+    expect(await list(specialist)).toEqual([ready.avatar]);
   });
 });

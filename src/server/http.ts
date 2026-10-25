@@ -1,9 +1,9 @@
 import { AuthenticationError } from './authentication';
 
-/** Read a bounded body before JSON parsing. Do not retain request credentials. */
-export async function readJsonBody(request: Request, limit = 16_384): Promise<unknown> {
+/** Read at most `limit` bytes without trusting Content-Length. Do not retain request credentials. */
+export async function readBody(request: Request, limit: number): Promise<Uint8Array> {
   const reader = request.body?.getReader();
-  if (!reader) throw new AuthenticationError(400, 'A JSON request body is required.');
+  if (!reader) throw new AuthenticationError(400, 'A request body is required.');
   const chunks: Uint8Array[] = [];
   let size = 0;
   try {
@@ -17,17 +17,27 @@ export async function readJsonBody(request: Request, limit = 16_384): Promise<un
       }
       chunks.push(value);
     }
-    const bytes = new Uint8Array(size);
-    let offset = 0;
-    for (const chunk of chunks) {
-      bytes.set(chunk, offset);
-      offset += chunk.byteLength;
-    }
-    return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
   } catch (error) {
     if (error instanceof AuthenticationError) throw error;
-    throw new AuthenticationError(400, 'The JSON request body is invalid.');
+    throw new AuthenticationError(400, 'The request body could not be read.');
   } finally {
     reader.releaseLock();
+  }
+  const bytes = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return bytes;
+}
+
+/** Read a bounded body before JSON parsing. */
+export async function readJsonBody(request: Request, limit = 16_384): Promise<unknown> {
+  const bytes = await readBody(request, limit);
+  try {
+    return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
+  } catch {
+    throw new AuthenticationError(400, 'The JSON request body is invalid.');
   }
 }

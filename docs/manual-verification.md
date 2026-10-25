@@ -7,7 +7,7 @@ For the published site, run `MINSKY_DOCS_URL=https://minsky-docs.icaic-minsky.wo
 These checks only read documentation.
 Check a direct guide URL after refresh, search by keyboard, phone navigation, and a missing page.
 Review light and dark themes at desktop and 320px widths.
-The sign-in footer, the **Documentation** item in the desktop console account menu and the documentation link in the phone **Me** tab open the guides in a new tab.
+The sign-in footer, the **Documentation** link in the **Help** section of the account page and the documentation link in the phone **Me** tab open the guides in a new tab.
 Those links reach the development app only after its separate frontend deployment.
 
 ## Cloudflare authentication
@@ -206,11 +206,50 @@ Sign in as the same accounts.
 
 Sign in as a contestant.
 
-1. Check the top bar: event, session, **Live** or **Reconnecting**, the theme menu and the account menu with **Change password** and **Sign out**.
+1. Check the top bar: event, session, **Live** or **Reconnecting**, the theme menu and the account menu with **My account**, **Change password** and **Sign out**.
 2. Open a report. Check the headline, the live unresolved timer, the four-step tracker, the resolution cards, the award card and the messages.
 3. Select **Report an issue**. Check the category tiles, the description limit of 2,000 characters and the team location.
 4. Send a reply with Enter. Add a line with Shift+Enter.
 5. Close contestant intake as admin. Check that **Report an issue** is disabled with a reason.
+
+### Account page (1280 × 800 and 1024 × 768)
+
+Do these checks as a staff account with several roles, as a session admin, and as a contestant.
+The desktop console and the contestant app show the page. The phone app keeps its **Me** tab.
+
+1. In the console, select the person card at the bottom of the sidebar. Check that the address is `/account`, that focus is on **My account** and that the card shows the open page. Collapse the sidebar. Check that the card shows only the avatar and that a tooltip shows its name.
+2. In the contestant app, open the account menu and select **My account**. Check the same address and focus.
+3. Select each link in the section nav. Check that the page scrolls to the section and that the nav stays in view on a wide window. Check that the layout has one column below 768 px of page width and no horizontal overflow.
+4. **Profile**: check the picture, the name, the username and the account ID. Select **Copy**. Check the message and paste the ID somewhere. A team account shows its team and location. Do the checks in [Profile pictures](#profile-pictures) for the picture.
+5. **Access in this session**: check that each role has a badge and a description. Only a session admin sees **Manage session accounts**. A team account shows no role and no admin link. In an archived event, check the archived notice.
+6. **Sessions**: with two sessions, select **Switch** on the other one. Check that its data loads and that the open issue or report is cleared.
+7. **Security**: enter a wrong current password. Check the error. Enter two different new passwords. Check the message. Enter a valid change. Check the success message and the empty fields. Reload. Check that you are still signed in on `/account`. Sign out and sign in with the new password.
+8. **Appearance**: choose **Light** and **Dark**. Check that the theme changes at once and stays after a reload. Move between the options with the arrow keys.
+9. **Activity**: check the three counts against the issues of this account. Check that the recent list shows the five newest replies, internal notes and resolutions of this account only. A contestant sees no internal note.
+10. **Help**: check that **Documentation** opens the guides in a new tab and that the build ID shows.
+11. In the console, press ⌘K or Ctrl+K and run **Change password**. In the contestant app, run **Change password** in the account menu. Check that the address is `/account#security`, that **Current password** has focus and that the section is in view. Repeat while you are on `/account`.
+12. Select **Sign out** in the page header. Check that the sign-in page shows. Sign in again and select **Sign out of this device** in **Security**.
+13. Press Tab from the person card or the top bar through the page. Check that every control gets focus in reading order and that every focus ring is visible. Check the light and the dark theme.
+
+### Profile pictures
+
+Use a real phone photo and a real phone for these checks. A generated test image does not carry the camera data or the orientation flag of a phone photo.
+Do them as a staff account on the console, as a staff account on a phone, and as a contestant. The contestant app has the controls on its account page only.
+
+1. Turn on location for the phone camera. Take a photo in portrait and one in landscape. Copy them to the computer, or choose them from the phone gallery in the phone app. An iPhone saves HEIC by default, and Minsky accepts only JPEG, PNG and WebP. Export the photo as a JPEG before you copy it.
+2. Open **My account** in the console. Select **Change picture** in the **Profile** section and choose the portrait photo. Check that the preview is upright, that it shows the middle square of the photo, and that the circle shows the same part.
+3. Select **Save picture**. Check the message "Profile picture updated." Check that the new picture shows in the page header, the **Profile** section and the sidebar card at once, without a reload.
+4. Open the network panel and reload the page. Save the response of the request to `/api/avatar/` (Cloudflare) or the Storage download (Supabase adapter). Run `exiftool` on the file. Check that it has no GPS tags or camera model, that it is a JPEG of at most 512 × 512 pixels, and that it is under 256 KB.
+5. Choose the landscape photo and select **Cancel**. Check that the picture does not change and that focus returns to **Change picture**.
+6. Choose a file larger than 2 MB. Check the alert "Choose an image of up to 2 MB." and that no preview opens. Choose a text file with the name `notes.jpg`. Check the alert "Choose a JPEG, PNG, or WebP image."
+7. Choose a very detailed photo of 1 to 2 MB, such as a close photo of gravel. Check that it saves and that the stored file is under 256 KB.
+8. Choose a PNG with a transparent background. Check that the saved picture has a white background.
+9. With a second browser, sign in as another staff member of the same session. Check that the picture shows on an issue that the first account owns within 10 seconds. If that account is an admin, also check the administration account list. Sign in as a contestant. Check that no staff picture shows in any contestant screen.
+10. Select **Remove picture**. Select **Cancel** in the question. Check that the picture stays. Select **Remove picture** again and confirm. Check the message "Profile picture removed.", the initials in every place, and that focus is on **Change picture**. Check in the second browser that the initials return within 10 seconds.
+11. Turn the network off. Select **Save picture**. Check the error in the dialog and that the button reads **Try again**. Turn the network on and select **Try again**. Check that the account has one picture.
+12. In the phone app, open **Me**. Check that **Change picture** and **Remove picture** work with the phone camera and gallery, and that the page has no horizontal scroll at 390 × 844.
+13. Use only the keyboard on the console. Press Tab to **Change picture** and Enter. Choose the file. Check that **Save picture** has focus in the dialog. Press Escape and check that focus returns to **Change picture**. Repeat and press Enter to save. Press Tab to **Remove picture** and Enter, then Escape. Check that focus returns to **Remove picture**.
+14. Check the light and the dark theme, and an archived event. The controls must work in an archived event, because the picture belongs to the account.
 
 ### Refresh persistence
 
@@ -466,7 +505,7 @@ The [frontend architecture](frontend-architecture.md#browser-routes) lists paths
 1. Open `/jury` while signed out. Sign in as a jury member. Check that the award screen opens.
 2. Refresh the page. Check that the address remains `/jury` and current session data loads.
 3. Open the queue, award screen, and account screen. Use browser Back and Forward. Check each address and screen.
-4. Open **Change password**. Check cancellation and completion. Both must retain `/account`.
+4. In the phone app, open **Change password** from **Me**. Check cancellation and completion. Both must retain `/account`. In the console and the contestant app, change the password in the **Security** section. Check that the address stays `/account`.
 5. As support staff, open `/administration`. Check that the app returns to `/issues` without administration data.
 6. Remove a jury or administrator role in another isolated client. Refresh access. Check that the restricted section closes.
 7. Repeat navigation in the organiser phone layout. Check keyboard focus after a tab change and after a return from an issue.
@@ -504,3 +543,29 @@ Use two browser windows for the live checks. Run these checks after a reviewed d
     In a window about 1280 by 720 px, open **New announcement** and **Edit**. Check that every field and the **Publish** or **Save changes** button shows without scrolling inside the strip.
 13. Archive the event. Check that announcements stay readable and every management control disappears.
 14. Repeat the checks on a Supabase build when you run the adapter on your own project.
+
+## 16. Motion and reduced motion
+
+Run these checks in a window of 1280 by 800 px, in the light and dark themes.
+Run the phone checks at 390 by 844 px.
+Use a development or test session with staff and contestant accounts.
+
+1. Open the issue queue in the desktop console. Select each status tab with the mouse.
+   Check that the white pill slides and resizes to the selected tab, with no jump.
+2. Reload the page. Check that the pill is already under **Active** and does not slide in from a corner.
+3. Press Tab until a status tab has focus. Press Space.
+   Check that the pill follows, the tab keeps `aria-pressed` and the focus ring is visible.
+4. Select a team in **Find a team**, then select **Resolved**. Check that the empty state offers **Show active issues**.
+   Select it. Check that the team filter clears, **Active** is selected and focus is on the **Active** tab.
+5. Open an issue. Press the right and left arrow keys on the sheet tabs.
+   Check that the selection moves, the underline slides with it and the panel fades in.
+   Select **Internal note** and **Public reply** in the composer. Check that the pill slides and is amber for the internal note.
+   As a jury member, open **Award review** and select each list. Check that the pill slides.
+6. Check that the side sheet opens in about a quarter of a second and closes faster.
+7. With a second account, report or claim an issue. Check that the row fades from a blue tint on the first screen.
+   Change the status tab and check that no row fades because of that.
+8. As a contestant, keep a report open. Claim it as staff. Check that the progress tracker changes color over a moment.
+9. In the phone app, select each bottom tab. Check that the bar along the top edge slides to the tab.
+   Press and hold a queue card and a button. Check that the card tints and the button shrinks a little.
+10. Turn on **Reduce motion** in the operating system, or set `prefers-reduced-motion: reduce` in the browser developer tools.
+    Repeat steps 1, 5, 7 and 9. Check that every change is instant and the **Live** dot does not pulse.

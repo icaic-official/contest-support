@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { SlidingIndicator } from "@/components/ui/sliding-indicator";
 import type { CommandRunner } from "@/connected/hooks/useCommand";
 import type { SessionData } from "@/connected/hooks/useSessionSnapshot";
 import type { Issue, Snapshot } from "@/connected/model";
@@ -56,9 +57,10 @@ export function TabBar({
       className="shrink-0 border-t bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur"
     >
       <ul
-        className="grid"
+        className="relative isolate grid"
         style={{ gridTemplateColumns: `repeat(${tabs.length}, minmax(0, 1fr))` }}
       >
+        <SlidingIndicator className="top-0 left-0 h-[3px] w-[calc(var(--indicator-w)-2rem)] translate-x-[calc(var(--indicator-x)+1rem)] rounded-b-full bg-foreground" />
         {tabs.map((tab) => {
           const { label, icon: Icon } = tabMeta[tab];
           const active = tab === current;
@@ -69,7 +71,7 @@ export function TabBar({
                 aria-current={active ? "page" : undefined}
                 onClick={() => onSelect(tab)}
                 className={cn(
-                  "flex h-14 w-full flex-col items-center justify-center gap-0.5 text-[11px] font-medium focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none",
+                  "flex h-14 w-full flex-col items-center justify-center gap-0.5 text-[11px] font-medium transition-colors duration-(--motion-fast) ease-out active:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none",
                   active ? "text-foreground" : "text-muted-foreground",
                 )}
               >
@@ -197,7 +199,7 @@ export function IssueCard({
 }) {
   const team = state.teams.find((item) => item.id === issue.team_id);
   return (
-    <li className="relative rounded-xl border bg-card p-3 has-[>button:focus-visible]:ring-[3px] has-[>button:focus-visible]:ring-ring/50">
+    <li className="relative rounded-xl border bg-card p-3 transition-colors duration-(--motion-fast) ease-out has-[>button:active]:bg-accent has-[>button:focus-visible]:ring-[3px] has-[>button:focus-visible]:ring-ring/50">
       <button
         id={`issue-card-${issue.id}`}
         type="button"
@@ -232,7 +234,11 @@ export function IssueCard({
               {issue.category}
             </span>
             <span className="flex min-w-0 items-center gap-1.5 text-xs">
-              <PersonAvatar name={issue.owner_name} className="size-6 text-[9px]" />
+              <PersonAvatar
+                name={issue.owner_name}
+                personId={issue.owner}
+                className="size-6 text-[9px]"
+              />
               <span className="truncate">
                 {issue.owner_name ?? "Unassigned"}
               </span>

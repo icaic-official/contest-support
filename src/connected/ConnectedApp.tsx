@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/card";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { documentationUrl } from "@/lib/links";
 import { PasswordForm } from "@/screens/PasswordForm";
 import { SignIn } from "@/screens/SignIn";
 import { backend, backendSetupMessage } from "@/backend";
@@ -21,8 +22,6 @@ import { useAccountStatus } from "./hooks/useAccountStatus";
 import { useAuthSession } from "./hooks/useAuthSession";
 import { Workspace } from "./Workspace";
 import { WorkflowRetryProvider } from "./WorkflowRetry";
-
-const documentationUrl = "https://minsky-docs.icaic-minsky.workers.dev";
 
 /**
  * Moves keyboard focus to the main landmark.

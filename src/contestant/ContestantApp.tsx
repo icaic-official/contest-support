@@ -1,7 +1,7 @@
 import { CircleAlert, Plus, RotateCw } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocation } from "react-router";
-import { AccountPage } from "@/connected/AccountPage";
+import { AccountPage, useOpenPasswordChange } from "@/connected/AccountPage";
 import { useRouteFocus } from "@/connected/navigation";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -28,7 +28,8 @@ import { ReportList } from "./ReportList";
  * them again.
  */
 export function ContestantApp(props: ShellProps) {
-  const { user, username, data, changePassword, signOut } = props;
+  const { user, username, data, signOut } = props;
+  const openPasswordChange = useOpenPasswordChange();
   const workflow = useWorkflowState(data);
   const { command, selectedIssueId, selectIssue } = workflow;
   const now = useNow(data.clockOffset);
@@ -79,6 +80,12 @@ export function ContestantApp(props: ShellProps) {
   const issue = issues.find((item) => item.id === selectedIssueId) ?? issues[0];
   const blocker = reportBlocker(state);
 
+  /** Clears the open report and the report form after the session changes. */
+  function resetForSession() {
+    selectIssue("");
+    setReporting(false);
+  }
+
   function openIssue(issueId: string) {
     setReporting(false);
     selectIssue(issueId);
@@ -120,14 +127,23 @@ export function ContestantApp(props: ShellProps) {
         account={username ?? user.email ?? undefined}
         onSelectSession={(sessionId) => {
           data.selectSession(sessionId);
-          selectIssue("");
-          setReporting(false);
+          resetForSession();
         }}
-        changePassword={changePassword}
+        changePassword={openPasswordChange}
         signOut={signOut}
       />
       {accountPage && (
-        <AccountPage shell={props} member={membership} headingId={headingId} />
+        <div className="min-h-0 flex-1 overflow-y-auto p-8">
+          <AccountPage
+            shell={props}
+            state={state}
+            member={membership}
+            headingId={headingId}
+            now={now}
+            locked={command.locked}
+            onSessionChange={resetForSession}
+          />
+        </div>
       )}
       <div
         hidden={accountPage}

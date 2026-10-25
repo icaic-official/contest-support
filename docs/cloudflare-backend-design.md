@@ -49,6 +49,9 @@ flowchart TD
     API --> Announcements[Announcement services]
     Announcements --> D1
     Announcements --> R2
+    API --> Avatars[Avatar service]
+    Avatars --> D1
+    Avatars --> R2
     D1 --> Pending[Committed notification records]
     Pending --> Live[Durable Object delivery adapter]
     Live --> CF
@@ -78,7 +81,7 @@ The Cloudflare implementations remain inside provider adapter modules.
 | Blob store | Store immutable image objects, inspect content, read bytes, and retry deletion. | Bucket clients and provider URLs. |
 | Change delivery | Deliver authorized snapshot invalidations and recover pending notifications. | Durable Object classes and WebSocket lifecycle details. |
 
-The application Worker constructs [D1 application access](../src/server/adapters/cloudflare/application.ts), [R2 images](../src/server/adapters/cloudflare/images.ts), [D1 announcements](../src/server/adapters/cloudflare/announcements.ts), [R2 announcement images](../src/server/adapters/cloudflare/announcementImages.ts), and [live delivery](../src/server/adapters/cloudflare/live.ts).
+The application Worker constructs [D1 application access](../src/server/adapters/cloudflare/application.ts), [R2 images](../src/server/adapters/cloudflare/images.ts), [D1 announcements](../src/server/adapters/cloudflare/announcements.ts), [R2 announcement images](../src/server/adapters/cloudflare/announcementImages.ts), [R2 account avatars](../src/server/adapters/cloudflare/avatars.ts), and [live delivery](../src/server/adapters/cloudflare/live.ts).
 See [session announcements](session-announcements.md) for the announcement rules.
 The [browser adapter](../src/backend/cloudflare/backend.ts) implements every `Backend` group.
 Issue decisions remain shared. Other operations preserve their behavior in the corresponding provider server adapter.
@@ -112,7 +115,7 @@ Terraform can later provision selected resources. Terraform does not replace app
 ## D1 stores the authoritative application state
 
 The connector uses one application database per environment.
-The complete schema includes workflow, account, administration, image, announcement, and notification records.
+The complete schema includes workflow, account, administration, image, announcement, avatar, and notification records.
 The same database contains account access state and all memberships.
 This permits password-reset authorization across every session assigned to an account.
 Splitting databases by contest session would require a separate consistency design for that rule.
@@ -260,6 +263,41 @@ Recovery retains tombstones and repeats exact-key deletion to catch late transfe
 R2 object consistency does not make a D1 metadata change and an R2 write atomic.
 Cache behavior can also differ from direct bucket reads.
 See [R2 consistency](https://developers.cloudflare.com/r2/reference/consistency/).
+
+## Account avatars use the private image bucket
+
+Profile pictures belong to accounts. [Migration 0011](../src/server/adapters/d1/migrations/0011_account_avatars.sql) adds `account_avatars`.
+[R2AvatarService](../src/server/adapters/cloudflare/avatars.ts) stores each file in the existing private bucket under `accounts/<accountId>/avatars/<avatarId>`.
+Issue and announcement image keys start with a session ID. Avatar keys start with `accounts/`.
+No new bucket, binding, or secret is needed.
+
+A row is `pending`, `ready`, `retired`, or `expired`.
+The ready row is the account's current picture. A partial unique index allows one ready row for each account.
+Triggers keep the owner, request ID, size, type, and digest unchanged. They allow only `pending` to `ready` or `expired`, and `ready` to `retired`.
+
+`PUT /api/avatar/<requestId>` stores a picture in this order:
+
+1. The Worker reads at most 256 KiB. It checks the JPEG, PNG, or WebP signature and the `X-Minsky-Digest` SHA-256 value.
+2. A D1 batch inserts a `pending` row and checks the login.
+3. A conditional R2 write stores the bytes. R2 checks the digest.
+4. One D1 batch checks that the row is pending and not expired. It retires the earlier ready row, makes the new row ready, and checks the login again.
+5. The Worker deletes the file of the retired row.
+
+A failure before step 4 leaves a pending row that nobody can read. A retry with the same request ID can finish it.
+A failure after step 4 leaves a retired row whose file deletion is still due.
+`POST /api/avatars` with `{ "action": "remove" }` retires the ready row and deletes its file. It succeeds when no picture exists.
+Both routes use the existing origin, cookie, and request-protection checks.
+
+`GET /api/avatars?sessionId=<id>` lists the pictures that the caller can read in that session.
+`GET /api/avatar/<sessionId>/<avatarId>` checks the visibility rule, reads R2, and checks the rule again before it returns the bytes.
+The response is private and not cacheable.
+
+The minutely maintenance run expires pending rows after 15 minutes.
+It repeats the exact file deletion of retired and expired rows, as it does for other images, so it also removes a late transfer.
+
+The foreign key from `account_avatars` to `accounts` has no cascade.
+Deleting an account fails while it has avatar rows.
+Fixture cleanup therefore deletes the exact avatar keys, then the rows, then the accounts. A cleanup that forgets the files fails instead of leaving them in R2.
 
 ## Durable Objects deliver invalidations
 

@@ -6,7 +6,7 @@ import {
   type User,
 } from '@supabase/supabase-js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { AnnouncementRejectedError, WorkflowRejectedError } from '../errors';
+import { AnnouncementRejectedError, ImageRequestError, WorkflowRejectedError } from '../errors';
 import { createSupabaseBackend } from './backend';
 
 const USER_ID = '00000000-0000-4000-8000-000000000001';
@@ -489,5 +489,54 @@ describe('Supabase announcement adapter', () => {
     const { backend, requests } = setup(() => json({ error: 'The image is hidden. Retry removal to finish deleting its file.' }, 400));
     await expect(backend.announcements.removeImage(SESSION_ID, ANNOUNCEMENT_ID)).rejects.toThrow('Retry removal');
     expect(new URL(requests[0].url).pathname).toBe('/functions/v1/announcement-images');
+  });
+});
+
+describe('Supabase avatar adapter', () => {
+  const avatar = { person_id: USER_ID, avatar_id: '00000000-0000-4000-8000-000000000500' };
+  const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3]);
+
+  it('lists the avatars for one session through the database function', async () => {
+    const { backend, requests } = setup(() => json([avatar]));
+    await expect(backend.avatars.list(SESSION_ID)).resolves.toEqual([avatar]);
+    expect(new URL(requests[0].url).pathname).toBe('/rest/v1/rpc/avatar_list');
+    expect(await requests[0].json()).toEqual({ p_session: SESSION_ID });
+    const invalid = setup(() => json([{ person_id: 'x' }]));
+    await expect(invalid.backend.avatars.list(SESSION_ID)).rejects.toThrow();
+  });
+
+  it('uploads through the avatars function and keeps its validation flag', async () => {
+    const { backend, requests } = setup(() => json(avatar));
+    await expect(backend.avatars.upload({ requestId: REQUEST_ID, file: new Blob([png]) })).resolves.toEqual(avatar);
+    expect(new URL(requests[0].url).pathname).toBe('/functions/v1/avatars');
+    const form = await requests[0].formData();
+    expect(form.get('request_id')).toBe(REQUEST_ID);
+    expect(new Uint8Array(await (form.get('image') as Blob).arrayBuffer())).toEqual(png);
+    const rejected = setup(() => json({ error: 'Choose a JPEG, PNG, or WebP picture of up to 256 KB.', validation: true }, 400));
+    const failure = rejected.backend.avatars.upload({ requestId: REQUEST_ID, file: new Blob([png]) });
+    await expect(failure).rejects.toBeInstanceOf(ImageRequestError);
+    await expect(failure).rejects.toMatchObject({ validation: true, message: 'Choose a JPEG, PNG, or WebP picture of up to 256 KB.' });
+  });
+
+  it('removes through the avatars function', async () => {
+    const { backend, requests } = setup(() => json({}));
+    await backend.avatars.remove();
+    expect(new URL(requests[0].url).pathname).toBe('/functions/v1/avatars');
+    expect(await requests[0].json()).toEqual({ action: 'remove' });
+  });
+
+  it('downloads only an avatar that the session list contains, without a cached response', async () => {
+    const reply = (listed: unknown[]) => (request: Request) =>
+      new URL(request.url).pathname === '/rest/v1/rpc/avatar_list' ? json(listed) : new Response(png);
+    const { backend, requests } = setup(reply([avatar]));
+    const blob = await backend.avatars.download(SESSION_ID, avatar);
+    expect(new Uint8Array(await blob.arrayBuffer())).toEqual(png);
+    const storage = new URL(requests[1].url);
+    expect(storage.pathname).toBe(`/storage/v1/object/person-avatars/${USER_ID}/${avatar.avatar_id}`);
+    expect(storage.searchParams.get('cacheNonce')).toMatch(/^[0-9a-f-]{36}$/);
+    expect(requests[1].cache).toBe('no-store');
+    const hidden = setup(reply([]));
+    await expect(hidden.backend.avatars.download(SESSION_ID, avatar)).rejects.toMatchObject({ validation: true });
+    expect(hidden.requests.map((request) => new URL(request.url).pathname)).toEqual(['/rest/v1/rpc/avatar_list']);
   });
 });

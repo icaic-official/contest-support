@@ -156,6 +156,8 @@ async function signIn(page: Page, viewport: Viewport) {
       result = snapshot;
     } else if (path === '/rest/v1/rpc/announcement_snapshot') {
       result = emptyAnnouncementSnapshot();
+    } else if (path === '/rest/v1/rpc/avatar_list') {
+      result = [];
     } else if (path === '/rest/v1/rpc/workflow') {
       commands.push(route.request().postDataJSON().p_action);
       result = ISSUE_IDS[0];
@@ -469,6 +471,23 @@ test('a team removed from the snapshot cannot filter the desktop queue or receiv
   await expect(queue).toHaveValue('');
   await expect(issueRows(page)).toHaveCount(1);
   await expect(rowTeams(page)).toHaveText(['Aurora']);
+  expect(fixture.commands).toEqual([]);
+  expect(fixture.errors).toEqual([]);
+});
+
+test('an empty filtered queue offers a way back to the active issues', async ({ page }) => {
+  const fixture = await signIn(page, desktop);
+  const queue = page.locator('#queue-team-search');
+  await queue.fill('ced');
+  await page.getByRole('option').click();
+  await statusTab(page, 'Resolved').click();
+  await expect(issueRows(page)).toHaveCount(0);
+  await expect(page.getByText('No issues in this view.')).toBeVisible();
+  await page.getByRole('button', { name: 'Show active issues', exact: true }).click();
+  await expect(statusTab(page, 'Active')).toHaveAttribute('aria-pressed', 'true');
+  await expect(statusTab(page, 'Active')).toBeFocused();
+  await expect(queue).toHaveValue('');
+  await expect(issueRows(page)).toHaveCount(2);
   expect(fixture.commands).toEqual([]);
   expect(fixture.errors).toEqual([]);
 });

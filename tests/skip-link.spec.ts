@@ -82,6 +82,7 @@ async function signIn(page: Page, membership: Membership): Promise<void> {
       "/rest/v1/sessions": [{ id: SESSION_ID, name: "Selection session" }],
       "/rest/v1/rpc/session_snapshot": state,
       "/rest/v1/rpc/announcement_snapshot": emptyAnnouncementSnapshot(),
+      "/rest/v1/rpc/avatar_list": [],
     };
     if (!(path in responses)) {
       throw new Error(`Unexpected request: ${path}`);

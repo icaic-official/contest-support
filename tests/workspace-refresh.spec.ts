@@ -248,6 +248,9 @@ async function openWorkspace(
       case '/rest/v1/rpc/announcement_snapshot':
         result = emptyAnnouncementSnapshot();
         break;
+      case '/rest/v1/rpc/avatar_list':
+        result = [];
+        break;
       case '/rest/v1/rpc/manage_member':
         writes.push({ path, body: route.request().postDataJSON() });
         result = null;
@@ -773,8 +776,8 @@ for (const nextUserId of [USER_ID, MEMBER_ID]) {
     await form.send.click();
     await expect(page.getByRole('button', { name: 'Retry last request', exact: true })).toBeEnabled();
     await form.scope.getByRole('button', { name: 'Close issue', exact: true }).click();
-    await page.getByRole('button', { name: /^Account menu for/ }).click();
-    await page.getByRole('menuitem', { name: 'Sign out', exact: true }).click();
+    await page.getByRole('button', { name: /^Account settings for/ }).click();
+    await page.getByRole('button', { name: 'Sign out', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Sign in', exact: true })).toBeVisible();
 
     user.id = nextUserId;
@@ -783,6 +786,9 @@ for (const nextUserId of [USER_ID, MEMBER_ID]) {
     await page.getByLabel('Username', { exact: true }).fill('reviewer');
     await page.getByLabel('Password', { exact: true }).fill('fixture-password');
     await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+    // Signing out from the account page keeps that address for the next sign in.
+    await expect(page).toHaveURL('/account');
+    await page.getByRole('navigation', { name: 'Console pages' }).getByRole('button', { name: /^Queue/ }).click();
     form = await openReply(page);
     message = form.message;
     await expect(page.getByRole('button', { name: 'Retry last request', exact: true })).toHaveCount(0);

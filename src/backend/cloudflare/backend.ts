@@ -1,8 +1,8 @@
 import { z } from 'zod';
-import type { Announcements, Backend, LiveUpdates } from '../contracts';
+import type { Announcements, Avatars, Backend, LiveUpdates } from '../contracts';
 import { AnnouncementRejectedError, ImageRequestError, WorkflowRejectedError } from '../errors';
 import { announcementSnapshotSchema } from '../../connected/announcementModel';
-import { imageKind } from '../../connected/imageFile';
+import { AVATAR_MAX_BYTES, imageKind } from '../../connected/imageFile';
 import { snapshotSchema } from '../../connected/model';
 import { createCloudflareAuthentication } from './authentication';
 
@@ -23,6 +23,7 @@ const announcementResultSchema = z.discriminatedUnion('outcome', [
   }),
 ]);
 const reservedSchema = z.object({ id: z.uuid(), path: z.string() });
+const avatarSchema = z.object({ person_id: z.uuid(), avatar_id: z.uuid() });
 const failureSchema = z.object({
   error: z.string(), validation: z.boolean().optional(),
   restart: z.boolean().optional(), incomplete: z.boolean().optional(),
@@ -88,11 +89,11 @@ export function createCloudflareBackend(options: {
   }
 
   /** The Worker requires the SHA-256 digest of the exact bytes, and R2 checks it again. */
-  async function putImage(url: string, body: Blob, contentType: string, bytes: ArrayBuffer): Promise<void> {
+  async function putImage(url: string, body: Blob, contentType: string, bytes: ArrayBuffer): Promise<unknown> {
     const digest = await crypto.subtle.digest('SHA-256', bytes);
     const headers = await csrfHeaders(contentType);
     headers.set('X-Minsky-Digest', Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join(''));
-    await imageResult(await send(url, { method: 'PUT', headers, body }));
+    return imageResult(await send(url, { method: 'PUT', headers, body }));
   }
 
   const announcements: Announcements = {
@@ -132,6 +133,31 @@ export function createCloudflareBackend(options: {
       if (!response.ok) {
         await imageResult(response);
         throw new ImageRequestError('This announcement image could not be opened.');
+      }
+      return response.blob();
+    },
+  };
+
+  const avatars: Avatars = {
+    async list(sessionId) {
+      return z.array(avatarSchema).parse(await imageResult(await send(`/api/avatars?sessionId=${encodeURIComponent(sessionId)}`)));
+    },
+    async upload({ requestId, file }) {
+      const bytes = await file.arrayBuffer();
+      const kind = imageKind(new Uint8Array(bytes, 0, Math.min(16, bytes.byteLength)));
+      if (!kind || bytes.byteLength > AVATAR_MAX_BYTES) {
+        throw new ImageRequestError(`Choose a JPEG, PNG, or WebP picture of up to ${AVATAR_MAX_BYTES / 1024} KB.`, { validation: true });
+      }
+      return avatarSchema.parse(await putImage(`/api/avatar/${encodeURIComponent(requestId)}`, file, kind, bytes));
+    },
+    async remove() {
+      await imageResult(await post('/api/avatars', { action: 'remove' }));
+    },
+    async download(sessionId, avatar) {
+      const response = await send(`/api/avatar/${encodeURIComponent(sessionId)}/${encodeURIComponent(avatar.avatar_id)}`);
+      if (!response.ok) {
+        await imageResult(response);
+        throw new ImageRequestError('This picture could not be opened.');
       }
       return response.blob();
     },
@@ -251,6 +277,7 @@ export function createCloudflareBackend(options: {
       },
     },
     announcements,
+    avatars,
     updates,
   };
 }

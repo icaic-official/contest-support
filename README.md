@@ -88,8 +88,8 @@ Never put a service credential in a `VITE_` variable.
 | `npm run typecheck` | Check TypeScript. |
 | `npm run lint` | Run ESLint. |
 | `npm run ci` | Run the Workers Builds check: installs, type checking, lint, unit tests, both builds, audits, and the Gitleaks scan. |
-| `npm run check:functions` | Check the Supabase `admin`, `attachments`, `announcement-images`, and `workflow` functions with Deno. |
-| `npm run test:functions` | Test attachment authorization and file removal with fake clients. |
+| `npm run check:functions` | Check the Supabase `admin`, `attachments`, `announcement-images`, `avatars`, and `workflow` functions with Deno. |
+| `npm run test:functions` | Test the attachment, announcement image, and avatar functions with fake clients. |
 | `npm test` | Run unit, script, and embedded database tests without cloud credentials. |
 | `npm run test:d1` | Run every D1 workflow case with local emulation and current identity guards. |
 | `npm run test:connector:runtime` | Run the complete connector through a temporary local HTTPS Worker, D1, R2, and Durable Objects. |

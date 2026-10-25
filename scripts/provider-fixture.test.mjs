@@ -45,10 +45,18 @@ afterEach(async () => {
 
 /** A narrow control-plane double. It does not implement Backend behavior. */
 function controlPlane(
-  { event, sessions = [], users = [], memberships = [], people = [], failDelete = false } = {},
+  { event, sessions = [], users = [], memberships = [], people = [], avatars = [], failDelete = false } = {},
 ) {
   const deletions = [];
   const client = {
+    storage: {
+      from: vi.fn((bucket) => ({
+        remove: vi.fn(async (paths) => {
+          deletions.push({ table: `storage:${bucket}`, ids: paths });
+          return { error: null };
+        }),
+      })),
+    },
     from: vi.fn((table) => ({
       insert: vi.fn(async () => ({
         error: new Error('Fixture creation failed.'),
@@ -58,7 +66,7 @@ function controlPlane(
           maybeSingle: async () => ({ data: event ?? null, error: null }),
         })),
         in: vi.fn(async () => ({
-          data: table === 'sessions' ? sessions : table === 'memberships' ? memberships : table === 'people' ? people : [],
+          data: { sessions, memberships, people, person_avatars: avatars }[table] ?? [],
           error: null,
         })),
       })),
@@ -176,12 +184,15 @@ describe('provider fixture recovery boundaries', () => {
       user_metadata: { provider_test_run: randomUUID() },
     };
     await writeFile(path, JSON.stringify(journal));
-    const { deletions } = controlPlane({ users: [owned, foreign] });
+    const avatar = { id: randomUUID(), person_id: owned.id };
+    const { deletions } = controlPlane({ users: [owned, foreign], avatars: [avatar] });
     await cleanupFixture(path);
     const accountDeletes = deletions.filter((deletion) =>
-      ['people', 'auth.users'].includes(deletion.table)
+      ['storage:person-avatars', 'person_avatars', 'people', 'auth.users'].includes(deletion.table)
     );
     expect(accountDeletes).toEqual([
+      { table: 'storage:person-avatars', ids: [`${owned.id}/${avatar.id}`] },
+      { table: 'person_avatars', ids: [owned.id] },
       { table: 'people', ids: [owned.id] },
       { table: 'auth.users', ids: [owned.id] },
     ]);

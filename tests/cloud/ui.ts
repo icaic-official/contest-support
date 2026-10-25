@@ -87,8 +87,8 @@ export function openDialog(page: Page): Locator {
 }
 
 /**
- * Signs out from any selected UI: the Me tab on a phone, or the account menu
- * on the desktop console and in the contestant UI.
+ * Signs out from any selected UI: the Me tab on a phone, the account page on
+ * the desktop console, or the account menu in the contestant UI.
  */
 export async function signOut(page: Page) {
   const ui = await uiRoot(page).getAttribute("data-ui");
@@ -96,6 +96,9 @@ export async function signOut(page: Page) {
     const back = page.getByRole("button", { name: "Back", exact: true });
     if (await back.count()) await back.click();
     await phoneTab(page, "Me");
+    await page.getByRole("button", { name: "Sign out", exact: true }).click();
+  } else if (ui === "organiser-desktop") {
+    await page.getByRole("button", { name: /^Account settings for / }).click();
     await page.getByRole("button", { name: "Sign out", exact: true }).click();
   } else {
     await page.getByRole("button", { name: /^Account menu for / }).click();

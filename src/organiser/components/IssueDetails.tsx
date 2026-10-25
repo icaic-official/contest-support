@@ -151,7 +151,11 @@ export function OwnerCard({
 }) {
   return (
     <div className="flex items-center gap-3 rounded-xl border p-3">
-      <PersonAvatar name={issue.owner_name} className="size-9" />
+      <PersonAvatar
+        name={issue.owner_name}
+        personId={issue.owner}
+        className="size-9"
+      />
       <div className="min-w-0 flex-1">
         <div className="text-xs text-muted-foreground">Owner</div>
         <div className="truncate font-medium">
@@ -294,7 +298,11 @@ function ActivityEntry({ item }: { item: HistoryItem }) {
   const internal = item.visibility === "internal";
   return (
     <li className="flex gap-2.5">
-      <PersonAvatar name={item.actor_name} className="size-7 text-[10px]" />
+      <PersonAvatar
+        name={item.actor_name}
+        personId={item.actor}
+        className="size-7 text-[10px]"
+      />
       <div
         className={cn(
           "min-w-0 flex-1 rounded-xl border p-3",

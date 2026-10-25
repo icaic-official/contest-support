@@ -37,7 +37,7 @@ Never use a project that holds real accounts or data.
 
 ### Prepare the Supabase test project
 
-1. Prepare the project with [Run the Supabase adapter](supabase-provider.md): link it, apply the Auth settings and migrations, and deploy the `admin`, `attachments`, `announcement-images`, and `workflow` functions.
+1. Prepare the project with [Run the Supabase adapter](supabase-provider.md): link it, apply the Auth settings and migrations, and deploy the `admin`, `attachments`, `announcement-images`, `avatars`, and `workflow` functions.
 2. Set the function origin to `http://127.0.0.1:4174`.
 3. Supply the following variables through your private environment.
 
@@ -66,7 +66,7 @@ npm run test:providers -- --provider=supabase
 ```
 
 Before it creates fixtures, the runner reads the project's metadata.
-It requires every repository migration version and active `admin`, `attachments`, and `announcement-images` functions.
+It requires every repository migration version and active `admin`, `attachments`, `announcement-images`, and `avatars` functions.
 It reports extra remote migration versions. It does not prove that deployed source matches the checkout, and it installs nothing.
 
 Leave the process running until fixture cleanup finishes.

@@ -166,12 +166,18 @@ describe('outbox retry fairness with real local D1', () => {
         return state.sockets.at(-1)!;
       };
       const [staff, contestant, other] = [await connect(fixture.staff), await connect(fixture.contestant), await connect(fixture.otherContestant)];
+      const mispaired = new FakeSocket();
+      mispaired.serializeAttachment({ accountId: fixture.staff.accountId, loginId: fixture.contestant.loginId,
+        sessionId: fixture.sessionId, expiresAt: Date.now() + 60_000 });
+      state.acceptWebSocket(mispaired);
       const signal = (audience: string, sequence: number) => coordinator.fetch(new Request('https://live.internal/notify', {
         method: 'POST', body: JSON.stringify({ id: randomUUID(), sessionId: fixture.sessionId, audience, sequence }) }));
       reads = 0;
       expect((await signal(`team:${fixture.teamId}`, 1)).status).toBe(204);
       expect(reads).toBe(2);
       expect([staff, contestant, other].map((socket) => socket.messages.length)).toEqual([1, 2, 1]);
+      expect(mispaired.closed).toBe(true);
+      expect(mispaired.messages).toEqual([]);
       await db.prepare('UPDATE logins SET revoked = 1 WHERE id = ?').bind(fixture.staff.loginId).run();
       expect((await signal('staff', 1)).status).toBe(204);
       expect(staff.closed).toBe(true);
@@ -380,11 +386,17 @@ describe('Durable Object live updates', () => {
     });
     const revoked = callers.find(({ team }) => team === test.teamId)!;
     test.db.access.delete([revoked.caller.accountId, revoked.caller.loginId, test.sessionId].join(':'));
+    const teamLogin = callers.filter(({ team }) => team === test.teamId)[1].caller.loginId;
+    const mispaired = new FakeSocket();
+    mispaired.serializeAttachment({ accountId: test.staff.accountId, loginId: teamLogin, sessionId: test.sessionId, expiresAt: Date.now() + 60_000 });
+    test.state.acceptWebSocket(mispaired);
     const changed = () => callers.filter(({ socket }) => socket.messages.length > 0);
     test.db.reads = 0;
     expect((await test.signal(`team:${test.teamId}`)).status).toBe(204);
     expect(test.db.reads).toBe(2);
     expect(revoked.socket.closed).toBe(true);
+    expect(mispaired.closed).toBe(true);
+    expect(mispaired.messages).toEqual([]);
     expect(changed().map(({ team }) => team)).toEqual(Array(399).fill(test.teamId));
     test.db.reads = 0;
     await test.coordinator.alarm();

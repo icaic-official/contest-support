@@ -272,7 +272,7 @@ export function issueAbilities(
       (issue.status === "claimed" || issue.status === "escalated") &&
       (owner || member.is_admin),
     reopen: !active && (support || member.team_id === issue.team_id),
-    reply: active && (support || jury),
+    reply: active && staff,
     internalNotes: staff,
     award: !active && !award && jury,
     apply: Boolean(award && !award.applied_at && (support || jury)),

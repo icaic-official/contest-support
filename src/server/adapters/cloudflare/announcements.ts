@@ -137,9 +137,6 @@ export class D1AnnouncementService {
     }
     const command = parsed.data.type === 'remove' ? parsed.data
       : { ...parsed.data, expires_at: parsed.data.expires_at === null ? null : new Date(parsed.data.expires_at).toISOString() };
-    if ('expires_at' in command && command.expires_at !== null && Date.parse(command.expires_at) <= Date.now()) {
-      throw new AnnouncementCommandError('input', 'Choose a future expiry time or no expiry.');
-    }
     const current = await this.statement(`SELECT c.is_admin, c.roles, c.archived FROM (${currentAccessSql}) c`,
       ...currentAccessBindings(caller, sessionId)).first<Pick<CurrentAccessRow, 'is_admin' | 'roles' | 'archived'>>();
     if (!current || !current.is_admin && !(JSON.parse(current.roles) as string[]).includes('jury')) {
@@ -148,6 +145,10 @@ export class D1AnnouncementService {
     if (current.archived) throw new AnnouncementCommandError('state', 'This event is archived.');
     const prior = await this.receipt(caller, requestId);
     if (prior) return this.replay(prior, sessionId, command);
+    // Only a new command needs a future expiry. A committed command can replay after its expiry passes.
+    if ('expires_at' in command && command.expires_at !== null && Date.parse(command.expires_at) <= Date.now()) {
+      throw new AnnouncementCommandError('input', 'Choose a future expiry time or no expiry.');
+    }
 
     const id = command.type === 'publish' ? crypto.randomUUID() : command.id;
     const guardId = crypto.randomUUID();

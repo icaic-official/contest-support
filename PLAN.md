@@ -3,6 +3,20 @@
 This file records the current agreed scope, newest first.
 Earlier requests, approvals, branch exceptions, and the original demo plan are in the [planning log](docs/history/plan-log.md).
 
+**Cloudflare only, agent tokens, and production, 2026-10-25.** The owner made three decisions.
+
+1. Remove the Supabase implementation completely. Cloudflare is the only backend.
+   Keep the shared backend contracts, so that a later provider can implement them. Do not build, run, or test another provider adapter until the owner states that the codebase is complete.
+   First, the mocked browser suite moves from the Supabase provider to the Cloudflare provider, so that browser coverage stays. Then a separate pull request deletes `supabase/`, `src/backend/supabase/`, `src/server/adapters/supabase/`, the Supabase scripts, tests, and dependencies, and the Supabase guides. Dated records in `docs/history/` stay.
+   This supersedes the 2026-10-23 and 2026-10-24 statements below that the Supabase adapter stays as a second implementation.
+   The hosted Supabase projects and the `SUPABASE_*` repository secrets stay until the owner deletes them.
+2. Agents can create and delete scoped Cloudflare API tokens with `npm run token:create`, `token:list`, and `token:delete`. The owner asked to keep new tokens few.
+   The owner creates one account-owned key with only the Account API Tokens Edit permission and stores it as `CLOUDFLARE_TOKEN_ADMIN` in `.env.local`.
+   The key stays out of `CLOUDFLARE_API_TOKEN`, so ordinary Wrangler commands never run with it. [AGENTS.md](AGENTS.md#api-tokens-for-agents) states the rules.
+3. Prepare a complete Cloudflare installation for production. Agents can create the production resources, named `minsky-prod*`.
+   Each production deployment and each production D1 migration needs the owner's explicit approval for that release.
+   A production readiness checklist defines the remaining work. The 800-user capacity target needs a separate load test.
+
 **Shared branch preview, 2026-10-24.** The owner chose one shared preview for branches (PR #73).
 The `minsky-preview` Worker binds only D1 database `minsky-preview` and private bucket `minsky-preview-images`. They hold only test data.
 Its Workers Builds trigger publishes every branch except `main` and `dependabot/*` with `npm run deploy`. Its build command only installs dependencies without the token, so the preview does not wait for checks. `minsky-ci` still reports them.

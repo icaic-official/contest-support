@@ -75,7 +75,7 @@ export function isGuardFailure(error: unknown): boolean {
 interface ReceiptRow { session_id: string; command: string; announcement_id: string }
 interface AnnouncementRow { revision: number; removed_at: string | null }
 
-const snapshotSql = `WITH access AS (${currentAccessSql}),
+export const snapshotSql = `WITH access AS (${currentAccessSql}),
   manager AS (SELECT 1 FROM access WHERE ${announcementManager('access')}),
   visible AS (SELECT a.* FROM announcements a WHERE a.session_id = ? AND EXISTS (SELECT 1 FROM access)
     AND (EXISTS (SELECT 1 FROM manager) OR (a.removed_at IS NULL AND (a.expires_at IS NULL OR a.expires_at > ${announcementNow}))))

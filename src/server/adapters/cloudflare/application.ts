@@ -87,7 +87,7 @@ export function currentReadyLoginBindings(caller: Caller): BindValue[] {
 
 interface AdminGate { id: string; caller: Caller; statements: D1Statement[] }
 
-const snapshotSql = `WITH login AS (${currentReadyLoginSql}), access AS (${currentAccessSql}),
+export const snapshotSql = `WITH login AS (${currentReadyLoginSql}), access AS (${currentAccessSql}),
   visible_issues AS (SELECT i.* FROM issues i CROSS JOIN access a
     WHERE i.session_id = ? AND (a.staff = 1 OR i.team_id = a.team_id))
 SELECT json_object(

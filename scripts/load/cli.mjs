@@ -405,6 +405,10 @@ async function analytics(options) {
   });
   await writeFile(options.results, JSON.stringify(results, null, 2) + '\n');
   for (const [index, step] of results.analytics.steps.entries()) {
+    if (!step.worker?.minutes) {
+      log(`Step ${index + 1}: no whole minute inside the step. Use --step-seconds of at least 120 for server-side cost.`);
+      continue;
+    }
     const requests = step.worker?.['sum.requests'];
     const queries = (step.d1?.['sum.readQueries'] ?? 0) + (step.d1?.['sum.writeQueries'] ?? 0);
     log(`Step ${index + 1} per minute: ${ms(requests)} Worker requests, ${ms(queries)} D1 queries ` +

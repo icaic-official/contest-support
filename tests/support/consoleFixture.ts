@@ -163,6 +163,8 @@ export async function signInConsole(
       result = snapshot();
     } else if (path === '/rest/v1/rpc/announcement_snapshot') {
       result = emptyAnnouncementSnapshot();
+    } else if (path === '/rest/v1/rpc/avatar_list') {
+      result = [];
     } else {
       throw new Error(`Unexpected fixture request: ${path}`);
     }

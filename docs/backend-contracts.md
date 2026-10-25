@@ -40,10 +40,12 @@ The complete schema adds migrations `0005` through `0013` to the authentication 
 [D1ApplicationService](../src/server/adapters/cloudflare/application.ts) returns each authorized snapshot in one database statement.
 Migration `0012` indexes `history(issue_id, at)`.
 Migration `0013` indexes `memberships(account_id, session_id)` and `issues(session_id, team_id)`.
-The snapshot evaluates the caller's access once, and finds a contestant's issues through the team index.
+The snapshot reads the caller's access row once in each section.
+It finds a contestant's issues through the team index, and the contestant's team by its key.
 It reads images from the visible issues, not from every image in the database.
-It reads the member list only for an administrator.
-For a session with 1,200 accounts and 100 issues, a contestant snapshot read 196 rows, where it read 9,712 before.
+It reads the member list and the audit entries only for an administrator.
+The read volume test session has 1,200 accounts, 100 issues and 1,200 audit entries.
+On 2026-10-26 a snapshot of that session read 122 rows for a contestant, 2,801 for a volunteer and 6,487 for an administrator (measured).
 The sessions list read 7 rows, where it read 1,205 before.
 [The query plan test](../src/server/adapters/d1/queryPlans.test.ts) fails if a snapshot query scans a table or loses these indexes.
 [The read volume test](../src/server/adapters/d1/readVolume.test.ts) fails if the rows read on that session grow again.

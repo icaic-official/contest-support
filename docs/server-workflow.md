@@ -93,6 +93,7 @@ Foreign keys, unique constraints, and assertions prevent partial or stale effect
 A false or missing assertion fails the batch and rolls back its writes.
 
 The commit checks current membership, roles, team, event, session settings, account restrictions, and captured workflow state.
+A submit also checks that its team still belongs to the session. Other commands read no team list.
 It also checks credential state, credential generation, login revocation and expiry, and the identity session's account and expiry.
 Receipt replay crosses an atomic access check too.
 A previously successful request cannot authorize replay after access expires or is revoked.

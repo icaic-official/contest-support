@@ -273,6 +273,7 @@ A failure after step 4 leaves a retired row whose file deletion is still due.
 Both routes use the existing origin, cookie, and request-protection checks.
 
 `GET /api/avatars?sessionId=<id>` lists the pictures that the caller can read in that session.
+The list starts from the caller's own picture and, for staff, from the staff memberships of that session. It reads no picture of another session.
 `GET /api/avatar/<sessionId>/<avatarId>` checks the visibility rule, reads R2, and checks the rule again before it returns the bytes.
 The response is private and not cacheable.
 

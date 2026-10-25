@@ -47,11 +47,14 @@ const attachmentSchema = z.object({
   sessionId: uuid,
   expiresAt: z.number().finite(),
 });
+// One claim round sends at most this many outbox rows.
+const claimLimit = 500;
+const audienceSchema = z.string().regex(/^(staff|(?:team|account):[0-9a-f-]{36})$/i);
+const sequenceSchema = z.number().int().positive().max(Number.MAX_SAFE_INTEGER);
+/** The highest pending sequence for each audience of one session. */
 const signalSchema = z.object({
-  id: uuid,
   sessionId: uuid,
-  audience: z.string().regex(/^(staff|(?:team|account):[0-9a-f-]{36})$/i),
-  sequence: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
+  audiences: z.array(z.object({ audience: audienceSchema, sequence: sequenceSchema }).strict()).min(1).max(claimLimit),
 }).strict();
 type Signal = z.infer<typeof signalSchema>;
 type SocketAttachment = z.infer<typeof attachmentSchema>;
@@ -204,22 +207,25 @@ export class SessionLiveCoordinator {
     return new Response(null, { status: 101, webSocket: pair[0] } as ResponseInit & { webSocket: LiveSocket });
   }
 
-  private async notify(signal: Signal): Promise<void> {
+  private async notify({ sessionId, audiences }: Signal): Promise<void> {
     // A notification can outlive its D1 transaction and race fixture cleanup.
     // Missing sessions and cleanup-fenced sessions must never recreate cursors.
-    if (await this.state.storage.get('fixtureCleanup') || !await this.sessionExists(signal.sessionId)) return;
-    const key = `sequence:${signal.sessionId}:${signal.audience}`;
-    const prior = await this.state.storage.get<number>(key) ?? 0;
+    if (await this.state.storage.get('fixtureCleanup') || !await this.sessionExists(sessionId)) return;
+    const fresh = new Map<string, number>();
+    for (const { audience, sequence } of audiences) {
+      const prior = await this.state.storage.get<number>(`sequence:${sessionId}:${audience}`) ?? 0;
+      if (sequence > Math.max(prior, fresh.get(audience) ?? 0)) fresh.set(audience, sequence);
+    }
+    // Check grants even when every sequence is old, so a duplicate still closes revoked sockets.
     for (const { socket, attachment, row } of await this.grants()) {
-      if (attachment.sessionId !== signal.sessionId || signal.sequence <= prior) continue;
-      const audience = row.staff ? 'staff' : `team:${row.team_id}`;
-      if (signal.audience !== audience && signal.audience !== `account:${row.account_id}`) continue;
+      if (attachment.sessionId !== sessionId) continue;
+      if (!fresh.has(row.staff ? 'staff' : `team:${row.team_id}`) && !fresh.has(`account:${row.account_id}`)) continue;
       try { socket.send(JSON.stringify({ type: 'change' })); }
       catch { close(socket, 1011, 'Updates are unavailable. Reconnect.'); }
     }
-    // A crash before this write can duplicate a harmless refresh hint. A crash
+    // A crash before these writes can duplicate a harmless refresh hint. A crash
     // afterward is safe because every new connection starts with a full refresh.
-    if (signal.sequence > prior) await this.state.storage.put(key, signal.sequence);
+    for (const [audience, sequence] of fresh) await this.state.storage.put(`sequence:${sessionId}:${audience}`, sequence);
     await this.scheduleAlarm();
   }
 
@@ -297,28 +303,61 @@ export function connectLive(request: Request, env: LiveEnvironment, caller: Call
   }));
 }
 
-/** Send committed outbox records. A failed or uncertain delivery stays retryable. */
-export async function dispatchNotifications(env: LiveEnvironment, limit = 100): Promise<{ delivered: number; failed: number }> {
-  const result = await env.DB.prepare(`SELECT id, session_id AS sessionId, audience, sequence FROM notifications
-    WHERE delivered = 0 ORDER BY COALESCE(last_attempt_at, 0), session_id, audience, sequence LIMIT ?`).bind(Math.max(1, Math.min(1000, limit))).all<Signal>();
-  let delivered = 0;
-  let failed = 0;
-  for (const signal of result.results) {
-    try {
-      await env.DB.prepare('UPDATE notifications SET attempts = attempts + 1, last_attempt_at = unixepoch() WHERE id = ? AND delivered = 0')
-        .bind(signal.id).run();
-      const coordinator = env.LIVE_UPDATES.get(env.LIVE_UPDATES.idFromName(signal.sessionId));
-      const response = await coordinator.fetch(new Request('https://live.internal/notify', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(signal),
-      }));
-      if (!response.ok) { failed++; logEvent('warn', 'live.notify_rejected', { task: 'notify', status: response.status }); continue; }
-      await env.DB.prepare('UPDATE notifications SET delivered = 1 WHERE id = ? AND delivered = 0').bind(signal.id).run();
-      delivered++;
-    } catch (error) { failed++; logEvent('error', 'live.notify_error', { task: 'notify', error }); }
-  }
-  return { delivered, failed };
+// A claim that outlives its dispatcher, for example after a crash or a lost
+// response, expires after this time. The next dispatcher then retries it.
+const leaseSeconds = 30;
+// Stop starting new rounds after this time, so the last round can finish
+// inside the 30 seconds that waitUntil allows after a response.
+const roundBudgetMs = 10_000;
+
+// One statement claims the rows, so concurrent dispatchers never claim the same row.
+export const claimSql = `UPDATE notifications SET claimed_until = ?1 + ${leaseSeconds}, attempts = attempts + 1, last_attempt_at = ?1
+  WHERE id IN (SELECT id FROM notifications WHERE delivered = 0 AND COALESCE(claimed_until, 0) <= ?1
+    ORDER BY COALESCE(last_attempt_at, 0), session_id, audience, sequence LIMIT ?2)
+  RETURNING id, session_id AS sessionId, audience, sequence`;
+
+interface Claimed { id: string; sessionId: string; audience: string; sequence: number }
+
+async function deliverSession(env: LiveEnvironment, sessionId: string, rows: Claimed[]): Promise<boolean> {
+  const audiences = new Map<string, number>();
+  for (const { audience, sequence } of rows) audiences.set(audience, Math.max(sequence, audiences.get(audience) ?? 0));
+  try {
+    const coordinator = env.LIVE_UPDATES.get(env.LIVE_UPDATES.idFromName(sessionId));
+    const response = await coordinator.fetch(new Request('https://live.internal/notify', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId, audiences: [...audiences].map(([audience, sequence]) => ({ audience, sequence })) }),
+    }));
+    if (!response.ok) { logEvent('warn', 'live.notify_rejected', { task: 'notify', status: response.status }); return false; }
+    await env.DB.prepare('UPDATE notifications SET delivered = 1 WHERE id IN (SELECT value FROM json_each(?)) AND delivered = 0')
+      .bind(JSON.stringify(rows.map(({ id }) => id))).run();
+    return true;
+  } catch (error) { logEvent('error', 'live.notify_error', { task: 'notify', error }); return false; }
 }
 
+/**
+ * Claim committed outbox records and send one coalesced request for each
+ * session. A failed or uncertain delivery stays claimed until its lease
+ * expires, and then becomes retryable.
+ */
+export async function dispatchNotifications(env: LiveEnvironment, requested = claimLimit): Promise<{ delivered: number; failed: number }> {
+  const limit = Math.max(1, Math.min(claimLimit, requested));
+  const started = Date.now();
+  let delivered = 0;
+  let failed = 0;
+  for (;;) {
+    const { results } = await env.DB.prepare(claimSql)
+      .bind(Math.floor(Date.now() / 1000), limit).all<Claimed>();
+    const sessions = new Map<string, Claimed[]>();
+    for (const row of results) {
+      const rows = sessions.get(row.sessionId);
+      if (rows) rows.push(row); else sessions.set(row.sessionId, [row]);
+    }
+    const outcomes = await Promise.all([...sessions].map(async ([sessionId, rows]) =>
+      ({ rows: rows.length, ok: await deliverSession(env, sessionId, rows) })));
+    for (const { rows, ok } of outcomes) { if (ok) delivered += rows; else failed += rows; }
+    if (results.length < limit || failed || Date.now() - started >= roundBudgetMs) return { delivered, failed };
+  }
+}
 
 /** Binding-only maintenance. The public application fetch handler never calls this. */
 export async function maintainFixtureSessions(request: Request, env: LiveEnvironment): Promise<Response> {

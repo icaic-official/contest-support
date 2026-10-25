@@ -293,6 +293,19 @@ The connection coordinator is one Durable Object per contest session.
 The Worker attempts delivery after the database commit.
 A scheduled recovery scan retries pending rows if the Worker stops before delivery.
 The coordinator accepts repeated deliveries and ignores older duplicate sequences for the same audience.
+
+A dispatcher claims up to 500 pending rows with one `UPDATE … RETURNING` statement.
+The claim sets `claimed_until` to 30 seconds later, so a concurrent dispatcher does not take the same rows.
+The dispatcher sends one request to each session's coordinator.
+The request holds only the highest claimed sequence for each audience, so a burst of changes to one audience sends one hint.
+The dispatcher marks the rows delivered after the coordinator accepts the request.
+It repeats this until no rows remain or 10 seconds have passed.
+A failed or uncertain delivery keeps its claim until the claim expires. The next dispatcher then retries it. This delay prevents every new request from sending the same failing rows again.
+The index `notifications_claim_order` serves the claim order without a sort.
+
+An account without a login has no live connection.
+Account setup therefore writes only the `staff` notification for that account. A later first connection starts with a full refresh.
+
 Acknowledging delivery means that the coordinator accepted the invalidation. It does not prove that every browser received it.
 
 Team changes reach the affected team and staff.

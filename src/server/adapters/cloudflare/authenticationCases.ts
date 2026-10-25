@@ -641,9 +641,14 @@ export function registerAuthenticationCases(group: AuthenticationCases) {
 
       it('creates a temporary account with stable identity and restricted membership', async () => {
         const accountUsername = `new_${randomSecret().slice(0, 20)}`;
+        const signals = async (audience: string) => (await stmt('SELECT count(*) AS n FROM notifications WHERE session_id = ? AND audience = ?', fixture.sessionId, audience).first<{ n: number }>())!.n;
+        const staffBefore = await signals('staff');
         const result = await service.account(adminHeaders, fixture.sessionId, { action: 'create_account', username: accountUsername, name: `auth-fixture:${fixture.eventId}`, teamId: fixture.teamId, roles: [], isAdmin: false });
         const row = await stmt('SELECT id FROM accounts WHERE username = ?', accountUsername).first<{id: string}>();
         extraIds.push(row!.id);
+        // A new account has no login, so setup writes one staff notification and no account notification.
+        expect(await signals(`account:${row!.id}`)).toBe(0);
+        expect(await signals('staff')).toBe(staffBefore + (fullApplication ? 1 : 0));
         const current = await service.current(await signIn(accountUsername, result.temporaryPassword!));
         expect(current?.user.id).toBe(row!.id);
         expect(current?.status.must_change).toBe(true);

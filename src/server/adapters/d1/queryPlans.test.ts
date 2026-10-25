@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { openStoreDatabase } from '../cloudflare/tooling/store-database.mjs';
 import { snapshotSql as announcementSnapshotSql } from '../cloudflare/announcements';
 import { currentAccessSql, snapshotSql } from '../cloudflare/application';
+import { claimSql } from '../cloudflare/live';
 import type { D1Connection } from './connection';
 import { applyMigrations } from './testFixture';
 
@@ -38,6 +39,13 @@ describe('D1 query plans', () => {
     return plan.results.map((row) => row.detail)
       .filter((detail) => detail.startsWith('SCAN ') && !/^SCAN (?:CONSTANT ROW|\(subquery-\d+\)|json_each)/.test(detail));
   }
+
+  it('notification claim reads pending rows in claim order without a sort', async () => {
+    const plan = await db.prepare(`EXPLAIN QUERY PLAN ${claimSql}`).bind(1, 500).all<{ detail: string }>();
+    const details = plan.results.map((row) => row.detail);
+    expect(details).toContainEqual(expect.stringMatching(/^SEARCH notifications USING INDEX notifications_claim_order \(delivered=\?\)/));
+    expect(details.filter((detail) => /^SCAN notifications|TEMP B-TREE/.test(detail))).toEqual([]);
+  });
 
   for (const [name, sql] of Object.entries(queries)) {
     it(`${name} does not scan a growing table`, async () => {

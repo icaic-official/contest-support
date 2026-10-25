@@ -210,6 +210,7 @@ Sign in as the same accounts.
 6. Claim an issue in a row. Check that the page stays. Claim another issue in the side sheet. Check that the sheet stays open.
 7. Open resolve, escalate and reopen from the sheet. Check that each opens a dialog and that **Cancel** closes it without an action.
 8. Check that the sheet shows one filled primary action. **Decide award** and **Confirm applied** open the **Outcome & award** tab.
+9. On a resolved issue without an award, open **Outcome & award** and choose **Other amount**. Type an amount and an explanation. Open **Activity**, then open **Outcome & award** again. Check that the amount and the explanation are still there.
 
 ### Contestant desktop app (1280 × 800)
 

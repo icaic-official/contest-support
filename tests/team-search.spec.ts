@@ -225,6 +225,27 @@ test('phone report sheet: Tab leaves open suggestions, and keyboard and pointer 
   expect(fixture.errors).toEqual([]);
 });
 
+test('phone report sheet sends one submit command per chosen team', async ({ page, api }) => {
+  const fixture = await signIn(page, api, phone);
+  const report = await openReport(page);
+  const reportTeam = report.locator('#report-team-search');
+  const addTeam = report.getByRole('button', { name: 'Add another team', exact: true });
+  await expect(addTeam).toBeDisabled();
+  await reportTeam.fill('ced');
+  await page.getByRole('option').click();
+  await addTeam.click();
+  await reportTeam.fill('aur');
+  await page.getByRole('option').click();
+  await expect(report.getByRole('list', { name: 'Teams to report' })).toContainText('Cedar');
+  await report.getByLabel('What’s happening?').fill('Shared outage');
+  await report.getByRole('button', { name: 'Submit 2 issues', exact: true }).click();
+  await expect.poll(() => fixture.commands()).toEqual([
+    { type: 'submit', team_id: CEDAR_ID, category: 'Network', description: 'Shared outage' },
+    { type: 'submit', team_id: AURORA_ID, category: 'Network', description: 'Shared outage' },
+  ]);
+  expect(fixture.errors).toEqual([]);
+});
+
 test('phone Find tab searches teams by name and location and opens a team', async ({ page, api }) => {
   const fixture = await signIn(page, api, phone);
   await page

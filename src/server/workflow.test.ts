@@ -25,6 +25,17 @@ describe('shared workflow compatibility edges', () => {
       .toMatchObject({ teamId: 'team' });
     expect(decideWorkflow(state, command)).toEqual({ outcome: 'rejected', reason: 'input' });
   });
+  it('lets any staff member, and only staff, submit for a chosen team', () => {
+    const command = { type: 'submit' as const, category: 'Backend', description: 'Fixture', team_id: 'team' };
+    for (const membership of [
+      { team_id: null, roles: ['jury' as const], is_admin: false },
+      { team_id: null, roles: [], is_admin: true },
+    ]) {
+      expect(decideWorkflow({ ...state, membership }, command)).toMatchObject({ type: 'submit', teamId: 'team' });
+    }
+    expect(decideWorkflow({ ...state, membership: { team_id: null, roles: [], is_admin: false } }, command))
+      .toEqual({ outcome: 'rejected', reason: 'access' });
+  });
   it('compares receipts as JSON values while preserving original whitespace', () => {
     expect(equalWorkflowJson({ type: 'message', text: ' text ', extra: { a: 1, b: 2 } },
       { extra: { b: 2, a: 1 }, text: ' text ', type: 'message' })).toBe(true);

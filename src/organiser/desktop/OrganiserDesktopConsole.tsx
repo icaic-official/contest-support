@@ -21,7 +21,7 @@ import { inlineActionReturnsToList } from "@/connected/hooks/inlineAction";
 import { useNow } from "@/connected/hooks/useNow";
 import { useTeamSelection } from "@/connected/hooks/useTeamSelection";
 import type { WorkflowState } from "@/connected/hooks/useWorkflowState";
-import { type Issue, isSupport, type Snapshot } from "@/connected/model";
+import { type Issue, isStaff, type Snapshot } from "@/connected/model";
 import type { ShellProps } from "@/connected/shell";
 import { chooseTeam, initialTeamSelection } from "@/connected/teamSearch";
 import { NoSessionAccess } from "@/screens/NoSessionAccess";
@@ -216,7 +216,7 @@ export function OrganiserDesktopConsole({
     page && page !== "account" && pages.includes(page) ? page : pages[0];
   const issues = visibleIssues(state.issues, member);
   const archived = Boolean(state.event?.archived);
-  const canReport = isSupport(member);
+  const canReport = isStaff(member);
   const personName = accountName(state, user, username);
   const counts = Object.fromEntries(
     pages.map((item) => [item, navCount(item, issues, state, member)]),

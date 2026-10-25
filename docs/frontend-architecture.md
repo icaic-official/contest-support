@@ -229,7 +229,7 @@ Shared organiser parts are one level up, so the desktop console can use them:
 | `components/issueDisplay.tsx` | Status badge (icon and label), place tile, unresolved timer, **Live** or **Reconnecting** badge, avatar and `AwardEvidence`. |
 | `components/IssueDetails.tsx` | Timers, lifecycle bar, owner, handoff banner, award receipt, resolution history and activity. |
 | `actions/IssueForms.tsx` | `ReplyForm`, `ResolveForm`, `EscalateForm`, `ReopenForm`, `AwardForm` and `ApplyForm`. Each form takes the issue, the `CommandRunner` and `onDone`. |
-| `actions/ReportForm.tsx` | Report for a team, with `TeamSearch`. |
+| `actions/ReportForm.tsx` | Report for one or more teams, with `TeamSearch` and **Add another team**. It sends one submit command per team. Every staff member can open it. |
 | `actions/OrganiserImages.tsx` | `ImageGallery`, `ImageUploadForm`, `ImagePreviewDialog` and `OrganiserImages`. They use `useIssueImages`. |
 | `actions/ActionSheet.tsx` | `ActionSheet` (a vaul bottom sheet with a **Cancel** button) and `CommandFeedback` (the command error and **Retry last request**). `showCancel` hides **Cancel** when the content has its own **Done** button. `onClosed` runs after the closing animation. |
 | `admin/adminModel.ts` | Pure admin rules: the username pattern, image limit bounds and steps, the membership draft (Staff or Team, roles, Admin), and the request inputs for the `Backend` admin contract. `createAccountCommand`, `setUsernameCommand` and `resetPasswordCommand` build an `AccountCommand`. `membershipInput` builds a `MembershipInput`. `imageLimitsInput` builds the image limits. `adminModel.test.ts` tests them. |

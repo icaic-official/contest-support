@@ -105,7 +105,7 @@ export function decideWorkflow(state: WorkflowState, command: Command): Workflow
   const isStaff = member.is_admin || member.roles.length > 0;
 
   if (command.type === 'submit') {
-    const lacksSubmissionRole = member.team_id === null && !hasSupportRole;
+    const lacksSubmissionRole = member.team_id === null && !isStaff;
     const teamIntakeClosed = member.team_id !== null && !state.session.intake_open;
     if (lacksSubmissionRole || teamIntakeClosed) {
       return reject('access');

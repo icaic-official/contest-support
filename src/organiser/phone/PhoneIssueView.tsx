@@ -126,6 +126,7 @@ export function PhoneIssueView({
     if (next) setSheetContent(next);
     setSheetOpen(Boolean(next));
   };
+  const [replyAfterUpload, setReplyAfterUpload] = useState(false);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const team = state.teams.find((item) => item.id === issue.team_id);
   const teamName = team?.name ?? "the team";
@@ -277,7 +278,7 @@ export function PhoneIssueView({
               ? "This event is archived."
               : issue.owner_name
                 ? `${issue.owner_name} owns this issue.`
-                : "No action available."}
+                : "No one owns this issue."}
           </p>
         );
     }
@@ -294,6 +295,14 @@ export function PhoneIssueView({
             internalAllowed={can.internalNotes}
             draft={replyDraft}
             onDraft={onReplyDraft}
+            onAttachImage={
+              can.upload
+                ? () => {
+                    setReplyAfterUpload(true);
+                    setSheet("image");
+                  }
+                : undefined
+            }
           />
         );
       case "resolve":
@@ -364,7 +373,10 @@ export function PhoneIssueView({
           userId={member.user_id}
           canUpload={can.upload}
           uploadOpen={sheetOpen && sheet === "image"}
-          onUploadOpenChange={(open) => setSheet(open ? "image" : undefined)}
+          onUploadOpenChange={(open) => {
+            setSheet(open ? "image" : replyAfterUpload ? "reply" : undefined);
+            if (!open) setReplyAfterUpload(false);
+          }}
           onChanged={shell.data.refresh}
         />
         <ActivityList issue={issue} state={state} />

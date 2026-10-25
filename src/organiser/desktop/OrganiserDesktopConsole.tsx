@@ -364,7 +364,7 @@ export function OrganiserDesktopConsole({
                 onOpenPalette={() => setPaletteOpen(true)}
               />
               {/* ConnectedApp already renders the page's <main> landmark. */}
-              <div className="flex-1 overflow-y-auto">
+              <div className="relative flex-1 overflow-y-auto">
                 <div className="mx-auto max-w-[1400px] space-y-4 p-6">
                   <div className="space-y-2 empty:hidden">
                     {archived && (

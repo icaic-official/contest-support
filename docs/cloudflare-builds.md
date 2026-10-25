@@ -222,6 +222,35 @@ Pause publication during a live contest. A merge then does not change the applic
 - If a published version is bad, roll back the Worker with `npx wrangler rollback --config src/server/adapters/cloudflare/deploy/development.wrangler.jsonc`. Write migrations that only add tables, columns, or indexes, so that the earlier Worker still runs against the newer schema.
 - If a migration damaged data, find `Restore point before migrations:` in the deploy log. Run the `npx wrangler d1 time-travel restore` command on that line. It returns `minsky-development` to its state before the migration and discards later writes. See [D1 Time Travel](https://developers.cloudflare.com/d1/reference/time-travel/).
 
+### Read the Worker logs
+
+Workers Logs is on for `minsky-dev`. The next publication applies this setting.
+The Worker writes one JSON object for each failure. It does not log a successful request.
+
+To read the logs in the dashboard:
+
+1. Open **Workers & Pages > minsky-dev > Logs**.
+2. Filter on `level = error`, or on one `event` value from the table.
+
+To watch live from a terminal, run `npx wrangler tail minsky-dev --format json`.
+
+| Event | Meaning |
+| --- | --- |
+| `worker.unhandled_error` | A request to `/api` failed. The client got a 503. |
+| `http.unhandled_error` | An application route failed. The client got a 503. |
+| `authentication.unhandled_error` | Sign-in or account handling failed. The client got a 503. |
+| `live.coordinator_error` | The live-update Durable Object failed a request. |
+| `live.alarm_error` | The Durable Object alarm failed. |
+| `live.notify_error`, `live.notify_rejected` | One live notification was not delivered. The cron job retries it. |
+| `notifications.delivery_failed` | A delivery pass left notifications undelivered. |
+| `scheduled.task_failed` | One task of the every-minute cron job failed. The `task` field names it. This includes the image, announcement image, and avatar recovery steps. |
+| `scheduled.failed` | The cron job had at least one failed task. |
+
+Each event has `level` and `event`. It can also have `route`, `method`, `requestId`, `status`, `task`, counts, `errorName`, and `errorCode`.
+`requestId` is the `cf-ray` value of the request.
+The logs never contain passwords, cookies, tokens, IP addresses, request bodies, image data, message text, or error messages.
+A migration failure is not a Worker log. It appears in the Workers Builds log of the failed build.
+
 ### Change the D1 schema
 
 Every merge to `main` applies its new D1 migrations automatically. A Worker rollback then runs the earlier code against the newer schema.

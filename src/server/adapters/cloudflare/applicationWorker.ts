@@ -11,6 +11,8 @@ import { D1AnnouncementService } from './announcements';
 import { R2AnnouncementImageService } from './announcementImages';
 import { R2AvatarService } from './avatars';
 import { createApplicationHandler, privateJson } from './http';
+import { logEvent, requestFields } from './log';
+import { withSecurityHeaders } from './securityHeaders';
 import { connectLive, dispatchNotifications, maintainFixtureSessions, type LiveEnvironment } from './live';
 
 export { SessionLiveCoordinator } from './live';
@@ -38,7 +40,10 @@ function authentication(env: ApplicationEnvironment) {
 
 async function deliver(env: ApplicationEnvironment): Promise<void> {
   const result = await dispatchNotifications(env);
-  if (result.failed) throw new Error('Live notification delivery requires another attempt.');
+  if (result.failed) {
+    logEvent('error', 'notifications.delivery_failed', { task: 'deliver', delivered: result.delivered, failed: result.failed });
+    throw new Error('Live notification delivery requires another attempt.');
+  }
 }
 
 /** Installed application entry. Existing static development hosting stays separate. */
@@ -47,9 +52,9 @@ export default {
     const path = new URL(request.url).pathname;
     if (path !== '/api' && !path.startsWith('/api/')) {
       if (/^\/(?:\.|src(?:\/|$)|supabase(?:\/|$)|scripts(?:\/|$)|node_modules(?:\/|$))/.test(path)) {
-        return new Response(null, { status: 404 });
+        return withSecurityHeaders(new Response(null, { status: 404 }), request.url);
       }
-      return env.ASSETS.fetch(request);
+      return withSecurityHeaders(await env.ASSETS.fetch(request), request.url);
     }
     try {
       let response: Response;
@@ -76,21 +81,31 @@ export default {
       }
       // A credential operation can commit its restriction before returning an
       // error. Dispatch after every mutation. Cron retries after process loss.
-      if (request.method === 'POST' || request.method === 'PUT') context.waitUntil(deliver(env));
+      if (request.method === 'POST' || request.method === 'PUT') context.waitUntil(deliver(env).catch(() => { /* Already logged. Cron retries. */ }));
       return response;
-    } catch {
+    } catch (error) {
+      logEvent('error', 'worker.unhandled_error', { ...requestFields(request), status: 503, error });
       return privateJson({ error: 'The application is unavailable. The write outcome may be unknown.' }, 503);
     }
   },
   async scheduled(event: unknown, env: ApplicationEnvironment): Promise<void> {
-    const results = await Promise.allSettled([
-      new R2ImageService(env.DB, env.IMAGES).recover(),
-      new R2AnnouncementImageService(env.DB, env.IMAGES).recover(),
-      new R2AvatarService(env.DB, env.IMAGES).recover(),
-      deliver(env),
-      authenticationWorker.scheduled(event, env),
-    ]);
-    if (results.some((result) => result.status === 'rejected')) {
+    const tasks = {
+      'recover-images': new R2ImageService(env.DB, env.IMAGES).recover(),
+      'recover-announcement-images': new R2AnnouncementImageService(env.DB, env.IMAGES).recover(),
+      'recover-avatars': new R2AvatarService(env.DB, env.IMAGES).recover(),
+      'deliver-notifications': deliver(env),
+      'expire-sessions': authenticationWorker.scheduled(event, env),
+    };
+    const names = Object.keys(tasks);
+    const results = await Promise.allSettled(Object.values(tasks));
+    let failed = 0;
+    results.forEach((result, index) => {
+      if (result.status !== 'rejected') return;
+      failed++;
+      logEvent('error', 'scheduled.task_failed', { task: names[index], error: result.reason });
+    });
+    if (failed) {
+      logEvent('error', 'scheduled.failed', { failed });
       throw new Error('Application maintenance requires another attempt.');
     }
   },

@@ -35,10 +35,18 @@ The [D1 store](../src/server/adapters/d1/store.ts) persists all nine `WorkflowSe
 Its batches recheck credentials, generation, identity-session expiry, application-login expiry, current permissions, and captured state.
 One database timestamp supplies each workflow commit's ledger and history records.
 State, receipts, history, resolutions, awards, and audience notifications commit together.
-The complete schema adds migrations `0005` through `0012` to the authentication foundation.
+The complete schema adds migrations `0005` through `0013` to the authentication foundation.
 
 [D1ApplicationService](../src/server/adapters/cloudflare/application.ts) returns each authorized snapshot in one database statement.
-Migration `0012` indexes `history(issue_id, at)`. [The query plan test](../src/server/adapters/d1/queryPlans.test.ts) fails if a snapshot query scans a table.
+Migration `0012` indexes `history(issue_id, at)`.
+Migration `0013` indexes `memberships(account_id, session_id)` and `issues(session_id, team_id)`.
+The snapshot evaluates the caller's access once, and finds a contestant's issues through the team index.
+It reads images from the visible issues, not from every image in the database.
+It reads the member list only for an administrator.
+For a session with 1,200 accounts and 100 issues, a contestant snapshot read 196 rows, where it read 9,712 before.
+The sessions list read 7 rows, where it read 1,205 before.
+[The query plan test](../src/server/adapters/d1/queryPlans.test.ts) fails if a snapshot query scans a table or loses these indexes.
+[The read volume test](../src/server/adapters/d1/readVolume.test.ts) fails if the rows read on that session grow again.
 Snapshots preserve names, timestamps, history, awards, image metadata, limits, and administrator records.
 A valid login with removed membership receives an empty snapshot with null membership.
 An invalid login cannot authorize that read.

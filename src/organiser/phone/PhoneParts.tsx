@@ -134,7 +134,8 @@ export function PhoneHeader({
 
 /**
  * Banners that every tab shows: an archived event, a refresh error, the last
- * command result and the retry button.
+ * command result and the retry button. An error stays pinned to the top of
+ * the scrolling list, because the card that failed can be far down it.
  */
 export function PhoneStatus({
   state,
@@ -145,8 +146,14 @@ export function PhoneStatus({
   data: SessionData;
   command: CommandRunner;
 }) {
+  const failed = Boolean(data.refreshError || command.error);
   return (
-    <div className="space-y-2 empty:hidden">
+    <div
+      className={cn(
+        "space-y-2 empty:hidden",
+        failed && "sticky top-0 z-10 bg-background pb-2",
+      )}
+    >
       {state.event?.archived && (
         <Alert>
           <Archive aria-hidden="true" />

@@ -18,7 +18,7 @@ import { initialTeamSelection } from "@/connected/teamSearch";
 import { NoSessionAccess } from "@/screens/NoSessionAccess";
 import { ActionSheet, CommandFeedback } from "../actions/ActionSheet";
 import { emptyReply, type ReplyDraft } from "../actions/IssueForms";
-import { ReportForm } from "../actions/ReportForm";
+import { emptyReport, ReportForm } from "../actions/ReportForm";
 import {
   issueAbilities,
   openableIssues,
@@ -104,6 +104,7 @@ export function OrganiserPhoneApp({
   const [pushSheet, setPushSheet] = useState<IssueSheet>();
   const [reportOpen, setReportOpen] = useState(false);
   const [reportTeam, setReportTeam] = useTeamSelection(data.sessionId, state);
+  const [reportDraft, setReportDraft] = useState(emptyReport);
   const [replyDrafts, setReplyDrafts] = useState<Record<string, ReplyDraft>>(
     {},
   );
@@ -245,6 +246,7 @@ export function OrganiserPhoneApp({
                   workflow.selectIssue("");
                   workflow.setStatusFilter("all");
                   setReportTeam(initialTeamSelection());
+                  setReportDraft(emptyReport);
                   setReportOpen(false);
                   setReplyDrafts({});
                 }}
@@ -274,6 +276,8 @@ export function OrganiserPhoneApp({
             command={command}
             selection={reportTeam}
             onSelection={setReportTeam}
+            draft={reportDraft}
+            onDraft={setReportDraft}
             onDone={() => setReportOpen(false)}
           />
         </ActionSheet>

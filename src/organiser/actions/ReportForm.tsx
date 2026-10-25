@@ -1,4 +1,4 @@
-import { useId, useState } from "react";
+import { type Dispatch, type SetStateAction, useId } from "react";
 import { Plus, Send, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -14,6 +14,23 @@ import {
 import { cn } from "@/lib/utils";
 
 /**
+ * What staff typed into the form. The shell keeps it, so closing the sheet
+ * does not lose it. An empty category means the first category of the session.
+ */
+export interface ReportDraft {
+  category: string;
+  description: string;
+  /** Teams already added with Add another team. The chosen team is not in it. */
+  added: string[];
+}
+
+export const emptyReport: ReportDraft = {
+  category: "",
+  description: "",
+  added: [],
+};
+
+/**
  * Reports an issue for one or more teams. Staff find each team with the T0008
  * fuzzy team search. Staff can report while contestant intake is closed.
  * Each team gets its own issue, with its own timer, owner and award. The form
@@ -24,19 +41,28 @@ export function ReportForm({
   command,
   selection,
   onSelection,
+  draft,
+  onDraft,
   onDone,
 }: {
   state: Snapshot;
   command: CommandRunner;
   selection: TeamSelection;
   onSelection: (selection: TeamSelection) => void;
+  draft: ReportDraft;
+  // A sent team leaves the draft while later teams still send, so changes
+  // must build on the latest draft.
+  onDraft: Dispatch<SetStateAction<ReportDraft>>;
   onDone: () => void;
 }) {
   const id = useId();
   const categories = state.session?.categories ?? [];
-  const [category, setCategory] = useState(categories[0] ?? "");
-  const [description, setDescription] = useState("");
-  const [added, setAdded] = useState<string[]>([]);
+  const { description, added } = draft;
+  const category = categories.includes(draft.category)
+    ? draft.category
+    : (categories[0] ?? "");
+  const changeAdded = (change: (added: string[]) => string[]) =>
+    onDraft((current) => ({ ...current, added: change(current.added) }));
   const teamId = submitTeamId(selection);
   const targets =
     teamId && !added.includes(teamId) ? [...added, teamId] : added;
@@ -50,15 +76,17 @@ export function ReportForm({
         { type: "submit", category, description, team_id: target },
         {
           stayOnPage: !last,
+          // A retry after a lost response runs this callback, but not the
+          // rest of this function.
           onSuccess: () => {
             if (target === teamId) onSelection(initialTeamSelection());
-            setAdded((current) => current.filter((id) => id !== target));
+            if (last) onDraft(emptyReport);
+            else changeAdded((current) => current.filter((id) => id !== target));
           },
         },
       );
       if (!recorded) return;
     }
-    setDescription("");
     onDone();
   }
 
@@ -99,7 +127,7 @@ export function ReportForm({
                 className="flex size-9 items-center justify-center rounded-full"
                 onClick={() => {
                   if (target === teamId) onSelection(initialTeamSelection());
-                  setAdded((current) => current.filter((id) => id !== target));
+                  changeAdded((current) => current.filter((id) => id !== target));
                 }}
               >
                 <X aria-hidden="true" className="size-4" />
@@ -115,7 +143,7 @@ export function ReportForm({
         disabled={command.locked || !teamId || added.includes(teamId)}
         onClick={() => {
           if (!teamId) return;
-          setAdded((current) => [...current, teamId]);
+          changeAdded((current) => [...current, teamId]);
           onSelection(initialTeamSelection());
         }}
       >
@@ -139,7 +167,9 @@ export function ReportForm({
                 name={`${id}-category`}
                 value={item}
                 checked={category === item}
-                onChange={() => setCategory(item)}
+                onChange={() =>
+                  onDraft((current) => ({ ...current, category: item }))
+                }
                 className="sr-only"
               />
               {item}
@@ -152,7 +182,12 @@ export function ReportForm({
         <Textarea
           id={`${id}-description`}
           value={description}
-          onChange={(event) => setDescription(event.target.value)}
+          onChange={(event) =>
+            onDraft((current) => ({
+              ...current,
+              description: event.target.value,
+            }))
+          }
           required
           maxLength={2000}
           readOnly={command.locked}

@@ -174,6 +174,16 @@ function IssueSheetBody({
   ).length;
   const base = { issue_id: issue.id, revision: issue.revision };
   const disabled = command.locked;
+  const decideId = `decide-${issue.id}`;
+  const applyId = `apply-${issue.id}`;
+  // The tab can already be open, so focus moves either way. The panel is
+  // still hidden until React renders, so focus waits one frame.
+  const showOutcome = (headingId: string) => {
+    onTab("outcome");
+    window.requestAnimationFrame(() =>
+      document.getElementById(headingId)?.focus(),
+    );
+  };
 
   const actions: ReactNode[] = [];
   // The primary action is a filled button. Other actions are outlined.
@@ -237,7 +247,7 @@ function IssueSheetBody({
   }
   if (can.award) {
     add("award", primary === "award", (variant) => (
-      <Button variant={variant} onClick={() => onTab("outcome")}>
+      <Button variant={variant} onClick={() => showOutcome(decideId)}>
         <Scale aria-hidden="true" />
         Decide award
       </Button>
@@ -245,7 +255,7 @@ function IssueSheetBody({
   }
   if (can.apply) {
     add("apply", primary === "apply", (variant) => (
-      <Button variant={variant} onClick={() => onTab("outcome")}>
+      <Button variant={variant} onClick={() => showOutcome(applyId)}>
         <CheckCheck aria-hidden="true" />
         Confirm applied
       </Button>
@@ -390,10 +400,14 @@ function IssueSheetBody({
             <AwardReceipt award={award} state={state} />
             {can.award && (
               <section
-                aria-labelledby={`decide-${issue.id}`}
+                aria-labelledby={decideId}
                 className="rounded-xl border p-4"
               >
-                <h2 id={`decide-${issue.id}`} className="text-sm font-semibold">
+                <h2
+                  id={decideId}
+                  tabIndex={-1}
+                  className="text-sm font-semibold outline-none"
+                >
                   Decide award
                 </h2>
                 <p className="text-xs text-muted-foreground">
@@ -405,12 +419,13 @@ function IssueSheetBody({
             )}
             {can.apply && (
               <section
-                aria-labelledby={`apply-${issue.id}`}
+                aria-labelledby={applyId}
                 className="rounded-xl border p-4"
               >
                 <h2
-                  id={`apply-${issue.id}`}
-                  className="mb-3 text-sm font-semibold"
+                  id={applyId}
+                  tabIndex={-1}
+                  className="mb-3 text-sm font-semibold outline-none"
                 >
                   Confirm external application
                 </h2>

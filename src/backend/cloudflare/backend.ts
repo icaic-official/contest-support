@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { Announcements, Avatars, Backend, LiveUpdates } from '../contracts';
-import { AnnouncementRejectedError, ImageRequestError, WorkflowRejectedError } from '../errors';
+import { AnnouncementRejectedError, ImageRequestError, WorkflowRejectedError, workflowRejectionMessage } from '../errors';
 import { announcementSnapshotSchema } from '../../connected/announcementModel';
 import { AVATAR_MAX_BYTES, imageKind } from '../../connected/imageFile';
 import { type Command, snapshotSchema, type Snapshot } from '../../connected/model';
@@ -166,7 +166,7 @@ export function createCloudflareBackend(options: {
     const result = workflowSchema.safeParse(await response.json().catch(() => undefined));
     // Only the endpoint's typed rejection confirms that no command committed.
     if (result.success && result.data.outcome === 'rejected') {
-      throw new WorkflowRejectedError(`Workflow rejected: ${result.data.reason}.`);
+      throw new WorkflowRejectedError(workflowRejectionMessage(result.data.reason));
     }
     if (!response.ok || !result.success || result.data.outcome !== 'committed') {
       throw new Error('Workflow outcome is unknown. Retry the same request.');

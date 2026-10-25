@@ -9,6 +9,16 @@ Every current member of the session reads the active announcements.
 The **Announcements** list is above the issue workspace on every screen.
 Select a title to show its details and images.
 
+## Show more or hide the list
+
+The list shows the two newest announcements. Select **Show N more** to see the rest, where N is the number that are hidden.
+Select **Show fewer** to return to two.
+
+Select **Hide** to close the list. A one-line bar with the number of announcements and **Show** stays.
+Hiding the list does not delete anything. Open announcements and unsent drafts stay as they were.
+When someone publishes a new announcement, the list shows again.
+Your browser remembers the choice for your account and this session.
+
 ## Publish
 
 1. Select **New announcement**.

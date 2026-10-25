@@ -1,5 +1,6 @@
 import {
   ChevronDown,
+  ChevronUp,
   CircleAlert,
   Megaphone,
   Pencil,
@@ -41,6 +42,8 @@ import type { SessionData } from "./hooks/useSessionSnapshot";
 import { checkImageFile } from "./imageCheck";
 import { megabytes } from "./imageFile";
 import { formatDate } from "./labels";
+
+const VISIBLE_ANNOUNCEMENTS = 2;
 
 /** `unknown` keeps the request ID for Retry. */
 type Outcome = "done" | "rejected" | "unknown";
@@ -101,9 +104,45 @@ function useAnnouncementCommand(list: AnnouncementData) {
 }
 
 /**
+ * The announcement IDs that were present when the viewer hid the strip, kept
+ * per person and session in this browser. `undefined` means the strip is not
+ * hidden. Anything stored that is not a list of IDs counts as not hidden.
+ */
+function useSeenAnnouncements(key: string) {
+  const [state, setState] = useState(() => ({ key, seen: storedSeen(key) }));
+  // A person or session change reads that key's choice before this render commits.
+  if (state.key !== key) setState({ key, seen: storedSeen(key) });
+
+  function setSeen(seen: ReadonlySet<string> | undefined) {
+    setState({ key, seen });
+    try {
+      if (seen) window.localStorage.setItem(key, JSON.stringify([...seen]));
+      else window.localStorage.removeItem(key);
+    } catch {
+      // The choice still applies until the page reloads.
+    }
+  }
+
+  return [state.seen, setSeen] as const;
+}
+
+function storedSeen(key: string): ReadonlySet<string> | undefined {
+  try {
+    const stored: unknown = JSON.parse(window.localStorage.getItem(key) ?? "null");
+    return Array.isArray(stored) && stored.every((id) => typeof id === "string")
+      ? new Set<string>(stored)
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
  * Active announcements above the workspace. Titles expand to plain-text
  * details and private images. Admins and jury also publish, edit, and remove.
  * Reading never waits for issue data, and failures never disable reporting.
+ * The strip lists the newest announcements first. Any viewer can show the rest
+ * or hide the strip until an announcement they have not seen arrives.
  */
 export function Announcements({ data }: { data: SessionData }) {
   const member = data.snapshot?.membership;
@@ -113,6 +152,11 @@ export function Announcements({ data }: { data: SessionData }) {
   const command = useAnnouncementCommand(list);
   const now = useNow(data.clockOffset);
   const headingId = useId();
+  const bodyId = useId();
+  const [seen, setSeen] = useSeenAnnouncements(
+    `minsky:announcements-hidden:${member?.user_id ?? ""}:${data.sessionId}`,
+  );
+  const [showAll, setShowAll] = useState(false);
   const [open, setOpen] = useState<ReadonlySet<string>>(new Set());
   const [composing, setComposing] = useState(false);
   const [newDraft, setNewDraft] = useState(emptyAnnouncementDraft);
@@ -128,6 +172,14 @@ export function Announcements({ data }: { data: SessionData }) {
   // Readers see nothing until there is something to read. Failures stay quiet
   // for them, because issue work continues without announcements.
   if (!manager && items.length === 0) return null;
+  // A new announcement is not in `seen`, so it shows the strip again. An edit keeps its ID.
+  const hidden =
+    seen !== undefined && items.length > 0 && items.every((item) => seen.has(item.id));
+  // An open edit or removal prompt stays in view when a live change pushes it down.
+  const pinned =
+    items.findIndex((item) => item.id === edit?.id || item.id === removing) >=
+    VISIBLE_ANNOUNCEMENTS;
+  const shown = showAll || pinned ? items : items.slice(0, VISIBLE_ANNOUNCEMENTS);
 
   function toggle(id: string) {
     setOpen((current) => {
@@ -169,12 +221,15 @@ export function Announcements({ data }: { data: SessionData }) {
       className={`${composing || edit ? "max-h-[80dvh]" : "max-h-[40dvh]"} shrink-0 overflow-y-auto border-b bg-muted/40`}
     >
       <div className="mx-auto grid max-w-4xl gap-2 px-4 py-2 sm:px-8">
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Megaphone aria-hidden="true" className="size-4 text-muted-foreground" />
           <h2 id={headingId} className="flex-1 text-sm font-medium">
             Announcements
+            {hidden && (
+              <span className="font-normal text-muted-foreground"> · {items.length}</span>
+            )}
           </h2>
-          {canWrite && (
+          {canWrite && !hidden && (
             <Button
               ref={newButton}
               size="sm"
@@ -187,19 +242,25 @@ export function Announcements({ data }: { data: SessionData }) {
               New announcement
             </Button>
           )}
+          {items.length > 0 && (
+            // One button for both states keeps keyboard focus on it.
+            <Button
+              size="sm"
+              variant="ghost"
+              className="ml-auto"
+              aria-expanded={!hidden}
+              aria-controls={bodyId}
+              onClick={() =>
+                setSeen(hidden ? undefined : new Set(items.map((item) => item.id)))
+              }
+            >
+              {hidden ? <ChevronDown aria-hidden="true" /> : <ChevronUp aria-hidden="true" />}
+              {hidden ? "Show" : "Hide"}
+              <span className="sr-only"> announcements</span>
+            </Button>
+          )}
         </div>
-        {list.error && manager && (
-          <Alert variant="destructive">
-            <CircleAlert aria-hidden="true" />
-            <AlertDescription className="flex items-center gap-3">
-              <span className="flex-1">{list.error}</span>
-              <Button size="sm" variant="outline" onClick={() => void list.refresh()}>
-                <RotateCw aria-hidden="true" />
-                Reload
-              </Button>
-            </AlertDescription>
-          </Alert>
-        )}
+        {/* A failed publish may be unconfirmed, so its Retry stays reachable while hidden. */}
         {command.error && (
           <Alert variant="destructive" role="alert">
             <CircleAlert aria-hidden="true" />
@@ -219,49 +280,75 @@ export function Announcements({ data }: { data: SessionData }) {
             </AlertDescription>
           </Alert>
         )}
-        {composing && canWrite && (
-          <AnnouncementForm
-            legend="New announcement"
-            submitLabel="Publish"
-            draft={newDraft}
-            onDraft={setNewDraft}
-            now={now}
-            busy={command.busy}
-            onSubmit={() => void publish()}
-            onCancel={() => setComposing(false)}
-          />
-        )}
-        {manager && list.loaded && items.length === 0 && !list.error && (
-          <p className="text-sm text-muted-foreground">No announcements yet.</p>
-        )}
-        <ul className="grid gap-1">
-          {items.map((item) => (
-            <AnnouncementItem
-              key={item.id}
-              item={item}
-              images={list.images.filter((image) => image.announcement_id === item.id)}
-              expanded={open.has(item.id)}
-              onToggle={() => toggle(item.id)}
-              manager={manager}
-              canWrite={canWrite}
+        {/* Hiding keeps the body mounted, so open items, drafts, and uploads survive Show. */}
+        <div id={bodyId} hidden={hidden} className="grid gap-2">
+          {list.error && manager && (
+            <Alert variant="destructive">
+              <CircleAlert aria-hidden="true" />
+              <AlertDescription className="flex items-center gap-3">
+                <span className="flex-1">{list.error}</span>
+                <Button size="sm" variant="outline" onClick={() => void list.refresh()}>
+                  <RotateCw aria-hidden="true" />
+                  Reload
+                </Button>
+              </AlertDescription>
+            </Alert>
+          )}
+          {composing && canWrite && (
+            <AnnouncementForm
+              legend="New announcement"
+              submitLabel="Publish"
+              draft={newDraft}
+              onDraft={setNewDraft}
               now={now}
               busy={command.busy}
-              editing={edit?.id === item.id ? edit : undefined}
-              removing={removing === item.id}
-              onEdit={() => {
-                setOpen((current) => new Set(current).add(item.id));
-                setEdit({ id: item.id, base: item.revision, draft: draftOf(item) });
-              }}
-              onEditChange={setEdit}
-              onSave={(current) => void save(current)}
-              onCancelEdit={() => setEdit(undefined)}
-              onAskRemove={() => setRemoving(item.id)}
-              onCancelRemove={() => setRemoving(undefined)}
-              onRemove={() => void remove(item)}
-              list={list}
+              onSubmit={() => void publish()}
+              onCancel={() => setComposing(false)}
             />
-          ))}
-        </ul>
+          )}
+          {manager && list.loaded && items.length === 0 && !list.error && (
+            <p className="text-sm text-muted-foreground">No announcements yet.</p>
+          )}
+          <ul className="grid gap-1">
+            {shown.map((item) => (
+              <AnnouncementItem
+                key={item.id}
+                item={item}
+                images={list.images.filter((image) => image.announcement_id === item.id)}
+                expanded={open.has(item.id)}
+                onToggle={() => toggle(item.id)}
+                manager={manager}
+                canWrite={canWrite}
+                now={now}
+                busy={command.busy}
+                editing={edit?.id === item.id ? edit : undefined}
+                removing={removing === item.id}
+                onEdit={() => {
+                  setOpen((current) => new Set(current).add(item.id));
+                  setEdit({ id: item.id, base: item.revision, draft: draftOf(item) });
+                }}
+                onEditChange={setEdit}
+                onSave={(current) => void save(current)}
+                onCancelEdit={() => setEdit(undefined)}
+                onAskRemove={() => setRemoving(item.id)}
+                onCancelRemove={() => setRemoving(undefined)}
+                onRemove={() => void remove(item)}
+                list={list}
+              />
+            ))}
+          </ul>
+          {items.length > VISIBLE_ANNOUNCEMENTS && !pinned && (
+            <Button
+              size="sm"
+              variant="ghost"
+              className="w-fit"
+              aria-expanded={showAll}
+              onClick={() => setShowAll((value) => !value)}
+            >
+              {showAll ? "Show fewer" : `Show ${items.length - VISIBLE_ANNOUNCEMENTS} more`}
+            </Button>
+          )}
+        </div>
       </div>
     </section>
   );

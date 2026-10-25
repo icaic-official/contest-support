@@ -356,9 +356,9 @@ describe("missingActionHint", () => {
   const claimed = issue({ status: "claimed", owner: other, owner_name: "Other" });
   const escalated = { ...claimed, status: "escalated" as const };
   const adminOpen =
-    "You cannot claim this issue. Claiming needs the Volunteer or Specialist role. Add the Volunteer role to your own account in Accounts to claim it.";
+    "You cannot claim this issue. Claiming needs the Volunteer or Specialist role. Add the Volunteer role to your own account in Accounts to claim it. You can still reply and add images.";
   const juryOpen =
-    "You cannot claim this issue. Claiming needs the Volunteer or Specialist role. A session admin can add a role in Accounts.";
+    "You cannot claim this issue. Claiming needs the Volunteer or Specialist role. A session admin can add a role in Accounts. You can still reply and add images.";
   const juryClaimed =
     "You cannot resolve this issue. Only its owner or a session admin can resolve it.";
 
@@ -415,9 +415,9 @@ describe("missingActionHint", () => {
     ];
     for (const person of people) {
       const can = issueAbilities(issue(), noAwards, person);
-      expect(missingActionHint(issue(), person, false) !== undefined).toBe(
-        isStaff(person) && !can.claim,
-      );
+      const hint = missingActionHint(issue(), person, false);
+      expect(hint !== undefined).toBe(isStaff(person) && !can.claim);
+      if (hint) expect(can.reply && can.upload).toBe(true);
     }
   });
 });

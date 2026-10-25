@@ -309,7 +309,11 @@ describe('Cloudflare session announcements with local D1 and R2 bindings', () =>
   it('keeps the images and files of a removed announcement and hides them from everyone', async () => {
     const id = await publish();
     const image = await publishedImage(id);
+    const unfinished = await reserve(id);
+    await transfer(unfinished.path);
     await service.execute(admin, fixture.sessionId, randomUUID(), { type: 'remove', id, revision: 1 });
+    await images.remove(admin, fixture.sessionId, unfinished.id, true);
+    expect(await bucket.get(unfinished.path)).toBeNull();
     for (const caller of [contestant, jury, admin]) {
       await expect(images.download(caller, image.path)).rejects.toMatchObject({ validation: true });
       expect((await read(caller)).images).toEqual([]);

@@ -69,7 +69,7 @@ These steps occur in sequence:
 
 1. `src/main.tsx` wraps `ConnectedApp` in `BrowserRouter`. `ConnectedApp` restores the session with `useAuthSession`.
 2. Without a user, it shows `SignIn` (`src/screens/SignIn.tsx`).
-3. `useAccountStatus` checks the account every 10 seconds and on window focus.
+3. `useAccountStatus` checks the account on the [refresh schedule](#refresh-schedule) and on window focus.
    If the password is temporary, `PasswordForm` (`src/screens/PasswordForm.tsx`) shows. The database also enforces this change.
 4. `Workspace` (`src/connected/Workspace.tsx`) loads session data with `useSessionSnapshot`. It wraps the UI in `AvatarProvider`, which loads [profile pictures](#profile-pictures). It selects the UI with `uiKindFor` from `model.ts`:
    - A membership with `team_id` gets `ContestantApp` (`src/contestant/ContestantApp.tsx`).
@@ -155,8 +155,8 @@ They call the `Backend` contracts through `backend`.
 | Hook | Responsibility |
 | --- | --- |
 | `useAuthSession()` | Uses `requireBackend().auth`. Restores the stored session and follows sign-in and sign-out. Returns `user`, `loading`, `error` and `signOut`. |
-| `useAccountStatus(userId)` | Reads `account_status` every 10 seconds and on focus. Returns `account`, `error` and `recheck()`. |
-| `useSessionSnapshot(userId)` | Loads memberships, the session list and the selected snapshot. Reads run in sequence. A generation counter discards responses for an earlier session. It refreshes on Realtime changes, every 10 seconds, on focus and when the browser is online again. It clears the snapshot after an error. It records the server clock offset. |
+| `useAccountStatus(userId, live)` | Reads `account_status` on the refresh schedule and on focus. `live` is true while the live channel is connected. Returns `account`, `error` and `recheck()`. |
+| `useSessionSnapshot(userId)` | Loads memberships, the session list and the selected snapshot. Reads run in sequence. A generation counter discards responses for an earlier session. It refreshes on live changes, on focus, when the tab becomes visible and when the browser is online again. Its timer runs every 10 seconds while the live channel is down and every 60 seconds while it is connected. Each tick also adds one to `SessionData.updates`, so announcements and pictures read again. It clears the snapshot after an error. It records the server clock offset. |
 | `useCommand({ sessionId, refresh, onRecorded })` | Runs one workflow command at a time. It uses the actor-bound request from `WorkflowRetryProvider`. An explicit retry retains the original session, request ID, and command. `onSuccess` clears the originating form before refresh while that form remains mounted. |
 | `useWorkflowState(data)` | Combines `useCommand` with the selected issue and the status filter. A recorded command selects its issue when the person did not choose an issue while it ran. An inline queue action does not select its issue. A reopened issue sets the filter to `claimed`. |
 | `useAvatarEditor()` | The steps of changing the caller's own profile picture: choose, preview, save and remove. See [Profile pictures](#profile-pictures). |
@@ -169,6 +169,18 @@ Show **Retry last request** while `command.pending` is set and `command.busy` is
 
 `src/connected/labels.ts` holds the status names, the resolution summaries and the award minute presets.
 Use these values in every UI so that the text stays the same.
+
+## Refresh schedule
+
+`startRefreshSchedule` (`src/connected/hooks/refreshSchedule.ts`) owns the timer for `useSessionSnapshot` and `useAccountStatus`.
+
+| Live channel | Timer | Also refreshes on |
+| --- | --- | --- |
+| Connected | Every 60 seconds | A live hint, window focus, the tab becoming visible, the browser coming online |
+| Down or reconnecting | Every 10 seconds | The same events, and at once when the channel drops or reconnects |
+
+The 60-second timer is a safety net for changes that send no hint: a picture change, an announcement expiry, and a password reset.
+The server also closes a socket when access is revoked, and the drop starts a refresh.
 
 ## Contestant app
 
@@ -333,7 +345,7 @@ A picture belongs to an account, not to a session. The visibility rule is in [Av
 
 These rules apply:
 
-- The provider calls `avatars.list(sessionId)` when the session or `SessionData.updates` changes, and every 10 seconds. A picture change sends no live signal, so the poll shows the change of another person. A failed read keeps the earlier list. A session change or lost access drops the list. An unchanged list keeps the same map object, so the avatars do not render again.
+- The provider calls `avatars.list(sessionId)` when the session or `SessionData.updates` changes. `updates` counts live signals and session timer ticks. A picture change sends no live signal, so the timer shows the change of another person. A failed read keeps the earlier list. A session change or lost access drops the list. An unchanged list keeps the same map object, so the avatars do not render again.
 - Only the newest read or change sets the list. An upload and a removal set the list themselves. A read that started earlier then cannot bring back the old picture.
 - `PersonAvatar` takes an optional `personId`. It shows the picture through `useAvatarUrl`, and it shows initials when the person has no picture, when the caller cannot see it, or when the browser cannot decode it. The picture has an empty `alt`, because the name stands next to it. A call site that has no person ID shows initials.
 - `AvatarImageCache` downloads a picture when the first avatar on screen asks for it. Every other avatar of that picture shares its object URL. The avatar ID is the cache key. It changes on every upload, so a cached picture never goes stale. The cache revokes the URL of a picture that left the list, and all URLs when the session changes or the provider unmounts. After an upload the cache holds the encoded file, so the new picture needs no download.

@@ -83,7 +83,8 @@ test("a changed picture replaces the old one and revokes its URL", async ({ page
   await expect(image).toBeVisible();
   const before = await image.getAttribute("src");
   server.pictures.set(USER_ID, picture(solid(64, 64, blue)));
-  await page.clock.fastForward(10_000);
+  // A picture change sends no live hint. A connected client sees it on the 60-second refresh.
+  await page.clock.fastForward(60_000);
   await expect(image).not.toHaveAttribute("src", before!);
   expect(
     await page.evaluate(

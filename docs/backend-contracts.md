@@ -222,7 +222,7 @@ Failures use `ImageRequestError`. `validation` marks a rejected file or request.
 
 The issue snapshot and its `members` list do not contain pictures.
 A picture change sends no live signal.
-The frontend reads `list()` again after each live signal and every 10 seconds. Other people then see a changed picture after their next read.
+The frontend reads `list()` again after each live signal and on the session timer. The timer runs every 10 seconds while the live channel is down and every 60 seconds while it is connected. Other people then see a changed picture after their next read.
 
 The Cloudflare route checks the given session before and after it reads R2.
 See [Cloudflare account avatars](cloudflare-backend-design.md#account-avatars-use-the-private-image-bucket).

@@ -316,7 +316,13 @@ See [Durable Objects alarms](https://developers.cloudflare.com/durable-objects/a
 
 Every successful connection or reconnect triggers a fresh authorized snapshot.
 A missed invalidation cannot require the browser to reconstruct issue history from messages.
-The existing focus refresh and ten-second polling remain until tests justify a replacement.
+While the live channel is connected, the browser refreshes on live hints, on focus, when the tab becomes visible, and once every 60 seconds.
+The 60-second refresh is a safety net. It bounds the delay for changes that send no hint: a profile picture change, an announcement expiry, and a password reset.
+While the channel is down or reconnecting, the browser refreshes every 10 seconds as before.
+A drop or a reconnect starts a refresh at once.
+One timer in `useSessionSnapshot` drives the snapshot, announcement and picture reads.
+The account check in `useAccountStatus` uses the same schedule.
+`createCloudflareAuthentication` keeps its own 60-second session check.
 Closing a subscription stops callbacks immediately and releases the socket and timers.
 
 The healthy-connection target remains live updates within three seconds.

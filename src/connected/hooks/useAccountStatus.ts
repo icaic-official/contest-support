@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { backend } from "@/backend";
 import type { AccountStatus } from "@/backend/contracts";
 import { errorMessage } from "@/backend/errors";
+import { startRefreshSchedule } from "./refreshSchedule";
 
 /** Password and session state of the signed-in account. */
 export interface AccountState {
@@ -13,13 +14,18 @@ export interface AccountState {
 }
 
 /**
- * Checks the account every 10 seconds and when the window gets focus, so a
- * password reset by an organizer signs out other devices.
+ * Checks the account on the refresh schedule, so a password reset by an
+ * organizer signs out other devices. Pass `live` as true while the live
+ * channel is connected: the check then runs every 60 seconds, not every 10.
  */
-export function useAccountStatus(userId: string | undefined): AccountState {
+export function useAccountStatus(
+  userId: string | undefined,
+  live: boolean,
+): AccountState {
   const [account, setAccount] = useState<AccountStatus>();
   const [error, setError] = useState("");
   const [attempt, setAttempt] = useState(0);
+  const check = useRef<() => void>(undefined);
   useEffect(() => {
     if (!userId) return;
     let active = true;
@@ -35,16 +41,21 @@ export function useAccountStatus(userId: string | undefined): AccountState {
       }
     }
     void refreshAccount();
-    const interval = window.setInterval(() => {
-      void refreshAccount();
-    }, 10000);
-    window.addEventListener("focus", refreshAccount);
+    check.current = () => void refreshAccount();
     return () => {
       active = false;
-      window.clearInterval(interval);
-      window.removeEventListener("focus", refreshAccount);
+      check.current = undefined;
     };
   }, [userId, attempt]);
+  useEffect(() => {
+    if (!userId) return;
+    return startRefreshSchedule({
+      refresh: () => check.current?.(),
+      connected: live,
+      window,
+      document,
+    });
+  }, [userId, live]);
   return {
     account,
     error,

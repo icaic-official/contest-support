@@ -61,8 +61,11 @@ export interface IssueImagesState {
   busy: boolean;
   /** The plain-language image limits. */
   limitText: string;
-  /** Uploads a file, or continues the upload in `retry`. */
-  send: (file: File) => Promise<void>;
+  /**
+   * Uploads a file, or continues the upload in `retry`. Resolves to true when
+   * the image was added, so the caller can clear its file input.
+   */
+  send: (file: File) => Promise<boolean>;
   /** Deletes the unfinished files of the upload in `retry`. */
   cancelUpload: () => Promise<boolean>;
   remove: (item: PendingRemoval) => Promise<void>;
@@ -151,7 +154,7 @@ export function useIssueImages({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [issueId, sessionId, shownKey, transport]);
 
-  async function send(file: File) {
+  async function send(file: File): Promise<boolean> {
     const pending = retry?.pending;
     const requestId = retry?.requestId ?? crypto.randomUUID();
     setBusy(true);
@@ -168,7 +171,7 @@ export function useIssueImages({
           setRetry(undefined);
           setMessage("Image added.");
           await onChanged();
-          return;
+          return true;
         } catch (cause) {
           if (!(isImageRequestError(cause) && cause.incomplete)) {
             throw cause;
@@ -218,6 +221,7 @@ export function useIssueImages({
       setRetry(undefined);
       setMessage("Image added.");
       await onChanged();
+      return true;
     } catch (cause) {
       const text =
         cause instanceof Error
@@ -232,7 +236,7 @@ export function useIssueImages({
             setMessage(
               `${text} The unfinished files could not be deleted. Use Cancel upload to try again.`,
             );
-            return;
+            return false;
           }
         }
         setRetry(undefined);
@@ -240,6 +244,7 @@ export function useIssueImages({
         setRetry({ file, requestId, pending: started });
       }
       setMessage(text);
+      return false;
     } finally {
       setBusy(false);
       setProgress(undefined);

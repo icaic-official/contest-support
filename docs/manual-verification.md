@@ -356,6 +356,9 @@ Use an active event unless a step says the event is archived.
 34. Repeat with a password reset and with event archival.
 35. Start two uploads, then lower the count limit to one. Check that only one can become attached.
 36. Try a file path with an extra folder. Check that Storage refuses it.
+37. After an upload succeeds, check that the file control shows no chosen file. Check that the visibility choice is the same as before.
+38. Select **Add image** again without a new file. Check that the app asks for an image and that no second image appears.
+39. Choose another file. Check that the "Image added." message goes away.
 
 Check delayed previews with two different images, A and B, in an isolated test:
 
@@ -369,6 +372,9 @@ Check delayed previews with two different images, A and B, in an isolated test:
 `tests/images.spec.ts` automates these response-order checks with the development image harness.
 It also checks that closing the preview releases its temporary browser URL.
 These tests do not access hosted data.
+
+`tests/image-upload.spec.ts` automates steps 37 to 39 on a phone with local storage.
+It also checks that a failed upload keeps its file for **Try the upload again**.
 
 ## 11. Team search
 

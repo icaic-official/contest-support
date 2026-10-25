@@ -300,6 +300,7 @@ Shared parts that the console added or changed:
 - `actions/ActionDialog.tsx` is a centred dialog with the props of `ActionSheet`. The console uses it for resolve, escalate, reopen, report, accounts and image upload.
 - `OrganiserImages` takes `surface="dialog"` to show the upload form in an `ActionDialog`.
 - `ReplyForm` takes `layout="composer"`: the message first, then the audience switch and **Send**. Ctrl+Enter or ⌘+Enter sends in both layouts.
+- `ReplyForm` takes `onAttachImage` when the person can upload. It adds a camera button, **Attach an image**, before **Send** in both layouts. The button opens the issue's image upload. The image belongs to the issue, not to the message, and the upload keeps its own visibility choice. On a phone, the upload goes back to the Reply sheet and its draft when it closes.
 - `LifecycleBar` takes `details`. `lifecycleDetails()` gives the submission and first assignment times, "Requested" during a handoff and the resolution time.
 
 These rules apply:

@@ -67,7 +67,7 @@ Existing `sessionId` parameters already mean "contest ID" and keep their names.
 
 A competition is an `events` row. A contest is a `sessions` row with a new `kind` column. All operational data already belongs to one session, and the live channel is already per session (`src/server/adapters/cloudflare/live.ts:252`). So practice and live share no issues, awards, announcements, or images.
 
-Migration 0011 adds the `admin_grants` table, `sessions.kind`, `teams.roster_key`, the `setup_receipts` table, and an index on `memberships(account_id)`. It writes no rows. Migration 0012 in Phase 2 adds `installation.name` and `organization_audit`. Migration 0013 in Phase 5 adds `sessions.archived_at` and the `contest_state` view.
+Migration 0012 adds the `admin_grants` table, `sessions.kind`, `teams.roster_key`, the `setup_receipts` table, and an index on `memberships(account_id)`. It writes no rows. Migration 0013 in Phase 2 adds `installation.name` and `organization_audit`. Migration 0014 in Phase 5 adds `sessions.archived_at` and the `contest_state` view.
 
 ### Authority
 
@@ -219,10 +219,10 @@ export const requiredAuthority: { [T in SetupCommand['type']]: 'installation' | 
 export declare function accountAuthority(actor: AccountId, target: AccountId): SqlCheck;
 ```
 
-### Migration 0011 sketch
+### Migration 0012 sketch
 
 ```sql
--- 0011_contests.sql. Every statement only adds schema.
+-- 0012_contests.sql. Every statement only adds schema.
 
 -- Authority above the contest. Each grant names one application account.
 -- Bootstrap, owner recovery, and the trusted grant-admin command write grants with
@@ -369,7 +369,7 @@ This phase deletes `D1AuthenticationService.sessions()` (`src/server/adapters/cl
 
 ### Phase 1. Add a practice contest
 
-This phase ships migration 0011, `grant-admin`, the first grant in bootstrap, `authority.ts`, the grant-holder reset rule, and `Setup` for `add_session` and `join_session`. It also ships `SessionSummary.kind` and `event`, the **Add contest** form with its preview, the badge, and docs. Tests on D1 and on Supabase with embedded PostgreSQL cover these cases:
+This phase ships migration 0012, `grant-admin`, the first grant in bootstrap, `authority.ts`, the grant-holder reset rule, and `Setup` for `add_session` and `join_session`. It also ships `SessionSummary.kind` and `event`, the **Add contest** form with its preview, the badge, and docs. Tests on D1 and on Supabase with embedded PostgreSQL cover these cases:
 
 - A copied team account lands on the copied team, and no `notCopied` item copies.
 - The preview counts equal the inserted rows.
@@ -381,7 +381,7 @@ One manual browser check confirms that an issue filed in practice never appears 
 
 ### Phase 2. Competitions and competition admins
 
-This phase ships migration 0012, `create_event`, `grant_admin`, `revoke_admin`, and competition archive. It also ships CSV team import, the **Competitions** page, bootstrap through `createEventStatements`, and owner recovery that needs only the owner record. Tests show that one call makes both contests and that the last organization admin cannot be revoked. A further test shows that owner recovery works after the first competition is archived. Nothing existing breaks.
+This phase ships migration 0013, `create_event`, `grant_admin`, `revoke_admin`, and competition archive. It also ships CSV team import, the **Competitions** page, bootstrap through `createEventStatements`, and owner recovery that needs only the owner record. Tests show that one call makes both contests and that the last organization admin cannot be revoked. A further test shows that owner recovery works after the first competition is archived. Nothing existing breaks.
 
 ### Phase 3. Account authority across competitions
 
@@ -393,7 +393,7 @@ This phase ships routes under `/contests/<id>/`, `sortSessions`, `chooseSession`
 
 ### Phase 5. Archive one contest
 
-This phase ships migration 0013 and one sweep that moves the 13 D1 reads to `contest_state` or `currentAccessSql`. On Supabase, `app_private.contest_archived` replaces the direct reads in 18 function names, some of them superseded. To reproduce that count, run `awk 'tolower($0) ~ /create (or replace )?function/ { match(tolower($0), /function [a-z_.]+/); name=substr(tolower($0), RSTART+9, RLENGTH-9) } /archived/ && name != "" { print name }' supabase/migrations/*.sql | sort -u | wc -l`. A repository test fails on a new direct read. Tests show that practice archives while live keeps working. This is the widest change, so it ships as one pull request with the guard test. A missed read would leave one write path open in an archived contest. After a revert, a contest archived through `archived_at` becomes writable again, because the old Worker reads only `events.archived`.
+This phase ships migration 0014 and one sweep that moves the 13 D1 reads to `contest_state` or `currentAccessSql`. On Supabase, `app_private.contest_archived` replaces the direct reads in 18 function names, some of them superseded. To reproduce that count, run `awk 'tolower($0) ~ /create (or replace )?function/ { match(tolower($0), /function [a-z_.]+/); name=substr(tolower($0), RSTART+9, RLENGTH-9) } /archived/ && name != "" { print name }' supabase/migrations/*.sql | sort -u | wc -l`. A repository test fails on a new direct read. Tests show that practice archives while live keeps working. This is the widest change, so it ships as one pull request with the guard test. A missed read would leave one write path open in an archived contest. After a revert, a contest archived through `archived_at` becomes writable again, because the old Worker reads only `events.archived`.
 
 ### Phase 6. Roster sync and bulk accounts
 

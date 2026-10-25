@@ -166,7 +166,7 @@ async function signIn(page: Page, viewport: Viewport) {
     }
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(result) });
   });
-  await page.goto('/');
+  await page.goto('/sign-in');
   await expect(page).toHaveTitle(/^Minsky\b/);
   await page.getByLabel('Username', { exact: true }).fill('reviewer');
   await page.getByLabel('Password', { exact: true }).fill('fixture-password');

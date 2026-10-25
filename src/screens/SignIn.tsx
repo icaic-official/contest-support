@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Eye, EyeOff, LoaderCircle } from "lucide-react";
+import { Link } from "react-router";
 import { BrandMark } from "@/components/brand";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -19,7 +20,12 @@ export function SignIn() {
       aria-labelledby="sign-in-heading"
       className="w-full max-w-sm"
     >
-      <BrandMark className="mb-10 text-lg" />
+      <Link
+        to="/"
+        className="mb-10 flex w-fit rounded-md text-lg outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+      >
+        <BrandMark />
+      </Link>
       <h1
         id="sign-in-heading"
         className="text-3xl font-semibold tracking-tight"

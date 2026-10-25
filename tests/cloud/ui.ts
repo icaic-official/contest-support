@@ -44,7 +44,7 @@ export async function submitSignIn(
  */
 export async function login(page: Page, name: string, ui?: Ui) {
   const details = fixture().accounts[name];
-  await page.goto("/");
+  await page.goto("/sign-in");
   await submitSignIn(page, details.username, details.password);
   await expect(uiRoot(page, ui)).toBeVisible({ timeout: 15000 });
   // Hosted Realtime can take several seconds to join the channel.

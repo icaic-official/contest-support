@@ -1,5 +1,5 @@
 import { type MouseEvent, type ReactNode, useState } from "react";
-import { useNavigate } from "react-router";
+import { useLocation, useNavigate } from "react-router";
 import { BrandMark } from "@/components/brand";
 import { BuildId } from "@/components/build-id";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -15,6 +15,7 @@ import {
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { documentationUrl } from "@/lib/links";
+import { Landing } from "@/screens/Landing";
 import { PasswordForm } from "@/screens/PasswordForm";
 import { SignIn } from "@/screens/SignIn";
 import { backend, backendSetupMessage } from "@/backend";
@@ -49,12 +50,23 @@ function skipToMain(event: MouseEvent<HTMLAnchorElement>): void {
   }
 }
 
+/** The page chrome around the main landmark. */
+type Layout = "dashboard" | "centered" | "landing";
+
+const mainClasses: Record<Layout, string> = {
+  dashboard: "flex-1 outline-none",
+  landing: "flex-1 outline-none",
+  centered:
+    "flex flex-1 flex-col items-center justify-center gap-4 px-6 py-12 outline-none",
+};
+
 /**
  * The application root. It restores the sign-in, enforces the password
  * change, and then hands over to Workspace, which selects the UI.
  */
 export function ConnectedApp() {
   const navigate = useNavigate();
+  const { pathname } = useLocation();
   const auth = useAuthSession();
   const { user } = auth;
   const account = useAccountStatus(user?.id);
@@ -68,6 +80,13 @@ export function ConnectedApp() {
     !status.must_change &&
     !passwordSetup &&
     !account.error;
+  // Every other signed-out path is a deep link and goes through sign-in.
+  const showLanding = !auth.loading && !!backend && !user && pathname === "/";
+  const layout: Layout = dashboardReady
+    ? "dashboard"
+    : showLanding
+      ? "landing"
+      : "centered";
   let content: ReactNode;
   if (auth.loading) {
     content = <StatusMessage>Restoring your session…</StatusMessage>;
@@ -77,6 +96,8 @@ export function ConnectedApp() {
         <AlertDescription>{backendSetupMessage}</AlertDescription>
       </Alert>
     );
+  } else if (showLanding) {
+    content = <Landing />;
   } else if (!user) {
     content = <SignIn />;
   } else if (account.error) {
@@ -152,7 +173,7 @@ export function ConnectedApp() {
             </Button>
           </header>
         )}
-        {!user && !auth.loading && (
+        {layout === "centered" && !user && !auth.loading && (
           <div className="absolute top-3 right-3">
             <ThemeToggle />
           </div>
@@ -160,14 +181,10 @@ export function ConnectedApp() {
         <main
           id="main"
           tabIndex={-1}
-          className={
-            dashboardReady
-              ? "flex-1 outline-none"
-              : "flex flex-1 flex-col items-center justify-center gap-4 px-6 py-12 outline-none"
-          }
+          className={mainClasses[layout]}
         >
           {auth.error && (
-            <Alert variant="destructive" className="max-w-md">
+            <Alert variant="destructive" className="mx-auto max-w-md">
               <AlertDescription>{auth.error}</AlertDescription>
             </Alert>
           )}
@@ -175,7 +192,7 @@ export function ConnectedApp() {
             {content}
           </WorkflowRetryProvider>
         </main>
-        {!dashboardReady && (
+        {layout !== "dashboard" && (
           <footer className="px-6 py-4 text-center text-xs text-muted-foreground">
             Minsky · Development deployment ·{" "}
             <a

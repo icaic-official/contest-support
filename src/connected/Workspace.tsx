@@ -11,7 +11,7 @@ import { useCommand } from "./hooks/useCommand";
 import { useSessionSnapshot } from "./hooks/useSessionSnapshot";
 import { type UiKind, uiKindFor } from "./model";
 import type { ShellProps } from "./shell";
-import { canOpenPage, pageForPath } from "./navigation";
+import { canOpenPage, isEntryPath, pageForPath } from "./navigation";
 
 /**
  * Loads the session data and selects the UI from the membership: team
@@ -29,7 +29,7 @@ export function Workspace(props: Omit<ShellProps, "data">) {
   const [kind, setKind] = useState<UiKind>();
   if (current && current !== kind) setKind(current);
   const page = pageForPath(pathname);
-  if (pathname === "/") return <Navigate to="/issues" replace />;
+  if (isEntryPath(pathname)) return <Navigate to="/issues" replace />;
   if (!page) {
     return (
       <div className="flex flex-col items-center gap-4 p-6">

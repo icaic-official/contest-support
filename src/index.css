@@ -148,3 +148,34 @@
   );
   border-color: rgb(245 158 11 / 0.45);
 }
+
+/* The landing page backdrop: soft status-colored glows over a dotted grid.
+ * The mask fades it out before the next section. */
+@utility hero-backdrop {
+  background-image:
+    radial-gradient(
+      circle at 15% 10%,
+      color-mix(in srgb, var(--status-open) 16%, transparent),
+      transparent 40%
+    ),
+    radial-gradient(
+      circle at 85% 5%,
+      color-mix(in srgb, var(--status-claimed) 14%, transparent),
+      transparent 38%
+    ),
+    radial-gradient(
+      circle at 75% 85%,
+      color-mix(in srgb, var(--status-resolved) 12%, transparent),
+      transparent 36%
+    ),
+    radial-gradient(
+      color-mix(in srgb, var(--muted-foreground) 35%, transparent) 1px,
+      transparent 1px
+    );
+  background-size:
+    auto,
+    auto,
+    auto,
+    24px 24px;
+  mask-image: linear-gradient(to bottom, black 55%, transparent);
+}

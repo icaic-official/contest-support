@@ -45,7 +45,7 @@ test("public signup is disabled while organizer-created accounts can log in", as
 test("sign-in stays usable on phones and exposes recovery help by keyboard", async ({
   page,
 }, testInfo) => {
-  await page.goto("/");
+  await page.goto("/sign-in");
   await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
   await page.evaluate(() => document.fonts.ready);
   await page.screenshot({
@@ -1034,7 +1034,7 @@ test("organizer creates username accounts, mandatory changes and reset invalidat
     expect(signed.error).toBeNull();
     expect((await api.from("sessions").select("*")).data).toEqual([]);
     expect((await api.rpc("complete_password_change")).error).not.toBeNull();
-    await team.goto("/");
+    await team.goto("/sign-in");
     await submitSignIn(team, username.toUpperCase(), temporary);
     await expect(
       team.getByRole("heading", { name: "Change your temporary password" }),

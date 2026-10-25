@@ -93,7 +93,7 @@ async function signIn(page: Page, membership: Membership): Promise<void> {
       body: JSON.stringify(responses[path]),
     });
   });
-  await page.goto("/");
+  await page.goto("/sign-in");
   await page.getByLabel("Username", { exact: true }).fill("selection");
   await page.getByLabel("Password", { exact: true }).fill("fixture-password");
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
@@ -153,11 +153,11 @@ const staff: Membership = {
   is_admin: false,
 };
 
-test("Enter on the landing skip link focuses the main landmark", async ({
+test("Enter on the sign-in skip link focuses the main landmark", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 320, height: 740 });
-  await page.goto("/");
+  await page.goto("/sign-in");
   await expect(page.getByRole("heading", { name: "Sign in", exact: true }))
     .toBeVisible();
   await focusHeadingAfterHash(page);

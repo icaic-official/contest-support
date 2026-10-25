@@ -236,7 +236,7 @@ export async function openApp(
     if (!(path in responses)) throw new Error(`Unexpected request: ${path}`);
     return json(responses[path]);
   });
-  const startPath = options.startPath ?? "/";
+  const startPath = options.startPath ?? "/sign-in";
   await page.goto(startPath);
   await page.getByLabel("Username", { exact: true }).fill("ada");
   await page.getByLabel("Password", { exact: true }).fill("fixture-password");

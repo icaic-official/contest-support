@@ -203,17 +203,24 @@ describe('Cloudflare session announcements with local D1 and R2 bindings', () =>
     expect((await read(admin)).announcements[0].revision).toBe(2);
   });
 
-  it('hides expired and removed announcements from readers but keeps them for managers', async () => {
+  it('hides removed announcements from everyone, keeps their records, and keeps expired ones for managers', async () => {
     const expiring = await publish(admin, { expires_at: new Date(Date.now() + 60_000).toISOString() });
     const removed = await publish();
     const active = await publish();
-    await service.execute(admin, fixture.sessionId, randomUUID(), { type: 'remove', id: removed, revision: 0 });
+    const remove = { type: 'remove', id: removed, revision: 0 };
+    await expect(service.execute(jury, fixture.sessionId, randomUUID(), { ...remove, revision: 1 })).rejects.toMatchObject({ reason: 'conflict' });
+    const request = randomUUID();
+    expect(await service.execute(jury, fixture.sessionId, request, remove)).toBe(removed);
+    expect(await service.execute(jury, fixture.sessionId, request, remove)).toBe(removed);
     await statement(`UPDATE announcements SET expires_at = strftime('%Y-%m-%dT%H:%M:%fZ', published_at, '+0.001 seconds') WHERE id = ?`, expiring).run();
     await new Promise((resolve) => setTimeout(resolve, 20));
     expect((await read(contestant)).announcements.map((announcement) => announcement.id)).toEqual([active]);
-    expect((await read(jury)).announcements.map((announcement) => announcement.id).sort()).toEqual([active, expiring, removed].sort());
-    const [gone] = (await read(admin)).announcements.filter((announcement) => announcement.id === removed);
-    expect(gone).toMatchObject({ removed_by: admin.accountId, revision: 1 });
+    for (const manager of [jury, admin]) {
+      expect((await read(manager)).announcements.map((announcement) => announcement.id).sort()).toEqual([active, expiring].sort());
+    }
+    expect(await statement(`SELECT title, details, author, revision, removed_by, removed_name, removed_at IS NOT NULL AS stamped
+      FROM announcements WHERE id = ?`, removed).first()).toEqual({ title: 'Fictional title', details: 'Fictional plain details.',
+      author: admin.accountId, revision: 1, removed_by: jury.accountId, removed_name: `d1-proof:${fixture.eventId}:1`, stamped: 1 });
     await expect(service.execute(admin, fixture.sessionId, randomUUID(), { type: 'edit', id: removed, revision: 1, title: 'x', details: 'y', expires_at: null }))
       .rejects.toMatchObject({ reason: 'state' });
     // An expired announcement can return by clearing its expiry.
@@ -299,17 +306,18 @@ describe('Cloudflare session announcements with local D1 and R2 bindings', () =>
     expect((await read(admin)).announcements[0].revision).toBe(2);
   });
 
-  it('hides images with a removed announcement from readers and lets managers remove them', async () => {
+  it('keeps the images and files of a removed announcement and hides them from everyone', async () => {
     const id = await publish();
     const image = await publishedImage(id);
     await service.execute(admin, fixture.sessionId, randomUUID(), { type: 'remove', id, revision: 1 });
-    await expect(images.download(contestant, image.path)).rejects.toMatchObject({ validation: true });
-    expect(await bytesOf(image.path, jury)).toEqual(png);
-    expect((await read(contestant)).images).toEqual([]);
-    expect((await read(admin)).images).toHaveLength(1);
+    for (const caller of [contestant, jury, admin]) {
+      await expect(images.download(caller, image.path)).rejects.toMatchObject({ validation: true });
+      expect((await read(caller)).images).toEqual([]);
+    }
     await expect(reserve(id)).rejects.toMatchObject({ validation: true });
-    await images.remove(admin, fixture.sessionId, image.id);
-    expect(await bucket.get(image.path)).toBeNull();
+    await expect(images.remove(admin, fixture.sessionId, image.id)).rejects.toMatchObject({ validation: true });
+    expect(await statement('SELECT state FROM announcement_images WHERE id = ?', image.id).first()).toEqual({ state: 'ready' });
+    expect(await bucket.get(image.path)).not.toBeNull();
   });
 
   it('shortens a long file name instead of rejecting the image', async () => {

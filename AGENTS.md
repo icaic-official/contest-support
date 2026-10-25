@@ -25,14 +25,14 @@
 - Contribution types include, but are not limited to: `bugfix`, `build`, `feature`, `style`, `refactor`, `perf`, `test`, `ci`, `chore`, `docs`.
 - Name every branch `<type>/<title>`, whether or not it gets a PR. For example: `bugfix/race-request-fix` or `feature/session-announcements`.
 - Write each commit message in this form. Merge commits are exempt.
-
   ```
-  <type>[optional scope]: <description>
+  [Type]: <description>
 
   [optional body]
 
   [optional footer(s)]
   ```
+  - The first letter of the type is to be capitalized.
 
 - Write pull requests with [the PR template](.github/pull_request_template.md). It defines the PR title and description format.
 

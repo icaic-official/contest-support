@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { Caller } from '../../authentication';
 import type { D1Connection } from '../d1/connection';
+import { logEvent, requestFields } from './log';
 import { currentAccessBindings, currentAccessSql, type CurrentAccessRow } from './application';
 
 interface LiveSocket {
@@ -120,7 +121,8 @@ export class SessionLiveCoordinator {
         return new Response(null, { status: 204 });
       }
       return new Response(null, { status: 404 });
-    } catch {
+    } catch (error) {
+      logEvent('error', 'live.coordinator_error', { ...requestFields(request), status: 503, error });
       // Leave the outbox record pending. Retried delivery is safe after an
       // uncertain response or a coordinator restart.
       return new Response(null, { status: 503 });
@@ -190,6 +192,9 @@ export class SessionLiveCoordinator {
         socket.serializeAttachment({ ...attachment, expiresAt: this.expiry(row) });
       }
       await this.scheduleAlarm();
+    }).catch((error: unknown) => {
+      logEvent('error', 'live.alarm_error', { task: 'alarm', error });
+      throw error;
     });
   }
 
@@ -270,10 +275,10 @@ export async function dispatchNotifications(env: LiveEnvironment, limit = 100): 
       const response = await coordinator.fetch(new Request('https://live.internal/notify', {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(signal),
       }));
-      if (!response.ok) { failed++; continue; }
+      if (!response.ok) { failed++; logEvent('warn', 'live.notify_rejected', { task: 'notify', status: response.status }); continue; }
       await env.DB.prepare('UPDATE notifications SET delivered = 1 WHERE id = ? AND delivered = 0').bind(signal.id).run();
       delivered++;
-    } catch { failed++; }
+    } catch (error) { failed++; logEvent('error', 'live.notify_error', { task: 'notify', error }); }
   }
   return { delivered, failed };
 }

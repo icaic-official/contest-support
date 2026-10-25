@@ -4,6 +4,7 @@ import type { D1Connection } from '../d1/connection';
 import { D1AuthenticationService } from './authentication';
 import { createBetterAuthIdentity } from './identity';
 import { passwordHasher } from './password';
+import { logEvent, requestFields } from './log';
 
 interface Environment {
   DB: D1Connection;
@@ -39,6 +40,7 @@ export default {
       if (error instanceof AuthenticationError) {
         return Response.json({ error: error.message }, { status: error.status, headers: { 'Cache-Control': 'no-store' } });
       }
+      logEvent('error', 'authentication.unhandled_error', { ...requestFields(request), status: 503, error });
       return Response.json({ error: 'Authentication is unavailable. Try again later.' }, {
         status: 503, headers: { 'Cache-Control': 'no-store' },
       });

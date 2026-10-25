@@ -88,6 +88,9 @@ export function currentReadyLoginBindings(caller: Caller): BindValue[] {
 
 interface AdminGate { id: string; caller: Caller; statements: D1Statement[] }
 
+// Each section reads the one `access` row once. As the inner table of a join,
+// it would be read again for every row of the section. The audit section takes
+// its key from `access`, so a caller who is not an admin reads no audit row.
 export const snapshotSql = `WITH login AS (${currentReadyLoginSql}), access AS MATERIALIZED (${currentAccessSql}),
   visible_issues AS MATERIALIZED (
     SELECT i.* FROM access a CROSS JOIN issues i WHERE i.session_id = ? AND i.team_id = a.team_id
@@ -122,8 +125,8 @@ SELECT json_object(
   'history', json(COALESCE((SELECT json_group_array(json(row)) FROM (
     SELECT json_object('id', h.id, 'issue_id', h.issue_id, 'at', h.at,
       'actor', h.actor, 'actor_name', h.actor_name, 'text', h.text, 'visibility', h.visibility) AS row
-    FROM history h JOIN visible_issues i ON i.id = h.issue_id CROSS JOIN access a
-    WHERE h.visibility = 'public' OR a.staff = 1 ORDER BY h.at, h.id)), '[]')),
+    FROM history h JOIN visible_issues i ON i.id = h.issue_id
+    WHERE h.visibility = 'public' OR (SELECT staff FROM access) = 1 ORDER BY h.at, h.id)), '[]')),
   'awards', json(COALESCE((SELECT json_group_array(json(row)) FROM (
     SELECT json_object('id', w.id, 'issue_id', w.issue_id, 'resolution_id', w.resolution_id,
       'minutes', w.minutes, 'explanation', w.explanation, 'actor_name', w.actor_name,
@@ -134,12 +137,12 @@ SELECT json_object(
       'uploader_name', x.uploader_name, 'uploaded_at', x.uploaded_at,
       'visibility', x.visibility, 'byte_size', x.byte_size, 'content_type', x.content_type,
       'original_name', x.original_name) AS row
-    FROM visible_issues i CROSS JOIN issue_images x CROSS JOIN access a
-    WHERE x.issue_id = i.id AND x.state = 'ready' AND (x.visibility = 'public' OR a.staff = 1)
+    FROM visible_issues i CROSS JOIN issue_images x
+    WHERE x.issue_id = i.id AND x.state = 'ready' AND (x.visibility = 'public' OR (SELECT staff FROM access) = 1)
     ORDER BY x.uploaded_at, x.id)), '[]')),
   'pending_removals', json(COALESCE((SELECT json_group_array(json(row)) FROM (
     SELECT json_object('id', x.id, 'issue_id', x.issue_id, 'original_name', x.original_name) AS row
-    FROM issue_images x CROSS JOIN access a WHERE x.session_id = ? AND a.staff = 1
+    FROM access a CROSS JOIN issue_images x WHERE a.staff = 1 AND x.session_id = ?
       AND x.state IN ('deleting', 'deleted') AND x.files_removed_at IS NULL AND x.deleted_by = a.account_id
     ORDER BY x.deleted_at, x.id)), '[]')),
   'members', json(COALESCE((SELECT json_group_array(json(row)) FROM (
@@ -152,7 +155,7 @@ SELECT json_object(
     WHERE a.is_admin = 1 AND m.session_id = ? ORDER BY p.name, p.id)), '[]')),
   'audit', json(COALESCE((SELECT json_group_array(json(row)) FROM (
     SELECT json_object('id', d.id, 'actor', d.actor, 'at', d.at, 'action', d.action, 'target', d.target) AS row
-    FROM admin_audit d CROSS JOIN access a WHERE d.session_id = ? AND a.is_admin = 1
+    FROM admin_audit d WHERE d.session_id = (SELECT ? FROM access WHERE is_admin = 1)
     ORDER BY d.at DESC, d.id DESC LIMIT 50)), '[]')),
   'server_time', strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
 ) AS snapshot WHERE EXISTS (SELECT 1 FROM login)`;

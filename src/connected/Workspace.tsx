@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, Navigate, useLocation } from "react-router";
 import { BuildId } from "@/components/build-id";
+import { RenderErrorBoundary } from "@/components/render-error-boundary";
 import { Button } from "@/components/ui/button";
 import { ContestantApp } from "@/contestant/ContestantApp";
 import { OrganiserApp } from "@/organiser/OrganiserApp";
@@ -56,7 +57,12 @@ export function Workspace(props: Omit<ShellProps, "data">) {
     <AvatarProvider data={data} userId={props.user.id}>
       <div className="flex h-dvh flex-col">
         <Announcements data={data} />
-        <div className="min-h-0 flex-1">{app}</div>
+        {/* A crash in one UI keeps the announcements and build id visible. */}
+        <div className="min-h-0 flex-1">
+          <RenderErrorBoundary scope="region" resetKey={pathname}>
+            {app}
+          </RenderErrorBoundary>
+        </div>
         <p className="px-4 py-0.5 text-right text-[11px] text-muted-foreground">
           <BuildId />
         </p>

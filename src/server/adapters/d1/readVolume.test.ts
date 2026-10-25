@@ -1,7 +1,11 @@
+import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import type { Command } from '../../../connected/model';
+import { decideWorkflow } from '../../workflow';
 import { openStoreDatabase } from '../cloudflare/tooling/store-database.mjs';
 import { currentAccessBindings, currentAccessSql, currentReadyLoginSql, sessionsListSql, snapshotSql } from '../cloudflare/application';
-import type { D1Connection } from './connection';
+import type { D1Connection, D1Statement } from './connection';
+import { D1ApplicationStore } from './store';
 import { applyMigrations } from './testFixture';
 
 const configPath = 'src/server/adapters/cloudflare/deploy/connector-store-ci.wrangler.jsonc';
@@ -167,6 +171,49 @@ async function snapshot(db: D1Connection, n: number, sql = snapshotSql) {
   return { rowsRead: result.meta?.rows_read ?? Infinity, body };
 }
 
+/**
+ * Sums `meta.rows_read` over every statement. `first()` runs as `all()`,
+ * because only `all()` returns `meta`. Local D1 reads the same rows for both.
+ */
+function metered(db: D1Connection) {
+  const usage = { rowsRead: 0 };
+  const originals = new WeakMap<D1Statement, D1Statement>();
+  const count = (result: unknown) => {
+    usage.rowsRead += (result as { meta?: { rows_read?: number } }).meta?.rows_read ?? Infinity;
+  };
+  const wrap = (statement: D1Statement): D1Statement => {
+    const wrapped: D1Statement = {
+      bind: (...values) => wrap(statement.bind(...values)),
+      first: async <T>() => {
+        const result = await statement.all<T>();
+        count(result);
+        return result.results[0] ?? null;
+      },
+      all: async <T>() => {
+        const result = await statement.all<T>();
+        count(result);
+        return result;
+      },
+      run: async () => {
+        const result = await statement.run();
+        count(result);
+        return result;
+      },
+    };
+    originals.set(wrapped, statement);
+    return wrapped;
+  };
+  const connection: D1Connection = {
+    prepare: (sql) => wrap(db.prepare(sql)),
+    batch: async (statements) => {
+      const results = await db.batch(statements.map((statement) => originals.get(statement) ?? statement));
+      results.forEach(count);
+      return results;
+    },
+  };
+  return { connection, usage };
+}
+
 async function expectReferenceSnapshots(db: D1Connection) {
   for (const [name, n] of Object.entries(callers)) {
     expect((await snapshot(db, n)).body, name).toEqual((await snapshot(db, n, referenceSnapshotSql)).body);
@@ -244,7 +291,7 @@ describe('rows read for a session with 1,200 accounts and 100 issues', () => {
 
 // Measured on 2026-10-26, a contestant snapshot in a session of 480 teams read
 // 1,014 rows while it read every team of the session, and 56 rows after.
-describe('rows read for a contestant in a session of 480 teams', () => {
+describe('rows read in a session of 480 teams', () => {
   let db: D1Connection;
   let dispose: () => Promise<void>;
 
@@ -259,5 +306,30 @@ describe('rows read for a contestant in a session of 480 teams', () => {
     expect(body.teams.map((team: { id: string }) => team.id)).toEqual(['team-8']);
     expect((await snapshot(db, callers.volunteer)).body.teams).toHaveLength(480);
     expect(rowsRead).toBeLessThan(60);
+  });
+
+  // Each command is the store's read and its commit batch. Measured on
+  // 2026-10-26, while every command built the session's team list four times,
+  // a claim read 1,494 rows. With only the named team, the four commands read
+  // 49 to 55 rows.
+  it('reads no team list for a workflow command, and only the named team for a submit', async () => {
+    await db.prepare("UPDATE sessions SET intake_open = 1 WHERE id = 'sess-1'").run();
+    const commands: Array<[number, Command]> = [
+      [callers.volunteer, { type: 'claim', issue_id: 'issue-1', revision: 1 }],
+      [callers.contestant, { type: 'message', issue_id: 'issue-7', revision: 1, text: 'Fictional reply', visibility: 'public' }],
+      [callers.volunteer, { type: 'submit', category: 'Devices', description: 'Fictional report', team_id: 'team-9' }],
+      [callers.contestant, { type: 'submit', category: 'Devices', description: 'Fictional report' }],
+    ];
+    for (const [n, command] of commands) {
+      const caller = { accountId: `acc-${n}`, loginId: `login-${n}` };
+      const requestId = randomUUID();
+      const { connection, usage } = metered(db);
+      const store = new D1ApplicationStore(connection);
+      const read = await store.read(caller, 'sess-1', requestId, command);
+      const decision = read && decideWorkflow(read.state, command);
+      if (!read || !decision || 'outcome' in decision) throw new Error(`${command.type} by account ${n} was not accepted.`);
+      expect(await store.commit(caller, 'sess-1', requestId, command, read, decision)).toMatchObject({ outcome: 'committed' });
+      expect(usage.rowsRead, `${command.type} by account ${n}`).toBeLessThan(60);
+    }
   });
 });

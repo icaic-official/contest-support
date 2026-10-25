@@ -226,6 +226,21 @@ describe("D1 workflow persistence", () => {
     await expectNoAssertions();
   });
 
+  it("commits a claim in one batch when a team is added after its read", async () => {
+    let batches = 0;
+    const raced = beforeBatch(db, async () => {
+      await fixture.statement("INSERT INTO teams (id, session_id) VALUES (?, ?)", randomUUID(), fixture.sessionId).run();
+    });
+    workflow = workflowService({
+      prepare: (sql) => raced.prepare(sql),
+      batch: async (statements) => { batches++; return raced.batch(statements); },
+    });
+    expect(await execute(claim())).toEqual({ outcome: "committed", issueId: fixture.issueId });
+    expect(batches).toBe(1);
+    expect((await fixture.durableState()).history).toHaveLength(1);
+    await expectNoAssertions();
+  });
+
   it.each(["membership", "disabled", "must_change", "archive", "expired", "revoked"] as const)(
     "checks current %s access before replaying a saved receipt", async (change) => {
       const requestId = randomUUID();

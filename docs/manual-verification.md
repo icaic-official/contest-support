@@ -181,7 +181,8 @@ Review the sign-in page at 1280 × 800, 390 × 844 and 320 × 740.
 1. Toggle **Show password** and **Hide password** with the keyboard.
 2. Check that organizer access and recovery guidance remain visible.
 3. Sign in with an account without membership. Check that the access screen shows **Refresh access** and **Sign out**.
-4. Press Tab once after sign-in. Check that **Skip to main content** appears and moves focus to the main content.
+4. Sign in with a member account. Disconnect the network and wait up to 10 seconds for the access screen. Check that it asks you to check the connection and does not mention an organizer. Select **Refresh access**. Check that the button stays disabled while the read runs. Connect again and select the button. Check that the workspace returns.
+5. Press Tab once after sign-in. Check that **Skip to main content** appears and moves focus to the main content.
 
 ### Organiser phone app (390 × 844)
 
@@ -230,7 +231,7 @@ Do these checks as a staff account with several roles, as a session admin, and a
 The desktop console and the contestant app show the page. The phone app keeps its **Me** tab.
 
 1. In the console, select the person card at the bottom of the sidebar. Check that the address is `/account`, that focus is on **My account** and that the card shows the open page. Collapse the sidebar. Check that the card shows only the avatar and that a tooltip shows its name.
-2. In the contestant app, open the account menu and select **My account**. Check the same address and focus.
+2. In the contestant app, open the account menu and select **My account**. Check the same address and focus. Check that the page has no **Skip to report details** link. Select **Minsky** in the top bar. Check that the reports page opens.
 3. Select each link in the section nav. Check that the page scrolls to the section and that the nav stays in view on a wide window. Check that the layout has one column below 768 px of page width and no horizontal overflow.
 4. **Profile**: check the picture, the name, the username and the account ID. Select **Copy**. Check the message and paste the ID somewhere. A team account shows its team and location. Do the checks in [Profile pictures](#profile-pictures) for the picture.
 5. **Access in this session**: check that each role has a badge and a description. Only a session admin sees **Manage session accounts**. A team account shows no role and no admin link. In an archived event, check the archived notice.

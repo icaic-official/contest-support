@@ -78,6 +78,8 @@ These steps occur in sequence:
 
 Before the first snapshot, `Workspace` shows `NoSessionAccess` (`src/screens/NoSessionAccess.tsx`).
 That screen shows a loading state, refresh errors, a **Refresh access** button and **Sign out**.
+After a refresh error it asks the person to check the connection. Without a refresh error it asks the person to contact an organizer.
+**Refresh access** stays disabled while its read runs.
 
 After a UI is selected, `Workspace` keeps that UI mounted when the snapshot disappears.
 A refresh error or a session change can remove the snapshot. The shell then shows `NoSessionAccess` itself.
@@ -202,8 +204,8 @@ The server also closes a socket when access is revoked, and the drop starts a re
 
 | File | Content |
 | --- | --- |
-| `ContestantApp.tsx` | The shell. It holds the selected report, the open report form and the drafts of reports, replies and reopen reasons. Navigation moves focus to the main heading. Errors and **Retry last request** show at the top of the report area and stay in view during scrolling. On `/account` it shows the [account page](#account-page) in a scroll container of its own, under the top bar. |
-| `ContestantTopBar.tsx` | Event, session (a session menu when the team has more than one session), **Live** or **Reconnecting**, theme menu and the account menu with **My account**, **Change password** and **Sign out**. **Change password** opens `/account#security`. |
+| `ContestantApp.tsx` | The shell. It holds the selected report, the open report form and the drafts of reports, replies and reopen reasons. Navigation moves focus to the main heading. Errors and **Retry last request** show at the top of the report area and stay in view during scrolling. On `/account` it shows the [account page](#account-page) in a scroll container of its own, under the top bar. The **Skip to report details** link shows only on the report pages, not on `/account`. |
+| `ContestantTopBar.tsx` | The **Minsky** brand mark, which links to `/issues`, event, session (a session menu when the team has more than one session), **Live** or **Reconnecting**, theme menu and the account menu with **My account**, **Change password** and **Sign out**. **Change password** opens `/account#security`. |
 | `ReportList.tsx` | The team's reports, newest first, with a status badge, timer, number, category and age. |
 | `IssuePage.tsx` | The headline, report, unresolved timer, tracker, resolution cards, reopen form, award card, messages, images and the reply box. |
 | `ReportForm.tsx` | Category tiles with one generic icon, the description (up to 2,000 characters) and the team's location. |

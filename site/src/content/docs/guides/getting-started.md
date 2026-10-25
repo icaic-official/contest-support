@@ -62,7 +62,7 @@ Minsky saves a smaller copy of the image. The copy has no location or camera dat
 If the save fails and the button reads **Try again**, select it. Minsky does not save a second picture.
 
 To remove your picture, select **Remove picture** and confirm. Your initials show instead.
-The picture belongs to your account, so it is the same in every session. Other staff see a change within about 10 seconds.
+The picture belongs to your account, so it is the same in every session. Other staff see a change within about a minute.
 
 ## Forgot your password
 

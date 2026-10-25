@@ -64,7 +64,7 @@ See [backend contracts](backend-contracts.md#announcements).
 Announcement reads run independently of issue reads and of submission.
 A newer read cancels an older one. Changing session, losing access, or changing between reader and manager drops the cached records.
 A failed announcement read never disables reporting.
-Expiry uses server time. Readers see an expiry within the 10-second poll, and after a refresh or reconnect.
+Expiry uses server time. Readers see an expiry within 60 seconds while the live channel is connected, within 10 seconds while it is down, and after a refresh or reconnect.
 
 Request IDs make repeated commands safe. A repeated ID with the same command returns the first result.
 The same ID with another command is rejected.

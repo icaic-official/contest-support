@@ -56,7 +56,8 @@ export function ConnectedApp() {
   const navigate = useNavigate();
   const auth = useAuthSession();
   const { user } = auth;
-  const account = useAccountStatus(user?.id);
+  const [live, setLive] = useState(false);
+  const account = useAccountStatus(user?.id, live);
   const [passwordSetup, setPasswordSetup] = useState(false);
   // A voluntary password change ends when the person signs out.
   if (!user && passwordSetup) setPasswordSetup(false);
@@ -124,6 +125,7 @@ export function ConnectedApp() {
           setPasswordSetup(true);
         }}
         signOut={auth.signOut}
+        onLiveChange={setLive}
       />
     );
   }

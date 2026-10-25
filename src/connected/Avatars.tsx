@@ -40,9 +40,10 @@ const noop = () => {};
 /**
  * Reads the pictures that the person can see in the selected session, and
  * keeps one downloaded copy of each for every avatar on screen. The list loads
- * like announcements do: when the session or a live signal changes, and every
- * 10 seconds. A picture change sends no live signal, so the poll shows other
- * people's changes. A failed read keeps the earlier pictures.
+ * like announcements do: when the session changes, and each time `updates`
+ * changes. That counts live signals and the session timer. A picture change
+ * sends no live signal, so the timer shows other people's changes. A failed
+ * read keeps the earlier pictures.
  */
 export function AvatarProvider({
   data,
@@ -98,8 +99,6 @@ export function AvatarProvider({
   useEffect(() => {
     if (!sessionId || !allowed) return;
     void reload();
-    const interval = window.setInterval(() => void reload(), 10000);
-    return () => window.clearInterval(interval);
   }, [reload, sessionId, allowed, updates]);
 
   const upload = useCallback(

@@ -81,8 +81,7 @@ export class R2AnnouncementImageService {
     const parsed = beginSchema.safeParse(input);
     if (!parsed.success) throw new ImageRequestError(`Choose an image of up to ${megabytes(ANNOUNCEMENT_IMAGE_MAX_BYTES)} MB.`, { validation: true });
     const value = parsed.data;
-    // Keep the first 200 characters of the name.
-    const cleanName = [...cleanImageName(value.name)].slice(0, 200).join('');
+    const cleanName = cleanImageName(value.name);
     if (!cleanName.trim()) throw new ImageRequestError('Choose an image with a file name.', { validation: true });
     const repeat = async (): Promise<{ id: string; path: string } | undefined> => {
       const prior = await this.statement(`SELECT x.id FROM announcement_images x JOIN (${currentAccessSql}) c

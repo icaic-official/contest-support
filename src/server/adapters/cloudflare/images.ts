@@ -39,7 +39,7 @@ interface Image {
 
 const beginSchema = z.strictObject({
   requestId: z.uuid(), sessionId: z.uuid(), issueId: z.uuid(),
-  visibility: z.enum(['public', 'internal']), name: z.string().min(1).max(200),
+  visibility: z.enum(['public', 'internal']), name: z.string().min(1),
   bytes: z.number().int().positive().max(52_428_800),
 });
 const pathSchema = z.tuple([z.uuid(), z.uuid(), z.uuid(), z.enum(['original', 'thumbnail'])]);
@@ -52,10 +52,16 @@ const imageSql = `SELECT x.*, i.team_id, s.max_image_bytes, s.max_images_per_iss
   JOIN (${currentAccessSql}) c ON c.staff = 1 OR c.team_id = i.team_id OR (? = 1 AND x.uploader = c.account_id)
   WHERE x.session_id = ? AND x.id = ?`;
 
-/** Remove control characters and path separators from an uploaded file name. */
+/**
+ * Remove control characters, invisible direction and spacing marks, and path separators from an uploaded file name,
+ * and keep its first 200 characters. Direction marks such as U+202E reverse the displayed order.
+ * Joiners U+200C and U+200D stay, because some names and emoji need them.
+ */
 export function cleanImageName(name: string): string {
-  return name.trim().replace(/\p{Cc}/gu, '').replace(/[/\\]/g, '-');
+  return [...name.trim().replace(/[\p{Cc}\u061C\u200B\u200E\u200F\u202A-\u202E\u2066-\u2069\uFEFF]/gu, '').replace(/[/\\]/g, '-')].slice(0, 200).join('');
 }
+
+const archivedError = () => new ImageRequestError('This event is archived.', { validation: true });
 
 /**
  * Store a transfer at most once and confirm that the stored object is this transfer.
@@ -95,9 +101,10 @@ export class R2ImageService {
       throw new ImageRequestError('Image unavailable.', { validation: true });
     }
     const row = await this.statement(imageSql, ...currentAccessBindings(caller, sessionId), Number(ownedCleanup), sessionId, id).first<Image>();
-    if (!row || write && (!row.staff || row.uploader !== caller.accountId || row.archived)) {
+    if (!row || write && (!row.staff || row.uploader !== caller.accountId)) {
       throw new ImageRequestError('You do not have permission to change this image.', { validation: true });
     }
+    if (write && row.archived) throw archivedError();
     return row;
   }
 
@@ -263,9 +270,10 @@ export class R2ImageService {
     if (row.uploader !== caller.accountId) throw new ImageRequestError('Only the person who added this image can remove it.', { validation: true });
     const repeated = abandon ? ['abandoned', 'expired'].includes(row.state) : ['deleting', 'deleted'].includes(row.state);
     if (!repeated) {
-      if (!abandon && (!row.staff || row.archived)) {
+      if (!abandon && !row.staff) {
         throw new ImageRequestError('You do not have permission to change this image.', { validation: true });
       }
+      if (!abandon && row.archived) throw archivedError();
       if (row.state !== (abandon ? 'pending' : 'ready')) throw new ImageRequestError('Image unavailable.', { validation: true });
       const assertion = crypto.randomUUID();
       await this.batch(assertion, caller, [

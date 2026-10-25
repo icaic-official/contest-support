@@ -78,6 +78,8 @@ These steps occur in sequence:
 
 Before the first snapshot, `Workspace` shows `NoSessionAccess` (`src/screens/NoSessionAccess.tsx`).
 That screen shows a loading state, refresh errors, a **Refresh access** button and **Sign out**.
+After a refresh error it asks the person to check the connection. Without a refresh error it asks the person to contact an organizer.
+**Refresh access** stays disabled while its read runs.
 
 After a UI is selected, `Workspace` keeps that UI mounted when the snapshot disappears.
 A refresh error or a session change can remove the snapshot. The shell then shows `NoSessionAccess` itself.
@@ -202,8 +204,8 @@ The server also closes a socket when access is revoked, and the drop starts a re
 
 | File | Content |
 | --- | --- |
-| `ContestantApp.tsx` | The shell. It holds the selected report, the open report form and the drafts of reports, replies and reopen reasons. Navigation moves focus to the main heading. Errors and **Retry last request** show at the top of the report area and stay in view during scrolling. On `/account` it shows the [account page](#account-page) in a scroll container of its own, under the top bar. |
-| `ContestantTopBar.tsx` | Event, session (a session menu when the team has more than one session), **Live** or **Reconnecting**, theme menu and the account menu with **My account**, **Change password** and **Sign out**. **Change password** opens `/account#security`. |
+| `ContestantApp.tsx` | The shell. It holds the selected report, the open report form and the drafts of reports, replies and reopen reasons. Navigation moves focus to the main heading. Errors and **Retry last request** show at the top of the report area and stay in view during scrolling. On `/account` it shows the [account page](#account-page) in a scroll container of its own, under the top bar. The **Skip to report details** link shows only on the report pages, not on `/account`. |
+| `ContestantTopBar.tsx` | The **Minsky** brand mark, which links to `/issues`, event, session (a session menu when the team has more than one session), **Live** or **Reconnecting**, theme menu and the account menu with **My account**, **Change password** and **Sign out**. **Change password** opens `/account#security`. |
 | `ReportList.tsx` | The team's reports, newest first, with a status badge, timer, number, category and age. |
 | `IssuePage.tsx` | The headline, report, unresolved timer, tracker, resolution cards, reopen form, award card, messages, images and the reply box. |
 | `ReportForm.tsx` | Category tiles with one generic icon, the description (up to 2,000 characters) and the team's location. |
@@ -224,8 +226,8 @@ These rules apply:
 
 | File | Content |
 | --- | --- |
-| `OrganiserPhoneApp.tsx` | The shell. It holds the tab, the open issue, the report sheet and the reply drafts. The drafts stay in memory while the snapshot is missing. |
-| `PhoneParts.tsx` | Tab bar, tab header with **Live** or **Reconnecting** and the intake state, the status banners and the queue card. |
+| `OrganiserPhoneApp.tsx` | The shell. It holds the tab, the open issue, the report sheet, the report draft and the reply drafts. The drafts stay in memory while the snapshot is missing. Closing the report sheet keeps its draft. A session change clears the drafts. |
+| `PhoneParts.tsx` | Tab bar, tab header with **Live** or **Reconnecting** and the intake state, the status banners and the queue card. While a refresh error or a command error shows, the banners stay pinned to the top of the scrolling list. |
 | `PhoneTabs.tsx` | The Queue, Mine, Find, Awards and Me tabs. The Me tab has the [profile picture](#profile-pictures) controls. |
 | `PhoneSessionTab.tsx` | The Session tab for admins. It puts the admin parts from `src/organiser/admin/` on one page, with one sheet for a new account or one account. |
 | `PhoneIssueView.tsx` | The full-screen issue view with the bottom action bar and its sheets. |
@@ -238,7 +240,7 @@ Shared organiser parts are one level up, so the desktop console can use them:
 | `components/issueDisplay.tsx` | Status badge (icon and label), place tile, unresolved timer, **Live** or **Reconnecting** badge, avatar and `AwardEvidence`. |
 | `components/IssueDetails.tsx` | Timers, lifecycle bar, owner, handoff banner, award receipt, resolution history and activity. |
 | `actions/IssueForms.tsx` | `ReplyForm`, `ResolveForm`, `EscalateForm`, `ReopenForm`, `AwardForm` and `ApplyForm`. Each form takes the issue, the `CommandRunner` and `onDone`. |
-| `actions/ReportForm.tsx` | Report for one or more teams, with `TeamSearch` and **Add another team**. It sends one submit command per team. Every staff member can open it. |
+| `actions/ReportForm.tsx` | Report for one or more teams, with `TeamSearch` and **Add another team**. It sends one submit command per team. Every staff member can open it. The shell holds the description, the category and the added teams as a `ReportDraft`. The last recorded team clears it. |
 | `actions/OrganiserImages.tsx` | `ImageGallery`, `ImageUploadForm`, `ImagePreviewDialog` and `OrganiserImages`. They use `useIssueImages`. |
 | `actions/ActionSheet.tsx` | `ActionSheet` (a vaul bottom sheet with a **Cancel** button) and `CommandFeedback` (the command error and **Retry last request**). `showCancel` hides **Cancel** when the content has its own **Done** button. `onClosed` runs after the closing animation. |
 | `admin/adminModel.ts` | Pure admin rules: the username pattern, image limit bounds and steps, the membership draft (Staff or Team, roles, Admin), and the request inputs for the `Backend` admin contract. `createAccountCommand`, `setUsernameCommand` and `resetPasswordCommand` build an `AccountCommand`. `membershipInput` builds a `MembershipInput`. `imageLimitsInput` builds the image limits. `adminModel.test.ts` tests them. |
@@ -283,7 +285,7 @@ It uses the same hooks, rules and forms as the phone app. It adds no workflow ru
 
 | File | Content |
 | --- | --- |
-| `OrganiserDesktopConsole.tsx` | The shell. It holds the page, the sidebar state, the sheet tab, the command palette, the report dialog, the queue team filter and the reply drafts. These stay in memory while the snapshot is missing. It also handles ⌘K or Ctrl+K and the J and K keys. |
+| `OrganiserDesktopConsole.tsx` | The shell. It holds the page, the sidebar state, the sheet tab, the command palette, the report dialog, the report draft, the queue team filter and the reply drafts. These stay in memory while the snapshot is missing. It also handles ⌘K or Ctrl+K and the J and K keys. |
 | `ConsoleChrome.tsx` | `ConsoleSidebar` (session switcher, pages by role, intake switch for admins, and the person card that opens `/account`), `ConsoleTopBar` (sidebar button, breadcrumb, palette button, **Live** or **Reconnecting**, theme menu) and `CommandPalette`. |
 | `QueuePages.tsx` | `QueuePage` (status cards, status tabs with counts, T0008 team filter, issue table), `MinePage`, `HandoffsPage`, `TeamsPage` and the shared `PageHeader`. |
 | `IssueTable.tsx` | `IssueTable` (number, status with icon and label, report and category, team and location, owner, aging timer, **Claim** or **Accept**) and `StatCards`. |
@@ -310,7 +312,8 @@ These rules apply:
 - When the sheet closes, focus goes back to the control that opened it, then to the issue row, then to the page heading. Radix returns focus only to a `Dialog.Trigger`, so the console moves focus itself. The sheet keeps the last issue on screen while it slides out.
 - When the open issue leaves the person's lists, the sheet closes with the same status message as the phone app.
 - The queue team filter and the **Report for a team** dialog keep separate team choices. The UI before T0015 shared one choice.
-- The sheet shows one filled primary action from `primaryAction()`. Other allowed actions are outlined. **Decide award** and **Confirm applied** open the Outcome & award tab. Resolve, escalate and reopen open a dialog.
+- The sheet shows one filled primary action from `primaryAction()`. Other allowed actions are outlined. **Decide award** and **Confirm applied** open the Outcome & award tab and move focus to the heading of the award or application section. Resolve, escalate and reopen open a dialog.
+- A refresh error or a command error stays pinned to the top of the scrolling page, so the error of a row far down the list stays in view.
 - The Images tab and the Outcome & award tab stay mounted while another tab is open. An upload continues, and a typed award explanation or an apply confirmation stays when the person opens another tab and comes back. Only the Activity tab unmounts, because it has no form.
 - A staff member without a volunteer or specialist role sees one muted line under the action buttons with the same rule and text as the phone app (`missingActionHint()`).
 - The composer has **Public reply** and **Internal note**. An internal note has the amber striped surface. The draft clears only when the server records the message, also after **Retry last request** (T0012).

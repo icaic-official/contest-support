@@ -1,4 +1,5 @@
 import { LogOut, RefreshCw } from "lucide-react";
+import { useState } from "react";
 import { BrandMark } from "@/components/brand";
 import { BuildId } from "@/components/build-id";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -38,6 +39,7 @@ export function NoSessionAccess({
   onRetry?: () => void;
 }) {
   const { sessions, sessionId, loaded, refreshError } = data;
+  const [refreshing, setRefreshing] = useState(false);
   return (
     <div className="flex min-h-dvh flex-col">
       <header className="flex items-center justify-between gap-4 border-b px-4 py-3 sm:px-6">
@@ -78,8 +80,9 @@ export function NoSessionAccess({
                 </h1>
               </CardTitle>
               <CardDescription>
-                No session data is available. If your account was just created,
-                ask an organizer to assign your membership.
+                {refreshError
+                  ? "Minsky could not load your session."
+                  : "No session data is available. If your account was just created, ask an organizer to assign your membership."}
               </CardDescription>
             </CardHeader>
             {(refreshError || error || sessions.length > 1) && (
@@ -119,8 +122,11 @@ export function NoSessionAccess({
             <CardFooter className="flex flex-wrap gap-2">
               <Button
                 className="h-11"
+                disabled={refreshing}
+                loading={refreshing}
                 onClick={() => {
-                  void data.refresh();
+                  setRefreshing(true);
+                  void data.refresh().finally(() => setRefreshing(false));
                 }}
               >
                 <RefreshCw />

@@ -192,6 +192,43 @@ describe('Cloudflare private images with local D1 and R2 bindings', () => {
     expect(await fixture.rows('SELECT id FROM issue_images WHERE session_id = ?', fixture.sessionId)).toHaveLength(1);
   });
 
+  it('keeps the first 200 characters of a long file name instead of rejecting the image', async () => {
+    for (const [name, expected] of [
+      ['a'.repeat(201), 'a'.repeat(200)],
+      ['a'.repeat(255), 'a'.repeat(200)],
+      ['😀'.repeat(250), '😀'.repeat(200)],
+    ]) {
+      const image = await reserve({ name });
+      expect((await record(image.id))?.original_name).toBe(expected);
+    }
+  });
+
+  it('removes direction and spacing marks so a file name cannot reverse its displayed order', async () => {
+    const image = await reserve({ name: 'photo\u202Egnp.png\u200B\uFEFF' });
+    expect((await record(image.id))?.original_name).toBe('photognp.png');
+    await expect(reserve({ name: '\u202E\u200B' })).rejects.toMatchObject({ validation: true });
+  });
+
+  it('keeps joiners that emoji sequences and some scripts need in a file name', async () => {
+    const name = 'family\u{1F468}\u200D\u{1F469}\u200Dx.png';
+    const image = await reserve({ name });
+    expect((await record(image.id))?.original_name).toBe(name);
+  });
+
+  it('says that the event is archived, and keeps the permission message for a person without permission', async () => {
+    const ready = await published();
+    const pending = await reserve();
+    await statement('UPDATE events SET archived = 1 WHERE id = ?', fixture.eventId).run();
+    const archived = { message: 'This event is archived.', validation: true };
+    await expect(service.remove(fixture.staff, fixture.sessionId, ready.id)).rejects.toMatchObject(archived);
+    await expect(service.finish(fixture.staff, fixture.sessionId, pending.id)).rejects.toMatchObject(archived);
+    await expect(transfer(pending, 'original')).rejects.toMatchObject(archived);
+    for (const caller of [fixture.contestant, fixture.specialist]) {
+      await expect(service.finish(caller, fixture.sessionId, pending.id))
+        .rejects.toMatchObject({ message: 'You do not have permission to change this image.' });
+    }
+  });
+
   it('serializes concurrent reservations for the same request ID', async () => {
     const requestId = randomUUID();
     const images = await Promise.all([reserve({ requestId }), reserve({ requestId })]);

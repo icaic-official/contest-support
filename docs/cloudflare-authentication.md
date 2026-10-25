@@ -17,7 +17,7 @@ The [verification guide](verify-cloudflare-authentication.md) gives exact test c
 The raw Better Auth router is not exposed.
 
 `createCloudflareAuthentication()` implements the existing browser `Authentication` contract.
-Its additional `account()` and `sessions()` methods support account administration and session reads.
+Its additional `account()` method supports account administration. The application route `GET /api/sessions` is the only contest list.
 The complete `createCloudflareBackend()` factory wraps this authentication adapter and supplies the remaining operation groups.
 The backend entry point always creates the Cloudflare client. No provider fallback occurs.
 
@@ -32,7 +32,6 @@ Authenticated endpoints read the HttpOnly cookie. Request bodies cannot supply a
 | `GET /api/auth/session` | Cookie | Returns `user`, `status`, and `csrf`. An absent or invalid login returns 401. |
 | `POST /api/auth/sign-out` | Empty object | Revokes the login, deletes its identity session, and clears the cookie. |
 | `POST /api/auth/change-password` | `currentPassword`, `newPassword` | Changes the password and replaces the cookie. Revokes every earlier login. |
-| `GET /api/auth/sessions` | Cookie | Returns the account's current contest-session memberships. Requires a completed password change. |
 | `POST /api/accounts` | `sessionId`, `command` | Performs `create_account`, `set_username`, or `reset_password`. Uses existing `AccountCommand` fields. |
 
 The historical authentication Worker uses the session ID as its summary name.

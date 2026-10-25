@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { AccountCommand, AccountResult, SessionSummary } from '../../../backend/contracts';
+import type { AccountCommand, AccountResult } from '../../../backend/contracts';
 import { AuthenticationError, type AuthenticationService, type AuthenticationSession } from '../../authentication';
 import type { D1Connection, D1Statement } from '../d1/connection';
 import type { IdentityProvider } from './identity';
@@ -315,12 +315,4 @@ export class D1AuthenticationService implements AuthenticationService {
     return this.createLogin(before.username!, newPassword);
   }
 
-  async sessions(headers: Headers): Promise<SessionSummary[]> {
-    const current = await this.requireCurrent(headers);
-    const identity = await this.identity.session(headers);
-    if (!identity) throw new AuthenticationError(401, 'Sign in again.');
-    const result = await this.statement(`SELECT s.id, s.id AS name FROM sessions s JOIN memberships m ON m.session_id = s.id
-      JOIN (${currentLoginSql}) c ON c.id = m.account_id WHERE c.must_change = 0`, identity.identitySessionId, current.user.id).all<SessionSummary>();
-    return result.results;
-  }
 }

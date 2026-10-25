@@ -106,7 +106,7 @@ export function ImageUploadForm({ images }: { images: IssueImagesState }) {
       images.setMessage("Choose a JPEG, PNG, or WebP image.");
       return;
     }
-    await images.send(file);
+    if (await images.send(file) && fileRef.current) fileRef.current.value = "";
   }
   return (
     <form
@@ -160,7 +160,10 @@ export function ImageUploadForm({ images }: { images: IssueImagesState }) {
           accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
           disabled={locked}
           aria-describedby={`${id}-limits`}
-          onChange={() => images.clearRetry()}
+          onChange={() => {
+            images.clearRetry();
+            images.setMessage("");
+          }}
           className="block w-full text-sm file:mr-3 file:h-11 file:rounded-md file:border file:bg-background file:px-3 file:text-sm file:font-medium"
         />
         <p id={`${id}-limits`} className="text-xs text-muted-foreground">

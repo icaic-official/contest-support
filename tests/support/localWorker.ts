@@ -18,6 +18,19 @@ import { type FixtureAccount, FixtureWorker, type WorkerServices, test as base }
 
 interface Bindings { DB: D1Connection; IMAGES: PrivateBucket }
 
+/**
+ * The local R2 proxy rejects a Node request stream because it has no known
+ * length. The Worker streams the request body, so this buffers it for the proxy.
+ */
+function knownLength(bucket: PrivateBucket): PrivateBucket {
+  return {
+    get: (key, options) => bucket.get(key, options),
+    put: async (key, body, options) =>
+      bucket.put(key, body instanceof Uint8Array ? body : new Uint8Array(await new Response(body).arrayBuffer()), options),
+    delete: (keys) => bucket.delete(keys),
+  };
+}
+
 const names = ['jury', 'combined', 'volunteer', 'specialist', 'admin', 'contestant'] as const;
 type Name = typeof names[number];
 
@@ -60,7 +73,7 @@ export class LocalWorker extends FixtureWorker {
       workflow: this.workflow,
       announcements: new D1AnnouncementService(db),
       announcementImages: new R2AnnouncementImageService(db, bucket),
-      images: new R2ImageService(db, bucket),
+      images: new R2ImageService(db, knownLength(bucket)),
       avatars: new R2AvatarService(db, bucket),
     };
   }

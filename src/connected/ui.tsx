@@ -44,20 +44,6 @@ export function Icon({ name }: { name: IconName }) {
   );
 }
 
-export function Brand() {
-  return (
-    <a className="brand" href="#main" aria-label="Minsky home">
-      <svg className="brand-mark" viewBox="0 0 64 40" aria-hidden="true">
-        <path fill="#8dec99" d="M17 2h13L13 38H0Z" />
-        <path fill="#61c877" d="M30 2 43 38H30L23 19Z" />
-        <path fill="#a3efab" d="M40 6h12L36 38H24Z" />
-        <path fill="#70ce83" d="m52 6 12 32H52l-6-17Z" />
-      </svg>
-      <span>Minsky</span>
-    </a>
-  );
-}
-
 export function clockDuration(ms: number): string {
   const seconds = Math.floor(Math.max(0, ms) / 1000);
   const minutes = Math.floor(seconds / 60);

@@ -33,7 +33,6 @@ The browser alone does not prove authorization. The repository's policy and prov
 3. Back up the database and the image bucket together.
 4. Apply migrations, then deploy:
    - **Cloudflare:** the complete Worker and assets with your generated configuration. Keep `AUTH_SECRET`, R2 objects, and the Durable Object migration history.
-   - **Supabase:** the `admin`, `attachments`, `announcement-images`, and `avatars` functions, then the frontend. See [Run the Supabase adapter](https://github.com/GiftedNovaHD/minsky/blob/main/docs/supabase-provider.md#update-an-installation).
 5. Run the journey above.
 
 Merging a pull request does not deploy an installation.

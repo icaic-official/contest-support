@@ -4,12 +4,12 @@ Use this guide to check an implemented provider against Minsky's shared behavior
 Use an isolated test backend. Never use development or production accounts.
 For the suite's responsibilities and limits, see [the test contracts](provider-test-contracts.md).
 
-Both drivers use the same 11 shared scenarios.
-On 2026-10-19, protected runs at `2125875` passed all 11 cases on both providers. A later change needs fresh hosted verification.
+The Cloudflare driver runs 11 shared scenarios.
+On 2026-10-19, protected runs at `2125875` passed all 11 cases. A later change needs fresh hosted verification.
 Record local checks and CLI runs against hosted resources separately. Keep earlier protected GitHub runs as dated evidence.
 See [run log](history/run-log.md) for tested revisions, results, and cleanup evidence.
 For a new implementation, complete [Add a backend provider](add-provider.md) before using this runner.
-The runner currently accepts only `supabase` and `cloudflare`.
+The runner currently accepts only `cloudflare`.
 The commands below verify existing implementations. They do not register a provider or provision a new installation.
 
 ## List the scenarios without credentials
@@ -28,108 +28,6 @@ The commands below verify existing implementations. They do not register a provi
 
 The command lists the cases without creating accounts, records, or a browser session.
 `npm run ci` runs this list. It does not run the hosted provider commands below.
-
-## Run against the Supabase provider
-
-These runs are manual commands. They are not part of `npm run ci`.
-The project does not operate a Supabase test project. Use your own isolated test project.
-Never use a project that holds real accounts or data.
-
-### Prepare the Supabase test project
-
-1. Prepare the project with [Run the Supabase adapter](supabase-provider.md): link it, apply the Auth settings and migrations, and deploy the `admin`, `attachments`, `announcement-images`, `avatars`, and `workflow` functions.
-2. Set the function origin to `http://127.0.0.1:4174`.
-3. Supply the following variables through your private environment.
-
-   | Variable | Value |
-   | --- | --- |
-   | `MINSKY_TEST_PROJECT_REF` | Your isolated Supabase test project reference. |
-   | `SUPABASE_ACCESS_TOKEN` | A personal access token that can read the test project's migration and function metadata. |
-   | `SUPABASE_ANON_KEY` | The test project's public browser key. |
-   | `SUPABASE_SERVICE_ROLE_KEY` | The test project's privileged fixture key. |
-
-4. Install Chromium.
-
-   ```sh
-   npx playwright install chromium
-   ```
-
-Every Supabase runner requires `MINSKY_TEST_PROJECT_REF`. None falls back to the linked project.
-The runners refuse a reference that is not 20 lowercase letters.
-They also refuse the retired development project `ovymmobupzowotvrywek` while it exists.
-`npm run test:workflow:hosted` and `npm run test:cloud` can read the keys through your CLI login when the key variables are absent. They keep the key response in memory.
-
-### Run the shared provider scenarios
-
-```sh
-npm run test:providers -- --provider=supabase
-```
-
-Before it creates fixtures, the runner reads the project's metadata.
-It requires every repository migration version and active `admin`, `attachments`, `announcement-images`, and `avatars` functions.
-It reports extra remote migration versions. It does not prove that deployed source matches the checkout, and it installs nothing.
-
-Leave the process running until fixture cleanup finishes.
-A passing run exits with code zero and deletes its recovery journal.
-A failed scenario or failed cleanup exits with a nonzero code.
-Do not enable traces, screenshots, video, or debug request logging for real fixture credentials.
-The runner blocks overrides that change the suite's isolation or reports.
-
-### Run the shared workflow check
-
-This check runs the shared workflow service through the deployed `workflow` function.
-The [workflow reference](server-workflow.md) defines its boundaries and compatibility rules.
-
-Run the local checks first. They need no project:
-
-```sh
-npm run typecheck
-npm run lint
-npm run build
-npm test
-npm run check:functions
-npm run test:functions
-```
-
-Local tests include shared decisions, orchestration, Supabase commit guards, and the complete D1 workflow.
-Two regression cases expire a login during a commit statement, before its final access check. New writes and receipt replays must both fail without changing workflow records.
-Embedded PostgreSQL and local D1 use isolated data. These checks do not establish hosted results.
-
-Then run the hosted check:
-
-```sh
-npm run test:workflow:hosted
-```
-
-Before it creates fixtures, the runner calls the read-only `shared_workflow_read` function and an `OPTIONS` request to the `workflow` function.
-If either is missing, it stops with `No fixtures were created.`
-The runner does not install migrations or deploy functions. It accepts only the `--recover=` option.
-
-Each run creates real temporary Auth accounts and records with a unique run UUID.
-The cases share that run's fixture and use distinct issue and request IDs.
-Fixture setup assigns fresh passwords through the privileged Auth API, then completes the database password-change gate. This avoids the rate-limited password-change endpoint. The provider scenarios keep the normal password-change flow.
-The lifecycle, access, and retry scenarios keep their shared assertions.
-Extra cases check the trusted boundary, direct mutation refusal, and a permission change during a commit.
-
-A passing run exits with code zero and removes its recovery journal.
-A cleanup failure keeps `minsky-workflow-proof-*/fixture.json` under `RUNNER_TEMP` or the system temporary directory, and prints its path.
-The journal holds fixture identifiers, not passwords or provider keys.
-Record the source revision, the deployed function version, the test result, and the cleanup result.
-
-### Run the Supabase browser suite
-
-```sh
-npm run test:cloud
-```
-
-This suite starts a local frontend on port 4174 with `VITE_BACKEND=supabase`.
-It checks managed Auth, the database, Realtime, images, account creation and reset, temporary-password changes, and the jury journey.
-It checks that public signup fails while organizer-created accounts can sign in.
-Its prerequisite is the same project preparation. It does not run the metadata check.
-
-The suite keeps credentials in memory and in an ignored temporary fixture file. Do not interrupt fixture deletion.
-Do not capture live temporary credentials in screenshots. The tests dismiss credentials before capture.
-A passing run deletes the fixture file and its temporary directory, also when an assertion fails.
 
 ## Run against Cloudflare
 
@@ -165,7 +63,6 @@ The runner checks the generated configuration, live target metadata, and the pro
 Fixture setup checks required migrations and schema fields before creating records.
 Each browser context uses real hosted cookies, API requests, and WebSockets.
 Only test bridge assets come from the local Vite server.
-Both providers run the same 11 behavior scenarios.
 
 A passing run exits with code zero after all 11 cases and cleanup.
 Cleanup verifies the owned D1 records, exact R2 keys, and Durable Object state before deleting the identifiers-only journal.
@@ -366,11 +263,6 @@ Record the tested source revision and installation result in the [run log](histo
 GitHub Actions no longer runs these checks.
 A maintainer or coding agent runs them on the reviewed revision.
 
-For the Supabase adapter, use your own isolated test project, as [Run against the Supabase provider](#run-against-the-supabase-provider) states.
-Apply the revision's migrations and functions to that project first when the change includes them.
-A run against an older backend checks the frontend only. It does not check that revision's backend.
-Record the revision, backend versions, results, and cleanup outcome.
-
 For the complete Cloudflare connector, run the hosted commands in this guide on the reviewed revision.
 Do not point them at the development database.
 The test commands do not migrate, deploy, or create resources.
@@ -378,7 +270,6 @@ Before you run them, migrate the store and connector CI databases and deploy the
 The private bucket, service activation, and initial Worker secret must exist before those commands can pass.
 Record the result and tested revision in [run log](history/run-log.md), separately from other hosted CLI results.
 Earlier authentication runs do not check this connector path.
-Record Supabase verification separately from Cloudflare CLI runs.
 
 ## Recover an incomplete fixture
 
@@ -386,13 +277,7 @@ Record Supabase verification separately from Cloudflare CLI runs.
 
 1. Locate the `recovery.json` path printed by the failed local run.
 2. Restore the same provider target and privileged provider access to your private environment.
-3. For Supabase, run recovery with the journal's absolute path:
-
-   ```sh
-   npm run test:providers -- --provider=supabase --recover=/absolute/path/recovery.json
-   ```
-
-4. For Cloudflare, retain every exact target option and add the journal path:
+3. Retain every exact target option and add the journal path:
 
    ```sh
    npm run test:providers -- --provider=cloudflare \
@@ -403,41 +288,13 @@ Record Supabase verification separately from Cloudflare CLI runs.
      --recover=/absolute/path/recovery.json
    ```
 
-5. Check that recovery exits with code zero and deletes the journal.
+4. Check that recovery exits with code zero and deletes the journal.
 
 Recovery checks the target and fixture ownership before deletion.
-Do not substitute a project reference or edit identifiers to make a mismatch pass.
+Do not substitute another target or edit identifiers to make a mismatch pass.
 If recovery fails, retain the journal and inspect the reported cleanup step.
 Do not reset the project or delete records by a broad name prefix.
 Recovery skips scenario execution and normal backend prerequisites, but retains target and ownership checks.
-
-### Recover Supabase workflow fixtures
-
-1. Keep the exact journal path that the failed `npm run test:workflow:hosted` run printed.
-2. Confirm that the journal names your test project and the failed run.
-3. Restore the same `MINSKY_TEST_PROJECT_REF` and keys in your private environment.
-4. Run scoped recovery:
-
-   ```sh
-   npm run test:workflow:hosted -- --recover=/absolute/path/fixture.json
-   ```
-
-5. Confirm that recovery exits with code zero and removes the journal.
-
-Recovery checks the event, sessions, and exact account metadata before deletion. It deletes only that run's records and objects.
-If recovery fails, keep the journal and inspect the reported step.
-
-### Recover test:cloud fixtures
-
-`npm run test:cloud` has no recovery command.
-If its cleanup fails, it keeps the fixture file and prints `Fixture cleanup did not complete. Recovery file retained at <path>`.
-The file holds the run's event, session, team, and account IDs. It can hold temporary test passwords. Do not copy its contents into logs, chat, or a pull request.
-
-1. Use the IDs in the file to find the remaining records in your test project.
-2. Delete only the records and Auth accounts of that run. Do not delete by name prefix.
-3. Delete the file and its directory after cleanup succeeds.
-
-The file stays on the machine that ran the tests.
 
 ### Recover direct D1 fixtures
 

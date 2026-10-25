@@ -4,7 +4,7 @@ Ticket status and verification evidence are in the [T0006 ticket](tickets.md#t00
 
 An announcement is a short message for one contest session.
 Admins and jury publish it. Every current member of the session reads it.
-This page is the reference for the behavior and for both provider implementations.
+This page is the reference for the behavior.
 
 ## Reading and management
 
@@ -57,7 +57,7 @@ Adding or removing an image also changes the revision.
 
 ## Backend and updates
 
-Both providers keep announcements and image metadata separate from issue history, ownership, timers, and awards.
+The provider keeps announcements and image metadata separate from issue history, ownership, timers, and awards.
 The browser reads announcements through `Backend.announcements`, not through the issue snapshot.
 See [backend contracts](backend-contracts.md#announcements).
 
@@ -83,23 +83,12 @@ The same ID with another command is rejected.
 The announcement text route accepts bodies up to 64 KiB. Other JSON routes keep 16 KiB.
 Text of 10,000 characters can use up to 40,000 bytes in UTF-8.
 
-### Supabase
-
-| Part | Implementation |
-| --- | --- |
-| Records | [Migration 202610240001](../supabase/migrations/202610240001_announcements.sql) adds `announcements` and `announcement_images`, row level security, and the private `announcement-images` bucket. Direct table writes are denied. |
-| Commands | The `announcement_command`, `begin_announcement_image`, `complete_announcement_image`, and `remove_announcement_image` functions recheck membership, account readiness, role, and archive state in a transaction. A stale revision raises SQLSTATE `MN409`. |
-| Images | The [announcement-images function](../supabase/functions/announcement-images/handler.ts) is the only writer of stored files. It checks the file signature and size. Postgres checks the stored object size and type when it completes an upload. |
-| Live updates | Each write raises the session revision. Clients already listen for that change. |
-| Cleanup | The next upload to the same announcement tries once to delete the files of its expired reservations. No scheduled run or retry exists, so an abandoned reservation can keep an unreadable file. |
-
 ## Verification
 
 | Layer | Command | Covers |
 | --- | --- | --- |
-| Unit and embedded database | `npm test` | Both D1 and R2 services with local bindings. The Supabase migration and policies in embedded PostgreSQL. Both browser adapters. Draft and expiry rules. |
-| Edge Function | `npm run test:functions` | Signature and size checks, retained files after failed or overlapping completion, and retryable removal. |
+| Unit | `npm test` | The D1 and R2 services with local bindings. The browser adapter. Draft and expiry rules. |
 | Local browser | `npm run test:e2e` | Live titles, keyboard disclosure, a report draft during a live change, slow reads, removal, competing edits, and a 390 px layout. Provider transport is simulated. |
 
-These checks do not cover hosted Supabase, hosted Cloudflare, image transfers in a browser, other browsers, screen readers, or physical devices.
+These checks do not cover hosted Cloudflare, image transfers in a browser, other browsers, screen readers, or physical devices.
 The shared provider verification protocol does not cover announcements yet.

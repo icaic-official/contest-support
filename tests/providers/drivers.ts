@@ -1,4 +1,3 @@
-import { cleanupFixture, createFixture } from './supabase/fixture';
 import type { ScenarioData } from './contracts';
 import { cleanupFixture as cleanupCloudflareFixture, createFixture as createCloudflareFixture } from './cloudflare/fixture';
 import { createDiagnostics } from './cloudflare/diagnostics';
@@ -21,14 +20,6 @@ interface ProviderDriver {
 }
 
 const drivers: Record<string, ProviderDriver> = {
-  supabase: {
-    browserModule: '/tests/providers/supabase/browser.ts',
-    async create(path) {
-      const { url, publicKey, ...data } = await createFixture(path);
-      return { data, browserConfiguration: { url, publicKey } };
-    },
-    cleanup: cleanupFixture,
-  },
   cloudflare: {
     assetOrigin: 'http://127.0.0.1:4174',
     browserModule: '/tests/providers/cloudflare/browser.ts',

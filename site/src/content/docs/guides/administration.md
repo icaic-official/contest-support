@@ -13,7 +13,7 @@ Use the **Session** tab (phone) or the **Accounts** and **Session settings** pag
 4. Send them through a private channel.
 
 Choose the team for a contestant. Give staff any of **Volunteer**, **Specialist**, **Jury**, and **Admin**. Roles combine.
-App access is separate from access to GitHub and to the hosting provider, such as Cloudflare or your own Supabase project.
+App access is separate from access to GitHub and to the hosting provider, such as Cloudflare.
 
 ## Reset a password
 

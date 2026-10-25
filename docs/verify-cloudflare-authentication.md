@@ -70,7 +70,7 @@ npx wrangler d1 info minsky-auth-ci --config wrangler.auth-ci.jsonc --json
 Expect account `458ad6a930b0fb717796dfa19ca6a2b1` and database `5d746d29-0a66-4346-96a6-4974126685d7`.
 The database name must be `minsky-auth-ci`. Stop if any value differs.
 The local authentication tests use temporary local databases.
-The Cloudflare development database, the retired Supabase projects, and the earlier D1 proof database are separate targets.
+The Cloudflare development database and the earlier D1 proof database are separate targets.
 
 The committed Worker configuration requests a 1,000 ms CPU cap per request.
 Cloudflare requires Workers Paid for that setting.
@@ -158,7 +158,7 @@ Local elapsed time and hosted client time are not hosted CPU measurements.
 The GitHub `cloudflare_auth` job is removed. No GitHub workflow runs these checks.
 Run the hosted authentication checks with the commands in [CI settings](cloudflare-build-settings.md#on-demand-checks).
 Run them on the reviewed revision. They migrate and deploy only `minsky-auth-ci`.
-They do not run Supabase migrations or deploy the application.
+They do not deploy the application.
 Your Wrangler credentials need D1 access and deployment access to the isolated authentication Worker.
 The Worker must already have its private `AUTH_SECRET`.
 Ordinary checks run local browser security tests without hosted credentials.
@@ -196,5 +196,4 @@ For an interrupted account operation in an authorized fixture, use organizer-ass
 The organizer must administer every assigned session. Archived memberships block recovery through the account API.
 T0020 adds trusted, provider-owned [installation-owner recovery](../site/src/content/docs/operators/installation.mdx#recover-the-owner).
 That procedure passed the recorded empty-installation checks. Confirm the exact installation and owner before recovery.
-`npm run cloud:recover-admin` is the Supabase provider's recovery command. It does not operate on Cloudflare.
 Use `npm run cloudflare:recover-admin` to reset a Cloudflare admin password.

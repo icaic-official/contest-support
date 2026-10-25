@@ -47,8 +47,8 @@ The candidate remains stopped, with its public and preview URLs disabled and its
 The separate installation-verification and CI resources are listed in [run log](history/run-log.md#t0021-fresh-development-installation-2026-10-18).
 Do not substitute those resources for development.
 
-Existing Supabase records, accounts, passwords, images, and IDs do not appear in the fresh installation.
-The activation left Supabase intact. It exported no records, reset no accounts, and deleted no resources.
+Records, accounts, passwords, images, and IDs from the earlier backend do not appear in the fresh installation.
+The activation exported no records, reset no accounts, and deleted no resources.
 The new owner comes from the supported bootstrap process. Its credentials stay in private files outside the checkout.
 
 ## Complete the approval record
@@ -106,7 +106,7 @@ Keep only one dispatcher active for this installation.
 Do not delete either namespace, the database, the bucket, the administrator, or private secrets.
 
 Only the candidate URL becomes unavailable during this step.
-During the first switch, Supabase remained available at the stable URL until the complete Worker replaced it.
+During the first switch, the earlier backend remained available at the stable URL until the complete Worker replaced it.
 This step is reversible through the candidate's recorded URL and schedule after stopping any stable dispatcher.
 
 ## Create the approved stable secret
@@ -196,13 +196,12 @@ No assertion, timeout, or protection changed. The initial wait failure has no co
 | Repeat verification and retained namespace | CLI stable verification passes 14/14 at 14:07:38 UTC, with clean owned-fixture removal. The live audit confirms namespace `71700338eed643d59185f4a777fcb7b2` and every binding match the first deployment. |
 
 The [run log](history/run-log.md) owns detailed verification results and remaining manual checks.
-No Supabase data or identifiers transferred.
+No data or identifiers transferred from the earlier backend.
 
 ## Recover a Cloudflare admin password
 
 The development admin is `organizer`.
 
-`npm run cloud:recover-admin` changes a Supabase account only.
 Use `npm run cloudflare:recover-admin` when a Cloudflare admin cannot sign in.
 Run it in a private terminal on your computer.
 The command refuses CI.
@@ -259,7 +258,7 @@ Retain all new D1 records, R2 objects, owner results, journals, and private secr
 Use the latest recorded compatible complete stable revision with the retained stable configuration.
 The first verified complete stable source is `4e43739ac2ce56cca7e7739e4db189aa2854d4a9`.
 The initial activation approval allowed candidate source `f6864f6ea29e663e78483d0cfd28a8f4e3299c2c` for first repair. That repair was not needed. The verified stable source is now the recorded repair baseline.
-Do not restore the earlier assets-only Supabase version after Cloudflare writes begin.
+Do not restore the earlier assets-only version after Cloudflare writes begin.
 
 Create a separate repair checkout at the selected revision and install its locked dependencies.
 Set these public path variables in the repair shell:
@@ -284,5 +283,5 @@ Verify stable authentication, workflows, images, and live updates before resumin
 
 If repair requires the candidate URL, first stop stable traffic, disable stable routes and schedules, and drain admitted work.
 Then restore only the candidate's recorded URL and schedule. An unavailable stable URL alone does not stop its cron.
-A return to Supabase requires a separate approved recovery plan. It does not transfer new Cloudflare records.
+A return to the earlier backend requires a separate approved recovery plan. It does not transfer new Cloudflare records.
 The guarded app deployment refuses an assets-only overwrite of a complete Worker.

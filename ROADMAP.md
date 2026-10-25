@@ -17,13 +17,12 @@ In general, we wish for the platform's model to operate in a similar fashion to 
 | Database | Cloudflare D1 (SQLite) |
 | Blob storage | Cloudflare R2 (issue and announcement images) |
 | Realtime | Durable Objects, one per contest session |
-| Alt provider | Supabase adapter. Run it on your own Supabase project. The project operates no Supabase installation. |
 | CI/CD | Cloudflare Workers Builds |
 | Tests | Vitest (unit), Playwright (end-to-end) |
 
 **Limitation**: each D1 database has a single primary, runs one query at a time, and is capped at 10 GB.
 
-On 2026-10-23 the owner selected Cloudflare as the live backend. On 2026-10-24 the owner retired the project's own Supabase projects. The Supabase adapter stays as code that anyone can run on their own project.
+On 2026-10-23 the owner selected Cloudflare as the live backend. On 2026-10-25 the owner removed the Supabase implementation. Cloudflare is the only backend, and the provider contracts stay for a later provider.
 This file owns the stack direction. [Product direction](docs/product-direction.md) owns product requirements.
 See [Cloudflare backend design](docs/cloudflare-backend-design.md) for the implemented boundaries.
 

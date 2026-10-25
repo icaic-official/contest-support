@@ -1,8 +1,8 @@
 # Shared provider test contracts
 
 The shared suite checks Minsky behavior through the browser `Backend` interface.
-Supabase and Cloudflare supply browser adapters and fixture drivers.
-The same 11 scenarios apply to both providers without weaker assertions.
+Cloudflare supplies the browser adapter and fixture driver. On 2026-10-25 the owner removed the Supabase implementation.
+The 11 scenarios apply to any provider without weaker assertions.
 The three new cases cover account creation, image-limit boundaries, and reconnect recovery.
 See [run log](history/run-log.md) and [PR #43](https://github.com/GiftedNovaHD/minsky/pull/43) for source-specific hosted results.
 Earlier eight-case results verify the recorded revisions only.
@@ -14,19 +14,7 @@ Direct persistence and account suites use a D1-only database. Their records cann
 Complete application checks use separate Worker, D1, private R2, and Durable Object resources.
 See [run log](history/run-log.md#t0020-connector-implementation-2026-10-18) for source-specific evidence.
 
-T0019 reuses the workflow scenarios against the [shared server service](server-workflow.md).
-The focused [hosted Supabase suite](../tests/workflow/supabase.test.ts) replaces only the workflow executor in a real Supabase connection.
-Commands pass through the deployed `workflow` Edge Function, the shared service, and guarded PostgreSQL commits.
-Reads and other operations retain their existing Supabase adapters.
-Scenario assertions remain provider-neutral and unchanged for the replacement path.
-This focused suite does not constitute a second complete `Backend` implementation.
-Use [Run the shared workflow check](run-provider-tests.md#run-the-shared-workflow-check) to run it.
-The focused workflow run shares one owned fixture across cases with distinct request and issue IDs.
-Its organizer setup uses a fresh privileged Auth password update, then completes the actual mandatory-change database gate.
-That setup avoids password-change rate limits. It is not evidence for the account password-change endpoint.
-The existing provider authentication scenario keeps its normal setup and assertions.
-
-The suite complements the database, function, and hosted UI tests.
+The suite complements the database and hosted UI tests.
 It does not replace provider-specific policy tests or prove capacity, installation, or migration correctness.
 [Run the provider tests](run-provider-tests.md) describes setup and recovery.
 
@@ -39,24 +27,17 @@ It does not replace provider-specific policy tests or prove capacity, installati
 | `tests/providers/drivers.ts` | Explicit selection of an implemented fixture driver. |
 | `tests/providers/browser-backend.ts` | A separate browser context for each connection and a typed Node proxy for `Backend`. |
 | `tests/providers/browser-dispatch.ts` | Calls to the real browser adapter, serialized errors and image bytes, and callback forwarding. |
-| `tests/providers/supabase/` | Supabase fixture creation, the real browser adapter, transport fault injection, and scoped cleanup. |
 | `tests/providers/cloudflare/` | Exact Cloudflare CI target checks, D1 and identity fixtures, the real browser adapter, committed-response loss, and exact R2 object cleanup. |
 | `scripts/provider-test.mjs` | Target checks, backend prerequisites, process status, and recovery-journal retention. |
 | `playwright.providers.config.ts` | Hosted suite isolation and disabled credential-bearing captures. |
-| `tests/workflow/supabase.test.ts` | Reuses workflow scenarios through the opt-in shared server path and adds trusted-boundary checks. |
-| `scripts/workflow-proof.mjs` | Requires an explicit isolated project in `MINSKY_TEST_PROJECT_REF` and retains recovery journals on cleanup failure. |
-| `tests/providers/supabase/target.mjs` | Validates the Supabase test project reference and refuses the retired development project. |
 
 Each connection has a separate browser context, including its cookies and local storage.
 The Node scenarios call a `Backend` bridge that invokes the real adapter in that context.
 The bridge transfers image bytes, typed errors, progress, and subscription callbacks.
-Separate contexts permit both bearer-token providers and cookie-based providers without changing the scenarios.
+Separate contexts permit bearer-token providers and cookie-based providers without changing the scenarios.
 
-The Supabase driver disables persisted browser sessions and uses each account's real login.
-The service key stays in Node fixture setup and cleanup.
-The browser receives only the public key and temporary fixture credentials.
 The response fault control discards one successful workflow or account response after the server commits it.
-Both providers reuse `tests/providers/support/response-fault.ts` with their actual endpoint paths.
+A provider reuses `tests/providers/support/response-fault.ts` with its actual endpoint paths.
 This tests uncertain outcomes without replacing the operation.
 The browser bridge can also close real provider WebSockets and reject reconnects until the scenario resumes them.
 It leaves HTTP requests available so another connection can commit changes during the interruption.
@@ -99,12 +80,10 @@ Local checks cover application reads, image limits and recovery, live updates, a
 Installation and tooling tests cover bootstrap, owner recovery, exact target selection, and credential handling.
 See [run log](history/run-log.md) for exact case counts and revisions.
 
-The existing SQL and function suites retain lower-level permission and failure cases.
+The local D1 and Worker suites retain lower-level permission and failure cases.
 The hosted UI suite still checks the app's account journey and provider-specific integration.
 Passing shared scenarios on one provider does not establish another provider's conformance.
-The focused T0019 suite adds direct plan rejection and captured-state race checks for the shared Supabase execution path.
-Local embedded PostgreSQL covers additional commit guards and rollback cases.
-Record local, hosted Supabase, and hosted D1 results separately. Keep earlier protected GitHub Actions results as dated evidence.
+Record local and hosted D1 results separately. Keep earlier protected GitHub Actions results as dated evidence.
 
 ## Fixture ownership and recovery
 
@@ -114,7 +93,6 @@ Accounts created through the application use exact name and username markers sav
 The name includes the full run UUID. Cleanup discovers their IDs after a lost create response and checks their memberships before deletion.
 Cloudflare removes a created-account username counter only after that account ID is proved and retained. A planned username alone is not ownership evidence.
 Cleanup checks those ownership records before deletion.
-The Supabase account scan also finds a creation whose response was lost before the runner saved its account ID.
 Cloudflare records its generated account IDs before its first fixture write.
 
 The recovery journal contains identifiers and the provider target. It contains no credentials.
@@ -128,7 +106,6 @@ The Cloudflare fixture uses the named `SessionMaintenance` service entrypoint th
 The public application has no maintenance route.
 Cleanup first proves fixture ownership and blocks late live messages. It then removes owned D1 rows and verifies empty coordinator storage.
 An interrupted cleanup retains its identifiers-only journal for retry.
-Supabase receipt cleanup retains its existing foreign-key behavior.
 
 A cleanup failure fails the run and retains the journal on the machine that ran the tests. The runner prints its path.
 Recovery refuses a different target or ownership mismatch.
@@ -143,7 +120,7 @@ The lost-response controls must discard committed workflow and account responses
 The reconnect control must interrupt the real subscription transport, hold reconnect attempts, then permit recovery.
 
 Cloudflare passed the earlier eight-case registry through its guarded hosted CLI runner.
-On 2026-10-19, protected runs at `2125875` passed the 11-case registry on both implementations. See [run log](history/run-log.md#final-pre-merge-and-merged-main-checks).
+On 2026-10-19, protected runs at `2125875` passed the 11-case registry. See [run log](history/run-log.md#final-pre-merge-and-merged-main-checks).
 A later change to the registry or to an adapter needs fresh hosted verification.
 Every new provider must pass the same registry.
 A driver cannot skip a failing behavior because its database or identity provider differs.
@@ -174,8 +151,7 @@ Terraform can later create resources. It cannot establish the behavior that thes
 ## Earlier bounded authentication reuse (T0018 and T0020)
 
 T0018 extracts `verifyTemporaryAuthentication()` from the existing authentication scenario.
-The Supabase scenario retains its workflow hooks. Cloudflare supplies its real authentication adapter and protected session-list hooks.
-Both providers use the same identity, temporary-password, password-change, logout, stale-password, and subscription-cleanup assertions.
+Cloudflare supplies its real authentication adapter and protected session-list hooks.
 That earlier bounded reuse did not establish complete Cloudflare `Backend` conformance.
 T0020's complete driver then passed all eight unchanged scenarios against the hosted Cloudflare application.
 The former [protected connector job](history/run-log.md#final-protected-connector-verification) passed as a separate verification gate. GitHub Actions no longer runs it.

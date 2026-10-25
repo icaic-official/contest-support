@@ -4,9 +4,9 @@ These tickets describe development work, not contestant issues.
 
 On 2026-10-23 the owner selected Cloudflare as the live backend.
 The development Worker is `minsky-dev` and the development D1 database is `minsky-development`.
-On 2026-10-24 the owner retired the project's own Supabase projects. The Supabase adapter stays as code that readers run on their own projects.
+On 2026-10-24 the owner retired the project's own Supabase projects. On 2026-10-25 the owner removed the Supabase implementation.
 Older summaries that say to keep Supabase active describe that ticket's scope.
-The 2026-10-23 decision supersedes them.
+The later decisions supersede them.
 
 [T0006 session announcements](#t0006--session-announcements) merged in [PR #62](https://github.com/GiftedNovaHD/minsky/pull/62) at `62d882a` on 2026-10-24.
 [T0023](#t0023--documentation-site-redesign-and-accuracy) merged in [PR #47](https://github.com/GiftedNovaHD/minsky/pull/47) at `df6120c` on 2026-10-24.
@@ -249,7 +249,6 @@ Bounded subagent work is authorized.
 ### Verification
 
 The [workflow reference](server-workflow.md) records the existing behavior and implemented boundaries.
-The [workflow check](run-provider-tests.md#run-the-shared-workflow-check) gives the local and hosted commands and recovery procedure.
 [Run log](history/run-log.md) records observed results.
 An interface or an uncalled rule module does not complete this extraction.
 
@@ -547,7 +546,7 @@ Cloud first, features first: connectivity is assumed. Offline queues, synchroniz
 
 - Walk the user through Cloudflare and Supabase account/organization setup and developer access. Distinguish provider-console membership from Minsky application accounts. Ownership/billing records are deferred to T0005; the user completes provider login, verification and any payment entry in the provider UI.
 - Start with one Supabase Free development project and Workers Free on a `workers.dev` address. Use shared cloud access for contributors and an isolated cloud test project for privileged CI; Docker is optional. Avoid requiring paid hosted database branches, a purchased application domain, R2 or AWS merely to begin.
-- Follow [the Supabase provider guide](supabase-provider.md), completing it with the actual region, non-secret project identifiers, deployment URL, tested commands and setup results. Explain any required spend before selecting a paid service. Recording selected plans, recurring charges and receipt handling is deferred to T0005.
+- Follow the Supabase provider guide (removed 2026-10-25), completing it with the actual region, non-secret project identifiers, deployment URL, tested commands and setup results. Explain any required spend before selecting a paid service. Recording selected plans, recurring charges and receipt handling is deferred to T0005.
 - Add repository-owned Vite build/Workers Static Assets configuration, pinned npm tooling, environment examples and ignored secret files. Cloudflare serves the frontend only; all backend functionality lives in Supabase. Use Supabase Auth, Postgres policies/transactional database functions and Realtime, with Supabase Edge Functions for privileged account administration. Version and deploy those functions with the repository. Keep service credentials out of frontend builds and public CI logs; no custom Cloudflare backend endpoints are needed.
 - Provision username/password accounts using Supabase Auth behind internal email-format identifiers. Show temporary credentials for each create/reset action; distribute them securely outside the app. Enforce mandatory password changes in database policies and RPCs. Verify first login, password change, reset and prior-session denial against hosted Auth.
 - Sender-domain access is no longer a T0003 blocker. SMTP/email invitations and email recovery were explicitly replaced by the user; do not silently reintroduce email sending.

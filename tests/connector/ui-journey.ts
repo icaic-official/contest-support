@@ -153,7 +153,7 @@ export async function runUiJourney(browser: Browser, fixture: UiFixture, options
     workspaces.push(workspace);
     page.on('request', (request) => {
       const url = new URL(request.url());
-      if (url.hostname.endsWith('.supabase.co')) externalBackend = true;
+      if (url.origin !== fixture.origin && ['http:', 'https:'].includes(url.protocol)) externalBackend = true;
       if (url.origin === fixture.origin && url.pathname === '/api/auth/session') currentOriginAuthentication = true;
       if (url.origin === fixture.origin && url.pathname.startsWith('/api/')) requests.add(`${request.method()} ${url.pathname}`);
     });

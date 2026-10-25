@@ -34,8 +34,8 @@ They are not part of T0005.
 
 Implemented interface decision (2026-10-02): provide a public login landing page and a sidebar for the authenticated workspace.
 The user removed the old local demo, its commands, and tests that applied only to the demo.
-At that stage, Supabase accounts and shared data replaced the local demo.
-The later backend decisions below select Cloudflare for development and keep Supabase as adapter code that readers run on their own projects.
+At that stage, hosted accounts and shared data replaced the local demo.
+The later backend decisions below select Cloudflare as the only backend.
 Isolated fixtures remain for verification.
 The broader organizer tools below remain incomplete.
 
@@ -55,7 +55,7 @@ The broader organizer tools below remain incomplete.
 - Contestants and helpers must be able to reopen resolved issues. T0002 implements reopening on the same issue and retains its history. Reopening continues an issue whose resolution needs review. A separate recurrence may still use a linked new report in future work. Linked-report controls remain outside T0002. The ticket records the implemented rules for ownership, timing, and awards.
 - The user confirmed that reopening resumes accumulated unresolved time and excludes time spent resolved. First-assignment delay remains separate. Awards remain discretionary.
 - Public replies and private notes are separate. The agreed direction includes photos, session announcements, in-app alerts, and browser push that users explicitly enable.
-- Staff upload JPEG, PNG, or WebP images on an issue. Each image records its uploader and time. The uploader chooses team-visible or staff-only visibility, and the choice stays fixed. Every staff member can upload while the event is active. Only the uploader can remove an image during that time. Contestants can view team-visible images on their own team's issues. Session admins set the per-session size and count limits. Resolved issues keep their images. Archived events keep the files for preview and download. The Supabase implementation uses a private Storage bucket. The active Cloudflare implementation uses private R2. Contestant uploads remain out of scope.
+- Staff upload JPEG, PNG, or WebP images on an issue. Each image records its uploader and time. The uploader chooses team-visible or staff-only visibility, and the choice stays fixed. Every staff member can upload while the event is active. Only the uploader can remove an image during that time. Contestants can view team-visible images on their own team's issues. Session admins set the per-session size and count limits. Resolved issues keep their images. Archived events keep the files for preview and download. The Cloudflare implementation uses private R2. Contestant uploads remain out of scope.
 - Session admins and jury publish announcements for a session. Every member reads the active ones above the issue workspace. Titles expand to plain-text details and up to four private images. Expiry and removal hide an announcement from readers. Managers keep it. See [session announcements](session-announcements.md).
 - Shared incidents use explicit affected rosters, selective closure of linked reports, and bulk awards with recipient exceptions.
 - Awards use a separate ledger. One authorized decision precedes separate confirmation of external application. Contestants see the decision and application status. Minsky permits explicit zero-minute decisions with a public explanation. It also supports preset and custom award amounts.
@@ -65,7 +65,7 @@ The broader organizer tools below remain incomplete.
 
 [ROADMAP.md](../ROADMAP.md) owns the current and target technology stack.
 On 2026-10-23 the owner selected Cloudflare as the live backend. The development Worker is `minsky-dev` and its D1 database is `minsky-development`.
-On 2026-10-24 the owner retired the project's own Supabase projects. The Supabase adapter stays as a second implementation that anyone can run on their own project with [Run the Supabase adapter](supabase-provider.md).
+On 2026-10-25 the owner removed the earlier Supabase implementation. Cloudflare is the only backend. The provider contracts stay for a later provider.
 [Cloudflare backend design](cloudflare-backend-design.md) explains the implemented boundaries. [Add a backend provider](add-provider.md) states what another provider must implement.
 A backend switch needs separate owner approval. Follow the [activation procedure](activate-cloudflare-development.md).
 
@@ -89,11 +89,11 @@ Actual authorization, synchronization, deployment, capacity, and recovery behavi
 T0018 selected maintained Better Auth for bounded Cloudflare authentication. T0020 retains it in the complete connector.
 See [the identity choice](cloudflare-authentication-choice.md) and [API reference](cloudflare-authentication.md).
 On 2026-10-18, the owner selected a fresh Cloudflare development installation in T0021.
-Existing Supabase records are disposable trial data, including the administrator.
+Records from the earlier backend are disposable trial data, including the administrator.
 Transfer no accounts, passwords, issues, history, images, or IDs.
 Create a new administrator through the supported bootstrap process and require a temporary-password change.
 This replaces the 2026-10-17 data-preservation decision. Preserve application behavior and database rules.
-T0021 left Supabase intact. It did not export data, reset accounts, or delete resources. The 2026-10-24 retirement leaves deletion of those projects to the owner.
+T0021 did not export data, reset accounts, or delete resources of the earlier backend.
 T0021 requires fresh credential distribution, recovery, expiry, and revocation checks before activation.
 The [verification record](history/run-log.md) distinguishes those checks from later deployment results.
 
@@ -109,13 +109,13 @@ Confirm production role and category configuration and integration requirements 
 Do not turn this direction into a speculative implementation backlog.
 
 Contributor decision (2026-10-02): the user permits full cloud credential access for contributors.
-The setup at that time used hosted Supabase, local frontend development, and cloud-side function bundling.
+The setup at that time used a hosted backend and local frontend development.
 Docker is optional.
 Keep privileged credentials outside Git and frontend builds.
 Cloud CI uses a protected, isolated test project.
 
 Authentication revision (2026-10-02): the user chose organizer-created usernames and temporary passwords in T0003.
-Supabase uses internal identifiers with email format.
+The identity provider uses internal identifiers with email format.
 These identifiers are not mailboxes.
 Credential distribution and organizer-issued resets replace email invitations and email recovery.
 Keep team accounts shared and staff identities individual.

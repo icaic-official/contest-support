@@ -75,7 +75,7 @@ That command reads `wrangler.jsonc` and would publish `minsky-dev`.
 10. Add build variable `SKIP_DEPENDENCY_INSTALL` with value `1`.
     The check script installs the root and `site` lockfiles itself.
     Build variables are under **Settings > Build > Build variables and secrets**.
-11. Do not add `CLOUDFLARE_API_TOKEN`, Supabase keys, or `AUTH_SECRET` to this Worker.
+11. Do not add `CLOUDFLARE_API_TOKEN` or `AUTH_SECRET` to this Worker.
     Ordinary checks do not use those values.
 12. Leave **Settings > Build > Build watch paths** at the default, which includes every file.
 
@@ -186,7 +186,7 @@ You need access to Cloudflare account `458ad6a930b0fb717796dfa19ca6a2b1`.
 
    The deploy script compares the last four values with the committed configuration.
    A pull request that changes the configuration to another database or bucket fails until you also change these values.
-10. Do not add `MINSKY_DEV_BACKEND` or Supabase variables. The script always publishes the Cloudflare app.
+10. Do not add `MINSKY_DEV_BACKEND`. The script always publishes the Cloudflare app.
 11. Do not add `AUTH_SECRET`. That secret stays on the Worker and is never a build input.
 12. Leave **Build watch paths** at the default, which includes every file.
 
@@ -366,6 +366,6 @@ The reset discards all preview data written after that point, including test acc
 ## Checks that stay on demand
 
 Browser tests need Chromium libraries that the [build image](https://developers.cloudflare.com/workers/ci-cd/builds/build-image/) does not install.
-Hosted Supabase and Cloudflare suites also exceed the 20 minute build limit, or they change isolated CI resources.
+Hosted Cloudflare suites also exceed the 20 minute build limit, or they change isolated CI resources.
 Coding agents run those commands when the change needs them.
 The exact commands are in [deployment settings](cloudflare-build-settings.md#on-demand-checks).

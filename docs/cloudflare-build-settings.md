@@ -31,7 +31,7 @@ Both `minsky-ci` triggers set the build variable `NODE_VERSION` to `22.23.2`.
 That value is already set in Cloudflare.
 It keeps CI on Node.js 22.23.2 when the build image's default Node.js changes.
 
-`npm run ci` installs both lockfiles, then runs the app production build, ESLint, Deno function checks, function tests, unit tests, the provider scenario list, the docs build, both `npm audit` checks, and a checksum-verified Gitleaks scan.
+`npm run ci` installs both lockfiles, then runs the app production build, ESLint, unit tests, the provider scenario list, the docs build, both `npm audit` checks, and a checksum-verified Gitleaks scan.
 The app build starts with `tsc -b`, so it is also the type check. It runs first so that type errors fail early.
 Vitest uses every CPU. It starts the four short authentication files first, because a fresh install has no earlier test durations and Vitest would otherwise start them last.
 `npm run ci:worker` runs `wrangler versions upload --config wrangler.ci.jsonc --dry-run`.
@@ -149,16 +149,6 @@ This paragraph is arithmetic from the pricing page. It is not a measured bill.
 The hosted connector job used a 45 minute limit and the hosted authentication job used 35 minutes.
 Both exceed the 20 minute Workers Builds timeout, so they cannot move into a build command.
 
-Hosted Supabase checks need your own isolated Supabase test project and its private keys. The project operates no Supabase project.
-Prepare the test project and set `MINSKY_TEST_PROJECT_REF` as [Run against the Supabase provider](run-provider-tests.md#run-against-the-supabase-provider) states.
-
-```sh
-node scripts/check-cloud-backend.mjs
-npm run test:cloud
-npm run test:providers -- --provider=supabase
-npm run test:workflow:hosted
-```
-
 Hosted Cloudflare authentication checks change only the isolated authentication CI Worker:
 
 ```sh
@@ -241,7 +231,7 @@ The removed `deploy:preview` command cannot upload an assets-only app version.
 | Docs | `wrangler.docs.jsonc` | `minsky-docs` | `site/dist` |
 
 The stable URLs are `https://minsky-dev.icaic-minsky.workers.dev` and `https://minsky-docs.icaic-minsky.workers.dev`.
-The app build always sets `VITE_BACKEND=cloudflare` and removes Supabase public settings. It uses same-origin cookie authentication.
+The app build always sets `VITE_BACKEND=cloudflare`. It uses same-origin cookie authentication.
 A missing Cloudflare configuration stops the app publication. There is no static upload path.
 The selected Cloudflare config must have the exact stable name, origin, account, D1 UUID, database name, and bucket name.
 The script rejects CI, test, and installation resource names.

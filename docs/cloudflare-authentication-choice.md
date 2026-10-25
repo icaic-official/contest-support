@@ -94,7 +94,6 @@ An identity login that races a password reset cannot gain access through an olde
 See [Better Auth security settings](https://better-auth.com/docs/reference/security).
 
 Untrusted previews must use isolated fictional data and a separate authentication deployment.
-Supabase frontend builds do not receive this identity adapter or its credentials.
 
 ## Resource evidence and deployment cost
 

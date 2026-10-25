@@ -685,7 +685,7 @@ export function registerAuthenticationCases(group: AuthenticationCases) {
         await expectFailure(signIn(username, password, new D1AuthenticationService(db, racingIdentity, hasher))).toMatchObject({ status: 409 });
       });
 
-      it('passes the same temporary-authentication lifecycle used by the Supabase provider scenario', async () => {
+      it('passes the shared temporary-authentication lifecycle scenario', async () => {
         await stmt('UPDATE accounts SET must_change = 1 WHERE id = ?', fixture.contestant.accountId).run();
         const handle = createAuthenticationHandler(service, { origins: [origin] });
         let cookie = '';

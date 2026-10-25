@@ -644,7 +644,7 @@ function isolatedEnv(directory: string): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = {};
   for (const [key, value] of Object.entries(process.env)) {
     if (value === undefined) continue;
-    if (key.startsWith('CLOUDFLARE_') || key.startsWith('CF_') || key.startsWith('SUPABASE_') || key.startsWith('VITE_')) continue;
+    if (key.startsWith('CLOUDFLARE_') || key.startsWith('CF_') || key.startsWith('VITE_')) continue;
     env[key] = value;
   }
   env.CI = 'true';

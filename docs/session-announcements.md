@@ -99,7 +99,7 @@ Text of 10,000 characters can use up to 40,000 bytes in UTF-8.
 | --- | --- | --- |
 | Unit and embedded database | `npm test` | Both D1 and R2 services with local bindings. The Supabase migration and policies in embedded PostgreSQL. Both browser adapters. Draft and expiry rules. |
 | Edge Function | `npm run test:functions` | Signature and size checks, retained files after failed or overlapping completion, and retryable removal. |
-| Local browser | `npm run test:e2e` | Live titles, keyboard disclosure, a report draft during a live change, slow reads, removal, competing edits, and a 390 px layout. Provider transport is simulated. |
+| Local browser | `npm run test:e2e` | Live titles, keyboard disclosure, a report draft during a live change, slow reads, removal, competing edits, and a 390 px layout. The Worker announcement service runs on local D1. Identity and the live socket are simulated. |
 
 These checks do not cover hosted Supabase, hosted Cloudflare, image transfers in a browser, other browsers, screen readers, or physical devices.
 The shared provider verification protocol does not cover announcements yet.

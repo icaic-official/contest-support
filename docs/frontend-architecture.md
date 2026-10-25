@@ -69,7 +69,7 @@ The implementations are in `src/backend/supabase/` and `src/backend/cloudflare/`
 These steps occur in sequence:
 
 1. `src/main.tsx` wraps `ConnectedApp` in `BrowserRouter`. `ConnectedApp` restores the session with `useAuthSession`.
-2. Without a user, it shows `SignIn` (`src/screens/SignIn.tsx`).
+2. Without a user, it shows `Landing` (`src/screens/Landing.tsx`) at `/` and `SignIn` (`src/screens/SignIn.tsx`) at every other path. See [Landing page](#landing-page).
 3. `useAccountStatus` checks the account every 10 seconds and on window focus.
    If the password is temporary, `PasswordForm` (`src/screens/PasswordForm.tsx`) shows. The database also enforces this change.
 4. `Workspace` (`src/connected/Workspace.tsx`) loads session data with `useSessionSnapshot`. It wraps the UI in `AvatarProvider`, which loads [profile pictures](#profile-pictures). It selects the UI with `uiKindFor` from `model.ts`:
@@ -84,6 +84,14 @@ After a UI is selected, `Workspace` keeps that UI mounted when the snapshot disa
 A refresh error or a session change can remove the snapshot. The shell then shows `NoSessionAccess` itself.
 Its selection, filters and form drafts stay in memory. A shell must not unmount its state when `data.snapshot` is undefined.
 
+## Landing page
+
+`Landing` is the public page at `/` for signed-out visitors. It links to `/sign-in` and to the published guides (`documentationUrl`). `signInPath` in `src/connected/navigation.ts` is the one address of the sign-in page.
+`ConnectedApp` derives one `layout` value (`dashboard`, `centered` or `landing`) from the account state and the path. The layout sets the `<main>` classes, the floating theme toggle and the footer. The landing page has its own header and theme toggle.
+The `steps` table in `src/screens/Landing.tsx` holds one row for each issue status, with the lifecycle text, the demo activity entry and the simulated seconds on the timer. The animated demo card and the lifecycle rail both read it.
+The demo state is one step index and one tick. The card is decorative, so assistive technology skips it. With `prefers-reduced-motion: reduce` the demo does not run and shows the resolved issue.
+The hero backdrop is the `hero-backdrop` utility in `src/index.css`.
+
 ## Browser routes
 
 `src/connected/navigation.ts` maps browser paths to the existing pages and phone tabs.
@@ -91,7 +99,8 @@ The same authorized snapshot selects the interface and checks route access.
 
 | Path | Screen and access |
 | --- | --- |
-| `/` | Opens `/issues` after account and session checks. |
+| `/` | Signed out: the landing page. Signed in: opens `/issues` after account and session checks. |
+| `/sign-in` | Signed out: the sign-in page. Signed in: opens `/issues` after account and session checks. |
 | `/issues` | The current membership's issue queue or team reports. |
 | `/issues/mine` | Assigned issues for support staff. |
 | `/issues/handoffs` | Handoff issues for support staff. |
@@ -103,7 +112,7 @@ The same authorized snapshot selects the interface and checks route access.
 | `/account` | Phone **Me**, or the **My account** settings page in the desktop console and the contestant app. `/account#security` opens the **Security** section and focuses **Current password**. |
 
 Navigation controls update the address and browser history.
-Direct paths remain through sign-in and required password changes.
+A signed-out visitor on any other path sees the sign-in page. Direct paths remain through sign-in and required password changes.
 Reload retains the section and reads current session data.
 A full reload discards unsent drafts, queue filters, and uncertain requests.
 Browser Back and Forward restore the section.

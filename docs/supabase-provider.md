@@ -141,7 +141,7 @@ Contestant intake stays closed until an admin opens it.
    npm run dev
    ```
 
-4. Open [http://127.0.0.1:5173](http://127.0.0.1:5173). Sign in as the first admin with the username, for example `organizer`, and the password from the dashboard.
+4. Open [http://127.0.0.1:5173](http://127.0.0.1:5173). Select **Sign in**. Then sign in as the first admin with the username, for example `organizer`, and the password from the dashboard.
 5. Change the password if the app asks for it.
 
 `npm run build` creates static assets in `dist/` with the same settings. You can serve them from any static host. Add that origin to `ALLOWED_ORIGINS`.

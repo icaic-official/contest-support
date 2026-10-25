@@ -8,7 +8,7 @@ description: Get your account, change your temporary password, choose a session,
 Your organizer gives you the address, a username, and a temporary password.
 There is no public registration.
 
-1. Open the address and sign in.
+1. Open the address and select **Sign in**.
 2. Set a new password. You cannot see contest data until you do.
 
 Teams share one account. Each staff member has a personal account, so the history shows who acted.

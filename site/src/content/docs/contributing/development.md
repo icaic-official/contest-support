@@ -26,7 +26,7 @@ Never put a service key in a `VITE_` variable. An admin must add your account to
 `src/connected/` owns authentication checks, browser routes, session data, and workflow retry protection.
 `src/contestant/` contains the contestant desktop app.
 `src/organiser/` contains the organiser phone app, desktop console, and shared forms.
-`src/screens/` contains sign-in, password change, and session-access screens.
+`src/screens/` contains the landing page and the sign-in, password change, and session-access screens.
 Features use the selected backend contracts. Provider SDKs stay inside provider implementations.
 See the repository's [frontend architecture](https://github.com/GiftedNovaHD/minsky/blob/main/docs/frontend-architecture.md) for the module and route reference.
 

@@ -11,4 +11,5 @@ Check the repository and the current guides before you act on anything here.
 | [T0021 run report](t0021-run-report.md) | T0021 preparation, verification, activation, and follow-ups, 2026-10-18 to 2026-10-20. |
 | [T0009 jury worklist specification](t0009-jury-worklist.md) | The accepted T0009 specification. T0015 later moved the lists into the Awards tab and the Award review page. |
 | [PR #21 component record](pr21-installation-disposition.md) | Reuse decisions for the deferred container packaging in PR #21. |
+| [D1 read-volume baseline](read-volume-baseline-2026-10-26.md) | D1 calls and rows read for each API request on `main` at `f978488`, at 15 data sizes, with ranked causes and prototype deltas, 2026-10-26. |
 | [Supabase provider records](supabase-provider-records.md) | The T0005 Worker preview and the initial Supabase setup record, 2026-10-02 to 2026-10-11. |

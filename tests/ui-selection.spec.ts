@@ -266,6 +266,45 @@ test("the account page changes the password in place and keeps the route", async
   await expect(page).toHaveURL("/account");
 });
 
+test("the password form blocks a new password under 12 characters and shows the rule", async ({
+  page,
+  api,
+}) => {
+  await signIn(page, api, staff, "/account");
+  const current = page.getByLabel("Current password", { exact: true });
+  const next = page.getByLabel("New password", { exact: true });
+  const confirm = page.getByLabel("Confirm password", { exact: true });
+  const save = page.getByRole("button", { name: "Save password", exact: true });
+  const changes = () => api.bodies("/api/auth/change-password");
+  const changed = page
+    .getByRole("status")
+    .filter({ hasText: "Your password was changed." });
+
+  await expect(page.getByText("Use 12 to 128 characters.")).toBeVisible();
+  await expect(next).toHaveAccessibleDescription("Use 12 to 128 characters.");
+
+  await current.fill("fixture-password");
+  for (const password of ["eightchr", "elevenchars"]) {
+    await next.fill(password);
+    await confirm.fill(password);
+    await save.click();
+    expect(
+      await next.evaluate(
+        (input) => input instanceof HTMLInputElement && input.validity.tooShort,
+      ),
+    ).toBe(true);
+    await expect(next).toHaveValue(password);
+    await expect(changed).toHaveCount(0);
+    expect(changes()).toHaveLength(0);
+  }
+
+  await next.fill("twelve-chars");
+  await confirm.fill("twelve-chars");
+  await save.click();
+  await expect(changed).toBeVisible();
+  expect(changes()).toHaveLength(1);
+});
+
 test("the organiser account page shows every section and signs out", async ({
   page,
   api,

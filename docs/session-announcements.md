@@ -19,6 +19,16 @@ This page is the reference for the behavior and for both provider implementation
   A keyboard-operable disclosure shows the details and the images.
   Reporting stays available under the existing intake and archive rules.
   The strip uses at most 40% of the window height and scrolls inside that area. While a manager has the new or edit form open, it can use up to 80%, so the whole form fits on a laptop screen.
+- The strip lists the two newest announcements. **Show N more** lists the rest. **Show fewer** returns to two.
+  An announcement with an open edit or removal prompt stays listed, also when a new announcement pushes it down.
+- Every member can hide the strip with **Hide**. A one-line bar with the heading, the announcement count, and **Show** replaces it.
+  Hiding does not close an open announcement or discard a draft. **Show** restores them.
+  A failed publish message stays visible while the strip is hidden, so Retry stays available.
+- The browser stores the hidden choice with the IDs of the announcements that it covered.
+  It keeps one choice for each person and session in that browser.
+  An announcement that was not listed when the member hid the strip shows it again.
+  This includes an expired announcement that a manager activates again. A change to a listed announcement does not.
+  If the browser cannot store the choice, the choice applies until the page reloads.
 - Each announcement shows its publisher and the server publication time.
   After a change, it shows the latest editor and time.
 - Editing keeps the original publisher and time.
@@ -99,7 +109,7 @@ Text of 10,000 characters can use up to 40,000 bytes in UTF-8.
 | --- | --- | --- |
 | Unit and embedded database | `npm test` | Both D1 and R2 services with local bindings. The Supabase migration and policies in embedded PostgreSQL. Both browser adapters. Draft and expiry rules. |
 | Edge Function | `npm run test:functions` | Signature and size checks, retained files after failed or overlapping completion, and retryable removal. |
-| Local browser | `npm run test:e2e` | Live titles, keyboard disclosure, a report draft during a live change, slow reads, removal, competing edits, and a 390 px layout. Provider transport is simulated. |
+| Local browser | `npm run test:e2e` | Live titles, keyboard disclosure, a report draft during a live change, slow reads, removal, competing edits, the two-announcement list, hiding the strip, and a 390 px layout. Provider transport is simulated. |
 
 These checks do not cover hosted Supabase, hosted Cloudflare, image transfers in a browser, other browsers, screen readers, or physical devices.
 The shared provider verification protocol does not cover announcements yet.

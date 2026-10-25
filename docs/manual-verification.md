@@ -541,8 +541,12 @@ Use two browser windows for the live checks. Run these checks after a reviewed d
 11. Reload each window. Check that the state is unchanged and the reporting form never waited for announcements.
 12. At 320 px and 390 px wide, check that the announcement strip wraps, scrolls inside its area, and causes no horizontal page scroll.
     In a window about 1280 by 720 px, open **New announcement** and **Edit**. Check that every field and the **Publish** or **Save changes** button shows without scrolling inside the strip.
-13. Archive the event. Check that announcements stay readable and every management control disappears.
-14. Repeat the checks on a Supabase build when you run the adapter on your own project.
+13. Publish at least three announcements. Check that every member sees the two newest, and that **Show 1 more** and **Show fewer** work with the keyboard.
+    As a reader, select **Hide**. Check that focus stays on the button, which now reads **Show**, and that the bar shows the count.
+    Reload and check that the strip stays hidden. Publish another announcement and check that the strip shows again.
+    As a manager, hide the strip with the new announcement form open. Select **Show** and check that the draft is still there.
+14. Archive the event. Check that announcements stay readable and every management control disappears.
+15. Repeat the checks on a Supabase build when you run the adapter on your own project.
 
 ## 16. Motion and reduced motion
 

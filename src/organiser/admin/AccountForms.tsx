@@ -109,7 +109,12 @@ export function MembershipFields({
           {(
             [
               ["staff", "Staff", "One person", UserRound],
-              ["team", "Team", "Shared team login", Users],
+              [
+                "team",
+                "Team",
+                teams.length === 0 ? "Add a team first." : "Shared team login",
+                Users,
+              ],
             ] as const
           ).map(([kind, label, help, Icon]) => (
             <label key={kind} className={cardClass}>

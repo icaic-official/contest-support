@@ -163,7 +163,7 @@ for (const viewport of viewports) {
         .getByRole("button", { name: "Retry last request", exact: true })
         .click();
 
-      // The recorded report opens its issue over the form, which hides the form from role queries.
+      // On the desktop the issue sheet opens over the dialog and hides it from role queries, so this query uses the label.
       await expect(page.getByLabel(/What.s happening/)).toHaveValue("");
       expect((await local.snapshot()).issues).toHaveLength(1);
     });

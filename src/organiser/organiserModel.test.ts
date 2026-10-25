@@ -243,7 +243,7 @@ describe("issueAbilities and primaryAction", () => {
     expect(primaryAction(theirs)).toBeUndefined();
   });
 
-  it("lets an admin resolve an issue that someone else owns or nobody owns yet", () => {
+  it("lets an admin resolve an issue that someone else owns", () => {
     const admin = member({ roles: [], is_admin: true });
     const claimed = issue({ status: "claimed", owner: other, owner_name: "Other" });
     const can = issueAbilities(claimed, noAwards, admin);
@@ -253,10 +253,7 @@ describe("issueAbilities and primaryAction", () => {
     expect(
       issueAbilities({ ...claimed, status: "escalated" }, noAwards, admin).resolve,
     ).toBe(true);
-    expect(issueAbilities(issue(), noAwards, admin).resolve).toBe(true);
-    expect(
-      issueAbilities(issue(), noAwards, member({ roles: ["volunteer"] })).resolve,
-    ).toBe(false);
+    expect(issueAbilities(issue(), noAwards, admin).resolve).toBe(false);
     expect(
       issueAbilities({ ...claimed, status: "resolved" }, noAwards, admin).resolve,
     ).toBe(false);

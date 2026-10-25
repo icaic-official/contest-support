@@ -132,6 +132,9 @@ These commands connect to provider accounts. Several of them change hosted data 
 | `npm run cloud:recover-admin` | Reset a Supabase provider administrator when that provider's only admin cannot sign in. |
 | `npm run cloudflare:recover-admin` | Reset the password of an existing Cloudflare admin. Prints the temporary password once in that terminal. |
 | `npm run cloud:hosting-login` | Sign in to Cloudflare with Wrangler. |
+| `npm run token:create -- <request.json> --out <file>` | Create a scoped Cloudflare API token for an agent task. Needs `CLOUDFLARE_TOKEN_ADMIN`. See [API tokens for agents](AGENTS.md#api-tokens-for-agents). |
+| `npm run token:list` | List the tokens that agents created, with their permissions and expiry. |
+| `npm run token:delete -- <id>` | Delete a token that an agent created. |
 
 See [Run the Supabase adapter](docs/supabase-provider.md) for the exact arguments and the `npx supabase functions deploy` commands.
 
@@ -197,6 +200,7 @@ The [T0021 activation record](docs/history/run-log.md#t0021-approved-activation-
 Plans and rules:
 
 - [Contributor rules](AGENTS.md), the [planning record](PLAN.md), and the [roadmap](ROADMAP.md) for the technology stack.
+  [AGENTS.md](AGENTS.md#api-tokens-for-agents) also states which Cloudflare tokens and resources agents can create.
 - [Product direction](docs/product-direction.md) — agreed requirements and open decisions.
 - [Development tickets](docs/tickets.md) — ticket scope, status, and acceptance criteria.
 - [Writing guide](docs/writing-guide.md) and [documentation release plan](docs/documentation-release-plan.md).

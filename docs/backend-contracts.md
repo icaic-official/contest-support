@@ -47,9 +47,10 @@ The [D1 store](../src/server/adapters/d1/store.ts) persists all nine `WorkflowSe
 Its batches recheck credentials, generation, identity-session expiry, application-login expiry, current permissions, and captured state.
 One database timestamp supplies each workflow commit's ledger and history records.
 State, receipts, history, resolutions, awards, and audience notifications commit together.
-The complete schema adds migrations `0005` through `0011` to the authentication foundation.
+The complete schema adds migrations `0005` through `0012` to the authentication foundation.
 
 [D1ApplicationService](../src/server/adapters/cloudflare/application.ts) returns each authorized snapshot in one database statement.
+Migration `0012` indexes `history(issue_id, at)`. [The query plan test](../src/server/adapters/d1/queryPlans.test.ts) fails if a snapshot query scans a table.
 Snapshots preserve names, timestamps, history, awards, image metadata, limits, and administrator records.
 A valid login with removed membership receives an empty snapshot with null membership.
 An invalid login cannot authorize that read.

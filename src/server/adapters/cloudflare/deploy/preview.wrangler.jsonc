@@ -16,7 +16,7 @@
     "cpu_ms": 1000
   },
   "observability": {
-    "enabled": false
+    "enabled": true
   },
   "triggers": {
     "crons": [

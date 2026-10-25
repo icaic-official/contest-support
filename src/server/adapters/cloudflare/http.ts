@@ -10,6 +10,7 @@ import type { R2ImageService } from './images';
 import { AnnouncementCommandError, type D1AnnouncementService } from './announcements';
 import type { R2AnnouncementImageService } from './announcementImages';
 import type { R2AvatarService } from './avatars';
+import { logEvent, requestFields } from './log';
 
 const uuid = z.uuid();
 const member = z.strictObject({ teamId: uuid.nullable(), roles: z.array(roleSchema).max(3), isAdmin: z.boolean() });
@@ -195,6 +196,7 @@ export function createApplicationHandler(services: ApplicationHttpServices, orig
       if (error instanceof ImageRequestError) return privateJson({ error: error.message,
         validation: error.validation, restart: error.restart, incomplete: error.incomplete }, 409);
       if (error instanceof z.ZodError || error instanceof URIError) return privateJson({ error: 'The request is invalid.' }, 400);
+      logEvent('error', 'http.unhandled_error', { ...requestFields(request), status: 503, error });
       return privateJson({ error: 'The request could not be completed. Its write outcome may be unknown.' }, 503);
     }
   };

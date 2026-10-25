@@ -4,18 +4,21 @@ import {
   ageClass,
   ageTier,
   awardLists,
+  changedIssueIds,
   chipForFilter,
   filterForChip,
   isJuryOnly,
   issueAbilities,
   issuesByNumber,
   issueThatLeft,
+  liveChangeIds,
   matchesChip,
   openableIssues,
   organiserTabs,
   placeOf,
   primaryAction,
   queueChips,
+  recentChanges,
   sheetAllowed,
   sortByUnresolved,
   visibleIssues,
@@ -450,5 +453,50 @@ describe("issue view closing rules", () => {
     expect(issueThatLeft("", open, undefined)).toBeUndefined();
     expect(issueThatLeft("b", open, undefined)).toBeUndefined();
     expect(issueThatLeft("a", undefined, undefined)).toBeUndefined();
+  });
+
+  it("finds new issues and issues whose status or revision changed", () => {
+    const quiet = issue({ id: "quiet", revision: 3 });
+    const claimed = issue({ id: "claimed", revision: 1 });
+    const replied = issue({ id: "replied", revision: 1 });
+    const previous = [quiet, claimed, replied];
+    const next = [
+      quiet,
+      { ...claimed, status: "claimed" as const, revision: 2 },
+      { ...replied, revision: 2 },
+      issue({ id: "fresh", number: 9 }),
+    ];
+    expect([...changedIssueIds(previous, next)].sort()).toEqual([
+      "claimed",
+      "fresh",
+      "replied",
+    ]);
+    expect(changedIssueIds(previous, [...previous])).toEqual(new Set());
+    expect(changedIssueIds(previous, [quiet])).toEqual(new Set());
+  });
+
+  it("keeps a highlight for its window and drops it after, however many updates come", () => {
+    const window = 1000;
+    let changes: ReadonlyMap<string, number> = new Map();
+    // An update every 400 ms with one new id, for two seconds.
+    for (let step = 0; step < 6; step += 1) {
+      changes = recentChanges(changes, new Set([`id-${step}`]), step * 400, window);
+    }
+    // At 2000 ms the entries from 0, 400 and 800 ms are gone.
+    expect([...changes.keys()]).toEqual(["id-3", "id-4", "id-5"]);
+    expect([...liveChangeIds(changes, 2000, window)]).toEqual(["id-3", "id-4", "id-5"]);
+    expect([...liveChangeIds(changes, 2300, window)]).toEqual(["id-4", "id-5"]);
+    expect(liveChangeIds(changes, 4000, window)).toEqual(new Set());
+  });
+
+  it("does not restart a highlight that is already running", () => {
+    const first = recentChanges(new Map(), new Set(["a"]), 100, 1000);
+    const again = recentChanges(first, new Set(["a", "b"]), 600, 1000);
+    expect(again.get("a")).toBe(100);
+    expect(again.get("b")).toBe(600);
+    // After its window an id can highlight again.
+    const later = recentChanges(again, new Set(["a"]), 1200, 1000);
+    expect(later.get("a")).toBe(1200);
+    expect(later.get("b")).toBe(600);
   });
 });

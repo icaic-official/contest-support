@@ -831,3 +831,35 @@ test("refresh, empty states, desktop, phone layouts and zoom reflow remain usabl
   await expect(page.getByText("Nothing in this list.")).toBeVisible();
   expect(errors).toEqual([]);
 });
+
+test("the desktop list switch slides its indicator to the selected list", async ({
+  page,
+  local,
+}) => {
+  void local;
+  await login(page, "jury", desktop);
+  await openAwards(page);
+  const group = page.getByRole("group", { name: "Award lists" });
+  const pill = group.locator('[data-slot="sliding-indicator"]');
+  const sitsUnder = async (list: Locator) => {
+    const [a, b] = await Promise.all([pill.boundingBox(), list.boundingBox()]);
+    if (!a || !b) return Infinity;
+    return Math.max(
+      Math.abs(a.x - b.x),
+      Math.abs(a.y - b.y),
+      Math.abs(a.width - b.width),
+      Math.abs(a.height - b.height),
+    );
+  };
+  await expect
+    .poll(() => sitsUnder(listButton(page, "To decide")))
+    .toBeLessThan(1.5);
+  await showList(page, "Applied");
+  await expect
+    .poll(() => sitsUnder(listButton(page, "Applied")))
+    .toBeLessThan(1.5);
+  await showList(page, "To apply");
+  await expect
+    .poll(() => sitsUnder(listButton(page, "To apply")))
+    .toBeLessThan(1.5);
+});

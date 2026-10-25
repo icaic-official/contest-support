@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/table";
 import type { Issue, Snapshot } from "@/connected/model";
 import { clockDuration } from "@/connected/ui";
+import { useChangedIssues } from "../useChangedIssues";
 import {
   PersonAvatar,
   StatusBadge,
@@ -40,6 +41,8 @@ function wasReopened(issue: Issue, state: Snapshot): boolean {
  * Issues in a data table. The issue number is a button that opens the side
  * sheet, so every row is reachable with Tab and Enter. A click anywhere on
  * the row also opens it. Claim or Accept is a separate button in the row.
+ * A row that a live update added or changed fades from a tint. This includes
+ * a reply or a claim that the person made.
  */
 export function IssueTable({
   issues,
@@ -53,11 +56,12 @@ export function IssueTable({
   empty: ReactNode;
 }) {
   const { state, now, workflow } = props;
+  const changed = useChangedIssues(state.issues, state.session?.id, now);
   if (!issues.length) {
     return (
-      <p className="rounded-xl border border-dashed p-10 text-center text-sm text-muted-foreground">
+      <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed p-10 text-center text-sm text-muted-foreground">
         {empty}
-      </p>
+      </div>
     );
   }
   return (
@@ -88,7 +92,8 @@ export function IssueTable({
               <TableRow
                 key={issue.id}
                 data-state={selected ? "selected" : undefined}
-                className="cursor-pointer"
+                data-changed={changed.has(issue.id) ? "" : undefined}
+                className="cursor-pointer data-[changed]:animate-row-flash"
                 onClick={() => props.openIssue(issue.id)}
               >
                 <TableCell className="pl-4">

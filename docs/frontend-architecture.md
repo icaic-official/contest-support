@@ -181,7 +181,7 @@ They call the `Backend` contracts through `backend`.
 Use `command.locked` to disable workflow controls. It is true while a command runs or waits for a retry.
 Show **Retry last request** while `command.pending` is set and `command.busy` is false.
 
-`src/connected/labels.ts` holds the status names, the resolution summaries and the award minute presets.
+`src/connected/labels.ts` holds the status names, the resolution summaries, the award minute presets, and the parsers for the resolve comment and the custom award minutes.
 Use these values in every UI so that the text stays the same.
 
 ## Refresh schedule

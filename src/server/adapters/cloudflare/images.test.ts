@@ -229,6 +229,20 @@ describe('Cloudflare private images with local D1 and R2 bindings', () => {
     }
   });
 
+  it('says that the event is archived when staff reserve a new image, and keeps the access message for others', async () => {
+    await statement('UPDATE events SET archived = 1 WHERE id = ?', fixture.eventId).run();
+    await expect(reserve()).rejects.toMatchObject({ message: 'This event is archived.', validation: true });
+    await expect(reserve({}, service, fixture.contestant))
+      .rejects.toMatchObject({ message: 'Image access or limits changed. Refresh and try again.', validation: true });
+    expect(await fixture.rows('SELECT id FROM issue_images WHERE session_id = ?', fixture.sessionId)).toEqual([]);
+  });
+
+  it('keeps the limits message when an active event reaches its image count limit', async () => {
+    await statement('UPDATE sessions SET max_images_per_issue = 1 WHERE id = ?', fixture.sessionId).run();
+    await reserve();
+    await expect(reserve()).rejects.toMatchObject({ message: 'Image access or limits changed. Refresh and try again.', validation: true });
+  });
+
   it('serializes concurrent reservations for the same request ID', async () => {
     const requestId = randomUUID();
     const images = await Promise.all([reserve({ requestId }), reserve({ requestId })]);

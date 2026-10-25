@@ -235,7 +235,8 @@ export function Announcements({ data }: { data: SessionData }) {
     <section
       aria-labelledby={headingId}
       // Reading keeps the queue in view. An open form needs room for all its controls.
-      className={`${composing || edit ? "max-h-[80dvh]" : "max-h-[40dvh]"} shrink-0 overflow-y-auto border-b bg-muted/40`}
+      // Below the desktop breakpoint every button is 44 px high, so a thumb can hit it.
+      className={`${composing || edit ? "max-h-[80dvh]" : "max-h-[40dvh]"} shrink-0 overflow-y-auto border-b bg-muted/40 max-lg:**:data-[slot=button]:h-11`}
     >
       <div className="mx-auto grid max-w-4xl grid-cols-1 gap-2 px-4 py-2 sm:px-8">
         <div className="flex flex-wrap items-center gap-2">
@@ -392,6 +393,29 @@ export function Announcements({ data }: { data: SessionData }) {
   );
 }
 
+/**
+ * Focus for an inline confirmation. Opening it shows the whole prompt in the
+ * scrolling strip and focuses its safe choice. When the closed prompt took
+ * focus with it, focus returns to the control that opened it. Opening another
+ * prompt closes this one, and focus stays in the new prompt.
+ */
+function useConfirmFocus(confirming: boolean) {
+  const trigger = useRef<HTMLButtonElement>(null);
+  const prompt = useRef<HTMLDivElement>(null);
+  const keep = useRef<HTMLButtonElement>(null);
+  const wasConfirming = useRef(false);
+  useEffect(() => {
+    if (confirming) {
+      prompt.current?.scrollIntoView({ block: "nearest" });
+      keep.current?.focus({ preventScroll: true });
+    } else if (wasConfirming.current && document.activeElement === document.body) {
+      trigger.current?.focus();
+    }
+    wasConfirming.current = confirming;
+  }, [confirming]);
+  return { trigger, prompt, keep };
+}
+
 function AnnouncementItem(props: {
   item: Announcement;
   images: AnnouncementImage[];
@@ -419,29 +443,14 @@ function AnnouncementItem(props: {
     running !== undefined && "id" in running && running.id === item.id;
   const panelId = useId();
   const warningId = useId();
-  const removeButton = useRef<HTMLButtonElement>(null);
-  const prompt = useRef<HTMLDivElement>(null);
-  const keepButton = useRef<HTMLButtonElement>(null);
-  const wasPrompting = useRef(false);
+  const { trigger: removeButton, prompt, keep: keepButton } = useConfirmFocus(removing);
   const status = announcementStatus(item, now);
-  // Show the whole prompt in the scrolling strip and focus its safe choice.
-  // When the closed prompt took focus with it, return focus to Remove. Opening
-  // another item's prompt closes this one, and focus stays in the new prompt.
-  useEffect(() => {
-    if (removing) {
-      prompt.current?.scrollIntoView({ block: "nearest" });
-      keepButton.current?.focus({ preventScroll: true });
-    } else if (wasPrompting.current && document.activeElement === document.body) {
-      removeButton.current?.focus();
-    }
-    wasPrompting.current = removing;
-  }, [removing]);
   return (
     <li className="rounded-lg border bg-card">
       <h3 className="text-sm">
         <button
           type="button"
-          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left font-medium hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left font-medium hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none max-lg:min-h-11"
           aria-expanded={expanded}
           aria-controls={panelId}
           onClick={props.onToggle}
@@ -770,9 +779,21 @@ function AnnouncementImageView({
   image: AnnouncementImage;
   canRemove: boolean;
   busy: boolean;
-  onRemove: () => void;
+  onRemove: () => Promise<void>;
 }) {
   const { url, failed } = useImageUrl(image.session_id, image.announcement_id, image.id);
+  const [confirming, setConfirming] = useState(false);
+  const [removing, setRemoving] = useState(false);
+  const warningId = useId();
+  const { trigger, prompt, keep } = useConfirmFocus(confirming);
+
+  async function confirm() {
+    setRemoving(true);
+    await onRemove();
+    setRemoving(false);
+    setConfirming(false);
+  }
+
   return (
     <li className="grid gap-1 rounded-md border bg-background p-2">
       {url ? (
@@ -787,20 +808,55 @@ function AnnouncementImageView({
         {image.name}. Added by {image.uploader_name}{" "}
         <time dateTime={image.uploaded_at}>{formatDate(image.uploaded_at)}</time>
       </span>
-      <div className="flex flex-wrap gap-2">
-        {url && (
-          <Button asChild size="xs" variant="outline">
-            <a href={url} download={image.name}>
-              Download<span className="sr-only"> {image.name}</span>
-            </a>
-          </Button>
-        )}
-        {canRemove && (
-          <Button size="xs" variant="outline" disabled={busy} onClick={onRemove}>
-            Remove<span className="sr-only"> {image.name}</span>
-          </Button>
-        )}
-      </div>
+      {confirming && canRemove ? (
+        <div
+          ref={prompt}
+          role="group"
+          aria-labelledby={warningId}
+          className="grid gap-2 rounded-md border border-destructive/50 p-2"
+        >
+          <p id={warningId} className="text-xs font-medium break-words">
+            Remove {image.name}? It leaves this announcement for everyone.
+            Minsky deletes the file and cannot restore it.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              size="xs"
+              variant="destructive"
+              disabled={busy}
+              loading={removing}
+              aria-describedby={warningId}
+              onClick={() => void confirm()}
+            >
+              Remove image
+            </Button>
+            <Button ref={keep} size="xs" variant="ghost" onClick={() => setConfirming(false)}>
+              Keep image
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <div className="flex flex-wrap gap-2">
+          {url && (
+            <Button asChild size="xs" variant="outline">
+              <a href={url} download={image.name}>
+                Download<span className="sr-only"> {image.name}</span>
+              </a>
+            </Button>
+          )}
+          {canRemove && (
+            <Button
+              ref={trigger}
+              size="xs"
+              variant="outline"
+              disabled={busy}
+              onClick={() => setConfirming(true)}
+            >
+              Remove<span className="sr-only"> {image.name}</span>
+            </Button>
+          )}
+        </div>
+      )}
     </li>
   );
 }
@@ -889,7 +945,7 @@ function AnnouncementImages({
               image={image}
               canRemove={canRemove}
               busy={busy}
-              onRemove={() => void remove(image)}
+              onRemove={() => remove(image)}
             />
           ))}
         </ul>

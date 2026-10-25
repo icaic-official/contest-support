@@ -61,12 +61,16 @@ Adding or removing an image also changes the revision.
 - The formats are JPEG, PNG, and WebP. An announcement has up to four images of up to 10 MB (10,485,760 bytes) each.
   The limits are fixed. They do not use the per-session issue image limits.
 - The file picker, progress, retry, inline view, and download work on phones and desktops.
+  Below 1024 px wide, every button in the announcement strip is 44 px high. At 1024 px and wider, the buttons keep their compact desktop size.
   An upload failure leaves the published text available.
 - Each image records its uploader and upload time. Readers see ready images of the announcements they can read.
 - A reservation lasts 15 minutes. A new upload reclaims expired reservations of the same announcement.
 - A failed or uncertain completion keeps its stored file.
   A retry or an overlapping request can publish it. Pending files stay unreadable.
   Cleanup of expired reservations removes unused files. No failed request deletes a file that another request can still publish.
+- **Remove** on an image opens a prompt. The prompt names the file and says that Minsky deletes it and cannot restore it.
+  **Remove image** deletes it. **Keep image** closes the prompt. Nothing is deleted until the manager confirms.
+  When the prompt opens, focus moves to **Keep image**. When the prompt closes, focus returns to **Remove**.
 - Removing an image deletes its stored file and keeps its metadata.
   Expiring an announcement keeps its images for managers. Removing an announcement keeps its images and files, but nobody can open them in the app.
 

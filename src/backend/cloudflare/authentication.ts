@@ -15,6 +15,13 @@ const errorSchema = z.object({ error: z.string() });
 
 export interface CloudflareAuthentication extends Authentication {
   account(sessionId: string, command: AccountCommand): Promise<AccountResult>;
+  /**
+   * Sends a request with the login's CSRF token. The token comes from the
+   * last session read and is reused until the login changes. A 403 reply
+   * means the server stopped before it ran the request, so one retry with a
+   * fresh token is safe.
+   */
+  withCsrf(send: (token: string) => Promise<Response>): Promise<Response>;
 }
 
 /** Experimental auth transport. It does not select the active application backend. */
@@ -35,15 +42,20 @@ export function createCloudflareAuthentication(options: {
   const subscribers = new Set<(user: AccountIdentity | undefined) => void>();
   let generation = 0;
   let timer: ReturnType<typeof setInterval> | undefined;
+  // The CSRF token of the current login. It changes only with the login.
+  let csrf: string | undefined;
 
   function notify(user: AccountIdentity | undefined) {
     for (const callback of subscribers) callback(user);
   }
 
-  async function read(path: string, init?: RequestInit): Promise<Response> {
-    const response = await request(new URL(path, origin), {
+  function fetchRaw(path: string, init?: RequestInit): Promise<Response> {
+    return request(new URL(path, origin), {
       ...init, credentials: 'same-origin', cache: 'no-store', redirect: 'error',
     });
+  }
+
+  async function checked(response: Response): Promise<Response> {
     if (!response.ok && response.status !== 401) {
       const parsed = errorSchema.safeParse(await response.json().catch(() => undefined));
       throw new Error(parsed.success ? parsed.data.error : 'The authentication request failed.');
@@ -51,10 +63,39 @@ export function createCloudflareAuthentication(options: {
     return response;
   }
 
+  async function read(path: string, init?: RequestInit): Promise<Response> {
+    return checked(await fetchRaw(path, init));
+  }
+
   async function session() {
+    const expected = generation;
     const response = await read('/api/auth/session');
-    if (response.status === 401) return undefined;
-    return sessionSchema.parse(await response.json());
+    if (response.status === 401) {
+      if (expected === generation) csrf = undefined;
+      return undefined;
+    }
+    const current = sessionSchema.parse(await response.json());
+    // A read that started before a sign-in, sign-out or password change can carry the old login.
+    if (expected === generation) csrf = current.csrf;
+    return current;
+  }
+
+  async function token(fresh = false): Promise<string> {
+    if (!fresh && csrf) return csrf;
+    const current = await session();
+    if (!current) {
+      notify(undefined);
+      throw new Error('Sign in to continue.');
+    }
+    return current.csrf;
+  }
+
+  async function withCsrf(send: (token: string) => Promise<Response>): Promise<Response> {
+    const used = await token();
+    const response = await send(used);
+    if (response.status !== 403) return response;
+    const fresh = await token(true);
+    return fresh === used ? response : send(fresh);
   }
 
   async function refresh() {
@@ -70,16 +111,12 @@ export function createCloudflareAuthentication(options: {
   }
 
   async function mutate(path: string, body: unknown, authenticated = true) {
-    const headers = new Headers({ 'Content-Type': 'application/json', 'X-Minsky-Request': '1' });
-    if (authenticated) {
-      const current = await session();
-      if (!current) {
-        notify(undefined);
-        throw new Error('Sign in to continue.');
-      }
-      headers.set('X-CSRF-Token', current.csrf);
-    }
-    const response = await read(path, { method: 'POST', headers, body: JSON.stringify(body) });
+    const send = (csrfToken?: string) => {
+      const headers = new Headers({ 'Content-Type': 'application/json', 'X-Minsky-Request': '1' });
+      if (csrfToken) headers.set('X-CSRF-Token', csrfToken);
+      return fetchRaw(path, { method: 'POST', headers, body: JSON.stringify(body) });
+    };
+    const response = await checked(authenticated ? await withCsrf(send) : await send());
     if (response.status === 401) {
       notify(undefined);
       throw new Error('Sign in to continue.');
@@ -95,10 +132,12 @@ export function createCloudflareAuthentication(options: {
       // Reads started during a mutation can still contain the earlier identity.
       // Discard them after success or failure, including an unknown write outcome.
       generation++;
+      csrf = undefined;
     }
   }
 
   return {
+    withCsrf,
     async currentUser() {
       return (await session())?.user;
     },

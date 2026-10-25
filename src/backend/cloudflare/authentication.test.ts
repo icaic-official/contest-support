@@ -72,7 +72,7 @@ describe('Cloudflare browser authentication transport', () => {
     } finally { stop(); }
   });
 
-  it('reads a fresh CSRF token before writes and sends typed account commands', async () => {
+  it('reads the CSRF token once and reuses it for later writes', async () => {
     let reads = 0;
     const { auth, requests } = setup((request) => request.method === 'GET'
       ? json({ user, status, csrf: `csrf-${++reads}` })
@@ -81,8 +81,42 @@ describe('Cloudflare browser authentication transport', () => {
     await expect(auth.account(SESSION_ID, command)).resolves.toEqual({ temporaryPassword: 'fictional-temporary-password' });
     await auth.account(SESSION_ID, command);
     const writes = requests.filter((request) => request.method === 'POST');
-    expect(writes.map((request) => request.headers.get('X-CSRF-Token'))).toEqual(['csrf-1', 'csrf-2']);
+    expect(writes.map((request) => request.headers.get('X-CSRF-Token'))).toEqual(['csrf-1', 'csrf-1']);
+    expect(requests.filter((request) => request.method === 'GET')).toHaveLength(1);
     expect(await writes[0].json()).toEqual({ sessionId: SESSION_ID, command });
+  });
+
+  it('reads a new token after the login changes', async () => {
+    let reads = 0;
+    const { auth, requests } = setup((request) => request.method === 'GET'
+      ? json({ user, status, csrf: `csrf-${++reads}` })
+      : json({}));
+    const command = { action: 'reset_password', userId: ACCOUNT_ID } as const;
+    await auth.account(SESSION_ID, command);
+    await auth.signOut();
+    await auth.account(SESSION_ID, command).catch(() => undefined);
+    const tokens = requests.filter((request) => request.method === 'POST').map((request) => request.headers.get('X-CSRF-Token'));
+    expect(tokens).toEqual(['csrf-1', 'csrf-1', 'csrf-2']);
+  });
+
+  it('does not keep a token from a read that began before a sign-out', async () => {
+    const pending: Array<(response: Response) => void> = [];
+    let deferReads = false;
+    const { auth, requests } = setup((request) => {
+      if (request.method === 'POST') return json({});
+      if (deferReads) return new Promise<Response>((resolve) => { pending.push(resolve); });
+      return json({ user, status, csrf: 'csrf-new' });
+    });
+    deferReads = true;
+    const stale = auth.currentUser();
+    await vi.waitFor(() => expect(pending).toHaveLength(1));
+    deferReads = false;
+    await auth.signOut().catch(() => undefined);
+    pending[0](json({ user, status, csrf: 'csrf-old' }));
+    await stale;
+    await auth.account(SESSION_ID, { action: 'reset_password', userId: ACCOUNT_ID });
+    const last = requests.filter((request) => request.method === 'POST').at(-1);
+    expect(last?.headers.get('X-CSRF-Token')).toBe('csrf-new');
   });
 
   it('completes password changes only after the server clears the gate', async () => {
@@ -105,7 +139,8 @@ describe('Cloudflare browser authentication transport', () => {
       ? json({ error: 'The current password is incorrect.' }, 403)
       : json({ user, status, csrf: 'test' }));
     await expect(auth.changePassword('wrong', 'new')).rejects.toThrow('current password');
-    expect(requests).toHaveLength(2);
+    // A 403 checks for a new token once. The same token does not send the write again.
+    expect(requests.map((request) => request.method)).toEqual(['GET', 'POST', 'GET']);
   });
 
   it('notifies logout after the server revokes the session and rejects stale writes', async () => {

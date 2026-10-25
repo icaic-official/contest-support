@@ -125,6 +125,11 @@ Recovery does not automatically repeat a write. The person must select **Retry l
 An explicit retry uses the original session even if access removal selects another session.
 The server checks access to that original session and can reject the retry.
 
+A recorded command shows its result from the command response. `useCommand` calls `executeAndRead`, and `useSessionSnapshot.applySnapshot` puts the returned snapshot in the same queue as the reads.
+An older snapshot never replaces a newer one, which the server time decides.
+The hook reads sessions and the snapshot again only when the response has no usable snapshot, or when the command is rejected or its result is unknown.
+The live hint that the commit sends still refreshes every open screen, the actor's too.
+
 A successful command or definitive server rejection clears the pending request.
 Signing out or changing the actor also clears it.
 A transport failure retains the request ID, so the server can reject a duplicate write.

@@ -100,7 +100,9 @@ The token prevents cross-site request forgery, where another site attempts an ac
 POST requests with cross-site fetch metadata are rejected. No CORS access or preflight permission is exposed.
 Bodies are limited to 16 KiB. Redirected browser authentication requests fail.
 
-The browser adapter fetches a fresh CSRF token before each authenticated mutation.
+The browser adapter keeps the token from the last session read and reuses it for later mutations.
+The token belongs to one login. The adapter forgets it when a sign-in, sign-out or password change completes, and when a session read returns 401.
+A 403 reply means the server stopped before it ran the request. The adapter then reads the session again, and sends the request one more time only when the token changed.
 Subscriptions check session state every 60 seconds and on focus or page restoration.
 Callbacks run synchronously. Subscription cleanup is idempotent and stops later callbacks.
 Completed login, logout, and password-change requests invalidate earlier subscription reads, including reads started during the request.

@@ -310,6 +310,7 @@ These rules apply:
 - When the open issue leaves the person's lists, the sheet closes with the same status message as the phone app.
 - The queue team filter and the **Report for a team** dialog keep separate team choices. The UI before T0015 shared one choice.
 - The sheet shows one filled primary action from `primaryAction()`. Other allowed actions are outlined. **Decide award** and **Confirm applied** open the Outcome & award tab. Resolve, escalate and reopen open a dialog.
+- The Images tab and the Outcome & award tab stay mounted while another tab is open. An upload continues, and a typed award explanation or an apply confirmation stays when the person opens another tab and comes back. Only the Activity tab unmounts, because it has no form.
 - The composer has **Public reply** and **Internal note**. An internal note has the amber striped surface. The draft clears only when the server records the message, also after **Retry last request** (T0012).
 - The command palette finds issues by number (`31`, `#31`, `ISS-31`) or by report text from three characters, teams and tables with the T0008 search, pages and actions. A team opens the queue with that team filter. A jury-only member goes to Teams & tables instead.
 - The intake switch in the sidebar and the admin pages share one `useSessionAdmin`, so one admin request runs at a time. Admin errors and notices show at the top of the page and in the open dialog.

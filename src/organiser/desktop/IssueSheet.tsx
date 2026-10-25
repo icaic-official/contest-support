@@ -371,7 +371,13 @@ function IssueSheetBody({
               surface="dialog"
             />
           </TabsContent>
-          <TabsContent value="outcome" className="space-y-4 px-6 py-4">
+          {/* The forms stay mounted so a typed award draft survives another tab. */}
+          <TabsContent
+            value="outcome"
+            forceMount
+            hidden={tab !== "outcome"}
+            className="space-y-4 px-6 py-4"
+          >
             <ResolutionHistory issue={issue} state={state} />
             <AwardReceipt award={award} state={state} />
             {can.award && (

@@ -11,8 +11,8 @@ Each claim carries one of these labels:
 
 ## Summary
 
-1. **The avatar list is the heaviest ordinary read** (measured). `GET /api/avatars` reads 5 to 7 rows for every ready profile picture in the whole installation, in every session and event. With a picture for each of 1,200 accounts it reads 6,005 rows for a contestant and 8,416 for a volunteer. It returns 1 and 3 avatars. A rewrite plus one partial index reads 12 and 28 rows (measured on a prototype statement).
-2. **A screen refresh after each live hint costs 6,322 to 14,339 rows** (measured parts, inferred sum). Every hint makes each screen read `/api/sessions`, `/api/snapshot`, `/api/announcements` and `/api/avatars`. The avatar list is 50% to 95% of that.
+1. **The avatar list grows with every ready profile picture in the installation** (measured). `GET /api/avatars` reads 7 rows for each ready picture for staff and 5 for a contestant, in every session and event. This seed gives each of 1,200 accounts a picture, so the list reads 6,005 rows for a contestant and 8,416 for a volunteer, and it is the heaviest ordinary read here. It returns 1 and 3 avatars. With fewer pictures it is lighter. The staff list passes the volunteer snapshot (3,406 rows) at about 480 ready pictures, and the contestant list passes the contestant snapshot (201 rows) at about 40 (inferred from the slopes). A rewrite plus one partial index reads 12 and 28 rows (measured on a prototype statement).
+2. **A screen refresh after each live hint costs 6,322 to 14,339 rows** (measured parts, inferred sum). Every hint makes each screen read `/api/sessions`, `/api/snapshot`, `/api/announcements` and `/api/avatars`. With a picture for every account, the avatar list is 50% to 95% of that.
 3. **The staff snapshot is linear in issues by design** (measured). It reads 33 rows for each issue with its 5 history rows and 3 images, and 3 rows for each history row. One of those 3 rows is a re-read of the caller's access row. Reading the staff flag once removes 799 of 3,401 rows (measured on a prototype).
 4. **Some reads grow with data they do not return** (measured). The contestant snapshot reads every team of the session. At 480 teams its statement reads 1,018 rows for a contestant who sees 1 team, and 60 rows with a key lookup. Each workflow command builds the session's team list three times, although only `submit` uses it.
 5. **The minutely cron scans whole tables** (measured). One tick reads 7,880 rows at the base shape, from scans of `issue_images`, `announcement_images`, `logins` and `ba_session`. Four additive indexes cut it to 22 rows (measured on a prototype).
@@ -142,6 +142,7 @@ Rows read include the dispatch after the response. "Calls" counts the request fi
 | 17 | Live alarm, 4 sockets | Coordinator | 1 | 31 | 0 | Flat |
 
 The account slopes of the avatar list come from a seed with a ready avatar for every account. The list grows with ready avatars, not with members.
+No admin command and no contestant reply were measured. An admin who resolves for an absent owner gets the admin snapshot in the response, so that command reads about 7,005 + 180 ≈ 7,200 rows (inferred). A contestant reply reads about as much as a submit, about 375 rows (inferred).
 The socket slopes come from runs in which every account had a socket. A real contest connects fewer.
 
 One dispatch cycle with the four caller sockets makes 4 calls and reads 44 to 54 rows (measured). The calls are the claim, the session check, one grant query, and the delivery mark. An internal note reads 44 rows, because it notifies only `staff`.
@@ -182,6 +183,7 @@ Scaling the teams in proportion as well changes these by less than 6% (measured)
 The hypotheses follow the perf playbook's mantras in order: don't do it, don't do it again, do it less.
 "Prototype" means that the changed statement ran against the same seeded database and returned the same rows, without the `server_time` field, as the current statement.
 It was not run through the application, so each delta is a guess for the request until a later change measures it with `npm run perf:reads`.
+The [appendix](#appendix-prototype-statements) gives the exact SQL of each prototype.
 The cron prototype ran without sign-ins, so its database had 4 fewer logins and 4 fewer identity sessions than the tool's run. At 1 row each, that is why it starts at 7,872 rows and the ranking shows 7,880.
 
 | Prototype | Current rows | Prototype rows | Same result |
@@ -315,7 +317,7 @@ These statements no longer match `main` at `f978488`. The page is not changed in
 
 ## Other findings not fixed here
 
-- `src/connected/hooks/refreshSchedule.ts` sets `DISCONNECTED_REFRESH_MS` and `CONNECTED_REFRESH_MS` to 60,000 since `448f52c`. `docs/cloudflare-backend-design.md` line 335 and `docs/frontend-architecture.md` lines 175 and 196 say that the browser refreshes every 10 seconds while the channel is down. Either the code or those pages is wrong.
+- **A likely bug in the refresh period.** `src/connected/hooks/refreshSchedule.ts` sets both `DISCONNECTED_REFRESH_MS` and `CONNECTED_REFRESH_MS` to 60,000. The commit that added them, `448f52c`, says "While it is down the timer runs every 10 seconds as before". `docs/cloudflare-backend-design.md` line 335 and `docs/frontend-architecture.md` lines 175 and 196 also say 10 seconds. `refreshSchedule.test.ts` divides by the constant, so it passes for any value. A screen with a dropped socket therefore refreshes every 60 seconds, not every 10 (inferred from the code). A fix makes each disconnected screen send its refresh reads 6 times as often.
 - The installed packages differ from the lockfile. See [machine and versions](#machine-and-versions).
 
 ## Limits of this baseline
@@ -325,3 +327,75 @@ These statements no longer match `main` at `f978488`. The page is not changed in
 - The seed has no resolutions or awards except those that the commands create, and no admin audit rows.
 - The prototype deltas come from single statements on the same data, not from requests through the application.
 - This baseline counts rows and round trips. It does not measure time.
+
+## Appendix: prototype statements
+
+A one-off script ran these prototypes on the seeded base shape, on 480 teams and on 4,800 accounts. It is not committed, because it edits application SQL by text replacement and stops working when the fixes land.
+After a fix lands, `npm run perf:reads` measures it through the application.
+Each prototype keeps the bound values of the current statement in the same order, unless the edit says otherwise.
+
+H1 uses the avatar statement in the H1 section and this partial index:
+
+```sql
+CREATE INDEX memberships_staff ON memberships(session_id, account_id) WHERE team_id IS NULL;
+```
+
+H2 runs the real `scheduled` handler before and after these indexes:
+
+```sql
+CREATE INDEX issue_images_state ON issue_images(state);
+CREATE INDEX announcement_images_state ON announcement_images(state);
+CREATE INDEX logins_expires ON logins(expires_at);
+CREATE INDEX ba_session_expires ON ba_session(expiresAt);
+```
+
+H3 changes two sections of `snapshotSql`. In `history`, it replaces the first text with the second:
+
+```sql
+FROM history h JOIN visible_issues i ON i.id = h.issue_id CROSS JOIN access a
+    WHERE h.visibility = 'public' OR a.staff = 1
+
+FROM history h JOIN visible_issues i ON i.id = h.issue_id
+    WHERE h.visibility = 'public' OR (SELECT staff FROM access) = 1
+```
+
+In `attachments`, it makes the same change:
+
+```sql
+FROM visible_issues i CROSS JOIN issue_images x CROSS JOIN access a
+    WHERE x.issue_id = i.id AND x.state = 'ready' AND (x.visibility = 'public' OR a.staff = 1)
+
+FROM visible_issues i CROSS JOIN issue_images x
+    WHERE x.issue_id = i.id AND x.state = 'ready' AND (x.visibility = 'public' OR (SELECT staff FROM access) = 1)
+```
+
+H4 replaces the inner query of the `teams` section. `<row>` stands for `json_object('id', t.id, 'session_id', t.session_id, 'name', t.name, 'location', t.location)`:
+
+```sql
+SELECT <row> AS row
+    FROM teams t CROSS JOIN access a WHERE t.session_id = ? AND (a.staff = 1 OR t.id = a.team_id) ORDER BY t.name, t.id
+
+SELECT row FROM (SELECT <row> AS row, t.name AS n, t.id AS k FROM access a CROSS JOIN teams t WHERE a.staff = 1 AND t.session_id = ?
+      UNION ALL SELECT <row>, t.name, t.id FROM access a JOIN teams t ON t.id = a.team_id) ORDER BY n, k
+```
+
+H5 replaces each copy of this subquery in `workflowSql` with `'[]'`. It measures the cost of the lists, not a finished fix:
+
+```sql
+(SELECT json_group_array(t.id) FROM (SELECT id FROM teams WHERE session_id = s.id ORDER BY id) t)
+```
+
+H6 adds `AND i.id = '<issue id>'` to both branches of `visible_issues` in `snapshotSql`, after `i.team_id = a.team_id` and after `i.session_id = ?`.
+
+H7 replaces `WHERE a.is_admin = 1 AND m.session_id = ?` in the `members` section with `WHERE 0 AND m.session_id = ?`. The section then reads no member.
+
+H8 binds the seeded session token:
+
+```sql
+SELECT a.*, l.id AS login_id, l.csrf, l.expires_at AS login_expires_at, b.expiresAt AS identity_expires_at
+  FROM ba_session b JOIN logins l ON l.identity_session_id = b.id JOIN accounts a ON a.id = l.account_id AND a.id = b.userId
+  WHERE b.token = ? AND a.disabled = 0
+    AND b.expiresAt > strftime('%Y-%m-%dT%H:%M:%fZ', 'now') AND l.revoked = 0
+    AND l.expires_at > unixepoch() AND l.credential_generation = a.credential_generation
+    AND a.credential_state = 'ready'
+```

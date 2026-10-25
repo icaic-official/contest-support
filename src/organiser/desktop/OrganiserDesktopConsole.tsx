@@ -24,6 +24,7 @@ import type { WorkflowState } from "@/connected/hooks/useWorkflowState";
 import { type Issue, isStaff, type Snapshot } from "@/connected/model";
 import type { ShellProps } from "@/connected/shell";
 import { chooseTeam, initialTeamSelection } from "@/connected/teamSearch";
+import { cn } from "@/lib/utils";
 import { NoSessionAccess } from "@/screens/NoSessionAccess";
 import { ActionDialog } from "../actions/ActionDialog";
 import { CommandFeedback } from "../actions/ActionSheet";
@@ -371,7 +372,14 @@ export function OrganiserDesktopConsole({
               {/* ConnectedApp already renders the page's <main> landmark. */}
               <div className="relative flex-1 overflow-y-auto">
                 <div className="mx-auto max-w-[1400px] space-y-4 p-6">
-                  <div className="space-y-2 empty:hidden">
+                  <div
+                    className={cn(
+                      "space-y-2 empty:hidden",
+                      // An error stays in view, because the row that failed can be far down the page.
+                      (data.refreshError || command.error) &&
+                        "sticky top-0 z-10 bg-background pb-2",
+                    )}
+                  >
                     {archived && (
                       <Alert>
                         <Archive aria-hidden="true" />

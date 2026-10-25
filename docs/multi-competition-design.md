@@ -22,9 +22,9 @@ This is the target procedure for the first production contest. The phase that sh
 1. The installer runs bootstrap. It creates the first competition and its first contest, **Practice 1**, of kind practice (Phase 4). The bootstrap account becomes the first organization admin (Phase 3).
 2. For a later competition, an organization admin selects **New competition** and names its first contest (Phase 5).
 3. In Practice 1, an admin imports a CSV file of teams and staff, and Minsky shows a credential sheet once (Phase 2). The admin corrects teams and categories in the editors (Phase 1).
-4. The admin selects **Add contest**, names it **Live 1**, and chooses kind live. The roster source defaults to the last contest, Practice 1. The preview says that every team gets a new password, and Minsky then shows the Live 1 sheet once (Phase 4).
+4. After practice, the admin closes intake in Practice 1. Then the admin selects **Add contest**, names it **Live 1**, and chooses kind live. The roster source defaults to the last contest, Practice 1. Minsky resets every team password and shows the Live 1 sheet once (Phase 4).
 5. The admin archives Practice 1 (Phase 7) and opens intake in Live 1 (Phase 4).
-6. Later, the admin adds **Practice 2** from Live 1, and teams keep their passwords. Then the admin adds **Live 2** from Practice 2, which issues a new sheet.
+6. Later, the admin adds **Practice 2** from Live 1, and teams keep their passwords. After Practice 2 and Live 1 close intake, the admin adds **Live 2** from Practice 2, which issues a new sheet.
 7. After the last contest, the admin archives the competition (Phase 5).
 
 Minsky deletes no contest data and has no data reset.
@@ -57,7 +57,7 @@ The server returns contests in competition and position order, not by name as to
 
 ### Rosters
 
-**Copy roster** copies one contest's roster into any other contest of the same competition, for example Live 1 into Practice 2. It adds the teams, team memberships, and staff memberships with roles that the target lacks, and changes nothing that exists. So a repeated copy inserts nothing.
+**Copy roster** copies one contest's roster into any other contest of the same competition, for example Live 1 into Practice 2. It adds the teams, team memberships, and staff memberships with roles that the target lacks. It changes nothing that exists, so a repeated copy inserts nothing.
 
 `teams.roster_key` links each copied team to the first team in its chain, so every contest maps a team account to the same team. A team that first appears in Live 1 starts its own key.
 
@@ -67,7 +67,7 @@ A copy never includes operational data, audit records, receipts, the intake stat
 
 ### Team credentials
 
-The owner's rule is that leaked practice credentials cannot open the live contest. An account has one password at a time, and that password opens every contest the account belongs to.
+The owner's rule is that leaked practice credentials cannot open the live contest. An account has one password at a time, and it opens every contest of that account.
 
 The **issuing contest** of an account is the `session_id` of its newest `create_account` or `reset_password` row in `account_operations` that is not superseded. That column already exists (`0003_authentication.sql:14-23`). A team's own password change records no contest (`src/server/adapters/cloudflare/authentication.ts:340`), so it keeps the issuing contest. The `issued_contest` view reads it.
 
@@ -75,21 +75,21 @@ The **issuing contest** of an account is the `session_id` of its newest `create_
 
 **Rule 2.** Intake in a live contest opens only if every team account in it has a completed password issued for this contest. A pending reset does not count.
 
-**Rule 3.** While a contest has intake open, its team accounts get new passwords only from that contest. Minsky refuses a reset, a reissue, or a Rule 1 copy from any other contest that would change such a password. The copy preview names the affected contests.
+**Rule 3.** While a contest that is not archived has intake open, its team accounts get new passwords only from that contest. Minsky refuses a reset, a reissue, or a Rule 1 copy from any other contest that would change such a password. The copy preview names the affected contests.
 
 The rules give these results:
 
 | Situation | Result |
 | --- | --- |
-| Practice 1 to Live 1 | Rule 1 resets each team account. A leaked Practice 1 password fails. |
+| Practice 1 to Live 1 | Rule 1 resets each team account, so a leaked Practice 1 password fails. Refused while Practice 1 intake is open (Rule 3). |
 | Live 1 to Practice 2 | No reset. Teams use their Live 1 passwords. |
 | Two practice contests | They share whatever password each team holds. |
-| Practice 2 to Live 2 | Rule 1 resets each team account. Live 1 and Practice 2 passwords fail. |
-| Live 1 to Live 2 | The same, but refused while Live 1 intake is open (Rule 3). |
+| Practice 2 to Live 2 | Rule 1 resets each team account, so Live 1 and Practice 2 passwords fail. Refused while Practice 2 or Live 1 intake is open (Rule 3). |
+| Live 1 to Live 2 | The same as Practice 2 to Live 2. |
 | A Practice 2 reissue while Live 1 intake is open | Refused (Rule 3). The admin reissues from Live 1. |
 | An existing account attached to a live contest | Rule 2 blocks intake until a reissue from that contest. |
 | A CSV import into a live contest | `create_account` names that contest, so Rule 2 passes. |
-| A contest that exists today | It becomes live and keeps its passwords, which name it. |
+| A contest that exists today | It becomes live. Its `create_account` and `reset_password` rows already name it, so its teams keep their passwords. An account attached from another contest needs a reissue. |
 
 The reset in Rule 1 hashes nothing, because hash samples took 56 to 96 ms of CPU (`docs/history/run-log.md:1701-1703`) and the Worker has `cpu_ms: 1000` (`src/server/adapters/cloudflare/tooling/configuration.mjs:76`). After the copy, the browser calls `CredentialBatches.next` until no account remains. Each call hashes the passwords that fit in one request and returns them for the sheet. No password is stored, so a lost response needs **Issue again**.
 
@@ -105,7 +105,7 @@ A contest admin can never reset an account that holds a grant. Otherwise a conte
 
 ### Archive
 
-Phase 5 archives a competition on `events.archived`. Phase 7 adds `sessions.archived_at` and the `contest_state` view, so each contest archives alone. An archived contest rejects every write and stays readable.
+Phase 5 archives a competition on `events.archived`. Phase 7 adds `sessions.archived_at` and the `contest_state` view, so each contest archives alone. An archived contest rejects every write and stays readable. It never blocks a reset under Rule 3, even if its intake was left open.
 
 `installation.session_id` points at bootstrap's first contest, the anchor (`0008_installation.sql:2-9`). Owner recovery requires an admin membership in the anchor and an active event (`src/server/adapters/cloudflare/installation.ts:140-145`). The anchor is usually Practice 1, the first contest to be archived. So Phase 5 moves owner recovery to the installation grant before Phase 7 can archive the anchor.
 
@@ -230,7 +230,7 @@ Draft pull request #95 deletes `D1AuthenticationService.sessions()`, which retur
 
 ### Phase 1. Team and category editors (built in #96)
 
-Draft pull request #96 lets a contest admin add, rename, and delete teams and edit the category list. It adds no migration.
+Draft pull request #96 lets a contest admin edit teams and categories.
 
 ### Phase 2. Bulk accounts (required)
 
@@ -246,8 +246,8 @@ A migration adds the Phase 4 schema, and the bootstrap configuration gains the f
 
 - A copy in each direction maps team accounts by roster key, copies no operational data, and inserts nothing when repeated. The preview counts equal the inserted rows.
 - A copy into live revokes old passwords, and a copy into practice revokes none.
-- Live intake fails before the sheet and after a newer password from another contest.
-- Rule 3 refuses a reset and a live copy that touch a team in another contest with open intake.
+- Live intake fails before the sheet and after a newer password from another contest. The refusal names each account that needs a reissue.
+- Rule 3 refuses a reset and a live copy that touch a team in another open contest, the source included. An archived contest blocks nothing.
 - `join_session` restores access after a contest admin removes the owner.
 
 ### Phase 5. Competitions and competition archive (required)
@@ -264,7 +264,7 @@ Phase 7 needs Phase 5. A migration adds `sessions.archived_at` and `contest_stat
 
 ### Phase 8. Contest addresses (later)
 
-Routes under `/contests/<id>/` keep the contest after a refresh. Check with a browser journey that refreshes a deep link.
+Routes under `/contests/<id>/` keep the contest after a refresh.
 
 ### Phase 9. Accounts across competitions (later)
 
@@ -299,7 +299,7 @@ These decisions are still open:
 ## Alternatives considered
 
 - **One roster per competition.** Issues reference `teams(session_id, id)` (`0001_transaction_proof.sql:60`), and `memberships` keys on `session_id` (`0001_transaction_proof.sql:34-42`). A change to those keys needs a table rebuild.
-- **A reset on every copy.** A copy into Practice 2 would sign teams out of Live 1 and print a sheet that nobody needs.
+- **A reset on every copy.** A copy into Practice 2 would print a sheet that nobody needs.
 
 ## Risks
 

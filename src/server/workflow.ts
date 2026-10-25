@@ -168,14 +168,12 @@ export function decideWorkflow(state: WorkflowState, command: Command): Workflow
       break;
     }
     case 'resolve': {
-      // Admins can close an issue for an absent owner. The owner stays recorded.
-      // They can also close an open issue directly. An unowned issue has no owner to keep,
-      // so the admin becomes the owner. The first assignment time stays empty.
+      // Admins can close an assigned issue for an absent owner. The owner stays recorded.
       const isOwner = hasSupportRole && issue.owner === actor.id;
-      if (!(isOwner || member.is_admin) || issue.status === 'resolved') {
+      if (!(isOwner || member.is_admin) || !['claimed', 'escalated'].includes(issue.status)) {
         return reject('state');
       }
-      decision.issue = issue.owner === null ? { status: 'resolved', owner: actor.id } : { status: 'resolved' };
+      decision.issue = { status: 'resolved' };
       decision.resolution = { summary: workflowText(command.summary) };
       decision.history.text = `Resolved: ${decision.resolution.summary}`;
       break;

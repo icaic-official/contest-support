@@ -11,7 +11,12 @@ export type SearchIssue = {
   status: "open" | "claimed" | "escalated" | "resolved" | string;
 };
 
-export type MatchRank = 1 | 2 | 3 | 4 | 5;
+/**
+ * 1 exact name, 2 exact location, 3 whole word, 4 word prefix, 5 text inside
+ * a word, 6 small spelling mistake, 7 letters in order across the name and
+ * location.
+ */
+export type MatchRank = 1 | 2 | 3 | 4 | 5 | 6 | 7;
 
 export type TeamMatch = {
   id: string;
@@ -24,6 +29,8 @@ export type TeamMatch = {
 export type TeamSearchResult = {
   suggestions: TeamMatch[];
   overflow: boolean;
+  /** Every match, before the list limit. */
+  total: number;
 };
 
 export type TeamSelection = {
@@ -114,7 +121,15 @@ function spellingMatch(query: string, field: string): boolean {
   return damerauLevenshtein(query, field) <= limit;
 }
 
-function tokenRank(query: string, fields: readonly string[]): MatchRank | null {
+/**
+ * `wholeOnly` stops a one-letter token from matching inside a word, so "hall a"
+ * does not match every hall.
+ */
+function tokenRank(
+  query: string,
+  fields: readonly string[],
+  wholeOnly: boolean,
+): MatchRank | null {
   let best: MatchRank | null = null;
   const queryIsNumber = /^\p{N}+$/u.test(query);
   for (const field of fields) {
@@ -130,10 +145,13 @@ function tokenRank(query: string, fields: readonly string[]): MatchRank | null {
       continue;
     }
     if (query === field) return 3;
-    if (query.length >= 3 && field.includes(query)) {
+    if (wholeOnly) continue;
+    if (field.startsWith(query)) {
       best = best === null || best > 4 ? 4 : best;
-    } else if (best !== 4 && spellingMatch(query, field)) {
-      best = 5;
+    } else if (field.includes(query)) {
+      best = best === null || best > 5 ? 5 : best;
+    } else if ((best === null || best > 6) && spellingMatch(query, field)) {
+      best = 6;
     }
   }
   return best;
@@ -149,11 +167,38 @@ function rankTeam(query: string, team: SearchTeam): MatchRank | null {
   const fields = [...teamTokens(team.name), ...teamTokens(team.location)];
   let worst: MatchRank = 3;
   for (const token of queries) {
-    const rank = tokenRank(token, fields);
-    if (rank === null) return null;
+    const rank = tokenRank(
+      token,
+      fields,
+      queries.length > 1 && token.length === 1,
+    );
+    if (rank === null) return inOrderRank(normalized, team);
     if (rank > worst) worst = rank;
   }
   return worst;
+}
+
+function isSubsequence(letters: string, text: string): boolean {
+  let at = 0;
+  for (const letter of text) {
+    if (letter === letters[at]) at++;
+    if (at === letters.length) return true;
+  }
+  return false;
+}
+
+/**
+ * Letters typed in order, skipping others, such as "ialp" for
+ * "Installation Alpha". Numbers never match this way.
+ */
+function inOrderRank(normalized: string, team: SearchTeam): MatchRank | null {
+  const letters = normalized.replace(/ /g, "");
+  if (letters.length < 2 || /\p{N}/u.test(letters)) return null;
+  const text = normalizeTeamText(`${team.name} ${team.location}`).replace(
+    / /g,
+    "",
+  );
+  return isSubsequence(letters, text) ? 7 : null;
 }
 
 export function unresolvedCount(
@@ -169,12 +214,32 @@ export function unresolvedLabel(count: number): string {
   return count === 1 ? "1 unresolved issue" : `${count} unresolved issues`;
 }
 
+function sortMatches(matches: TeamMatch[]): TeamMatch[] {
+  return matches.sort(
+    (left, right) =>
+      left.rank - right.rank ||
+      left.name.localeCompare(right.name, "en", { sensitivity: "base" }) ||
+      left.location.localeCompare(right.location, "en", { sensitivity: "base" }) ||
+      left.id.localeCompare(right.id),
+  );
+}
+
+function limited(matches: TeamMatch[]): TeamSearchResult {
+  return {
+    suggestions: matches.slice(0, suggestionLimit),
+    overflow: matches.length > suggestionLimit,
+    total: matches.length,
+  };
+}
+
 export function searchTeams(
   teams: readonly SearchTeam[],
   issues: readonly SearchIssue[],
   query: string,
 ): TeamSearchResult {
-  if (!normalizeTeamText(query)) return { suggestions: [], overflow: false };
+  if (!normalizeTeamText(query)) {
+    return { suggestions: [], overflow: false, total: 0 };
+  }
   const matches: TeamMatch[] = [];
   for (const team of teams) {
     const rank = rankTeam(query, team);
@@ -187,17 +252,30 @@ export function searchTeams(
       rank,
     });
   }
-  matches.sort(
-    (left, right) =>
-      left.rank - right.rank ||
-      left.name.localeCompare(right.name, "en", { sensitivity: "base" }) ||
-      left.location.localeCompare(right.location, "en", { sensitivity: "base" }) ||
-      left.id.localeCompare(right.id),
+  return limited(sortMatches(matches));
+}
+
+/**
+ * The list under the search box. An empty query lists every team by name so
+ * people can browse. Other queries use `searchTeams`.
+ */
+export function suggestTeams(
+  teams: readonly SearchTeam[],
+  issues: readonly SearchIssue[],
+  query: string,
+): TeamSearchResult {
+  if (normalizeTeamText(query)) return searchTeams(teams, issues, query);
+  return limited(
+    sortMatches(
+      teams.map((team) => ({
+        id: team.id,
+        name: team.name,
+        location: team.location,
+        unresolved: unresolvedCount(issues, team.id),
+        rank: 1,
+      })),
+    ),
   );
-  return {
-    suggestions: matches.slice(0, suggestionLimit),
-    overflow: matches.length > suggestionLimit,
-  };
 }
 
 /**
@@ -226,18 +304,30 @@ export function editTeamQuery(
   return {
     teamId: null,
     query,
-    open: normalizeTeamText(query).length > 0,
+    open: true,
     activeIndex: -1,
     activeControl,
   };
 }
 
+/** Shows the list. An empty box lists every team so people can browse. */
+export function openTeamList(
+  selection: TeamSelection,
+  activeControl: string,
+): TeamSelection {
+  return { ...selection, open: true, activeIndex: -1, activeControl };
+}
+
+/**
+ * Typed text reopens the list on focus. An empty box waits for a click or
+ * ArrowDown, because a dialog focuses its first field when it opens.
+ */
 export function focusTeamQuery(
   selection: TeamSelection,
   activeControl: string,
 ): TeamSelection {
   if (!normalizeTeamText(selection.query)) return selection;
-  return { ...selection, open: true, activeIndex: -1, activeControl };
+  return openTeamList(selection, activeControl);
 }
 
 export function moveTeamHighlight(

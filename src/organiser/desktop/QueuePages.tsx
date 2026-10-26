@@ -30,6 +30,11 @@ import {
   queueTabs,
 } from "./consoleModel";
 import { IssueTable, StatCards } from "./IssueTable";
+import {
+  defaultQueueSort,
+  nextQueueSort,
+  sortQueueIssues,
+} from "./queueSort";
 
 /** The heading, the description and an optional action of a page. */
 export function PageHeader({
@@ -81,12 +86,11 @@ function queueTabId(tab: QueueTab): string {
   return `queue-tab-${tab}`;
 }
 
-const footnote =
-  "Sorted by unresolved time, longest first. Timers are grey under 10 minutes, amber under 20 minutes and rose after that. Press J or K to move between rows.";
+const footnote = "Press J or K to move between rows.";
 
 /**
  * The issue queue: status cards, status tabs with counts, the T0008 team
- * filter and the issue table, sorted by unresolved time.
+ * filter and the issue table. It sorts by unresolved time until a header is clicked.
  */
 export function QueuePage({
   props,
@@ -101,13 +105,16 @@ export function QueuePage({
   onReport?: () => void;
 }) {
   const { state, member, workflow, now } = props;
+  const [sort, setSort] = useState(defaultQueueSort);
   const issues = visibleIssues(state.issues, member);
   const teamIssues = teamSelection.teamId
     ? issues.filter((issue) => issue.team_id === teamSelection.teamId)
     : issues;
   const tab = queueTabForFilter(workflow.statusFilter);
-  const shown = sortByUnresolved(
+  const shown = sortQueueIssues(
     teamIssues.filter((issue) => matchesQueueTab(issue, tab)),
+    sort,
+    state.teams,
     state.resolutions,
     now,
   );
@@ -140,7 +147,7 @@ export function QueuePage({
     <div className="space-y-6">
       <PageHeader
         title="Issue queue"
-        description={`Live view of every report in ${state.session?.name ?? "this session"}. Timers come from saved timestamps.`}
+        description={`Live view of every report in ${state.session?.name ?? "this session"}.`}
         action={
           onReport && (
             <ReportButton
@@ -199,6 +206,10 @@ export function QueuePage({
         props={props}
         caption="Issue queue"
         empty={empty}
+        sorting={{
+          sort,
+          onSort: (key) => setSort((current) => nextQueueSort(current, key)),
+        }}
       />
       {shown.length > 0 && (
         <p className="text-xs text-muted-foreground">{footnote}</p>

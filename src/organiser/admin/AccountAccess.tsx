@@ -206,11 +206,11 @@ export function MemberActions({
         member={membership}
         teams={teams}
         disabled={disabled}
-        onSave={(draft) => {
-          void admin.saveMembership(person.id, draft).then((done) => {
+        onSave={(draft) =>
+          admin.saveMembership(person.id, draft).then((done) => {
             if (done) onDone();
-          });
-        }}
+          })
+        }
       />
       <div className="space-y-2 border-t pt-4">
         {person.id !== selfId && (

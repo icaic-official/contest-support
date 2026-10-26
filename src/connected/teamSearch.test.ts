@@ -5,15 +5,18 @@ import {
   clearTeamSelection,
   closeTeamList,
   editTeamQuery,
+  focusTeamQuery,
   initialTeamSelection,
   issueVisibleForTeam,
   keepTeamSelection,
   moveTeamHighlight,
+  openTeamList,
   searchTeams,
   type SearchIssue,
   type SearchTeam,
   submitTeamId,
   suggestionLimit,
+  suggestTeams,
   unresolvedCount,
 } from "./teamSearch";
 
@@ -46,7 +49,7 @@ describe("team search", () => {
       "partial",
       "fuzzy",
     ]);
-    expect(result.suggestions.map((team) => team.rank)).toEqual([1, 2, 3, 4, 5]);
+    expect(result.suggestions.map((team) => team.rank)).toEqual([1, 2, 3, 4, 6]);
     expect(result.overflow).toBe(false);
   });
 
@@ -77,9 +80,6 @@ describe("team search", () => {
     expect(searchTeams(teams, issues, "A").suggestions.map((team) => team.id)).toEqual(
       expect.arrayContaining(["aurora", "cedar"]),
     );
-    expect(searchTeams(teams, issues, "A").suggestions.map((team) => team.id)).not.toContain(
-      "partial",
-    );
   });
 
   it("returns no suggestions for an empty or weak query and caps the list", () => {
@@ -94,6 +94,87 @@ describe("team search", () => {
     expect(result.suggestions).toHaveLength(suggestionLimit);
     expect(result.overflow).toBe(true);
     expect(result.suggestions[0]?.name).toBe("Team A");
+  });
+
+  it("matches text inside a word from the first character, ignoring case", () => {
+    const place: SearchTeam[] = [
+      { id: "install", name: "Installation Alpha", location: "Hall A" },
+      { id: "alpha", name: "Alpha", location: "Hall B" },
+      { id: "beta", name: "Beta", location: "Hall C" },
+    ];
+    const ids = (query: string) =>
+      searchTeams(place, [], query).suggestions.map((team) => team.id);
+    expect(ids("I")).toEqual(["install"]);
+    expect(ids("a")).toEqual(["install", "alpha", "beta"]);
+    expect(ids("ALPHA")).toEqual(["alpha", "install"]);
+    expect(ids("stall")).toEqual(["install"]);
+    expect(ids("hall c")).toEqual(["beta"]);
+  });
+
+  it("matches letters typed in order and ranks them after other matches", () => {
+    const place: SearchTeam[] = [
+      { id: "install", name: "Installation Alpha", location: "Hall A" },
+      { id: "alpha", name: "Alpha", location: "Hall B" },
+    ];
+    const result = searchTeams(place, [], "ialp");
+    expect(result.suggestions.map((team) => [team.id, team.rank])).toEqual([
+      ["install", 7],
+    ]);
+    expect(
+      searchTeams(place, [], "alp").suggestions.map((team) => team.rank),
+    ).toEqual([4, 4]);
+    expect(
+      searchTeams(place, [], "lph").suggestions.map((team) => team.rank),
+    ).toEqual([5, 5]);
+  });
+
+  it("reports no match for text that is not in any team", () => {
+    const result = searchTeams(teams, issues, "qxj");
+    expect(result).toEqual({ suggestions: [], overflow: false, total: 0 });
+  });
+
+  it("lists every team by name for an empty query and reports the rest", () => {
+    const empty = suggestTeams(teams, issues, "  ");
+    expect(empty.suggestions.map((team) => team.name)).toEqual(
+      [...teams]
+        .map((team) => team.name)
+        .sort((a, b) => a.localeCompare(b))
+        .slice(0, suggestionLimit),
+    );
+    expect(empty.total).toBe(teams.length);
+    expect(
+      empty.suggestions.find((team) => team.id === "aurora")?.unresolved,
+    ).toBe(2);
+    const many = Array.from({ length: suggestionLimit + 3 }, (_, index) => ({
+      id: `team-${index}`,
+      name: `Team ${String.fromCharCode(65 + index)}`,
+      location: "Hall Z",
+    }));
+    const browse = suggestTeams(many, [], "");
+    expect(browse.suggestions).toHaveLength(suggestionLimit);
+    expect(browse.overflow).toBe(true);
+    expect(browse.total - browse.suggestions.length).toBe(3);
+    expect(suggestTeams(many, [], "team b").suggestions[0]?.name).toBe(
+      "Team B",
+    );
+  });
+
+  it("opens an empty list on click, not on focus", () => {
+    const empty = initialTeamSelection();
+    expect(focusTeamQuery(empty, "q")).toBe(empty);
+    expect(openTeamList(empty, "q").open).toBe(true);
+    expect(focusTeamQuery(editTeamQuery(empty, "ab"), "q").open).toBe(true);
+  });
+
+  it("keeps a one-letter word exact when other words are typed", () => {
+    const place: SearchTeam[] = [
+      { id: "a", name: "Aurora", location: "Hall A · Desk 12" },
+      { id: "b", name: "Brook", location: "Hall B · Desk 12" },
+    ];
+    const ids = (query: string) =>
+      searchTeams(place, [], query).suggestions.map((team) => team.id);
+    expect(ids("hall a")).toEqual(["a"]);
+    expect(ids("A12")).toEqual(["a"]);
   });
 
   it("never uses partial or spelling matches for numeric tokens", () => {

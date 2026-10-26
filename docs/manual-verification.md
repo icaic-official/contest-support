@@ -391,8 +391,8 @@ Use a volunteer or specialist account, then repeat the queue search as jury and 
 Use a contestant account to confirm that team search stays hidden.
 
 1. Open the issue queue.
-2. Type part of a team name.
-3. Check that suggestions update and that none is selected by itself.
+2. Click the empty **Find a team** box. Check that the list shows teams in name order, at most eight, with a count of the rest.
+3. Type part of a team name, including letters from the middle of a word. Check that suggestions update and that none is selected by itself.
 4. Check that each suggestion shows the team name, location, and unresolved-issue count.
 5. Choose a suggestion with the keyboard and again with a pointer.
 6. Check that the queue shows that team's issues.

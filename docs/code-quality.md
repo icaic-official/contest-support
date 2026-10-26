@@ -15,6 +15,22 @@ The [CI reference](cloudflare-build-settings.md#workers-builds) owns the command
 Its tests also fail on a D1 migration that drops or renames schema, because `main` publishes automatically. See [Change the D1 schema](cloudflare-builds.md#change-the-d1-schema).
 Browser suites and hosted provider suites are on-demand commands. They are not required PR checks.
 
+### Type rules
+
+`tsconfig.json` turns on `strict`, unused locals and parameters, `noFallthroughCasesInSwitch`, `noImplicitOverride`, and `noImplicitReturns`.
+`npm run lint` also runs type-aware rules on application code in `src/`.
+These rules reject:
+
+- non-null assertions (`value!`),
+- type assertions that do not change the type,
+- type assertions on object literals (annotate the variable instead),
+- values of type `any` that flow into assignments, arguments, calls, member access, or return values,
+- a `switch` on a union that misses a member and has no `default`.
+
+The type-aware rules do not apply to tests, test harnesses (`authenticationCases.ts` and `src/server/adapters/d1/test*.ts`), or the vendored components in `src/components/ui/`.
+When a value comes from outside the program, such as JSON, router state, or a library typed as `any`, narrow it with a check or give it a declared type at that boundary.
+If an assertion is the only option, explain in a comment why it is safe.
+
 ## Dependency updates
 
 Dependabot proposes weekly npm updates for the application and the documentation site.
@@ -51,6 +67,7 @@ gitleaks git --redact --log-opts=--all .
 
 This command checks committed history.
 Review uncommitted files before you commit them.
+`.gitignore` excludes local secret files: `.env*` (except `.env.example`) and `.dev.vars*`, which Wrangler reads next to each configuration.
 If you detect a real secret, revoke or rotate it.
 Then follow the provider's incident steps.
 Deleting the current file does not remove the secret from Git history.

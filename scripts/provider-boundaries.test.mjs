@@ -3,12 +3,19 @@ import { fileURLToPath, URL } from 'node:url';
 import { ESLint } from 'eslint';
 import { test } from 'vitest';
 
-const eslint = new ESLint({ cwd: fileURLToPath(new URL('../', import.meta.url)) });
+const boundaryRules = new Set(['no-restricted-imports', 'no-restricted-syntax']);
+// The cases lint virtual files, which the TypeScript project service cannot
+// load. The boundary rules need no type information.
+const eslint = new ESLint({
+  cwd: fileURLToPath(new URL('../', import.meta.url)),
+  overrideConfig: { languageOptions: { parserOptions: { projectService: false } } },
+  ruleFilter: ({ ruleId }) => boundaryRules.has(ruleId),
+});
 
 async function boundaryErrors(code, filePath = 'src/connected/BoundaryCheck.tsx') {
   const [result] = await eslint.lintText(code, { filePath });
-  return result.messages.filter(({ ruleId }) =>
-    ruleId === 'no-restricted-imports' || ruleId === 'no-restricted-syntax');
+  assert.deepEqual(result.messages.filter(({ fatal }) => fatal), [], code);
+  return result.messages.filter(({ ruleId }) => boundaryRules.has(ruleId));
 }
 
 test('UI static imports, re-exports, and literal dynamic imports reject provider SDKs and implementations', async () => {
@@ -25,7 +32,7 @@ test('UI static imports, re-exports, and literal dynamic imports reject provider
       assert.equal((await boundaryErrors(code)).length, 1, code);
     }
   }
-// Each of the 45 cases lints with type information. A busy runner can pass 5 seconds.
+// The 45 cases each run a full lint. A busy runner can pass 5 seconds.
 }, 60_000);
 
 test('UI uses shared contracts, errors, the selected backend, and ordinary lazy imports', async () => {

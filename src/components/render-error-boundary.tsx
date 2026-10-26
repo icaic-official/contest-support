@@ -33,7 +33,7 @@ interface State {
  * when those fail.
  */
 export class RenderErrorBoundary extends Component<Props, State> {
-  state: State = { failed: false, resetKey: this.props.resetKey };
+  override state: State = { failed: false, resetKey: this.props.resetKey };
 
   static getDerivedStateFromError(): Partial<State> {
     return { failed: true };
@@ -46,12 +46,12 @@ export class RenderErrorBoundary extends Component<Props, State> {
       : { failed: false, resetKey: props.resetKey };
   }
 
-  componentDidCatch(error: unknown, info: ErrorInfo): void {
+  override componentDidCatch(error: unknown, info: ErrorInfo): void {
     // The console is the only place a developer can read the cause.
     console.error("Render failed.", error, info.componentStack);
   }
 
-  render(): ReactNode {
+  override render(): ReactNode {
     if (!this.state.failed) return this.props.children;
     return <RecoveryScreen scope={this.props.scope} />;
   }

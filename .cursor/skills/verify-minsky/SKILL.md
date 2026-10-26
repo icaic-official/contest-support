@@ -5,7 +5,7 @@ description: Drive the Minsky contest-support web app in a local browser and cap
 
 # Verify Minsky
 
-Minsky's primary surface is the web app. Contestants report issues. Staff claim and reply. Jury members record time awards. Administrators manage accounts. After sign-in, the membership and the window width select one of three layouts: the contestant desktop, the organiser phone layout below 1024 px, or the organiser desktop console at 1024 px and wider.
+Minsky's primary surface is the web app. Contestants report issues. Staff claim and reply. Jury members record time awards. Administrators manage accounts. After sign-in, the membership and the window width select one of three layouts: the contestant desktop, the organizer phone layout below 1024 px, or the organizer desktop console at 1024 px and wider.
 
 This skill drives the local Cloudflare backend. D1 stores the rows. R2 is the local image bucket. A Durable Object serves live updates.
 
@@ -28,7 +28,7 @@ Leave the serve process running in its own terminal. On a machine that uses tmux
 node .cursor/skills/verify-minsky/scripts/minsky-verify.ts serve --seed empty
 ```
 
-Use `--seed jury` when the journey needs the six existing issues. The default viewport is `1280x800`. Pass `--viewport 390x844` for the organiser phone layout. Set the viewport before sign-in.
+Use `--seed jury` when the journey needs the six existing issues. The default viewport is `1280x800`. Pass `--viewport 390x844` for the organizer phone layout. Set the viewport before sign-in.
 
 Stdout prints this line only after the **Sign in** heading is visible:
 
@@ -97,7 +97,7 @@ Useful handles from this app:
 - Connection badge: the visible text is **Live**. The status role has no accessible name, so wait with `wait-text --text Live --exact`.
 - Contestant account menu: button **Account menu for Aurora**, then menuitem **Sign out**.
 - Desktop console navigation: navigation **Console pages**. Staff buttons include **Queue**, **Award review**, and **Accounts**. The visible names can include a count. Omit `--exact` when the recipe says the count is present.
-- Phone tabs sit in navigation **Organiser sections**.
+- Phone tabs sit in navigation **Organizer sections**.
 
 Run one action per command. A command prints one JSON object. `"ok": true` and exit code 0 mean the action completed. A missing control, a strict-mode duplicate, or a timeout returns `"ok": false` and exit code 1. Stop the journey and report that result.
 

@@ -38,6 +38,7 @@ Messages close when the issue is resolved. Select **Reopen issue** to continue.
 
 Staff can upload JPEG, PNG, or WebP while the event is active, also on resolved issues.
 Choose **Staff only** (default) or **Visible to the team** before upload. You cannot change it later.
+To add an image while you write a reply, select the camera button beside **Send**. The image goes to the issue, not to the message. Its visibility is separate from the audience of the reply.
 Only the uploader can remove an image.
 
 If an upload fails, select **Try the upload again**. Select **Cancel upload** before you change the file or audience.

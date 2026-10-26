@@ -1,9 +1,10 @@
-import type { Browser, Page } from "@playwright/test";
+import type { Browser, Locator, Page } from "@playwright/test";
 import { type LocalWorker, expect, test } from "./support/localWorker";
+import { png, red } from "./support/pictures";
 
 // The real Worker announcement service and migrations on local D1. Only the
-// identity and the live socket are simulated. Image transfers are covered by
-// the Cloudflare service tests.
+// identity and the live socket are simulated. Image uploads use the real
+// image service on local R2. The Cloudflare service tests cover the transfer rules.
 
 const desktop = { width: 1280, height: 800 };
 const phone = { width: 390, height: 844 };
@@ -289,4 +290,77 @@ test("a manager can hide the strip and keeps an unsent draft", async ({ browser,
   await admin.getByRole("button", { name: "Show announcements", exact: true }).click();
   await expect(create.getByLabel("Title")).toHaveValue("Unsent title");
   await expect(admin.getByRole("button", { name: /Room change/ })).toBeVisible();
+});
+
+/** The visible buttons and links in `region` that are smaller than `minimum` pixels in either direction. */
+async function smallControls(region: Locator, minimum = 44): Promise<string[]> {
+  return region.locator("button, a[href]").evaluateAll((elements, limit) => elements
+    .map((element) => ({ element, box: element.getBoundingClientRect() }))
+    .filter(({ element, box }) => element.getClientRects().length > 0 && (box.height < limit || box.width < limit))
+    .map(({ element, box }) => `${element.textContent?.trim() ?? ""} ${Math.round(box.width)}x${Math.round(box.height)}`), minimum);
+}
+
+async function addImage(page: Page, name: string) {
+  await page.getByLabel("Add an image").setInputFiles({
+    name,
+    mimeType: "image/png",
+    buffer: png(8, 8, () => red),
+  });
+  await expect(page.getByRole("button", { name: `Remove ${name}` })).toBeVisible();
+}
+
+test("every announcement control is large enough to tap on a phone", async ({ browser, local }) => {
+  const admin = await signIn(browser, local, "admin", phone);
+  const strip = admin.getByRole("region", { name: /^Announcements/ });
+  await publish(admin, "Room change", "Use room 2.");
+  expect(await smallControls(strip)).toEqual([]);
+
+  await admin.getByRole("button", { name: "Room change" }).click();
+  await addImage(admin, "plan.png");
+  expect(await smallControls(strip)).toEqual([]);
+
+  await admin.getByRole("button", { name: "Remove plan.png" }).click();
+  expect(await smallControls(strip)).toEqual([]);
+  await admin.getByRole("button", { name: "Keep image" }).click();
+
+  await admin.getByRole("button", { name: "Remove", exact: true }).click();
+  expect(await smallControls(strip)).toEqual([]);
+  await admin.getByRole("button", { name: "Keep announcement" }).click();
+
+  await admin.getByRole("button", { name: "Edit", exact: true }).click();
+  expect(await smallControls(strip)).toEqual([]);
+  await admin.getByRole("button", { name: "Cancel edit" }).click();
+
+  await admin.getByRole("button", { name: "New announcement" }).click();
+  expect(await smallControls(strip)).toEqual([]);
+  expect(await admin.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
+  expect(await strip.evaluate((element) => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(0);
+});
+
+test("an announcement image is deleted only after the manager confirms", async ({ browser, local }) => {
+  const admin = await signIn(browser, local, "admin");
+  await publish(admin, "Room change", "Use room 2.");
+  await admin.getByRole("button", { name: "Room change" }).click();
+  await addImage(admin, "plan.png");
+  const state = () => local.rows<{ state: string }>(
+    "SELECT state FROM announcement_images WHERE session_id IN (?, ?) AND name = ?",
+    ...local.sessions, "plan.png");
+  expect(await state()).toEqual([{ state: "ready" }]);
+
+  const remove = admin.getByRole("button", { name: "Remove plan.png" });
+  await remove.click();
+  const prompt = admin.getByRole("group", { name: /Remove plan\.png\?/ });
+  await expect(prompt).toContainText("Minsky deletes the file");
+  await expect(prompt.getByRole("button", { name: "Keep image" })).toBeFocused();
+  expect(await state()).toEqual([{ state: "ready" }]);
+
+  await prompt.getByRole("button", { name: "Keep image" }).click();
+  await expect(prompt).toHaveCount(0);
+  await expect(remove).toBeFocused();
+  expect(await state()).toEqual([{ state: "ready" }]);
+
+  await remove.click();
+  await prompt.getByRole("button", { name: "Remove image" }).click();
+  await expect(admin.getByRole("button", { name: "Remove plan.png" })).toHaveCount(0);
+  expect(await state()).not.toEqual([{ state: "ready" }]);
 });

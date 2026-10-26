@@ -266,7 +266,7 @@ test('phone report sheet sends one submit command per chosen team', async ({ pag
 test('phone Find tab searches teams by name and location and opens a team', async ({ page, api }) => {
   const fixture = await signIn(page, api, phone);
   await page
-    .getByRole('navigation', { name: 'Organiser sections' })
+    .getByRole('navigation', { name: 'Organizer sections' })
     .getByRole('button', { name: 'Find', exact: true })
     .click();
   const find = page.getByLabel('Find a team, table or issue number');
@@ -463,7 +463,7 @@ test('a team removed from the snapshot leaves the phone Find tab and report shee
   await report.getByRole('button', { name: 'Cancel', exact: true }).click();
   await expect(report).toBeHidden();
   await page
-    .getByRole('navigation', { name: 'Organiser sections' })
+    .getByRole('navigation', { name: 'Organizer sections' })
     .getByRole('button', { name: 'Find', exact: true })
     .click();
   await page.getByRole('region', { name: 'Teams' }).getByRole('button', { name: /Cedar/ }).click();
@@ -475,7 +475,7 @@ test('a team removed from the snapshot leaves the phone Find tab and report shee
   await expect(teams).toHaveCount(1);
   await expect(teams).toContainText('Aurora');
   await page
-    .getByRole('navigation', { name: 'Organiser sections' })
+    .getByRole('navigation', { name: 'Organizer sections' })
     .getByRole('button', { name: 'Queue', exact: true })
     .click();
   await expect(page.locator('[id^="issue-card-"]')).toHaveCount(1);

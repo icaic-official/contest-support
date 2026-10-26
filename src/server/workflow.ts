@@ -160,15 +160,13 @@ export function decideWorkflow(state: WorkflowState, command: Command): Workflow
       decision.issue = { status: 'claimed', owner: actor.id };
       decision.history.text = 'Specialist accepted ownership.';
       break;
-    case 'message': {
-      const canReply = member.team_id !== null || hasSupportRole || hasJuryRole;
-      const canUseVisibility = command.visibility !== 'internal' || isStaff;
-      if (issue.status === 'resolved' || !canReply || !canUseVisibility) {
+    case 'message':
+      // The access check above admits only staff and the issue's team. All of them can reply.
+      if (issue.status === 'resolved' || (command.visibility === 'internal' && !isStaff)) {
         return reject('state');
       }
       decision.history = { text: workflowText(command.text), visibility: command.visibility };
       break;
-    }
     case 'resolve': {
       // Admins can close an assigned issue for an absent owner. The owner stays recorded.
       const isOwner = hasSupportRole && issue.owner === actor.id;

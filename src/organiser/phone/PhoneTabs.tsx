@@ -20,6 +20,7 @@ import {
   useAvatarEditor,
 } from "@/connected/hooks/useAvatarEditor";
 import type { WorkflowState } from "@/connected/hooks/useWorkflowState";
+import { awardMinutesLabel } from "@/connected/labels";
 import {
   isRunning,
   type Issue,
@@ -450,11 +451,7 @@ export function AwardsTab(props: PhoneTabProps) {
                 {award && (
                   <div className="mt-3 flex items-center gap-3">
                     <span className="text-2xl font-bold tabular-nums">
-                      +{award.minutes}
-                      <span className="text-sm font-medium text-muted-foreground">
-                        {" "}
-                        min
-                      </span>
+                      {awardMinutesLabel(award.minutes)}
                     </span>
                     <span className="flex-1 text-xs text-muted-foreground">
                       “{award.explanation}”
@@ -647,7 +644,7 @@ export function MeTab(props: PhoneTabProps & { onSessionChange: () => void }) {
         </button>
       </div>
       <p className="px-1 text-xs text-muted-foreground">
-        Ask an organiser if your roles or team assignment need to change.
+        Ask an organizer if your roles or team assignment need to change.
         Development deployment.
       </p>
     </div>

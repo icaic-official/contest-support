@@ -2,7 +2,7 @@ import { useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { IssueImages } from "./IssueImages";
 import { ImageRequestError } from "../backend/errors";
-import type { ImageTransport, StartedImage } from "../backend/contracts";
+import type { ImageTransport } from "../backend/contracts";
 import type { Attachment, PendingRemoval } from "./model";
 import "../index.css";
 
@@ -14,90 +14,32 @@ const pixel = Uint8Array.from(atob(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
 ), (char) => char.charCodeAt(0));
 
+/** This page shows, previews and removes images. It never uploads. */
+const cannotUpload = async (): Promise<never> => {
+  throw new ImageRequestError("The preview page cannot add images.");
+};
+
 function Preview({
   title,
-  canUpload,
+  staff,
   archived = false,
   attachments,
   initialPendingRemovals = [],
 }: {
   title: string;
-  canUpload: boolean;
+  staff: boolean;
   archived?: boolean;
   attachments: Attachment[];
   initialPendingRemovals?: PendingRemoval[];
 }) {
   const [images, setImages] = useState(attachments);
   const [pendingRemovals, setPendingRemovals] = useState(initialPendingRemovals);
-  const uploads = useRef(0);
   const removals = useRef(initialPendingRemovals.length ? 1 : 0);
-  const pending = useRef(new Map<string, {
-    visibility: "public" | "internal";
-    name: string;
-    bytes: number;
-    original: boolean;
-    thumbnail: boolean;
-    ready: boolean;
-  }>());
-  const requests = useRef(new Map<string, string>());
   const transport = useMemo<ImageTransport>(() => ({
-    async begin(input): Promise<StartedImage> {
-      const id = requests.current.get(input.requestId) ?? crypto.randomUUID();
-      if (!requests.current.has(input.requestId)) {
-        requests.current.set(input.requestId, id);
-        pending.current.set(id, {
-          visibility: input.visibility,
-          name: input.name,
-          bytes: input.bytes,
-          original: false,
-          thumbnail: false,
-          ready: false,
-        });
-      }
-      return {
-        id,
-        original_path: `${input.sessionId}/${input.issueId}/${id}/original`,
-        thumbnail_path: `${input.sessionId}/${input.issueId}/${id}/thumbnail`,
-      };
-    },
-    async upload(path, body, _type, onProgress) {
-      uploads.current += 1;
-      onProgress(Math.round(body.size / 2));
-      if (body instanceof File && body.name.includes("fail") && uploads.current === 1) {
-        throw new ImageRequestError("Upload failed. Check your connection and try again.");
-      }
-      const image = pending.current.get(path.split("/")[2]);
-      if (!image) throw new ImageRequestError("Image unavailable.");
-      if (image.ready) throw new ImageRequestError("You do not have permission to add images to this issue.", { validation: true });
-      if (path.endsWith("/original")) image.original = true;
-      if (path.endsWith("/thumbnail")) image.thumbnail = true;
-      onProgress(body.size);
-    },
-    async finish(_session, attachmentId) {
-      const image = pending.current.get(attachmentId);
-      if (!image?.original || !image.thumbnail) {
-        throw new ImageRequestError("Upload the image before finishing.", {
-          restart: true,
-          incomplete: true,
-        });
-      }
-      if (image.ready) return;
-      image.ready = true;
-      setImages((current) => [...current, {
-        id: attachmentId,
-        issue_id: issueId,
-        uploader: ada,
-        uploader_name: "Ada Lovelace",
-        uploaded_at: new Date().toISOString(),
-        visibility: image.visibility,
-        byte_size: image.bytes,
-        content_type: "image/png",
-        original_name: image.name,
-      }]);
-      if (image.name.includes("finish-response")) {
-        throw new ImageRequestError("Upload failed. Check your connection and try again.", { restart: true });
-      }
-    },
+    begin: cannotUpload,
+    upload: cannotUpload,
+    finish: cannotUpload,
+    abandon: cannotUpload,
     async remove(_session, attachmentId) {
       setImages((current) => current.filter((item) => item.id !== attachmentId));
       removals.current += 1;
@@ -106,9 +48,6 @@ function Preview({
         throw new ImageRequestError("The stored files could not be deleted. Try again.");
       }
       setPendingRemovals([]);
-    },
-    async abandon(_session, attachmentId) {
-      pending.current.delete(attachmentId);
     },
     async download(path) {
       if (previewResponse && path.endsWith(`${existing.id}/original`)) {
@@ -127,8 +66,7 @@ function Preview({
         sessionId={sessionId}
         issueId={issueId}
         archived={archived}
-        canUpload={canUpload && !archived}
-        staff={canUpload || archived}
+        staff={staff}
         userId={ada}
         limits={{ maxImageBytes: 10 * 1048576, maxImages: 12, maxTotalBytes: 120 * 1048576 }}
         attachments={images}
@@ -152,16 +90,25 @@ const existing: Attachment = {
   original_name: "screen.png",
 };
 
+const second: Attachment = {
+  ...existing,
+  id: "00000000-0000-4000-8000-000000000403",
+  uploaded_at: "2026-10-11T02:20:00.000Z",
+  visibility: "public",
+  original_name: "new.png",
+};
+
 createRoot(document.getElementById("root")!).render(
   <main className="legacy-ui">
-    <Preview title="Staff images" canUpload attachments={[existing]} />
-    <Preview title="Contestant images" canUpload={false} attachments={[{
+    <Preview title="Staff images" staff attachments={[existing]} />
+    <Preview title="Several images" staff attachments={[existing, second]} />
+    <Preview title="Contestant images" staff={false} attachments={[{
       ...existing,
       id: "00000000-0000-4000-8000-000000000402",
       visibility: "public",
     }]} />
-    <Preview title="Archived images" canUpload archived attachments={[existing]} />
-    <Preview title="Pending removal" canUpload attachments={[]} initialPendingRemovals={[{
+    <Preview title="Archived images" staff archived attachments={[existing]} />
+    <Preview title="Pending removal" staff attachments={[]} initialPendingRemovals={[{
       id: existing.id,
       issue_id: issueId,
       original_name: existing.original_name,

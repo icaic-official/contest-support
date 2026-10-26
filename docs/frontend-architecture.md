@@ -1,7 +1,7 @@
 # Frontend architecture
 
 This reference describes the shared frontend, its three layouts, and its browser routes.
-T0015 provides the contestant desktop app, organiser phone app, and organiser desktop console.
+T0015 provides the contestant desktop app, organizer phone app, and organizer desktop console.
 PR #45 added browser routes and workflow retry protections to the redesigned shells.
 See [T0015](history/tickets.md#t0015--organiser-and-contestant-frontend-redesign) and [T0021](history/tickets.md#t0021-fresh-cloudflare-development-installation) for the recorded scope.
 
@@ -218,11 +218,13 @@ These rules apply:
 - The timer uses `unresolvedTime()` from `model.ts`. It stops on resolution and continues on reopening. Resolved intervals are not counted.
 - **Report an issue** is disabled with a reason when contestant intake is closed or the event is archived. Reply and reopen are not available in an archived event.
 - The reply box sends with Enter and adds a line with Shift+Enter. The draft is cleared only when the server records the message, also after **Retry last request** (T0012).
-- `IssueImages` gets only the team-visible images, with `staff={false}` and `canUpload={false}`. Its image list and preview dialog use Tailwind classes. The upload form is not restyled yet. The organiser steps restyle it. The old class names, such as `image-thumb`, stay because tests use them.
+- `IssueImages` gets only the team-visible images, with `staff={false}`. It shows the image list and the preview dialog with Tailwind classes. It has no upload form. Staff upload through `OrganiserImages`.
 
-## Organiser phone app
+<a id="organiser-phone-app"></a>
 
-`OrganiserPhoneApp` (`src/organiser/phone/`) is the organiser UI below 1024 px. It follows `design/redesign/e-organiser-phone.html`.
+## Organizer phone app
+
+`OrganiserPhoneApp` (`src/organiser/phone/`) is the organizer UI below 1024 px. It follows `design/redesign/e-organiser-phone.html`.
 
 | File | Content |
 | --- | --- |
@@ -232,7 +234,7 @@ These rules apply:
 | `PhoneSessionTab.tsx` | The Session tab for admins. It puts the admin parts from `src/organiser/admin/` on one page, with one sheet for a new account or one account. |
 | `PhoneIssueView.tsx` | The full-screen issue view with the bottom action bar and its sheets. |
 
-Shared organiser parts are one level up, so the desktop console can use them:
+Shared organizer parts are one level up, so the desktop console can use them:
 
 | File | Content |
 | --- | --- |
@@ -266,7 +268,7 @@ These rules apply:
 - A recorded command selects its issue only when the person did not change the selection while the command ran. Thus **Back** during the refresh after a command is not undone. An inline **Claim** or **Accept** does not select its issue, so the issue view does not open and close. When the person opens an issue while that command runs, the action does not close it.
 - When the open issue leaves the person's lists, for example after a live reopen, the issue view closes. The status message "ISS-N is no longer in your lists." appears and focus moves to the page heading (`useLeftIssueNotice`, `issueThatLeft()`).
 - An open sheet closes when its action is no longer allowed, for example after the person loses the jury role (`sheetAllowed()`).
-- A staff member without a volunteer or specialist role sees one muted line under the buttons of the bottom bar. On an open issue it says why **Claim** is missing. A jury member also sees one on a claimed or escalated issue, because only its owner or an admin can resolve it (`missingActionHint()`). A resolved issue and an archived event have no hint.
+- A staff member without a volunteer or specialist role sees one muted line under the buttons of the bottom bar. On an open issue it says why **Claim** is missing and that the person can still reply and add images. The bar then says that no one owns the issue. A jury member also sees one on a claimed or escalated issue, because only its owner or an admin can resolve it (`missingActionHint()`). A resolved issue and an archived event have no hint.
 - The Find tab keeps its query when the person goes back from a team.
 - The Session tab keeps the behavior of the `AdminPanel` from before T0015: status counts, the intake switch, image limits (1–50 MB, 1–24 images, 1–120 MB), accounts, a username for accounts without one, membership changes, password reset (not for your own account), removal of session access, assignment by user ID and recent administration activity.
 - A new account and a password reset show the credentials once, in the same sheet. If the admin closes the sheet while the request runs, the sheet opens again for the credentials. Closing the sheet discards them.
@@ -276,11 +278,13 @@ These rules apply:
 - The Session tab holds the **Teams** and **Categories** sections, which use the editors of the desktop pages. The **Add teams** box keeps its text until the server records it. A lost answer does not duplicate teams, because each new team carries an ID that the box keeps until the request succeeds.
 - In an archived event, every admin control is disabled. `PhoneStatus` shows the archived banner.
 
-`useIssueImages` (`src/connected/hooks/`) holds the upload, retry, preview and removal logic of `IssueImages`. `IssueImages` uses it with its existing markup.
+`useIssueImages` (`src/connected/hooks/`) holds the upload, retry, preview and removal logic of the issue images. `OrganiserImages` uses all of it. `IssueImages` shows the images and the preview, and it uses the preview and removal logic.
 
-## Organiser desktop console
+<a id="organiser-desktop-console"></a>
 
-`OrganiserDesktopConsole` (`src/organiser/desktop/`) is the organiser UI at 1024 px and wider. It follows `design/redesign/a-console.html`.
+## Organizer desktop console
+
+`OrganiserDesktopConsole` (`src/organiser/desktop/`) is the organizer UI at 1024 px and wider. It follows `design/redesign/a-console.html`.
 It uses the same hooks, rules and forms as the phone app. It adds no workflow rules of its own.
 
 | File | Content |
@@ -300,6 +304,7 @@ Shared parts that the console added or changed:
 - `actions/ActionDialog.tsx` is a centred dialog with the props of `ActionSheet`. The console uses it for resolve, escalate, reopen, report, accounts and image upload.
 - `OrganiserImages` takes `surface="dialog"` to show the upload form in an `ActionDialog`.
 - `ReplyForm` takes `layout="composer"`: the message first, then the audience switch and **Send**. Ctrl+Enter or ⌘+Enter sends in both layouts.
+- `ReplyForm` takes `onAttachImage` when the person can upload. It adds a camera button, **Attach an image**, before **Send** in both layouts. The button opens the issue's image upload. The image belongs to the issue, not to the message, and the upload keeps its own visibility choice. On a phone, the upload goes back to the Reply sheet and its draft when it closes.
 - `LifecycleBar` takes `details`. `lifecycleDetails()` gives the submission and first assignment times, "Requested" during a handoff and the resolution time.
 
 These rules apply:
@@ -418,7 +423,7 @@ The app has three boundaries:
 | Boundary | Where | What stays usable |
 | --- | --- | --- |
 | `app` | `src/main.tsx`, around the router | Nothing. This is the last resort. It shows the brand header and the card. |
-| `region` | `Workspace`, around the contestant or organiser UI | The announcement banner and the build ID. |
+| `region` | `Workspace`, around the contestant or organizer UI | The announcement banner and the build ID. |
 | `region` | The desktop console, around the page body | The sidebar and the top bar. |
 
 A region boundary clears its failure when its `resetKey` changes. The `Workspace` boundary uses the path. The console boundary uses the page. A person can leave a failed page without a reload.
@@ -430,7 +435,7 @@ The boundary writes the error and the component stack to the console. It sends n
 The root element of each layout has `data-ui="contestant"`, `data-ui="organiser-phone"` or `data-ui="organiser-desktop"`.
 `tests/ui-selection.spec.ts` uses this attribute to check the UI selection. Keep it on the root element of each layout.
 
-Put components that both organiser layouts use in `src/organiser/`.
+Put components that both organizer layouts use in `src/organiser/`.
 Keep `IssueImages`, `TeamSearch`, `teamSearch.ts`, `model.ts`, `jury.ts` and the image modules. Restyle them only.
 
 ## Local checks

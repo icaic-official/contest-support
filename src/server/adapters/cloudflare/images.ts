@@ -154,6 +154,11 @@ export class R2ImageService {
     };
     const repeated = await repeat();
     if (repeated) return repeated;
+    // The batch guard also rejects an archived event, but it cannot say why.
+    const archived = await this.statement(`SELECT 1 FROM (${currentAccessSql}) c JOIN sessions s ON s.id = ?
+      JOIN events e ON e.id = s.event_id WHERE c.staff = 1 AND e.archived = 1`,
+    ...currentAccessBindings(caller, value.sessionId), value.sessionId).first();
+    if (archived) throw archivedError();
     const id = crypto.randomUUID();
     const assertion = crypto.randomUUID();
     const original = attachmentPath(value.sessionId, value.issueId, id, 'original');

@@ -282,7 +282,7 @@ test("a report travels from the contestant through support, the jury and externa
     // The jury records an award on the organiser phone.
     const jury = await signIn(browser, local, "jury", phone);
     await jury
-      .getByRole("navigation", { name: "Organiser sections" })
+      .getByRole("navigation", { name: "Organizer sections" })
       .getByRole("button", { name: "Awards", exact: true })
       .click();
     const juryRow = jury

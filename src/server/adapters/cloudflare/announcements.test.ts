@@ -345,6 +345,20 @@ describe('Cloudflare session announcements with local D1 and R2 bindings', () =>
     expect((await read(admin)).announcements[0].revision).toBe(2);
   });
 
+  it('says that the event is archived for a manager, and keeps the permission message for others', async () => {
+    const id = await publish();
+    const ready = await publishedImage(id);
+    const pending = await reserve(id);
+    await statement('UPDATE events SET archived = 1 WHERE id = ?', fixture.eventId).run();
+    const archived = { message: 'This event is archived.', validation: true };
+    await expect(images.remove(admin, fixture.sessionId, ready.id)).rejects.toMatchObject(archived);
+    await expect(images.finish(jury, fixture.sessionId, pending.id)).rejects.toMatchObject(archived);
+    await expect(transfer(pending.path)).rejects.toMatchObject(archived);
+    const denied = { message: 'Only session admins and jury can manage announcements.', validation: true };
+    await expect(images.remove(contestant, fixture.sessionId, ready.id)).rejects.toMatchObject(denied);
+    await expect(images.finish(contestant, fixture.sessionId, pending.id)).rejects.toMatchObject(denied);
+  });
+
   it('keeps the images and files of a removed announcement and hides them from everyone', async () => {
     const id = await publish();
     const image = await publishedImage(id);

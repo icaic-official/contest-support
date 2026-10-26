@@ -125,7 +125,7 @@ async function showTeams(page: Page) {
     await page.getByRole("navigation", { name: "Console pages" }).getByRole("button", { name: "Roster", exact: true }).click();
     await expect(page.getByRole("heading", { level: 1, name: "Roster", exact: true })).toBeVisible();
   } else {
-    await page.getByRole("navigation", { name: "Organiser sections" }).getByRole("button", { name: "Session", exact: true }).click();
+    await page.getByRole("navigation", { name: "Organizer sections" }).getByRole("button", { name: "Session", exact: true }).click();
     await page.getByText(/^Teams · \d+$/).click();
   }
   return page.getByLabel("Add teams", { exact: true });
@@ -136,7 +136,7 @@ async function showCategories(page: Page) {
   if ((page.viewportSize()?.width ?? 0) >= 1024) {
     await page.getByRole("navigation", { name: "Console pages" }).getByRole("button", { name: "Session settings", exact: true }).click();
   } else {
-    await page.getByRole("navigation", { name: "Organiser sections" }).getByRole("button", { name: "Session", exact: true }).click();
+    await page.getByRole("navigation", { name: "Organizer sections" }).getByRole("button", { name: "Session", exact: true }).click();
     await page.locator("summary", { hasText: "Categories" }).click();
   }
   return page.getByLabel("New category", { exact: true });

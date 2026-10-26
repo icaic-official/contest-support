@@ -45,7 +45,7 @@ export const capabilityInfo: Record<
   admin: {
     label: "Session admin",
     description:
-      "Manages accounts, roles, contestant intake, image limits, and announcements for this session. Resolves an assigned issue when its owner is away. This role alone does not claim or reply to issues. To do that, also give yourself the Volunteer role.",
+      "Manages accounts, roles, contestant intake, image limits, and announcements for this session. Replies to teams, writes internal notes, and adds images. Resolves an assigned issue when its owner is away. This role alone does not claim or hand off issues. To do that, also give yourself the Volunteer role.",
   },
 };
 

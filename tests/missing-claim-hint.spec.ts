@@ -4,7 +4,7 @@ import { expect, test } from "./support/localWorker";
 test.use({ seedIssues: false });
 
 const adminHint =
-  "You cannot claim this issue. Claiming needs the Volunteer or Specialist role. Add the Volunteer role to your own account in Accounts to claim it.";
+  "You cannot claim this issue. Claiming needs the Volunteer or Specialist role. Add the Volunteer role to your own account in Accounts to claim it. You can still reply and add images.";
 
 const openOnDesktop = (page: Page) =>
   page.getByText("Keyboard stopped responding").first().click();
@@ -16,11 +16,13 @@ for (const viewport of [
     name: "desktop issue sheet",
     size: { width: 1280, height: 800 },
     open: openOnDesktop,
+    reply: (page: Page) => page.getByRole("textbox", { name: "Message", exact: true }),
   },
   {
     name: "phone issue view",
     size: { width: 390, height: 844 },
     open: openOnPhone,
+    reply: (page: Page) => page.getByRole("button", { name: "Reply", exact: true }),
   },
 ]) {
   test(`an admin without a support role learns why Claim is missing on the ${viewport.name}`, async ({
@@ -44,6 +46,8 @@ for (const viewport of [
     await expect(page.getByRole("list", { name: "Issue progress" })).toBeVisible();
     await expect(page.getByText(adminHint)).toBeVisible();
     await expect(page.getByRole("button", { name: "Claim" })).toHaveCount(0);
+    await expect(viewport.reply(page)).toBeVisible();
+    await expect(page.getByText("No action available.")).toHaveCount(0);
   });
 }
 

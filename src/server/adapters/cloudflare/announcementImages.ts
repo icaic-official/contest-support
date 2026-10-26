@@ -59,9 +59,8 @@ export class R2AnnouncementImageService {
 
   /** Managers change images while the event is active. */
   private manage(row: Image): void {
-    if (!row.manager || row.archived) {
-      throw new ImageRequestError('Only session admins and jury can manage announcements.', { validation: true });
-    }
+    if (!row.manager) throw new ImageRequestError('Only session admins and jury can manage announcements.', { validation: true });
+    if (row.archived) throw new ImageRequestError('This event is archived.', { validation: true });
   }
 
   private async batch(id: string, caller: Caller, sessionId: string, statements: D1Statement[]): Promise<void> {

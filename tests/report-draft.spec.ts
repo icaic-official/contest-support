@@ -16,7 +16,7 @@ const viewports = [
         .locator('[data-slot="drawer-overlay"]')
         .click({ position: { x: 10, y: 10 } }),
     switchToSecondary: async (page: Page) => {
-      const tabs = page.getByRole("navigation", { name: "Organiser sections" });
+      const tabs = page.getByRole("navigation", { name: "Organizer sections" });
       await tabs.getByRole("button", { name: "Me", exact: true }).click();
       await page.getByRole("radio", { name: "Secondary" }).check();
       await tabs.getByRole("button", { name: "Queue", exact: true }).click();
@@ -197,3 +197,17 @@ for (const viewport of viewports) {
     });
   });
 }
+
+test("a team chip can be removed with a tap on a phone", async ({ page, local }) => {
+  void local;
+  await page.setViewportSize({ width: 390, height: 844 });
+  await signIn(page, "volunteer");
+  const report = await openReport(page, "Report");
+  await chooseTeam(page, report, "aur");
+  const chip = teamsToReport(report).getByRole("listitem");
+  const box = await chip.getByRole("button", { name: "Remove Aurora" }).boundingBox();
+  expect(box?.width).toBeGreaterThanOrEqual(44);
+  expect(box?.height).toBeGreaterThanOrEqual(44);
+  expect((await chip.boundingBox())?.height).toBeGreaterThanOrEqual(box!.height);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
+});

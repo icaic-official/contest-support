@@ -157,6 +157,10 @@ function IssueSheetBody({
     setDialogContent(next);
     setDialogOpen(true);
   };
+  const openUpload = () => {
+    onTab("images");
+    setUploadOpen(true);
+  };
   const team = state.teams.find((item) => item.id === issue.team_id);
   const teamName = team?.name ?? "the team";
   const can = issueAbilities(issue, state, member);
@@ -272,13 +276,7 @@ function IssueSheetBody({
   }
   if (can.upload) {
     add("image", false, (variant) => (
-      <Button
-        variant={variant}
-        onClick={() => {
-          onTab("images");
-          setUploadOpen(true);
-        }}
-      >
+      <Button variant={variant} onClick={openUpload}>
         <Camera aria-hidden="true" />
         Add image
       </Button>
@@ -449,6 +447,7 @@ function IssueSheetBody({
             internalAllowed={can.internalNotes}
             draft={replyDraft}
             onDraft={onReplyDraft}
+            onAttachImage={can.upload ? openUpload : undefined}
             layout="composer"
           />
         </div>

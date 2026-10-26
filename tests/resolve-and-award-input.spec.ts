@@ -75,7 +75,7 @@ test("the award form rejects decimal minutes and says why", async ({
   });
   const jury = await signIn(browser, local, "jury", { width: 390, height: 844 });
   await jury
-    .getByRole("navigation", { name: "Organiser sections" })
+    .getByRole("navigation", { name: "Organizer sections" })
     .getByRole("button", { name: "Awards", exact: true })
     .click();
   await jury

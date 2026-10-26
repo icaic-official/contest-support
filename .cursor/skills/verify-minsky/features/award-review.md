@@ -11,7 +11,7 @@ A jury member reviews resolved reports, records a time award, and sees which awa
 ## How to get to it (user POV)
 
 - Sign in as `jury` on a window at least 1024 px wide. Choose **Award review** in **Console pages**.
-- On a window narrower than 1024 px, choose the **Awards** tab in **Organiser sections**.
+- On a window narrower than 1024 px, choose the **Awards** tab in **Organizer sections**.
 
 ## Driving it with minsky-verify
 

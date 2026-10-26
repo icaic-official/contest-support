@@ -36,7 +36,7 @@ Open a published announcement and use **Add an image**.
 - Up to 4 images, 10 MB each. The issue image limits do not apply.
 - If an upload fails, select **Retry upload**. The text stays published.
 
-Managers can remove any image of an announcement.
+Managers can remove any image of an announcement. **Remove** asks you to confirm first. Select **Remove image** to delete the file. Select **Keep image** to cancel. Minsky cannot restore a deleted image.
 
 ## Edit
 

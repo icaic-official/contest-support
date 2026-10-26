@@ -412,14 +412,58 @@ describe("D1 workflow persistence", () => {
       .toEqual({ outcome: "committed", issueId: fixture.issueId });
   });
 
-  it("prevents an admin without team membership or staff roles from posting messages", async () => {
+  async function makeStaffAdminOnly() {
     await db.batch([
       fixture.statement("DELETE FROM membership_roles WHERE session_id = ? AND account_id = ?", fixture.sessionId, fixture.staff.accountId),
       fixture.statement("UPDATE memberships SET is_admin = 1 WHERE session_id = ? AND account_id = ?", fixture.sessionId, fixture.staff.accountId),
     ]);
+  }
+
+  it("lets an admin without team membership or staff roles reply and write internal notes, but not claim", async () => {
+    await makeStaffAdminOnly();
     const before = await fixture.durableState();
-    expect(await execute(message("public"))).toEqual({ outcome: "rejected", reason: "state" });
-    expect(await execute(message("internal"))).toEqual({ outcome: "rejected", reason: "state" });
+    expect(await execute(claim())).toEqual({ outcome: "rejected", reason: "state" });
+    expect(await fixture.durableState()).toEqual(before);
+
+    expect(await execute(message("public", "Fictional admin reply"))).toEqual({ outcome: "committed", issueId: fixture.issueId });
+    expect(await execute({ type: "message", issue_id: fixture.issueId, revision: 2, text: "Fictional admin note", visibility: "internal" }))
+      .toEqual({ outcome: "committed", issueId: fixture.issueId });
+    const contestant = await application.snapshot(fixture.contestant, fixture.sessionId);
+    expect(contestant.history).toMatchObject([
+      { actor: fixture.staff.accountId, text: "Fictional admin reply", visibility: "public" },
+    ]);
+    const staff = await application.snapshot(fixture.staff, fixture.sessionId);
+    expect(staff.history).toHaveLength(2);
+    expect(staff.history).toContainEqual(expect.objectContaining({
+      actor: fixture.staff.accountId, text: "Fictional admin note", visibility: "internal",
+    }));
+  });
+
+  it("keeps an admin without a support role from handing off, accepting, reopening, or replying after resolution", async () => {
+    // Set up both issues with real roles first, so the admin owns a claimed issue.
+    expect(await execute(claim())).toEqual({ outcome: "committed", issueId: fixture.issueId });
+    expect(await execute(claim(fixture.otherIssueId), fixture.specialist))
+      .toEqual({ outcome: "committed", issueId: fixture.otherIssueId });
+    expect(await execute({ type: "escalate", issue_id: fixture.otherIssueId, revision: 2 }, fixture.specialist))
+      .toEqual({ outcome: "committed", issueId: fixture.otherIssueId });
+    await makeStaffAdminOnly();
+
+    let before = await fixture.durableState();
+    expect(await execute({ type: "escalate", issue_id: fixture.issueId, revision: 2 }))
+      .toEqual({ outcome: "rejected", reason: "state" });
+    expect(await execute({ type: "accept", issue_id: fixture.otherIssueId, revision: 3 }))
+      .toEqual({ outcome: "rejected", reason: "state" });
+    expect(await fixture.durableState()).toEqual(before);
+
+    expect(await execute({ type: "resolve", issue_id: fixture.issueId, revision: 2, summary: "Fixed fixture" }))
+      .toEqual({ outcome: "committed", issueId: fixture.issueId });
+    before = await fixture.durableState();
+    expect(await execute({ type: "reopen", issue_id: fixture.issueId, revision: 3, reason: "Still failing" }))
+      .toEqual({ outcome: "rejected", reason: "state" });
+    for (const visibility of ["public", "internal"] as const) {
+      expect(await execute({ type: "message", issue_id: fixture.issueId, revision: 3, text: "Late reply", visibility }))
+        .toEqual({ outcome: "rejected", reason: "state" });
+    }
     expect(await fixture.durableState()).toEqual(before);
   });
 

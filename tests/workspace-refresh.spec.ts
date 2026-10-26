@@ -239,9 +239,8 @@ for (const [layout, viewport] of viewports) {
       const form = await openReply(page);
       await form.message.fill('Rejected reply.');
       await form.send.click();
-      // The Cloudflare client reports the rejection reason, not a server message.
       await expect(form.scope.getByRole('alert').first()).toContainText(
-        'Workflow rejected: state.',
+        'This issue changed while you were working. Refresh and try again.',
       );
       await expect(form.retry).not.toBeVisible();
       await form.message.fill('Updated reply.');
@@ -385,7 +384,7 @@ for (const [layout, viewport] of viewports) {
       await form.message.fill('Keep this rejected draft.');
       await form.send.click();
       await expect(form.scope.getByRole('alert').first()).toHaveText(
-        'Workflow rejected: state.',
+        'This issue changed while you were working. Refresh and try again.',
       );
       await expect(form.message).toHaveValue('Keep this rejected draft.');
       await expect(form.message).toBeEditable();
@@ -412,7 +411,7 @@ for (const [layout, viewport] of viewports) {
           .click();
       } else {
         await page
-          .getByRole('navigation', { name: 'Organiser sections' })
+          .getByRole('navigation', { name: 'Organizer sections' })
           .getByRole('button', { name: 'Session', exact: true })
           .click();
       }

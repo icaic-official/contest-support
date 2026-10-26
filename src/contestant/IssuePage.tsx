@@ -474,7 +474,6 @@ export function IssuePage({
               sessionId={snapshot.session.id}
               issueId={issue.id}
               archived={archived}
-              canUpload={false}
               staff={false}
               userId={userId}
               limits={{

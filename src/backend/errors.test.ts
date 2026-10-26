@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { errorMessage } from './errors';
+import { errorMessage, workflowRejectionMessage } from './errors';
 
 const unreachable = 'Minsky could not reach the server. Check your connection and try again.';
 
@@ -17,5 +17,16 @@ describe('errorMessage', () => {
 
   it('uses a general message when the failure has no text', () => {
     expect(errorMessage(undefined)).toBe('The request could not be completed.');
+  });
+});
+
+describe('workflowRejectionMessage', () => {
+  it.each([
+    ['state', 'This issue changed while you were working. Refresh and try again.'],
+    ['access', 'You no longer have access to do this.'],
+    ['input', 'Check what you entered and try again.'],
+    ['request_id', 'This request was already used. Refresh and try again.'],
+  ] as const)('explains the %s rejection in plain words', (reason, message) => {
+    expect(workflowRejectionMessage(reason)).toBe(message);
   });
 });

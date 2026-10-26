@@ -117,14 +117,14 @@ export function ReportForm({
           {targets.map((target) => (
             <li
               key={target}
-              className="flex h-9 items-center gap-1 rounded-full border pl-3 text-sm"
+              className="flex h-9 items-center gap-1 rounded-full border pl-3 text-sm max-lg:h-11"
             >
               {teamName(target)}
               <button
                 type="button"
                 aria-label={`Remove ${teamName(target)}`}
                 disabled={command.locked}
-                className="flex size-9 items-center justify-center rounded-full"
+                className="flex size-9 items-center justify-center rounded-full max-lg:size-11"
                 onClick={() => {
                   if (target === teamId) onSelection(initialTeamSelection());
                   changeAdded((current) => current.filter((id) => id !== target));

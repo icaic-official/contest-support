@@ -18,7 +18,7 @@ The shared rules retain these decisions:
 | `claim` | A volunteer or specialist claims an open issue. | Owner, claimed status, and first assignment time. |
 | `escalate` | The current support owner escalates a claimed issue. | Escalated status. The owner remains assigned. |
 | `accept` | Another specialist accepts an escalated issue. | New owner and claimed status. The first assignment time remains unchanged. |
-| `message` | The affected team, support, or jury replies to an unresolved issue. Internal notes additionally require staff access. | Public reply or internal note with the authenticated actor. |
+| `message` | The affected team or any staff member replies to an unresolved issue. This includes an admin without other roles. Internal notes additionally require staff access. | Public reply or internal note with the authenticated actor. |
 | `resolve` | The current support owner or an admin resolves a claimed or escalated issue. The owner stays assigned when an admin resolves. | A new resolution summary, actor, and time. The timer stops. |
 | `reopen` | The affected team or support reopens a resolved issue. Intake state does not restrict reopening. | Reopening reason, actor, and time. Claimed status resumes with the prior owner. |
 | `award` | Jury awards nonnegative whole minutes to a resolved issue. Only one award can exist per issue. | Award linked to the current resolution, with an explanation and actor. Zero minutes is valid. |
@@ -26,7 +26,7 @@ The shared rules retain these decisions:
 
 Support means volunteer or specialist.
 Assigned roles combine capabilities.
-An administrator flag alone grants no support, jury, or conversation capability.
+An administrator flag alone grants no support or jury capability. It grants replies, internal notes, image uploads, and the resolution of a claimed or escalated issue.
 Contestant membership and staff membership are mutually exclusive.
 Staff can read every team in their session.
 Contestants can read only their own team.

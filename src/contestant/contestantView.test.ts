@@ -292,7 +292,7 @@ describe("reportBlocker", () => {
     expect(reportBlocker({ session, event })).toBeUndefined();
     expect(
       reportBlocker({ session: { ...session, intake_open: false }, event }),
-    ).toBe("Reporting is closed by the organisers.");
+    ).toBe("Reporting is closed by the organizers.");
     expect(
       reportBlocker({ session, event: { ...event, archived: true } }),
     ).toBe("This event is archived. Records are read only.");

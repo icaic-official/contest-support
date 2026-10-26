@@ -34,7 +34,7 @@ async function login(page: Page, name = "jury", viewport: Viewport = phone) {
 }
 
 function phoneTabs(page: Page) {
-  return page.getByRole("navigation", { name: "Organiser sections" });
+  return page.getByRole("navigation", { name: "Organizer sections" });
 }
 
 function consolePages(page: Page) {
@@ -115,13 +115,16 @@ function phoneIssueHeading(page: Page, number: number) {
   });
 }
 
-/** Picks award minutes. The radio is visually hidden inside its label. */
-async function chooseMinutes(scope: Locator, minutes: number) {
+/**
+ * Picks award minutes or the custom amount. The radio is visually hidden
+ * inside its label.
+ */
+async function chooseMinutes(scope: Locator, minutes: number | "Other amount") {
   await scope
     .locator("label")
     .filter({
       has: scope.page().getByRole("radio", {
-        name: `${minutes} min`,
+        name: minutes === "Other amount" ? minutes : `${minutes} min`,
         exact: true,
       }),
     })
@@ -161,7 +164,7 @@ test("lists outstanding work across queue filters and keeps the filters after re
   await showList(page, "To apply");
   // Oldest decision first. A zero award and a reopened issue still wait.
   expect(await issueNumbers(page, "To apply")).toEqual(["ISS-3", "ISS-4"]);
-  await expect(row(page, 3)).toContainText("+0 min");
+  await expect(row(page, 3)).toContainText("No time added");
   await expect(row(page, 4)).toContainText("Reopened · In progress");
   await expect(row(page, 4)).toContainText(
     "This award relates to an earlier resolution.",
@@ -263,10 +266,10 @@ test("jury-only members record an explicit zero and can confirm a reopened issue
   await award
     .getByLabel("Public award explanation")
     .fill("Reviewed: no adjustment required.");
-  await award.getByRole("button", { name: "Record 0 minutes" }).click();
+  await award.getByRole("button", { name: "Record no time added" }).click();
   await expect(award).toHaveCount(0);
   await expect(page.getByRole("region", { name: "Time award" })).toContainText(
-    "+0 min",
+    "No time added",
   );
   await expect(page.getByRole("region", { name: "Time award" })).toContainText(
     "Pending external application",
@@ -278,7 +281,7 @@ test("jury-only members record an explicit zero and can confirm a reopened issue
   await expectCounts(page, { decide: 1, apply: 3, done: 1 });
   await showList(page, "To apply");
   await expect(row(page, 1)).toContainText(time!);
-  await expect(row(page, 1)).toContainText("+0 min");
+  await expect(row(page, 1)).toContainText("No time added");
   expect(
     (await local.snapshot()).awards.find(
       (item) => item.issue_id === local.issues[0],
@@ -316,6 +319,75 @@ test("jury-only members record an explicit zero and can confirm a reopened issue
   expect(
     current.issues.find((item) => item.id === local.issues[3])?.status,
   ).toBe("claimed");
+});
+
+test("staff read one-minute and zero awards in plain words", async ({
+  page,
+  local,
+}) => {
+  await login(page, "jury", desktop);
+  await openAwards(page);
+
+  const one = row(page, 1);
+  await chooseMinutes(one, "Other amount");
+  await one.getByLabel("Custom award minutes").fill("1");
+  await one.getByLabel("Public award explanation").fill("One minute lost");
+  await one.getByRole("button", { name: "Record 1 minute", exact: true }).click();
+  const first = sheet(page, "ISS-1: Issue 1 verification");
+  await first.getByRole("tab", { name: "Outcome & award" }).click();
+  await expect(
+    first.getByRole("region", { name: "Time award" }).getByText("1 minute", { exact: true }),
+  ).toBeVisible();
+  await first.getByRole("tab", { name: /^Activity/ }).click();
+  await expect(
+    first.getByText("1 minute awarded: One minute lost", { exact: true }),
+  ).toBeVisible();
+  await first.getByRole("button", { name: "Close issue" }).click();
+
+  const none = row(page, 2);
+  await chooseMinutes(none, 0);
+  await none.getByLabel("Public award explanation").fill("No change needed");
+  await none.getByRole("button", { name: "Record no time added", exact: true }).click();
+  const second = sheet(page, "ISS-2: Issue 2 verification");
+  await second.getByRole("tab", { name: "Outcome & award" }).click();
+  await expect(
+    second.getByRole("region", { name: "Time award" }).getByText("No time added", { exact: true }),
+  ).toBeVisible();
+  await second.getByRole("tab", { name: /^Activity/ }).click();
+  await expect(
+    second.getByText("No time added: No change needed", { exact: true }),
+  ).toBeVisible();
+  await second.getByRole("button", { name: "Close issue" }).click();
+
+  await showList(page, "To apply");
+  await expect(row(page, 1).getByText("1 minute", { exact: true })).toBeVisible();
+  await expect(row(page, 2).getByText("No time added", { exact: true })).toBeVisible();
+  await expect(row(page, 3).getByText("No time added", { exact: true })).toBeVisible();
+  await expect(row(page, 4).getByText("5 minutes", { exact: true })).toBeVisible();
+  // Only the display changes. The stored history text keeps its form.
+  expect(
+    (await local.snapshot()).history.map((item) => item.text),
+  ).toEqual(
+    expect.arrayContaining([
+      "1 minutes awarded: One minute lost",
+      "0 minutes awarded: No change needed",
+    ]),
+  );
+
+});
+
+test("the admin overview reads a one-minute total in the singular", async ({
+  page,
+  local,
+}) => {
+  await local.run(
+    "UPDATE awards SET minutes = CASE WHEN issue_id = ? THEN 1 ELSE 0 END",
+    local.issues[3],
+  );
+  await login(page, "admin", desktop);
+  await consolePages(page).getByRole("button", { name: "Overview" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Overview" })).toBeVisible();
+  await expect(page.getByText("minute decided", { exact: true })).toBeVisible();
 });
 
 test("two simulated Realtime clients refresh decisions and confirmations without losing an unrelated draft", async ({
@@ -374,7 +446,7 @@ test("two simulated Realtime clients refresh decisions and confirmations without
     await page.getByRole("button", { name: "Back", exact: true }).click();
     await expectCounts(page, { decide: 1, apply: 3, done: 1 });
     await showList(page, "To apply");
-    await expect(row(page, 2)).toContainText("+5 min");
+    await expect(row(page, 2)).toContainText("5 minutes");
     await row(page, 2)
       .getByRole("button", { name: "Confirm applied externally" })
       .click();
@@ -674,7 +746,7 @@ test("archived details remain readable, while failed reads cannot masquerade as 
   await expect(page.getByRole("button", { name: /^Record/ })).toHaveCount(0);
   await expect(row(page, 1)).toContainText("Resolution 1: service restored");
   await showList(page, "To apply");
-  await expect(row(page, 4)).toContainText("+5 min");
+  await expect(row(page, 4)).toContainText("5 minutes");
   await expect(
     page.getByRole("button", { name: "Confirm applied externally" }),
   ).toHaveCount(0);

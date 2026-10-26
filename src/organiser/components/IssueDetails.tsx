@@ -7,7 +7,8 @@ import {
   RotateCcw,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { formatDate } from "@/connected/labels";
+import { historyText } from "@/connected/historyEvents";
+import { awardMinutesLabel, formatDate } from "@/connected/labels";
 import type { Issue, Snapshot } from "@/connected/model";
 import { clockDuration } from "@/connected/ui";
 import { cn } from "@/lib/utils";
@@ -226,9 +227,9 @@ export function AwardReceipt({
       aria-label="Time award"
       className="rounded-xl border p-3"
     >
-      <div className="flex items-baseline justify-between gap-2">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
         <span className="text-xl font-bold tabular-nums">
-          +{award.minutes} min
+          {awardMinutesLabel(award.minutes)}
         </span>
         <Badge
           variant="outline"
@@ -307,7 +308,7 @@ export function ResolutionHistory({
   );
 }
 
-function ActivityEntry({ item }: { item: HistoryItem }) {
+function ActivityEntry({ item, text }: { item: HistoryItem; text: string }) {
   const internal = item.visibility === "internal";
   return (
     <li className="flex gap-2.5">
@@ -343,7 +344,7 @@ function ActivityEntry({ item }: { item: HistoryItem }) {
           )}
         </div>
         <p className="mt-1 text-sm break-words whitespace-pre-wrap">
-          {item.text}
+          {text}
         </p>
       </div>
     </li>
@@ -362,6 +363,11 @@ export function ActivityList({
   state: Snapshot;
 }) {
   const history = state.history.filter((item) => item.issue_id === issue.id);
+  const context = {
+    issue,
+    resolutions: state.resolutions.filter((r) => r.issue_id === issue.id),
+    award: state.awards.find((a) => a.issue_id === issue.id),
+  };
   return (
     <section aria-labelledby={`activity-${issue.id}`}>
       <h2
@@ -375,7 +381,11 @@ export function ActivityList({
           Submitted by {issue.reporter_name} · {formatDate(issue.created_at)}
         </li>
         {history.map((item) => (
-          <ActivityEntry key={item.id} item={item} />
+          <ActivityEntry
+            key={item.id}
+            item={item}
+            text={historyText(item, context)}
+          />
         ))}
       </ol>
     </section>

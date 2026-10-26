@@ -20,7 +20,7 @@ import {
   type SessionMember,
   accountKind,
   actorName,
-  auditActionText,
+  auditEntryText,
 } from "./adminModel";
 import type { SessionAdmin } from "./useSessionAdmin";
 
@@ -284,7 +284,7 @@ export function Collapsible({
   );
 }
 
-/** The latest administration actions with the actor and the time. */
+/** The latest administration actions with the person they changed, the actor and the time. */
 export function AdminActivity({ state }: { state: Snapshot }) {
   if (!state.audit.length) {
     return (
@@ -298,7 +298,7 @@ export function AdminActivity({ state }: { state: Snapshot }) {
       {state.audit.map((entry) => (
         <li key={entry.id}>
           <span className="block font-medium first-letter:uppercase">
-            {auditActionText(entry.action)}
+            {auditEntryText(state.members, entry)}
           </span>
           <span className="block text-xs text-muted-foreground">
             {actorName(state.members, entry.actor)} · {formatDate(entry.at)}

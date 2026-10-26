@@ -29,10 +29,10 @@ Work only in a clearly identified development or test session.
 T0015 replaced the earlier workspace with three UIs. The membership and the window width select the UI:
 
 - A contestant account gets the contestant desktop app. Use a window at least 1024 px wide, such as 1280 × 800.
-- A staff account below 1024 px gets the organiser phone app. Use 390 × 844, and 320 × 740 for the narrow check.
-- A staff account at 1024 px and wider gets the organiser desktop console. Use 1280 × 800.
+- A staff account below 1024 px gets the organizer phone app. Use 390 × 844, and 320 × 740 for the narrow check.
+- A staff account at 1024 px and wider gets the organizer desktop console. Use 1280 × 800.
 
-Unless a step names one UI, do the step in the organiser phone app and again in the organiser desktop console.
+Unless a step names one UI, do the step in the organizer phone app and again in the organizer desktop console.
 Section 7 lists the checks for each UI.
 
 ## 1. Login and session access
@@ -65,7 +65,7 @@ Section 7 lists the checks for each UI.
 
 Expected result: the app rejects removal of the last admin.
 
-Check the admin screens of T0015 in both organiser layouts:
+Check the admin screens of T0015 in both organizer layouts:
 
 1. In the phone **Session** tab, check the status counts, the intake switch and the image limits with the − and + buttons.
 2. Select **New account**. Create a staff account. Check that the sheet shows the username and the temporary password once, with copy buttons and **Done**.
@@ -185,7 +185,7 @@ Review the sign-in page at 1280 × 800, 390 × 844 and 320 × 740.
 4. Sign in with a member account. Disconnect the network and wait up to 10 seconds for the access screen. Check that it asks you to check the connection and does not mention an organizer. Select **Refresh access**. Check that the button stays disabled while the read runs. Connect again and select the button. Check that the workspace returns.
 5. Press Tab once after sign-in. Check that **Skip to main content** appears and moves focus to the main content.
 
-### Organiser phone app (390 × 844)
+### Organizer phone app (390 × 844)
 
 Sign in as a volunteer, a specialist, a jury member and an admin.
 
@@ -199,11 +199,11 @@ Sign in as a volunteer, a specialist, a jury member and an admin.
 8. Change the tab. Check that focus moves to the tab heading.
 9. Check that buttons are at least 44 px high.
 10. Repeat steps 3 to 8 at 320 × 740.
-11. Sign in as an admin without a support role. Open an open issue. Check that the bottom bar shows **Resolve** and no **Claim**, and that one muted line under the buttons says that claiming needs the Volunteer or Specialist role. Sign in as a volunteer. Check that the same issue shows **Claim** and no such line.
+11. Sign in as an admin without a support role. Open an open issue. Check that the bottom bar shows **Reply** and no **Claim**, and that one muted line under the buttons says that claiming needs the Volunteer or Specialist role and that you can still reply and add images. Sign in as a volunteer. Check that the same issue shows **Claim** and no such line.
 12. In a long queue, scroll to a card far down. Make its claim fail, for example when another volunteer claims the issue first. Check that the error stays pinned to the top of the list. Do the same with a lost connection. Check that **Retry last request** stays in view.
 13. Select **Report**. Type a description and add a second team. Close the sheet with a swipe down or a tap on the dimmed page. Select **Report** again. Check that the description, the category and the teams are still there. Send the report. Check that the next report form is empty.
 
-### Organiser desktop console (1280 × 800)
+### Organizer desktop console (1280 × 800)
 
 Sign in as the same accounts.
 
@@ -216,7 +216,7 @@ Sign in as the same accounts.
 7. Open resolve, escalate and reopen from the sheet. Check that each opens a dialog and that **Cancel** closes it without an action.
 8. Check that the sheet shows one filled primary action. **Decide award** and **Confirm applied** open the **Outcome & award** tab and move focus to the heading of the award or application section. With a screen reader, check that it reads the heading.
 9. On a resolved issue without an award, open **Outcome & award** and choose **Other amount**. Type an amount and an explanation. Open **Activity**, then open **Outcome & award** again. Check that the amount and the explanation are still there.
-10. Sign in as an admin without a support role. Open an open issue. Check that the sheet shows **Resolve** and no **Claim**, and that one muted line under the buttons says that claiming needs the Volunteer or Specialist role.
+10. Sign in as an admin without a support role. Open an open issue. Check that the sheet shows **Add image** and the reply composer and no **Claim**, and that one muted line under the buttons says that claiming needs the Volunteer or Specialist role and that you can still reply and add images.
 11. In a long queue, scroll to a row far down. Make its claim fail, for example when another volunteer claims the issue first. Check that the error stays pinned to the top of the page. Do the same with a lost connection. Check that **Retry last request** stays in view.
 12. Select **Report for a team**. Type a description and add a second team. Press Escape. Open the dialog again. Check that the description, the category and the teams are still there. Send the report. Check that the next report form is empty.
 
@@ -382,8 +382,10 @@ Check delayed previews with two different images, A and B, in an isolated test:
 It also checks that closing the preview releases its temporary browser URL.
 These tests do not access hosted data.
 
-`tests/image-upload.spec.ts` automates steps 37 to 39 on a phone with local storage.
+`tests/image-upload.spec.ts` automates steps 15, 27, and 37 to 39 on a phone with local storage.
 It also checks that a failed upload keeps its file for **Try the upload again**.
+It also checks that **Cancel upload** makes the visibility choice available again. It does not check that the unfinished files are deleted or that contestants cannot see the new image. Check those two results by hand (steps 28 and 29).
+It also checks that a lost completion response does not attach the image twice.
 
 ## 11. Team search
 
@@ -509,7 +511,7 @@ The [frontend architecture](frontend-architecture.md#browser-routes) lists paths
 4. In the phone app, open **Change password** from **Me**. Check cancellation and completion. Both must retain `/account`. In the console and the contestant app, change the password in the **Security** section. Check that the address stays `/account`.
 5. As support staff, open `/administration`. Check that the app returns to `/issues` without administration data.
 6. Remove a jury or administrator role in another isolated client. Refresh access. Check that the restricted section closes.
-7. Repeat navigation in the organiser phone layout. Check keyboard focus after a tab change and after a return from an issue.
+7. Repeat navigation in the organizer phone layout. Check keyboard focus after a tab change and after a return from an issue.
 8. Use the existing fictional-response retry cases to interrupt a workflow response and account check.
    Check that protected content hides while the account check fails.
    After recovery, select **Retry last request**. Check that it reuses the original actor, session, request ID, and command.
@@ -535,7 +537,8 @@ Use two browser windows for the live checks. Run these checks after a reviewed d
    Choose **Load latest text** and save.
 7. Add a JPEG, PNG, and WebP image. Check progress, the inline image, and download.
    Try a text file renamed to `.png`, an image above 10 MB, and a fifth image. Each must fail with a clear message and leave the text available.
-8. Remove one image. Check that readers lose it and the manager list shows one fewer.
+8. Select **Remove** on one image. Check that a prompt asks first and that **Keep image** closes it with focus on **Remove** and the image still listed.
+   Select **Remove**, then **Remove image**. Check that readers lose the image and the manager list shows one fewer.
 9. Set an expiry about one minute ahead. After it passes, check that readers lose the announcement within 15 seconds and the manager still sees **Expired**.
    Clear the expiry and check that readers see it again.
 10. Use only the keyboard to select **Remove** on an announcement with an image. Check that the prompt says that the announcement leaves the strip for everyone and that Minsky keeps the record.
@@ -543,6 +546,7 @@ Use two browser windows for the live checks. Run these checks after a reviewed d
     Select **Remove**, then **Remove announcement**. Check that every member, managers included, loses the announcement, and that focus moves to **New announcement**.
 11. Reload each window. Check that the state is unchanged and the reporting form never waited for announcements.
 12. At 320 px and 390 px wide, check that the announcement strip wraps, scrolls inside its area, and causes no horizontal page scroll.
+    Check that every button in the strip, including **Download** and **Remove** on an image, is at least 44 px high.
     In a window about 1280 by 720 px, open **New announcement** and **Edit**. Check that every field and the **Publish** or **Save changes** button shows without scrolling inside the strip.
 13. Publish at least three announcements. Check that every member sees the two newest, and that **Show 1 more** and **Show fewer** work with the keyboard.
     As a reader, select **Hide**. Check that focus stays on the button, which now reads **Show**, and that the bar shows the count.

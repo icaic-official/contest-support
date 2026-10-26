@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { workflowEvent } from "./historyEvents";
+import { historyText, workflowEvent } from "./historyEvents";
 import type { Issue, Resolution, Snapshot } from "./model";
 
 const SESSION = "00000000-0000-4000-8000-000000000100";
@@ -64,5 +64,22 @@ describe("workflowEvent", () => {
   it("treats typed text that imitates a step as a message", () => {
     expect(workflowEvent(entry("Resolved: typed by hand"), context)).toBeUndefined();
     expect(workflowEvent(entry("Thanks, it works."), context)).toBeUndefined();
+  });
+});
+
+describe("historyText", () => {
+  it.each([
+    ["0 minutes awarded: Fine", "No time added: Fine"],
+    ["1 minutes awarded: Fine", "1 minute awarded: Fine"],
+    ["10 minutes awarded: Fine", "10 minutes awarded: Fine"],
+  ])("shows the award entry %j as %j", (stored, shown) => {
+    expect(historyText(entry(stored, award.at), context)).toBe(shown);
+  });
+
+  it("keeps the stored text of other entries and of typed text that imitates an award", () => {
+    expect(historyText(entry("Issue claimed."), context)).toBe("Issue claimed.");
+    expect(historyText(entry("1 minutes awarded: typed"), context)).toBe(
+      "1 minutes awarded: typed",
+    );
   });
 });

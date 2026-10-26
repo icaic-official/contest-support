@@ -1,6 +1,7 @@
 import { type ReactNode, useId, useState } from "react";
 import {
   ArrowUpRight,
+  Camera,
   Check,
   CheckCheck,
   Eye,
@@ -20,6 +21,7 @@ import { Textarea } from "@/components/ui/textarea";
 import type { CommandRunner } from "@/connected/hooks/useCommand";
 import {
   awardMinutePresets,
+  awardMinutesLabel,
   maxAwardMinutes,
   maxSummaryLength,
   noCommentSummary,
@@ -98,6 +100,9 @@ export const emptyReply: ReplyDraft = { text: "", visibility: "public" };
  * The phone sheets use the stacked layout. The desktop console uses the
  * composer layout: the message first, then the audience switch and Send in
  * one row. Ctrl+Enter or ⌘+Enter sends in both layouts.
+ *
+ * `onAttachImage` adds a camera button that opens the issue's image upload.
+ * The image belongs to the issue, not to the message.
  */
 export function ReplyForm({
   issue,
@@ -107,12 +112,14 @@ export function ReplyForm({
   internalAllowed,
   draft,
   onDraft,
+  onAttachImage,
   layout = "stacked",
 }: IssueFormProps & {
   teamName: string;
   internalAllowed: boolean;
   draft: ReplyDraft;
   onDraft: (draft: ReplyDraft) => void;
+  onAttachImage?: () => void;
   layout?: "stacked" | "composer";
 }) {
   const id = useId();
@@ -209,10 +216,22 @@ export function ReplyForm({
       />
     </div>
   );
+  const attach = onAttachImage && (
+    <Button
+      type="button"
+      variant="outline"
+      size="icon"
+      className={cn(!composer && "size-11")}
+      aria-label="Attach an image"
+      onClick={onAttachImage}
+    >
+      <Camera aria-hidden="true" />
+    </Button>
+  );
   const send = (
     <Button
       type="submit"
-      className={cn(composer ? "h-9" : "h-11 w-full")}
+      className={cn(composer ? "h-9" : "h-11 flex-1")}
       disabled={command.locked || !draft.text.trim()}
       loading={isRunning(command.running, "message", issue.id)}
     >
@@ -255,6 +274,7 @@ export function ReplyForm({
           <div className="flex flex-wrap items-center gap-2">
             {audience}
             <div className="min-w-0 flex-1">{hint}</div>
+            {attach}
             {send}
           </div>
         </>
@@ -263,7 +283,10 @@ export function ReplyForm({
           {audience}
           {hint}
           {message}
-          {send}
+          <div className="flex gap-2">
+            {attach}
+            {send}
+          </div>
         </>
       )}
     </form>
@@ -551,7 +574,9 @@ export function AwardForm({ issue, command, onDone }: IssueFormProps) {
         loading={isRunning(command.running, "award", issue.id)}
       >
         <Scale aria-hidden="true" />
-        {value === undefined ? "Record award" : `Record ${value} minutes`}
+        {value === undefined
+          ? "Record award"
+          : `Record ${value === 0 ? "no time added" : awardMinutesLabel(value)}`}
       </Button>
     </form>
   );

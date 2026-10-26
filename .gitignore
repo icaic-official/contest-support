@@ -8,11 +8,12 @@ playwright-report/
 test-results/
 .env*
 !.env.example
+# Wrangler reads local secrets from .dev.vars next to each config.
+.dev.vars*
 .vitest/
 
 # Lapiz preview build output and local state
 .lapiz/build/
 .lapiz/dist/
 .lapiz/state/
-.lapiz/.dev.vars
 .lapiz/wrangler.preview.json

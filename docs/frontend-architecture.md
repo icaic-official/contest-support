@@ -306,7 +306,7 @@ These rules apply:
 
 - The sidebar pages follow the combined roles. Volunteers and specialists get Queue, Assigned to me and Handoffs. Jury members get Award review. Every person gets Teams & tables. Admins also get Overview, Accounts, Roster and Session settings. Admins without support roles still get Queue. A jury-only member sees resolved issues only.
 - The queue tabs use the shared status filter of `useWorkflowState`. Active is `all`, All is `everything` and the other tabs are statuses. The phone app shows All active for `everything`. A reopened issue sets `claimed`, so In progress shows it.
-- Rows are sorted by unresolved time, longest first. The timer colors are the same as in the phone app.
+- Rows start sorted by unresolved time, longest first. The Issue, Status, Report, Team, Owner and Unresolved headers sort the table. A first click sorts ascending and a second click sorts descending. Unassigned owners always sort last. The timer colors are the same as in the phone app.
 - The issue number in each row is a button. Tab reaches it and Enter opens the sheet. A click on the row also opens it. J and K move focus between rows when no field or dialog has focus.
 - **Claim** or **Accept** in a row stays on the page and does not open the sheet. When the person opens an issue while that command runs, the row action does not close it. **Claim** or **Accept handoff** in the sheet keeps the sheet open. A recorded report opens its issue in the sheet.
 - When the sheet closes, focus goes back to the control that opened it, then to the issue row, then to the page heading. Radix returns focus only to a `Dialog.Trigger`, so the console moves focus itself. The sheet keeps the last issue on screen while it slides out.

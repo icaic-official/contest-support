@@ -137,7 +137,7 @@ export function TeamRosterEditor({
         <p id={`${id}-lines-help`} className="text-xs text-muted-foreground">
           One team on each line. Write the name, then a comma or a tab, then
           the table or location. You can paste lines from a spreadsheet. Press
-          Ctrl+Enter or Cmd+Enter to add.
+          Ctrl+Enter or ⌘+Enter to add.
         </p>
         <div
           id={`${id}-lines-state`}

@@ -50,10 +50,7 @@ const sheetTitles: Record<
   { title: string; description?: string }
 > = {
   reply: { title: "Reply" },
-  resolve: {
-    title: "Resolve issue",
-    description: "The team sees this summary. The timer stops.",
-  },
+  resolve: { title: "Resolve issue" },
   escalate: { title: "Escalate to a specialist?" },
   reopen: { title: "Reopen issue" },
   award: {

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { PasswordInput } from "@/components/PasswordInput";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -9,7 +10,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { backend } from "@/backend";
 import { errorMessage } from "@/backend/errors";
@@ -105,10 +105,9 @@ export function PasswordChangeForm({
             return (
               <div key={field.name} className="grid gap-2">
                 <Label htmlFor={field.id}>{field.label}</Label>
-                <Input
+                <PasswordInput
                   id={field.id}
                   name={field.name}
-                  type="password"
                   required
                   minLength={isNew ? MIN_PASSWORD_LENGTH : undefined}
                   maxLength={isNew ? MAX_PASSWORD_LENGTH : undefined}

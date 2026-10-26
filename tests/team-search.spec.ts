@@ -150,6 +150,23 @@ async function openReport(page: Page): Promise<Locator> {
   return report;
 }
 
+test('desktop queue filter lists teams on an empty click and matches inside words', async ({ page, api }) => {
+  await signIn(page, api, desktop);
+  const queue = page.locator('#queue-team-search');
+  const options = page.getByRole('option');
+  await queue.click();
+  const names = await options.locator('strong').allTextContents();
+  expect(names.length).toBeGreaterThan(1);
+  expect(names).toEqual([...names].sort((a, b) => a.localeCompare(b)));
+  await queue.fill('U');
+  await expect(options.filter({ hasText: 'Aurora' })).toHaveCount(1);
+  await queue.fill('ror');
+  await expect(options.filter({ hasText: 'Aurora' })).toHaveCount(1);
+  await queue.fill('zzzz');
+  await expect(options).toHaveCount(0);
+  await expect(page.getByText('No matching teams.')).toBeVisible();
+});
+
 test('desktop queue filter: Tab leaves open suggestions, and keyboard and pointer select a team', async ({ page, api }) => {
   const fixture = await signIn(page, api, desktop);
   const queue = page.locator('#queue-team-search');

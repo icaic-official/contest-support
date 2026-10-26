@@ -8,7 +8,8 @@ import {
   editTeamQuery,
   focusTeamQuery,
   moveTeamHighlight,
-  searchTeams,
+  openTeamList,
+  suggestTeams,
   type SearchIssue,
   type SearchTeam,
   type TeamSelection,
@@ -33,7 +34,7 @@ export function TeamSearch({
   onSelection: (selection: TeamSelection) => void;
   variant: "inline" | "field";
 }) {
-  const result = searchTeams(teams, issues, selection.query);
+  const result = suggestTeams(teams, issues, selection.query);
   const selected = teams.find((team) => team.id === selection.teamId);
   const value =
     selection.teamId && selection.query === ""
@@ -93,6 +94,7 @@ export function TeamSearch({
               // Clear refocuses before React commits; do not replay unchanged state.
               if (next !== selection) onSelection(next);
             }}
+            onClick={() => onSelection(openTeamList(selection, id))}
             onKeyDown={(event) => {
               if (
                 (event.key === "ArrowDown" || event.key === "ArrowUp") &&
@@ -182,7 +184,7 @@ export function TeamSearch({
           )}
           {result.overflow && (
             <p className="team-search-note px-2 py-1.5 text-xs text-muted-foreground" role="status">
-              Keep typing to narrow the list.
+              {result.total - result.suggestions.length} more. Keep typing to narrow the list.
             </p>
           )}
         </div>

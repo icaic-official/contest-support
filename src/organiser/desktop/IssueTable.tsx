@@ -1,5 +1,12 @@
 import type { ReactNode } from "react";
-import { Hand, Handshake, RotateCcw } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowUp,
+  ChevronsUpDown,
+  Hand,
+  Handshake,
+  RotateCcw,
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,6 +28,77 @@ import {
 } from "../components/issueDisplay";
 import type { ConsolePageProps } from "./consoleProps";
 import { type QueueStats, queueStats } from "./consoleModel";
+import type { QueueSort, QueueSortKey } from "./queueSort";
+
+const columns: readonly {
+  key: QueueSortKey;
+  label: string;
+  className?: string;
+}[] = [
+  { key: "issue", label: "Issue", className: "pl-4" },
+  { key: "status", label: "Status" },
+  { key: "report", label: "Report" },
+  { key: "team", label: "Team" },
+  { key: "owner", label: "Owner" },
+  { key: "unresolved", label: "Unresolved", className: "text-right" },
+];
+
+/** What a sortable table needs: the current sort and a way to change it. */
+interface Sorting {
+  sort: QueueSort;
+  onSort: (key: QueueSortKey) => void;
+}
+
+/**
+ * A column header. With `sorting` it is a native button, so Tab and Enter
+ * work. Without it the header is plain text.
+ */
+function ColumnHead({
+  column,
+  sorting,
+}: {
+  column: (typeof columns)[number];
+  sorting?: Sorting;
+}) {
+  if (!sorting) {
+    return (
+      <TableHead className={`${column.className ?? ""} text-muted-foreground`}>
+        {column.label}
+      </TableHead>
+    );
+  }
+  const { sort, onSort } = sorting;
+  const active = sort.key === column.key;
+  const Icon = !active
+    ? ChevronsUpDown
+    : sort.direction === "asc"
+      ? ArrowUp
+      : ArrowDown;
+  return (
+    <TableHead
+      aria-sort={
+        active
+          ? sort.direction === "asc"
+            ? "ascending"
+            : "descending"
+          : undefined
+      }
+      className={column.className}
+    >
+      <button
+        type="button"
+        onClick={() => onSort(column.key)}
+        className={`inline-flex items-center gap-1 rounded-sm outline-none hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 ${active ? "text-foreground" : "text-muted-foreground"}`}
+      >
+        {column.label}
+        <Icon
+          aria-hidden="true"
+          className={`size-3 ${active ? "" : "opacity-50"}`}
+        />
+      </button>
+    </TableHead>
+  );
+}
 
 /** The id of the open button of an issue row. Focus returns to it. */
 export function issueRowId(issueId: string): string {
@@ -49,11 +127,14 @@ export function IssueTable({
   props,
   caption,
   empty,
+  sorting,
 }: {
   issues: readonly Issue[];
   props: ConsolePageProps;
   caption: string;
   empty: ReactNode;
+  /** Omit it for headers that do not sort. */
+  sorting?: Sorting;
 }) {
   const { state, now, workflow } = props;
   const changed = useChangedIssues(state.issues, state.session?.id, now);
@@ -70,14 +151,9 @@ export function IssueTable({
         <caption className="sr-only">{caption}</caption>
         <TableHeader>
           <TableRow className="text-xs hover:bg-transparent">
-            <TableHead className="pl-4 text-muted-foreground">Issue</TableHead>
-            <TableHead className="text-muted-foreground">Status</TableHead>
-            <TableHead className="text-muted-foreground">Report</TableHead>
-            <TableHead className="text-muted-foreground">Team</TableHead>
-            <TableHead className="text-muted-foreground">Owner</TableHead>
-            <TableHead className="text-right text-muted-foreground">
-              Unresolved
-            </TableHead>
+            {columns.map((column) => (
+              <ColumnHead key={column.key} column={column} sorting={sorting} />
+            ))}
             <TableHead className="pr-4">
               <span className="sr-only">Action</span>
             </TableHead>
@@ -114,7 +190,10 @@ export function IssueTable({
                   <div className="flex flex-col items-start gap-1">
                     <StatusBadge status={issue.status} />
                     {wasReopened(issue, state) && (
-                      <Badge variant="outline" className="text-muted-foreground">
+                      <Badge
+                        variant="outline"
+                        className="text-muted-foreground"
+                      >
                         <RotateCcw aria-hidden="true" />
                         Reopened
                       </Badge>
@@ -122,7 +201,9 @@ export function IssueTable({
                   </div>
                 </TableCell>
                 <TableCell className="w-full max-w-0">
-                  <div className="truncate font-medium">{issue.description}</div>
+                  <div className="truncate font-medium">
+                    {issue.description}
+                  </div>
                   <div className="truncate text-xs text-muted-foreground">
                     {issue.category}
                   </div>

@@ -330,21 +330,30 @@ export function MembershipForm({
   member: Membership;
   teams: Snapshot["teams"];
   disabled: boolean;
-  onSave: (draft: MembershipDraft) => void;
+  /** Resolves when the request ends. The button spins until then. */
+  onSave: (draft: MembershipDraft) => Promise<void>;
 }) {
   const [draft, setDraft] = useState(() => draftOfMembership(member));
+  const [saving, setSaving] = useState(false);
   return (
     <form
       onSubmit={(event) => {
         event.preventDefault();
-        if (isCompleteMembership(draft)) onSave(draft);
+        if (!isCompleteMembership(draft)) return;
+        setSaving(true);
+        void onSave(draft).finally(() => setSaving(false));
       }}
     >
       <fieldset disabled={disabled} className="space-y-3">
         <legend className="sr-only">Membership</legend>
         <MembershipFields draft={draft} teams={teams} onChange={setDraft} />
-        <Button type="submit" variant="secondary" className="h-11 w-full">
-          Save membership
+        <Button
+          type="submit"
+          variant="secondary"
+          className="h-11 w-full"
+          loading={saving}
+        >
+          {saving ? "Saving…" : "Save membership"}
         </Button>
       </fieldset>
     </form>

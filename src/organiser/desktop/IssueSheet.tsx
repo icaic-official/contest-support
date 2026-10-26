@@ -57,10 +57,7 @@ type SheetDialog = "resolve" | "escalate" | "reopen";
 
 const dialogText: Record<SheetDialog, { title: string; description?: string }> =
   {
-    resolve: {
-      title: "Resolve issue",
-      description: "The team sees this summary. The timer stops.",
-    },
+    resolve: { title: "Resolve issue" },
     escalate: { title: "Escalate to a specialist?" },
     reopen: { title: "Reopen issue" },
   };

@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { Eye, EyeOff } from "lucide-react";
 import { Link } from "react-router";
 import { BrandMark } from "@/components/brand";
+import { PasswordInput } from "@/components/PasswordInput";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,7 +12,6 @@ import { errorMessage } from "@/backend/errors";
 /** The public sign-in page. Organizers create every account. */
 export function SignIn() {
   const [busy, setBusy] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   return (
     <section
@@ -73,29 +72,14 @@ export function SignIn() {
           </div>
           <div className="grid gap-2">
             <Label htmlFor="sign-in-password">Password</Label>
-            <div className="relative">
-              <Input
-                id="sign-in-password"
-                name="password"
-                type={showPassword ? "text" : "password"}
-                required
-                autoComplete="current-password"
-                placeholder="Enter your password"
-                className="h-11 pr-12"
-              />
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="absolute top-1/2 right-1 -translate-y-1/2"
-                aria-label={showPassword ? "Hide password" : "Show password"}
-                aria-pressed={showPassword}
-                aria-controls="sign-in-password"
-                onClick={() => setShowPassword(!showPassword)}
-              >
-                {showPassword ? <EyeOff /> : <Eye />}
-              </Button>
-            </div>
+            <PasswordInput
+              id="sign-in-password"
+              name="password"
+              required
+              autoComplete="current-password"
+              placeholder="Enter your password"
+              className="h-11"
+            />
           </div>
           <Button type="submit" size="lg" className="h-11 w-full" loading={busy}>
             {busy ? "Signing in…" : "Sign in"}

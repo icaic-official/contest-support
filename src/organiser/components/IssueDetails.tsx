@@ -39,12 +39,8 @@ export function IssueTimers({
     <dl className="grid grid-cols-2 gap-2">
       <div className="rounded-xl border p-3">
         <dt className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          {running ? (
-            <span className="size-1.5 animate-pulse rounded-full bg-emerald-500" />
-          ) : (
-            <Clock aria-hidden="true" className="size-3" />
-          )}
-          {running ? "Unresolved · running" : "Unresolved · stopped"}
+          {!running && <Clock aria-hidden="true" className="size-3" />}
+          {running ? "Unresolved" : "Unresolved · stopped"}
         </dt>
         <dd className="mt-0.5 text-2xl font-semibold">
           <UnresolvedTimer

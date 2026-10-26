@@ -300,9 +300,7 @@ export function ResolveForm({ issue, command, onDone }: IssueFormProps) {
       }}
     >
       <fieldset className="space-y-2" disabled={command.locked}>
-        <legend className="pb-1 text-sm font-medium">
-          Resolution summary · visible to the team
-        </legend>
+        <legend className="sr-only">Resolution summary</legend>
         {resolutionPresets.map((preset) => (
           <ChoiceCard
             key={preset}

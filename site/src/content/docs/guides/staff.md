@@ -13,7 +13,7 @@ In the console:
 - <kbd>⌘</kbd> <kbd>K</kbd> or <kbd>Ctrl</kbd> <kbd>K</kbd> finds an issue number, team, table, or page.
 - <kbd>J</kbd> and <kbd>K</kbd> move between rows. <kbd>Enter</kbd> opens one.
 
-Team search tolerates small spelling errors. Select a suggestion; typed text alone does not select a team.
+Click the empty search box to browse teams by name. Team search matches text inside a name or location from the first letter, accepts letters typed in order, and tolerates small spelling errors. Select a suggestion; typed text alone does not select a team.
 
 ## Claim, hand off, resolve
 

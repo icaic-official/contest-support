@@ -147,7 +147,7 @@ A `RosterRow` is one CSV line for a team or a staff member. `order_sessions` lis
 
 ### Migration sketch
 
-Each phase takes the next free migration number on `main` when its pull request opens. Numbers up to `0012_history_index.sql` are taken.
+Each phase takes the next free migration number on `main` when its pull request opens. Numbers up to `0016_staff_membership_index.sql` are taken.
 
 ```sql
 -- Phase 3. Organization and competition admins.

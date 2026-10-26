@@ -42,7 +42,8 @@
     "test:auth:hosted": "node scripts/auth-test.mjs",
     "test:auth:hash": "node scripts/auth-hash-benchmark.mjs",
     "test:auth:http": "node scripts/auth-http-test.mjs",
-    "load": "node scripts/load/cli.mjs"
+    "load": "node scripts/load/cli.mjs",
+    "perf:reads": "node scripts/d1-read-volume.mjs"
   },
   "dependencies": {
     "@fontsource-variable/inter": "^5.3.0",

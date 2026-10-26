@@ -44,11 +44,25 @@ export const baseSecurityHeaders: Record<string, string> = {
   'Referrer-Policy': 'no-referrer',
 };
 
-/** Adds the security headers to an asset response. Only HTML documents get a CSP. */
+/** One year. A new build changes the hash, so a browser never needs to ask about the old URL again. */
+export const immutableCacheControl = 'public, max-age=31536000, immutable';
+
+/** Vite names every built file `assets/<name>-<hash>.<extension>`, with an 8-character base64url hash. */
+const hashedAssetPath = /^\/assets\/[^/]+-[A-Za-z0-9_-]{8}\.[A-Za-z0-9]+$/;
+
+/**
+ * Adds the security headers to an asset response. Only HTML documents get a CSP.
+ * A hashed build file also gets a one-year cache. The single-page fallback answers a
+ * missing hashed name with the HTML shell and status 200, so an HTML body never qualifies.
+ */
 export function withSecurityHeaders(response: Response, requestUrl: string): Response {
   const secured = new Response(response.body, response);
   for (const [name, value] of Object.entries(baseSecurityHeaders)) secured.headers.set(name, value);
-  if (secured.headers.get('Content-Type')?.toLowerCase().startsWith('text/html')) {
+  const html = secured.headers.get('Content-Type')?.toLowerCase().startsWith('text/html') ?? false;
+  if ((response.ok || response.status === 304) && !html && hashedAssetPath.test(new URL(requestUrl).pathname)) {
+    secured.headers.set('Cache-Control', immutableCacheControl);
+  }
+  if (html) {
     secured.headers.set('Content-Security-Policy', contentSecurityPolicy(new URL(requestUrl).origin));
     secured.headers.set('X-Frame-Options', 'DENY');
     secured.headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=()');

@@ -35,18 +35,26 @@ The [D1 store](../src/server/adapters/d1/store.ts) persists all nine `WorkflowSe
 Its batches recheck credentials, generation, identity-session expiry, application-login expiry, current permissions, and captured state.
 One database timestamp supplies each workflow commit's ledger and history records.
 State, receipts, history, resolutions, awards, and audience notifications commit together.
-The complete schema adds migrations `0005` through `0013` to the authentication foundation.
+The complete schema adds migrations `0005` through `0016` to the authentication foundation.
 
 [D1ApplicationService](../src/server/adapters/cloudflare/application.ts) returns each authorized snapshot in one database statement.
 Migration `0012` indexes `history(issue_id, at)`.
 Migration `0013` indexes `memberships(account_id, session_id)` and `issues(session_id, team_id)`.
-The snapshot evaluates the caller's access once, and finds a contestant's issues through the team index.
+The snapshot reads the caller's access row once in each section.
+It finds a contestant's issues through the team index, and the contestant's team by its key.
 It reads images from the visible issues, not from every image in the database.
-It reads the member list only for an administrator.
-For a session with 1,200 accounts and 100 issues, a contestant snapshot read 196 rows, where it read 9,712 before.
+It reads the member list and the audit entries only for an administrator.
+The read volume test session has 1,200 accounts, 100 issues and 1,200 audit entries.
+On 2026-10-26 a snapshot of that session read 122 rows for a contestant, 2,801 for a volunteer and 6,487 for an administrator (measured).
 The sessions list read 7 rows, where it read 1,205 before.
 [The query plan test](../src/server/adapters/d1/queryPlans.test.ts) fails if a snapshot query scans a table or loses these indexes.
 [The read volume test](../src/server/adapters/d1/readVolume.test.ts) fails if the rows read on that session grow again.
+The every-minute cron job also reads by state and expiry.
+Migration `0015` indexes the pending, expired, and removed rows of `issue_images` and `announcement_images`, `logins(expires_at)`, and `ba_session(expiresAt)`.
+Before it, one cron tick read 7,880 rows on a session with 1,200 accounts and 100 issues. Now it reads 24, which includes the 3 rows of the notification claim (measured with `npm run perf:reads`).
+[The cron read test](../src/server/adapters/d1/cronReads.test.ts) fails if a cron statement scans a table or reads more rows than the work needs.
+It allows one scan, of the password-attempt counters, which hold one row for each failed sign-in key of the last day.
+Migration `0016` adds the partial index `memberships_staff`, which holds the memberships with no team. The avatar list of a staff member reads it, and `readVolume.test.ts` fails if that list reads the whole session again.
 Snapshots preserve names, timestamps, history, awards, image metadata, limits, and administrator records.
 A valid login with removed membership receives an empty snapshot with null membership.
 An invalid login cannot authorize that read.

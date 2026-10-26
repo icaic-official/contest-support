@@ -67,10 +67,11 @@ function useAnnouncementCommand(list: AnnouncementData) {
   const pending = useRef<{ requestId: string; command: AnnouncementCommand }>(undefined);
 
   async function run(command: AnnouncementCommand): Promise<Outcome> {
-    const same =
-      pending.current &&
-      JSON.stringify(pending.current.command) === JSON.stringify(command);
-    const requestId = same ? pending.current!.requestId : crypto.randomUUID();
+    const previous = pending.current;
+    const requestId =
+      previous && JSON.stringify(previous.command) === JSON.stringify(command)
+        ? previous.requestId
+        : crypto.randomUUID();
     pending.current = { requestId, command };
     setRunning(command);
     setError("");

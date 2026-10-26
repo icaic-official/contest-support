@@ -320,6 +320,8 @@ export class D1AuthenticationService implements AuthenticationService {
       JOIN ba_account c ON c.userId = l.id AND c.providerId = 'credential' WHERE l.login_id = ?`,
     identity.identitySessionId, identity.accountId, current.caller.loginId).first<Login & { password: string }>();
     if (!before || !(await this.passwords.verify(currentPassword, before.password))) throw new AuthenticationError(400, 'Current password is incorrect.');
+    const { username } = before;
+    if (!username) throw new AuthenticationError(409, 'Set a username before changing this password.');
     const operationId = crypto.randomUUID();
     const assertionId = crypto.randomUUID();
     // Self changes have no external identity update. Hash before the atomic
@@ -342,7 +344,7 @@ export class D1AuthenticationService implements AuthenticationService {
     ] });
     // The authenticated change uses its own attempt limit. Replacing the login
     // must also succeed when the public username window is already exhausted.
-    return this.createLogin(before.username!, newPassword);
+    return this.createLogin(username, newPassword);
   }
 
 }

@@ -1,7 +1,7 @@
 import { createHash, randomBytes, randomUUID, scryptSync } from 'node:crypto';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { openStoreDatabase } from './tooling/store-database.mjs';
-import type { D1Connection, D1Statement, D1Value } from '../d1/connection';
+import type { D1Binding, D1Connection, D1Statement, D1Value } from '../d1/connection';
 import { D1Fixture, applyMigrations } from '../d1/testFixture';
 import { measureD1 } from '../d1/testMetrics';
 import { D1ApplicationService, notificationStatements } from './application';
@@ -49,7 +49,7 @@ export function registerAuthenticationCases(group: AuthenticationCases) {
   // Hosted runs use maintained scrypt, which took 1.5 to 8.3 seconds per account case
   // on Workers Builds. Their Vitest configurations set a limit above that.
   describe('Cloudflare account authentication', () => {
-    let db: D1Connection;
+    let db: D1Binding;
     let dispose: () => Promise<void>;
     let fixture: D1Fixture;
     let identity: IdentityProvider;
@@ -73,7 +73,7 @@ export function registerAuthenticationCases(group: AuthenticationCases) {
         await applyMigrations(db);
       }
       fullApplication = !!await db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'admin_audit'").first();
-      identity = createBetterAuthIdentity(db as Parameters<typeof createBetterAuthIdentity>[0], {
+      identity = createBetterAuthIdentity(db, {
         origin, secret: randomSecret(), secureCookies: false, hasher,
       });
     }, 120_000);

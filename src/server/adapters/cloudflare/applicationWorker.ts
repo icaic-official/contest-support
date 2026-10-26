@@ -1,5 +1,6 @@
 import { WorkerEntrypoint } from 'cloudflare:workers';
 import { WorkflowService } from '../../workflow';
+import type { D1Binding } from '../d1/connection';
 import { D1ApplicationStore } from '../d1/store';
 import authenticationWorker from './worker';
 import { D1AuthenticationService } from './authentication';
@@ -23,6 +24,7 @@ export class SessionMaintenance extends WorkerEntrypoint<LiveEnvironment> {
 }
 
 export interface ApplicationEnvironment extends LiveEnvironment {
+  DB: D1Binding;
   AUTH_ORIGIN: string;
   AUTH_SECRET: string;
   IMAGES: PrivateBucket;
@@ -32,7 +34,7 @@ export interface ApplicationEnvironment extends LiveEnvironment {
 interface ExecutionContext { waitUntil(operation: Promise<unknown>): void }
 
 function authentication(env: ApplicationEnvironment) {
-  const identity = sharedBetterAuthIdentity(env.DB as Parameters<typeof sharedBetterAuthIdentity>[0], {
+  const identity = sharedBetterAuthIdentity(env.DB, {
     origin: env.AUTH_ORIGIN, secret: env.AUTH_SECRET, secureCookies: true,
   });
   return new D1AuthenticationService(env.DB, identity, passwordHasher);

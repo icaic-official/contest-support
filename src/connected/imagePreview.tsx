@@ -98,7 +98,9 @@ const second: Attachment = {
   original_name: "new.png",
 };
 
-createRoot(document.getElementById("root")!).render(
+const root = document.getElementById("root");
+if (!root) throw new Error("Preview root is missing.");
+createRoot(root).render(
   <main className="legacy-ui">
     <Preview title="Staff images" staff attachments={[existing]} />
     <Preview title="Several images" staff attachments={[existing, second]} />

@@ -1,7 +1,8 @@
 import type { D1Connection, D1Statement } from './connection';
 
 /** Test transport measurements. SQL, bound values, rows, and errors stay private. */
-export function measureD1(db: D1Connection, report: (line: string) => void, source = 0) {
+// Generic so a measured binding keeps exec() and the other members that the proxy forwards.
+export function measureD1<Connection extends D1Connection>(db: Connection, report: (line: string) => void, source = 0) {
   const statements = new WeakMap<D1Statement, D1Statement>();
   const totals = { calls: 0, statements: 0, wallMs: 0, sqlMs: 0, inFlight: 0 };
   let lastReport = -Infinity;
@@ -51,7 +52,7 @@ export function measureD1(db: D1Connection, report: (line: string) => void, sour
     return measured;
   }
 
-  function forward<T extends object>(target: T, methods: T): T {
+  function forward<T extends M, M extends object>(target: T, methods: M): T {
     return new Proxy(target, {
       get(original, key) {
         if (Object.hasOwn(methods, key)) return Reflect.get(methods, key);

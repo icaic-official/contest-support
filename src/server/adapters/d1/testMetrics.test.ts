@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 import { getPlatformProxy } from 'wrangler';
-import type { D1Connection } from './connection';
+import type { D1Binding } from './connection';
 import { measureD1 } from './testMetrics';
 import { D1Fixture, applyMigrations } from './testFixture';
 import { D1AuthenticationService } from '../cloudflare/authentication';
@@ -8,7 +8,7 @@ import { createBetterAuthIdentity } from '../cloudflare/identity';
 import { passwordHasher, randomSecret } from '../cloudflare/password';
 
 it('measures the real D1 transport without exposing data or changing batch rollback', async () => {
-  const platform = await getPlatformProxy<{ DB: D1Connection }>({
+  const platform = await getPlatformProxy<{ DB: D1Binding }>({
     configPath: 'src/server/adapters/cloudflare/deploy/connector-store-ci.wrangler.jsonc', persist: false, remoteBindings: false, envFiles: [],
   });
   const lines: string[] = [];
@@ -41,7 +41,7 @@ it('measures the real D1 transport without exposing data or changing batch rollb
 }, 120_000);
 
 it('keeps native D1 capabilities used by the maintained identity adapter', async () => {
-  const platform = await getPlatformProxy<{ DB: D1Connection }>({
+  const platform = await getPlatformProxy<{ DB: D1Binding }>({
     configPath: 'src/server/adapters/cloudflare/deploy/connector-store-ci.wrangler.jsonc', persist: false, remoteBindings: false, envFiles: [],
   });
   const lines: string[] = [];
@@ -63,7 +63,7 @@ it('keeps native D1 capabilities used by the maintained identity adapter', async
       fixture.statement(`INSERT INTO ba_account (id, accountId, providerId, userId, password, createdAt, updatedAt)
         VALUES (?, ?, 'credential', ?, ?, ?, ?)`, crypto.randomUUID(), id, id, await passwordHasher.hash(password), now, now),
     ]);
-    const identity = createBetterAuthIdentity(db as Parameters<typeof createBetterAuthIdentity>[0], {
+    const identity = createBetterAuthIdentity(db, {
       origin: 'http://127.0.0.1:8788', secret: randomSecret(), secureCookies: false,
     });
     const service = new D1AuthenticationService(db, identity, passwordHasher);

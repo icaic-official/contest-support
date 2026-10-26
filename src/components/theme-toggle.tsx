@@ -34,7 +34,10 @@ export function ThemeToggle() {
       <DropdownMenuContent align="end">
         <DropdownMenuRadioGroup
           value={preference}
-          onValueChange={(value) => setPreference(value as ThemePreference)}
+          onValueChange={(value) => {
+            const option = themeOptions.find((item) => item.value === value);
+            if (option) setPreference(option.value);
+          }}
         >
           {themeOptions.map(({ value, label, icon: Icon }) => (
             <DropdownMenuRadioItem key={value} value={value}>

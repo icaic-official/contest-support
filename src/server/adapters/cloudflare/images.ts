@@ -306,7 +306,8 @@ export class R2ImageService {
     const allowed = (row: Image) => row.state === 'ready' && (row.staff || row.visibility === 'public') &&
       path === (kind === 'original' ? row.original_path : row.thumbnail_path);
     const row = await this.image(caller, sessionId, id);
-    if (!allowed(row)) throw new ImageRequestError('Image unavailable.', { validation: true });
+    const contentType = kind === 'original' ? row.content_type : row.thumbnail_content_type;
+    if (!allowed(row) || !contentType) throw new ImageRequestError('Image unavailable.', { validation: true });
     const object = await this.bucket.get(path);
     if (!object) throw new ImageRequestError('Image unavailable.');
     // R2 awaits cannot carry an earlier database authorization into a response.
@@ -317,7 +318,7 @@ export class R2ImageService {
       await object.body.cancel();
       throw error;
     }
-    return { body: object.body, contentType: kind === 'original' ? row.content_type! : row.thumbnail_content_type! };
+    return { body: object.body, contentType };
   }
 
   /** Retry exact tombstone keys. Retain tasks so an interrupted late PUT is found. */

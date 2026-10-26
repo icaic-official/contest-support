@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { getPlatformProxy } from 'wrangler';
-import type { D1Connection, D1Statement } from '../d1/connection';
+import type { D1Binding, D1Connection, D1Statement } from '../d1/connection';
 import { applyMigrations } from '../d1/testFixture';
 import { D1AuthenticationService } from './authentication';
 import { createBetterAuthIdentity } from './identity';
@@ -53,12 +53,12 @@ describe('competition configuration from PR #21', () => {
 });
 
 describe('trusted Cloudflare installation and owner recovery', () => {
-  let db: D1Connection;
+  let db: D1Binding;
   let dispose: (() => Promise<void>) | undefined;
 
   beforeEach(async () => {
     // Every case owns a fresh local database. These tests cannot select hosted data.
-    const platform = await getPlatformProxy<{ DB: D1Connection }>({
+    const platform = await getPlatformProxy<{ DB: D1Binding }>({
       configPath: 'wrangler.auth-ci.jsonc', persist: false, remoteBindings: false, envFiles: [],
     });
     db = platform.env.DB;
@@ -72,7 +72,7 @@ describe('trusted Cloudflare installation and owner recovery', () => {
     return db.prepare(sql).bind(...values);
   }
 
-  function bootstrap(connection = db, passwords = fastPasswords) {
+  function bootstrap(connection: D1Connection = db, passwords = fastPasswords) {
     return bootstrapInstallation(connection, competition, { passwords });
   }
 
@@ -110,7 +110,7 @@ describe('trusted Cloudflare installation and owner recovery', () => {
     expect(await stmt("SELECT action, actor, target FROM admin_audit WHERE action = 'trusted_bootstrap'").first()).toEqual({
       action: 'trusted_bootstrap', actor: result.accountId, target: result.accountId,
     });
-    const identity = createBetterAuthIdentity(db as Parameters<typeof createBetterAuthIdentity>[0], {
+    const identity = createBetterAuthIdentity(db, {
       origin: 'http://127.0.0.1:8788', secret: randomSecret(), secureCookies: false,
     });
     const authentication = new D1AuthenticationService(db, identity, passwordHasher);

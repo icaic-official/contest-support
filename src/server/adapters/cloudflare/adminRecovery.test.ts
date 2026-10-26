@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { getPlatformProxy } from 'wrangler';
-import type { D1Connection, D1Statement } from '../d1/connection';
+import type { D1Binding, D1Connection, D1Statement } from '../d1/connection';
 import { applyMigrations } from '../d1/testFixture';
 import { recoverCloudflareAdmin, writeTemporaryPassword, type AdminRecoveryResult } from './adminRecovery';
 import { D1AuthenticationService } from './authentication';
@@ -33,11 +33,11 @@ function passwordAppearsOnce(lines: string[], password: string): boolean {
 }
 
 describe('Cloudflare admin password recovery', () => {
-  let db: D1Connection;
+  let db: D1Binding;
   let dispose: (() => Promise<void>) | undefined;
 
   beforeEach(async () => {
-    const platform = await getPlatformProxy<{ DB: D1Connection }>({
+    const platform = await getPlatformProxy<{ DB: D1Binding }>({
       configPath: 'wrangler.auth-ci.jsonc', persist: false, remoteBindings: false, envFiles: [],
     });
     db = platform.env.DB;
@@ -79,7 +79,7 @@ describe('Cloudflare admin password recovery', () => {
   it('prints a replacement password once and the old password stops signing in', async () => {
     const installed = await bootstrap(passwordHasher);
     await seedLogin(installed.accountId);
-    const identity = createBetterAuthIdentity(db as Parameters<typeof createBetterAuthIdentity>[0], {
+    const identity = createBetterAuthIdentity(db, {
       origin: 'http://127.0.0.1:8788', secret: randomSecret(), secureCookies: false,
     });
     const authentication = new D1AuthenticationService(db, identity, passwordHasher);

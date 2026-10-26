@@ -226,8 +226,8 @@ export class R2AnnouncementImageService {
     const parsed = keySchema.safeParse(path.split('/'));
     if (!parsed.success) throw new ImageRequestError('Image unavailable.', { validation: true });
     const [sessionId, , , id] = parsed.data;
-    const allowed = (row: Image) => row.state === 'ready' && path === row.object_key && !!row.content_type &&
-      !row.announcement_removed && (row.manager || !row.announcement_expired);
+    const allowed = (row: Image): row is Image & { content_type: string } => row.state === 'ready' && path === row.object_key && !!row.content_type &&
+      !row.announcement_removed && (!!row.manager || !row.announcement_expired);
     const row = await this.image(caller, sessionId, id);
     if (!allowed(row)) throw new ImageRequestError('Image unavailable.', { validation: true });
     const object = await this.bucket.get(path);
@@ -238,7 +238,7 @@ export class R2AnnouncementImageService {
       await object.body.cancel();
       throw error;
     }
-    return { body: object.body, contentType: row.content_type! };
+    return { body: object.body, contentType: row.content_type };
   }
 
   /** Expire old reservations and retry exact object deletions. */

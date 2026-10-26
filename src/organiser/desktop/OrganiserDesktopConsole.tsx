@@ -212,6 +212,7 @@ export function OrganiserDesktopConsole({
     );
   }
 
+  const session = state.session;
   const groups = consoleNavGroups(member);
   const pages = groups.flatMap((group) => group.pages);
   const currentPage =
@@ -277,12 +278,13 @@ export function OrganiserDesktopConsole({
     setReportOpen(true);
   }
 
-  function rowAction(issue: Issue): RowAction | undefined {
-    const can = issueAbilities(issue, state!, member!);
+  // An arrow keeps the narrowing of state and member from the guard above.
+  const rowAction = (issue: Issue): RowAction | undefined => {
+    const can = issueAbilities(issue, state, member);
     if (can.accept) return "accept";
     if (can.claim) return "claim";
     return undefined;
-  }
+  };
 
   function runRowAction(issue: Issue, action: RowAction) {
     const mark = workflow.selectionMark();
@@ -349,7 +351,7 @@ export function OrganiserDesktopConsole({
               intake={
                 member.is_admin
                   ? {
-                      open: state.session!.intake_open,
+                      open: session.intake_open,
                       disabled: admin.busy || admin.archived,
                       onChange: (open) => {
                         void admin.setIntake(open);
@@ -362,7 +364,7 @@ export function OrganiserDesktopConsole({
             />
             <div className="flex min-w-0 flex-1 flex-col">
               <ConsoleTopBar
-                sessionName={state.session!.name}
+                sessionName={session.name}
                 pageLabel={
                   accountPage ? "My account" : consolePageLabels[currentPage]
                 }

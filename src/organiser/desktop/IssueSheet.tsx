@@ -50,7 +50,7 @@ import {
   missingActionHint,
   primaryAction,
 } from "../organiserModel";
-import type { ConsolePageProps, SheetTab } from "./consoleProps";
+import { type ConsolePageProps, type SheetTab, sheetTabs } from "./consoleProps";
 
 /** A task of the sheet that opens in a dialog. */
 type SheetDialog = "resolve" | "escalate" | "reopen";
@@ -351,7 +351,10 @@ function IssueSheetBody({
         </div>
         <Tabs
           value={tab}
-          onValueChange={(value) => onTab(value as SheetTab)}
+          onValueChange={(value) => {
+            const next = sheetTabs.find((item) => item === value);
+            if (next) onTab(next);
+          }}
           className="gap-0"
         >
           <TabsList

@@ -14,3 +14,8 @@ export interface D1Connection {
   prepare(sql: string): D1Statement;
   batch(statements: D1Statement[]): Promise<unknown[]>;
 }
+
+/** The Workers D1 binding. Better Auth recognizes its native D1 adapter by exec(). */
+export interface D1Binding extends D1Connection {
+  exec(query: string): Promise<unknown>;
+}

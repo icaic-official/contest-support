@@ -300,8 +300,9 @@ export class D1ApplicationService {
     const gate = await this.adminGate(caller, sessionId);
     const guardIds: string[] = [];
     const guards = (...checks: Array<[string, ...D1Value[]]>) => checks.map(([sql, ...values]) => {
-      guardIds.push(crypto.randomUUID());
-      return this.assertion(guardIds.at(-1)!, sql, ...values);
+      const id = crypto.randomUUID();
+      guardIds.push(id);
+      return this.assertion(id, sql, ...values);
     });
     const changes = await this.rosterChanges(sessionId, command, guards);
     await this.commit(gate, [

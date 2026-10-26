@@ -72,14 +72,14 @@ export function isWorkflowCommand(value: unknown): value is Command {
   if (value.type === 'submit') return validText(value.description) && typeof value.category === 'string' &&
     (value.team_id === undefined || typeof value.team_id === 'string');
   if (typeof value.issue_id !== 'string' || !uuid.test(value.issue_id) ||
-    !Number.isSafeInteger(value.revision) || (value.revision as number) < 0) return false;
+    typeof value.revision !== 'number' || !Number.isSafeInteger(value.revision) || value.revision < 0) return false;
   switch (value.type) {
     case 'claim': case 'accept': case 'escalate': case 'apply': return true;
     case 'message': return validText(value.text) && (value.visibility === 'public' || value.visibility === 'internal');
     case 'resolve': return validText(value.summary);
     case 'reopen': return validText(value.reason);
-    case 'award': return validText(value.explanation) && Number.isInteger(value.minutes) &&
-      (value.minutes as number) >= 0 && (value.minutes as number) <= 2147483647;
+    case 'award': return validText(value.explanation) && typeof value.minutes === 'number' &&
+      Number.isInteger(value.minutes) && value.minutes >= 0 && value.minutes <= 2147483647;
     default: return false;
   }
 }

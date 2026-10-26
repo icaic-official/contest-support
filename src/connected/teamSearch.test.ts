@@ -7,7 +7,6 @@ import {
   editTeamQuery,
   focusTeamQuery,
   initialTeamSelection,
-  issueVisibleForTeam,
   keepTeamSelection,
   moveTeamHighlight,
   openTeamList,
@@ -199,16 +198,9 @@ describe("team search", () => {
     ]);
   });
 
-  it("counts unresolved issues without using the status filter", () => {
+  it("counts unresolved issues", () => {
     expect(unresolvedCount(issues, "aurora")).toBe(2);
     expect(unresolvedCount(issues, "orbit")).toBe(0);
-    const open = { team_id: "aurora", status: "open" };
-    const resolved = { team_id: "aurora", status: "resolved" };
-    expect(issueVisibleForTeam(open, "aurora", "resolved", false)).toBe(false);
-    expect(issueVisibleForTeam(resolved, "aurora", "resolved", false)).toBe(true);
-    expect(issueVisibleForTeam(open, "aurora", "all", true)).toBe(false);
-    expect(issueVisibleForTeam(resolved, "aurora", "open", true)).toBe(true);
-    expect(issueVisibleForTeam(resolved, "cedar", "all", false)).toBe(false);
   });
 
   it("keeps the first suggestion unselected until staff choose an id", () => {

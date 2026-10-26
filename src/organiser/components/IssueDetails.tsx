@@ -9,13 +9,10 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { historyText } from "@/connected/historyEvents";
 import { awardMinutesLabel, formatDate } from "@/connected/labels";
-import type { Issue, Snapshot } from "@/connected/model";
+import type { Award, HistoryEntry, Issue, Snapshot } from "@/connected/model";
 import { clockDuration } from "@/connected/ui";
 import { cn } from "@/lib/utils";
 import { PersonAvatar, UnresolvedTimer } from "./issueDisplay";
-
-type Award = Snapshot["awards"][number];
-type HistoryItem = Snapshot["history"][number];
 
 function wallTime(value: string): string {
   return new Date(value).toLocaleTimeString([], {
@@ -308,7 +305,7 @@ export function ResolutionHistory({
   );
 }
 
-function ActivityEntry({ item, text }: { item: HistoryItem; text: string }) {
+function ActivityEntry({ item, text }: { item: HistoryEntry; text: string }) {
   const internal = item.visibility === "internal";
   return (
     <li className="flex gap-2.5">

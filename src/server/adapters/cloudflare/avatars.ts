@@ -3,11 +3,10 @@ import type { PersonAvatar } from '../../../backend/contracts';
 import { ImageRequestError } from '../../../backend/errors';
 import { AVATAR_MAX_BYTES, imageKind } from '../../../connected/imageFile';
 import type { Caller } from '../../authentication';
-import type { D1Connection, D1Statement } from '../d1/connection';
+import type { D1Connection, D1Statement, D1Value } from '../d1/connection';
 import { currentAccessBindings, currentAccessSql, currentReadyLoginBindings, currentReadyLoginSql } from './application';
 import { putVerifiedImage, type PrivateBucket } from './images';
 
-type Value = string | number | null;
 type AvatarState = 'pending' | 'ready' | 'retired' | 'expired';
 interface StoredAvatar { id: string; account_id: string }
 
@@ -38,7 +37,7 @@ const visibleSql = `WITH login AS (${currentReadyLoginSql}), access AS (${curren
 export class R2AvatarService {
   constructor(private readonly db: D1Connection, private readonly bucket: PrivateBucket) {}
 
-  private statement(sql: string, ...values: Value[]): D1Statement { return this.db.prepare(sql).bind(...values); }
+  private statement(sql: string, ...values: D1Value[]): D1Statement { return this.db.prepare(sql).bind(...values); }
 
   private visible(caller: Caller, sessionId: string, avatarId?: string): D1Statement {
     const bindings = [...currentReadyLoginBindings(caller), ...currentAccessBindings(caller, sessionId), sessionId];
@@ -47,7 +46,7 @@ export class R2AvatarService {
       : this.statement(`${visibleSql} WHERE avatar_id = ?`, ...bindings, avatarId);
   }
 
-  private assertion(id: string, sql: string, ...values: Value[]): D1Statement {
+  private assertion(id: string, sql: string, ...values: D1Value[]): D1Statement {
     return this.statement(`INSERT INTO command_assertions (id, valid) VALUES (?, CASE WHEN EXISTS (${sql}) THEN 1 ELSE 0 END)`, id, ...values);
   }
 

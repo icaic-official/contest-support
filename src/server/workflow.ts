@@ -1,4 +1,4 @@
-import type { Command, Role } from '../connected/model.ts';
+import type { Command, IssueStatus, Role } from '../connected/model.ts';
 import type { Caller } from './authentication.ts';
 
 export type CommandResult =
@@ -14,7 +14,7 @@ export interface WorkflowState {
   /** The session's teams among the membership team and the team that a submit names. */
   teams: string[];
   issue: {
-    id: string; team_id: string; status: 'open' | 'claimed' | 'escalated' | 'resolved';
+    id: string; team_id: string; status: IssueStatus;
     owner: string | null; revision: number;
   } | null;
   resolution: { id: string } | null;
@@ -28,7 +28,7 @@ export interface WorkflowDecision {
   teamId: string;
   history: { text: string; visibility: 'public' | 'internal' };
   submission?: { category: string; description: string };
-  issue?: { status?: 'open' | 'claimed' | 'escalated' | 'resolved'; owner?: string };
+  issue?: { status?: IssueStatus; owner?: string };
   resolution?: { summary: string };
   reopen?: { reason: string };
   award?: { resolutionId: string; minutes: number; explanation: string };

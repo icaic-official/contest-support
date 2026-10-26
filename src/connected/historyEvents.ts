@@ -1,8 +1,5 @@
 import { awardMinutesLabel } from "./labels";
-import type { Issue, Resolution, Snapshot } from "./model";
-
-type HistoryEntry = Snapshot["history"][number];
-type Award = Snapshot["awards"][number];
+import type { Award, HistoryEntry, Issue, Resolution } from "./model";
 
 /** A workflow step that the server records as a history entry. */
 export type WorkflowEvent =

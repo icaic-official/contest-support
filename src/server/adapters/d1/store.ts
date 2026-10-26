@@ -1,7 +1,7 @@
 import type { Caller } from '../../authentication';
 import type { WorkflowPersistence, WorkflowRead, WorkflowDecision, WorkflowCommitResult } from '../../workflow.ts';
 import type { Command, Issue, Role } from '../../../connected/model.ts';
-import type { D1Connection, D1Statement } from './connection';
+import type { D1Connection, D1Statement, D1Value } from './connection';
 
 interface WorkflowRow {
   actor_name: string;
@@ -69,7 +69,7 @@ const workflowSql = `SELECT a.name AS actor_name, m.team_id AS membership_team, 
 export class D1ApplicationStore implements WorkflowPersistence {
   constructor(private readonly db: D1Connection) {}
 
-  private statement(sql: string, ...values: Array<string | number | null>): D1Statement {
+  private statement(sql: string, ...values: D1Value[]): D1Statement {
     return this.db.prepare(sql).bind(...values);
   }
 
@@ -105,7 +105,7 @@ export class D1ApplicationStore implements WorkflowPersistence {
     read: WorkflowRead, decision: WorkflowDecision): Promise<WorkflowCommitResult> {
     const assertionId = crypto.randomUUID();
     const parameters = this.parameters(caller, sessionId, requestId, command);
-    const assertion = (suffix: string, condition: string, ...values: Array<string | number | null>) =>
+    const assertion = (suffix: string, condition: string, ...values: D1Value[]) =>
       this.statement(`INSERT INTO command_assertions (id, valid) VALUES (?, CASE WHEN ${condition} THEN 1 ELSE 0 END)`,
         `${assertionId}:${suffix}`, ...values);
     // Reuse the authorized read query for access checks inside either batch.

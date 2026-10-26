@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type { AccountCommand, AccountResult } from '../../../backend/contracts';
 import { AuthenticationError, type AuthenticationService, type AuthenticationSession } from '../../authentication';
-import type { D1Connection, D1Statement } from '../d1/connection';
+import type { D1Connection, D1Statement, D1Value } from '../d1/connection';
 import type { IdentityProvider } from './identity';
 import { beginCredentialReset, completeCredentialReset } from './credentialReset';
 import { randomSecret, type PasswordHasher } from './password';
@@ -46,7 +46,7 @@ interface Login extends Account {
 
 interface SqlCheck {
   sql: string;
-  values: Array<string | number | null>;
+  values: D1Value[];
 }
 
 // This query is also evaluated inside each privileged batch. No browser claim
@@ -68,7 +68,7 @@ export class D1AuthenticationService implements AuthenticationService {
     private readonly passwords: PasswordHasher,
   ) {}
 
-  private statement(sql: string, ...values: Array<string | number | null>): D1Statement {
+  private statement(sql: string, ...values: D1Value[]): D1Statement {
     return this.db.prepare(sql).bind(...values);
   }
 
@@ -84,7 +84,7 @@ export class D1AuthenticationService implements AuthenticationService {
     }
   }
 
-  private assertion(id: string, sql: string, ...values: Array<string | number | null>): D1Statement {
+  private assertion(id: string, sql: string, ...values: D1Value[]): D1Statement {
     return this.statement(`INSERT INTO command_assertions (id, valid) VALUES (?, CASE WHEN EXISTS (${sql}) THEN 1 ELSE 0 END)`, id, ...values);
   }
 
@@ -186,11 +186,11 @@ export class D1AuthenticationService implements AuthenticationService {
     return { cookie: await this.identity.signOut(headers) };
   }
 
-  private adminCondition(sessionId: string, actor: string, target?: string): [string, Array<string | number | null>] {
+  private adminCondition(sessionId: string, actor: string, target?: string): [string, D1Value[]] {
     let sql = `SELECT 1 FROM memberships m JOIN sessions s ON s.id = m.session_id
       JOIN events e ON e.id = s.event_id
       WHERE m.account_id = ? AND m.session_id = ? AND m.is_admin = 1 AND e.archived = 0`;
-    const values: Array<string | number | null> = [actor, sessionId];
+    const values: D1Value[] = [actor, sessionId];
     if (target) {
       sql += ` AND EXISTS (SELECT 1 FROM memberships WHERE session_id = m.session_id AND account_id = ?)
         AND NOT EXISTS (SELECT 1 FROM memberships t JOIN sessions ts ON ts.id = t.session_id

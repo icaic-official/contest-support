@@ -1,7 +1,7 @@
 import { createHash, randomBytes, randomUUID, scryptSync } from 'node:crypto';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { openStoreDatabase } from './tooling/store-database.mjs';
-import type { D1Connection, D1Statement } from '../d1/connection';
+import type { D1Connection, D1Statement, D1Value } from '../d1/connection';
 import { D1Fixture, applyMigrations } from '../d1/testFixture';
 import { measureD1 } from '../d1/testMetrics';
 import { D1ApplicationService, notificationStatements } from './application';
@@ -80,7 +80,7 @@ export function registerAuthenticationCases(group: AuthenticationCases) {
 
     afterAll(async () => { if (dispose) await dispose(); }, 120_000);
 
-    function stmt(sql: string, ...values: Array<string | number | null>): D1Statement {
+    function stmt(sql: string, ...values: D1Value[]): D1Statement {
       return db.prepare(sql).bind(...values);
     }
 

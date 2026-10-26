@@ -132,7 +132,16 @@ export const snapshotSchema = z.object({
 });
 export type Snapshot = z.infer<typeof snapshotSchema>;
 export type Issue = z.infer<typeof issueSchema>;
+export type IssueStatus = Issue["status"];
+/**
+ * The queue filter that the phone and desktop layouts share. "all" shows
+ * active issues. "everything" shows every issue.
+ */
+export type StatusFilter = "all" | "everything" | IssueStatus;
 export type Resolution = z.infer<typeof resolutionSchema>;
+export type Team = Snapshot["teams"][number];
+export type Award = Snapshot["awards"][number];
+export type HistoryEntry = Snapshot["history"][number];
 export type Command =
   | { type: "submit"; category: string; description: string; team_id?: string }
   | {

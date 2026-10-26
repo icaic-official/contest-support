@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { D1Connection, D1Statement } from '../d1/connection';
+import type { D1Connection, D1Statement, D1Value } from '../d1/connection';
 import { passwordHasher, randomSecret, type PasswordHasher } from './password';
 
 // Retain PR #21's competition fields and normalized-name checks. Credentials
@@ -44,11 +44,11 @@ export function validateCompetitionConfiguration(input: unknown): CompetitionCon
   return parsed.data;
 }
 
-function statement(db: D1Connection, sql: string, ...values: Array<string | number | null>): D1Statement {
+function statement(db: D1Connection, sql: string, ...values: D1Value[]): D1Statement {
   return db.prepare(sql).bind(...values);
 }
 
-function assertion(db: D1Connection, id: string, condition: string, ...values: Array<string | number | null>): D1Statement {
+function assertion(db: D1Connection, id: string, condition: string, ...values: D1Value[]): D1Statement {
   return statement(db, `INSERT INTO command_assertions (id, valid)
     VALUES (?, CASE WHEN ${condition} THEN 1 ELSE 0 END)`, id, ...values);
 }

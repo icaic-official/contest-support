@@ -5,6 +5,7 @@ import {
   type Membership,
   type Resolution,
   type Snapshot,
+  type StatusFilter,
   unresolvedTime,
 } from "@/connected/model";
 import { normalizeTeamText } from "@/connected/teamSearch";
@@ -112,34 +113,17 @@ export const queueTabs: readonly { tab: QueueTab; label: string }[] = [
 ];
 
 /**
- * The shared status filter value of the All tab. The phone app treats every
- * value that is not a status as "All active", so this value is safe there.
- */
-export const everythingFilter = "everything";
-
-/**
  * Maps the shared status filter of useWorkflowState to a queue tab. "all" is
  * the default and shows active issues, as the phone app does. "claimed"
  * after a reopen shows In progress, so the reopened issue stays in view.
  */
-export function queueTabForFilter(filter: string): QueueTab {
-  if (filter === everythingFilter) return "everything";
-  if (
-    filter === "open" ||
-    filter === "claimed" ||
-    filter === "escalated" ||
-    filter === "resolved"
-  ) {
-    return filter;
-  }
-  return "active";
+export function queueTabForFilter(filter: StatusFilter): QueueTab {
+  return filter === "all" ? "active" : filter;
 }
 
 /** The shared status filter value for a queue tab. */
-export function filterForQueueTab(tab: QueueTab): string {
-  if (tab === "active") return "all";
-  if (tab === "everything") return everythingFilter;
-  return tab;
+export function filterForQueueTab(tab: QueueTab): StatusFilter {
+  return tab === "active" ? "all" : tab;
 }
 
 export function matchesQueueTab(issue: Issue, tab: QueueTab): boolean {

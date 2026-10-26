@@ -1,12 +1,11 @@
 import { describe, expect, it } from "vitest";
-import type { Issue, Membership, Resolution, Snapshot } from "@/connected/model";
+import type { Award, Issue, Membership, Resolution } from "@/connected/model";
 import { chipForFilter } from "../organiserModel";
 import {
   awardSummary,
   categoryCounts,
   consoleNavGroups,
   consolePages,
-  everythingFilter,
   filterForQueueTab,
   labelMatches,
   latestResolver,
@@ -71,8 +70,6 @@ function resolution(overrides: Partial<Resolution> = {}): Resolution {
     ...overrides,
   };
 }
-
-type Award = Snapshot["awards"][number];
 
 function award(overrides: Partial<Award> = {}): Award {
   return {
@@ -165,7 +162,6 @@ describe("queue tabs", () => {
       expect(queueTabForFilter(filterForQueueTab(tab))).toBe(tab);
     }
     expect(queueTabForFilter("all")).toBe("active");
-    expect(queueTabForFilter("unknown")).toBe("active");
   });
 
   it("shows a reopened issue under In progress", () => {
@@ -173,7 +169,7 @@ describe("queue tabs", () => {
   });
 
   it("keeps the phone app on All active for the All tab", () => {
-    expect(chipForFilter(everythingFilter)).toBe("active");
+    expect(chipForFilter("everything")).toBe("active");
   });
 
   it("matches statuses", () => {

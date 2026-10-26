@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import { unstable_splitSqlQuery as splitSqlQuery } from "wrangler";
 import type { Caller } from '../../authentication';
 import type { D1Connection, D1Statement } from "./connection";
+import type { D1Value } from './connection.ts';
 
 type Row = Record<string, unknown>;
 
@@ -43,11 +44,11 @@ export class D1Fixture {
     private readonly workflow = false,
   ) {}
 
-  statement(sql: string, ...values: Array<string | number | null>): D1Statement {
+  statement(sql: string, ...values: D1Value[]): D1Statement {
     return this.db.prepare(sql).bind(...values);
   }
 
-  async rows(sql: string, ...values: Array<string | number | null>): Promise<Row[]> {
+  async rows(sql: string, ...values: D1Value[]): Promise<Row[]> {
     return (await this.statement(sql, ...values).all<Row>()).results;
   }
 

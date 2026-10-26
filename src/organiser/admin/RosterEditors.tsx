@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import type { Snapshot } from "@/connected/model";
+import type { Snapshot, Team } from "@/connected/model";
 import { normalizeTeamText } from "@/connected/teamSearch";
 import { ConfirmDialog } from "./AccountAccess";
 import type { SessionAdmin } from "./useSessionAdmin";
@@ -29,8 +29,6 @@ import {
   teamLinesError,
   teamUsage,
 } from "./rosterModel";
-
-type Team = Snapshot["teams"][number];
 
 const fieldClass = "h-11 text-base md:text-sm";
 

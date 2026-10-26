@@ -1,13 +1,11 @@
 import { describe, expect, it } from "vitest";
-import type { Issue, Snapshot } from "@/connected/model";
+import type { Issue, Team } from "@/connected/model";
 import {
   defaultQueueSort,
   nextQueueSort,
   type QueueSort,
   sortQueueIssues,
 } from "./queueSort";
-
-type Team = Snapshot["teams"][number];
 
 const now = Date.parse("2026-10-17T12:00:00Z");
 

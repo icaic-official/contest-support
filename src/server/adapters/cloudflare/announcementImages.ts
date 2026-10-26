@@ -4,7 +4,7 @@ import { ImageRequestError } from '../../../backend/errors';
 import { megabytes } from '../../../connected/imageFile';
 import type { Caller } from '../../authentication';
 import { equalWorkflowJson } from '../../workflow';
-import type { D1Connection, D1Statement } from '../d1/connection';
+import type { D1Connection, D1Statement, D1Value } from '../d1/connection';
 import {
   announcementAssertion, announcementManager, announcementNow, guardedAnnouncementBatch, sessionAudiences,
 } from './announcements';
@@ -23,7 +23,6 @@ const beginSchema = z.strictObject({
   name: z.string().min(1), bytes: z.number().int().min(1).max(ANNOUNCEMENT_IMAGE_MAX_BYTES),
 });
 const keySchema = z.tuple([z.uuid(), z.literal('announcements'), z.uuid(), z.uuid()]);
-type Value = string | number | null;
 
 /** A ready image, or a reservation that has not expired. */
 function usable(image: { state: string; expired: number }): boolean {
@@ -46,7 +45,7 @@ const imageSql = `SELECT x.id, x.session_id, x.announcement_id, x.uploader, x.up
 export class R2AnnouncementImageService {
   constructor(private readonly db: D1Connection, private readonly bucket: PrivateBucket) {}
 
-  private statement(sql: string, ...values: Value[]): D1Statement { return this.db.prepare(sql).bind(...values); }
+  private statement(sql: string, ...values: D1Value[]): D1Statement { return this.db.prepare(sql).bind(...values); }
 
   private async image(caller: Caller, sessionId: string, id: string): Promise<Image> {
     if (!z.uuid().safeParse(sessionId).success || !z.uuid().safeParse(id).success) {

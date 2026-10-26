@@ -1,3 +1,5 @@
+import type { IssueStatus } from "./model";
+
 export const suggestionLimit = 8;
 
 export type SearchTeam = {
@@ -8,7 +10,7 @@ export type SearchTeam = {
 
 export type SearchIssue = {
   team_id: string;
-  status: "open" | "claimed" | "escalated" | "resolved" | string;
+  status: IssueStatus;
 };
 
 /**
@@ -276,23 +278,6 @@ export function suggestTeams(
       })),
     ),
   );
-}
-
-/**
- * Jury members stay on resolved issues. Other staff combine the team with the
- * status filter. The unresolved count stays independent of that filter.
- */
-export function issueVisibleForTeam(
-  issue: SearchIssue,
-  teamId: string | null,
-  statusFilter: string,
-  juryOnly: boolean,
-): boolean {
-  if (juryOnly && issue.status !== "resolved") return false;
-  if (!juryOnly && statusFilter !== "all" && issue.status !== statusFilter) {
-    return false;
-  }
-  return teamId === null || issue.team_id === teamId;
 }
 
 /** Editing the chosen text drops its id. A query never selects a team by itself. */

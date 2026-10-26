@@ -5,6 +5,7 @@ import {
   type Membership,
   type Resolution,
   type Snapshot,
+  type StatusFilter,
   unresolvedTime,
 } from "@/connected/model";
 import { type JuryRow, juryWorklists } from "@/connected/jury";
@@ -126,16 +127,23 @@ export const queueChips: readonly { chip: QueueChip; label: string }[] = [
  * Maps the shared status filter of useWorkflowState to a chip. "all" and
  * "claimed" show all active issues, so a reopened issue stays in view.
  */
-export function chipForFilter(filter: string): QueueChip {
+export function chipForFilter(filter: StatusFilter): QueueChip {
   if (filter === "open") return "waiting";
   if (filter === "escalated") return "handoffs";
   if (filter === "resolved") return "resolved";
   return "active";
 }
 
+const chipFilters: Record<QueueChip, StatusFilter> = {
+  waiting: "open",
+  handoffs: "escalated",
+  active: "all",
+  resolved: "resolved",
+};
+
 /** The shared status filter value for a chip. */
-export function filterForChip(chip: QueueChip): string {
-  return { waiting: "open", handoffs: "escalated", active: "all", resolved: "resolved" }[chip];
+export function filterForChip(chip: QueueChip): StatusFilter {
+  return chipFilters[chip];
 }
 
 export function matchesChip(issue: Issue, chip: QueueChip): boolean {

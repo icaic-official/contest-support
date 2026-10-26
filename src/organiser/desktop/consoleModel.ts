@@ -146,14 +146,14 @@ export function median(values: readonly number[]): number | undefined {
 export interface QueueStats {
   open: number;
   /** Unresolved time of the oldest open issue. */
-  oldestOpenMs?: number;
+  oldestOpenMs: number | undefined;
   claimed: number;
   /** Distinct owners of issues in progress. */
   helpers: number;
   escalated: number;
   resolved: number;
   /** Median unresolved time of resolved issues. */
-  medianResolvedMs?: number;
+  medianResolvedMs: number | undefined;
 }
 
 /** Counts issues by status from persisted timestamps. */

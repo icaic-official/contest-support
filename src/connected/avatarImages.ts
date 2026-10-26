@@ -25,7 +25,7 @@ export function avatarMap(
 /** One avatar ID. Its picture never changes, so the ID is a safe cache key. */
 interface Entry {
   avatar: PersonAvatar;
-  url?: string;
+  url: string | undefined;
   failed: boolean;
   listeners: Set<() => void>;
 }
@@ -57,7 +57,7 @@ export class AvatarImageCache {
   subscribe(avatar: PersonAvatar, listener: () => void): () => void {
     let entry = this.entries.get(avatar.avatar_id);
     if (!entry) {
-      entry = { avatar, failed: false, listeners: new Set() };
+      entry = { avatar, url: undefined, failed: false, listeners: new Set() };
       this.entries.set(avatar.avatar_id, entry);
       this.load(entry);
     }
@@ -86,7 +86,7 @@ export class AvatarImageCache {
   seed(avatar: PersonAvatar, blob: Blob): void {
     let entry = this.entries.get(avatar.avatar_id);
     if (!entry) {
-      entry = { avatar, failed: false, listeners: new Set() };
+      entry = { avatar, url: undefined, failed: false, listeners: new Set() };
       this.entries.set(avatar.avatar_id, entry);
     }
     if (entry.url) return;

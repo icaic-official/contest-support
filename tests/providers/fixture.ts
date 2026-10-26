@@ -10,7 +10,7 @@ interface PreparedFixture {
   module: string;
   configuration: unknown;
   origin: string;
-  assetOrigin?: string;
+  assetOrigin?: string | undefined;
   diagnostics?(accountId?: string): BrowserDiagnostics | undefined;
 }
 

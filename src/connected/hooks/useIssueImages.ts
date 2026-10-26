@@ -17,7 +17,7 @@ export interface ImageLimits {
 export interface ImageRetry {
   file: File;
   requestId: string;
-  pending?: StartedImage;
+  pending?: StartedImage | undefined;
   /** True when only the deletion of unfinished files can continue. */
   cleanupOnly?: boolean;
 }
@@ -32,7 +32,7 @@ export interface IssueImagesOptions {
   attachments: readonly Attachment[];
   pendingRemovals: readonly PendingRemoval[];
   onChanged: () => Promise<void>;
-  transport?: ImageTransport;
+  transport?: ImageTransport | undefined;
   /**
    * Returns whether the preview is still on screen. A late download for a
    * closed preview is ignored. The default uses the open preview state.

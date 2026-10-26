@@ -20,7 +20,7 @@ export interface TeamLine {
   line: number;
   name: string;
   location: string;
-  problem?: string;
+  problem: string | undefined;
 }
 
 function lineProblem(name: string, location: string): string | undefined {

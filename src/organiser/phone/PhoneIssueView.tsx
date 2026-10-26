@@ -107,7 +107,7 @@ export function PhoneIssueView({
 }: {
   issue: Issue;
   props: PhoneTabProps;
-  initialSheet?: IssueSheet;
+  initialSheet?: IssueSheet | undefined;
   onBack: () => void;
   replyDraft: ReplyDraft;
   onReplyDraft: (draft: ReplyDraft) => void;

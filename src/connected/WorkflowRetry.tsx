@@ -13,7 +13,7 @@ interface PendingWorkflowRequest {
   sessionId: string;
   request: string;
   command: Command;
-  onSuccess?: () => void;
+  onSuccess: (() => void) | undefined;
   /** A queue action stays on the list instead of selecting its issue. */
   stayOnPage: boolean;
 }

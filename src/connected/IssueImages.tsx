@@ -26,7 +26,7 @@ export function IssueImages({
   attachments: readonly Attachment[];
   pendingRemovals: readonly PendingRemoval[];
   onChanged: () => Promise<void>;
-  transport?: ImageTransport;
+  transport?: ImageTransport | undefined;
 }) {
   const id = useId();
   const dialogRef = useRef<HTMLDialogElement>(null);

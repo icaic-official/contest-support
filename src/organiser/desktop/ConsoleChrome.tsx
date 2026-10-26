@@ -198,11 +198,13 @@ export function ConsoleSidebar({
   locked: boolean;
   onSessionChange: () => void;
   /** The intake switch for admins. Omit it for other people. */
-  intake?: {
-    open: boolean;
-    disabled: boolean;
-    onChange: (open: boolean) => void;
-  };
+  intake?:
+    | {
+        open: boolean;
+        disabled: boolean;
+        onChange: (open: boolean) => void;
+      }
+    | undefined;
   /** True while the account page is open. */
   accountPage: boolean;
   onAccount: () => void;

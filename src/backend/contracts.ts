@@ -59,7 +59,7 @@ export interface Workflows {
     sessionId: string,
     requestId: string,
     command: Command,
-  ): Promise<{ issueId: string; snapshot?: Snapshot }>;
+  ): Promise<{ issueId: string; snapshot?: Snapshot | undefined }>;
 }
 
 export interface MembershipInput {

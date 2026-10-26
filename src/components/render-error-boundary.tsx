@@ -17,13 +17,13 @@ interface Props {
    */
   scope: "app" | "region";
   /** The boundary shows its children again when this value changes. */
-  resetKey?: string;
+  resetKey?: string | undefined;
   children: ReactNode;
 }
 
 interface State {
   failed: boolean;
-  resetKey?: string;
+  resetKey?: string | undefined;
 }
 
 /**

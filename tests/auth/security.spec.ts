@@ -24,7 +24,7 @@ async function request(page: Page, path: string, body?: object, csrf: 'current' 
     const response = await fetch(path, {
       method: body ? 'POST' : 'GET',
       headers,
-      body: body ? JSON.stringify(body) : undefined,
+      body: body ? JSON.stringify(body) : null,
       cache: 'no-store',
     });
     return { status: response.status, body: await response.json() };

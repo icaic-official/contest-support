@@ -46,7 +46,7 @@ function Panel({
   className,
 }: {
   title: string;
-  description?: string;
+  description?: string | undefined;
   children: ReactNode;
   className?: string;
 }) {

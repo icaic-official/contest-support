@@ -4,13 +4,13 @@ import type {
   Unsubscribe,
 } from '../contracts';
 
-const identitySchema = z.object({ id: z.uuid(), name: z.string().optional(), email: z.string().optional() });
+const identitySchema = z.object({ id: z.uuid(), name: z.string().exactOptional(), email: z.string().exactOptional() });
 const sessionSchema = z.object({
   user: identitySchema,
   status: z.object({ username: z.string().nullable(), must_change: z.boolean(), session_valid: z.boolean() }),
   csrf: z.string().min(1),
 });
-const resultSchema = z.object({ temporaryPassword: z.string().optional() });
+const resultSchema = z.object({ temporaryPassword: z.string().exactOptional() });
 const errorSchema = z.object({ error: z.string() });
 
 export interface CloudflareAuthentication extends Authentication {

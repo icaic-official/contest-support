@@ -119,7 +119,7 @@ export function ReplyForm({
   internalAllowed: boolean;
   draft: ReplyDraft;
   onDraft: (draft: ReplyDraft) => void;
-  onAttachImage?: () => void;
+  onAttachImage?: (() => void) | undefined;
   layout?: "stacked" | "composer";
 }) {
   const id = useId();

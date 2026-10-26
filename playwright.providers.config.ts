@@ -17,9 +17,11 @@ export default defineConfig({
     screenshot: 'off',
     video: 'off',
   },
-  webServer: process.env.MINSKY_PROVIDER_RECOVERY === 'true' ? undefined : {
-    command: 'npm run dev -- --port 4174 --strictPort',
-    url: 'http://127.0.0.1:4174/tests/providers/browser.html',
-    reuseExistingServer: false,
-  },
+  ...(process.env.MINSKY_PROVIDER_RECOVERY === 'true' ? {} : {
+    webServer: {
+      command: 'npm run dev -- --port 4174 --strictPort',
+      url: 'http://127.0.0.1:4174/tests/providers/browser.html',
+      reuseExistingServer: false,
+    },
+  }),
 });

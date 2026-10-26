@@ -57,25 +57,25 @@ interface SessionFile {
 
 interface Command {
   op: string;
-  role?: string;
-  name?: string;
-  exact?: boolean;
-  label?: string;
-  value?: string;
-  text?: string;
-  option?: string;
-  withinRole?: string;
-  withinName?: string;
-  withinExact?: boolean;
-  out?: string;
-  user?: string;
-  width?: number;
-  height?: number;
+  role?: string | undefined;
+  name?: string | undefined;
+  exact?: boolean | undefined;
+  label?: string | undefined;
+  value?: string | undefined;
+  text?: string | undefined;
+  option?: string | undefined;
+  withinRole?: string | undefined;
+  withinName?: string | undefined;
+  withinExact?: boolean | undefined;
+  out?: string | undefined;
+  user?: string | undefined;
+  width?: number | undefined;
+  height?: number | undefined;
 }
 
 interface Result {
   ok: boolean;
-  error?: string;
+  error?: string | undefined;
   shuttingDown?: boolean;
   text?: string;
   path?: string;
@@ -374,7 +374,7 @@ function asRole(role: string): Role {
 function scopeOf(page: Page, command: Command): Page | Locator {
   if (!command.withinRole) return page;
   return page.getByRole(asRole(command.withinRole), {
-    name: command.withinName,
+    ...(command.withinName === undefined ? {} : { name: command.withinName }),
     exact: command.withinExact ?? false,
   });
 }
@@ -1051,26 +1051,23 @@ async function serve(root: string, seed: Seed, viewport: { width: number; height
     if (command.op === 'shutdown') return { ok: true, shuttingDown: true };
     if (command.op === 'doctor') return doctorLive(api, page);
     if (command.op === 'click') {
-      await target.getByRole(asRole(requiredRole(command)), { name: command.name, exact: command.exact }).click();
+      await target.getByRole(...roleQuery(command)).click();
       return { ok: true };
     }
     if (command.op === 'click-text') {
-      await target.getByText(requiredText(command), { exact: command.exact }).click();
+      await target.getByText(requiredText(command), { exact: command.exact ?? false }).click();
       return { ok: true };
     }
     if (command.op === 'fill') {
-      await target.getByLabel(requiredLabel(command), { exact: command.exact }).fill(command.value ?? '');
+      await target.getByLabel(requiredLabel(command), { exact: command.exact ?? false }).fill(command.value ?? '');
       return { ok: true };
     }
     if (command.op === 'select') {
-      await target.getByLabel(requiredLabel(command), { exact: command.exact }).selectOption({ label: command.option ?? '' });
+      await target.getByLabel(requiredLabel(command), { exact: command.exact ?? false }).selectOption({ label: command.option ?? '' });
       return { ok: true };
     }
     if (command.op === 'absent') {
-      const locator = target.getByRole(asRole(requiredRole(command)), {
-        name: command.name,
-        exact: command.exact,
-      });
+      const locator = target.getByRole(...roleQuery(command));
       const deadline = Date.now() + ACTION_TIMEOUT_MS;
       let count = await locator.count();
       while (count !== 0 && Date.now() < deadline) {
@@ -1081,15 +1078,15 @@ async function serve(root: string, seed: Seed, viewport: { width: number; height
       return { ok: true, count: 0 };
     }
     if (command.op === 'wait') {
-      await target.getByRole(asRole(requiredRole(command)), { name: command.name, exact: command.exact }).waitFor({ state: 'visible' });
+      await target.getByRole(...roleQuery(command)).waitFor({ state: 'visible' });
       return { ok: true };
     }
     if (command.op === 'wait-text') {
-      await target.getByText(requiredText(command), { exact: command.exact }).first().waitFor({ state: 'visible' });
+      await target.getByText(requiredText(command), { exact: command.exact ?? false }).first().waitFor({ state: 'visible' });
       return { ok: true };
     }
     if (command.op === 'text') {
-      const text = await target.getByRole(asRole(requiredRole(command)), { name: command.name, exact: command.exact }).innerText();
+      const text = await target.getByRole(...roleQuery(command)).innerText();
       return { ok: true, text };
     }
     if (command.op === 'screenshot') {
@@ -1137,9 +1134,10 @@ async function serve(root: string, seed: Seed, viewport: { width: number; height
   }
 }
 
-function requiredRole(command: Command): string {
+/** The role and accessible name of a control. Playwright's exact match defaults to false. */
+function roleQuery(command: Command): [Role, { name: string; exact: boolean }] {
   if (!command.role || command.name === undefined) throw new Error('This action needs --role and --name.');
-  return command.role;
+  return [asRole(command.role), { name: command.name, exact: command.exact ?? false }];
 }
 
 function requiredLabel(command: Command): string {

@@ -17,7 +17,14 @@ Browser suites and hosted provider suites are on-demand commands. They are not r
 
 ### Type rules
 
-`tsconfig.json` turns on `strict`, unused locals and parameters, `noFallthroughCasesInSwitch`, `noImplicitOverride`, and `noImplicitReturns`.
+`tsconfig.json` turns on `strict`, unused locals and parameters, `exactOptionalPropertyTypes`, `noFallthroughCasesInSwitch`, `noImplicitOverride`, and `noImplicitReturns`.
+
+`exactOptionalPropertyTypes` makes `prop?: T` mean that the key is absent or holds a `T`. An explicit `undefined` is then an error. Choose the declaration by meaning:
+
+- Write `prop?: T | undefined` when a missing value and `undefined` mean the same thing, such as an optional component prop that a caller passes through.
+- Write `prop: T | undefined` when every value has the key but it can be empty, such as a computed statistic or a hook result.
+- For a library type, such as `RequestInit` or a Playwright option, leave the key out or pass the library's own empty value, such as `null`.
+- For JSON that a zod schema parses, use `.exactOptional()` when the type must match a contract that declares `prop?: T`.
 `npm run lint` also runs type-aware rules on application code in `src/`.
 These rules reject:
 

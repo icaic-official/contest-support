@@ -58,7 +58,7 @@ function ColumnHead({
   sorting,
 }: {
   column: (typeof columns)[number];
-  sorting?: Sorting;
+  sorting?: Sorting | undefined;
 }) {
   if (!sorting) {
     return (
@@ -134,7 +134,7 @@ export function IssueTable({
   caption: string;
   empty: ReactNode;
   /** Omit it for headers that do not sort. */
-  sorting?: Sorting;
+  sorting?: Sorting | undefined;
 }) {
   const { state, now, workflow } = props;
   const changed = useChangedIssues(state.issues, state.session?.id, now);

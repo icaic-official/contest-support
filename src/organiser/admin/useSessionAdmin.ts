@@ -30,7 +30,7 @@ export interface SessionAdmin {
   error: string;
   notice: string;
   /** The credentials of the last account request, shown once. */
-  credentials?: Credentials;
+  credentials: Credentials | undefined;
   dismissCredentials: () => void;
   /** Each request resolves to true when the server records it. */
   setIntake: (open: boolean) => Promise<boolean>;

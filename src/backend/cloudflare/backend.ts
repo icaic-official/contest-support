@@ -25,8 +25,8 @@ const announcementResultSchema = z.discriminatedUnion('outcome', [
 const reservedSchema = z.object({ id: z.uuid(), path: z.string() });
 const avatarSchema = z.object({ person_id: z.uuid(), avatar_id: z.uuid() });
 const failureSchema = z.object({
-  error: z.string(), validation: z.boolean().optional(),
-  restart: z.boolean().optional(), incomplete: z.boolean().optional(),
+  error: z.string(), validation: z.boolean().exactOptional(),
+  restart: z.boolean().exactOptional(), incomplete: z.boolean().exactOptional(),
 });
 
 /** Each instance uses one same-origin deployment and independent subscriptions. */
@@ -97,7 +97,7 @@ export function createCloudflareBackend(options: {
   const announcements: Announcements = {
     async snapshot(sessionId, signal) {
       return announcementSnapshotSchema.parse(await readJson(await send(
-        `/api/announcements?sessionId=${encodeURIComponent(sessionId)}`, { signal })));
+        `/api/announcements?sessionId=${encodeURIComponent(sessionId)}`, { signal: signal ?? null })));
     },
     async execute(sessionId, requestId, command) {
       const response = await post('/api/announcements', { sessionId, requestId, command });
@@ -161,7 +161,7 @@ export function createCloudflareBackend(options: {
     },
   };
 
-  async function executeWorkflow(sessionId: string, requestId: string, command: Command): Promise<{ issueId: string; snapshot?: Snapshot }> {
+  async function executeWorkflow(sessionId: string, requestId: string, command: Command): Promise<{ issueId: string; snapshot: Snapshot | undefined }> {
     const response = await post('/api/workflow', { sessionId, requestId, command });
     const result = workflowSchema.safeParse(await response.json().catch(() => undefined));
     // Only the endpoint's typed rejection confirms that no command committed.

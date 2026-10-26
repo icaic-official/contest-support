@@ -12,8 +12,8 @@ interface PreparedFixture {
 /** Providers own fixture setup, browser construction, and recovery. */
 interface ProviderDriver {
   browserModule: string;
-  browserOrigin?: string;
-  assetOrigin?: string;
+  browserOrigin?: string | undefined;
+  assetOrigin?: string | undefined;
   create(path: string): Promise<PreparedFixture>;
   cleanup(path: string): Promise<void>;
   diagnostics?(path: string, accountId?: string): BrowserDiagnostics;

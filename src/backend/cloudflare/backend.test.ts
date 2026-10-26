@@ -272,7 +272,7 @@ describe('Cloudflare Backend transport', () => {
     });
 
     it('reserves, transfers with a SHA-256 digest, then finishes an image', async () => {
-      const calls: Array<{ method: string; path: string; headers: Headers; body?: BodyInit | null }> = [];
+      const calls: Array<{ method: string; path: string; headers: Headers; body?: BodyInit | null | undefined }> = [];
       const fetcher = vi.fn<typeof fetch>(async (input, init) => {
         const url = new URL(String(input));
         calls.push({ method: init?.method ?? 'GET', path: url.pathname, headers: new Headers(init?.headers), body: init?.body });

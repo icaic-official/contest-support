@@ -13,7 +13,7 @@ Put optional footers, such as Closes #123, at the end of the description.
 
 Describe the problem.
 Describe the resulting behavior.
-Reference the GitHub issue, if one exists.
+If a GitHub issue describes the change, reference it.
 
 ## Verification
 

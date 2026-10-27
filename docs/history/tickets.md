@@ -1,7 +1,7 @@
 # Development tickets
 
 This is a historical record. On 2026-10-27 the owner retired the development ticket system.
-Do not add tickets here. Each pull request now records the scope, decisions, and verification of its change.
+Do not add tickets here. Each pull request records the scope, decisions, and verification of its change.
 
 These tickets describe development work, not contestant issues.
 

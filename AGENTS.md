@@ -7,7 +7,7 @@
 - Follow the user's latest explicit instructions. If README.md and PLAN.md differ, PLAN.md records the newer agreed scope.
 - Inspect the working tree and existing implementation before you change files.
 - Preserve unrelated user changes.
-- Read the pull request or GitHub issue that describes the work, if one exists.
+- If a pull request or GitHub issue describes the work, read it.
 - Read relevant documents under `docs/` when they exist.
 - Do not assume that planned files or features exist.
 - Treat historical run reports as records of those runs. Check the repository to establish current state.
@@ -150,9 +150,9 @@ A token that can create tokens can grant itself any permission. So these rules a
 - Before each push, check that every new commit you created has the required author and contains each required trailer exactly once.
 - Distinguish development work from contestant issues in code, documentation, and communication.
 - Start each change from updated `main`.
-- Name branches as the [Contributions](#contributions) section states. Reference the GitHub issue, if one exists, in the PR description.
+- Name branches as the [Contributions](#contributions) section states. If a GitHub issue describes the change, reference it in the PR description.
 
-On 2026-10-27 the owner retired the development ticket system. The pull request records the scope, decisions, and verification of each change.
+On 2026-10-27 the owner retired the development ticket system. Each pull request records the scope, decisions, and verification of its change.
 [docs/history/tickets.md](docs/history/tickets.md) keeps tickets T0001 to T0025 as a historical record. Do not add tickets to it.
 Historical branch exceptions remain in the [planning log](docs/history/plan-log.md).
 

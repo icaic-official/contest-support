@@ -44,7 +44,6 @@ Add pages when they provide useful content. Do not publish empty sections or spe
 ### 1. Select the release license and publication policy
 
 **Observed:** the repository is private. It contains no application `LICENSE`, `CONTRIBUTING.md`, or `SECURITY.md`.
-The Public Sans font notice is present, but it is not an application license.
 Public pages link to source and PRs that readers without repository access cannot inspect.
 
 **Complete when:** the owner selects the application and documentation licensing terms and approves repository publication.

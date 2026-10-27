@@ -60,8 +60,8 @@ function Preview({
     },
   }), []);
   return (
-    <section className="panel detail" aria-label={title}>
-      <h2>{title}</h2>
+    <section className="grid gap-3 rounded-xl border bg-card p-4" aria-label={title}>
+      <h2 className="text-lg font-semibold">{title}</h2>
       <IssueImages
         sessionId={sessionId}
         issueId={issueId}
@@ -101,7 +101,7 @@ const second: Attachment = {
 const root = document.getElementById("root");
 if (!root) throw new Error("Preview root is missing.");
 createRoot(root).render(
-  <main className="legacy-ui">
+  <main className="mx-auto grid max-w-4xl gap-6 p-6">
     <Preview title="Staff images" staff attachments={[existing]} />
     <Preview title="Several images" staff attachments={[existing, second]} />
     <Preview title="Contestant images" staff={false} attachments={[{

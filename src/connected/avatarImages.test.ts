@@ -38,12 +38,12 @@ function setup() {
     (url) => revoked.push(url),
   );
   const finish = async (id: string, index = 0) => {
-    downloads.get(id)![index].resolve(new Blob(["x"]));
+    downloads.get(id)![index]!.resolve(new Blob(["x"]));
     await Promise.resolve();
     await Promise.resolve();
   };
   const fail = async (id: string, index = 0) => {
-    downloads.get(id)![index].reject(new Error("offline"));
+    downloads.get(id)![index]!.reject(new Error("offline"));
     await Promise.resolve();
     await Promise.resolve();
   };

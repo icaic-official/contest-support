@@ -33,7 +33,7 @@ const hasher: PasswordHasher = remote ? passwordHasher : {
   },
   async verify(password, hash) {
     const [salt, key] = hash.split(':');
-    return /^[a-f0-9]{32}:[a-f0-9]{128}$/.test(hash) && quickKey(password, salt) === key;
+    return /^[a-f0-9]{32}:[a-f0-9]{128}$/.test(hash) && quickKey(password, salt!) === key;
   },
 };
 
@@ -92,7 +92,7 @@ export function registerAuthenticationCases(group: AuthenticationCases) {
     async function signIn(accountUsername = username, accountPassword = password, instance = service): Promise<Headers> {
       usernames.push(accountUsername.trim().toLowerCase());
       const signed = await instance.signIn(accountUsername, accountPassword);
-      return new Headers({ cookie: signed.cookie.split(';')[0] });
+      return new Headers({ cookie: signed.cookie.split(';')[0]! });
     }
 
     async function credentialEffects(): Promise<string> {
@@ -135,7 +135,7 @@ export function registerAuthenticationCases(group: AuthenticationCases) {
         pending: stmt("UPDATE accounts SET must_change = 1, credential_state = 'pending' WHERE id = ?", fixture.staff.accountId),
         permission: stmt('UPDATE memberships SET is_admin = 0 WHERE account_id = ?', fixture.staff.accountId),
       };
-      return changes[restriction];
+      return changes[restriction]!;
     }
 
     beforeEach(async () => {
@@ -193,9 +193,9 @@ export function registerAuthenticationCases(group: AuthenticationCases) {
         ...uniqueUsernames.map((name) => stmt('SELECT key FROM authentication_limits WHERE key = ?', `username:${name}`)),
       ]);
       for (let index = 0; index < ids.length; index++) {
-        expect(checks[index * 3][0]?.n).toBe(0);
-        expect(checks[index * 3 + 1][0]?.n).toBe(0);
-        expect(checks[index * 3 + 2][0]?.n).toBe(0);
+        expect(checks[index * 3]![0]?.n).toBe(0);
+        expect(checks[index * 3 + 1]![0]?.n).toBe(0);
+        expect(checks[index * 3 + 2]![0]?.n).toBe(0);
       }
       for (const rows of checks.slice(ids.length * 3)) expect(rows[0] ?? null).toBeNull();
       await fixture.cleanup();
@@ -221,7 +221,7 @@ export function registerAuthenticationCases(group: AuthenticationCases) {
             pending: stmt("UPDATE accounts SET must_change = 1, credential_state = 'pending' WHERE id = ?", target),
           };
           let before: string | undefined;
-          const racing = changeAtFinalGuard(changes[restriction], 1, async () => { before = await credentialEffects(); });
+          const racing = changeAtFinalGuard(changes[restriction]!, 1, async () => { before = await credentialEffects(); });
           await expectFailure(signIn(username, password, racing)).toMatchObject({ status: 409 });
           expect(before).toBeDefined();
           expect(await credentialEffects()).toBe(before);
@@ -253,7 +253,7 @@ export function registerAuthenticationCases(group: AuthenticationCases) {
         await expectFailure(interrupted.changePassword(adminHeaders, password, randomSecret())).toThrow('Interrupted self hash');
         expect((await service.current(adminHeaders))?.status.must_change).toBe(true);
         const changed = await service.changePassword(adminHeaders, password, randomSecret());
-        expect((await service.current(new Headers({ cookie: changed.cookie.split(';')[0] })))?.status.must_change).toBe(false);
+        expect((await service.current(new Headers({ cookie: changed.cookie.split(';')[0]! })))?.status.must_change).toBe(false);
       });
 
       it('recovers a committed self change after the database response is lost', async () => {
@@ -501,7 +501,7 @@ export function registerAuthenticationCases(group: AuthenticationCases) {
         const second = await signIn();
         const replacement = randomSecret();
         const result = await service.changePassword(first, password, replacement);
-        const fresh = new Headers({ cookie: result.cookie.split(';')[0] });
+        const fresh = new Headers({ cookie: result.cookie.split(';')[0]! });
         expect((await service.current(fresh))?.status.must_change).toBe(false);
         expect(await service.current(first)).toBeUndefined();
         expect(await service.current(second)).toBeUndefined();
@@ -519,7 +519,7 @@ export function registerAuthenticationCases(group: AuthenticationCases) {
         const headers = await signIn();
         const replacement = randomSecret();
         const changed = await service.changePassword(headers, password, replacement);
-        const fresh = new Headers({ cookie: changed.cookie.split(';')[0] });
+        const fresh = new Headers({ cookie: changed.cookie.split(';')[0]! });
 
         expect((await service.current(fresh))?.status).toMatchObject({ must_change: false, session_valid: true });
         expect(await service.current(headers)).toBeUndefined();
@@ -608,7 +608,7 @@ export function registerAuthenticationCases(group: AuthenticationCases) {
           ...notificationStatements(db, fixture.sessionId, ['staff', `team:${fixture.teamId}`]),
         ]);
         const before = await fixture.durableState();
-        expect(before.history.length).toBe(1);
+        expect(before.history!.length).toBe(1);
         const reset = await service.account(adminHeaders, fixture.sessionId, { action: 'reset_password', userId: fixture.contestant.accountId });
         expect(Boolean(reset.temporaryPassword)).toBe(true);
         expect(await service.current(oldHeaders)).toBeUndefined();
@@ -620,10 +620,10 @@ export function registerAuthenticationCases(group: AuthenticationCases) {
         const after = await fixture.durableState();
         for (const key of ['issues', 'receipts', 'history']) expect(after[key]).toEqual(before[key]);
         for (const key of ['sequences', 'notifications']) {
-          expect(after[key].filter((row) => String(row.audience).startsWith('team:')))
-            .toEqual(before[key].filter((row) => String(row.audience).startsWith('team:')));
+          expect(after[key]!.filter((row) => String(row.audience).startsWith('team:')))
+            .toEqual(before[key]!.filter((row) => String(row.audience).startsWith('team:')));
         }
-        expect(after.notifications.filter((row) => row.audience === 'staff')).toHaveLength(fullApplication ? 2 : 1);
+        expect(after.notifications!.filter((row) => row.audience === 'staff')).toHaveLength(fullApplication ? 2 : 1);
         // The contestant has a login, so the reset still sends the account a revocation hint.
         expect((await stmt('SELECT count(*) AS n FROM notifications WHERE audience = ?', `account:${fixture.contestant.accountId}`)
           .first<{ n: number }>())!.n).toBeGreaterThan(0);
@@ -703,7 +703,7 @@ export function registerAuthenticationCases(group: AuthenticationCases) {
             if (request.method === 'POST') request.headers.set('Origin', origin);
             const response = await handle(request);
             const replacement = response.headers.get('Set-Cookie');
-            if (replacement) cookie = replacement.split(';')[0];
+            if (replacement) cookie = replacement.split(';')[0]!;
             return response;
           },
         });

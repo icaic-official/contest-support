@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { readJsonBody } from './http';
+import { hasJsonBody, readJsonBody } from './http';
 import { roleSchema } from '../connected/model';
 import { AuthenticationError, type AuthenticationService } from './authentication';
 
@@ -65,7 +65,7 @@ export function createAuthenticationHandler(
       }
       if (request.method !== 'POST') return json({ error: 'The request method is not permitted.' }, 405);
       if (origin === null || request.headers.get('X-Minsky-Request') !== '1' ||
-          request.headers.get('Content-Type')?.split(';')[0].trim().toLowerCase() !== 'application/json' ||
+          !hasJsonBody(request) ||
           request.headers.get('Sec-Fetch-Site') === 'cross-site') {
         throw new AuthenticationError(403, 'The request protection checks failed.');
       }

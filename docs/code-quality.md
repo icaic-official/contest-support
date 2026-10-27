@@ -17,7 +17,17 @@ Browser suites and hosted provider suites are on-demand commands. They are not r
 
 ### Type rules
 
-`tsconfig.json` turns on `strict`, unused locals and parameters, `exactOptionalPropertyTypes`, `noFallthroughCasesInSwitch`, `noImplicitOverride`, and `noImplicitReturns`.
+`tsconfig.json` turns on `strict`, unused locals and parameters, `exactOptionalPropertyTypes`, `noFallthroughCasesInSwitch`, `noImplicitOverride`, `noImplicitReturns`, and `noUncheckedIndexedAccess`.
+
+`noUncheckedIndexedAccess` gives `array[index]` and `record[key]` the type `T | undefined`. In application code, handle the missing value where it can occur:
+
+- Destructure the first element (`const [first] = items`) and test it, instead of a length check followed by `items[0]`.
+- Keep values that belong together in one object, instead of two arrays read with the same index.
+- Where an index can only be in range, such as a matrix cell, read it through one local accessor that throws a `RangeError` for a missing value. Do not replace the value with a default.
+
+Tests can use `value!` on fixture data. A missing value then fails the test.
+
+The `no-unnecessary-condition` rule is not enabled. It reports correct checks of a React ref or a cleanup flag after an `await` as unnecessary.
 
 `exactOptionalPropertyTypes` makes `prop?: T` mean that the key is absent or holds a `T`. An explicit `undefined` is then an error. Choose the declaration by meaning:
 

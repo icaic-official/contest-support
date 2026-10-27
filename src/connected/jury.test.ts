@@ -128,10 +128,10 @@ describe("jury worklist eligibility", () => {
       issues: [{ ...issue, resolved_at: current.at }],
       resolutions: [old, current],
     });
-    expect(juryWorklists(state).decision[0].resolution?.summary).toBe(
+    expect(juryWorklists(state).decision[0]!.resolution?.summary).toBe(
       "Cable replaced",
     );
-    const pending = juryWorklists({ ...state, awards: [award] }).application[0];
+    const pending = juryWorklists({ ...state, awards: [award] }).application[0]!;
     expect(pending.resolution?.summary).toBe("Service restored");
     expect(pending.resolution?.reopened_at).toBe(old.reopened_at);
     expect(

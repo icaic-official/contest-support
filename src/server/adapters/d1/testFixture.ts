@@ -166,7 +166,7 @@ export class D1Fixture {
     const rows = await this.rowsBatch(queries.map(([, sql]) =>
       this.statement(sql, this.sessionId, this.secondSessionId)));
     const result: Record<string, Row[]> = {};
-    queries.forEach(([name], index) => { result[name] = rows[index]; });
+    queries.forEach(([name], index) => { result[name] = rows[index]!; });
     return result;
   }
 
@@ -228,10 +228,10 @@ export class D1Fixture {
     const [people, logins, memberships, events, remainingSessions, sequences, notifications,
       identityUsers, identitySessions] = checks.slice(workflowQueries.length);
     if (this.workflow) {
-      if (identityUsers.length || identitySessions.length) throw new Error(`Fixture identities remain for ${this.eventId}.`);
+      if (identityUsers!.length || identitySessions!.length) throw new Error(`Fixture identities remain for ${this.eventId}.`);
     }
-    if (people.length !== 0) throw new Error(`Fixture accounts remain for ${this.eventId}.`);
-    if (logins.length || memberships.length || events.length || remainingSessions.length || sequences.length || notifications.length) {
+    if (people!.length !== 0) throw new Error(`Fixture accounts remain for ${this.eventId}.`);
+    if (logins!.length || memberships!.length || events!.length || remainingSessions!.length || sequences!.length || notifications!.length) {
       throw new Error(`Fixture access records remain for ${this.eventId}.`);
     }
   }

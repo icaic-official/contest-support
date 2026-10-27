@@ -107,7 +107,7 @@ describe('Better Auth work per request with real local D1', () => {
       body: JSON.stringify({ username, password }),
     });
     expect(signed.status).toBe(200);
-    const cookie = signed.headers.getSetCookie().find((value) => value.startsWith('__Host-minsky-session='))!.split(';')[0];
+    const cookie = signed.headers.getSetCookie().find((value) => value.startsWith('__Host-minsky-session='))!.split(';')[0]!;
 
     sql.length = 0;
     const response = await request('/api/sessions', { headers: { Cookie: cookie } });
@@ -123,7 +123,7 @@ describe('Better Auth work per request with real local D1', () => {
     const first = sharedBetterAuthIdentity(binding, options);
     expect(sharedBetterAuthIdentity(binding, { ...options })).toBe(first);
     const signed = await first.signIn(username, password);
-    const cookie = signed.cookie.split(';')[0];
+    const cookie = signed.cookie.split(';')[0]!;
     expect((await first.session(new Headers({ cookie })))?.accountId).toBe(signed.accountId);
     const rotated = sharedBetterAuthIdentity(binding, { ...options, secret: randomUUID() + randomUUID() });
     expect(rotated).not.toBe(first);

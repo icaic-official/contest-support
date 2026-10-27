@@ -69,7 +69,7 @@ async function connection(
 }
 
 async function statistics(context: BrowserContext) {
-  return context.pages()[0].evaluate(async () => {
+  return context.pages()[0]!.evaluate(async () => {
     // Vite adds this query when the browser dispatcher imports the fixture.
     const module = '/tests/providers/support/bridge-provider.ts?import';
     const provider = await import(/* @vite-ignore */ module) as {
@@ -101,7 +101,7 @@ test('provider bridge isolates HttpOnly sessions for different actors', async ({
     expect(await second.client.backend.auth.currentUser()).toEqual({
       id: 'second-account',
     });
-    expect(await first.context.pages()[0].evaluate(() => document.cookie)).toBe(
+    expect(await first.context.pages()[0]!.evaluate(() => document.cookie)).toBe(
       '',
     );
     expect(
@@ -309,8 +309,8 @@ test('provider bridge loads real adapters through Vite at a remote HTTPS browser
   });
   try {
     expect(await client.backend.auth.currentUser()).toBeUndefined();
-    expect(context.pages()[0].url()).toBe(`${origin}/tests/providers/browser.html`);
-    expect(await context.pages()[0].evaluate(() => location.origin)).toBe(origin);
+    expect(context.pages()[0]!.url()).toBe(`${origin}/tests/providers/browser.html`);
+    expect(await context.pages()[0]!.evaluate(() => location.origin)).toBe(origin);
     expect(apiRequests.length).toBeGreaterThan(0);
     expect(apiRequests.every((request) => request.origin === origin && request.path === '/api/auth/session')).toBe(true);
     expect(assetRequests).toContain('/tests/providers/browser-dispatch.ts');
@@ -318,7 +318,7 @@ test('provider bridge loads real adapters through Vite at a remote HTTPS browser
     expect(assetRequests.some((path) => path.startsWith('/node_modules/.vite/'))).toBe(true);
     expect(assetRequests).toContain('/node_modules/vite/dist/client/env.mjs');
     expect(preferenceCookieReceived).toBe(true);
-    expect(await context.pages()[0].evaluate(() => document.cookie)).toBe('');
+    expect(await context.pages()[0]!.evaluate(() => document.cookie)).toBe('');
     expect((await context.cookies()).map((cookie) => ({ name: cookie.name, domain: cookie.domain, httpOnly: cookie.httpOnly })))
       .toEqual([{ name: 'bridge_preference', domain: 'provider-bridge.invalid', httpOnly: true }]);
     let connected = false;
@@ -366,7 +366,7 @@ test('provider bridge interrupts a real socket, retains missed state, and resume
     socket.on('error', () => sockets.delete(socket));
     socket.on('end', () => { sockets.delete(socket); socket.destroy(); });
     socket.on('data', (data: Buffer) => {
-      if ((data[0] & 0x0f) === 8) socket.end(Buffer.from([0x88, 0]), () => socket.destroy());
+      if ((data[0]! & 0x0f) === 8) socket.end(Buffer.from([0x88, 0]), () => socket.destroy());
     });
     send(socket, '{"type":"ready"}');
   });

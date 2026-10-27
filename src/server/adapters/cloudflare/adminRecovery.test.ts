@@ -84,7 +84,7 @@ describe('Cloudflare admin password recovery', () => {
     });
     const authentication = new D1AuthenticationService(db, identity, passwordHasher);
     const first = await authentication.signIn(installed.adminUsername, installed.temporaryPassword);
-    const oldHeaders = new Headers({ cookie: first.cookie.split(';')[0] });
+    const oldHeaders = new Headers({ cookie: first.cookie.split(';')[0]! });
     expect((await authentication.current(oldHeaders))?.user.id).toBe(installed.accountId);
     const before = await stmt('SELECT access_version FROM accounts WHERE id = ?', installed.accountId).first<{ access_version: number }>();
     const lines: string[] = [];
@@ -109,7 +109,7 @@ describe('Cloudflare admin password recovery', () => {
     expect(await stmt('SELECT count(*) AS n FROM logins WHERE account_id = ? AND revoked = 0', installed.accountId).first()).toEqual({ n: 0 });
     await expectFailure(authentication.signIn(installed.adminUsername, installed.temporaryPassword)).toMatchObject({ status: 401 });
     const next = await authentication.signIn(installed.adminUsername, password);
-    const headers = new Headers({ cookie: next.cookie.split(';')[0] });
+    const headers = new Headers({ cookie: next.cookie.split(';')[0]! });
     expect((await authentication.current(headers))?.status.must_change).toBe(true);
     expect(await stmt('SELECT credential_generation, credential_state, must_change FROM accounts WHERE id = ?', installed.accountId).first()).toEqual({
       credential_generation: 2, credential_state: 'ready', must_change: 1,
@@ -160,7 +160,7 @@ describe('Cloudflare admin password recovery', () => {
     const archivedSession = randomUUID();
     await db.batch([
       stmt(`INSERT INTO accounts (id, name, username, must_change) VALUES (?, 'Contestant', 'contestant', 0)`, contestantId),
-      stmt('INSERT INTO memberships (session_id, account_id, team_id, is_admin) VALUES (?, ?, ?, 0)', installed.sessionId, contestantId, installed.teamIds[0]),
+      stmt('INSERT INTO memberships (session_id, account_id, team_id, is_admin) VALUES (?, ?, ?, 0)', installed.sessionId, contestantId, installed.teamIds[0]!),
       stmt('INSERT INTO events (id, archived) VALUES (?, 1)', archivedEvent),
       stmt('INSERT INTO sessions (id, event_id) VALUES (?, ?)', archivedSession, archivedEvent),
       stmt(`INSERT INTO accounts (id, name, username, must_change) VALUES (?, 'Former admin', 'former_admin', 0)`, archivedId),
@@ -206,6 +206,6 @@ describe('Cloudflare admin password recovery', () => {
     const lines: string[] = [];
     writeTemporaryPassword({ username: 'organizer', temporaryPassword: 'fixture-temporary-password' }, (line) => lines.push(line));
     expect(passwordAppearsOnce(lines, 'fixture-temporary-password')).toBe(true);
-    expect(lines[0].includes('fixture-temporary-password')).toBe(false);
+    expect(lines[0]!.includes('fixture-temporary-password')).toBe(false);
   });
 });

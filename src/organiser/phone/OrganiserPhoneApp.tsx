@@ -138,7 +138,8 @@ export function OrganiserPhoneApp({
   }
 
   const tabs = organiserTabs(member);
-  const currentTab = tabs.includes(tab) ? tab : tabs[0];
+  // Every person has the Me tab, so the list is never empty.
+  const currentTab = tabs.includes(tab) ? tab : tabs[0] ?? "me";
   const archived = Boolean(state.event?.archived);
   const canReport = isStaff(member);
 

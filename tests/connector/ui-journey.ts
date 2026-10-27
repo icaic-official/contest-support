@@ -123,7 +123,7 @@ async function upload(dialog: Locator, visibility: 'public' | 'internal') {
     if (!context) throw new Error('The fictional image could not be prepared.');
     context.fillStyle = visibility === 'public' ? '#008844' : '#ee8800';
     context.fillRect(0, 0, 8, 8);
-    return canvas.toDataURL('image/png').split(',')[1];
+    return canvas.toDataURL('image/png').split(',')[1]!;
   }, visibility);
   await choose(dialog.getByRole('radio', { name: visibility === 'public' ? /^Visible to the team/ : /^Staff only/ }));
   await dialog.getByLabel('Image file').setInputFiles({
@@ -408,7 +408,7 @@ export async function runUiJourney(browser: Browser, fixture: UiFixture, options
     const sheet = specialist.page.getByRole('dialog', { name: `${issueReference}: ${description}` });
     await expect(sheet).toBeVisible();
     await expect(owner(sheet)).toHaveText(/^You \(.+\)$/);
-    const specialistName = /^You \((.+)\)$/.exec((await owner(sheet).textContent()) ?? '')![1];
+    const specialistName = /^You \((.+)\)$/.exec((await owner(sheet).textContent()) ?? '')![1]!;
     await expect(owner(volunteerView)).toHaveText(specialistName);
     const firstAssigned = (await firstAssignment(sheet).textContent())!;
     phase = 'private and public conversation';

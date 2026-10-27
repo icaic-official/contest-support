@@ -158,13 +158,13 @@ it('runs the complete application through isolated HTTPS, D1, R2, and Durable Ob
   }
 
   async function socketState(actor: Actor, key: string): Promise<SocketState> {
-    return actor.page.evaluate((key) => (window as RuntimeWindow).fixtureSockets![key].state, key);
+    return actor.page.evaluate((key) => (window as RuntimeWindow).fixtureSockets![key]!.state, key);
   }
 
   async function flush() {
     // Wrangler exposes this route only in the local test server. It invokes the
     // real production scheduled handler; no product fixture route is installed.
-    const context = accountContexts[0];
+    const context = accountContexts[0]!;
     const response = await network(context, '/__scheduled');
     if (!response.ok()) throw new Error(`Local scheduled recovery returned ${response.status()}.`);
   }
@@ -246,8 +246,8 @@ it('runs the complete application through isolated HTTPS, D1, R2, and Durable Ob
     await admin(organizer, { action: 'set_intake', open: true });
     await admin(organizer, { action: 'set_image_limits', limits: { fileMegabytes: 1, count: 3, totalMegabytes: 3 } });
     const specialist = await createAccount(organizer, 'specialist', { teamId: null, roles: ['specialist'], isAdmin: false });
-    const contestant = await createAccount(organizer, 'team', { teamId: installation.teamIds[0], roles: [], isAdmin: false });
-    const other = await createAccount(organizer, 'other', { teamId: installation.teamIds[1], roles: [], isAdmin: false });
+    const contestant = await createAccount(organizer, 'team', { teamId: installation.teamIds[0]!, roles: [], isAdmin: false });
+    const other = await createAccount(organizer, 'other', { teamId: installation.teamIds[1]!, roles: [], isAdmin: false });
     const assignedUsername = `rt_${unique}_assigned`;
     usernames.push(assignedUsername);
     await json(organizer, '/api/accounts', { sessionId: installation.sessionId,
@@ -275,7 +275,7 @@ it('runs the complete application through isolated HTTPS, D1, R2, and Durable Ob
     await workflow(organizer, { type: 'claim', issue_id: issueId, revision: 1 });
     await expect.poll(async () => (await socketState(contestant, 'team')).messages.length).toBeGreaterThan(1);
     await workflow(organizer, { type: 'escalate', issue_id: issueId, revision: 2 });
-    expect((await snapshot(contestant)).issues[0].owner).toBe(organizer.id);
+    expect((await snapshot(contestant)).issues[0]!.owner).toBe(organizer.id);
     await workflow(specialist, { type: 'accept', issue_id: issueId, revision: 3 });
     await workflow(specialist, { type: 'resolve', issue_id: issueId, revision: 4, summary: 'Fictional repair' });
     const awardCommand: Command = { type: 'award', issue_id: issueId, revision: 5, minutes: 3, explanation: 'Fictional delay' };
@@ -285,14 +285,14 @@ it('runs the complete application through isolated HTTPS, D1, R2, and Durable Ob
     await workflow(organizer, { type: 'apply', issue_id: issueId, revision: 6 });
     const resolved = await snapshot(contestant);
     expect(resolved.issues[0]).toMatchObject({ status: 'resolved', owner: specialist.id });
-    expect(resolved.issues[0].created_at).toMatch(/^\d{4}-/);
-    expect(resolved.issues[0].first_assigned_at).toMatch(/^\d{4}-/);
-    expect(resolved.issues[0].resolved_at).toBe(resolved.resolutions[0].at);
+    expect(resolved.issues[0]!.created_at).toMatch(/^\d{4}-/);
+    expect(resolved.issues[0]!.first_assigned_at).toMatch(/^\d{4}-/);
+    expect(resolved.issues[0]!.resolved_at).toBe(resolved.resolutions[0]!.at);
     expect(resolved.awards[0]).toMatchObject({ minutes: 3, applied_name: 'Fictional organizer' });
     await workflow(contestant, { type: 'reopen', issue_id: issueId, revision: 7, reason: 'Fictional recurrence' });
     const reopened = await snapshot(contestant);
     expect(reopened.issues[0]).toMatchObject({ owner: specialist.id, status: 'claimed', resolved_at: null,
-      first_assigned_at: resolved.issues[0].first_assigned_at });
+      first_assigned_at: resolved.issues[0]!.first_assigned_at });
     expect(reopened.awards).toEqual(resolved.awards);
     expect(reopened.resolutions[0]).toMatchObject({ reopened_by: contestant.id, reason: 'Fictional recurrence' });
     await workflow(contestant, { type: 'message', issue_id: issueId, revision: 8, text: 'Public fictional reply', visibility: 'public' });
@@ -339,7 +339,7 @@ it('runs the complete application through isolated HTTPS, D1, R2, and Durable Ob
     await json(contestant, '/api/workflow', { sessionId: installation.sessionId, requestId: randomUUID(),
       command: { type: 'submit', category: 'Devices', description: 'Closed fictional intake' } }, 409);
     await admin(organizer, { action: 'set_intake', open: true });
-    await organizer.page.evaluate(() => (window as RuntimeWindow).fixtureSockets!.staff.socket.close());
+    await organizer.page.evaluate(() => (window as RuntimeWindow).fixtureSockets!.staff!.socket.close());
     await connect(organizer, 'reconnected');
     expect((await snapshot(organizer)).issues).toHaveLength(2);
     await admin(organizer, { action: 'remove_member', userId: other.id });

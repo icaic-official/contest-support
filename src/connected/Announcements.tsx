@@ -186,8 +186,9 @@ export function Announcements({ data }: { data: SessionData }) {
   // for them, because issue work continues without announcements.
   if (!manager && items.length === 0) return null;
   // A new announcement is not in `seen`, so it shows the strip again. An edit keeps its ID.
+  const [latest] = items;
   const hidden =
-    seen !== undefined && items.length > 0 && items.every((item) => seen.has(item.id));
+    seen !== undefined && latest !== undefined && items.every((item) => seen.has(item.id));
   // An open edit or removal prompt stays in view when a live change pushes it down.
   const pinned =
     items.findIndex((item) => item.id === edit?.id || item.id === removing) >=
@@ -245,7 +246,7 @@ export function Announcements({ data }: { data: SessionData }) {
           <h2 id={headingId} className="min-w-0 flex-1 truncate text-sm font-medium">
             Announcements
             {hidden && (
-              <span className="font-normal text-muted-foreground"> · {items[0].title}</span>
+              <span className="font-normal text-muted-foreground"> · {latest.title}</span>
             )}
           </h2>
           {canWrite && !hidden && (

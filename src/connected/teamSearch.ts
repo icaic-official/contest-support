@@ -92,15 +92,20 @@ function damerauLevenshtein(left: string, right: string): number {
     () => 0,
   );
   const index = (row: number, column: number) => row * columns + column;
+  const at = (row: number, column: number): number => {
+    const distance = distances[index(row, column)];
+    if (distance === undefined) throw new RangeError("Edit distance cell is out of range.");
+    return distance;
+  };
   for (let row = 0; row < rows; row++) distances[index(row, 0)] = row;
   for (let column = 0; column < columns; column++) distances[index(0, column)] = column;
   for (let row = 1; row < rows; row++) {
     for (let column = 1; column < columns; column++) {
       const substitution = left[row - 1] === right[column - 1] ? 0 : 1;
       let distance = Math.min(
-        distances[index(row - 1, column)] + 1,
-        distances[index(row, column - 1)] + 1,
-        distances[index(row - 1, column - 1)] + substitution,
+        at(row - 1, column) + 1,
+        at(row, column - 1) + 1,
+        at(row - 1, column - 1) + substitution,
       );
       if (
         row > 1 &&
@@ -108,12 +113,12 @@ function damerauLevenshtein(left: string, right: string): number {
         left[row - 1] === right[column - 2] &&
         left[row - 2] === right[column - 1]
       ) {
-        distance = Math.min(distance, distances[index(row - 2, column - 2)] + 1);
+        distance = Math.min(distance, at(row - 2, column - 2) + 1);
       }
       distances[index(row, column)] = distance;
     }
   }
-  return distances[index(left.length, right.length)];
+  return at(left.length, right.length);
 }
 
 function spellingMatch(query: string, field: string): boolean {

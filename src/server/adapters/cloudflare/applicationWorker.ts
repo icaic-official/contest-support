@@ -98,16 +98,13 @@ export default {
       'deliver-notifications': deliver(env),
       'expire-sessions': authenticationWorker.scheduled(event, env),
     };
-    const names = Object.keys(tasks);
-    const results = await Promise.allSettled(Object.values(tasks));
-    let failed = 0;
-    results.forEach((result, index) => {
-      if (result.status !== 'rejected') return;
-      failed++;
-      logEvent('error', 'scheduled.task_failed', { task: names[index], error: result.reason });
-    });
-    if (failed) {
-      logEvent('error', 'scheduled.failed', { failed });
+    // Every task settles before any failure is logged, in task order.
+    const outcomes = await Promise.all(Object.entries(tasks).map(([task, run]) =>
+      run.then(() => undefined, (error: unknown) => ({ task, error }))));
+    const failures = outcomes.filter((outcome) => outcome !== undefined);
+    for (const { task, error } of failures) logEvent('error', 'scheduled.task_failed', { task, error });
+    if (failures.length) {
+      logEvent('error', 'scheduled.failed', { failed: failures.length });
       throw new Error('Application maintenance requires another attempt.');
     }
   },

@@ -74,7 +74,7 @@ describe('Cloudflare Backend transport', () => {
       const backend = createCloudflareBackend({ origin, fetch: fetcher });
       await expect(mutate(backend)).rejects.toThrow(message);
       expect(fetcher).toHaveBeenCalledTimes(1);
-      const [input, init] = fetcher.mock.calls[0];
+      const [input, init] = fetcher.mock.calls[0]!;
       const preflight = new Request(input, init);
       expect(new URL(preflight.url).pathname).toBe('/api/auth/session');
       expect(preflight.method).toBe('GET');
@@ -86,7 +86,7 @@ describe('Cloudflare Backend transport', () => {
     const fetcher = transport(() => Response.json({ outcome: 'committed', issueId }));
     const backend = createCloudflareBackend({ origin, fetch: fetcher });
     expect(await backend.workflows.execute(sessionId, requestId, command)).toBe(issueId);
-    const [, init] = fetcher.mock.calls[1];
+    const [, init] = fetcher.mock.calls[1]!;
     expect(JSON.parse(String(init?.body))).toEqual({ sessionId, requestId, command });
     expect(new Headers(init?.headers).get('X-CSRF-Token')).toBe('fresh-token');
     expect(init).toMatchObject({ credentials: 'same-origin', cache: 'no-store', redirect: 'error' });
@@ -209,30 +209,30 @@ describe('Cloudflare Backend transport', () => {
     const input = { sessionId, userId: issueId, onChange: change, onConnection: connection };
     const stopFirst = backend.updates.subscribe(input);
     const stopSecond = backend.updates.subscribe(input);
-    sockets[0].message('change');
+    sockets[0]!.message('change');
     expect(change).not.toHaveBeenCalled();
-    sockets[0].message('ready');
+    sockets[0]!.message('ready');
     expect(connection).toHaveBeenLastCalledWith(true);
     stopFirst();
     stopFirst();
-    sockets[0].message('change');
-    sockets[0].disconnect();
+    sockets[0]!.message('change');
+    sockets[0]!.disconnect();
     expect(change).not.toHaveBeenCalled();
-    sockets[1].message('ready');
-    sockets[1].message('change');
+    sockets[1]!.message('ready');
+    sockets[1]!.message('change');
     expect(change).toHaveBeenCalledTimes(1);
-    sockets[1].disconnect();
+    sockets[1]!.disconnect();
     expect(connection).toHaveBeenLastCalledWith(false);
     vi.advanceTimersByTime(500);
     expect(sockets).toHaveLength(3);
-    sockets[2].message('ready');
+    sockets[2]!.message('ready');
     expect(connection).toHaveBeenLastCalledWith(true);
     stopSecond();
-    sockets[2].message('change');
+    sockets[2]!.message('change');
     vi.advanceTimersByTime(60_000);
     expect(change).toHaveBeenCalledTimes(1);
     expect(factory).toHaveBeenCalledTimes(3);
-    expect(factory.mock.calls[0][0]).toBe(`wss://connector.example/api/updates?sessionId=${sessionId}`);
+    expect(factory.mock.calls[0]![0]).toBe(`wss://connector.example/api/updates?sessionId=${sessionId}`);
   });
 
   describe('announcements', () => {

@@ -56,7 +56,7 @@ for (const committed of [false, true]) {
     await expect(retry).toHaveCount(0);
     expect(requests).toHaveLength(2);
     expect(requests[1]).toEqual(requests[0]);
-    expect(requests[0].sessionId).toBe(originalSession);
+    expect(requests[0]!.sessionId).toBe(originalSession);
     // A retry still reaches the original server access check. It cannot create
     // the report under the contestant's membership in the other session.
     const recorded = await local.rows<{ session_id: string }>(
@@ -184,7 +184,7 @@ test('the account gate preserves a retry after all session access is removed', a
   await retry.click();
   await expect(retry).toHaveCount(0);
   expect(requests).toEqual([requests[0], requests[0]]);
-  expect(requests[0].sessionId).toBe(local.sessions[0]);
+  expect(requests[0]!.sessionId).toBe(local.sessions[0]);
   const recorded = await local.rows('SELECT id FROM issues WHERE reporter = ?', local.users.contestant);
   expect(recorded).toHaveLength(0);
 });

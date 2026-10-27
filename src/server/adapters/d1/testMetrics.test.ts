@@ -68,7 +68,7 @@ it('keeps native D1 capabilities used by the maintained identity adapter', async
     });
     const service = new D1AuthenticationService(db, identity, passwordHasher);
     const signed = await service.signIn(username, password);
-    const current = await service.current(new Headers({ cookie: signed.cookie.split(';')[0] }));
+    const current = await service.current(new Headers({ cookie: signed.cookie.split(';')[0]! }));
     expect(current?.user.id).toBe(id);
     expect(lines.join('\n')).not.toContain(password);
     expect(lines.join('\n')).not.toContain(signed.cookie);

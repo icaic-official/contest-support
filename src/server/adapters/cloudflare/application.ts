@@ -392,8 +392,8 @@ export class D1ApplicationService {
           WHERE session_id = ? AND category <> '' GROUP BY category ORDER BY category`, sessionId)
           .all<{ category: string; issues: number }>()).results;
         const stuck = used.filter((row) => !kept.has(row.category));
-        if (stuck.length) {
-          const [first] = stuck;
+        const [first] = stuck;
+        if (first) {
           throw new AuthenticationError(409, `${first.category} has ${first.issues} ${first.issues === 1 ? 'issue' : 'issues'} and stays in the list.${
             stuck.length > 1 ? ` ${stuck.length - 1} more ${stuck.length === 2 ? 'category stays' : 'categories stay'} too.` : ''}`);
         }

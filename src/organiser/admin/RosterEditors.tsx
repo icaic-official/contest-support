@@ -447,7 +447,9 @@ function CategoryForm({
   }
 
   function move(index: number, to: number) {
-    const key = items[index].key;
+    const item = items[index];
+    if (!item) return;
+    const { key } = item;
     setItems(moveItem(items, index, to));
     // A button at the edge of the list is disabled, so focus its partner.
     const up = to < index;

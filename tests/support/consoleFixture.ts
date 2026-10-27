@@ -9,7 +9,7 @@ const TEAM_IDS = [
   '00000000-0000-4000-8000-000000000005',
   '00000000-0000-4000-8000-000000000006',
   '00000000-0000-4000-8000-000000000007',
-];
+] as const;
 const issueId = (number: number) => `00000000-0000-4000-8000-0000000001${String(number).padStart(2, '0')}`;
 const resolutionId = (number: number) => `00000000-0000-4000-8000-0000000002${String(number).padStart(2, '0')}`;
 

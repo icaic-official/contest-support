@@ -339,7 +339,7 @@ function evidenceFile(root: string, out: string): string {
 function flags(argv: string[]): Record<string, string | true> {
   const values: Record<string, string | true> = {};
   for (let index = 0; index < argv.length; index += 1) {
-    const arg = argv[index];
+    const arg = argv[index]!;
     if (!arg.startsWith('--')) throw new Error(`Unexpected argument ${arg}`);
     const key = arg.slice(2);
     const next = argv[index + 1];
@@ -503,7 +503,7 @@ async function waitForPid(port: number): Promise<number> {
   const deadline = Date.now() + 15_000;
   while (Date.now() < deadline) {
     const pids = listenPids(port);
-    if (pids.length === 1) return pids[0];
+    if (pids.length === 1) return pids[0]!;
     await delay(100);
   }
   throw new Error(`Could not find one listener on port ${port}.`);

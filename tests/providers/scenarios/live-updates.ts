@@ -101,7 +101,7 @@ export async function liveUpdates(context: ScenarioContext): Promise<void> {
     await submit(writer, sessionId, context.teamId);
     await eventually(
       () => remaining.every(({ state }, index) =>
-        state.changes > changesBefore[index]
+        state.changes > changesBefore[index]!
       ),
       'Stopping one subscriber must preserve its siblings and the separate observer.',
     );

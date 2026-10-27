@@ -126,7 +126,7 @@ export abstract class FixtureWorker {
       }
       const loss = write ? this.losses.findIndex((item) =>
         url.pathname === item.path || url.pathname.startsWith(`${item.path}/`)) : -1;
-      const stage = loss < 0 ? undefined : this.losses.splice(loss, 1)[0].stage;
+      const stage = loss < 0 ? undefined : this.losses.splice(loss, 1)[0]!.stage;
       if (stage === 'request') {
         await route.abort('failed');
         return;

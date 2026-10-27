@@ -1,5 +1,11 @@
 import { AuthenticationError } from './authentication';
 
+/** Whether the media type of the request, without its parameters, is JSON. */
+export function hasJsonBody(request: Request): boolean {
+  const mediaType = request.headers.get('Content-Type')?.split(';')[0];
+  return mediaType?.trim().toLowerCase() === 'application/json';
+}
+
 /** Read at most `limit` bytes without trusting Content-Length. Do not retain request credentials. */
 export async function readBody(request: Request, limit: number): Promise<Uint8Array> {
   const reader = request.body?.getReader();

@@ -102,7 +102,7 @@ describe('trusted Cloudflare installation and owner recovery', () => {
   it('installs quoted values through current migrations and enforces the temporary-password gate', async () => {
     const result = await bootstrap(db, passwordHasher);
     expect(await stmt('SELECT name FROM events WHERE id = ?', result.eventId).first()).toEqual({ name: competition.eventName });
-    expect(await stmt('SELECT name, location FROM teams WHERE id = ?', result.teamIds[0]).first()).toEqual(competition.teams[0]);
+    expect(await stmt('SELECT name, location FROM teams WHERE id = ?', result.teamIds[0]!).first()).toEqual(competition.teams[0]);
     expect(await stmt('SELECT name, categories, intake_open FROM sessions WHERE id = ?', result.sessionId).first()).toEqual({
       name: competition.sessionName, categories: JSON.stringify(competition.categories), intake_open: 0,
     });
@@ -115,18 +115,18 @@ describe('trusted Cloudflare installation and owner recovery', () => {
     });
     const authentication = new D1AuthenticationService(db, identity, passwordHasher);
     const signed = await authentication.signIn(result.adminUsername, result.temporaryPassword);
-    const headers = new Headers({ cookie: signed.cookie.split(';')[0] });
+    const headers = new Headers({ cookie: signed.cookie.split(';')[0]! });
     const current = await authentication.current(headers);
     expect(current?.user.id).toBe(result.accountId);
     expect(current?.status.must_change).toBe(true);
     const changed = await authentication.changePassword(headers, result.temporaryPassword, randomSecret());
     expect(await authentication.current(headers)).toBeUndefined();
-    const changedHeaders = new Headers({ cookie: changed.cookie.split(';')[0] });
+    const changedHeaders = new Headers({ cookie: changed.cookie.split(';')[0]! });
     expect((await authentication.current(changedHeaders))?.status.must_change).toBe(false);
     const recovered = await recoverInstallationOwner(db, result);
     expect(await authentication.current(changedHeaders)).toBeUndefined();
     const recoveryLogin = await authentication.signIn(recovered.adminUsername, recovered.temporaryPassword);
-    const recoveryHeaders = new Headers({ cookie: recoveryLogin.cookie.split(';')[0] });
+    const recoveryHeaders = new Headers({ cookie: recoveryLogin.cookie.split(';')[0]! });
     expect((await authentication.current(recoveryHeaders))?.status.must_change).toBe(true);
     await expectFailure(bootstrap()).toThrow('The database is not empty.');
   }, 120_000);
@@ -201,7 +201,7 @@ describe('trusted Cloudflare installation and owner recovery', () => {
     const result = await bootstrap();
     const issueId = randomUUID();
     await db.batch([
-      stmt("INSERT INTO issues (id, session_id, team_id, status) VALUES (?, ?, ?, 'open')", issueId, result.sessionId, result.teamIds[0]),
+      stmt("INSERT INTO issues (id, session_id, team_id, status) VALUES (?, ?, ?, 'open')", issueId, result.sessionId, result.teamIds[0]!),
       stmt("INSERT INTO history (id, issue_id, actor, at, text, visibility) VALUES (?, ?, ?, '2026-01-01T00:00:00.000Z', 'History survives recovery', 'public')", randomUUID(), issueId, result.accountId),
     ]);
     await seedOldLogin(result.accountId);

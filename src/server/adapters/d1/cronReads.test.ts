@@ -191,7 +191,7 @@ describe('the minute cron on an installation with 1,000 images and 500 signed-in
   // failed sign-in key of the last day, so the scan stays small and an index would add two writes
   // to every failed attempt. Add the index if that table grows.
   it('searches every cleanup statement through an index', async () => {
-    const statements = new Map(ticks[0].map((entry) => [`${entry.sql}\n${JSON.stringify(entry.values)}`, entry]));
+    const statements = new Map(ticks[0]!.map((entry) => [`${entry.sql}\n${JSON.stringify(entry.values)}`, entry]));
     expect(statements.size).toBeGreaterThan(10);
     const scans: string[] = [];
     for (const { sql, values } of statements.values()) {

@@ -210,8 +210,9 @@ export function placeOf(location: string): Place {
     .match(
       /^(.*?)[\s,·|/-]*(?:\b(?:table|desk|seat|station|booth|pc)\s*)?#?(\d+[a-z]?)$/iu,
     );
-  if (!match) return { area: location.trim(), seat: "" };
-  return { area: match[1].replace(/[\s,·|/-]+$/u, "").trim(), seat: match[2] };
+  const [, area, seat] = match ?? [];
+  if (area === undefined || seat === undefined) return { area: location.trim(), seat: "" };
+  return { area: area.replace(/[\s,·|/-]+$/u, "").trim(), seat };
 }
 
 /**

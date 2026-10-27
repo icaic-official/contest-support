@@ -102,28 +102,28 @@ describe('sign-in failure limits at the Worker boundary with real local D1', () 
 
     // The 200th failure fills the ceiling. The next attempt, even with the correct password, is refused.
     expect(await signIn(ip, `ghost_${run}_0`, 'Fictional wrong password')).toBe(401);
-    expect(await signIn(ip, names[0])).toBe(429);
+    expect(await signIn(ip, names[0]!)).toBe(429);
     expect(await signIn(ip, `ghost_${run}_1`, 'Fictional wrong password')).toBe(429);
     // A refused attempt does not add to the count or extend the window.
     expect(await counter(key)).toEqual([{ key, attempts: signInFailureLimits.perIp }]);
-    expect(await signIn('198.51.100.3', names[0])).toBe(200);
+    expect(await signIn('198.51.100.3', names[0]!)).toBe(200);
     await db.prepare('UPDATE authentication_limits SET window_start = unixepoch() - 901 WHERE key = ?').bind(key).run();
-    expect(await signIn(ip, names[0])).toBe(200);
+    expect(await signIn(ip, names[0]!)).toBe(200);
   }, timeout);
 
   it('locks only the username with 10 failures and leaves other users on the same IP alone', async () => {
     const [target, other] = await createAccounts('lock', 2);
     const ip = '198.51.100.4';
     for (let index = 0; index < signInFailureLimits.perUsername; index++) {
-      expect(await signIn(ip, target, 'Fictional wrong password')).toBe(401);
+      expect(await signIn(ip, target!, 'Fictional wrong password')).toBe(401);
     }
-    expect(await signIn(ip, target)).toBe(429);
-    expect(await signIn('198.51.100.5', target)).toBe(429);
-    expect(await signIn(ip, other)).toBe(200);
+    expect(await signIn(ip, target!)).toBe(429);
+    expect(await signIn('198.51.100.5', target!)).toBe(429);
+    expect(await signIn(ip, other!)).toBe(200);
     // The IP count is far below its ceiling, so only the username refuses.
     const key = await ipKey(ip);
     expect(await counter(key)).toEqual([{ key, attempts: signInFailureLimits.perUsername }]);
     await db.prepare('UPDATE authentication_limits SET window_start = unixepoch() - 901 WHERE key = ?').bind(`username:${target}`).run();
-    expect(await signIn(ip, target)).toBe(200);
+    expect(await signIn(ip, target!)).toBe(200);
   }, timeout);
 });

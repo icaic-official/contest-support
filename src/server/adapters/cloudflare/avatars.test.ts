@@ -203,7 +203,7 @@ describe('Cloudflare avatars with local D1 and R2 bindings', () => {
       return db.batch(statements);
     } }, bucket);
     await expect(upload(staff, png, requestId, lossy)).rejects.toBeDefined();
-    const [pending] = await fixture.rows('SELECT id, state FROM account_avatars WHERE account_id = ?', staff.accountId);
+    const pending = (await fixture.rows('SELECT id, state FROM account_avatars WHERE account_id = ?', staff.accountId))[0]!;
     expect(pending.state).toBe('pending');
     expect(await bucket.get(avatarKey(staff.accountId, pending.id as string))).not.toBeNull();
     expect(await avatars.list(staff, fixture.sessionId)).toEqual([]);
@@ -219,7 +219,7 @@ describe('Cloudflare avatars with local D1 and R2 bindings', () => {
     } }, bucket);
     await expect(upload(staff, png, randomUUID(), lossy)).rejects.toBeDefined();
     lose = false;
-    const [{ id: abandoned }] = await fixture.rows('SELECT id FROM account_avatars WHERE account_id = ?', staff.accountId) as Array<{ id: string }>;
+    const { id: abandoned } = (await fixture.rows('SELECT id FROM account_avatars WHERE account_id = ?', staff.accountId) as Array<{ id: string }>)[0]!;
     const abandonedKey = avatarKey(staff.accountId, abandoned);
     await db.prepare('UPDATE account_avatars SET expires_at = unixepoch() - 1 WHERE id = ?').bind(abandoned).run();
 

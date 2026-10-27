@@ -175,7 +175,7 @@ export function accountKind(
     labels: [
       ...staffRoles
         .filter((role) => member.roles.includes(role))
-        .map((role) => role[0].toUpperCase() + role.slice(1)),
+        .map((role) => role.charAt(0).toUpperCase() + role.slice(1)),
       ...(member.is_admin ? ["Admin"] : []),
     ],
   };

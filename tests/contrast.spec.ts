@@ -62,12 +62,12 @@ async function contrastOf(locator: Locator): Promise<number> {
       const unit = value / 255;
       return unit <= 0.03928 ? unit / 12.92 : ((unit + 0.055) / 1.055) ** 2.4;
     };
-    return 0.2126 * linear(r) + 0.7152 * linear(g) + 0.0722 * linear(b);
+    return 0.2126 * linear(r!) + 0.7152 * linear(g!) + 0.0722 * linear(b!);
   };
   const [lighter, darker] = [luminance(text), luminance(background)].sort(
     (a, b) => b - a,
   );
-  return (lighter + 0.05) / (darker + 0.05);
+  return (lighter! + 0.05) / (darker! + 0.05);
 }
 
 /** An open issue that was reported `minutes` before the fixture server time. */

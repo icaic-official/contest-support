@@ -92,8 +92,8 @@ describe("D1 workflow persistence", () => {
     const state = await fixture.durableState();
     expect(state.receipts).toHaveLength(1);
     expect(state.history).toHaveLength(1);
-    expect(state.sequences.find((row) => row.audience === `team:${fixture.teamId}`)?.sequence).toBe(1);
-    expect(state.notifications.map((row) => row.audience).sort()).toEqual(["staff", `team:${fixture.teamId}`].sort());
+    expect(state.sequences!.find((row) => row.audience === `team:${fixture.teamId}`)?.sequence).toBe(1);
+    expect(state.notifications!.map((row) => row.audience).sort()).toEqual(["staff", `team:${fixture.teamId}`].sort());
     await expectNoAssertions();
   });
 
@@ -105,7 +105,7 @@ describe("D1 workflow persistence", () => {
     expect(state.receipts).toHaveLength(1);
     expect(state.history).toHaveLength(1);
     expect(state.notifications).toHaveLength(2);
-    expect(state.sequences.every((row) => row.sequence === 1)).toBe(true);
+    expect(state.sequences!.every((row) => row.sequence === 1)).toBe(true);
   });
 
   it("replays concurrent identical request IDs without duplicate writes", async () => {
@@ -166,7 +166,7 @@ describe("D1 workflow persistence", () => {
     expect(await execute(original, fixture.staff, requestId))
       .toEqual({ outcome: "committed", issueId: fixture.issueId });
     const before = await fixture.durableState();
-    expect(before.history[0].text).toBe("Fictional text");
+    expect(before.history![0]!.text).toBe("Fictional text");
     expect(await execute(message("public", "Fictional text"), fixture.staff, requestId))
       .toEqual({ outcome: "rejected", reason: "request_id" });
     expect(await execute(original, fixture.staff, requestId))
@@ -311,10 +311,10 @@ describe("D1 workflow persistence", () => {
     const staff = await application.snapshot(fixture.staff, fixture.sessionId);
     expect(staff.history).toHaveLength(1);
     const state = await fixture.durableState();
-    expect(state.notifications.map((row) => row.audience)).toEqual(["staff"]);
-    expect(state.sequences.map((row) => row.audience)).toEqual(["staff"]);
-    expect(state.sequences[0].sequence).toBe(1);
-    expect(state.issues.find((row) => row.id === fixture.issueId)).toMatchObject({ public_revision: 1, write_version: 2 });
+    expect(state.notifications!.map((row) => row.audience)).toEqual(["staff"]);
+    expect(state.sequences!.map((row) => row.audience)).toEqual(["staff"]);
+    expect(state.sequences![0]!.sequence).toBe(1);
+    expect(state.issues!.find((row) => row.id === fixture.issueId)).toMatchObject({ public_revision: 1, write_version: 2 });
   });
 
   it("rereads after a private change and commits the public command without exposing a private conflict", async () => {
@@ -333,7 +333,7 @@ describe("D1 workflow persistence", () => {
     expect(state.history).toHaveLength(2);
     expect(state.receipts).toHaveLength(2);
     expect(state.notifications).toHaveLength(3);
-    expect(state.sequences.find((row) => row.audience === `team:${fixture.teamId}`)?.sequence).toBe(1);
+    expect(state.sequences!.find((row) => row.audience === `team:${fixture.teamId}`)?.sequence).toBe(1);
   });
 
   it("bounds retries without changing the public view during repeated private conflicts", async () => {
@@ -350,7 +350,7 @@ describe("D1 workflow persistence", () => {
     expect({ ...after, server_time: before.server_time }).toEqual(before);
     const state = await fixture.durableState();
     expect(state.history).toHaveLength(3);
-    expect(state.notifications.every((row) => row.audience === "staff")).toBe(true);
+    expect(state.notifications!.every((row) => row.audience === "staff")).toBe(true);
     await expectNoAssertions();
   });
 
@@ -530,14 +530,14 @@ describe("D1 workflow persistence", () => {
       expect(submitted.outcome).toBe('committed');
       if (submitted.outcome !== 'committed') throw new Error('Submission failed.');
       const issueId = submitted.issueId;
-      const initial = (await fixture.rows('SELECT * FROM issues WHERE id = ?', issueId))[0];
+      const initial = (await fixture.rows('SELECT * FROM issues WHERE id = ?', issueId))[0]!;
       expect(initial).toMatchObject({ reporter: fixture.contestant.accountId, category: 'Devices',
         description: 'Fictional keyboard failure', status: 'open', public_revision: 1, number: 3 });
       expect(initial.created_at).toMatch(/^\d{4}-\d{2}-\d{2}T/);
       expect(await next('claim', issueId)).toMatchObject({ outcome: 'committed' });
-      const assigned = (await fixture.rows('SELECT * FROM issues WHERE id = ?', issueId))[0];
+      const assigned = (await fixture.rows('SELECT * FROM issues WHERE id = ?', issueId))[0]!;
       expect(assigned.owner).toBe(fixture.staff.accountId);
-      const claimHistory = (await fixture.rows("SELECT * FROM history WHERE issue_id = ? AND text = 'Issue claimed.'", issueId))[0];
+      const claimHistory = (await fixture.rows("SELECT * FROM history WHERE issue_id = ? AND text = 'Issue claimed.'", issueId))[0]!;
       expect(assigned.first_assigned_at).toBe(claimHistory.at);
       expect(await command({ type: 'message', issue_id: issueId, revision: 2, text: 'Private fixture', visibility: 'internal' }))
         .toMatchObject({ outcome: 'committed' });
@@ -549,7 +549,7 @@ describe("D1 workflow persistence", () => {
       expect(await next('accept', issueId, fixture.specialist)).toMatchObject({ outcome: 'committed' });
       expect(await command({ type: 'resolve', issue_id: issueId, revision: 5, summary: ' First resolution ' }, fixture.specialist))
         .toMatchObject({ outcome: 'committed' });
-      const firstResolution = (await fixture.rows('SELECT * FROM resolutions WHERE issue_id = ?', issueId))[0];
+      const firstResolution = (await fixture.rows('SELECT * FROM resolutions WHERE issue_id = ?', issueId))[0]!;
       const firstResolved = (await fixture.rows('SELECT * FROM issues WHERE id = ?', issueId))[0];
       expect(firstResolved).toMatchObject({ resolved_at: firstResolution.at, owner: fixture.specialist.accountId,
         first_assigned_at: assigned.first_assigned_at });
@@ -557,7 +557,7 @@ describe("D1 workflow persistence", () => {
       expect(await command({ type: 'award', issue_id: issueId, revision: 6, minutes: 7, explanation: ' Fixture delay ' }))
         .toMatchObject({ outcome: 'committed' });
       expect(await next('apply', issueId)).toMatchObject({ outcome: 'committed' });
-      const award = (await fixture.rows('SELECT * FROM awards WHERE issue_id = ?', issueId))[0];
+      const award = (await fixture.rows('SELECT * FROM awards WHERE issue_id = ?', issueId))[0]!;
       expect(award).toMatchObject({ resolution_id: firstResolution.id, minutes: 7, explanation: 'Fixture delay', applied_by: fixture.staff.accountId });
       expect(award.applied_at).toMatch(/^\d{4}-/);
       expect(await command({ type: 'reopen', issue_id: issueId, revision: 8, reason: ' Fixture recurred ' }, fixture.contestant))

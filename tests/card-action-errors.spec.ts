@@ -15,7 +15,7 @@ async function openIssues(local: LocalWorker): Promise<void> {
       type: "submit",
       category: "Backend",
       description: `Queue item ${n}`,
-      team_id: local.teams[n % 2],
+      team_id: local.teams[n % 2]!,
     });
   }
 }

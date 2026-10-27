@@ -41,7 +41,7 @@ function cookieClient() {
         hostOnly: !/;\s*Domain=/i.test(setCookie),
         root: /;\s*Path=\/(?:;|$)/i.test(setCookie),
       };
-      cookie = /;\s*Max-Age=0(?:;|$)/i.test(setCookie) ? '' : setCookie.split(';')[0];
+      cookie = /;\s*Max-Age=0(?:;|$)/i.test(setCookie) ? '' : setCookie.split(';')[0]!;
     }
     return response;
   };

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createApplicationHandler, type ApplicationHttpServices } from './http';
+import type { Snapshot } from '../../../connected/model';
 import type { AuthenticationSession } from '../../authentication';
 import { ImageRequestError } from '../../../backend/errors';
 import { AnnouncementCommandError } from './announcements';
@@ -126,7 +127,10 @@ describe('Cloudflare application HTTP boundary', () => {
   });
 
   describe('workflow response snapshot', () => {
-    const snapshot = { server_time: '2026-10-25T00:00:00Z' } as Awaited<ReturnType<ApplicationHttpServices['application']['snapshot']>>;
+    const snapshot: Snapshot = {
+      session: null, event: null, membership: null, teams: [], issues: [], resolutions: [], history: [], attachments: [],
+      pending_removals: [], awards: [], members: [], audit: [], server_time: '2026-10-25T00:00:00Z',
+    };
     const body = { sessionId, requestId, command: {} };
 
     it('returns the snapshot read after the commit, for the same caller and session', async () => {

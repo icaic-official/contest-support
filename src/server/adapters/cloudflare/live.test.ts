@@ -334,7 +334,7 @@ describe('Durable Object live updates', () => {
     const test = fixture();
     const socket = await test.connect();
     expect(socket.messages).toEqual(['{"type":"ready"}']);
-    expect(socket.deserializeAttachment()).toEqual({ ...test.staff, sessionId: test.sessionId, expiresAt: expect.any(Number) });
+    expect(socket.deserializeAttachment()).toEqual({ ...test.staff, sessionId: test.sessionId, expiresAt: expect.any(Number) as unknown });
     expect(test.db.reads).toBe(1);
     expect(test.state.alarmAt).toBeGreaterThan(Date.now());
     expect(test.state.alarmAt).toBeLessThanOrEqual(Date.now() + 30_000);

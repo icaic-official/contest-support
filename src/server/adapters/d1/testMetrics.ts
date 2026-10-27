@@ -31,7 +31,7 @@ export function measureD1<Connection extends D1Connection>(db: Connection, repor
       const result = await operation();
       // first() returns a row without provider metadata. Do not inspect that row.
       if (metadata) totals.sqlMs += Array.isArray(result)
-        ? result.reduce((sum, item) => sum + duration(item), 0) : duration(result);
+        ? result.reduce<number>((sum, item) => sum + duration(item), 0) : duration(result);
       return result;
     } finally {
       totals.wallMs += performance.now() - start;
@@ -56,8 +56,8 @@ export function measureD1<Connection extends D1Connection>(db: Connection, repor
     return new Proxy(target, {
       get(original, key) {
         if (Object.hasOwn(methods, key)) return Reflect.get(methods, key);
-        const value = Reflect.get(original, key, original);
-        return typeof value === 'function' ? value.bind(original) : value;
+        const value: unknown = Reflect.get(original, key, original);
+        return typeof value === 'function' ? (value as (...args: unknown[]) => unknown).bind(original) : value;
       },
     });
   }

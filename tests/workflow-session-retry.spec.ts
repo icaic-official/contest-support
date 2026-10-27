@@ -19,7 +19,7 @@ for (const committed of [false, true]) {
     );
     const requests: WorkflowRequest[] = [];
     await page.route('**/api/workflow', async (route) => {
-      const request: WorkflowRequest = route.request().postDataJSON();
+      const request = route.request().postDataJSON() as WorkflowRequest;
       requests.push(request);
       if (requests.length > 1) {
         await route.fallback();
@@ -85,7 +85,7 @@ test('a response after the account gate remount keeps an explicit retry and does
     }
   });
   await page.route('**/api/workflow', async (route) => {
-    const request: WorkflowRequest = route.request().postDataJSON();
+    const request = route.request().postDataJSON() as WorkflowRequest;
     requests.push(request);
     if (requests.length > 1) {
       await route.fallback();
@@ -146,7 +146,7 @@ test('the account gate preserves a retry after all session access is removed', a
 }) => {
   const requests: WorkflowRequest[] = [];
   await page.route('**/api/workflow', async (route) => {
-    requests.push(route.request().postDataJSON());
+    requests.push(route.request().postDataJSON() as WorkflowRequest);
     if (requests.length > 1) {
       await route.fallback();
       return;
@@ -202,7 +202,7 @@ test('a late success in the original session preserves the current session form 
     completeResponse = resolve;
   });
   await page.route('**/api/workflow', async (route) => {
-    const request: WorkflowRequest = route.request().postDataJSON();
+    const request = route.request().postDataJSON() as WorkflowRequest;
     const id = await local.act(
       local.users.contestant,
       request.command,

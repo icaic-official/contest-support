@@ -62,11 +62,13 @@ export class D1Fixture {
   }
 
   private recoveryDetails() {
-    const config = JSON.parse(readFileSync(this.configPath, "utf8"));
+    const config = JSON.parse(readFileSync(this.configPath, "utf8")) as {
+      account_id: string; d1_databases: Array<{ database_id: string; database_name: string }>;
+    };
     return {
       config: this.configPath, workflow: this.workflow, remote: process.env.MINSKY_AUTH_REMOTE === "1" || Boolean(process.env.MINSKY_CONNECTOR_D1_CONFIG),
-      accountId: config.account_id, databaseId: config.d1_databases[0].database_id,
-      databaseName: config.d1_databases[0].database_name,
+      accountId: config.account_id, databaseId: config.d1_databases[0]!.database_id,
+      databaseName: config.d1_databases[0]!.database_name,
       eventId: this.eventId, sessionIds: [this.sessionId, this.secondSessionId],
       teamIds: [this.teamId, this.otherTeamId, this.secondSessionTeamId],
       issueIds: [this.issueId, this.otherIssueId, this.secondSessionIssueId],

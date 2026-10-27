@@ -28,7 +28,7 @@ it('measures the real D1 transport without exposing data or changing batch rollb
     await expect(failure).rejects.toThrow();
     expect((await db.prepare('SELECT id FROM measurements ORDER BY id').all()).results).toEqual([{ id: 1 }]);
     metrics.flush();
-    const summary = JSON.parse(lines.at(-1)!.slice('MINSKY_D1_METRICS '.length));
+    const summary = JSON.parse(lines.at(-1)!.slice('MINSKY_D1_METRICS '.length)) as { wallMs: number; sqlMs: number };
     expect(summary).toMatchObject({ calls: 5, statements: 6, inFlight: 0 });
     expect(summary.wallMs).toBeGreaterThanOrEqual(0);
     expect(summary.sqlMs).toBeGreaterThanOrEqual(0);

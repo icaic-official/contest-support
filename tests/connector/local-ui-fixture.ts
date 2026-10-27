@@ -23,7 +23,9 @@ export async function createLocalUiFixture(env: LocalUiEnvironment, origin: stri
   const sessionIds: [string, string] = [randomUUID(), randomUUID()];
   const teamIds: [string, string, string] = [randomUUID(), randomUUID(), randomUUID()];
   const control = { event: randomUUID(), session: randomUUID(), account: randomUUID(), key: `control:${randomUUID()}` };
-  const accounts = {} as Record<Actor, TestAccount>;
+  const accounts = Object.fromEntries(actors.map((actor) => [actor, {
+    id: randomUUID(), username: `local-${runId.slice(0, 12)}-${actor.toLowerCase()}`, password: randomSecret() + 'A9!',
+  }])) as Record<Actor, TestAccount>;
   const write = (sql: string, ...values: Array<string | number | null>) => db.prepare(sql).bind(...values);
   const queries = [
     write('INSERT INTO events (id, name) VALUES (?, ?), (?, ?)', eventId, `Provider contract ${runId}`, control.event, 'Unrelated local control'),
@@ -36,8 +38,7 @@ export async function createLocalUiFixture(env: LocalUiEnvironment, origin: stri
       id, sessionIds[index === 2 ? 1 : 0], `Provider team ${index}`, `Fixture desk ${index}`)),
   ];
   for (const actor of actors) {
-    const account = { id: randomUUID(), username: `local-${runId.slice(0, 12)}-${actor.toLowerCase()}`, password: randomSecret() + 'A9!' };
-    accounts[actor] = account;
+    const account = accounts[actor];
     const name = `Fictional ${actor}`;
     const sessionId = sessionIds[actor === 'isolated' || actor === 'otherAdmin' ? 1 : 0];
     const team = actor === 'contestant' || actor === 'temporary' ? teamIds[0]

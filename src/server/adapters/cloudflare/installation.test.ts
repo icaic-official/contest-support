@@ -85,7 +85,7 @@ describe('trusted Cloudflare installation and owner recovery', () => {
     const tables = ['events', 'sessions', 'teams', 'memberships', 'membership_roles', 'issues', 'history', 'resolutions', 'awards', 'installation'];
     return Object.fromEntries(await Promise.all(tables.map(async (table) => [table,
       (await db.prepare(`SELECT * FROM "${table}" ORDER BY rowid`).all()).results,
-    ])));
+    ] as const)));
   }
 
   async function seedOldLogin(accountId: string): Promise<void> {

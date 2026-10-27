@@ -115,7 +115,7 @@ describe('Cloudflare Backend transport', () => {
       const { fetcher, log } = counted(() => Response.json({ outcome: 'committed', issueId }));
       const backend = createCloudflareBackend({ origin, fetch: fetcher });
       for (let action = 0; action < 3; action++) await backend.workflows.execute(sessionId, crypto.randomUUID(), command);
-      expect(log).toEqual(['GET /api/auth/session', ...Array(3).fill('POST /api/workflow token-1')]);
+      expect(log).toEqual(['GET /api/auth/session', ...Array<string>(3).fill('POST /api/workflow token-1')]);
     });
 
     it('returns the changed snapshot with the commit, and drops an invalid one', async () => {
@@ -278,7 +278,7 @@ describe('Cloudflare Backend transport', () => {
         calls.push({ method: init?.method ?? 'GET', path: url.pathname, headers: new Headers(init?.headers), body: init?.body });
         if (url.pathname === '/api/auth/session') return Response.json(sessionBody);
         if (init?.method === 'PUT') return Response.json({});
-        const body = JSON.parse(String(init?.body));
+        const body = JSON.parse(String(init?.body)) as { action: string };
         return body.action === 'begin' ? Response.json({ id: imageId, path: `${sessionId}/announcements/${announcementId}/${imageId}` }) : Response.json({});
       });
       const progress = vi.fn();
@@ -290,7 +290,7 @@ describe('Cloudflare Backend transport', () => {
       expect(put.headers.get('Content-Type')).toBe('image/png');
       expect(put.headers.get('X-Minsky-Digest')).toMatch(/^[0-9a-f]{64}$/);
       expect(put.headers.get('X-CSRF-Token')).toBe('fresh-token');
-      expect(calls.filter((call) => call.path === '/api/announcement-images').map((call) => JSON.parse(String(call.body)).action))
+      expect(calls.filter((call) => call.path === '/api/announcement-images').map((call) => (JSON.parse(String(call.body)) as { action: string }).action))
         .toEqual(['begin', 'finish']);
       expect(progress).toHaveBeenLastCalledWith(100);
       const rejected = vi.fn<typeof fetch>();

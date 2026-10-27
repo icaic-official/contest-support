@@ -48,11 +48,17 @@ describe("usernames", () => {
 });
 
 describe("image limits", () => {
-  const session = {
+  const session: NonNullable<Snapshot["session"]> = {
+    id: "00000000-0000-4000-8000-000000000100",
+    event_id: "00000000-0000-4000-8000-000000000010",
+    name: "Fictional session",
+    intake_open: true,
+    categories: ["Backend"],
+    revision: 0,
     max_image_bytes: 10 * 1048576,
     max_images_per_issue: 6,
     max_image_bytes_per_issue: 40 * 1048576,
-  } as NonNullable<Snapshot["session"]>;
+  };
 
   it("converts bytes to megabytes", () => {
     expect(limitsOfSession(session)).toEqual({

@@ -101,7 +101,7 @@ describe('Cloudflare admin password recovery', () => {
     } finally {
       for (const method of methods) console[method] = originals.get(method)!;
     }
-    const password = recovered!.temporaryPassword;
+    const password = recovered.temporaryPassword;
     expect(passwordAppearsOnce(lines, password)).toBe(true);
     expect(consoleLines.some((line) => line.includes(password))).toBe(false);
     expect(await authentication.current(oldHeaders)).toBeUndefined();

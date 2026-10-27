@@ -150,7 +150,7 @@ it('runs the complete application through isolated HTTPS, D1, R2, and Durable Ob
       const socket = new WebSocket(url);
       const state: SocketState = { messages: [], closed: false };
       target.fixtureSockets[key] = { socket, state };
-      socket.onmessage = (event) => { state.messages.push(JSON.parse(event.data)); };
+      socket.onmessage = (event) => { state.messages.push(JSON.parse(String(event.data)) as { type: string }); };
       socket.onclose = () => { state.closed = true; };
       socket.onerror = () => { state.closed = true; };
     }, { sessionId: installation!.sessionId, key });

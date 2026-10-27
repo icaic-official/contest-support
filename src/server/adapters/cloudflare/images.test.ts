@@ -512,7 +512,7 @@ describe('Cloudflare private images with local D1 and R2 bindings', () => {
     const tasks = await fixture.rows('SELECT attachment_id FROM image_deletions WHERE attachment_id = ?', image.id);
     expect(first?.state === 'pending' || tasks.length === 1).toBe(true);
     await service.recover(fixture.sessionId);
-    expect(await record(image.id)).toMatchObject({ state: 'expired', files_removed_at: expect.any(String) });
+    expect(await record(image.id)).toMatchObject({ state: 'expired', files_removed_at: expect.any(String) as unknown });
     expect(await bucket.get(image.original_path)).toBeNull();
   });
 

@@ -29,8 +29,8 @@ function recordSql<Connection extends D1Connection>(db: Connection, sql: string[
       if (key === 'first' || key === 'all' || key === 'run') {
         return (...args: unknown[]) => { sql.push(text); return (Reflect.get(target, key) as (...a: unknown[]) => unknown).apply(target, args); };
       }
-      const value = Reflect.get(target, key, target);
-      return typeof value === 'function' ? value.bind(target) : value;
+      const value: unknown = Reflect.get(target, key, target);
+      return typeof value === 'function' ? (value as (...args: unknown[]) => unknown).bind(target) : value;
     },
   });
   const texts = new WeakMap<D1Statement, string>();
@@ -49,8 +49,8 @@ function recordSql<Connection extends D1Connection>(db: Connection, sql: string[
           return target.batch(statements);
         };
       }
-      const value = Reflect.get(target, key, target);
-      return typeof value === 'function' ? value.bind(target) : value;
+      const value: unknown = Reflect.get(target, key, target);
+      return typeof value === 'function' ? (value as (...args: unknown[]) => unknown).bind(target) : value;
     },
   });
 }

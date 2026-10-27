@@ -293,7 +293,7 @@ for (const [layout, viewport] of viewports) {
         const { state } = await openWorkspace(page, api, viewport);
         const requests: WorkflowRequest[] = [];
         await page.route('**/api/workflow', async (route) => {
-          const request: WorkflowRequest = route.request().postDataJSON();
+          const request = route.request().postDataJSON() as WorkflowRequest;
           const action = request.command;
           if (action.type !== 'message') throw new Error('Expected a reply request.');
           requests.push(request);

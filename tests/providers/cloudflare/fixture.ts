@@ -142,14 +142,14 @@ export async function createFixture(path: string, dependencies: Dependencies = {
     };
     const createdAccounts = createdAccountMarkers(journal.runId);
     journal.createdAccounts = Object.values(createdAccounts);
-    const accounts = {} as Record<Actor, TestAccount>;
+    const accounts = Object.fromEntries(actors.map((actor) => [actor, {
+      id: accountIds[actor], username: username(journal, actor), password: randomSecret() + 'A9!',
+    }])) as Record<Actor, TestAccount>;
     const hashes = new Map<Actor, string>();
     // Maintained production hashing stays outside D1. Passwords and hashes
     // remain in memory and never enter the recovery journal or provider output.
     for (const actor of actors) {
-      const password = randomSecret() + 'A9!';
-      accounts[actor] = { id: accountIds[actor], username: username(journal, actor), password };
-      hashes.set(actor, await passwordHasher.hash(password));
+      hashes.set(actor, await passwordHasher.hash(accounts[actor].password));
     }
     await writeFile(path, JSON.stringify(journal), { flag: 'wx', mode: 0o600 });
     saved = true;

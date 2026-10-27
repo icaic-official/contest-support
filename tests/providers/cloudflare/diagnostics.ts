@@ -63,7 +63,8 @@ function safeFlags(value: unknown): AuthFlags | undefined {
   if (!Number.isSafeInteger(input.wrapperCount) || (input.wrapperCount as number) < 0 ||
       flagNames.some(name => typeof input[name] !== 'boolean')) return undefined;
   // Copy only reviewed primitive fields. Extra callback data never reaches output.
-  return { ...Object.fromEntries(flagNames.map(name => [name, input[name]])), wrapperCount: input.wrapperCount } as AuthFlags;
+  const flags = Object.fromEntries(flagNames.map(name => [name, input[name]])) as Record<typeof flagNames[number], boolean>;
+  return { ...flags, wrapperCount: input.wrapperCount as number };
 }
 
 /** URLs and account IDs stay private. Only fixed enums and primitive metrics survive. */
@@ -159,5 +160,6 @@ export async function readD1AuthFlags(
   if (!row || flagNames.some(name => row[name] !== 0 && row[name] !== 1) || !Number.isSafeInteger(row.wrapperCount)) {
     throw new Error('Fixture authentication diagnostics are unavailable.');
   }
-  return { ...Object.fromEntries(flagNames.map(name => [name, row[name] === 1])), wrapperCount: row.wrapperCount } as AuthFlags;
+  const flags = Object.fromEntries(flagNames.map(name => [name, row[name] === 1])) as Record<typeof flagNames[number], boolean>;
+  return { ...flags, wrapperCount: row.wrapperCount as number };
 }

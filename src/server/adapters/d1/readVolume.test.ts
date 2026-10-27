@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import type { Command } from '../../../connected/model';
+import type { Command, Snapshot } from '../../../connected/model';
 import { decideWorkflow } from '../../workflow';
 import { openStoreDatabase } from '../cloudflare/tooling/store-database.mjs';
 import { currentAccessBindings, currentAccessSql, currentReadyLoginSql, sessionsListSql, snapshotSql } from '../cloudflare/application';
@@ -165,13 +165,16 @@ async function open(teamCount: number) {
   return platform;
 }
 
+/** A snapshot read by `snapshot()`. `server_time` is deleted before the tests compare it. */
+type ReadBody = Omit<Snapshot, 'server_time'> & { server_time?: string };
+
 async function snapshot(db: D1Connection, n: number, sql = snapshotSql) {
   const caller = { accountId: `acc-${n}`, loginId: `login-${n}` };
   const result = await db.prepare(sql)
     .bind(caller.accountId, caller.loginId, ...currentAccessBindings(caller, 'sess-1'), ...Array<string>(9).fill('sess-1'))
     .all<{ snapshot: string }>();
   const row = result.results[0];
-  const body = row ? JSON.parse(row.snapshot) : null;
+  const body = row ? (JSON.parse(row.snapshot) as ReadBody) : null;
   if (body) delete body.server_time;
   return { rowsRead: result.meta?.rows_read ?? Infinity, body };
 }
@@ -252,37 +255,37 @@ describe('rows read for a session with 1,200 accounts and 100 issues', () => {
 
   it('reads only the contestant team rows for a contestant snapshot', async () => {
     const { rowsRead, body } = await snapshot(db, callers.contestant);
-    expect(body.teams.map((team: { id: string }) => team.id)).toEqual(['team-8']);
-    expect(body.issues).toHaveLength(4);
-    expect(body.history.length).toBeGreaterThan(0);
-    expect(body.history.filter((entry: { visibility: string }) => entry.visibility !== 'public')).toEqual([]);
-    expect(body.attachments).toHaveLength(8);
-    expect(body.attachments.filter((image: { visibility: string }) => image.visibility !== 'public')).toEqual([]);
-    expect(body.pending_removals).toEqual([]);
-    expect(body.members).toEqual([]);
-    expect(body.audit).toEqual([]);
+    expect(body!.teams.map((team: { id: string }) => team.id)).toEqual(['team-8']);
+    expect(body!.issues).toHaveLength(4);
+    expect(body!.history.length).toBeGreaterThan(0);
+    expect(body!.history.filter((entry: { visibility: string }) => entry.visibility !== 'public')).toEqual([]);
+    expect(body!.attachments).toHaveLength(8);
+    expect(body!.attachments.filter((image: { visibility: string }) => image.visibility !== 'public')).toEqual([]);
+    expect(body!.pending_removals).toEqual([]);
+    expect(body!.members).toEqual([]);
+    expect(body!.audit).toEqual([]);
     expect(rowsRead).toBeLessThan(130);
   });
 
   it('returns staff notes and only their own removals to a volunteer within a bounded read', async () => {
     const { rowsRead, body } = await snapshot(db, callers.volunteer);
-    expect(body.teams).toHaveLength(teams);
-    expect(body.issues).toHaveLength(issues);
-    expect(body.history).toHaveLength(issues * 5);
-    expect(body.attachments).toHaveLength(300);
-    expect(body.pending_removals).toHaveLength(20);
-    expect(body.members).toEqual([]);
-    expect(body.audit).toEqual([]);
+    expect(body!.teams).toHaveLength(teams);
+    expect(body!.issues).toHaveLength(issues);
+    expect(body!.history).toHaveLength(issues * 5);
+    expect(body!.attachments).toHaveLength(300);
+    expect(body!.pending_removals).toHaveLength(20);
+    expect(body!.members).toEqual([]);
+    expect(body!.audit).toEqual([]);
     expect(rowsRead).toBeLessThan(2_950);
   });
 
   it('returns every issue, member, image, and the latest audit to the admin within a bounded read', async () => {
     const { rowsRead, body } = await snapshot(db, callers.admin);
-    expect(body.issues).toHaveLength(issues);
-    expect(body.members).toHaveLength(accounts + 1);
-    expect(body.attachments).toHaveLength(300);
-    expect(body.pending_removals).toEqual([]);
-    expect(body.audit).toHaveLength(50);
+    expect(body!.issues).toHaveLength(issues);
+    expect(body!.members).toHaveLength(accounts + 1);
+    expect(body!.attachments).toHaveLength(300);
+    expect(body!.pending_removals).toEqual([]);
+    expect(body!.audit).toHaveLength(50);
     expect(rowsRead).toBeLessThan(6_800);
   });
 
@@ -339,8 +342,8 @@ describe('rows read in a session of 480 teams', () => {
   it('returns the reference snapshot to every caller and reads no other team', async () => {
     await expectReferenceSnapshots(db);
     const { rowsRead, body } = await snapshot(db, callers.contestant);
-    expect(body.teams.map((team: { id: string }) => team.id)).toEqual(['team-8']);
-    expect((await snapshot(db, callers.volunteer)).body.teams).toHaveLength(480);
+    expect(body!.teams.map((team: { id: string }) => team.id)).toEqual(['team-8']);
+    expect((await snapshot(db, callers.volunteer)).body!.teams).toHaveLength(480);
     expect(rowsRead).toBeLessThan(60);
   });
 

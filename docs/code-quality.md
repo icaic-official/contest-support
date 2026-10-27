@@ -35,17 +35,18 @@ The `no-unnecessary-condition` rule is not enabled. It reports correct checks of
 - Write `prop: T | undefined` when every value has the key but it can be empty, such as a computed statistic or a hook result.
 - For a library type, such as `RequestInit` or a Playwright option, leave the key out or pass the library's own empty value, such as `null`.
 - For JSON that a zod schema parses, use `.exactOptional()` when the type must match a contract that declares `prop?: T`.
-`npm run lint` also runs type-aware rules on application code in `src/`.
+`npm run lint` also runs type-aware rules on `src/`, `tests/`, and the root configuration files.
 These rules reject:
 
-- non-null assertions (`value!`),
+- non-null assertions (`value!`), in application code only,
 - type assertions that do not change the type,
 - type assertions on object literals (annotate the variable instead),
 - values of type `any` that flow into assignments, arguments, calls, member access, or return values,
 - a `switch` on a union that misses a member and has no `default`.
 
-The type-aware rules do not apply to tests, test harnesses (`authenticationCases.ts` and `src/server/adapters/d1/test*.ts`), or the vendored components in `src/components/ui/`.
+The vendored components in `src/components/ui/` keep only the syntactic rules.
 When a value comes from outside the program, such as JSON, router state, or a library typed as `any`, narrow it with a check or give it a declared type at that boundary.
+In a test, a cast of parsed data to the type that the test expects is enough, because the assertions that follow check it.
 If an assertion is the only option, explain in a comment why it is safe.
 
 ## Dependency updates

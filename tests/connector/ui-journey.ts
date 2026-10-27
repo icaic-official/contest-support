@@ -166,7 +166,7 @@ export async function runUiJourney(browser: Browser, fixture: UiFixture, options
       if (new URL(socket.url()).pathname !== '/api/updates') return;
       socket.on('framereceived', ({ payload }) => {
         try {
-          const value = JSON.parse(typeof payload === 'string' ? payload : payload.toString());
+          const value = JSON.parse(typeof payload === 'string' ? payload : payload.toString()) as { type: string };
           if (Object.keys(value).length !== 1 || !['ready', 'change'].includes(value.type)) { probe.invalid = true; return; }
           if (value.type === 'ready') probe.ready++;
           else probe.changes++;

@@ -79,11 +79,14 @@ describe('isolated hosted Cloudflare authentication HTTP', () => {
   }
 
   beforeAll(async () => {
-    const config = JSON.parse(readFileSync(configPath, 'utf8'));
+    const config = JSON.parse(readFileSync(configPath, 'utf8')) as {
+      account_id: string; name: string; vars: { AUTH_ORIGIN: string };
+      d1_databases: Array<{ database_id: string; remote: boolean }>;
+    };
     if (process.env.MINSKY_AUTH_HTTP_REMOTE !== '1' || process.env.MINSKY_AUTH_REMOTE !== '1' ||
         process.env.MINSKY_AUTH_HTTP_ORIGIN !== origin || config.account_id !== '458ad6a930b0fb717796dfa19ca6a2b1' ||
         config.name !== 'minsky-auth-ci' || config.vars.AUTH_ORIGIN !== origin ||
-        config.d1_databases[0].database_id !== '5d746d29-0a66-4346-96a6-4974126685d7' || config.d1_databases[0].remote !== true) {
+        config.d1_databases[0]!.database_id !== '5d746d29-0a66-4346-96a6-4974126685d7' || config.d1_databases[0]!.remote !== true) {
       throw new Error('Use the guarded hosted HTTP runner with the exact isolated account, database, and origin.');
     }
     const platform = await getPlatformProxy<{ DB: D1Connection }>({

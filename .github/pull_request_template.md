@@ -13,7 +13,7 @@ Put optional footers, such as Closes #123, at the end of the description.
 
 Describe the problem.
 Describe the resulting behavior.
-Reference the development ticket, if one exists.
+If a GitHub issue describes the change, reference it.
 
 ## Verification
 
@@ -28,7 +28,7 @@ Explain deliberate TypeScript style exceptions.
 Complete each applicable item after review.
 Explain each item that does not apply.
 
-- [ ] The change fits the active ticket and its acceptance criteria.
+- [ ] The change stays within the scope that this PR describes.
 - [ ] The code is readable. It contains no unnecessary abstractions or unrelated rewrites.
 - [ ] The change preserves authorization and separation of public data from internal data. Credentials remain outside Git and frontend builds.
 - [ ] The change preserves ownership, timers, lifecycle history, awards, and external application status.

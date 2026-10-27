@@ -10,7 +10,7 @@ There is no generic database adapter or infrastructure provisioning interface.
 1. Read [the backend contracts](backend-contracts.md) and [the shared server workflow](server-workflow.md).
 2. Read [the provider test contracts](provider-test-contracts.md).
 3. Inspect `package.json` for the current verification commands.
-4. Create a ticket with the provider's scope, resource targets, costs, and verification requirements.
+4. Open a GitHub issue with the provider's scope, resource targets, costs, and verification requirements.
 5. Keep development, CI, and installation-verification resources separate.
 
 Ordinary code review and local checks require no access to the maintainers' provider accounts.

@@ -1,5 +1,8 @@
 # Development tickets
 
+This is a historical record. On 2026-10-27 the owner retired the development ticket system.
+Do not add tickets here. Each pull request records the scope, decisions, and verification of its change.
+
 These tickets describe development work, not contestant issues.
 
 On 2026-10-23 the owner selected Cloudflare as the live backend.

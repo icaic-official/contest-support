@@ -7,7 +7,7 @@
 - Follow the user's latest explicit instructions. If README.md and PLAN.md differ, PLAN.md records the newer agreed scope.
 - Inspect the working tree and existing implementation before you change files.
 - Preserve unrelated user changes.
-- Read the active development ticket.
+- Read the pull request or GitHub issue that describes the work, if one exists.
 - Read relevant documents under `docs/` when they exist.
 - Do not assume that planned files or features exist.
 - Treat historical run reports as records of those runs. Check the repository to establish current state.
@@ -139,7 +139,7 @@ A token that can create tokens can grant itself any permission. So these rules a
 - Delete only records that belong to those fixtures.
 - Do not expose a shared-data reset or persona impersonation control in the connected product.
 
-## Ticket and Git workflow
+## Git workflow
 
 - Set the author of every new commit to `CJX <72659439+GiftedNovaHD@users.noreply.github.com>`.
   Before the first commit, run `git config author.name CJX` and `git config author.email 72659439+GiftedNovaHD@users.noreply.github.com`.
@@ -148,28 +148,30 @@ A token that can create tokens can grant itself any permission. So these rules a
 - Separate the co-author trailer from the commit body with a blank line.
 - Preserve the primary author and any other co-author trailers.
 - Before each push, check that every new commit you created has the required author and contains each required trailer exactly once.
-- Distinguish development tickets from contestant issues in code, documentation, and communication.
-- Start each development ticket from updated `main`.
-- Name branches as the [Contributions](#contributions) section states. Reference the development ticket, if one exists, in the PR description.
+- Distinguish development work from contestant issues in code, documentation, and communication.
+- Start each change from updated `main`.
+- Name branches as the [Contributions](#contributions) section states. Reference the GitHub issue, if one exists, in the PR description.
 
-Historical branch exceptions remain in the [planning log](docs/history/plan-log.md). Use the normal ticket workflow unless the user gives a newer instruction.
+On 2026-10-27 the owner retired the development ticket system. The pull request records the scope, decisions, and verification of each change.
+[docs/history/tickets.md](docs/history/tickets.md) keeps tickets T0001 to T0025 as a historical record. Do not add tickets to it.
+Historical branch exceptions remain in the [planning log](docs/history/plan-log.md).
 
 Complete these steps in sequence:
 
-1. Implement the active ticket.
+1. Implement the change.
 2. Verify the implementation.
 3. Update relevant documentation.
 4. Prepare a pull request for the user's review.
 
 The user reviews and merges.
-Do not merge the current ticket unless the user explicitly changes this workflow.
-Unless the user explicitly changes this workflow, wait for their merge before you start the next ticket.
+Do not merge the current PR unless the user explicitly changes this workflow.
+Unless the user explicitly changes this workflow, wait for their merge before you start the next change.
 Testing and merging are workflow steps.
 Do not create long-lived `test` or `merge` branches for them.
 
-Keep future work in a short candidate queue until feedback determines the next ticket.
+Keep future work in a short candidate queue until feedback determines the next change.
 Do not create a large speculative backlog.
-Routine implementation and verification within the active ticket do not require repeated confirmation.
+Routine implementation and verification within the current change do not require repeated confirmation.
 Ask only for missing decisions that materially affect scope or behavior.
 
 ## Cloud development and deployment workflow
@@ -183,9 +185,9 @@ On-demand hosted Cloudflare checks use the separate connector and store CI targe
 The project operates no Supabase project.
 Production resources do not exist yet. Their names start with `minsky-prod`.
 
-For each ticket, use this sequence:
+For each change, use this sequence:
 
-1. Create the ticket branch from updated `main`.
+1. Create the branch from updated `main`.
 2. Develop against the Cloudflare development installation. Its Worker is `minsky-dev` and its D1 database is `minsky-development`.
 3. Add repository-owned D1 migrations for the schema you change.
 4. Run fast checks.
@@ -289,5 +291,5 @@ Distinguish completed checks from suggested manual steps.
 4. **Build/test results** — Record observed results and checks that could not run.
 5. **Manual verification steps** — State what you checked manually and what the user should still verify.
 6. **Risks** — Record known limitations, unresolved decisions, or regressions. Do not invent risks.
-7. **Follow-up tickets** — Reference existing tickets or concise candidate work. Do not imply that an uncreated ticket exists.
+7. **Follow-up work** — Reference existing GitHub issues or concise candidate work. Do not imply that an uncreated issue exists.
 8. **Docs that need updating** — List outstanding documentation work. Use **None** if relevant documents are current.

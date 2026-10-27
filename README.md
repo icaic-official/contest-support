@@ -179,7 +179,7 @@ Plans and rules:
 - [Contributor rules](AGENTS.md), the [planning record](PLAN.md), and the [roadmap](ROADMAP.md) for the technology stack.
   [AGENTS.md](AGENTS.md#api-tokens-for-agents) also states which Cloudflare tokens and resources agents can create.
 - [Product direction](docs/product-direction.md) — agreed requirements and open decisions.
-- [Development tickets](docs/history/tickets.md) — ticket scope, status, and acceptance criteria.
+- [Development tickets](docs/history/tickets.md) — retired ticket records T0001 to T0025. Pull requests now record each change.
 - [Writing guide](docs/writing-guide.md) and [documentation release plan](docs/documentation-release-plan.md).
 - [Code quality](docs/code-quality.md) — CI summary, dependency policy, secret scanning, and review requirements.
 

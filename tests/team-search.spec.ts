@@ -60,7 +60,7 @@ async function signIn(page: Page, api: FakeWorker, viewport: Viewport) {
     return sessionSnapshot(member, {
       session: {
         event_id: EVENT_ID,
-        name: sessionNames[sessionId],
+        name: sessionNames[sessionId]!,
         categories: ['Network', 'Device'],
         max_image_bytes: 10 * 1048576,
         max_images_per_issue: 12,

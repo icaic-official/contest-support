@@ -69,7 +69,7 @@ export type Request =
   | { type: 'updatesSubscribe'; id: string; sessionId: string; userId: string };
 
 export type BrowserEvent =
-  | { type: 'auth'; id: string; user?: AccountIdentity }
+  | { type: 'auth'; id: string; user?: AccountIdentity | undefined }
   | { type: 'change'; id: string; arguments: unknown[] }
   | { type: 'connection'; id: string; connected: boolean }
   | { type: 'progress'; id: string; loaded: number };

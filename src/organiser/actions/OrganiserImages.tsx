@@ -35,7 +35,7 @@ export function ImageGallery({
   images: IssueImagesState;
   maxImages: number;
   /** Opens the upload form. Omit it when the person cannot upload. */
-  onAdd?: () => void;
+  onAdd?: (() => void) | undefined;
 }) {
   return (
     <div className="flex gap-2 overflow-x-auto pb-1">
@@ -348,7 +348,7 @@ export function OrganiserImages({
   uploadOpen: boolean;
   onUploadOpenChange: (open: boolean) => void;
   onChanged: () => Promise<void>;
-  transport?: ImageTransport;
+  transport?: ImageTransport | undefined;
   surface?: "sheet" | "dialog";
 }) {
   const Surface = surface === "dialog" ? ActionDialog : ActionSheet;

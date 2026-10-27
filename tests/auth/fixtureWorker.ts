@@ -2,7 +2,7 @@ import { createAuthenticationHandler } from '../../src/server/authenticationHttp
 import { D1AuthenticationService } from '../../src/server/adapters/cloudflare/authentication';
 import { createBetterAuthIdentity } from '../../src/server/adapters/cloudflare/identity';
 import { passwordHasher, randomSecret } from '../../src/server/adapters/cloudflare/password';
-import type { D1Connection } from '../../src/server/adapters/d1/connection';
+import type { D1Binding } from '../../src/server/adapters/d1/connection';
 
 const origin = 'https://127.0.0.1:8788';
 let secret: string | undefined;
@@ -14,7 +14,7 @@ function json(body: unknown, status = 200): Response {
 
 /** Local browser fixture only. The production Worker does not import this file. */
 export default {
-  async fetch(request: Request, env: { DB: D1Connection }): Promise<Response> {
+  async fetch(request: Request, env: { DB: D1Binding }): Promise<Response> {
     const url = new URL(request.url);
     if (!['127.0.0.1', 'localhost'].includes(url.hostname)) return new Response(null, { status: 403 });
     if (url.pathname === '/__fixture/health') return new Response('ready');
@@ -70,7 +70,7 @@ export default {
     // Wrangler supplies a real local D1 binding. The application contract keeps
     // only the D1 methods it uses; Better Auth accepts the full runtime binding.
     secret ??= randomSecret();
-    const identity = createBetterAuthIdentity(env.DB as Parameters<typeof createBetterAuthIdentity>[0], {
+    const identity = createBetterAuthIdentity(env.DB, {
       origin, secret, secureCookies: true,
     });
     const service = new D1AuthenticationService(env.DB, identity, passwordHasher);

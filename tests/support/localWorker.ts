@@ -82,7 +82,7 @@ export class LocalWorker extends FixtureWorker {
     return [...this.logins.values()];
   }
 
-  async attach(context: BrowserContext): Promise<void> {
+  override async attach(context: BrowserContext): Promise<void> {
     await this.guard(context);
     await super.attach(context);
   }

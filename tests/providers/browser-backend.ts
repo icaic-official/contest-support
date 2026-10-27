@@ -16,10 +16,10 @@ export interface BrowserBackend {
 
 interface Options {
   origin: string;
-  assetOrigin?: string;
+  assetOrigin?: string | undefined;
   module: string;
   configuration: unknown;
-  diagnostics?: BrowserDiagnostics;
+  diagnostics?: BrowserDiagnostics | undefined;
 }
 
 export interface BrowserDiagnostics {
@@ -75,7 +75,7 @@ export async function createBrowserBackend(
     const closed = (peer: WebSocketRoute, code: number | undefined, reason: string | undefined) => {
       sockets.delete(socket);
       // Native browser sockets accept only 1000 or application close codes.
-      track(peer.close({ code: code === 1000 || (code !== undefined && code >= 3000 && code <= 4999) ? code : 4000, reason }));
+      track(peer.close({ code: code === 1000 || (code !== undefined && code >= 3000 && code <= 4999) ? code : 4000, ...(reason === undefined ? {} : { reason }) }));
     };
     socket.onClose((code, reason) => closed(server, code, reason));
     server.onClose((code, reason) => closed(socket, code, reason));

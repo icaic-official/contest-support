@@ -33,7 +33,7 @@ export async function accountCreation(context: ScenarioContext): Promise<void> {
   await rejects(() => submit(teamClient, context.sessionId));
   await teamClient.auth.changePassword(created.temporaryPassword, crypto.randomUUID() + 'A9!');
   const sessions = await teamClient.workflows.sessions(teamId);
-  check(sessions.length === 1 && sessions[0].id === context.sessionId, 'The new account must see only its assigned session.');
+  check(sessions.length === 1 && sessions[0]!.id === context.sessionId, 'The new account must see only its assigned session.');
   const issueId = await submit(teamClient, context.sessionId);
   await rejects(() => change(teamClient, context.sessionId, issueId, { type: 'claim', issue_id: issueId, revision: 0 }));
 
@@ -44,13 +44,13 @@ export async function accountCreation(context: ScenarioContext): Promise<void> {
   const members = (await admin.workflows.snapshot(context.sessionId)).members;
   const matching = members.filter((member) => member.person.username === staff.username);
   check(matching.length === 1, 'A lost create response must leave exactly one created account.');
-  const staffId = matching[0].person.id;
-  check(matching[0].person.name === staff.name && matching[0].membership.team_id === null &&
-    !matching[0].membership.is_admin && ['volunteer', 'jury'].every((role) => matching[0].membership.roles.includes(role as 'volunteer' | 'jury')),
+  const staffId = matching[0]!.person.id;
+  check(matching[0]!.person.name === staff.name && matching[0]!.membership.team_id === null &&
+    !matching[0]!.membership.is_admin && ['volunteer', 'jury'].every((role) => matching[0]!.membership.roles.includes(role as 'volunteer' | 'jury')),
   'The created staff account must retain its person and combined roles.');
   await rejects(() => admin.admin.account(context.sessionId, staffCommand));
   const repeated = (await admin.workflows.snapshot(context.sessionId)).members.filter((member) => member.person.username === staff.username);
-  check(repeated.length === 1 && repeated[0].person.id === staffId, 'Repeating creation must not duplicate or replace the account.');
+  check(repeated.length === 1 && repeated[0]!.person.id === staffId, 'Repeating creation must not duplicate or replace the account.');
   const recovered = await admin.admin.account(context.sessionId, { action: 'reset_password', userId: staffId });
   check(recovered.temporaryPassword, 'Organizer recovery must recover a password lost with the create response.');
   const staffClient = await context.connect();

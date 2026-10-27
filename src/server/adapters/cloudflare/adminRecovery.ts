@@ -1,4 +1,4 @@
-import type { D1Connection, D1Statement } from '../d1/connection';
+import type { D1Connection, D1Statement, D1Value } from '../d1/connection';
 import { beginCredentialReset, completeCredentialReset, insertPendingReset } from './credentialReset';
 import { passwordHasher, randomSecret, type PasswordHasher } from './password';
 
@@ -44,26 +44,32 @@ const adminRoleSql = `SELECT 1 FROM accounts a
       )
     )`;
 
-function statement(db: D1Connection, sql: string, ...values: Array<string | number | null>): D1Statement {
+function statement(db: D1Connection, sql: string, ...values: D1Value[]): D1Statement {
   return db.prepare(sql).bind(...values);
 }
 
-function assertion(db: D1Connection, id: string, sql: string, ...values: Array<string | number | null>): D1Statement {
+function assertion(db: D1Connection, id: string, sql: string, ...values: D1Value[]): D1Statement {
   return statement(db, `INSERT INTO command_assertions (id, valid) VALUES (?, CASE WHEN EXISTS (${sql}) THEN 1 ELSE 0 END)`, id, ...values);
 }
 
-function selectorError(selector: AdminRecoverySelector): { username?: string; userId?: string } {
-  const hasUsername = selector.username !== undefined;
-  const hasUserId = selector.userId !== undefined;
-  if (hasUsername === hasUserId) throw new Error('Provide a username or an account ID. Recovery did not start.');
-  if (hasUsername) {
-    const username = selector.username!.trim().toLowerCase();
-    if (!usernamePattern.test(username)) throw new Error('The username is invalid. Recovery did not start.');
-    return { username };
+/** The normalized username or account ID that selects the account. */
+interface RecoveryKey {
+  byUsername: boolean;
+  key: string;
+}
+
+function parseSelector({ username, userId }: AdminRecoverySelector): RecoveryKey {
+  const oneSelector = 'Provide a username or an account ID. Recovery did not start.';
+  if (username !== undefined) {
+    if (userId !== undefined) throw new Error(oneSelector);
+    const key = username.trim().toLowerCase();
+    if (!usernamePattern.test(key)) throw new Error('The username is invalid. Recovery did not start.');
+    return { byUsername: true, key };
   }
-  const userId = selector.userId!.trim().toLowerCase();
-  if (!accountIdPattern.test(userId)) throw new Error('The account ID is invalid. Recovery did not start.');
-  return { userId };
+  if (userId === undefined) throw new Error(oneSelector);
+  const key = userId.trim().toLowerCase();
+  if (!accountIdPattern.test(key)) throw new Error('The account ID is invalid. Recovery did not start.');
+  return { byUsername: false, key };
 }
 
 /**
@@ -75,7 +81,7 @@ export async function recoverCloudflareAdmin(
   selector: AdminRecoverySelector,
   options: RecoveryOptions = {},
 ): Promise<AdminRecoveryResult> {
-  const identity = selectorError(selector);
+  const { byUsername, key } = parseSelector(selector);
   const lookupSql = `SELECT a.id, a.name, a.username, a.disabled, a.credential_generation,
       (
         SELECT session_id FROM (
@@ -93,10 +99,10 @@ export async function recoverCloudflareAdmin(
         LIMIT 1
       ) AS session_id
     FROM accounts a
-    WHERE ${identity.username ? 'a.username = ?' : 'a.id = ?'}`;
-  const target = await statement(db, lookupSql, identity.username ?? identity.userId!).first<RecoveryTarget>();
+    WHERE ${byUsername ? 'a.username = ?' : 'a.id = ?'}`;
+  const target = await statement(db, lookupSql, key).first<RecoveryTarget>();
   if (!target) {
-    throw new Error(identity.username
+    throw new Error(byUsername
       ? 'No account matches that username. Recovery did not start.'
       : 'No account matches that account ID. Recovery did not start.');
   }

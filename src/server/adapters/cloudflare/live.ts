@@ -204,7 +204,9 @@ export class SessionLiveCoordinator {
       close(server, 1011, 'Updates are unavailable. Reconnect.');
       throw error;
     }
-    return new Response(null, { status: 101, webSocket: pair[0] } as ResponseInit & { webSocket: LiveSocket });
+    // Workers accept a webSocket field that the DOM ResponseInit type lacks.
+    const upgrade: ResponseInit & { webSocket: LiveSocket } = { status: 101, webSocket: pair[0] };
+    return new Response(null, upgrade);
   }
 
   private async notify({ sessionId, audiences }: Signal): Promise<void> {
@@ -242,7 +244,7 @@ export class SessionLiveCoordinator {
 
   private async cleanup(target: CleanupTarget, prepare: boolean): Promise<Response> {
     const stored = await this.state.storage.get<CleanupTarget>('fixtureCleanup');
-    if (stored && !Object.keys(target).every((key) => stored[key as keyof CleanupTarget] === target[key as keyof CleanupTarget])) {
+    if (stored && (stored.sessionId !== target.sessionId || stored.eventId !== target.eventId || stored.runId !== target.runId)) {
       return new Response(null, { status: 409 });
     }
     const records = await this.state.storage.list();

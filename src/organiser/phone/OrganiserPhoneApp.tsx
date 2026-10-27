@@ -138,7 +138,8 @@ export function OrganiserPhoneApp({
   }
 
   const tabs = organiserTabs(member);
-  const currentTab = tabs.includes(tab) ? tab : tabs[0];
+  // Every person has the Me tab, so the list is never empty.
+  const currentTab = tabs.includes(tab) ? tab : tabs[0] ?? "me";
   const archived = Boolean(state.event?.archived);
   const canReport = isStaff(member);
 
@@ -154,12 +155,13 @@ export function OrganiserPhoneApp({
     focusLater(`issue-card-${issueId}`, headingId);
   }
 
-  function cardAction(issue: Issue): CardAction | undefined {
-    const can = issueAbilities(issue, state!, member!);
+  // An arrow keeps the narrowing of state and member from the guard above.
+  const cardAction = (issue: Issue): CardAction | undefined => {
+    const can = issueAbilities(issue, state, member);
     if (can.accept) return "accept";
     if (can.claim) return "claim";
     return undefined;
-  }
+  };
 
   function runCardAction(issue: Issue, action: CardAction) {
     const mark = workflow.selectionMark();

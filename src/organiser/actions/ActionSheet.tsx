@@ -30,7 +30,7 @@ export function ActionSheet({
   open: boolean;
   onOpenChange: (open: boolean) => void;
   title: string;
-  description?: string;
+  description?: string | undefined;
   showCancel?: boolean;
   onClosed?: () => void;
   children: ReactNode;

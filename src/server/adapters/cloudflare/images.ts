@@ -4,7 +4,7 @@ import { ImageRequestError } from '../../../backend/errors';
 import { attachmentPath, imageKind, THUMBNAIL_BYTES } from '../../../connected/imageFile';
 import type { Caller } from '../../authentication';
 import { equalWorkflowJson } from '../../workflow';
-import type { D1Connection, D1Statement } from '../d1/connection';
+import type { D1Connection, D1Statement, D1Value } from '../d1/connection';
 import { currentAccessBindings, currentAccessSql, currentReadyLoginBindings, currentReadyLoginSql, notificationStatements } from './application';
 
 export interface PrivateObject {
@@ -43,7 +43,6 @@ const beginSchema = z.strictObject({
   bytes: z.number().int().positive().max(52_428_800),
 });
 const pathSchema = z.tuple([z.uuid(), z.uuid(), z.uuid(), z.enum(['original', 'thumbnail'])]);
-type Value = string | number | null;
 const now = "strftime('%Y-%m-%dT%H:%M:%fZ', 'now')";
 const imageSql = `SELECT x.*, i.team_id, s.max_image_bytes, s.max_images_per_issue,
   s.max_image_bytes_per_issue, e.archived, c.staff, (x.expires_at <= unixepoch()) AS expired
@@ -94,7 +93,7 @@ export async function storedImage(bucket: PrivateBucket, path: string): Promise<
 export class R2ImageService {
   constructor(private readonly db: D1Connection, private readonly bucket: PrivateBucket) {}
 
-  private statement(sql: string, ...values: Value[]): D1Statement { return this.db.prepare(sql).bind(...values); }
+  private statement(sql: string, ...values: D1Value[]): D1Statement { return this.db.prepare(sql).bind(...values); }
 
   private async image(caller: Caller, sessionId: string, id: string, write = false, ownedCleanup = false): Promise<Image> {
     if (!z.uuid().safeParse(sessionId).success || !z.uuid().safeParse(id).success) {
@@ -108,7 +107,7 @@ export class R2ImageService {
     return row;
   }
 
-  private assertion(id: string, sql: string, ...values: Value[]): D1Statement {
+  private assertion(id: string, sql: string, ...values: D1Value[]): D1Statement {
     return this.statement(`INSERT INTO command_assertions (id, valid) VALUES (?, CASE WHEN EXISTS (${sql}) THEN 1 ELSE 0 END)`, id, ...values);
   }
 
@@ -307,7 +306,8 @@ export class R2ImageService {
     const allowed = (row: Image) => row.state === 'ready' && (row.staff || row.visibility === 'public') &&
       path === (kind === 'original' ? row.original_path : row.thumbnail_path);
     const row = await this.image(caller, sessionId, id);
-    if (!allowed(row)) throw new ImageRequestError('Image unavailable.', { validation: true });
+    const contentType = kind === 'original' ? row.content_type : row.thumbnail_content_type;
+    if (!allowed(row) || !contentType) throw new ImageRequestError('Image unavailable.', { validation: true });
     const object = await this.bucket.get(path);
     if (!object) throw new ImageRequestError('Image unavailable.');
     // R2 awaits cannot carry an earlier database authorization into a response.
@@ -318,7 +318,7 @@ export class R2ImageService {
       await object.body.cancel();
       throw error;
     }
-    return { body: object.body, contentType: kind === 'original' ? row.content_type! : row.thumbnail_content_type! };
+    return { body: object.body, contentType };
   }
 
   /** Retry exact tombstone keys. Retain tasks so an interrupted late PUT is found. */

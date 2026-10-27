@@ -197,7 +197,7 @@ describe('Cloudflare private images with local D1 and R2 bindings', () => {
       ['a'.repeat(201), 'a'.repeat(200)],
       ['a'.repeat(255), 'a'.repeat(200)],
       ['😀'.repeat(250), '😀'.repeat(200)],
-    ]) {
+    ] as const) {
       const image = await reserve({ name });
       expect((await record(image.id))?.original_name).toBe(expected);
     }
@@ -360,7 +360,7 @@ describe('Cloudflare private images with local D1 and R2 bindings', () => {
         membership: ['DELETE FROM memberships WHERE account_id = ?', fixture.staff.accountId],
         staff: ['DELETE FROM membership_roles WHERE account_id = ?', fixture.staff.accountId],
       };
-      await statement(...sql[change]).run();
+      await statement(...sql[change]!).run();
       await expect(bytes(image.original_path)).rejects.toThrow();
       await expect(bytes(image.thumbnail_path)).rejects.toThrow();
     });
@@ -385,7 +385,7 @@ describe('Cloudflare private images with local D1 and R2 bindings', () => {
         expired_login: ['UPDATE logins SET expires_at = unixepoch() - 1 WHERE id = ?', fixture.staff.loginId],
         archived: ['UPDATE events SET archived = 1 WHERE id = ?', fixture.eventId],
       };
-      const racing = beforeBatch(() => statement(...sql[change]).run());
+      const racing = beforeBatch(() => statement(...sql[change]!).run());
       await expect(racing.finish(fixture.staff, fixture.sessionId, image.id)).rejects.toThrow();
       expect((await record(image.id))?.state).toBe('pending');
       expect(await fixture.rows('SELECT id FROM history WHERE issue_id = ?', fixture.issueId)).toEqual([]);
@@ -406,7 +406,7 @@ describe('Cloudflare private images with local D1 and R2 bindings', () => {
           generation: ['UPDATE accounts SET credential_generation = credential_generation + 1 WHERE id = ?', fixture.staff.accountId],
           must_change: ['UPDATE accounts SET must_change = 1 WHERE id = ?', fixture.staff.accountId],
         };
-        const racing = changeAtFinalGuard(...changes[restriction]);
+        const racing = changeAtFinalGuard(...changes[restriction]!);
         const before = await guardedEffects();
         const result = operation === 'begin' ? reserve({}, racing)
           : operation === 'finish' ? racing.finish(fixture.staff, fixture.sessionId, image!.id)
@@ -435,7 +435,7 @@ describe('Cloudflare private images with local D1 and R2 bindings', () => {
         revoked: ['UPDATE logins SET revoked = 1 WHERE id = ?', fixture.staff.loginId],
         expired_identity: ["UPDATE ba_session SET expiresAt = '2000-01-01T00:00:00.000Z' WHERE userId = ?", fixture.staff.accountId],
       };
-      const racing = beforeBatch(() => statement(...sql[change]).run());
+      const racing = beforeBatch(() => statement(...sql[change]!).run());
       await expect(racing.remove(fixture.staff, fixture.sessionId, image.id)).rejects.toThrow();
       expect((await record(image.id))?.state).toBe('ready');
       expect(await fixture.rows('SELECT text FROM history WHERE issue_id = ?', fixture.issueId)).toEqual([{ text: 'Image added.' }]);
@@ -500,7 +500,7 @@ describe('Cloudflare private images with local D1 and R2 bindings', () => {
     const racing = new R2ImageService({
       prepare: (sql) => db.prepare(sql),
       batch: (statements) => db.batch([
-        statements[0],
+        statements[0]!,
         // Advance this reservation's deadline between the two SQL statements.
         // This models database time crossing expiry without a wall-clock delay.
         statement('UPDATE issue_images SET expires_at = unixepoch() - 1 WHERE id = ?', image.id),
@@ -512,7 +512,7 @@ describe('Cloudflare private images with local D1 and R2 bindings', () => {
     const tasks = await fixture.rows('SELECT attachment_id FROM image_deletions WHERE attachment_id = ?', image.id);
     expect(first?.state === 'pending' || tasks.length === 1).toBe(true);
     await service.recover(fixture.sessionId);
-    expect(await record(image.id)).toMatchObject({ state: 'expired', files_removed_at: expect.any(String) });
+    expect(await record(image.id)).toMatchObject({ state: 'expired', files_removed_at: expect.any(String) as unknown });
     expect(await bucket.get(image.original_path)).toBeNull();
   });
 

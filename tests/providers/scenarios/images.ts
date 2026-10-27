@@ -90,7 +90,7 @@ export async function images(context: ScenarioContext): Promise<void> {
     item.issue_id === id
   );
   check(
-    teamImages.length === 1 && teamImages[0].visibility === 'public',
+    teamImages.length === 1 && teamImages[0]!.visibility === 'public',
     'The team must receive only team-visible image metadata.',
   );
   for (const image of paths) {

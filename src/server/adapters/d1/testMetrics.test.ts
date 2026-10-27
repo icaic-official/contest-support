@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 import { getPlatformProxy } from 'wrangler';
-import type { D1Connection } from './connection';
+import type { D1Binding } from './connection';
 import { measureD1 } from './testMetrics';
 import { D1Fixture, applyMigrations } from './testFixture';
 import { D1AuthenticationService } from '../cloudflare/authentication';
@@ -8,7 +8,7 @@ import { createBetterAuthIdentity } from '../cloudflare/identity';
 import { passwordHasher, randomSecret } from '../cloudflare/password';
 
 it('measures the real D1 transport without exposing data or changing batch rollback', async () => {
-  const platform = await getPlatformProxy<{ DB: D1Connection }>({
+  const platform = await getPlatformProxy<{ DB: D1Binding }>({
     configPath: 'src/server/adapters/cloudflare/deploy/connector-store-ci.wrangler.jsonc', persist: false, remoteBindings: false, envFiles: [],
   });
   const lines: string[] = [];
@@ -28,7 +28,7 @@ it('measures the real D1 transport without exposing data or changing batch rollb
     await expect(failure).rejects.toThrow();
     expect((await db.prepare('SELECT id FROM measurements ORDER BY id').all()).results).toEqual([{ id: 1 }]);
     metrics.flush();
-    const summary = JSON.parse(lines.at(-1)!.slice('MINSKY_D1_METRICS '.length));
+    const summary = JSON.parse(lines.at(-1)!.slice('MINSKY_D1_METRICS '.length)) as { wallMs: number; sqlMs: number };
     expect(summary).toMatchObject({ calls: 5, statements: 6, inFlight: 0 });
     expect(summary.wallMs).toBeGreaterThanOrEqual(0);
     expect(summary.sqlMs).toBeGreaterThanOrEqual(0);
@@ -41,7 +41,7 @@ it('measures the real D1 transport without exposing data or changing batch rollb
 }, 120_000);
 
 it('keeps native D1 capabilities used by the maintained identity adapter', async () => {
-  const platform = await getPlatformProxy<{ DB: D1Connection }>({
+  const platform = await getPlatformProxy<{ DB: D1Binding }>({
     configPath: 'src/server/adapters/cloudflare/deploy/connector-store-ci.wrangler.jsonc', persist: false, remoteBindings: false, envFiles: [],
   });
   const lines: string[] = [];
@@ -63,12 +63,12 @@ it('keeps native D1 capabilities used by the maintained identity adapter', async
       fixture.statement(`INSERT INTO ba_account (id, accountId, providerId, userId, password, createdAt, updatedAt)
         VALUES (?, ?, 'credential', ?, ?, ?, ?)`, crypto.randomUUID(), id, id, await passwordHasher.hash(password), now, now),
     ]);
-    const identity = createBetterAuthIdentity(db as Parameters<typeof createBetterAuthIdentity>[0], {
+    const identity = createBetterAuthIdentity(db, {
       origin: 'http://127.0.0.1:8788', secret: randomSecret(), secureCookies: false,
     });
     const service = new D1AuthenticationService(db, identity, passwordHasher);
     const signed = await service.signIn(username, password);
-    const current = await service.current(new Headers({ cookie: signed.cookie.split(';')[0] }));
+    const current = await service.current(new Headers({ cookie: signed.cookie.split(';')[0]! }));
     expect(current?.user.id).toBe(id);
     expect(lines.join('\n')).not.toContain(password);
     expect(lines.join('\n')).not.toContain(signed.cookie);

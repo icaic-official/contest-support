@@ -18,16 +18,16 @@ async function request(page: Page, path: string, body?: object, csrf: 'current' 
       headers['X-Minsky-Request'] = '1';
       if (csrf === 'current') {
         const current = await fetch('/api/auth/session', { cache: 'no-store' });
-        if (current.ok) headers['X-CSRF-Token'] = (await current.json()).csrf;
+        if (current.ok) headers['X-CSRF-Token'] = (await current.json() as { csrf: string }).csrf;
       } else if (csrf === 'wrong') headers['X-CSRF-Token'] = 'incorrect-fixture-token';
     }
     const response = await fetch(path, {
       method: body ? 'POST' : 'GET',
       headers,
-      body: body ? JSON.stringify(body) : undefined,
+      body: body ? JSON.stringify(body) : null,
       cache: 'no-store',
     });
-    return { status: response.status, body: await response.json() };
+    return { status: response.status, body: await response.json() as { user: { id: string }; status: { must_change: boolean } } };
   }, { path, body, csrf });
 }
 
@@ -38,7 +38,7 @@ test.describe('Worker authentication browser security', () => {
     const id = randomUUID();
     const result = await api.post(`${origin}/__fixture/${id}`, { headers: { 'X-Minsky-Fixture': '1' } });
     expect(result.status()).toBe(201);
-    fixture = await result.json();
+    fixture = await result.json() as Fixture;
     await page.goto(origin);
   });
 
@@ -46,7 +46,7 @@ test.describe('Worker authentication browser security', () => {
     if (!fixture) return;
     const result = await api.delete(`${origin}/__fixture/${fixture.id}`, { headers: { 'X-Minsky-Fixture': '1' } });
     expect(result.status()).toBe(200);
-    expect((await result.json()).remaining).toBe(0);
+    expect((await result.json() as { remaining: number }).remaining).toBe(0);
   });
 
   test('keeps cookies private, restores sessions, enforces password changes, and revokes logout', async ({ page, context }) => {

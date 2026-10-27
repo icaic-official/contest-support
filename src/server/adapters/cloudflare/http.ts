@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { ImageRequestError } from '../../../backend/errors';
 import { AVATAR_MAX_BYTES } from '../../../connected/imageFile';
 import { roleSchema } from '../../../connected/model';
-import { readBody, readJsonBody } from '../../http';
+import { hasJsonBody, readBody, readJsonBody } from '../../http';
 import { AuthenticationError, type AuthenticationService, type Caller } from '../../authentication';
 import type { WorkflowService } from '../../workflow';
 import type { D1ApplicationService } from './application';
@@ -136,7 +136,7 @@ export function createApplicationHandler(services: ApplicationHttpServices, orig
           request.headers.get('Content-Type') ?? '', request.headers.get('X-Minsky-Digest') ?? '', Number(lengthHeader));
         return privateJson({});
       }
-      if (request.headers.get('Content-Type')?.split(';')[0].trim().toLowerCase() !== 'application/json') {
+      if (!hasJsonBody(request)) {
         throw new AuthenticationError(400, 'A JSON request body is required.');
       }
       const body = await readJsonBody(request, url.pathname === '/api/announcements' ? announcementBodyLimit

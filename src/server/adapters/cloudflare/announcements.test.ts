@@ -239,7 +239,7 @@ describe('Cloudflare session announcements with local D1 and R2 bindings', () =>
       service.execute(caller, fixture.sessionId, randomUUID(), { ...edit, revision: 1, title: `Race ${index}` })));
     expect(racing.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
     expect(racing.find((result) => result.status === 'rejected')).toMatchObject({ reason: { reason: 'conflict' } });
-    expect((await read(admin)).announcements[0].revision).toBe(2);
+    expect((await read(admin)).announcements[0]!.revision).toBe(2);
   });
 
   it('hides removed announcements from everyone, keeps their records, and keeps expired ones for managers', async () => {
@@ -283,7 +283,7 @@ describe('Cloudflare session announcements with local D1 and R2 bindings', () =>
     await transfer(image.path);
     await Promise.all([images.finish(admin, fixture.sessionId, image.id), images.finish(admin, fixture.sessionId, image.id)]);
     const [announcement] = (await read(contestant)).announcements;
-    expect(announcement.revision).toBe(1);
+    expect(announcement!.revision).toBe(1);
     const snapshot = await read(contestant);
     expect(snapshot.images).toMatchObject([{ id: image.id, announcement_id: id, uploader: admin.accountId, bytes: png.byteLength, content_type: 'image/png' }]);
     expect(await bytesOf(image.path, contestant)).toEqual(png);
@@ -342,7 +342,7 @@ describe('Cloudflare session announcements with local D1 and R2 bindings', () =>
     expect(await statement('SELECT state, deleted_by FROM announcement_images WHERE id = ?', image.id).first())
       .toEqual({ state: 'deleted', deleted_by: jury.accountId });
     expect((await read(contestant)).images).toEqual([]);
-    expect((await read(admin)).announcements[0].revision).toBe(2);
+    expect((await read(admin)).announcements[0]!.revision).toBe(2);
   });
 
   it('says that the event is archived for a manager, and keeps the permission message for others', async () => {

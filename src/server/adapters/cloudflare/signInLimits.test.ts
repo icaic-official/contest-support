@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { getPlatformProxy } from 'wrangler';
-import type { D1Connection } from '../d1/connection';
+import type { D1Binding } from '../d1/connection';
 import { applyMigrations } from '../d1/testFixture';
 import applicationWorker, { type ApplicationEnvironment } from './applicationWorker';
 import { signInFailureLimits } from './authentication';
@@ -22,7 +22,7 @@ const password = 'Fictional venue password 1';
 const timeout = 300_000;
 
 describe('sign-in failure limits at the Worker boundary with real local D1', () => {
-  let db: D1Connection;
+  let db: D1Binding;
   let dispose: () => Promise<void>;
   let env: ApplicationEnvironment;
   const run = randomUUID().replaceAll('-', '').slice(0, 8);
@@ -65,7 +65,7 @@ describe('sign-in failure limits at the Worker boundary with real local D1', () 
   const counter = async (key: string) => (await counters()).filter((row) => row.key === key);
 
   beforeAll(async () => {
-    const platform = await getPlatformProxy<{ DB: D1Connection }>({
+    const platform = await getPlatformProxy<{ DB: D1Binding }>({
       configPath: 'wrangler.auth-ci.jsonc', persist: false, remoteBindings: false, envFiles: [],
     });
     db = platform.env.DB;
@@ -102,28 +102,28 @@ describe('sign-in failure limits at the Worker boundary with real local D1', () 
 
     // The 200th failure fills the ceiling. The next attempt, even with the correct password, is refused.
     expect(await signIn(ip, `ghost_${run}_0`, 'Fictional wrong password')).toBe(401);
-    expect(await signIn(ip, names[0])).toBe(429);
+    expect(await signIn(ip, names[0]!)).toBe(429);
     expect(await signIn(ip, `ghost_${run}_1`, 'Fictional wrong password')).toBe(429);
     // A refused attempt does not add to the count or extend the window.
     expect(await counter(key)).toEqual([{ key, attempts: signInFailureLimits.perIp }]);
-    expect(await signIn('198.51.100.3', names[0])).toBe(200);
+    expect(await signIn('198.51.100.3', names[0]!)).toBe(200);
     await db.prepare('UPDATE authentication_limits SET window_start = unixepoch() - 901 WHERE key = ?').bind(key).run();
-    expect(await signIn(ip, names[0])).toBe(200);
+    expect(await signIn(ip, names[0]!)).toBe(200);
   }, timeout);
 
   it('locks only the username with 10 failures and leaves other users on the same IP alone', async () => {
     const [target, other] = await createAccounts('lock', 2);
     const ip = '198.51.100.4';
     for (let index = 0; index < signInFailureLimits.perUsername; index++) {
-      expect(await signIn(ip, target, 'Fictional wrong password')).toBe(401);
+      expect(await signIn(ip, target!, 'Fictional wrong password')).toBe(401);
     }
-    expect(await signIn(ip, target)).toBe(429);
-    expect(await signIn('198.51.100.5', target)).toBe(429);
-    expect(await signIn(ip, other)).toBe(200);
+    expect(await signIn(ip, target!)).toBe(429);
+    expect(await signIn('198.51.100.5', target!)).toBe(429);
+    expect(await signIn(ip, other!)).toBe(200);
     // The IP count is far below its ceiling, so only the username refuses.
     const key = await ipKey(ip);
     expect(await counter(key)).toEqual([{ key, attempts: signInFailureLimits.perUsername }]);
     await db.prepare('UPDATE authentication_limits SET window_start = unixepoch() - 901 WHERE key = ?').bind(`username:${target}`).run();
-    expect(await signIn(ip, target)).toBe(200);
+    expect(await signIn(ip, target!)).toBe(200);
   }, timeout);
 });

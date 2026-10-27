@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { getPlatformProxy } from 'wrangler';
-import type { D1Connection } from '../d1/connection';
+import type { D1Binding } from '../d1/connection';
 import { applyMigrations } from '../d1/testFixture';
 import applicationWorker, { type ApplicationEnvironment } from './applicationWorker';
 import { bootstrapInstallation } from './installation';
@@ -12,12 +12,12 @@ const origin = 'https://isolated-installation.example.invalid';
 const timeout = 120_000;
 
 describe('full Worker installation boundary with real local D1', () => {
-  let db: D1Connection;
+  let db: D1Binding;
   let dispose: () => Promise<void>;
   let env: ApplicationEnvironment;
 
   beforeAll(async () => {
-    const platform = await getPlatformProxy<{ DB: D1Connection }>({
+    const platform = await getPlatformProxy<{ DB: D1Binding }>({
       configPath: 'wrangler.auth-ci.jsonc', persist: false, remoteBindings: false, envFiles: [],
     });
     db = platform.env.DB;

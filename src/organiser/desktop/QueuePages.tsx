@@ -102,7 +102,7 @@ export function QueuePage({
   teamSelection: TeamSelection;
   onTeamSelection: (selection: TeamSelection) => void;
   /** Opens the report dialog. Omit it when the person cannot report. */
-  onReport?: () => void;
+  onReport?: (() => void) | undefined;
 }) {
   const { state, member, workflow, now } = props;
   const [sort, setSort] = useState(defaultQueueSort);
@@ -301,7 +301,7 @@ export function TeamsPage({
   teamId: string | undefined;
   onTeam: (teamId: string | undefined) => void;
   /** Opens the report dialog for a team. Omit it when the person cannot report. */
-  onReport?: (teamId: string) => void;
+  onReport?: ((teamId: string) => void) | undefined;
 }) {
   const { state, member, workflow, now } = props;
   const id = useId();

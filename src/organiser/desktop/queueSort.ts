@@ -1,11 +1,9 @@
 import {
   type Issue,
   type Resolution,
-  type Snapshot,
+  type Team,
   unresolvedTime,
 } from "@/connected/model";
-
-type Team = Snapshot["teams"][number];
 
 export type QueueSortKey =
   "issue" | "status" | "report" | "team" | "owner" | "unresolved";

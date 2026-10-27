@@ -1,13 +1,13 @@
 import { createAuthenticationHandler } from '../../authenticationHttp';
 import { AuthenticationError } from '../../authentication';
-import type { D1Connection } from '../d1/connection';
+import type { D1Binding } from '../d1/connection';
 import { D1AuthenticationService, signInFailureLimits } from './authentication';
 import { sharedBetterAuthIdentity } from './identity';
 import { passwordHasher } from './password';
 import { logEvent, requestFields } from './log';
 
 interface Environment {
-  DB: D1Connection;
+  DB: D1Binding;
   AUTH_ORIGIN: string;
   AUTH_SECRET: string;
 }
@@ -18,7 +18,7 @@ export default {
     try {
       // The application port narrows D1's surface. The runtime binding also has
       // exec(), which Better Auth uses to recognize its native D1 adapter.
-      const identity = sharedBetterAuthIdentity(env.DB as Parameters<typeof sharedBetterAuthIdentity>[0], {
+      const identity = sharedBetterAuthIdentity(env.DB, {
         origin: env.AUTH_ORIGIN, secret: env.AUTH_SECRET, secureCookies: true,
       });
       const service = new D1AuthenticationService(env.DB, identity, passwordHasher);

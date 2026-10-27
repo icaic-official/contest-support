@@ -5,8 +5,9 @@ import type { ShellProps } from "@/connected/shell";
 /** The inline action of a queue row. */
 export type RowAction = "claim" | "accept";
 
-/** A tab of the issue side sheet. */
-export type SheetTab = "activity" | "images" | "outcome";
+/** The tabs of the issue side sheet. */
+export const sheetTabs = ["activity", "images", "outcome"] as const;
+export type SheetTab = (typeof sheetTabs)[number];
 
 /** What every console page needs from the shell. */
 export interface ConsolePageProps {

@@ -24,7 +24,7 @@ export interface AnnouncementData {
 
 interface Loaded {
   audience: string;
-  snapshot?: AnnouncementSnapshot;
+  snapshot: AnnouncementSnapshot | undefined;
   error: string;
 }
 

@@ -4,9 +4,7 @@ import { rosterCommandSchema, rosterKey } from '../../../connected/roster';
 import { snapshotSchema, type Snapshot } from '../../../connected/model';
 import type { Caller } from '../../authentication';
 import { AuthenticationError } from '../../authentication';
-import type { D1Connection, D1Statement } from '../d1/connection';
-
-type BindValue = string | number | null;
+import type { D1Connection, D1Statement, D1Value } from '../d1/connection';
 
 export interface CurrentAccessRow {
   account_id: string;
@@ -57,7 +55,7 @@ export const currentAccessSql = accessSql('a.id = ? AND l.id = ? AND m.session_i
 // D1's 100 bound-parameter limit. Match each row on account_id and login_id.
 export const currentAccessForLoginsSql = accessSql('m.session_id = ? AND l.id IN (SELECT value FROM json_each(?))');
 
-export function currentAccessBindings(caller: Caller, sessionId: string): BindValue[] {
+export function currentAccessBindings(caller: Caller, sessionId: string): D1Value[] {
   return [caller.accountId, caller.loginId, sessionId];
 }
 
@@ -82,7 +80,7 @@ export const currentReadyLoginSql = `SELECT a.id FROM accounts a JOIN logins l O
     AND l.credential_generation = a.credential_generation
     AND b.expiresAt > strftime('%Y-%m-%dT%H:%M:%fZ', 'now')`;
 
-export function currentReadyLoginBindings(caller: Caller): BindValue[] {
+export function currentReadyLoginBindings(caller: Caller): D1Value[] {
   return [caller.accountId, caller.loginId];
 }
 
@@ -188,7 +186,7 @@ export const sessionsListSql = `SELECT s.id, s.name FROM sessions s
 export class D1ApplicationService {
   constructor(private readonly db: D1Connection) {}
 
-  private statement(sql: string, ...values: BindValue[]): D1Statement {
+  private statement(sql: string, ...values: D1Value[]): D1Statement {
     return this.db.prepare(sql).bind(...values);
   }
 
@@ -212,7 +210,7 @@ export class D1ApplicationService {
     return snapshotSchema.parse(JSON.parse(row.snapshot));
   }
 
-  private assertion(id: string, sql: string, ...values: BindValue[]): D1Statement {
+  private assertion(id: string, sql: string, ...values: D1Value[]): D1Statement {
     return this.statement(`INSERT INTO command_assertions (id, valid)
       VALUES (?, CASE WHEN EXISTS (${sql}) THEN 1 ELSE 0 END)`, id, ...values);
   }
@@ -301,9 +299,10 @@ export class D1ApplicationService {
     const command = parsed.data;
     const gate = await this.adminGate(caller, sessionId);
     const guardIds: string[] = [];
-    const guards = (...checks: Array<[string, ...BindValue[]]>) => checks.map(([sql, ...values]) => {
-      guardIds.push(crypto.randomUUID());
-      return this.assertion(guardIds.at(-1)!, sql, ...values);
+    const guards = (...checks: Array<[string, ...D1Value[]]>) => checks.map(([sql, ...values]) => {
+      const id = crypto.randomUUID();
+      guardIds.push(id);
+      return this.assertion(id, sql, ...values);
     });
     const changes = await this.rosterChanges(sessionId, command, guards);
     await this.commit(gate, [
@@ -317,7 +316,7 @@ export class D1ApplicationService {
   private async rosterChanges(
     sessionId: string,
     command: RosterCommand,
-    guards: (...checks: Array<[string, ...BindValue[]]>) => D1Statement[],
+    guards: (...checks: Array<[string, ...D1Value[]]>) => D1Statement[],
   ): Promise<{ statements: D1Statement[]; detail: object; audiences?: string[] }> {
     const teams = (await this.statement('SELECT id, name FROM teams WHERE session_id = ?', sessionId)
       .all<{ id: string; name: string }>()).results;
@@ -393,8 +392,8 @@ export class D1ApplicationService {
           WHERE session_id = ? AND category <> '' GROUP BY category ORDER BY category`, sessionId)
           .all<{ category: string; issues: number }>()).results;
         const stuck = used.filter((row) => !kept.has(row.category));
-        if (stuck.length) {
-          const [first] = stuck;
+        const [first] = stuck;
+        if (first) {
           throw new AuthenticationError(409, `${first.category} has ${first.issues} ${first.issues === 1 ? 'issue' : 'issues'} and stays in the list.${
             stuck.length > 1 ? ` ${stuck.length - 1} more ${stuck.length === 2 ? 'category stays' : 'categories stay'} too.` : ''}`);
         }

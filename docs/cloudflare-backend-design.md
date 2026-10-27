@@ -368,7 +368,7 @@ The local browser journey (`npm run test:connector:ui:local`) fails if any page 
 
 Vite puts a content hash in the name of every built file under `/assets/`, so a new build never reuses a URL. The Worker caches those files for a year.
 Every other asset keeps the `Cache-Control` value that Cloudflare sends, `public, max-age=0, must-revalidate`.
-This includes `/`, `/favicon.svg`, and the files in `/fonts/`.
+This includes `/` and `/favicon.svg`.
 The single-page fallback answers a missing `/assets/` name with the HTML shell and status 200, so the Worker does not cache an HTML response or an error response for a year.
 
 ## Separate installation and activation

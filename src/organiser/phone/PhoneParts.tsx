@@ -200,7 +200,7 @@ export function IssueCard({
   state: Snapshot;
   now: number;
   command: CommandRunner;
-  action?: CardAction;
+  action?: CardAction | undefined;
   onOpen: () => void;
   onAction: (action: CardAction) => void;
 }) {

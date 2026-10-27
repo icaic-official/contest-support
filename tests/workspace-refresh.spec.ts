@@ -247,8 +247,8 @@ for (const [layout, viewport] of viewports) {
       await form.send.click();
       await expect.poll(() => workflowRequests().length).toBe(2);
       const [first, second] = workflowRequests();
-      expect(second.requestId).not.toBe(first.requestId);
-      expect(second.command).toMatchObject({ type: 'message', text: 'Updated reply.' });
+      expect(second!.requestId).not.toBe(first!.requestId);
+      expect(second!.command).toMatchObject({ type: 'message', text: 'Updated reply.' });
     });
 
     test('an incoming issue preserves the displayed issue and sends its existing reply draft', async ({
@@ -259,7 +259,7 @@ for (const [layout, viewport] of viewports) {
       const form = await openReply(page);
       await form.message.fill('Keep this reply on the original issue.');
       state.issues.unshift({
-        ...state.issues[0],
+        ...state.issues[0]!,
         id: '00000000-0000-4000-8000-000000000301',
         number: 2,
         description: 'New incoming issue',
@@ -293,7 +293,7 @@ for (const [layout, viewport] of viewports) {
         const { state } = await openWorkspace(page, api, viewport);
         const requests: WorkflowRequest[] = [];
         await page.route('**/api/workflow', async (route) => {
-          const request: WorkflowRequest = route.request().postDataJSON();
+          const request = route.request().postDataJSON() as WorkflowRequest;
           const action = request.command;
           if (action.type !== 'message') throw new Error('Expected a reply request.');
           requests.push(request);
@@ -308,7 +308,7 @@ for (const [layout, viewport] of viewports) {
               text: action.text,
               visibility: action.visibility,
             });
-            if (action.visibility === 'public') state.issues[0].revision++;
+            if (action.visibility === 'public') state.issues[0]!.revision++;
           }
           if (requests.length <= 2) {
             await route.abort('failed');
@@ -351,7 +351,7 @@ for (const [layout, viewport] of viewports) {
           requestId: expect.any(String),
           command: {
             type: 'message',
-            issue_id: state.issues[0].id,
+            issue_id: state.issues[0]!.id,
             revision: 0,
             text: draft,
             visibility,
@@ -368,7 +368,7 @@ for (const [layout, viewport] of viewports) {
         }
         await expect(activityHeading(page)).toHaveText('Activity · 2 entries');
         expect(requests).toHaveLength(4);
-        expect(requests[3].requestId).not.toBe(requests[0].requestId);
+        expect(requests[3]!.requestId).not.toBe(requests[0]!.requestId);
         expect(state.history.map((item) => item.text)).toEqual([
           draft,
           'A fresh reply after the retry.',
@@ -430,15 +430,15 @@ for (const [layout, viewport] of viewports) {
       let sheet = await openAccount('Review helper');
       await sheet.getByText('Jury', { exact: true }).click();
       await expect(role(sheet, 'Jury')).toBeChecked();
-      state.members[0].person.name = 'Updated helper';
+      state.members[0]!.person.name = 'Updated helper';
       await refresh(page);
       // The account name updates and the unsaved choice stays.
       sheet = page.getByRole('dialog', { name: 'Updated helper', exact: true });
       await expect(sheet).toBeVisible();
       await expect(role(sheet, 'Jury')).toBeChecked();
 
-      state.members[0].membership.roles = ['volunteer', 'specialist'];
-      state.members[0].membership.is_admin = true;
+      state.members[0]!.membership.roles = ['volunteer', 'specialist'];
+      state.members[0]!.membership.is_admin = true;
       await refresh(page);
       await expect(role(sheet, 'Specialist')).toBeChecked();
       await expect(role(sheet, 'Admin')).toBeChecked();
@@ -457,8 +457,8 @@ for (const [layout, viewport] of viewports) {
         ]);
       await expect(sheet).toBeHidden();
 
-      state.members[0].membership = {
-        ...state.members[0].membership,
+      state.members[0]!.membership = {
+        ...state.members[0]!.membership,
         team_id: TEAM_ID,
         roles: [],
         is_admin: false,
@@ -494,7 +494,7 @@ for (const [layout, viewport] of viewports) {
       });
       await page.route('**/api/workflow', async (route) => {
         started();
-        const issue = state.issues[0];
+        const issue = state.issues[0]!;
         issue.status = 'claimed';
         issue.owner = USER_ID;
         issue.owner_name = 'Review administrator';
@@ -581,7 +581,7 @@ test('a committed submission retains its retry through an account-check failure'
       issueId = '00000000-0000-4000-8000-000000000301';
       receipts.set(requestId, issueId);
       state.issues.push({
-        ...state.issues[0],
+        ...state.issues[0]!,
         id: issueId,
         number: 2,
         category: command.category,
@@ -661,8 +661,8 @@ for (const nextUserId of [USER_ID, MEMBER_ID]) {
     await form.send.click();
     await expect.poll(() => workflowRequests().length).toBe(2);
     const [first, second] = workflowRequests();
-    expect(second.requestId).not.toBe(first.requestId);
-    expect(second.command).toMatchObject({
+    expect(second!.requestId).not.toBe(first!.requestId);
+    expect(second!.command).toMatchObject({
       type: 'message',
       text: 'A reply from the current actor.',
     });

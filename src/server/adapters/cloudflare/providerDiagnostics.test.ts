@@ -24,8 +24,8 @@ it('retains only endpoint enums, status counts, and numeric durations', async ()
     totalMilliseconds: 43, maxMilliseconds: 31, statuses: [{ status: 200, count: 1 }, { status: 503, count: 1 }] });
   expect(summary.requests[1]).toMatchObject({ endpoint: 'image', method: 'OTHER', count: 1 });
   expect(JSON.stringify(summary)).not.toContain(secret);
-  summary.requests[0].count = 999;
-  expect(diagnostics.summary().requests[0].count).toBe(2);
+  summary.requests[0]!.count = 999;
+  expect(diagnostics.summary().requests[0]!.count).toBe(2);
 });
 
 it('captures the first resource 401 and waits for its private state read before teardown', async () => {

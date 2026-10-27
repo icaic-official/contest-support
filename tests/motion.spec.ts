@@ -165,9 +165,9 @@ test('queue tabs: the indicator starts under the selected tab and slides to the 
   await expect(active).toHaveText(/Active 3\d/);
   await expect.poll(() => gap(pill, waiting, 'box')).toBeLessThan(1.5);
   const shifted = await stopTrail(page);
-  expect(shifted[shifted.length - 1]).toBeGreaterThan(shifted[0] + 3);
+  expect(shifted[shifted.length - 1]).toBeGreaterThan(shifted[0]! + 3);
   expect(
-    shifted.filter((left) => left > shifted[0] + 1 && left < shifted[shifted.length - 1] - 1),
+    shifted.filter((left) => left > shifted[0]! + 1 && left < shifted[shifted.length - 1]! - 1),
     'no frame shows the indicator on its way',
   ).toEqual([]);
   expect(fixture.errors).toEqual([]);
@@ -348,8 +348,8 @@ test.describe('reduced motion', () => {
     await expect.poll(() => gap(pill, waiting, 'box')).toBeLessThan(1.5);
     await page.waitForTimeout(100);
     const trail = await stopTrail(page);
-    const start = trail[0];
-    const end = trail[trail.length - 1];
+    const start = trail[0]!;
+    const end = trail[trail.length - 1]!;
     expect(end).toBeGreaterThan(start + 100);
     expect(trail.filter((left) => left > start + 2 && left < end - 2), 'no frame shows the indicator on its way').toEqual([]);
 

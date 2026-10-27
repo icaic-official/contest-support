@@ -83,7 +83,7 @@ describe('Cloudflare browser authentication transport', () => {
     const writes = requests.filter((request) => request.method === 'POST');
     expect(writes.map((request) => request.headers.get('X-CSRF-Token'))).toEqual(['csrf-1', 'csrf-1']);
     expect(requests.filter((request) => request.method === 'GET')).toHaveLength(1);
-    expect(await writes[0].json()).toEqual({ sessionId: SESSION_ID, command });
+    expect(await writes[0]!.json()).toEqual({ sessionId: SESSION_ID, command });
   });
 
   it('reads a new token after the login changes', async () => {
@@ -112,7 +112,7 @@ describe('Cloudflare browser authentication transport', () => {
     await vi.waitFor(() => expect(pending).toHaveLength(1));
     deferReads = false;
     await auth.signOut().catch(() => undefined);
-    pending[0](json({ user, status, csrf: 'csrf-old' }));
+    pending[0]!(json({ user, status, csrf: 'csrf-old' }));
     await stale;
     await auth.account(SESSION_ID, { action: 'reset_password', userId: ACCOUNT_ID });
     const last = requests.filter((request) => request.method === 'POST').at(-1);
@@ -129,7 +129,7 @@ describe('Cloudflare browser authentication transport', () => {
     expect(requests.map((request) => new URL(request.url).pathname)).toEqual([
       '/api/auth/session', '/api/auth/change-password', '/api/auth/session',
     ]);
-    expect(await requests[1].json()).toEqual({ currentPassword: 'fictional-old', newPassword: 'fictional-new' });
+    expect(await requests[1]!.json()).toEqual({ currentPassword: 'fictional-old', newPassword: 'fictional-new' });
     const restricted = setup((request) => request.method === 'POST' ? json({}) : json({ user, status: { ...status, must_change: true }, csrf: 'test' }));
     await expect(restricted.auth.changePassword('old', 'new')).rejects.toThrow('Sign in again');
   });
@@ -192,12 +192,12 @@ describe('Cloudflare browser authentication transport', () => {
 
         deferReads = false;
         signedIn = action !== 'signOut';
-        writes[0](json({}));
+        writes[0]!(json({}));
         await mutation;
         expect(changed).toHaveBeenLastCalledWith(signedIn ? user : undefined);
         const completedCalls = changed.mock.calls.slice();
         // An old cookie can also return 401 while password rotation replaces it.
-        pending[0](action === 'signOut' ? json({ user, status, csrf: 'test' }) : json({}, 401));
+        pending[0]!(action === 'signOut' ? json({ user, status, csrf: 'test' }) : json({}, 401));
         await vi.advanceTimersByTimeAsync(0);
         expect(changed.mock.calls).toEqual(completedCalls);
       } finally {
@@ -229,11 +229,11 @@ describe('Cloudflare browser authentication transport', () => {
       events.dispatchEvent(new Event('focus'));
       expect(pending).toHaveLength(1);
       revoked = statusCode === 401;
-      writes[0](json({ error: 'Unavailable' }, statusCode));
+      writes[0]!(json({ error: 'Unavailable' }, statusCode));
       await rejection;
       expect(changed).toHaveBeenLastCalledWith(revoked ? undefined : user);
       const completedCalls = changed.mock.calls.slice();
-      pending[0](revoked ? json({ user, status, csrf: 'test' }) : json({}, 401));
+      pending[0]!(revoked ? json({ user, status, csrf: 'test' }) : json({}, 401));
       await vi.advanceTimersByTimeAsync(0);
       expect(changed.mock.calls).toEqual(completedCalls);
 

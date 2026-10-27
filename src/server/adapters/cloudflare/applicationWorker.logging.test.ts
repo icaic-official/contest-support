@@ -14,7 +14,7 @@ afterEach(() => vi.restoreAllMocks());
 function failingEnvironment(): ApplicationEnvironment {
   const fail = () => { throw new Error(`database unavailable ${secret}`); };
   return {
-    DB: { prepare: fail, batch: fail, exec: fail } as unknown as ApplicationEnvironment['DB'],
+    DB: { prepare: fail, batch: fail, exec: fail },
     AUTH_ORIGIN: origin, AUTH_SECRET: secret,
     ASSETS: { fetch: async () => new Response(null, { status: 404 }) },
     IMAGES: { get: async () => null, put: async () => null, delete: async () => {} },
@@ -38,7 +38,7 @@ describe('Worker failure logging', () => {
       request('/api/auth/sign-in', { method: 'POST', body: JSON.stringify({ username: 'a', password: secret }) }),
       failingEnvironment(), context);
     expect(response.status).toBe(503);
-    expect(spy.mock.calls.map(([line]) => JSON.parse(String(line)))).toEqual([{
+    expect(spy.mock.calls.map(([line]) => JSON.parse(String(line)) as unknown)).toEqual([{
       level: 'error', event: 'worker.unhandled_error', route: '/api/auth/sign-in', method: 'POST',
       requestId: 'ray-test-1', status: 503, errorName: 'Error',
     }]);
@@ -60,7 +60,7 @@ describe('Worker failure logging', () => {
       expect(line).not.toContain(address);
       expect(line).not.toContain('database unavailable');
       expect(line).not.toContain('Bearer');
-      expect(() => JSON.parse(line)).not.toThrow();
+      expect(() => JSON.parse(line) as unknown).not.toThrow();
     }
   });
 });

@@ -31,12 +31,12 @@ export function NoSessionAccess({
 }: {
   data: SessionData;
   /** The username or email address of the signed-in account. */
-  account?: string;
+  account?: string | undefined;
   signOut: () => void;
   /** The error of the last workflow command, if any. */
   error?: string;
   /** Sends the pending workflow command again. Set it only while one waits. */
-  onRetry?: () => void;
+  onRetry?: (() => void) | undefined;
 }) {
   const { sessions, sessionId, loaded, refreshError } = data;
   const [refreshing, setRefreshing] = useState(false);

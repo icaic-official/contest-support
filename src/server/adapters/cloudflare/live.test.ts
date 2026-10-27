@@ -54,7 +54,7 @@ class FakeDatabase implements D1Connection {
         if (sql === 'SELECT id FROM sessions WHERE id = ?') return (this.sessions.has(String(values[0])) ? { id: values[0] } : null) as T | null;
         if (sql.includes('FROM sessions s JOIN events e')) {
           const session = this.sessions.get(String(values[0]));
-          return (session?.eventId === values[1] && `Provider contract ${session.runId}` === values[2] ? { owned: 1 } : null) as T | null;
+          return (session?.eventId === values[1] && `Provider contract ${session!.runId}` === values[2] ? { owned: 1 } : null) as T | null;
         }
         throw new Error(`Unexpected first: ${sql}`);
       },
@@ -254,7 +254,7 @@ describe('outbox retry fairness with real local D1', () => {
       } };
       const env: LiveEnvironment = { DB: flaky, LIVE_UPDATES: { idFromName: (name) => name, get: () => ({ fetch: (request) => coordinator.fetch(request) }) } };
       expect((await connectLive(new Request('https://example.invalid', { headers: { Upgrade: 'websocket' } }), env, fixture.staff, fixture.sessionId)).ok).toBe(true);
-      const socket = state.sockets[0];
+      const socket = state.sockets[0]!;
       await outbox(fixture.sessionId, ['staff']);
       expect(await dispatchNotifications(env)).toEqual({ delivered: 0, failed: 1 });
       expect(socket.messages).toHaveLength(2);
@@ -271,10 +271,10 @@ describe('outbox retry fairness with real local D1', () => {
     try {
       const [unavailable, healthy] = [fixture.sessionId, fixture.secondSessionId].sort();
       await db.batch([
-        fixture.statement("INSERT INTO audience_sequences (session_id, audience, sequence) VALUES (?, 'staff', 100), (?, 'staff', 1)", unavailable, healthy),
+        fixture.statement("INSERT INTO audience_sequences (session_id, audience, sequence) VALUES (?, 'staff', 100), (?, 'staff', 1)", unavailable!, healthy!),
         ...Array.from({ length: 100 }, (_, index) => fixture.statement(
-          "INSERT INTO notifications (id, session_id, audience, sequence) VALUES (?, ?, 'staff', ?)", randomUUID(), unavailable, index + 1)),
-        fixture.statement("INSERT INTO notifications (id, session_id, audience, sequence) VALUES (?, ?, 'staff', 1)", randomUUID(), healthy),
+          "INSERT INTO notifications (id, session_id, audience, sequence) VALUES (?, ?, 'staff', ?)", randomUUID(), unavailable!, index + 1)),
+        fixture.statement("INSERT INTO notifications (id, session_id, audience, sequence) VALUES (?, ?, 'staff', 1)", randomUUID(), healthy!),
       ]);
       const { env, requests } = recorder(async (sessionId) => sessionId === healthy ? 204 : 503);
       expect(await dispatchNotifications(env)).toEqual({ delivered: 1, failed: 100 });
@@ -282,7 +282,7 @@ describe('outbox retry fairness with real local D1', () => {
         [unavailable, [{ audience: 'staff', sequence: 100 }]], [healthy, [{ audience: 'staff', sequence: 1 }]]]));
       // A failed claim waits for its lease, so a burst of writes does not resend it at once.
       expect(await dispatchNotifications(env)).toEqual({ delivered: 0, failed: 0 });
-      expect(await fixture.rows('SELECT count(*) AS count FROM notifications WHERE session_id = ? AND delivered = 0 AND attempts = 1', unavailable))
+      expect(await fixture.rows('SELECT count(*) AS count FROM notifications WHERE session_id = ? AND delivered = 0 AND attempts = 1', unavailable!))
         .toEqual([{ count: 100 }]);
     } finally { await fixture.cleanup(); }
   }, 120_000);
@@ -334,7 +334,7 @@ describe('Durable Object live updates', () => {
     const test = fixture();
     const socket = await test.connect();
     expect(socket.messages).toEqual(['{"type":"ready"}']);
-    expect(socket.deserializeAttachment()).toEqual({ ...test.staff, sessionId: test.sessionId, expiresAt: expect.any(Number) });
+    expect(socket.deserializeAttachment()).toEqual({ ...test.staff, sessionId: test.sessionId, expiresAt: expect.any(Number) as unknown });
     expect(test.db.reads).toBe(1);
     expect(test.state.alarmAt).toBeGreaterThan(Date.now());
     expect(test.state.alarmAt).toBeLessThanOrEqual(Date.now() + 30_000);
@@ -420,7 +420,7 @@ describe('Durable Object live updates', () => {
     expect(test.state.alarmAt).toBe(expiry);
     test.db.access.clear();
     await test.coordinator.alarm();
-    expect(test.state.sockets[0].closed).toBe(true);
+    expect(test.state.sockets[0]!.closed).toBe(true);
   });
 
   it('closes a failed transport and lets a new connection refresh without poisoning dispatch', async () => {
@@ -439,7 +439,7 @@ describe('Durable Object live updates', () => {
     const test = fixture();
     const teams = [test.teamId, test.otherTeamId];
     const callers = Array.from({ length: 1000 }, (_, index) => {
-      const team = index % 5 === 0 ? null : teams[index % 2];
+      const team = index % 5 === 0 ? null : teams[index % 2]!;
       const caller = test.account(team === null, team);
       const socket = new FakeSocket();
       socket.serializeAttachment({ ...caller, sessionId: test.sessionId, expiresAt: Date.now() + 60_000 });
@@ -448,7 +448,7 @@ describe('Durable Object live updates', () => {
     });
     const revoked = callers.find(({ team }) => team === test.teamId)!;
     test.db.access.delete([revoked.caller.accountId, revoked.caller.loginId, test.sessionId].join(':'));
-    const teamLogin = callers.filter(({ team }) => team === test.teamId)[1].caller.loginId;
+    const teamLogin = callers.filter(({ team }) => team === test.teamId)[1]!.caller.loginId;
     const mispaired = new FakeSocket();
     mispaired.serializeAttachment({ accountId: test.staff.accountId, loginId: teamLogin, sessionId: test.sessionId, expiresAt: Date.now() + 60_000 });
     test.state.acceptWebSocket(mispaired);
@@ -608,7 +608,7 @@ describe('real local named maintenance service binding', () => {
       await applyMigrations(env.DB);
       const eventId = randomUUID();
       const runId = randomUUID();
-      const sessionIds = [randomUUID(), randomUUID()];
+      const sessionIds: [string, string] = [randomUUID(), randomUUID()];
       const controlEvent = randomUUID();
       const controlSession = randomUUID();
       await env.DB.batch([

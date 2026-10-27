@@ -6,9 +6,7 @@ import {
   rosterTextMax,
   teamsPerCommandMax,
 } from "@/connected/roster";
-import type { Issue, Snapshot } from "@/connected/model";
-
-type Team = Snapshot["teams"][number];
+import type { Issue, Snapshot, Team } from "@/connected/model";
 
 /** Sorts team names so that "Team 2" comes before "Team 10". */
 export const compareNames = new Intl.Collator(undefined, {
@@ -22,7 +20,7 @@ export interface TeamLine {
   line: number;
   name: string;
   location: string;
-  problem?: string;
+  problem: string | undefined;
 }
 
 function lineProblem(name: string, location: string): string | undefined {

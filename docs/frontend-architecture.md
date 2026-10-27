@@ -38,23 +38,9 @@ Always show a status with an icon or a label too. Do not use color alone.
 
 The redesigned screens use **Inter** for text and **JetBrains Mono** for timers.
 Both fonts come from `@fontsource-variable` packages and are part of the build. The app does not load fonts from a third-party server.
-The image preview page still uses Public Sans from `public/fonts/`, through `src/styles.css`.
 
 `src/lib/theme.ts` stores the light, dark or device theme choice in local storage.
 `applyTheme()` runs in `src/main.tsx` before the first render. `ThemeToggle` in `src/components/theme-toggle.tsx` lets a person change the theme.
-
-## Older workflow styles
-
-`src/styles.css` holds the styles of the workflow screens from before T0015.
-Every rule applies only inside an element with the `legacy-ui` class.
-`src/index.css` imports the file into the `legacy` cascade layer. That layer is above Tailwind's base styles and below shadcn components and Tailwind utilities.
-Thus the older element rules, such as `button` and `input`, cannot change shadcn components outside `.legacy-ui`.
-
-Do not put shadcn components inside a `.legacy-ui` element.
-No workspace screen uses `legacy-ui` any more. Only the image preview page (`src/connected/imagePreview.tsx`, `image-preview.html`) still uses it.
-The plan was that step 5 of T0015 removes the rules that the preview page does not use.
-This did not occur. On 2026-10-18, `src/styles.css` still has all 1,748 lines, and the Public Sans font in `public/fonts/` is still part of the build.
-The removal is a follow-up. Before you remove a rule, check the preview page in the browser.
 
 ## Backend access
 

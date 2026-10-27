@@ -126,7 +126,7 @@ export abstract class FixtureWorker {
       }
       const loss = write ? this.losses.findIndex((item) =>
         url.pathname === item.path || url.pathname.startsWith(`${item.path}/`)) : -1;
-      const stage = loss < 0 ? undefined : this.losses.splice(loss, 1)[0].stage;
+      const stage = loss < 0 ? undefined : this.losses.splice(loss, 1)[0]!.stage;
       if (stage === 'request') {
         await route.abort('failed');
         return;
@@ -136,7 +136,7 @@ export abstract class FixtureWorker {
       // Chromium adds the body length below the layer that Playwright intercepts.
       if (bytes) headers.set('Content-Length', String(bytes.byteLength));
       const response = await handler(new Request(url, {
-        method: request.method(), headers, body: bytes && new Uint8Array(bytes),
+        method: request.method(), headers, body: bytes ? new Uint8Array(bytes) : null,
       }));
       if (stage === 'response') {
         await route.abort('failed');

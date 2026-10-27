@@ -42,7 +42,7 @@ export interface Server {
   uploads: { requestId: string; bytes: Buffer }[];
   removals: number;
   /** The next upload fails with this error and stores nothing. */
-  failNextUpload?: ImageRequestError;
+  failNextUpload?: ImageRequestError | undefined;
 }
 
 let pictureCount = 0;

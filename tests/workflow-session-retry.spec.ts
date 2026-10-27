@@ -19,7 +19,7 @@ for (const committed of [false, true]) {
     );
     const requests: WorkflowRequest[] = [];
     await page.route('**/api/workflow', async (route) => {
-      const request: WorkflowRequest = route.request().postDataJSON();
+      const request = route.request().postDataJSON() as WorkflowRequest;
       requests.push(request);
       if (requests.length > 1) {
         await route.fallback();
@@ -56,7 +56,7 @@ for (const committed of [false, true]) {
     await expect(retry).toHaveCount(0);
     expect(requests).toHaveLength(2);
     expect(requests[1]).toEqual(requests[0]);
-    expect(requests[0].sessionId).toBe(originalSession);
+    expect(requests[0]!.sessionId).toBe(originalSession);
     // A retry still reaches the original server access check. It cannot create
     // the report under the contestant's membership in the other session.
     const recorded = await local.rows<{ session_id: string }>(
@@ -85,7 +85,7 @@ test('a response after the account gate remount keeps an explicit retry and does
     }
   });
   await page.route('**/api/workflow', async (route) => {
-    const request: WorkflowRequest = route.request().postDataJSON();
+    const request = route.request().postDataJSON() as WorkflowRequest;
     requests.push(request);
     if (requests.length > 1) {
       await route.fallback();
@@ -146,7 +146,7 @@ test('the account gate preserves a retry after all session access is removed', a
 }) => {
   const requests: WorkflowRequest[] = [];
   await page.route('**/api/workflow', async (route) => {
-    requests.push(route.request().postDataJSON());
+    requests.push(route.request().postDataJSON() as WorkflowRequest);
     if (requests.length > 1) {
       await route.fallback();
       return;
@@ -184,7 +184,7 @@ test('the account gate preserves a retry after all session access is removed', a
   await retry.click();
   await expect(retry).toHaveCount(0);
   expect(requests).toEqual([requests[0], requests[0]]);
-  expect(requests[0].sessionId).toBe(local.sessions[0]);
+  expect(requests[0]!.sessionId).toBe(local.sessions[0]);
   const recorded = await local.rows('SELECT id FROM issues WHERE reporter = ?', local.users.contestant);
   expect(recorded).toHaveLength(0);
 });
@@ -202,7 +202,7 @@ test('a late success in the original session preserves the current session form 
     completeResponse = resolve;
   });
   await page.route('**/api/workflow', async (route) => {
-    const request: WorkflowRequest = route.request().postDataJSON();
+    const request = route.request().postDataJSON() as WorkflowRequest;
     const id = await local.act(
       local.users.contestant,
       request.command,

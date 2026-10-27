@@ -1,9 +1,9 @@
 import type { Caller } from '../../authentication';
 import type { WorkflowPersistence, WorkflowRead, WorkflowDecision, WorkflowCommitResult } from '../../workflow.ts';
-import type { Command, Issue, Role } from '../../../connected/model.ts';
-import type { D1Connection, D1Statement } from './connection';
+import type { Command, IssueStatus, Role } from '../../../connected/model.ts';
+import type { D1Connection, D1Statement, D1Value } from './connection';
 
-interface WorkflowRow {
+interface WorkflowColumns {
   actor_name: string;
   membership_team: string | null;
   is_admin: number;
@@ -14,17 +14,21 @@ interface WorkflowRow {
   teams: string;
   issue_id: string | null;
   team_id: string | null;
-  status: Issue['status'] | null;
+  status: IssueStatus | null;
   owner: string | null;
   public_revision: number | null;
   resolution_id: string | null;
   award_id: string | null;
   applied_at: string | null;
   dependency: string;
-  receipt_command: string | null;
-  receipt_session: string | null;
-  receipt_issue: string | null;
 }
+
+/** The LEFT JOIN on command_receipts fills all three columns or none. */
+type ReceiptColumns =
+  | { receipt_command: null; receipt_session: null; receipt_issue: null }
+  | { receipt_command: string; receipt_session: string; receipt_issue: string };
+
+type WorkflowRow = WorkflowColumns & ReceiptColumns;
 
 // Each read uses one primary SQLite snapshot. A missing identity session always
 // denies access, including after password resets and identity-session removal.
@@ -69,7 +73,7 @@ const workflowSql = `SELECT a.name AS actor_name, m.team_id AS membership_team, 
 export class D1ApplicationStore implements WorkflowPersistence {
   constructor(private readonly db: D1Connection) {}
 
-  private statement(sql: string, ...values: Array<string | number | null>): D1Statement {
+  private statement(sql: string, ...values: D1Value[]): D1Statement {
     return this.db.prepare(sql).bind(...values);
   }
 
@@ -87,8 +91,8 @@ export class D1ApplicationStore implements WorkflowPersistence {
       state: {
         actor: { id: caller.accountId, name: row.actor_name },
         membership: { team_id: row.membership_team, is_admin: !!row.is_admin, roles: JSON.parse(row.roles) as Role[] },
-        session: { id: sessionId, intake_open: !!row.intake_open, categories: JSON.parse(row.categories) },
-        archived: !!row.archived, teams: JSON.parse(row.teams),
+        session: { id: sessionId, intake_open: !!row.intake_open, categories: JSON.parse(row.categories) as string[] },
+        archived: !!row.archived, teams: JSON.parse(row.teams) as string[],
         issue: row.issue_id && row.status && row.team_id && row.public_revision !== null
           ? { id: row.issue_id, team_id: row.team_id, status: row.status, owner: row.owner, revision: row.public_revision } : null,
         resolution: row.resolution_id ? { id: row.resolution_id } : null,
@@ -96,7 +100,7 @@ export class D1ApplicationStore implements WorkflowPersistence {
       },
       dependency: row.dependency,
       receipt: row.receipt_command === null ? null : {
-        sessionId: row.receipt_session!, command: JSON.parse(row.receipt_command), issueId: row.receipt_issue!,
+        sessionId: row.receipt_session, command: JSON.parse(row.receipt_command), issueId: row.receipt_issue,
       },
     };
   }
@@ -105,7 +109,7 @@ export class D1ApplicationStore implements WorkflowPersistence {
     read: WorkflowRead, decision: WorkflowDecision): Promise<WorkflowCommitResult> {
     const assertionId = crypto.randomUUID();
     const parameters = this.parameters(caller, sessionId, requestId, command);
-    const assertion = (suffix: string, condition: string, ...values: Array<string | number | null>) =>
+    const assertion = (suffix: string, condition: string, ...values: D1Value[]) =>
       this.statement(`INSERT INTO command_assertions (id, valid) VALUES (?, CASE WHEN ${condition} THEN 1 ELSE 0 END)`,
         `${assertionId}:${suffix}`, ...values);
     // Reuse the authorized read query for access checks inside either batch.

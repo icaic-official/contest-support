@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from "react";
 import { type CommandRunner, useCommand } from "./useCommand";
+import type { StatusFilter } from "../model";
 import type { SessionData } from "./useSessionSnapshot";
 
 /** Command and issue selection state that a UI shell shares with its layouts. */
@@ -14,8 +15,8 @@ export interface WorkflowState {
    */
   selectionMark: () => number;
   /** "all" or an issue status. */
-  statusFilter: string;
-  setStatusFilter: (filter: string) => void;
+  statusFilter: StatusFilter;
+  setStatusFilter: (filter: StatusFilter) => void;
 }
 
 /**
@@ -25,7 +26,7 @@ export interface WorkflowState {
  */
 export function useWorkflowState(data: SessionData): WorkflowState {
   const [selectedIssueId, setSelectedIssueId] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   // Counts selection changes. A recorded command selects its issue only when
   // the selection did not change while the command ran, so Back during the
   // refresh after a command is not undone.

@@ -74,7 +74,7 @@ describe('Cloudflare Backend transport', () => {
       const backend = createCloudflareBackend({ origin, fetch: fetcher });
       await expect(mutate(backend)).rejects.toThrow(message);
       expect(fetcher).toHaveBeenCalledTimes(1);
-      const [input, init] = fetcher.mock.calls[0];
+      const [input, init] = fetcher.mock.calls[0]!;
       const preflight = new Request(input, init);
       expect(new URL(preflight.url).pathname).toBe('/api/auth/session');
       expect(preflight.method).toBe('GET');
@@ -86,7 +86,7 @@ describe('Cloudflare Backend transport', () => {
     const fetcher = transport(() => Response.json({ outcome: 'committed', issueId }));
     const backend = createCloudflareBackend({ origin, fetch: fetcher });
     expect(await backend.workflows.execute(sessionId, requestId, command)).toBe(issueId);
-    const [, init] = fetcher.mock.calls[1];
+    const [, init] = fetcher.mock.calls[1]!;
     expect(JSON.parse(String(init?.body))).toEqual({ sessionId, requestId, command });
     expect(new Headers(init?.headers).get('X-CSRF-Token')).toBe('fresh-token');
     expect(init).toMatchObject({ credentials: 'same-origin', cache: 'no-store', redirect: 'error' });
@@ -115,7 +115,7 @@ describe('Cloudflare Backend transport', () => {
       const { fetcher, log } = counted(() => Response.json({ outcome: 'committed', issueId }));
       const backend = createCloudflareBackend({ origin, fetch: fetcher });
       for (let action = 0; action < 3; action++) await backend.workflows.execute(sessionId, crypto.randomUUID(), command);
-      expect(log).toEqual(['GET /api/auth/session', ...Array(3).fill('POST /api/workflow token-1')]);
+      expect(log).toEqual(['GET /api/auth/session', ...Array<string>(3).fill('POST /api/workflow token-1')]);
     });
 
     it('returns the changed snapshot with the commit, and drops an invalid one', async () => {
@@ -209,30 +209,30 @@ describe('Cloudflare Backend transport', () => {
     const input = { sessionId, userId: issueId, onChange: change, onConnection: connection };
     const stopFirst = backend.updates.subscribe(input);
     const stopSecond = backend.updates.subscribe(input);
-    sockets[0].message('change');
+    sockets[0]!.message('change');
     expect(change).not.toHaveBeenCalled();
-    sockets[0].message('ready');
+    sockets[0]!.message('ready');
     expect(connection).toHaveBeenLastCalledWith(true);
     stopFirst();
     stopFirst();
-    sockets[0].message('change');
-    sockets[0].disconnect();
+    sockets[0]!.message('change');
+    sockets[0]!.disconnect();
     expect(change).not.toHaveBeenCalled();
-    sockets[1].message('ready');
-    sockets[1].message('change');
+    sockets[1]!.message('ready');
+    sockets[1]!.message('change');
     expect(change).toHaveBeenCalledTimes(1);
-    sockets[1].disconnect();
+    sockets[1]!.disconnect();
     expect(connection).toHaveBeenLastCalledWith(false);
     vi.advanceTimersByTime(500);
     expect(sockets).toHaveLength(3);
-    sockets[2].message('ready');
+    sockets[2]!.message('ready');
     expect(connection).toHaveBeenLastCalledWith(true);
     stopSecond();
-    sockets[2].message('change');
+    sockets[2]!.message('change');
     vi.advanceTimersByTime(60_000);
     expect(change).toHaveBeenCalledTimes(1);
     expect(factory).toHaveBeenCalledTimes(3);
-    expect(factory.mock.calls[0][0]).toBe(`wss://connector.example/api/updates?sessionId=${sessionId}`);
+    expect(factory.mock.calls[0]![0]).toBe(`wss://connector.example/api/updates?sessionId=${sessionId}`);
   });
 
   describe('announcements', () => {
@@ -272,13 +272,13 @@ describe('Cloudflare Backend transport', () => {
     });
 
     it('reserves, transfers with a SHA-256 digest, then finishes an image', async () => {
-      const calls: Array<{ method: string; path: string; headers: Headers; body?: BodyInit | null }> = [];
+      const calls: Array<{ method: string; path: string; headers: Headers; body?: BodyInit | null | undefined }> = [];
       const fetcher = vi.fn<typeof fetch>(async (input, init) => {
         const url = new URL(String(input));
         calls.push({ method: init?.method ?? 'GET', path: url.pathname, headers: new Headers(init?.headers), body: init?.body });
         if (url.pathname === '/api/auth/session') return Response.json(sessionBody);
         if (init?.method === 'PUT') return Response.json({});
-        const body = JSON.parse(String(init?.body));
+        const body = JSON.parse(String(init?.body)) as { action: string };
         return body.action === 'begin' ? Response.json({ id: imageId, path: `${sessionId}/announcements/${announcementId}/${imageId}` }) : Response.json({});
       });
       const progress = vi.fn();
@@ -290,7 +290,7 @@ describe('Cloudflare Backend transport', () => {
       expect(put.headers.get('Content-Type')).toBe('image/png');
       expect(put.headers.get('X-Minsky-Digest')).toMatch(/^[0-9a-f]{64}$/);
       expect(put.headers.get('X-CSRF-Token')).toBe('fresh-token');
-      expect(calls.filter((call) => call.path === '/api/announcement-images').map((call) => JSON.parse(String(call.body)).action))
+      expect(calls.filter((call) => call.path === '/api/announcement-images').map((call) => (JSON.parse(String(call.body)) as { action: string }).action))
         .toEqual(['begin', 'finish']);
       expect(progress).toHaveBeenLastCalledWith(100);
       const rejected = vi.fn<typeof fetch>();

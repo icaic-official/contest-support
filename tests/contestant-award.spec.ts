@@ -35,7 +35,7 @@ for (const { minutes, heading, figure, step } of cases) {
     await local.run(
       "UPDATE awards SET minutes = ? WHERE issue_id = ?",
       minutes,
-      local.issues[4],
+      local.issues[4]!,
     );
     await openReport(page, 5);
     const card = page.getByRole("region", {

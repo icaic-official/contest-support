@@ -56,6 +56,7 @@ import {
   type ConsolePage,
   consoleNavGroups,
   consolePageLabels,
+  consolePages,
   navCount,
 } from "./consoleModel";
 import { IssueSheet } from "./IssueSheet";
@@ -171,14 +172,15 @@ export function OrganiserDesktopConsole({
       const rows = [
         ...document.querySelectorAll<HTMLElement>("[data-issue-row]"),
       ];
-      if (!rows.length) return;
-      const index = rows.indexOf(document.activeElement as HTMLElement);
+      const index = rows.findIndex((row) => row === document.activeElement);
       const step = event.key === "j" ? 1 : -1;
       const next =
         index < 0 ? 0 : Math.min(rows.length - 1, Math.max(0, index + step));
+      const row = rows[next];
+      if (!row) return;
       event.preventDefault();
-      rows[next].focus();
-      rows[next].scrollIntoView({ block: "nearest" });
+      row.focus();
+      row.scrollIntoView({ block: "nearest" });
     }
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
@@ -212,10 +214,12 @@ export function OrganiserDesktopConsole({
     );
   }
 
+  const session = state.session;
   const groups = consoleNavGroups(member);
-  const pages = groups.flatMap((group) => group.pages);
+  const pages = consolePages(member);
+  // Every person has the Teams page, so the list is never empty.
   const currentPage =
-    page && page !== "account" && pages.includes(page) ? page : pages[0];
+    page && page !== "account" && pages.includes(page) ? page : pages[0] ?? "teams";
   const issues = visibleIssues(state.issues, member);
   const archived = Boolean(state.event?.archived);
   const canReport = isStaff(member);
@@ -277,12 +281,13 @@ export function OrganiserDesktopConsole({
     setReportOpen(true);
   }
 
-  function rowAction(issue: Issue): RowAction | undefined {
-    const can = issueAbilities(issue, state!, member!);
+  // An arrow keeps the narrowing of state and member from the guard above.
+  const rowAction = (issue: Issue): RowAction | undefined => {
+    const can = issueAbilities(issue, state, member);
     if (can.accept) return "accept";
     if (can.claim) return "claim";
     return undefined;
-  }
+  };
 
   function runRowAction(issue: Issue, action: RowAction) {
     const mark = workflow.selectionMark();
@@ -349,7 +354,7 @@ export function OrganiserDesktopConsole({
               intake={
                 member.is_admin
                   ? {
-                      open: state.session!.intake_open,
+                      open: session.intake_open,
                       disabled: admin.busy || admin.archived,
                       onChange: (open) => {
                         void admin.setIntake(open);
@@ -362,7 +367,7 @@ export function OrganiserDesktopConsole({
             />
             <div className="flex min-w-0 flex-1 flex-col">
               <ConsoleTopBar
-                sessionName={state.session!.name}
+                sessionName={session.name}
                 pageLabel={
                   accountPage ? "My account" : consolePageLabels[currentPage]
                 }

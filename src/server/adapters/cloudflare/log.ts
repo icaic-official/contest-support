@@ -23,7 +23,7 @@ const SAFE_CODE = /^[A-Z][A-Z0-9_]{1,63}$/;
 /** Reduce a thrown value to its class name and, when present, a short code. */
 function describeError(error: unknown): { errorName: string; errorCode?: string } {
   if (error instanceof Error) {
-    const code = (error as { code?: unknown }).code;
+    const code = 'code' in error ? error.code : undefined;
     return { errorName: error.name, ...(typeof code === 'string' && SAFE_CODE.test(code) ? { errorCode: code } : {}) };
   }
   return { errorName: typeof error };

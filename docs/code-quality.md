@@ -15,6 +15,40 @@ The [CI reference](cloudflare-build-settings.md#workers-builds) owns the command
 Its tests also fail on a D1 migration that drops or renames schema, because `main` publishes automatically. See [Change the D1 schema](cloudflare-builds.md#change-the-d1-schema).
 Browser suites and hosted provider suites are on-demand commands. They are not required PR checks.
 
+### Type rules
+
+`tsconfig.json` turns on `strict`, unused locals and parameters, `exactOptionalPropertyTypes`, `noFallthroughCasesInSwitch`, `noImplicitOverride`, `noImplicitReturns`, and `noUncheckedIndexedAccess`.
+
+`noUncheckedIndexedAccess` gives `array[index]` and `record[key]` the type `T | undefined`. In application code, handle the missing value where it can occur:
+
+- Destructure the first element (`const [first] = items`) and test it, instead of a length check followed by `items[0]`.
+- Keep values that belong together in one object, instead of two arrays read with the same index.
+- Where an index can only be in range, such as a matrix cell, read it through one local accessor that throws a `RangeError` for a missing value. Do not replace the value with a default.
+
+Tests can use `value!` on fixture data. A missing value then fails the test.
+
+The `no-unnecessary-condition` rule is not enabled. It reports correct checks of a React ref or a cleanup flag after an `await` as unnecessary.
+
+`exactOptionalPropertyTypes` makes `prop?: T` mean that the key is absent or holds a `T`. An explicit `undefined` is then an error. Choose the declaration by meaning:
+
+- Write `prop?: T | undefined` when a missing value and `undefined` mean the same thing, such as an optional component prop that a caller passes through.
+- Write `prop: T | undefined` when every value has the key but it can be empty, such as a computed statistic or a hook result.
+- For a library type, such as `RequestInit` or a Playwright option, leave the key out or pass the library's own empty value, such as `null`.
+- For JSON that a zod schema parses, use `.exactOptional()` when the type must match a contract that declares `prop?: T`.
+`npm run lint` also runs type-aware rules on `src/`, `tests/`, and the root configuration files.
+These rules reject:
+
+- non-null assertions (`value!`), in application code only,
+- type assertions that do not change the type,
+- type assertions on object literals (annotate the variable instead),
+- values of type `any` that flow into assignments, arguments, calls, member access, or return values,
+- a `switch` on a union that misses a member and has no `default`.
+
+The vendored components in `src/components/ui/` keep only the syntactic rules.
+When a value comes from outside the program, such as JSON, router state, or a library typed as `any`, narrow it with a check or give it a declared type at that boundary.
+In a test, a cast of parsed data to the type that the test expects is enough, because the assertions that follow check it.
+If an assertion is the only option, explain in a comment why it is safe.
+
 ## Dependency updates
 
 Dependabot proposes weekly npm updates for the application and the documentation site.
@@ -51,6 +85,7 @@ gitleaks git --redact --log-opts=--all .
 
 This command checks committed history.
 Review uncommitted files before you commit them.
+`.gitignore` excludes local secret files: `.env*` (except `.env.example`) and `.dev.vars*`, which Wrangler reads next to each configuration.
 If you detect a real secret, revoke or rotate it.
 Then follow the provider's incident steps.
 Deleting the current file does not remove the secret from Git history.

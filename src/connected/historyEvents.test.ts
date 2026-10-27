@@ -6,15 +6,47 @@ const SESSION = "00000000-0000-4000-8000-000000000100";
 const ISSUE = "00000000-0000-4000-8000-000000000300";
 const HELPER = "00000000-0000-4000-8000-000000000002";
 
-const issue = { id: ISSUE, created_at: "2026-10-17T10:00:00Z" } as Issue;
-const resolution = {
+const issue: Issue = {
+  id: ISSUE,
+  number: 1,
+  session_id: SESSION,
+  team_id: "00000000-0000-4000-8000-000000000200",
+  reporter: HELPER,
+  reporter_name: "Fictional Reporter",
+  category: "Devices",
+  description: "Fictional report",
+  status: "open",
+  created_at: "2026-10-17T10:00:00Z",
+  first_assigned_at: null,
+  owner: null,
+  owner_name: null,
+  resolved_at: null,
+  revision: 0,
+};
+const resolution: Resolution = {
   id: "00000000-0000-4000-8000-000000000400",
   session_id: SESSION,
   issue_id: ISSUE,
+  actor: HELPER,
+  actor_name: "Priya Raman",
   at: "2026-10-17T10:20:00Z",
+  summary: "Fictional fix.",
   reopened_at: "2026-10-17T10:25:00Z",
-} as Resolution;
-const award = { at: "2026-10-17T10:30:00Z" } as Snapshot["awards"][number];
+  reopened_by: HELPER,
+  reopened_name: "Priya Raman",
+  reason: "Fictional reopen reason.",
+};
+const award: Snapshot["awards"][number] = {
+  id: "00000000-0000-4000-8000-000000000600",
+  issue_id: ISSUE,
+  resolution_id: resolution.id,
+  minutes: 5,
+  explanation: "Fictional award.",
+  actor_name: "Priya Raman",
+  at: "2026-10-17T10:30:00Z",
+  applied_at: null,
+  applied_name: null,
+};
 
 function entry(text: string, at = "2026-10-17T10:05:00Z") {
   return {

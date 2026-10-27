@@ -85,7 +85,7 @@ describe('Cloudflare authorized application and administration', () => {
     ]);
     for (const [id, visibility, state] of [
       [publicImage, 'public', 'ready'], [internalImage, 'internal', 'ready'], [removal, 'internal', 'deleting'],
-    ]) {
+    ] as const) {
       await statement(`INSERT INTO issue_images (id, session_id, issue_id, uploader, request_id, uploader_name,
         uploaded_at, visibility, declared_bytes, byte_size, content_type, original_name, state,
         original_path, thumbnail_path, deleted_by, deleted_at)
@@ -206,7 +206,7 @@ describe('Cloudflare authorized application and administration', () => {
       missing_identity: ['DELETE FROM ba_session WHERE userId = ?', caller.accountId],
       membership: ['DELETE FROM memberships WHERE account_id = ?', caller.accountId],
     };
-    await statement(...sql[restriction]).run();
+    await statement(...sql[restriction]!).run();
     if (restriction === 'membership') expect((await service.snapshot(caller, fixture.sessionId)).membership).toBeNull();
     else await expect(service.snapshot(caller, fixture.sessionId)).rejects.toMatchObject({ status: 403 });
     expect(await service.sessions(caller)).toEqual([]);
@@ -257,7 +257,7 @@ describe('Cloudflare authorized application and administration', () => {
       revoked: ['UPDATE logins SET revoked = 1 WHERE id = ?', fixture.staff.loginId],
       archived: ['UPDATE events SET archived = 1 WHERE id = ?', fixture.eventId],
     };
-    const racing = competing(() => statement(...sql[restriction]).run());
+    const racing = competing(() => statement(...sql[restriction]!).run());
     await expect(racing.setIntake(fixture.staff, fixture.sessionId, true)).rejects.toMatchObject({ status: 409 });
     expect(await adminEffects()).toEqual(before);
     const invalidations = await fixture.rows("SELECT audience FROM notifications WHERE session_id = ? AND audience LIKE 'account:%'", fixture.sessionId);
@@ -290,7 +290,7 @@ describe('Cloudflare authorized application and administration', () => {
           generation: ['UPDATE accounts SET credential_generation = credential_generation + 1 WHERE id = ?', fixture.staff.accountId],
           must_change: ['UPDATE accounts SET must_change = 1 WHERE id = ?', fixture.staff.accountId],
         };
-        const racing = changeAtFinalGuard(...changes[restriction]);
+        const racing = changeAtFinalGuard(...changes[restriction]!);
         const before = await guardedEffects();
         const result = operation === 'intake' ? racing.setIntake(fixture.staff, fixture.sessionId, true)
           : operation === 'limits' ? racing.setImageLimits(fixture.staff, fixture.sessionId, { fileMegabytes: 20, count: 8, totalMegabytes: 40 })
@@ -314,8 +314,8 @@ describe('Cloudflare authorized application and administration', () => {
       new Date(Date.now() + (index + 1) * 1000).toISOString(), `fictional_action_${index}`)));
     const audit = (await service.snapshot(fixture.staff, fixture.sessionId)).audit;
     expect(audit).toHaveLength(50);
-    expect(audit[0].action).toBe('fictional_action_54');
-    expect(audit[49].action).toBe('fictional_action_5');
+    expect(audit[0]!.action).toBe('fictional_action_54');
+    expect(audit[49]!.action).toBe('fictional_action_5');
   });
 
   it('applies staff capability changes immediately and commits membership audit plus refresh invalidations', async () => {
@@ -385,7 +385,7 @@ describe('Cloudflare authorized application and administration', () => {
 
   describe('roster editors', () => {
     const teamRows = () => fixture.rows('SELECT id, name, location FROM teams WHERE session_id = ? ORDER BY id', fixture.sessionId);
-    const categories = async () => JSON.parse((await fixture.rows('SELECT categories FROM sessions WHERE id = ?', fixture.sessionId))[0].categories as string) as string[];
+    const categories = async () => JSON.parse((await fixture.rows('SELECT categories FROM sessions WHERE id = ?', fixture.sessionId))[0]!.categories as string) as string[];
     const rosterEffects = async () => [await teamRows(), await categories(), ...await adminEffects()];
     const add = (name: string, location = '', id: string = randomUUID()) => ({ id, name, location });
 
@@ -476,7 +476,7 @@ describe('Cloudflare authorized application and administration', () => {
       await expect(service.editRoster(fixture.staff, fixture.sessionId, { type: 'delete_team', teamId: quiet }))
         .rejects.toMatchObject({ status: 409, message: '1 account belongs to Quiet. Move or remove it first.' });
       expect(await fixture.rows('SELECT 1 FROM teams WHERE id IN (?, ?)', fixture.teamId, quiet)).toHaveLength(2);
-      expect((await teamRows()).length).toBe(before[0].length + 1);
+      expect((await teamRows()).length).toBe(before[0]!.length + 1);
     });
 
     it('keeps a team that receives an issue between the read and the commit', async () => {

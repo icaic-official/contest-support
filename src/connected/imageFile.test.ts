@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
   MIB,
-  classifyAttachmentError,
   imageKind,
   imageRejection,
 } from "./imageFile";
@@ -29,14 +28,5 @@ describe("image files", () => {
     expect(imageRejection(MIB, "image/webp", limits, { count: 1, totalBytes: 120 * MIB }))
       .toBe("These images would exceed this issue's 120 MB limit.");
     expect(imageRejection(MIB, "image/jpeg", limits, { count: 1, totalBytes: 0 })).toBeUndefined();
-  });
-
-  it("separates validation failures from uploads that can be tried again", () => {
-    expect(classifyAttachmentError("Choose a JPEG, PNG, or WebP image.").validation).toBe(true);
-    expect(classifyAttachmentError("This event is archived. Images cannot be added.").restart)
-      .toBe(false);
-    expect(classifyAttachmentError("Upload failed. Check your connection and try again.").restart)
-      .toBe(true);
-    expect(classifyAttachmentError("Upload the image before finishing.").validation).toBe(false);
   });
 });

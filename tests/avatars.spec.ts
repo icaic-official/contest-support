@@ -147,16 +147,16 @@ test("a staff account crops, previews and saves a picture, then sees it everywhe
   expect(server.uploads).toHaveLength(1);
   expect(server.downloads).toEqual([]);
 
-  const [{ bytes }] = server.uploads;
+  const { bytes } = server.uploads[0]!;
   expect(isJpeg(bytes)).toBe(true);
   expect(bytes.length).toBeLessThanOrEqual(262144);
   // The middle square of the 1200 by 800 image: red on the left, blue on the right.
   const result = await inspect(page, bytes, [[64, 256], [448, 256]]);
   expect([result.width, result.height]).toEqual([512, 512]);
-  expect(result.colors[0][0]).toBeGreaterThan(150);
-  expect(result.colors[0][2]).toBeLessThan(90);
-  expect(result.colors[1][2]).toBeGreaterThan(150);
-  expect(result.colors[1][0]).toBeLessThan(90);
+  expect(result.colors[0]![0]).toBeGreaterThan(150);
+  expect(result.colors[0]![2]).toBeLessThan(90);
+  expect(result.colors[1]![2]).toBeGreaterThan(150);
+  expect(result.colors[1]![0]).toBeLessThan(90);
 });
 
 test("the saved picture follows the EXIF orientation and carries no EXIF data", async ({
@@ -182,12 +182,12 @@ test("the saved picture follows the EXIF orientation and carries no EXIF data", 
   await choose(page, "phone.jpg", photo, "image/jpeg");
   await previewDialog(page).getByRole("button", { name: "Save picture", exact: true }).click();
   await expect(page.getByText("Profile picture updated.")).toBeVisible();
-  const [{ bytes }] = server.uploads;
+  const { bytes } = server.uploads[0]!;
   expect(bytes.includes(Buffer.from("Exif\0\0", "binary"))).toBe(false);
   const result = await inspect(page, bytes, [[100, 20], [100, 180]]);
   expect([result.width, result.height]).toEqual([200, 200]);
-  expect(result.colors[0][0]).toBeGreaterThan(150);
-  expect(result.colors[1][2]).toBeGreaterThan(150);
+  expect(result.colors[0]![0]).toBeGreaterThan(150);
+  expect(result.colors[1]![2]).toBeGreaterThan(150);
 });
 
 test("a transparent picture gets a white background, not black", async ({ page, api }) => {
@@ -195,9 +195,9 @@ test("a transparent picture gets a white background, not black", async ({ page, 
   await choose(page, "logo.png", png(300, 300, () => [0, 0, 0, 0]));
   await previewDialog(page).getByRole("button", { name: "Save picture", exact: true }).click();
   await expect(page.getByText("Profile picture updated.")).toBeVisible();
-  const result = await inspect(page, server.uploads[0].bytes, [[150, 150]]);
+  const result = await inspect(page, server.uploads[0]!.bytes, [[150, 150]]);
   expect([result.width, result.height]).toEqual([300, 300]);
-  for (const channel of result.colors[0].slice(0, 3)) expect(channel).toBeGreaterThan(240);
+  for (const channel of result.colors[0]!.slice(0, 3)) expect(channel).toBeGreaterThan(240);
 });
 
 test("a picture that is too detailed for one encoding still fits the size limit", async ({
@@ -210,7 +210,7 @@ test("a picture that is too detailed for one encoding still fits the size limit"
   await choose(page, "noise.png", source);
   await previewDialog(page).getByRole("button", { name: "Save picture", exact: true }).click();
   await expect(page.getByText("Profile picture updated.")).toBeVisible();
-  const [{ bytes }] = server.uploads;
+  const { bytes } = server.uploads[0]!;
   expect(bytes.length).toBeLessThanOrEqual(262144);
   const result = await inspect(page, bytes, []);
   expect(result.width).toBeLessThanOrEqual(512);
@@ -297,8 +297,8 @@ test("a lost upload response is retried with the same request, and the picture i
   await dialog.getByRole("button", { name: "Try again", exact: true }).click();
   await expect(page.getByText("Profile picture updated.")).toBeVisible();
   expect(server.uploads).toHaveLength(2);
-  expect(server.uploads[1].requestId).toBe(server.uploads[0].requestId);
-  expect(server.uploads[1].bytes.equals(server.uploads[0].bytes)).toBe(true);
+  expect(server.uploads[1]!.requestId).toBe(server.uploads[0]!.requestId);
+  expect(server.uploads[1]!.bytes.equals(server.uploads[0]!.bytes)).toBe(true);
   await expect(shown(sidebarCard(page))).toBeVisible();
 });
 
@@ -320,7 +320,7 @@ for (const [kind, flag] of [
     await previewDialog(page).getByRole("button", { name: "Save picture", exact: true }).click();
     await expect(page.getByText("Profile picture updated.")).toBeVisible();
     expect(server.uploads).toHaveLength(2);
-    expect(server.uploads[1].requestId).not.toBe(server.uploads[0].requestId);
+    expect(server.uploads[1]!.requestId).not.toBe(server.uploads[0]!.requestId);
     await expect(page.getByRole("alert")).toHaveCount(0);
   });
 }

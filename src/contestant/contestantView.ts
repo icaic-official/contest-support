@@ -1,12 +1,9 @@
 import { type WorkflowEvent, workflowEvent } from "@/connected/historyEvents";
 import { awardMinutesLabel } from "@/connected/labels";
-import type { Attachment, Issue, Resolution, Snapshot } from "@/connected/model";
+import type { Attachment, Award, HistoryEntry, Issue, Resolution, Snapshot } from "@/connected/model";
 
 /** The id of the main heading. Navigation moves focus to it. */
 export const contestantHeadingId = "contestant-heading";
-
-type HistoryEntry = Snapshot["history"][number];
-type Award = Snapshot["awards"][number];
 
 /**
  * The reports of one team, newest first. The server sends only the team's own

@@ -50,7 +50,7 @@ interface Roster {
   commands: RosterCommand[];
   archived: boolean;
   /** The next command fails with this message and changes nothing. */
-  reject?: string;
+  reject?: string | undefined;
 }
 
 function team(id: string, name: string, location: string) {

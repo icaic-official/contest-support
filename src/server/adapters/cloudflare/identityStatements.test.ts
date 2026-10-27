@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { getPlatformProxy } from 'wrangler';
-import type { D1Connection, D1Statement } from '../d1/connection';
+import type { D1Binding, D1Connection, D1Statement } from '../d1/connection';
 import { applyMigrations } from '../d1/testFixture';
 import applicationWorker, { type ApplicationEnvironment } from './applicationWorker';
 import { createBetterAuthIdentity, sharedBetterAuthIdentity } from './identity';
@@ -22,15 +22,15 @@ const password = 'Fictional venue password 1';
 const timeout = 300_000;
 
 /** Records the SQL of every statement the code under test sends to D1. */
-function recordSql(db: D1Connection, sql: string[]): D1Connection {
+function recordSql<Connection extends D1Connection>(db: Connection, sql: string[]): Connection {
   const wrap = (statement: D1Statement, text: string): D1Statement => new Proxy(statement, {
     get(target, key) {
       if (key === 'bind') return (...values: Array<string | number | null>) => wrap(target.bind(...values), text);
       if (key === 'first' || key === 'all' || key === 'run') {
         return (...args: unknown[]) => { sql.push(text); return (Reflect.get(target, key) as (...a: unknown[]) => unknown).apply(target, args); };
       }
-      const value = Reflect.get(target, key, target);
-      return typeof value === 'function' ? value.bind(target) : value;
+      const value: unknown = Reflect.get(target, key, target);
+      return typeof value === 'function' ? (value as (...args: unknown[]) => unknown).bind(target) : value;
     },
   });
   const texts = new WeakMap<D1Statement, string>();
@@ -49,14 +49,14 @@ function recordSql(db: D1Connection, sql: string[]): D1Connection {
           return target.batch(statements);
         };
       }
-      const value = Reflect.get(target, key, target);
-      return typeof value === 'function' ? value.bind(target) : value;
+      const value: unknown = Reflect.get(target, key, target);
+      return typeof value === 'function' ? (value as (...args: unknown[]) => unknown).bind(target) : value;
     },
   });
 }
 
 describe('Better Auth work per request with real local D1', () => {
-  let db: D1Connection;
+  let db: D1Binding;
   let dispose: () => Promise<void>;
   let env: ApplicationEnvironment;
   const sql: string[] = [];
@@ -64,7 +64,7 @@ describe('Better Auth work per request with real local D1', () => {
   const username = `statements_${run}`;
 
   beforeAll(async () => {
-    const platform = await getPlatformProxy<{ DB: D1Connection }>({
+    const platform = await getPlatformProxy<{ DB: D1Binding }>({
       configPath: 'wrangler.auth-ci.jsonc', persist: false, remoteBindings: false, envFiles: [],
     });
     db = platform.env.DB;
@@ -107,7 +107,7 @@ describe('Better Auth work per request with real local D1', () => {
       body: JSON.stringify({ username, password }),
     });
     expect(signed.status).toBe(200);
-    const cookie = signed.headers.getSetCookie().find((value) => value.startsWith('__Host-minsky-session='))!.split(';')[0];
+    const cookie = signed.headers.getSetCookie().find((value) => value.startsWith('__Host-minsky-session='))!.split(';')[0]!;
 
     sql.length = 0;
     const response = await request('/api/sessions', { headers: { Cookie: cookie } });
@@ -119,11 +119,11 @@ describe('Better Auth work per request with real local D1', () => {
 
   it('reuses one identity per D1 binding and rebuilds it when the secret changes', async () => {
     const options = { origin, secret: randomUUID() + randomUUID(), secureCookies: true };
-    const binding = db as Parameters<typeof sharedBetterAuthIdentity>[0];
+    const binding = db;
     const first = sharedBetterAuthIdentity(binding, options);
     expect(sharedBetterAuthIdentity(binding, { ...options })).toBe(first);
     const signed = await first.signIn(username, password);
-    const cookie = signed.cookie.split(';')[0];
+    const cookie = signed.cookie.split(';')[0]!;
     expect((await first.session(new Headers({ cookie })))?.accountId).toBe(signed.accountId);
     const rotated = sharedBetterAuthIdentity(binding, { ...options, secret: randomUUID() + randomUUID() });
     expect(rotated).not.toBe(first);
@@ -133,14 +133,14 @@ describe('Better Auth work per request with real local D1', () => {
   // With the runtime check off, nothing else notices when a Better Auth
   // upgrade expects a table or column that the migrations lack.
   it('keeps the D1 migrations in step with the tables Better Auth expects', async () => {
-    const checked = createBetterAuthIdentity(db as Parameters<typeof createBetterAuthIdentity>[0], {
+    const checked = createBetterAuthIdentity(db, {
       origin, secret: randomUUID() + randomUUID(), secureCookies: true, validateSchema: true,
     });
     await expect(checked.session(new Headers())).resolves.toBeUndefined();
 
     await db.prepare('ALTER TABLE ba_session RENAME COLUMN token TO token_renamed').run();
     try {
-      const drifted = createBetterAuthIdentity(db as Parameters<typeof createBetterAuthIdentity>[0], {
+      const drifted = createBetterAuthIdentity(db, {
         origin, secret: randomUUID() + randomUUID(), secureCookies: true, validateSchema: true,
       });
       await expect(drifted.session(new Headers())).rejects.toThrow();

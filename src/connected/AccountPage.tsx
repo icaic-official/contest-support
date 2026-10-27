@@ -79,7 +79,9 @@ export function useOpenPasswordChange(): () => void {
  * browser does not scroll on its own after a client-side navigation.
  */
 function useSectionFocus(): void {
-  const { hash, key, state } = useLocation();
+  const location = useLocation();
+  const { hash, key } = location;
+  const state: unknown = location.state;
   useEffect(() => {
     const id = hash.slice(1);
     if (!accountSections.some((section) => section.id === id)) return;

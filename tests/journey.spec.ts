@@ -66,7 +66,7 @@ test("a report travels from the contestant through support, the jury and externa
       const state = await local.snapshot(local.users.admin);
       expect(state.issues).toHaveLength(1);
       return {
-        issue: state.issues[0],
+        issue: state.issues[0]!,
         resolutions: state.resolutions,
         state,
       };
@@ -309,7 +309,7 @@ test("a report travels from the contestant through support, the jury and externa
     await expect(timeAward).toContainText(
       "Not yet applied to your contest time",
     );
-    expect((await issueFor()).state.awards[0].applied_at).toBeNull();
+    expect((await issueFor()).state.awards[0]!.applied_at).toBeNull();
 
     // Staff confirm external application on the desktop console.
     await specialist
@@ -342,10 +342,10 @@ test("a report travels from the contestant through support, the jury and externa
     });
     // The snapshot names the person. The stored award keeps the account ID.
     expect(
-      await local.rows("SELECT applied_by FROM awards WHERE id = ?", done.state.awards[0].id),
+      await local.rows("SELECT applied_by FROM awards WHERE id = ?", done.state.awards[0]!.id),
     ).toEqual([{ applied_by: local.users.specialist }]);
-    expect(Date.parse(done.state.awards[0].applied_at!)).toBeGreaterThan(
-      Date.parse(done.state.awards[0].at),
+    expect(Date.parse(done.state.awards[0]!.applied_at!)).toBeGreaterThan(
+      Date.parse(done.state.awards[0]!.at),
     );
     // The timer stayed stopped through the award and its application.
     expect(done.issue.resolved_at).toBe(again.issue.resolved_at);

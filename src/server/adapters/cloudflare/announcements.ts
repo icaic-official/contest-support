@@ -6,13 +6,11 @@ import {
 import type { Caller } from '../../authentication';
 import { AuthenticationError } from '../../authentication';
 import { equalWorkflowJson } from '../../workflow';
-import type { D1Connection, D1Statement } from '../d1/connection';
+import type { D1Connection, D1Statement, D1Value } from '../d1/connection';
 import {
   currentAccessBindings, currentAccessSql, currentReadyLoginBindings, currentReadyLoginSql,
   notificationStatements, type CurrentAccessRow,
 } from './application';
-
-type Value = string | number | null;
 
 export const announcementNow = "strftime('%Y-%m-%dT%H:%M:%fZ', 'now')";
 
@@ -42,7 +40,7 @@ export function announcementManager(row: string): string {
   return `(${row}.is_admin = 1 OR EXISTS (SELECT 1 FROM json_each(${row}.roles) WHERE value = 'jury'))`;
 }
 
-export function announcementAssertion(db: D1Connection, id: string, sql: string, ...values: Value[]): D1Statement {
+export function announcementAssertion(db: D1Connection, id: string, sql: string, ...values: D1Value[]): D1Statement {
   return db.prepare(`INSERT INTO command_assertions (id, valid) VALUES (?, CASE WHEN EXISTS (${sql}) THEN 1 ELSE 0 END)`)
     .bind(id, ...values);
 }
@@ -103,7 +101,7 @@ WHERE EXISTS (SELECT 1 FROM access)`;
 export class D1AnnouncementService {
   constructor(private readonly db: D1Connection) {}
 
-  private statement(sql: string, ...values: Value[]): D1Statement { return this.db.prepare(sql).bind(...values); }
+  private statement(sql: string, ...values: D1Value[]): D1Statement { return this.db.prepare(sql).bind(...values); }
 
   /**
    * Readers see active records. Managers also see expired records. Nobody sees

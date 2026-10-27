@@ -5,6 +5,7 @@ import {
   type Membership,
   type Resolution,
   type Snapshot,
+  type StatusFilter,
   unresolvedTime,
 } from "@/connected/model";
 import { type JuryRow, juryWorklists } from "@/connected/jury";
@@ -126,16 +127,23 @@ export const queueChips: readonly { chip: QueueChip; label: string }[] = [
  * Maps the shared status filter of useWorkflowState to a chip. "all" and
  * "claimed" show all active issues, so a reopened issue stays in view.
  */
-export function chipForFilter(filter: string): QueueChip {
+export function chipForFilter(filter: StatusFilter): QueueChip {
   if (filter === "open") return "waiting";
   if (filter === "escalated") return "handoffs";
   if (filter === "resolved") return "resolved";
   return "active";
 }
 
+const chipFilters: Record<QueueChip, StatusFilter> = {
+  waiting: "open",
+  handoffs: "escalated",
+  active: "all",
+  resolved: "resolved",
+};
+
 /** The shared status filter value for a chip. */
-export function filterForChip(chip: QueueChip): string {
-  return { waiting: "open", handoffs: "escalated", active: "all", resolved: "resolved" }[chip];
+export function filterForChip(chip: QueueChip): StatusFilter {
+  return chipFilters[chip];
 }
 
 export function matchesChip(issue: Issue, chip: QueueChip): boolean {
@@ -202,8 +210,9 @@ export function placeOf(location: string): Place {
     .match(
       /^(.*?)[\s,·|/-]*(?:\b(?:table|desk|seat|station|booth|pc)\s*)?#?(\d+[a-z]?)$/iu,
     );
-  if (!match) return { area: location.trim(), seat: "" };
-  return { area: match[1].replace(/[\s,·|/-]+$/u, "").trim(), seat: match[2] };
+  const [, area, seat] = match ?? [];
+  if (area === undefined || seat === undefined) return { area: location.trim(), seat: "" };
+  return { area: area.replace(/[\s,·|/-]+$/u, "").trim(), seat };
 }
 
 /**
@@ -244,6 +253,20 @@ export interface IssueAbilities {
   upload: boolean;
 }
 
+/** An archived event is read-only. */
+const noAbilities: Readonly<IssueAbilities> = {
+  claim: false,
+  escalate: false,
+  accept: false,
+  resolve: false,
+  reopen: false,
+  reply: false,
+  internalNotes: false,
+  award: false,
+  apply: false,
+  upload: false,
+};
+
 /**
  * The actions that the membership allows on an issue. These are the rules of
  * the server workflow, which enforces them again. Any staff member can reply,
@@ -253,15 +276,15 @@ export function issueAbilities(
   issue: Issue,
   state: Pick<Snapshot, "awards" | "event">,
   member: Membership,
-): IssueAbilities {
-  const archived = Boolean(state.event?.archived);
+): Readonly<IssueAbilities> {
+  if (state.event?.archived) return noAbilities;
   const support = isSupport(member);
   const staff = isStaff(member);
   const active = issue.status !== "resolved";
   const owner = support && issue.owner === member.user_id;
   const award = state.awards.find((item) => item.issue_id === issue.id);
   const jury = member.roles.includes("jury");
-  const allowed = {
+  return {
     claim: support && issue.status === "open",
     escalate: owner && issue.status === "claimed",
     accept:
@@ -278,10 +301,6 @@ export function issueAbilities(
     apply: Boolean(award && !award.applied_at && (support || jury)),
     upload: staff,
   };
-  if (!archived) return allowed;
-  return Object.fromEntries(
-    Object.keys(allowed).map((key) => [key, false]),
-  ) as unknown as IssueAbilities;
 }
 
 /**

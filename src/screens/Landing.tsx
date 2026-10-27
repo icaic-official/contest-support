@@ -85,6 +85,13 @@ const steps: readonly Step[] = [
 ];
 
 const lastStep = steps.length - 1;
+
+/** A position only comes from `advance`, which keeps its step in range. */
+function stepAt(index: number): Step {
+  const step = steps[index];
+  if (!step) throw new RangeError(`The demo has no step ${index}.`);
+  return step;
+}
 const tickMs = 200;
 const stepTicks = 12;
 const holdTicks = 20;
@@ -106,9 +113,10 @@ function advance({ step, tick }: Position): Position {
 
 /** The simulated seconds on the issue timer. It stops on the last step. */
 function elapsedSeconds({ step, tick }: Position): number {
+  const { at } = stepAt(step);
   const next = steps[step + 1];
-  if (!next) return steps[step].at;
-  return steps[step].at + ((next.at - steps[step].at) * tick) / stepTicks;
+  if (!next) return at;
+  return at + ((next.at - at) * tick) / stepTicks;
 }
 
 /** Loops through the steps. With reduced motion it shows the resolved issue. */
@@ -305,7 +313,8 @@ function Section({
 
 /** A decorative issue that replays the lifecycle. Assistive technology skips it. */
 function DemoCard({ position }: { position: Position }) {
-  const resolved = steps[position.step].status === "resolved";
+  const { status } = stepAt(position.step);
+  const resolved = status === "resolved";
   return (
     <Card aria-hidden="true" className="gap-0 overflow-hidden py-0 shadow-lg">
       <div className="border-b px-5 py-4">
@@ -316,7 +325,7 @@ function DemoCard({ position }: { position: Position }) {
             </span>
             <Badge variant="secondary">Hardware</Badge>
           </div>
-          <StatusBadge status={steps[position.step].status} />
+          <StatusBadge status={status} />
         </div>
         <p className="mt-3 font-medium">Monitor goes black every few minutes</p>
         <p className="mt-1 text-sm text-muted-foreground">

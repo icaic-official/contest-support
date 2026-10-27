@@ -64,9 +64,10 @@ export function focusRequest(focusId: string): FocusRequest {
 
 /** The control that the location asks the page to focus, if any. */
 export function requestedFocusId(state: unknown): string | undefined {
-  if (typeof state !== "object" || state === null) return undefined;
-  const { focusId } = state as Partial<FocusRequest>;
-  return typeof focusId === "string" ? focusId : undefined;
+  if (typeof state !== "object" || state === null || !("focusId" in state)) {
+    return undefined;
+  }
+  return typeof state.focusId === "string" ? state.focusId : undefined;
 }
 
 /**

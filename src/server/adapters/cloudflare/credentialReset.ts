@@ -1,8 +1,6 @@
-import type { D1Connection, D1Statement } from '../d1/connection';
+import type { D1Connection, D1Statement, D1Value } from '../d1/connection';
 
-type SqlValue = string | number | null;
-
-function statement(db: D1Connection, sql: string, ...values: SqlValue[]): D1Statement {
+function statement(db: D1Connection, sql: string, ...values: D1Value[]): D1Statement {
   return db.prepare(sql).bind(...values);
 }
 

@@ -1,7 +1,8 @@
-import { betterAuth, type BetterAuthOptions } from "better-auth";
+import { betterAuth } from "better-auth";
 import { username } from "better-auth/plugins/username";
 import { isAPIError } from "better-auth/api";
 import { AuthenticationError } from "../../authentication";
+import type { D1Binding } from "../d1/connection";
 import { passwordHasher, type PasswordHasher } from "./password";
 
 export const IDENTITY_SESSION_SECONDS = 8 * 60 * 60;
@@ -42,7 +43,7 @@ const instances = new WeakMap<object, { origin: string; secret: string; identity
  * secret builds a new instance, so an old cookie never outlives its secret.
  */
 export function sharedBetterAuthIdentity(
-  database: NonNullable<BetterAuthOptions["database"]> & object,
+  database: D1Binding,
   options: IdentityOptions,
 ): IdentityProvider {
   const current = instances.get(database);
@@ -57,7 +58,8 @@ export function sharedBetterAuthIdentity(
  * account creation, reset authorization, CSRF checks, and mandatory changes.
  */
 export function createBetterAuthIdentity(
-  database: BetterAuthOptions["database"],
+  // Better Auth types its database option as any. This keeps callers checked.
+  database: D1Binding,
   options: IdentityOptions,
 ): IdentityProvider {
   const origin = new URL(options.origin);

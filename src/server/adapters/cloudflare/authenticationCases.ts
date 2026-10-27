@@ -1,7 +1,7 @@
 import { createHash, randomBytes, randomUUID, scryptSync } from 'node:crypto';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { openStoreDatabase } from './tooling/store-database.mjs';
-import type { D1Connection, D1Statement } from '../d1/connection';
+import type { D1Binding, D1Connection, D1Statement, D1Value } from '../d1/connection';
 import { D1Fixture, applyMigrations } from '../d1/testFixture';
 import { measureD1 } from '../d1/testMetrics';
 import { D1ApplicationService, notificationStatements } from './application';
@@ -33,7 +33,7 @@ const hasher: PasswordHasher = remote ? passwordHasher : {
   },
   async verify(password, hash) {
     const [salt, key] = hash.split(':');
-    return /^[a-f0-9]{32}:[a-f0-9]{128}$/.test(hash) && quickKey(password, salt) === key;
+    return /^[a-f0-9]{32}:[a-f0-9]{128}$/.test(hash) && quickKey(password, salt!) === key;
   },
 };
 
@@ -49,7 +49,7 @@ export function registerAuthenticationCases(group: AuthenticationCases) {
   // Hosted runs use maintained scrypt, which took 1.5 to 8.3 seconds per account case
   // on Workers Builds. Their Vitest configurations set a limit above that.
   describe('Cloudflare account authentication', () => {
-    let db: D1Connection;
+    let db: D1Binding;
     let dispose: () => Promise<void>;
     let fixture: D1Fixture;
     let identity: IdentityProvider;
@@ -73,14 +73,14 @@ export function registerAuthenticationCases(group: AuthenticationCases) {
         await applyMigrations(db);
       }
       fullApplication = !!await db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'admin_audit'").first();
-      identity = createBetterAuthIdentity(db as Parameters<typeof createBetterAuthIdentity>[0], {
+      identity = createBetterAuthIdentity(db, {
         origin, secret: randomSecret(), secureCookies: false, hasher,
       });
     }, 120_000);
 
     afterAll(async () => { if (dispose) await dispose(); }, 120_000);
 
-    function stmt(sql: string, ...values: Array<string | number | null>): D1Statement {
+    function stmt(sql: string, ...values: D1Value[]): D1Statement {
       return db.prepare(sql).bind(...values);
     }
 
@@ -92,7 +92,7 @@ export function registerAuthenticationCases(group: AuthenticationCases) {
     async function signIn(accountUsername = username, accountPassword = password, instance = service): Promise<Headers> {
       usernames.push(accountUsername.trim().toLowerCase());
       const signed = await instance.signIn(accountUsername, accountPassword);
-      return new Headers({ cookie: signed.cookie.split(';')[0] });
+      return new Headers({ cookie: signed.cookie.split(';')[0]! });
     }
 
     async function credentialEffects(): Promise<string> {
@@ -135,7 +135,7 @@ export function registerAuthenticationCases(group: AuthenticationCases) {
         pending: stmt("UPDATE accounts SET must_change = 1, credential_state = 'pending' WHERE id = ?", fixture.staff.accountId),
         permission: stmt('UPDATE memberships SET is_admin = 0 WHERE account_id = ?', fixture.staff.accountId),
       };
-      return changes[restriction];
+      return changes[restriction]!;
     }
 
     beforeEach(async () => {
@@ -193,9 +193,9 @@ export function registerAuthenticationCases(group: AuthenticationCases) {
         ...uniqueUsernames.map((name) => stmt('SELECT key FROM authentication_limits WHERE key = ?', `username:${name}`)),
       ]);
       for (let index = 0; index < ids.length; index++) {
-        expect(checks[index * 3][0]?.n).toBe(0);
-        expect(checks[index * 3 + 1][0]?.n).toBe(0);
-        expect(checks[index * 3 + 2][0]?.n).toBe(0);
+        expect(checks[index * 3]![0]?.n).toBe(0);
+        expect(checks[index * 3 + 1]![0]?.n).toBe(0);
+        expect(checks[index * 3 + 2]![0]?.n).toBe(0);
       }
       for (const rows of checks.slice(ids.length * 3)) expect(rows[0] ?? null).toBeNull();
       await fixture.cleanup();
@@ -221,7 +221,7 @@ export function registerAuthenticationCases(group: AuthenticationCases) {
             pending: stmt("UPDATE accounts SET must_change = 1, credential_state = 'pending' WHERE id = ?", target),
           };
           let before: string | undefined;
-          const racing = changeAtFinalGuard(changes[restriction], 1, async () => { before = await credentialEffects(); });
+          const racing = changeAtFinalGuard(changes[restriction]!, 1, async () => { before = await credentialEffects(); });
           await expectFailure(signIn(username, password, racing)).toMatchObject({ status: 409 });
           expect(before).toBeDefined();
           expect(await credentialEffects()).toBe(before);
@@ -253,7 +253,7 @@ export function registerAuthenticationCases(group: AuthenticationCases) {
         await expectFailure(interrupted.changePassword(adminHeaders, password, randomSecret())).toThrow('Interrupted self hash');
         expect((await service.current(adminHeaders))?.status.must_change).toBe(true);
         const changed = await service.changePassword(adminHeaders, password, randomSecret());
-        expect((await service.current(new Headers({ cookie: changed.cookie.split(';')[0] })))?.status.must_change).toBe(false);
+        expect((await service.current(new Headers({ cookie: changed.cookie.split(';')[0]! })))?.status.must_change).toBe(false);
       });
 
       it('recovers a committed self change after the database response is lost', async () => {
@@ -282,7 +282,7 @@ export function registerAuthenticationCases(group: AuthenticationCases) {
         await expectFailure(signIn()).toMatchObject({ status: 401 });
         expect((await stmt('SELECT credential_state FROM accounts WHERE id = ?', fixture.contestant.accountId).first<{credential_state: string}>())?.credential_state).toBe('pending');
         const recovered = await service.account(adminHeaders, fixture.sessionId, { action: 'reset_password', userId: fixture.contestant.accountId });
-        expect((await service.current(await signIn(username, recovered.temporaryPassword!)))?.status.must_change).toBe(true);
+        expect((await service.current(await signIn(username, recovered.temporaryPassword)))?.status.must_change).toBe(true);
       });
 
       it('rolls back reset initiation when current admin access changes before commit', async () => {
@@ -437,7 +437,7 @@ export function registerAuthenticationCases(group: AuthenticationCases) {
         await expectFailure(signIn()).toMatchObject({ status: 401 });
         await stmt('UPDATE memberships SET is_admin = 1 WHERE account_id = ?', fixture.staff.accountId).run();
         const reset = await service.account(adminHeaders, fixture.sessionId, { action: 'reset_password', userId: fixture.contestant.accountId });
-        expect((await service.current(await signIn(username, reset.temporaryPassword!)))?.status.must_change).toBe(true);
+        expect((await service.current(await signIn(username, reset.temporaryPassword)))?.status.must_change).toBe(true);
       });
 
       it('recovers an interrupted account creation without replacing its account ID', async () => {
@@ -449,7 +449,7 @@ export function registerAuthenticationCases(group: AuthenticationCases) {
         extraIds.push(row!.id);
         expect(row?.credential_state).toBe('pending');
         const recovered = await service.account(adminHeaders, fixture.sessionId, { action: 'reset_password', userId: row!.id });
-        expect((await service.current(await signIn(accountUsername, recovered.temporaryPassword!)))?.user.id).toBe(row?.id);
+        expect((await service.current(await signIn(accountUsername, recovered.temporaryPassword)))?.user.id).toBe(row?.id);
       });
 
       it('blocks reset when a different assigned session is archived', async () => {
@@ -501,7 +501,7 @@ export function registerAuthenticationCases(group: AuthenticationCases) {
         const second = await signIn();
         const replacement = randomSecret();
         const result = await service.changePassword(first, password, replacement);
-        const fresh = new Headers({ cookie: result.cookie.split(';')[0] });
+        const fresh = new Headers({ cookie: result.cookie.split(';')[0]! });
         expect((await service.current(fresh))?.status.must_change).toBe(false);
         expect(await service.current(first)).toBeUndefined();
         expect(await service.current(second)).toBeUndefined();
@@ -519,7 +519,7 @@ export function registerAuthenticationCases(group: AuthenticationCases) {
         const headers = await signIn();
         const replacement = randomSecret();
         const changed = await service.changePassword(headers, password, replacement);
-        const fresh = new Headers({ cookie: changed.cookie.split(';')[0] });
+        const fresh = new Headers({ cookie: changed.cookie.split(';')[0]! });
 
         expect((await service.current(fresh))?.status).toMatchObject({ must_change: false, session_valid: true });
         expect(await service.current(headers)).toBeUndefined();
@@ -608,22 +608,22 @@ export function registerAuthenticationCases(group: AuthenticationCases) {
           ...notificationStatements(db, fixture.sessionId, ['staff', `team:${fixture.teamId}`]),
         ]);
         const before = await fixture.durableState();
-        expect(before.history.length).toBe(1);
+        expect(before.history!.length).toBe(1);
         const reset = await service.account(adminHeaders, fixture.sessionId, { action: 'reset_password', userId: fixture.contestant.accountId });
         expect(Boolean(reset.temporaryPassword)).toBe(true);
         expect(await service.current(oldHeaders)).toBeUndefined();
         await expectFailure(signIn()).toMatchObject({ status: 401 });
-        const newHeaders = await signIn(username, reset.temporaryPassword!);
+        const newHeaders = await signIn(username, reset.temporaryPassword);
         const current = await service.current(newHeaders);
         expect(current?.user.id).toBe(fixture.contestant.accountId);
         expect(current?.status.must_change).toBe(true);
         const after = await fixture.durableState();
         for (const key of ['issues', 'receipts', 'history']) expect(after[key]).toEqual(before[key]);
         for (const key of ['sequences', 'notifications']) {
-          expect(after[key].filter((row) => String(row.audience).startsWith('team:')))
-            .toEqual(before[key].filter((row) => String(row.audience).startsWith('team:')));
+          expect(after[key]!.filter((row) => String(row.audience).startsWith('team:')))
+            .toEqual(before[key]!.filter((row) => String(row.audience).startsWith('team:')));
         }
-        expect(after.notifications.filter((row) => row.audience === 'staff')).toHaveLength(fullApplication ? 2 : 1);
+        expect(after.notifications!.filter((row) => row.audience === 'staff')).toHaveLength(fullApplication ? 2 : 1);
         // The contestant has a login, so the reset still sends the account a revocation hint.
         expect((await stmt('SELECT count(*) AS n FROM notifications WHERE audience = ?', `account:${fixture.contestant.accountId}`)
           .first<{ n: number }>())!.n).toBeGreaterThan(0);
@@ -648,7 +648,7 @@ export function registerAuthenticationCases(group: AuthenticationCases) {
         // A new account has no login, so setup writes one staff notification and no account notification.
         expect(await signals(`account:${row!.id}`)).toBe(0);
         expect(await signals('staff')).toBe(staffBefore + (fullApplication ? 1 : 0));
-        const current = await service.current(await signIn(accountUsername, result.temporaryPassword!));
+        const current = await service.current(await signIn(accountUsername, result.temporaryPassword));
         expect(current?.user.id).toBe(row!.id);
         expect(current?.status.must_change).toBe(true);
       });
@@ -663,7 +663,7 @@ export function registerAuthenticationCases(group: AuthenticationCases) {
         const pending = await stmt('SELECT credential_state, must_change FROM accounts WHERE id = ?', fixture.contestant.accountId).first();
         expect(pending).toEqual({ credential_state: 'pending', must_change: 1 });
         const reset = await service.account(adminHeaders, fixture.sessionId, { action: 'reset_password', userId: fixture.contestant.accountId });
-        expect((await service.current(await signIn(username, reset.temporaryPassword!)))?.status.must_change).toBe(true);
+        expect((await service.current(await signIn(username, reset.temporaryPassword)))?.status.must_change).toBe(true);
       });
 
       it('prevents a superseded reset from writing an older password', async () => {
@@ -679,7 +679,7 @@ export function registerAuthenticationCases(group: AuthenticationCases) {
         const second = await service.account(adminHeaders, fixture.sessionId, { action: 'reset_password', userId: fixture.contestant.accountId });
         release();
         expect(await firstOutcome).toBe(true);
-        expect((await service.current(await signIn(username, second.temporaryPassword!)))?.status.must_change).toBe(true);
+        expect((await service.current(await signIn(username, second.temporaryPassword)))?.status.must_change).toBe(true);
       });
 
       it('rejects an old password login that races a completed reset', async () => {
@@ -703,7 +703,7 @@ export function registerAuthenticationCases(group: AuthenticationCases) {
             if (request.method === 'POST') request.headers.set('Origin', origin);
             const response = await handle(request);
             const replacement = response.headers.get('Set-Cookie');
-            if (replacement) cookie = replacement.split(';')[0];
+            if (replacement) cookie = replacement.split(';')[0]!;
             return response;
           },
         });

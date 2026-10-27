@@ -5,13 +5,6 @@ import type { Issue, Membership, Role, Snapshot } from "@/connected/model";
 /** The username rule of the `admin` function, as an HTML `pattern`. */
 export const usernamePattern = "[a-zA-Z0-9][a-zA-Z0-9_-]{2,31}";
 
-const usernameExpression = new RegExp(`^${usernamePattern}$`);
-
-/** Whether the admin function accepts this username. */
-export function isValidUsername(value: string): boolean {
-  return usernameExpression.test(value.trim());
-}
-
 /** The staff roles in the order that the forms show them. */
 export const staffRoles: readonly Role[] = ["volunteer", "specialist", "jury"];
 
@@ -182,7 +175,7 @@ export function accountKind(
     labels: [
       ...staffRoles
         .filter((role) => member.roles.includes(role))
-        .map((role) => role[0].toUpperCase() + role.slice(1)),
+        .map((role) => role.charAt(0).toUpperCase() + role.slice(1)),
       ...(member.is_admin ? ["Admin"] : []),
     ],
   };

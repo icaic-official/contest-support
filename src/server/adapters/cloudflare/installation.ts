@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { D1Connection, D1Statement } from '../d1/connection';
+import type { D1Connection, D1Statement, D1Value } from '../d1/connection';
 import { passwordHasher, randomSecret, type PasswordHasher } from './password';
 
 // Retain PR #21's competition fields and normalized-name checks. Credentials
@@ -44,11 +44,11 @@ export function validateCompetitionConfiguration(input: unknown): CompetitionCon
   return parsed.data;
 }
 
-function statement(db: D1Connection, sql: string, ...values: Array<string | number | null>): D1Statement {
+function statement(db: D1Connection, sql: string, ...values: D1Value[]): D1Statement {
   return db.prepare(sql).bind(...values);
 }
 
-function assertion(db: D1Connection, id: string, condition: string, ...values: Array<string | number | null>): D1Statement {
+function assertion(db: D1Connection, id: string, condition: string, ...values: D1Value[]): D1Statement {
   return statement(db, `INSERT INTO command_assertions (id, valid)
     VALUES (?, CASE WHEN ${condition} THEN 1 ELSE 0 END)`, id, ...values);
 }
@@ -105,7 +105,7 @@ export async function bootstrapInstallation(
   const accountId = crypto.randomUUID();
   const eventId = crypto.randomUUID();
   const sessionId = crypto.randomUUID();
-  const teamIds = config.teams.map(() => crypto.randomUUID());
+  const teams = config.teams.map((team) => ({ ...team, id: crypto.randomUUID() }));
   const assertionId = crypto.randomUUID();
   const operationId = crypto.randomUUID();
   try {
@@ -119,8 +119,8 @@ export async function bootstrapInstallation(
       statement(db, 'INSERT INTO events (id, name) VALUES (?, ?)', eventId, config.eventName),
       statement(db, 'INSERT INTO sessions (id, event_id, name, categories, intake_open) VALUES (?, ?, ?, ?, 0)',
         sessionId, eventId, config.sessionName, JSON.stringify(config.categories)),
-      ...config.teams.map((team, index) => statement(db, 'INSERT INTO teams (id, session_id, name, location) VALUES (?, ?, ?, ?)',
-        teamIds[index], sessionId, team.name, team.location)),
+      ...teams.map((team) => statement(db, 'INSERT INTO teams (id, session_id, name, location) VALUES (?, ?, ?, ?)',
+        team.id, sessionId, team.name, team.location)),
       statement(db, 'INSERT INTO memberships (session_id, account_id, is_admin) VALUES (?, ?, 1)', sessionId, accountId),
       statement(db, `INSERT INTO account_operations (id, account_id, actor, session_id, action, state, completed_at)
         VALUES (?, ?, ?, ?, 'create_account', 'completed', unixepoch())`, operationId, accountId, accountId, sessionId),
@@ -134,7 +134,7 @@ export async function bootstrapInstallation(
     // A transport failure can follow a commit. Do not report it as rollback.
     throw new Error('Installation outcome is unknown. Inspect the installation before retrying.');
   }
-  return { installationId, accountId, eventId, sessionId, teamIds, adminUsername: config.adminUsername, temporaryPassword: password };
+  return { installationId, accountId, eventId, sessionId, teamIds: teams.map((team) => team.id), adminUsername: config.adminUsername, temporaryPassword: password };
 }
 
 const ownerCondition = `EXISTS (SELECT 1 FROM installation i

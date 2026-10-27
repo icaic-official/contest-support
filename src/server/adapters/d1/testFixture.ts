@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import { unstable_splitSqlQuery as splitSqlQuery } from "wrangler";
 import type { Caller } from '../../authentication';
 import type { D1Connection, D1Statement } from "./connection";
+import type { D1Value } from './connection.ts';
 
 type Row = Record<string, unknown>;
 
@@ -43,11 +44,11 @@ export class D1Fixture {
     private readonly workflow = false,
   ) {}
 
-  statement(sql: string, ...values: Array<string | number | null>): D1Statement {
+  statement(sql: string, ...values: D1Value[]): D1Statement {
     return this.db.prepare(sql).bind(...values);
   }
 
-  async rows(sql: string, ...values: Array<string | number | null>): Promise<Row[]> {
+  async rows(sql: string, ...values: D1Value[]): Promise<Row[]> {
     return (await this.statement(sql, ...values).all<Row>()).results;
   }
 
@@ -61,11 +62,13 @@ export class D1Fixture {
   }
 
   private recoveryDetails() {
-    const config = JSON.parse(readFileSync(this.configPath, "utf8"));
+    const config = JSON.parse(readFileSync(this.configPath, "utf8")) as {
+      account_id: string; d1_databases: Array<{ database_id: string; database_name: string }>;
+    };
     return {
       config: this.configPath, workflow: this.workflow, remote: process.env.MINSKY_AUTH_REMOTE === "1" || Boolean(process.env.MINSKY_CONNECTOR_D1_CONFIG),
-      accountId: config.account_id, databaseId: config.d1_databases[0].database_id,
-      databaseName: config.d1_databases[0].database_name,
+      accountId: config.account_id, databaseId: config.d1_databases[0]!.database_id,
+      databaseName: config.d1_databases[0]!.database_name,
       eventId: this.eventId, sessionIds: [this.sessionId, this.secondSessionId],
       teamIds: [this.teamId, this.otherTeamId, this.secondSessionTeamId],
       issueIds: [this.issueId, this.otherIssueId, this.secondSessionIssueId],
@@ -165,7 +168,7 @@ export class D1Fixture {
     const rows = await this.rowsBatch(queries.map(([, sql]) =>
       this.statement(sql, this.sessionId, this.secondSessionId)));
     const result: Record<string, Row[]> = {};
-    queries.forEach(([name], index) => { result[name] = rows[index]; });
+    queries.forEach(([name], index) => { result[name] = rows[index]!; });
     return result;
   }
 
@@ -227,10 +230,10 @@ export class D1Fixture {
     const [people, logins, memberships, events, remainingSessions, sequences, notifications,
       identityUsers, identitySessions] = checks.slice(workflowQueries.length);
     if (this.workflow) {
-      if (identityUsers.length || identitySessions.length) throw new Error(`Fixture identities remain for ${this.eventId}.`);
+      if (identityUsers!.length || identitySessions!.length) throw new Error(`Fixture identities remain for ${this.eventId}.`);
     }
-    if (people.length !== 0) throw new Error(`Fixture accounts remain for ${this.eventId}.`);
-    if (logins.length || memberships.length || events.length || remainingSessions.length || sequences.length || notifications.length) {
+    if (people!.length !== 0) throw new Error(`Fixture accounts remain for ${this.eventId}.`);
+    if (logins!.length || memberships!.length || events!.length || remainingSessions!.length || sequences!.length || notifications!.length) {
       throw new Error(`Fixture access records remain for ${this.eventId}.`);
     }
   }

@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { openStoreDatabase } from '../cloudflare/tooling/store-database.mjs';
 import applicationWorker, { type ApplicationEnvironment } from '../cloudflare/applicationWorker';
-import type { D1Connection, D1Statement } from './connection';
+import type { D1Binding, D1Connection, D1Statement } from './connection';
 import { applyMigrations } from './testFixture';
 
 vi.mock('cloudflare:workers', () => ({ WorkerEntrypoint: class {} }));
@@ -12,7 +12,7 @@ type Value = string | number | null;
 interface Recorded { sql: string; values: Value[]; rowsRead: number }
 
 /** Runs each statement on the real database and records its SQL, bound values, and rows read. */
-function recordStatements(db: D1Connection): { db: D1Connection; log: Recorded[] } {
+function recordStatements(db: D1Binding): { db: D1Binding; log: Recorded[] } {
   const log: Recorded[] = [];
   const parts = new WeakMap<D1Statement, { inner: D1Statement; sql: string; values: Value[] }>();
   const rowsRead = (result: unknown) => (result as { meta?: { rows_read?: number } }).meta?.rows_read ?? 0;
@@ -36,6 +36,7 @@ function recordStatements(db: D1Connection): { db: D1Connection; log: Recorded[]
     log,
     db: {
       prepare: (sql) => wrap(db.prepare(sql), sql, []),
+      exec: (query) => db.exec(query),
       batch: async (statements) => {
         const items = statements.map((statement) => {
           const item = parts.get(statement);
@@ -119,7 +120,7 @@ async function seed(db: D1Connection): Promise<void> {
 }
 
 describe('the minute cron on an installation with 1,000 images and 500 signed-in accounts', () => {
-  let db: D1Connection;
+  let db: D1Binding;
   let dispose: () => Promise<void>;
   const removedKeys: string[] = [];
   const ticks: Recorded[][] = [];
@@ -190,7 +191,7 @@ describe('the minute cron on an installation with 1,000 images and 500 signed-in
   // failed sign-in key of the last day, so the scan stays small and an index would add two writes
   // to every failed attempt. Add the index if that table grows.
   it('searches every cleanup statement through an index', async () => {
-    const statements = new Map(ticks[0].map((entry) => [`${entry.sql}\n${JSON.stringify(entry.values)}`, entry]));
+    const statements = new Map(ticks[0]!.map((entry) => [`${entry.sql}\n${JSON.stringify(entry.values)}`, entry]));
     expect(statements.size).toBeGreaterThan(10);
     const scans: string[] = [];
     for (const { sql, values } of statements.values()) {

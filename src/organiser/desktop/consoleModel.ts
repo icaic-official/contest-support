@@ -5,6 +5,7 @@ import {
   type Membership,
   type Resolution,
   type Snapshot,
+  type StatusFilter,
   unresolvedTime,
 } from "@/connected/model";
 import { normalizeTeamText } from "@/connected/teamSearch";
@@ -112,34 +113,17 @@ export const queueTabs: readonly { tab: QueueTab; label: string }[] = [
 ];
 
 /**
- * The shared status filter value of the All tab. The phone app treats every
- * value that is not a status as "All active", so this value is safe there.
- */
-export const everythingFilter = "everything";
-
-/**
  * Maps the shared status filter of useWorkflowState to a queue tab. "all" is
  * the default and shows active issues, as the phone app does. "claimed"
  * after a reopen shows In progress, so the reopened issue stays in view.
  */
-export function queueTabForFilter(filter: string): QueueTab {
-  if (filter === everythingFilter) return "everything";
-  if (
-    filter === "open" ||
-    filter === "claimed" ||
-    filter === "escalated" ||
-    filter === "resolved"
-  ) {
-    return filter;
-  }
-  return "active";
+export function queueTabForFilter(filter: StatusFilter): QueueTab {
+  return filter === "all" ? "active" : filter;
 }
 
 /** The shared status filter value for a queue tab. */
-export function filterForQueueTab(tab: QueueTab): string {
-  if (tab === "active") return "all";
-  if (tab === "everything") return everythingFilter;
-  return tab;
+export function filterForQueueTab(tab: QueueTab): StatusFilter {
+  return tab === "active" ? "all" : tab;
 }
 
 export function matchesQueueTab(issue: Issue, tab: QueueTab): boolean {
@@ -150,26 +134,26 @@ export function matchesQueueTab(issue: Issue, tab: QueueTab): boolean {
 
 /** The middle value of a list, or undefined for an empty list. */
 export function median(values: readonly number[]): number | undefined {
-  if (!values.length) return undefined;
   const sorted = [...values].sort((a, b) => a - b);
   const middle = Math.floor(sorted.length / 2);
-  return sorted.length % 2
-    ? sorted[middle]
-    : (sorted[middle - 1] + sorted[middle]) / 2;
+  const upper = sorted[middle];
+  const lower = sorted[middle - 1];
+  if (upper === undefined) return undefined;
+  return sorted.length % 2 || lower === undefined ? upper : (lower + upper) / 2;
 }
 
 /** The numbers on the status cards of the queue and the overview. */
 export interface QueueStats {
   open: number;
   /** Unresolved time of the oldest open issue. */
-  oldestOpenMs?: number;
+  oldestOpenMs: number | undefined;
   claimed: number;
   /** Distinct owners of issues in progress. */
   helpers: number;
   escalated: number;
   resolved: number;
   /** Median unresolved time of resolved issues. */
-  medianResolvedMs?: number;
+  medianResolvedMs: number | undefined;
 }
 
 /** Counts issues by status from persisted timestamps. */
@@ -292,14 +276,4 @@ export function paletteIssues(
 export function labelMatches(label: string, query: string): boolean {
   const text = normalizeTeamText(query);
   return !text || normalizeTeamText(label).includes(text);
-}
-
-/** The person who resolved an issue most recently, if it is resolved. */
-export function latestResolver(
-  issue: Issue,
-  resolutions: readonly Resolution[],
-): string | undefined {
-  if (issue.status !== "resolved") return undefined;
-  const records = resolutions.filter((record) => record.issue_id === issue.id);
-  return records.at(-1)?.actor_name;
 }

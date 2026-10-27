@@ -30,6 +30,32 @@ export default tseslint.config(
       "react-hooks/exhaustive-deps": "warn",
     },
   },
+  // Type-aware rules for application code, tests, and the root configs. The
+  // vendored shadcn/ui components stay on the syntactic rules above.
+  {
+    files: ["src/**/*.{ts,tsx}", "tests/**/*.ts", "*.config.ts"],
+    ignores: ["src/components/ui/**"],
+    languageOptions: { parserOptions: { projectService: true, tsconfigRootDir: import.meta.dirname } },
+    rules: {
+      "@typescript-eslint/consistent-type-assertions": ["error", { assertionStyle: "as", objectLiteralTypeAssertions: "never" }],
+      "@typescript-eslint/no-unnecessary-type-assertion": "error",
+      "@typescript-eslint/no-unsafe-argument": "error",
+      "@typescript-eslint/no-unsafe-assignment": "error",
+      "@typescript-eslint/no-unsafe-call": "error",
+      "@typescript-eslint/no-unsafe-member-access": "error",
+      "@typescript-eslint/no-unsafe-return": "error",
+      "@typescript-eslint/switch-exhaustiveness-check": ["error", { considerDefaultExhaustiveForUnions: true }],
+    },
+  },
+  // Tests may assert that fixture data exists with `value!`, so a missing value fails the test.
+  {
+    files: ["src/**/*.{ts,tsx}"],
+    ignores: [
+      "**/*.test.{ts,tsx}", "src/components/ui/**",
+      "src/server/adapters/cloudflare/authenticationCases.ts", "src/server/adapters/d1/test*.ts",
+    ],
+    rules: { "@typescript-eslint/no-non-null-assertion": "error" },
+  },
   {
     files: ["src/**/*.{ts,tsx}"],
     ignores: ["src/backend/*/**", "src/backend/index.ts", "src/server/**"],

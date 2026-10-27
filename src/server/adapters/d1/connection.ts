@@ -1,6 +1,9 @@
+/** A value that a D1 statement can bind. */
+export type D1Value = string | number | null;
+
 /** Only the D1 adapter and its fixture code use this binding surface. */
 export interface D1Statement {
-  bind(...values: Array<string | number | null>): D1Statement;
+  bind(...values: D1Value[]): D1Statement;
   first<T>(): Promise<T | null>;
   /** `meta.rows_read` is the number of rows D1 read, which D1 bills. */
   all<T>(): Promise<{ results: T[]; meta?: { rows_read?: number } }>;
@@ -10,4 +13,9 @@ export interface D1Statement {
 export interface D1Connection {
   prepare(sql: string): D1Statement;
   batch(statements: D1Statement[]): Promise<unknown[]>;
+}
+
+/** The Workers D1 binding. Better Auth recognizes its native D1 adapter by exec(). */
+export interface D1Binding extends D1Connection {
+  exec(query: string): Promise<unknown>;
 }

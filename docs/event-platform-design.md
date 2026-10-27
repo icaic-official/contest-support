@@ -541,7 +541,7 @@ It keeps the practice and live kinds, the reason for fresh live passwords, batch
 
 **Promotion of the two development accounts.**
 
-- **Rule.** `0017` gives a site grant to the accounts whose username is `organizer` or `playtest-admin`, by name (decision 1). Usernames are globally unique (`src/server/adapters/d1/migrations/0003_authentication.sql:5`), so the rule matches at most two accounts. On a database without them, it promotes nobody. The repository names `organizer` as the development owner (`docs/activate-cloudflare-development.md:36`). The owner supplied `playtest-admin`. The repository does not mention it, and it passes the username CHECK (`src/server/adapters/d1/migrations/0003_authentication.sql:2-4`). No count or query runs before the merge.
+- **Rule.** `0017` gives a site grant to the accounts whose username is `organizer` or `playtest-admin`, by name (decision 1). Usernames are globally unique (`src/server/adapters/d1/migrations/0003_authentication.sql:5`), so the rule matches at most two accounts. A matching account must also be a contest admin and hold no team seat. So a self-hosted team or volunteer that uses one of these names is not promoted. On a database without them, it promotes nobody. The repository names `organizer` as the development owner (`docs/activate-cloudflare-development.md:36`). The owner supplied `playtest-admin`. The repository does not mention it, and it passes the username CHECK (`src/server/adapters/d1/migrations/0003_authentication.sql:2-4`). No count or query runs before the merge.
 - **Reach.** `0017` runs on every database that applies the repository's migrations. These are all of them:
   - `minsky-development`, through the `minsky-dev` Workers Builds trigger after the merge (`AGENTS.md:65`). It promotes `organizer` and `playtest-admin`.
   - `minsky-preview`, when an agent applies migrations to it. It holds only test data. An account there with either username becomes a webmaster.
@@ -722,7 +722,7 @@ The [type sketch](event-platform-sketches.md#type-sketch) shows the final shape.
 
 The owner made these decisions on 2026-10-27, after the first draft of this design:
 
-1. **Promotion.** `0017` promotes exactly the accounts with usernames `organizer` and `playtest-admin` to webmasters, by name. On a database without them, it promotes nobody. This replaces the earlier rule, every contest admin of the installation event, and the owner's read-only count before the merge.
+1. **Promotion.** `0017` promotes exactly the accounts with usernames `organizer` and `playtest-admin` to webmasters, by name, when each is a contest admin with no team seat. On a database without them, it promotes nobody. This replaces the earlier rule, every contest admin of the installation event, and the owner's read-only count before the merge.
 2. **Who assigns people.** Event admins and optional contest admins both stay, with no setting. Only event admins and webmasters create accounts and assign people, entrants and staff, to contests. A contest admin manages only their own contest: settings, categories, announcements, the intake override, the issue workflow, and confined password reissue and handle change. A contest admin no longer adds or removes staff. An event that wants no contest admins assigns none. This design reads team locations and image limits as contest settings, so `set_location` and `set_image_limits` stay at contest level. It reads a contest's name, type, and schedule as event structure, so `update_contest` stays at event level. The owner can move either.
 3. **The override and the live gate.** **Open now**, **Close now**, and **Return to schedule** cannot open a live contest whose seats are not all ready. The live gate comes first in `intakeOpenSql`.
 4. **Reporting after the scheduled end.** A contestant with confirmed extra minutes may report until their personal end plus grace.
@@ -775,7 +775,7 @@ Local checks ran on the final sketches. The checks are not part of the repositor
 - The repository's migration guard, `destructiveStatements`, finds nothing in any of the seven sketch files.
 - An empty database stays empty after every file, and the previous Worker's bootstrap still runs on the new schema.
 - 86 behavior checks pass on development-shaped data. They cover identity and sign-in, isolation, takeover protection, the audited join, the resolver for every role, account management, staff assignment at event level, `forContests`, intake, the personal end time, awards, and the delete guards.
-- 37 probe checks pass. They cover the promotion by name, a database where nobody is promoted, the backfills, the previous Worker's writes, and a legacy cross-event actor that blocks its own deletion.
+- 38 probe checks pass. They cover the promotion by name, a database where nobody is promoted, a team account and a volunteer that use the two names and are not promoted, the backfills, the previous Worker's writes, and a legacy cross-event actor that blocks its own deletion.
 - No new lookup scans a table, and the previous Worker's sign-in keeps `accounts_username`.
 - A deletion of one event leaves exactly the database that holds the other event, across all 31 tables that reference events, contests, or accounts.
 - Every citation in the sketches exists in the repository.

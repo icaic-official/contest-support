@@ -24,7 +24,7 @@ The [event platform design](docs/event-platform-design.md) explains the proposed
 10. A calendar shows each member the contests of their own events. Webmasters see every event. There is no public listing yet.
 11. Announcements, categories, and image limits stay per contest. The product names become Webmaster, Event, and Contest. They replace Organization and Competition from the 2026-10-25 design.
 12. A webmaster deletes an event permanently after a typed confirmation that names what is lost. The deletion does not wait for the export in issue #116. It shows "done" after 65 minutes.
-13. The development accounts `organizer` and `playtest-admin` become webmasters. A migration promotes them by name. On a database without them, it promotes nobody.
+13. The development accounts `organizer` and `playtest-admin` become webmasters. A migration promotes them by name, and only when each is a contest admin with no team seat. On a database without them, it promotes nobody.
 
 This decision supersedes these earlier statements:
 

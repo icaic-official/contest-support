@@ -1315,8 +1315,13 @@ END;
 --   A self-hosted database: an account with either username. The example installation file names
 --   its admin organizer (src/server/adapters/cloudflare/tooling/competition.example.json:2).
 -- The grant goes in BEFORE the event backfill, so promoted accounts stay site accounts.
+-- A name alone is not enough: the account must be a contest admin and hold no team seat,
+-- so a self-hosted team or volunteer that happens to use one of these names stays as it is.
 INSERT INTO grants (account_id, scope, granted_by)
-SELECT id, 'site', 'migration:0017' FROM accounts WHERE username IN ('organizer', 'playtest-admin');
+SELECT a.id, 'site', 'migration:0017' FROM accounts a
+WHERE a.username IN ('organizer', 'playtest-admin')
+  AND EXISTS (SELECT 1 FROM memberships m WHERE m.account_id = a.id AND m.is_admin = 1)
+  AND NOT EXISTS (SELECT 1 FROM memberships m WHERE m.account_id = a.id AND m.team_id IS NOT NULL);
 
 INSERT INTO authority_audit (id, event_id, actor, actor_name, action, target, detail)
 SELECT lower(hex(randomblob(4)) || '-' || hex(randomblob(2)) || '-4' || substr(hex(randomblob(2)), 2) || '-a'

@@ -8,7 +8,6 @@ import {
   consolePages,
   filterForQueueTab,
   labelMatches,
-  latestResolver,
   matchesQueueTab,
   median,
   navCount,
@@ -321,20 +320,5 @@ describe("labelMatches", () => {
     expect(labelMatches("Café", "cafe")).toBe(true);
     expect(labelMatches("Queue", "")).toBe(true);
     expect(labelMatches("Queue", "award")).toBe(false);
-  });
-});
-
-describe("latestResolver", () => {
-  it("names the person of the current resolution", () => {
-    const resolutions = [
-      resolution({ id: "r1", actor_name: "Priya", reopened_at: "2026-10-17T10:08:00Z" }),
-      resolution({ id: "r2", actor_name: "Marcus" }),
-    ];
-    expect(latestResolver(issue({ status: "resolved" }), resolutions)).toBe(
-      "Marcus",
-    );
-    expect(latestResolver(issue({ status: "claimed" }), resolutions)).toBe(
-      undefined,
-    );
   });
 });

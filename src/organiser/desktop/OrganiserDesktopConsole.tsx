@@ -56,6 +56,7 @@ import {
   type ConsolePage,
   consoleNavGroups,
   consolePageLabels,
+  consolePages,
   navCount,
 } from "./consoleModel";
 import { IssueSheet } from "./IssueSheet";
@@ -214,7 +215,7 @@ export function OrganiserDesktopConsole({
 
   const session = state.session;
   const groups = consoleNavGroups(member);
-  const pages = groups.flatMap((group) => group.pages);
+  const pages = consolePages(member);
   const currentPage =
     page && page !== "account" && pages.includes(page) ? page : pages[0];
   const issues = visibleIssues(state.issues, member);

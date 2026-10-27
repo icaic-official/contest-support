@@ -5,13 +5,6 @@ import type { Issue, Membership, Role, Snapshot } from "@/connected/model";
 /** The username rule of the `admin` function, as an HTML `pattern`. */
 export const usernamePattern = "[a-zA-Z0-9][a-zA-Z0-9_-]{2,31}";
 
-const usernameExpression = new RegExp(`^${usernamePattern}$`);
-
-/** Whether the admin function accepts this username. */
-export function isValidUsername(value: string): boolean {
-  return usernameExpression.test(value.trim());
-}
-
 /** The staff roles in the order that the forms show them. */
 export const staffRoles: readonly Role[] = ["volunteer", "specialist", "jury"];
 

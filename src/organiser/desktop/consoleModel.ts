@@ -277,13 +277,3 @@ export function labelMatches(label: string, query: string): boolean {
   const text = normalizeTeamText(query);
   return !text || normalizeTeamText(label).includes(text);
 }
-
-/** The person who resolved an issue most recently, if it is resolved. */
-export function latestResolver(
-  issue: Issue,
-  resolutions: readonly Resolution[],
-): string | undefined {
-  if (issue.status !== "resolved") return undefined;
-  const records = resolutions.filter((record) => record.issue_id === issue.id);
-  return records.at(-1)?.actor_name;
-}

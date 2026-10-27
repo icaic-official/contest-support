@@ -61,30 +61,6 @@ export function imageRejection(
   return undefined;
 }
 
-export function classifyAttachmentError(message: string): {
-  validation: boolean;
-  restart: boolean;
-} {
-  const validation = [
-    "Choose a JPEG, PNG, or WebP image.",
-    "This image is larger than",
-    "These images would exceed",
-    "This issue already has",
-    "This event is archived.",
-    "You do not have permission",
-    "Only the person who added this image",
-    "Choose who can see this image.",
-    "Choose a maximum",
-    "The issue total must be",
-    "No access to this session.",
-    "Image unavailable.",
-    "Change your temporary password or sign in again.",
-  ].some((prefix) => message.startsWith(prefix));
-  const restart = message.startsWith("Upload the image before finishing.") ||
-    message.startsWith("Upload failed.");
-  return { validation, restart };
-}
-
 export function attachmentPath(
   sessionId: string,
   issueId: string,

@@ -9,7 +9,6 @@ import {
   imageLimitsInput,
   isCompleteMembership,
   isValidLimit,
-  isValidUsername,
   limitsOfSession,
   membershipInput,
   resetPasswordCommand,
@@ -17,6 +16,7 @@ import {
   statusCounts,
   stepLimit,
   toggleRole,
+  usernamePattern,
 } from "./adminModel";
 
 const sessionId = "00000000-0000-4000-8000-0000000000a1";
@@ -35,14 +35,15 @@ function member(overrides: Partial<Membership> = {}): Membership {
 }
 
 describe("usernames", () => {
-  it("accepts the same usernames as the admin function", () => {
-    expect(isValidUsername("team-aurora")).toBe(true);
-    expect(isValidUsername("Alex_Morgan")).toBe(true);
-    expect(isValidUsername(" abc ")).toBe(true);
-    expect(isValidUsername("ab")).toBe(false);
-    expect(isValidUsername("-abc")).toBe(false);
-    expect(isValidUsername("a".repeat(33))).toBe(false);
-    expect(isValidUsername("team aurora")).toBe(false);
+  it("gives the form the same username rule as the admin function", () => {
+    // A browser matches the pattern attribute against the whole value.
+    const accepts = (value: string) => new RegExp(`^(?:${usernamePattern})$`, "u").test(value);
+    expect(accepts("team-aurora")).toBe(true);
+    expect(accepts("Alex_Morgan")).toBe(true);
+    expect(accepts("ab")).toBe(false);
+    expect(accepts("-abc")).toBe(false);
+    expect(accepts("a".repeat(33))).toBe(false);
+    expect(accepts("team aurora")).toBe(false);
   });
 });
 

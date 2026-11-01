@@ -1,6 +1,6 @@
 # Webmaster, event, and contest platform
 
-**Status.** Proposed. Phase 1, `feature/scoped-authority`, implements the contest resolver, migration `0017`, and the local half of its gate. The [gate record](history/scoped-authority-gate.md) holds the measurements. The hosted half of the gate and Phases 2 to 8 are not built.
+**Status.** Proposed. Phase 1, `feature/scoped-authority`, implements the contest resolver, migration `0017`, and its gate. The local half passed. The hosted half, run on 2026-11-01, was inconclusive and did not pass. The snapshot p95 grew by 11 to 58 percent at 200 users, and the cause is not isolated. The [gate record](history/scoped-authority-gate.md) holds the measurements. Phases 2 to 8 are not built.
 
 Phase 1 differs from this page and the sketches in these points:
 

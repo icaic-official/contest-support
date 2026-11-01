@@ -12,5 +12,6 @@ Check the repository and the current guides before you act on anything here.
 | [T0009 jury worklist specification](t0009-jury-worklist.md) | The accepted T0009 specification. T0015 later moved the lists into the Awards tab and the Award review page. |
 | [PR #21 component record](pr21-installation-disposition.md) | Reuse decisions for the deferred container packaging in PR #21. |
 | [D1 read-volume baseline](read-volume-baseline-2026-10-26.md) | D1 calls and rows read for each API request on `main` at `f978488`, at 15 data sizes, with ranked causes and prototype deltas, 2026-10-26. |
+| [Scoped authority read gate](scoped-authority-gate.md) | The local read gate of Phase 1 of the event platform design: rows read for each request on `main` and on the branch, two failed drafts and their causes, 2026-11-01. |
 | [Multi-competition design](multi-competition-design.md) | The proposed design of 2026-10-25 for several competitions per installation. The 2026-10-27 [event platform design](../event-platform-design.md) supersedes it. |
 | [Supabase provider records](supabase-provider-records.md) | The T0005 Worker preview and the initial Supabase setup record, 2026-10-02 to 2026-10-11. |

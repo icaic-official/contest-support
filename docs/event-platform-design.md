@@ -735,6 +735,7 @@ The owner made these decisions on 2026-10-27, after the first draft of this desi
 11. **Contest kinds.** Practice and live stay beside the contest types. The live password rule needs them.
 12. **Member lists.** Webmasters do not appear in a contest's member list. The member list shows assigned members, and the audit shows joins.
 13. **Deletion progress.** A deletion shows "done" after 65 minutes. That covers upload reservations that live 3,600 s (`src/server/adapters/d1/migrations/0006_application.sql:34`).
+14. **Own handle.** Decided 2026-11-01. A staff account, admins included, may change its own handle with `set_handle` in Phase 3. A contestant account may not, because its handle is printed on the credential sheet that venue staff use. No setting controls this. Today `set_username` only assigns a username to an account that has none (`src/server/adapters/cloudflare/authentication.ts:238`), so nobody can rename an assigned username before Phase 3.
 
 ## Risks
 

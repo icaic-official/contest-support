@@ -64,6 +64,7 @@ describe('the previous Worker on the scoped authority schema', () => {
       bootstrap: randomUUID(), other: randomUUID(),
       practice: randomUUID(), live: randomUUID(), otherContest: randomUUID(),
       owner: randomUUID(), crossing: randomUUID(), otherStaff: randomUUID(), orphan: randomUUID(),
+      organizer: randomUUID(), playtest: randomUUID(),
     };
 
     beforeAll(async () => {
@@ -73,12 +74,15 @@ describe('the previous Worker on the scoped authority schema', () => {
       await run('INSERT INTO events (id, name) VALUES (?, ?), (?, ?)', ids.bootstrap, 'Bootstrap event', ids.other, 'Other event');
       await run('INSERT INTO sessions (id, event_id, name) VALUES (?, ?, ?), (?, ?, ?), (?, ?, ?)',
         ids.practice, ids.bootstrap, 'Practice', ids.live, ids.bootstrap, 'Live', ids.otherContest, ids.other, 'Other');
-      const usernames = { owner: ids.owner, crossing: ids.crossing, otherstaff: ids.otherStaff, orphan: ids.orphan };
+      const usernames = { owner: ids.owner, crossing: ids.crossing, otherstaff: ids.otherStaff, orphan: ids.orphan,
+        organizer: ids.organizer, 'playtest-admin': ids.playtest };
       for (const [username, id] of Object.entries(usernames)) await addAccount(db, id, username);
       // Before the migration, D1 accepted a membership in any event.
-      await run(`INSERT INTO memberships (session_id, account_id, is_admin) VALUES (?, ?, 1), (?, ?, 0), (?, ?, 0), (?, ?, 0), (?, ?, 0)`,
-        ids.practice, ids.owner, ids.practice, ids.crossing, ids.live, ids.crossing, ids.otherContest, ids.crossing,
-        ids.otherContest, ids.otherStaff);
+      await run(`INSERT INTO memberships (session_id, account_id, is_admin) VALUES (?, ?, 1), (?, ?, 0), (?, ?, 0), (?, ?, 0), (?, ?, 0),
+        (?, ?, 1), (?, ?, 1)`,
+      ids.practice, ids.owner, ids.practice, ids.crossing, ids.live, ids.crossing, ids.otherContest, ids.crossing,
+      ids.otherContest, ids.otherStaff, ids.practice, ids.organizer, ids.live, ids.playtest);
+      await run(`INSERT INTO membership_roles (session_id, account_id, role) VALUES (?, ?, 'jury')`, ids.live, ids.playtest);
       await run('INSERT INTO installation (singleton, id, owner_account_id, event_id, session_id) VALUES (1, ?, ?, ?, ?)',
         randomUUID(), ids.owner, ids.bootstrap, ids.practice);
       await applyMigrations(db, (name) => name >= scopedAuthority);
@@ -90,8 +94,30 @@ describe('the previous Worker on the scoped authority schema', () => {
       const placed = await all<{ id: string; event_id: string }>('SELECT id, event_id FROM accounts');
       expect(Object.fromEntries(placed.map((row) => [row.id, row.event_id]))).toEqual({
         [ids.owner]: ids.bootstrap, [ids.crossing]: ids.bootstrap, [ids.otherStaff]: ids.other, [ids.orphan]: ids.bootstrap,
+        [ids.organizer]: null, [ids.playtest]: null,
       });
       expect(await all('SELECT session_id FROM memberships WHERE account_id = ?', ids.crossing)).toHaveLength(3);
+    });
+
+    it('promotes organizer and playtest-admin to webmasters who keep their admin memberships', async () => {
+      const { all } = writer(db);
+      expect(await all(`SELECT account_id, granted_by FROM grants WHERE scope = 'site' ORDER BY account_id`))
+        .toEqual([ids.organizer, ids.playtest].sort().map((id) => ({ account_id: id, granted_by: 'migration:0017' })));
+      expect(await all('SELECT session_id, is_admin FROM memberships WHERE account_id IN (?, ?) ORDER BY session_id', ids.organizer, ids.playtest))
+        .toEqual([{ session_id: ids.practice, is_admin: 1 }, { session_id: ids.live, is_admin: 1 }]
+          .sort((left, right) => left.session_id.localeCompare(right.session_id)));
+      expect(await all(`SELECT target FROM authority_audit WHERE event_id IS NULL AND action = 'promote_webmaster' ORDER BY target`))
+        .toEqual([ids.organizer, ids.playtest].sort().map((target) => ({ target })));
+      const versions = await all<{ id: string; access_version: number }>('SELECT id, access_version FROM accounts WHERE id IN (?, ?)', ids.owner, ids.organizer);
+      const version = (id: string) => versions.find((row) => row.id === id)?.access_version;
+      expect(version(ids.organizer), 'the grant moves the access version of a promoted account').toBe((version(ids.owner) ?? 0) + 1);
+    });
+
+    it('cannot let a contest admin with another name reset a promoted webmaster', async () => {
+      const before = await writer(db).first('SELECT credential_generation FROM accounts WHERE id = ?', ids.organizer);
+      await expect(db.batch(previousWorker.resetPassword(db, ids.owner, ids.practice, ids.organizer)))
+        .rejects.toThrow(/Only a webmaster, or an event admin of the same event/);
+      expect(await writer(db).first('SELECT credential_generation FROM accounts WHERE id = ?', ids.organizer)).toEqual(before);
     });
 
     it('places an account that it creates in the event of its first contest', async () => {
@@ -123,6 +149,38 @@ describe('the previous Worker on the scoped authority schema', () => {
       ]);
       expect(await first('SELECT id FROM events WHERE id = ?', ids.other)).toBeNull();
       expect(await first('SELECT id FROM accounts WHERE id = ?', ids.otherStaff)).toBeNull();
+    });
+  });
+
+  describe('on data where the two names are not contest admins', () => {
+    let db: D1Connection;
+    let dispose: () => Promise<void>;
+    const ids = { event: randomUUID(), contest: randomUUID(), team: randomUUID(), organizer: randomUUID(), playtest: randomUUID(), admin: randomUUID() };
+
+    beforeAll(async () => {
+      ({ db, dispose } = await open());
+      await applyMigrations(db, (name) => name < scopedAuthority);
+      const { run } = writer(db);
+      await run('INSERT INTO events (id, name) VALUES (?, ?)', ids.event, 'Self-hosted event');
+      await run('INSERT INTO sessions (id, event_id, name) VALUES (?, ?, ?)', ids.contest, ids.event, 'Main');
+      await run('INSERT INTO teams (id, session_id, name) VALUES (?, ?, ?)', ids.team, ids.contest, 'Organizer team');
+      await addAccount(db, ids.organizer, 'organizer');
+      await addAccount(db, ids.playtest, 'playtest-admin');
+      await addAccount(db, ids.admin, 'admin');
+      await run('INSERT INTO memberships (session_id, account_id, team_id, is_admin) VALUES (?, ?, ?, 0), (?, ?, NULL, 0), (?, ?, NULL, 1)',
+        ids.contest, ids.organizer, ids.team, ids.contest, ids.playtest, ids.contest, ids.admin);
+      await run(`INSERT INTO membership_roles (session_id, account_id, role) VALUES (?, ?, 'volunteer')`, ids.contest, ids.playtest);
+      await run('INSERT INTO installation (singleton, id, owner_account_id, event_id, session_id) VALUES (1, ?, ?, ?, ?)',
+        randomUUID(), ids.admin, ids.event, ids.contest);
+      await applyMigrations(db, (name) => name >= scopedAuthority);
+    });
+    afterAll(async () => { await dispose?.(); });
+
+    it('promotes nobody, and every account stays in its event', async () => {
+      const { all } = writer(db);
+      expect(await all('SELECT account_id FROM grants')).toEqual([]);
+      expect(await all('SELECT id FROM accounts WHERE event_id IS NOT ?', ids.event)).toEqual([]);
+      expect(await all('SELECT is_admin FROM memberships WHERE account_id = ?', ids.admin)).toEqual([{ is_admin: 1 }]);
     });
   });
 

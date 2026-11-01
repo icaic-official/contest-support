@@ -140,7 +140,7 @@ An account belongs to one event. D1 refuses a membership or an event grant that 
 While the site setting `restrict_webmaster_reads` is on, a webmaster reads a contest's data only after an audited join. Contest settings and account changes ignore that setting.
 Each answer carries a stamp of every version that it depends on. A write batch evaluates the resolver again and compares the stamp.
 [capabilities.ts](../src/connected/capabilities.ts) holds the one table of what a seat may do. Workflow decisions and the browser's page gates both read it.
-No command creates a grant yet.
+No command creates a grant yet. Migration `0017` promotes the accounts named `organizer` and `playtest-admin` to webmasters when each is a contest admin with no team seat. They keep their admin memberships.
 The [event platform design](event-platform-design.md) describes the later phases.
 
 The implementation uses primary database reads for authorization and snapshots.

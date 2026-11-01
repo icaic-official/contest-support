@@ -1,6 +1,7 @@
 -- Site, event, and contest grants, and the event that owns each account.
 -- These D1 rules hold for every Worker version: isolation between events, the
--- last webmaster, takeover protection, and the audited join.
+-- last webmaster, takeover protection, and the audited join. It promotes the
+-- development accounts organizer and playtest-admin to webmasters.
 -- The previous Worker keeps working. It cannot add a membership that crosses
 -- events, and it cannot reset or rename a webmaster. Its new accounts take the
 -- event of their first membership (membership_adopts_event).
@@ -188,6 +189,25 @@ WHEN NEW.action IN ('create_account', 'reset_password', 'set_username') AND NEW.
 BEGIN
   SELECT RAISE(ABORT, 'Only a webmaster, or an event admin of the same event, may change this account');
 END;
+
+-- Owner decision of 2026-10-27: the accounts with the usernames organizer and
+-- playtest-admin become webmasters, by name. Usernames are globally unique, so
+-- each name matches at most one account, and a database without them promotes
+-- nobody. A name alone is not enough. The account must be a contest admin with
+-- no team seat, so a team or a volunteer that uses one of these names stays as
+-- it is. The grant comes before the placement below, so a promoted account stays
+-- a site account. It keeps its admin memberships for the previous Worker.
+INSERT INTO grants (account_id, scope, granted_by)
+SELECT a.id, 'site', 'migration:0017' FROM accounts a
+WHERE a.username IN ('organizer', 'playtest-admin')
+  AND EXISTS (SELECT 1 FROM memberships m WHERE m.account_id = a.id AND m.is_admin = 1)
+  AND NOT EXISTS (SELECT 1 FROM memberships m WHERE m.account_id = a.id AND m.team_id IS NOT NULL);
+
+INSERT INTO authority_audit (id, event_id, actor, actor_name, action, target, detail)
+SELECT lower(hex(randomblob(4)) || '-' || hex(randomblob(2)) || '-4' || substr(hex(randomblob(2)), 2) || '-a'
+    || substr(hex(randomblob(2)), 2) || '-' || hex(randomblob(6))),
+  NULL, g.account_id, a.name, 'promote_webmaster', g.account_id, '{"source":"migration:0017"}'
+FROM grants g JOIN accounts a ON a.id = g.account_id WHERE g.granted_by = 'migration:0017';
 
 -- Place every account that is not a webmaster in the event of most of its
 -- memberships. A tie goes to the oldest contest.

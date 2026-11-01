@@ -5,38 +5,9 @@ import { snapshotSchema, type Snapshot } from '../../../connected/model';
 import type { Caller } from '../../authentication';
 import { AuthenticationError } from '../../authentication';
 import type { D1Connection, D1Statement, D1Value } from '../d1/connection';
-import { contestDataSql } from './authority';
-
-/** One row of the contest resolver in authority.ts. Embedders read these names. */
-export interface CurrentAccessRow {
-  account_id: string;
-  account_name: string;
-  login_id: string;
-  login_expires_at: number;
-  identity_expires_at: string;
-  session_id: string;
-  event_id: string;
-  archived: number;
-  team_id: string | null;
-  is_admin: number;
-  staff: number;
-  roles: string;
-  entrant_kind: 'team';
-  manage: 'none' | 'contest' | 'event' | 'site';
-  data: number;
-  stamp: string;
-}
-
-// Bind accountId, loginId, sessionId in this order. Callers must come from the
-// trusted authentication service.
-export const currentAccessSql = contestDataSql('caller');
-
-// Bind sessionId, then a JSON array of login IDs. Match each row on account_id and login_id.
-export const currentAccessForLoginsSql = contestDataSql('logins');
-
-export function currentAccessBindings(caller: Caller, sessionId: string): D1Value[] {
-  return [caller.accountId, caller.loginId, sessionId];
-}
+import {
+  authorityGuard, contestDataBindings, contestDataSql, contestListBindings, contestSeatsSql, reaches, resolveAuthority,
+} from './authority';
 
 const memberSchema = z.object({
   teamId: z.string().uuid().nullable(),
@@ -70,7 +41,7 @@ interface AdminGate { id: string; caller: Caller; statements: D1Statement[] }
 // its key from `access`, so a caller who is not an admin reads no audit row.
 // A team member reads the own team by key. The memberships foreign key keeps
 // that team in the same session.
-export const snapshotSql = `WITH login AS (${currentReadyLoginSql}), access AS MATERIALIZED (${currentAccessSql}),
+export const snapshotSql = `WITH login AS (${currentReadyLoginSql}), access AS MATERIALIZED (${contestDataSql('caller')}),
   visible_issues AS MATERIALIZED (
     SELECT i.* FROM access a CROSS JOIN issues i WHERE i.session_id = ? AND i.team_id = a.team_id
     UNION ALL SELECT i.* FROM access a CROSS JOIN issues i WHERE a.staff = 1 AND i.session_id = ?)
@@ -127,12 +98,11 @@ SELECT json_object(
     ORDER BY x.deleted_at, x.id)), '[]')),
   'members', json(COALESCE((SELECT json_group_array(json(row)) FROM (
     SELECT json_object('membership', json_object('session_id', m.session_id, 'user_id', m.account_id,
-      'team_id', m.team_id, 'roles', json((SELECT json_group_array(role) FROM (SELECT role
-        FROM membership_roles mr WHERE mr.session_id = m.session_id AND mr.account_id = m.account_id ORDER BY role))),
+      'team_id', m.team_id, 'roles', json(m.roles),
       'is_admin', json(CASE WHEN m.is_admin THEN 'true' ELSE 'false' END)),
       'person', json_object('id', p.id, 'name', p.name, 'username', p.username)) AS row
-    FROM access a CROSS JOIN memberships m JOIN accounts p ON p.id = m.account_id
-    WHERE a.is_admin = 1 AND m.session_id = ? ORDER BY p.name, p.id)), '[]')),
+    FROM access a CROSS JOIN (${contestSeatsSql}) m JOIN accounts p ON p.id = m.account_id
+    WHERE a.is_admin = 1 ORDER BY p.name, p.id)), '[]')),
   'audit', json(COALESCE((SELECT json_group_array(json(row)) FROM (
     SELECT json_object('id', d.id, 'actor', d.actor, 'at', d.at, 'action', d.action, 'target', d.target) AS row
     FROM admin_audit d WHERE d.session_id = (SELECT ? FROM access WHERE is_admin = 1)
@@ -151,15 +121,9 @@ export function notificationStatements(db: D1Connection, sessionId: string, audi
   ]);
 }
 
-/** Bind accountId, loginId. */
-export const sessionsListSql = `SELECT s.id, s.name FROM sessions s
-  JOIN memberships m ON m.session_id = s.id JOIN accounts a ON a.id = m.account_id
-  JOIN logins l ON l.account_id = a.id
-  JOIN ba_session b ON b.id = l.identity_session_id AND b.userId = a.id
-  WHERE a.id = ? AND l.id = ? AND a.disabled = 0 AND a.must_change = 0
-    AND a.credential_state = 'ready' AND l.revoked = 0 AND l.expires_at > unixepoch()
-    AND l.credential_generation = a.credential_generation
-    AND b.expiresAt > strftime('%Y-%m-%dT%H:%M:%fZ', 'now') ORDER BY s.name, s.id`;
+/** Every contest that the caller can open. Bind with contestListBindings. */
+export const sessionsListSql = `SELECT session_id AS id, session_name AS name FROM (${contestDataSql('contests')})
+  ORDER BY name, id`;
 
 /** D1 owns current access, consistent snapshots, and atomic administration. */
 export class D1ApplicationService {
@@ -177,13 +141,13 @@ export class D1ApplicationService {
   }
 
   async sessions(caller: Caller): Promise<SessionSummary[]> {
-    const result = await this.statement(sessionsListSql, caller.accountId, caller.loginId).all<SessionSummary>();
+    const result = await this.statement(sessionsListSql, ...contestListBindings(caller)).all<SessionSummary>();
     return result.results;
   }
 
   async snapshot(caller: Caller, sessionId: string): Promise<Snapshot> {
     this.validIds(sessionId);
-    const row = await this.statement(snapshotSql, caller.accountId, caller.loginId, ...currentAccessBindings(caller, sessionId),
+    const row = await this.statement(snapshotSql, caller.accountId, caller.loginId, ...contestDataBindings(caller, sessionId),
       ...Array<string>(9).fill(sessionId)).first<{ snapshot: string }>();
     if (!row) throw new AuthenticationError(403, 'Sign in again or change your temporary password.');
     return snapshotSchema.parse(JSON.parse(row.snapshot));
@@ -195,15 +159,12 @@ export class D1ApplicationService {
   }
 
   private async adminGate(caller: Caller, sessionId: string): Promise<AdminGate> {
-    const current = await this.statement(currentAccessSql, ...currentAccessBindings(caller, sessionId)).first<CurrentAccessRow>();
-    const event = await this.statement(`SELECT e.archived FROM events e JOIN sessions s ON s.event_id = e.id WHERE s.id = ?`, sessionId)
-      .first<{ archived: number }>();
-    if (!current?.is_admin || event?.archived !== 0) {
+    const authority = await resolveAuthority(this.db, caller, { scope: 'contest', contestId: sessionId });
+    if (!authority || !reaches(authority, 'contest') || !authority.writable) {
       throw new AuthenticationError(403, 'Admin membership in an active event is required.');
     }
     const id = crypto.randomUUID();
-    return { id, caller, statements: [this.assertion(id, `SELECT 1 FROM (${currentAccessSql})
-      WHERE is_admin = 1 AND archived = 0 AND stamp = ?`, ...currentAccessBindings(caller, sessionId), current.stamp)] };
+    return { id, caller, statements: [authorityGuard(this.db, id, authority)] };
   }
 
   private async commit(gate: AdminGate, statements: D1Statement[]): Promise<void> {

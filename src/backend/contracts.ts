@@ -5,6 +5,22 @@ import type {
 } from '../connected/announcementModel.ts';
 import type { Command, Role, Snapshot } from '../connected/model.ts';
 
+/**
+ * How far an account's authority reaches over a contest's structure. Ordered:
+ * none < contest (contest admin) < event (event admin) < site (webmaster).
+ */
+export type ManageLevel = 'none' | 'contest' | 'event' | 'site';
+
+export type EntrantKind = 'team' | 'single';
+
+/**
+ * What an account holds inside one contest. `admin` is true for contest admins,
+ * event admins, and webmasters alike. A contestant seat never holds a role.
+ */
+export type Seat =
+  | { readonly kind: 'contestant'; readonly entryId: string; readonly entrantKind: EntrantKind }
+  | { readonly kind: 'staff'; readonly admin: boolean; readonly roles: readonly Role[] };
+
 export interface AccountIdentity {
   id: string;
   email?: string;

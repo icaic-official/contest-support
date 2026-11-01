@@ -1,6 +1,7 @@
 import type { Caller } from '../../authentication';
 import type { WorkflowPersistence, WorkflowRead, WorkflowDecision, WorkflowCommitResult } from '../../workflow.ts';
 import type { Command, IssueStatus, Role } from '../../../connected/model.ts';
+import { contestDataBindings, contestDataSql } from '../cloudflare/authority';
 import type { D1Connection, D1Statement, D1Value } from './connection';
 
 interface WorkflowColumns {
@@ -30,21 +31,18 @@ type ReceiptColumns =
 
 type WorkflowRow = WorkflowColumns & ReceiptColumns;
 
-// Each read uses one primary SQLite snapshot. A missing identity session always
-// denies access, including after password resets and identity-session removal.
-// `teams` holds only the membership team and the team that a submit names.
-const workflowSql = `SELECT a.name AS actor_name, m.team_id AS membership_team, m.is_admin,
-    (SELECT json_group_array(r.role) FROM membership_roles r
-      WHERE r.session_id = s.id AND r.account_id = a.id) AS roles,
-    s.intake_open, s.categories, e.archived,
-    (SELECT json_group_array(t.id) FROM (SELECT id FROM teams WHERE session_id = s.id AND id IN (m.team_id, ?) ORDER BY id) t) AS teams,
+// Each read uses one primary SQLite snapshot. The contest resolver checks the
+// login, the identity session, and the caller's seat. Its stamp covers every
+// version that access depends on. `teams` holds only the membership team and
+// the team that a submit names.
+const workflowSql = `SELECT c.account_name AS actor_name, c.team_id AS membership_team, c.is_admin, c.roles,
+    s.intake_open, s.categories, c.archived,
+    (SELECT json_group_array(t.id) FROM (SELECT id FROM teams WHERE session_id = s.id AND id IN (c.team_id, ?) ORDER BY id) t) AS teams,
     i.id AS issue_id, i.team_id, i.status, i.owner, i.public_revision,
     (SELECT id FROM resolutions WHERE issue_id = i.id AND reopened_at IS NULL) AS resolution_id,
     aw.id AS award_id, aw.applied_at,
-    json_object('access', a.access_version, 'name', a.name, 'generation', a.credential_generation,
-      'login', l.version, 'identity', b.id, 'expires', b.expiresAt,
-      'membership', m.version, 'session', s.version, 'event', e.version,
-      'teams', (SELECT json_group_array(t.id) FROM (SELECT id FROM teams WHERE session_id = s.id AND id IN (m.team_id, ?) ORDER BY id) t),
+    json_object('authority', json(c.stamp), 'name', c.account_name, 'expires', c.identity_expires_at,
+      'teams', (SELECT json_group_array(t.id) FROM (SELECT id FROM teams WHERE session_id = s.id AND id IN (c.team_id, ?) ORDER BY id) t),
       'issue', i.write_version,
       'resolutions', (SELECT json_group_array(json_object('id', r.id, 'at', r.at, 'reopened_at', r.reopened_at,
         'reopened_by', r.reopened_by, 'summary', r.summary, 'reason', r.reason))
@@ -52,21 +50,12 @@ const workflowSql = `SELECT a.name AS actor_name, m.team_id AS membership_team, 
       'award', json_object('id', aw.id, 'applied_at', aw.applied_at, 'applied_by', aw.applied_by,
         'minutes', aw.minutes, 'explanation', aw.explanation, 'resolution', aw.resolution_id)) AS dependency,
     cr.command AS receipt_command, cr.session_id AS receipt_session, cr.issue_id AS receipt_issue
-  FROM accounts a
-  JOIN logins l ON l.account_id = a.id AND l.id = ? AND l.revoked = 0 AND l.expires_at > unixepoch()
-    AND l.credential_generation = a.credential_generation
-  JOIN ba_session b ON b.id = l.identity_session_id AND b.userId = a.id
-    AND b.expiresAt > strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
-  JOIN memberships m ON m.account_id = a.id AND m.session_id = ?
-  JOIN sessions s ON s.id = m.session_id
-  JOIN events e ON e.id = s.event_id
-  LEFT JOIN command_receipts cr ON cr.actor = a.id AND cr.request_id = ?
-  LEFT JOIN issues i ON i.session_id = s.id AND i.id = COALESCE(?, cr.issue_id)
-    AND (i.team_id = m.team_id OR m.is_admin = 1 OR EXISTS
-      (SELECT 1 FROM membership_roles r WHERE r.session_id = s.id AND r.account_id = a.id))
+  FROM (${contestDataSql('caller')}) c
+  JOIN sessions s ON s.id = c.session_id
+  LEFT JOIN command_receipts cr ON cr.actor = c.account_id AND cr.request_id = ?
+  LEFT JOIN issues i ON i.session_id = s.id AND i.id = COALESCE(?, cr.issue_id) AND (i.team_id = c.team_id OR c.staff = 1)
   LEFT JOIN awards aw ON aw.issue_id = i.id
-  WHERE a.id = ? AND a.disabled = 0 AND a.must_change = 0 AND a.credential_state = 'ready'
-    AND (? IS NULL OR i.id IS NOT NULL)
+  WHERE (? IS NULL OR i.id IS NOT NULL)
     AND (cr.session_id IS NULL OR cr.session_id <> s.id OR i.id IS NOT NULL)`;
 
 /** Persist shared workflow decisions with current identity and atomic D1 batches. */
@@ -81,7 +70,7 @@ export class D1ApplicationStore implements WorkflowPersistence {
   private parameters(caller: Caller, sessionId: string, requestId: string, command: Command) {
     const team = command.type === 'submit' ? command.team_id ?? null : null;
     const issueId = command.type === 'submit' ? null : command.issue_id;
-    return [team, team, caller.loginId, sessionId, requestId, issueId, caller.accountId, issueId];
+    return [team, team, ...contestDataBindings(caller, sessionId), requestId, issueId, issueId];
   }
 
   async read(caller: Caller, sessionId: string, requestId: string, command: Command): Promise<WorkflowRead | undefined> {

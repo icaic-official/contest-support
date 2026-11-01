@@ -3,6 +3,7 @@ import type { AccountCommand, AccountResult } from '../../../backend/contracts';
 import { AuthenticationError, type AuthenticationService, type AuthenticationSession } from '../../authentication';
 import type { D1Connection, D1Statement, D1Value } from '../d1/connection';
 import type { IdentityProvider } from './identity';
+import { authorityCheck, manageAccountBindings, manageAccountSql, reaches, resolveAuthority } from './authority';
 import { beginCredentialReset, completeCredentialReset } from './credentialReset';
 import { randomSecret, type PasswordHasher } from './password';
 
@@ -186,38 +187,30 @@ export class D1AuthenticationService implements AuthenticationService {
     return { cookie: await this.identity.signOut(headers) };
   }
 
-  private adminCondition(sessionId: string, actor: string, target?: string): [string, D1Value[]] {
-    let sql = `SELECT 1 FROM memberships m JOIN sessions s ON s.id = m.session_id
-      JOIN events e ON e.id = s.event_id
-      WHERE m.account_id = ? AND m.session_id = ? AND m.is_admin = 1 AND e.archived = 0`;
-    const values: D1Value[] = [actor, sessionId];
-    if (target) {
-      sql += ` AND EXISTS (SELECT 1 FROM memberships WHERE session_id = m.session_id AND account_id = ?)
-        AND NOT EXISTS (SELECT 1 FROM memberships t JOIN sessions ts ON ts.id = t.session_id
-          JOIN events te ON te.id = ts.event_id
-          WHERE t.account_id = ? AND (te.archived = 1 OR NOT EXISTS
-            (SELECT 1 FROM memberships am WHERE am.session_id = t.session_id AND am.account_id = ? AND am.is_admin = 1)))`;
-      values.push(target, target, actor);
-    }
-    return [sql, values];
-  }
-
-  private async adminAssertions(headers: Headers, sessionId: string, target?: string): Promise<{
+  /**
+   * The actor must manage the contest, and a target must hold a seat in it that
+   * the actor may manage. The resolver's stamp and the target rule are checked
+   * again inside each batch.
+   */
+  private async adminAssertions(current: AuthenticationSession, sessionId: string, target?: string): Promise<{
     current: AuthenticationSession; statements: D1Statement[]; assertionId: string; finalCheck: SqlCheck;
   }> {
-    const current = await this.requireCurrent(headers);
-    const identity = await this.identity.session(headers);
-    if (!identity) throw new AuthenticationError(401, 'Sign in again.');
-    const [sql, values] = this.adminCondition(sessionId, current.user.id, target);
-    if (!(await this.statement(sql, ...values).first())) throw new AuthenticationError(403, 'Account changes require admin access to all assigned sessions. Archived accounts cannot be changed.');
+    const refused = () => new AuthenticationError(403, 'Account changes require admin access to all assigned sessions. Archived accounts cannot be changed.');
+    const authority = await resolveAuthority(this.db, current.caller, { scope: 'contest', contestId: sessionId });
+    if (!authority || !reaches(authority, 'contest') || !authority.writable) throw refused();
+    const managed: SqlCheck | undefined = target ? {
+      sql: `${manageAccountSql} AND EXISTS (SELECT 1 FROM memberships WHERE session_id = ? AND account_id = t.id)`,
+      values: [...manageAccountBindings(current.user.id, target), sessionId],
+    } : undefined;
+    if (managed && !(await this.statement(managed.sql, ...managed.values).first())) throw refused();
+    const check = authorityCheck(authority);
+    // Each condition stays at one query level, so the final check that nests
+    // this one stays within D1's expression depth limit of 100.
+    const finalCheck: SqlCheck = managed
+      ? { sql: `${managed.sql} AND EXISTS (${check.sql})`, values: [...managed.values, ...check.values] }
+      : check;
     const assertionId = crypto.randomUUID();
-    return { current, assertionId, finalCheck: {
-      sql: `SELECT 1 FROM (${currentLoginSql}) WHERE must_change = 0 AND login_id = ? AND EXISTS (${sql})`,
-      values: [identity.identitySessionId, identity.accountId, current.caller.loginId, ...values],
-    }, statements: [
-      this.assertion(assertionId, `SELECT 1 FROM (${currentLoginSql}) WHERE must_change = 0`, identity.identitySessionId, identity.accountId),
-      this.assertion(`${assertionId}:admin`, sql, ...values),
-    ] };
+    return { current, assertionId, finalCheck, statements: [this.assertion(assertionId, finalCheck.sql, ...finalCheck.values)] };
   }
 
   private cleanupAssertions(id: string): D1Statement {
@@ -229,8 +222,9 @@ export class D1AuthenticationService implements AuthenticationService {
     if (!z.string().uuid().safeParse(sessionId).success || !parsed.success) throw new AuthenticationError(400, 'Invalid account request.');
     const command = parsed.data;
     const target = command.action === 'create_account' ? crypto.randomUUID() : command.userId;
-    const gate = await this.adminAssertions(headers, sessionId, command.action === 'create_account' ? undefined : target);
-    if (command.action === 'reset_password' && target === gate.current.user.id) throw new AuthenticationError(400, 'Use Change password for your own account.');
+    const current = await this.requireCurrent(headers);
+    if (command.action === 'reset_password' && target === current.user.id) throw new AuthenticationError(400, 'Use Change password for your own account.');
+    const gate = await this.adminAssertions(current, sessionId, command.action === 'create_account' ? undefined : target);
     const operationId = crypto.randomUUID();
     if (command.action === 'set_username') {
       await this.guarded([
@@ -281,7 +275,7 @@ export class D1AuthenticationService implements AuthenticationService {
     let adminAssertion: string | undefined;
     let finalCheck = prepared?.finalCheck;
     if (sessionId) {
-      const gate = await this.adminAssertions(headers, sessionId, target);
+      const gate = await this.adminAssertions(await this.requireCurrent(headers), sessionId, target);
       assertions.push(...gate.statements);
       adminAssertion = gate.assertionId;
       finalCheck = gate.finalCheck;

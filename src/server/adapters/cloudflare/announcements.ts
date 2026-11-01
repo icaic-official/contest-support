@@ -3,14 +3,13 @@ import {
   ANNOUNCEMENT_DETAILS_MAX, ANNOUNCEMENT_TITLE_MAX,
   announcementSnapshotSchema, type AnnouncementSnapshot,
 } from '../../../connected/announcementModel';
+import { can } from '../../../connected/capabilities';
 import type { Caller } from '../../authentication';
 import { AuthenticationError } from '../../authentication';
 import { equalWorkflowJson } from '../../workflow';
 import type { D1Connection, D1Statement, D1Value } from '../d1/connection';
-import {
-  currentAccessBindings, currentAccessSql, currentReadyLoginBindings, currentReadyLoginSql,
-  notificationStatements, type CurrentAccessRow,
-} from './application';
+import { currentReadyLoginBindings, currentReadyLoginSql, notificationStatements } from './application';
+import { type ContestAuthorityRow, contestDataBindings, contestDataSql, seatFromRow } from './authority';
 
 export const announcementNow = "strftime('%Y-%m-%dT%H:%M:%fZ', 'now')";
 
@@ -35,9 +34,12 @@ const commandSchema = z.discriminatedUnion('type', [
   z.strictObject({ type: z.literal('remove'), id: uuid, revision }),
 ]);
 
-/** Session admins and jury manage announcements. `row` names a current access row. */
+/**
+ * Session admins and jury manage announcements. `row` names a resolver row.
+ * This is capabilityRule.announce in SQL, for reads and guards inside D1.
+ */
 export function announcementManager(row: string): string {
-  return `(${row}.is_admin = 1 OR EXISTS (SELECT 1 FROM json_each(${row}.roles) WHERE value = 'jury'))`;
+  return `(${row}.staff = 1 AND (${row}.is_admin = 1 OR EXISTS (SELECT 1 FROM json_each(${row}.roles) WHERE value = 'jury')))`;
 }
 
 export function announcementAssertion(db: D1Connection, id: string, sql: string, ...values: D1Value[]): D1Statement {
@@ -53,9 +55,8 @@ export function announcementAssertion(db: D1Connection, id: string, sql: string,
 export function guardedAnnouncementBatch(db: D1Connection, guard: string, caller: Caller, sessionId: string,
   statements: D1Statement[]): D1Statement[] {
   return [
-    announcementAssertion(db, guard, `SELECT 1 FROM (${currentAccessSql}) c
-      JOIN sessions s ON s.id = ? JOIN events e ON e.id = s.event_id WHERE e.archived = 0 AND ${announcementManager('c')}`,
-    ...currentAccessBindings(caller, sessionId), sessionId),
+    announcementAssertion(db, guard, `SELECT 1 FROM (${contestDataSql('caller')}) c WHERE c.archived = 0 AND ${announcementManager('c')}`,
+      ...contestDataBindings(caller, sessionId)),
     ...statements,
     announcementAssertion(db, `${guard}:access`, currentReadyLoginSql, ...currentReadyLoginBindings(caller)),
     db.prepare('DELETE FROM command_assertions WHERE id IN (?, ?, ?)').bind(guard, `${guard}:state`, `${guard}:access`),
@@ -75,7 +76,7 @@ export function isGuardFailure(error: unknown): boolean {
 interface ReceiptRow { session_id: string; command: string; announcement_id: string }
 interface AnnouncementRow { revision: number; removed_at: string | null }
 
-export const snapshotSql = `WITH access AS (${currentAccessSql}),
+export const snapshotSql = `WITH access AS (${contestDataSql('caller')}),
   manager AS (SELECT 1 FROM access WHERE ${announcementManager('access')}),
   visible AS (SELECT a.* FROM announcements a WHERE a.session_id = ? AND EXISTS (SELECT 1 FROM access)
     AND a.removed_at IS NULL
@@ -109,7 +110,7 @@ export class D1AnnouncementService {
    */
   async snapshot(caller: Caller, sessionId: string): Promise<AnnouncementSnapshot> {
     if (!uuid.safeParse(sessionId).success) throw new AuthenticationError(400, 'Invalid session.');
-    const row = await this.statement(snapshotSql, ...currentAccessBindings(caller, sessionId), sessionId)
+    const row = await this.statement(snapshotSql, ...contestDataBindings(caller, sessionId), sessionId)
       .first<{ snapshot: string }>();
     if (!row) throw new AuthenticationError(403, 'Sign in again or change your temporary password.');
     return announcementSnapshotSchema.parse(JSON.parse(row.snapshot));
@@ -135,9 +136,8 @@ export class D1AnnouncementService {
     }
     const command = parsed.data.type === 'remove' ? parsed.data
       : { ...parsed.data, expires_at: parsed.data.expires_at === null ? null : new Date(parsed.data.expires_at).toISOString() };
-    const current = await this.statement(`SELECT c.is_admin, c.roles, c.archived FROM (${currentAccessSql}) c`,
-      ...currentAccessBindings(caller, sessionId)).first<Pick<CurrentAccessRow, 'is_admin' | 'roles' | 'archived'>>();
-    if (!current || !current.is_admin && !(JSON.parse(current.roles) as string[]).includes('jury')) {
+    const current = await this.statement(contestDataSql('caller'), ...contestDataBindings(caller, sessionId)).first<ContestAuthorityRow>();
+    if (!current || !can(seatFromRow(current), 'announce')) {
       throw new AnnouncementCommandError('access', 'Only session admins and jury can manage announcements.');
     }
     if (current.archived) throw new AnnouncementCommandError('state', 'This event is archived.');

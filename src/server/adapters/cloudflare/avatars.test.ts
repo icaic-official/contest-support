@@ -8,7 +8,8 @@ import { AVATAR_MAX_BYTES } from '../../../connected/imageFile';
 import type { Caller } from '../../authentication';
 import type { D1Connection } from '../d1/connection';
 import { D1Fixture, applyMigrations } from '../d1/testFixture';
-import { currentAccessBindings, currentAccessSql, currentReadyLoginBindings, currentReadyLoginSql } from './application';
+import { currentReadyLoginBindings, currentReadyLoginSql } from './application';
+import { contestDataBindings, contestDataSql } from './authority';
 import { R2AvatarService, avatarKey } from './avatars';
 import type { PrivateBucket } from './images';
 import { openStoreDatabase } from './tooling/store-database.mjs';
@@ -243,7 +244,7 @@ describe('Cloudflare avatars with local D1 and R2 bindings', () => {
  * The avatar statement before 2026-10-26. It checks every ready avatar of the
  * installation, and it is the reference for who can read whose avatar.
  */
-const referenceVisibleSql = `WITH login AS (${currentReadyLoginSql}), access AS (${currentAccessSql})
+const referenceVisibleSql = `WITH login AS (${currentReadyLoginSql}), access AS (${contestDataSql('caller')})
   SELECT v.account_id AS person_id, v.id AS avatar_id, v.content_type FROM account_avatars v CROSS JOIN login l
   WHERE v.state = 'ready' AND (v.account_id = l.id OR EXISTS (SELECT 1 FROM access a JOIN memberships m
     ON m.session_id = ? AND m.account_id = v.account_id AND m.team_id IS NULL AND (m.is_admin = 1 OR EXISTS (
@@ -322,7 +323,7 @@ describe('avatar reads match the reference rule for every caller, session, and a
   afterAll(async () => { await dispose?.(); });
 
   async function reference(caller: Caller, sessionId: string, avatarId?: string) {
-    const bindings = [...currentReadyLoginBindings(caller), ...currentAccessBindings(caller, sessionId), sessionId];
+    const bindings = [...currentReadyLoginBindings(caller), ...contestDataBindings(caller, sessionId), sessionId];
     const statement = avatarId === undefined
       ? db.prepare(`${referenceVisibleSql} ORDER BY v.account_id`).bind(...bindings)
       : db.prepare(`${referenceVisibleSql} AND v.id = ?`).bind(...bindings, avatarId);

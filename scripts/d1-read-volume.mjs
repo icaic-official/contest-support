@@ -48,7 +48,8 @@ async function loadWorker() {
       stdin: { resolveDir: repositoryRoot, loader: 'ts', contents: `
         export { default as worker, SessionLiveCoordinator } from './src/server/adapters/cloudflare/applicationWorker.ts';
         export { claimSql, dispatchNotifications } from './src/server/adapters/cloudflare/live.ts';
-        export { currentAccessBindings, currentAccessForLoginsSql, currentAccessSql, sessionsListSql, snapshotSql } from './src/server/adapters/cloudflare/application.ts';
+        export { sessionsListSql, snapshotSql } from './src/server/adapters/cloudflare/application.ts';
+        export { contestDataBindings, contestDataSql } from './src/server/adapters/cloudflare/authority.ts';
         export { snapshotSql as announcementSnapshotSql } from './src/server/adapters/cloudflare/announcements.ts';
         export { passwordHasher } from './src/server/adapters/cloudflare/password.ts';
         export { measureD1 } from './src/server/adapters/d1/testMetrics.ts';` },
@@ -271,7 +272,7 @@ async function measureShape(name, shape) {
       const current = await raw.prepare('SELECT id FROM logins WHERE account_id = ? ORDER BY rowid DESC LIMIT 1').bind(login.account).first();
       const caller = { accountId: login.account, loginId: current.id };
       const result = await raw.prepare(lib.snapshotSql).bind(caller.accountId, caller.loginId,
-        ...lib.currentAccessBindings(caller, session), ...Array(9).fill(session)).all();
+        ...lib.contestDataBindings(caller, session), ...Array(9).fill(session)).all();
       return result.meta.rows_read;
     };
     const undelivered = async () => (await raw.prepare('SELECT count(*) AS n FROM notifications WHERE delivered = 0').first()).n;
@@ -420,8 +421,8 @@ function validate({ metrics, metricLines, log, records, direct }) {
 
 function label(sql) {
   const known = [[lib.snapshotSql, 'application snapshotSql'], [lib.announcementSnapshotSql, 'announcements snapshotSql'],
-    [lib.sessionsListSql, 'sessionsListSql'], [lib.currentAccessSql, 'currentAccessSql'],
-    [lib.currentAccessForLoginsSql, 'currentAccessForLoginsSql'], [lib.claimSql, 'claimSql']];
+    [lib.sessionsListSql, 'sessionsListSql'], [lib.contestDataSql('caller'), "contestDataSql('caller')"],
+    [lib.contestDataSql('logins'), "contestDataSql('logins')"], [lib.claimSql, 'claimSql']];
   return known.find(([text]) => text === sql)?.[1] ?? sql.replace(/\s+/g, ' ').trim().slice(0, 110);
 }
 

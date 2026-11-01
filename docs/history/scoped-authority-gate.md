@@ -28,6 +28,7 @@ Condition 2 also holds. `npm run test:d1` passes on the measured commit with eve
 The same commit adds two ceilings. The snapshot of an event admin and of a webmaster, neither of whom holds a membership, reads fewer than 6,800 rows, which is the admin ceiling.
 
 The design's fallback, a per-login authority cache, was not built, because the gate passes.
+The gate also passes after the fourth commit moves every other reader onto the resolver. There, no request type reads more than 6 added rows (measured, see [below](#after-every-reader-moved-to-the-resolver)).
 
 ## Revisions
 
@@ -92,6 +93,35 @@ This is a judgment for the owner to review. The cache addresses the cost of the 
 | 2 | 11 for a public message with every member connected at 4,800 accounts, and 10 for the live alarm there | The stamp read `site_settings` in every evaluation, 1 row each time. The live check runs one statement for each 500 sockets | Only a webmaster's stamp reads the site version. Other callers stamp the constant 0 |
 
 The second fix keeps the guard correct. Only a webmaster's answer depends on the site setting, and a new site grant moves the holder's `access_version`, so the stamp still changes (inferred from migration `0017`). `authority.test.ts` checks that a webmaster's guard fails after the setting changes.
+
+## After every reader moved to the resolver
+
+The fourth commit of the branch, `Feature: Route every access check through the authority resolver`, moves the remaining readers onto the resolver: the workflow read and its guards, the admin gate, the account checks, the contest list, and the staff avatar list.
+Three more runs on that commit, compared with the same three `main` runs, also pass (measured):
+
+- 390 of 630 request types read the same rows as on `main`. 240 read more.
+- No request type reads more than 6 added rows.
+- Every ceiling in `readVolume.test.ts` holds unchanged.
+
+| Endpoint | Callers | Added rows at every shape |
+| --- | --- | --- |
+| `/api/sessions` | admin, volunteer, jury, contestant | 4 |
+| Each workflow command | volunteer, jury, contestant | 3, or 2 to 3 for a contestant's submit |
+| `/api/avatars` | contestant | 2 |
+| screen refresh after a change hint | contestant | 6 |
+| screen refresh after a change hint | admin, volunteer, jury | 4 |
+
+The causes are these (inferred from the statements and plans):
+
+- A workflow command evaluates its read three times: the read, the guard before the writes, and the access check after them. Each evaluation reads the contest row a second time, for intake and categories.
+- The contest list reads the caller's candidate contests and then the resolver row of each, with the contest's event.
+- The screen refresh adds the contest list to the avatar list.
+
+A draft of this commit read 8 more rows for `/api/sessions` and 10 more for the contestant's screen refresh, which is the limit (measured). It merged the candidate contests with `UNION` and joined `sessions` again for the name. `UNION ALL` and a `session_name` column on the resolver row removed 4 of those rows.
+
+The fifth commit only adds the promotion statements to `0017`. They read and write nothing on the empty database that `perf:reads` seeds, so these numbers also hold for it (inferred).
+
+The commands are those above, with the branch checkout on the fourth commit and the output files `tip-1.json` to `tip-3.json` in place of `branch-1.json` to `branch-3.json`.
 
 ## What the numbers cover
 

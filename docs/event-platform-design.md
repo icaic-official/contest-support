@@ -1,6 +1,13 @@
 # Webmaster, event, and contest platform
 
-**Status.** Proposed. Not implemented. No part of this design is built.
+**Status.** Proposed. Phase 1, `feature/scoped-authority`, implements the contest resolver, migration `0017`, and the local half of its gate. The [gate record](history/scoped-authority-gate.md) holds the measurements. The hosted half of the gate and Phases 2 to 8 are not built.
+
+Phase 1 differs from this page and the sketches in these points:
+
+- The foreign key on `accounts.event_id` is `DEFERRABLE INITIALLY DEFERRED`. Test cleanups delete an event and then its accounts in one batch, and an immediate key refuses that order.
+- The resolver starts from the contest and its event, then joins the login tables, so the live form reads them once. Only a webmaster's stamp reads `site_settings`.
+- `/api/sessions` lists every contest that the caller can read. For a webmaster, that is every contest of the site.
+- `authorityCopies.test.ts` also refuses `FROM grants`. It exempts the two trusted terminal commands, `installation.ts` and `adminRecovery.ts`, which check an admin membership without a login.
 
 This page explains how one shared Minsky installation can host the events of many organizers. It settles GitHub issues #119 and #136 under the owner's decisions of 2026-10-27, which [PLAN.md](../PLAN.md) records. It supersedes the [earlier multi-competition design](history/multi-competition-design.md).
 The [sketches page](event-platform-sketches.md) holds the full type sketch and migration sketch.

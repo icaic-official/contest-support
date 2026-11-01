@@ -3,7 +3,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { Command, Snapshot } from '../../../connected/model';
 import { decideWorkflow } from '../../workflow';
 import { openStoreDatabase } from '../cloudflare/tooling/store-database.mjs';
-import { currentAccessBindings, currentAccessSql, currentReadyLoginSql, sessionsListSql, snapshotSql } from '../cloudflare/application';
+import { currentReadyLoginSql, sessionsListSql, snapshotSql } from '../cloudflare/application';
+import { contestDataBindings, contestDataSql, contestListBindings } from '../cloudflare/authority';
 import { R2AvatarService } from '../cloudflare/avatars';
 import type { PrivateBucket } from '../cloudflare/images';
 import type { D1Connection, D1Statement } from './connection';
@@ -94,7 +95,7 @@ async function seed(db: D1Connection, teamCount: number): Promise<void> {
  * once for every row. It is the reference for the permission filters.
  * Replace it when the snapshot gains or loses a field.
  */
-const referenceSnapshotSql = `WITH login AS (${currentReadyLoginSql}), access AS MATERIALIZED (${currentAccessSql}),
+const referenceSnapshotSql = `WITH login AS (${currentReadyLoginSql}), access AS MATERIALIZED (${contestDataSql('caller')}),
   visible_issues AS MATERIALIZED (
     SELECT i.* FROM access a CROSS JOIN issues i WHERE i.session_id = ? AND i.team_id = a.team_id
     UNION ALL SELECT i.* FROM access a CROSS JOIN issues i WHERE a.staff = 1 AND i.session_id = ?)
@@ -176,7 +177,7 @@ type ReadBody = Omit<Snapshot, 'server_time'> & { server_time?: string };
 async function snapshot(db: D1Connection, n: number, sql = snapshotSql) {
   const caller = { accountId: `acc-${n}`, loginId: `login-${n}` };
   const result = await db.prepare(sql)
-    .bind(caller.accountId, caller.loginId, ...currentAccessBindings(caller, 'sess-1'), ...Array<string>(9).fill('sess-1'))
+    .bind(caller.accountId, caller.loginId, ...contestDataBindings(caller, 'sess-1'), ...Array<string>(9).fill('sess-1'))
     .all<{ snapshot: string }>();
   const row = result.results[0];
   const body = row ? (JSON.parse(row.snapshot) as ReadBody) : null;
@@ -336,10 +337,14 @@ describe('rows read for a session with 1,200 accounts and 100 issues', () => {
   });
 
   it('reads a handful of rows for the sessions list', async () => {
-    const result = await db.prepare(sessionsListSql).bind(`acc-${callers.contestant}`, `login-${callers.contestant}`)
-      .all<{ id: string }>();
+    const list = async (n: number) => db.prepare(sessionsListSql)
+      .bind(...contestListBindings({ accountId: `acc-${n}`, loginId: `login-${n}` })).all<{ id: string }>();
+    const result = await list(callers.contestant);
     expect(result.results).toEqual([{ id: 'sess-1', name: 'Scale session' }]);
     expect(result.meta?.rows_read ?? Infinity).toBeLessThan(30);
+    for (const n of [callers.eventAdmin, callers.webmaster]) {
+      expect((await list(n)).results.map((row) => row.id), `account ${n}`).toEqual(['sess-2', 'sess-1']);
+    }
   });
 });
 

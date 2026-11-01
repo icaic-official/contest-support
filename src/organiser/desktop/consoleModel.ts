@@ -1,7 +1,7 @@
+import { can, seatOf } from "@/connected/capabilities";
 import { statusNames } from "@/connected/labels";
 import {
   type Issue,
-  isSupport,
   type Membership,
   type Resolution,
   type Snapshot,
@@ -50,12 +50,13 @@ export interface ConsoleNavGroup {
  */
 export function consoleNavGroups(member: Membership): ConsoleNavGroup[] {
   const work: ConsolePage[] = [];
-  if (isSupport(member)) work.push("queue", "mine", "handoffs");
+  const seat = seatOf(member);
+  if (can(seat, "claim")) work.push("queue", "mine", "handoffs");
   else if (!isJuryOnly(member)) work.push("queue");
-  if (member.roles.includes("jury")) work.push("awards");
+  if (can(seat, "award")) work.push("awards");
   work.push("teams");
   const groups: ConsoleNavGroup[] = [{ label: "Workspace", pages: work }];
-  if (member.is_admin) {
+  if (can(seat, "configure_contest")) {
     groups.push({ label: "Admin", pages: ["overview", "accounts", "roster", "settings"] });
   }
   return groups;

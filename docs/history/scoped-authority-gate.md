@@ -2,7 +2,8 @@
 
 **Status.** Dated record. It holds both halves of the Phase 1 gate in the [event platform design](../event-platform-design.md#delivery-phases), on branch `feature/scoped-authority`.
 The local half passed. The hosted half was INCONCLUSIVE and did not pass. See [Hosted half](#hosted-half).
-Every measurement before that section was made on a local D1 database. Every measurement in it was made on hosted D1.
+A later local diagnosis found a D1 compile cost in the snapshot readers and fixed it. A hosted rerun must still confirm the fix. See [Diagnosis](#diagnosis).
+Every measurement before the hosted half was made on a local D1 database. Every measurement in it was made on hosted D1. The diagnosis labels each of its numbers.
 
 Each claim carries one of these labels:
 
@@ -372,3 +373,161 @@ These are not part of the gate. All come from the first runs of the branch (meas
 - A first run on the same installation for each side. It would show whether the first-run socket failures belong to the code or to the database.
 - The harness cleanup step. The databases were deleted instead.
 - Any claim about production capacity.
+
+## Diagnosis
+
+**Status.** Added on 2026-11-01 after the hosted half, on branch `feature/scoped-authority`. It names the cause of a measured D1 cost, the fix, and the local numbers before and after. A hosted rerun must still confirm the fix. See [What a hosted rerun must confirm](#what-a-hosted-rerun-must-confirm).
+
+This section uses two more labels:
+
+- **Measured, local D1** means a number from `npm run perf:reads` or a repository test on a local D1 database.
+- **Measured, local SQLite** means a compile time from `node:sqlite` (SQLite 3.51.2, Node 22.22.1) on the machine above, with the migrations of that side applied. A compile time is the time of `prepare()`, which parses the SQL text and builds the program. It does not run the statement.
+
+### Cause
+
+The premise was that the branch does more work for each request, most likely more writes. The evidence contradicts it. The branch adds no statement, no D1 call, no written row, and no notification. See [The premise](#the-premise).
+
+The cost that grew is the compile time of each statement that embeds the resolver:
+
+1. D1 compiles each statement again on every call. On hosted D1, the mean time of a statement follows the local compile time of its text (measured, hosted, and measured, local SQLite). See [D1 time is compile time](#d1-time-is-compile-time).
+2. SQLite compiles a common table expression (CTE) again at each place that names it. This holds for a `MATERIALIZED` CTE, and for a CTE named inside another CTE (measured, local SQLite).
+3. The session snapshot named `access` in 10 places in its sections. `visible_issues` named it twice and 5 sections read `visible_issues`. So each snapshot compiled the resolver about 20 times. The announcement snapshot compiled it about 5 times (inferred from the statements, and consistent with the measured shares below).
+4. `main` has the same structure. One place that names the branch resolver costs 0.069 to 0.085 ms to compile, against 0.031 ms for `currentAccessSql` on `main` (measured, local SQLite). So the resolver's share of the snapshot compile grew from 0.64 ms to 1.54 ms.
+
+The first place that goes wrong is the readers. They name the resolver once for each section, and the richer resolver made that multiple 2.2 to 2.7 times as expensive.
+
+The link to the hosted latency is inferred. At 200 users every endpoint that calls D1 waited about the same added time, including `/api/auth/session`, whose SQL is the same on both sides. The anonymous canary, which calls no D1, did not slow. So the added time is a wait in a queue in front of D1, not work on the slow request's own path. The added compile time is the one D1 cost per call that grew. The hosted data cannot show that this cost fills the queue, for two reasons. The D1 statement time per request also depends on the request mix, which differed between runs. And D1 work outside `queryDurationMs` is not measured. A cost that grows with the length of the SQL text outside statement time is not ruled out. The fix changes the text length by less than 1 percent.
+
+### The premise
+
+Every count that the premise predicted to grow is the same on both sides (measured, local D1):
+
+| Count | `main` | Branch before the fix |
+| --- | ---: | ---: |
+| D1 calls, 630 request types, full plan | 3,750 | 3,750 |
+| Statements, 630 request types | 5,265 | 5,265 |
+| Rows written, 630 request types | 4,273 | 4,273 |
+| Dispatch calls and rows written | 540 and 975 | 540 and 975 |
+| `access_version` changes, base plan, 5 runs | 0 | 0 |
+| Notification rows added | 26 | 26 |
+| `command_assertions` rows left behind | 0 | 0 |
+| History rows added | 14 | 14 |
+| Live coordinator statements (socket checks) | 48 | 48 |
+| Workflow commands that ended in a 409 | 0 | 0 |
+
+The hosted crossover agrees (measured, hosted). X1 and X2 had no conflict. M3 and M5 had one each. Write queries for each run were 2,037 for M3, 2,026 for X1, 2,377 for M4, and 2,080 for X2. The first runs cannot show whether the branch writes more. Each first-run window also holds account setup and password changes, in different amounts. M1 holds 599 `ba_user` inserts and 456 completed password changes. A1 holds 330 `ba_account` inserts. B1 holds 198 account inserts and 268 membership inserts.
+
+Every D1 endpoint gained a similar wait (measured, hosted). Each value is the 200-user p50 of the branch run minus the mean of the two neighbouring `main` runs:
+
+| Endpoint | X1 against M3 and M4 | X2 against M4 and M5 |
+| --- | ---: | ---: |
+| `auth-session` | +139 ms | +220 ms |
+| `sessions` | +218 ms | +295 ms |
+| `snapshot` | +245 ms | +314 ms |
+| `announcements` | +216 ms | +304 ms |
+| `avatars` | +225 ms | +310 ms |
+| `canary:anonymous-api`, no D1 | -5 ms | +12 ms |
+
+### D1 time is compile time
+
+For each statement shorter than 4,096 characters with at least 50 calls in a run, the hosted mean time per call was compared with the local compile time of the same text (measured, hosted, and measured, local SQLite):
+
+| Side | Runs | Statements | Fit | r |
+| --- | --- | ---: | --- | ---: |
+| `main` | M3, M4, M5 | 42 | 0.10 ms + 3.07 x compile | 0.983 |
+| Branch | X1, X2, B2 | 40 | 0.15 ms + 2.72 x compile | 0.965 |
+
+The announcement snapshot shows it for one statement. It reads 8 rows on both sides. Its local compile time is 0.34 ms on `main` and 0.72 ms on the branch. Its hosted mean is 1.12 to 1.18 ms on `main` and 1.79 to 2.39 ms on the branch.
+
+Local D1 hides this cost. Its `meta.duration` is whole milliseconds, and its total over 642 statements was 101 ms on both sides (measured, local D1).
+
+The compile time of each reader splits into the resolver's share and the rest. The share is the compile time minus the compile time with the resolver replaced by a constant row (measured, local SQLite, one run):
+
+| Statement | `main` share | `main` rest | Branch share | Branch rest |
+| --- | ---: | ---: | ---: | ---: |
+| Session snapshot | 0.638 ms | 0.541 ms | 1.539 ms | 0.539 ms |
+| Announcement snapshot | 0.276 ms | 0.128 ms | 0.629 ms | 0.146 ms |
+| Avatar list | 0.068 ms | 0.118 ms | 0.167 ms | 0.123 ms |
+| Live socket check | 0.069 ms | 0.009 ms | 0.153 ms | 0.011 ms |
+
+The rest is the same on both sides. All of the growth is in the resolver's share.
+
+### Fix
+
+The fix is in the two readers that named the resolver more than once. Every other reader names it once.
+
+- `snapshotSql` in `application.ts` reads the resolver row once, as `c` in `FROM login LEFT JOIN access c ON true`. Each section reads the columns of `c`. Without a seat, `c` is NULL and the sections are empty, as before. `visible_issues` names `access` once. It reads its two branches through one `OR`, which SQLite runs as two index searches (`MULTI-INDEX OR`).
+- `snapshotSql` in `announcements.ts` names `access` once in `visible`, and `access` is `MATERIALIZED`, so SQLite builds its program once. The image section reads `visible` before `announcement_images`. Without that order, SQLite scanned every announcement image of the site, and `queryPlans.test.ts` failed.
+- `queryPlans.test.ts` allows the scans of the one-row materialized `access` under its new alias `c`.
+
+The resolver, migration `0017`, and every other caller are unchanged. Removing the `SELECT * FROM (...) WHERE data = 1` wrapper of `contestDataSql` was tried. It made no measurable difference inside the readers (0.99 times), so it was not kept.
+
+### Before and after
+
+The compile time of each request type comes from two paired runs (measured, local SQLite). Each compiled every text 200 times in each of 7 rounds, with the two sides alternating. The values are milliseconds for one request. `/api/auth/session` has the same SQL on both sides, so its ratio shows the noise of each run: 0.96 in run 1 and 1.05 in run 2. A run with three sides was not used, because the side in the second and third place compiled the same SQL up to 40 percent slower.
+
+| Request type | Run 1, `main` | Run 1, after the fix | Run 2, before the fix | Run 2, after the fix |
+| --- | ---: | ---: | ---: | ---: |
+| `/api/auth/session` | 0.045 | 0.044 | 0.040 | 0.042 |
+| `/api/sessions` | 0.075 | 0.180 | 0.172 | 0.171 |
+| `/api/snapshot` | 1.190 | 0.955 | 1.738 | 0.917 |
+| `/api/announcements` | 0.451 | 0.430 | 0.769 | 0.435 |
+| `/api/avatars` | 0.234 | 0.300 | 0.290 | 0.298 |
+| `/api/updates`, the live socket | 0.127 | 0.180 | 0.174 | 0.178 |
+| `workflow claim` | 1.852 | 1.883 | 2.645 | 1.839 |
+| Live alarm, 4 sockets | 0.082 | 0.136 | 0.134 | 0.136 |
+| Screen refresh: the five reads above `/api/updates` | 1.995 | 1.909 | 3.009 | 1.863 |
+| All 38 request types of the base shape | 22.679 | 23.077 | 32.728 | 22.580 |
+
+So the fix takes the compile time of a screen refresh from about 1.5 times that of `main` back to the level of `main`. The snapshot compiles faster than on `main`. The sessions list, the avatar list, and the live socket check stay slower. See [Not fixed](#not-fixed).
+
+The read gate still passes (measured, local D1). `node scripts/compare-read-volume.mjs --limit=10` passes against the three `main` runs of [Commands](#commands). Of 630 request types, 285 read fewer rows than on `main`, 75 read more, and none reads more than 4 added rows. The rows added are those that the earlier commits added to `/api/sessions` and to the contestant's `/api/avatars`. At the base shape, the contestant's snapshot request reads 115 rows, against 124 on `main` and before the fix. The admin's reads 6,177 rows, against 6,187. Every ceiling in `readVolume.test.ts` holds.
+
+The counts of [The premise](#the-premise) stay the same after the fix (measured, local D1, base plan, 3 runs): 498 calls, 700 statements, and 570 rows written for the requests, 70 calls and 130 rows written for the dispatch, 26 notification rows, 14 history rows, and 48 live coordinator statements, with no `access_version` change and no assertion left behind, on both sides. Over the full plan, both sides make 3,750 calls and 5,265 statements and write 4,273 rows.
+
+### Test
+
+`src/server/adapters/d1/readerCompile.test.ts` fails on the readers before the fix and passes after it. For the session snapshot and the announcement snapshot, it measures the resolver's share of the compile time, counted in compiles of the resolver alone. Both come from the same process, so the speed of the machine cancels. Inside Vitest, three runs of each version gave these shares (measured, local SQLite):
+
+| Statement | Before the fix | After the fix | Bound |
+| --- | ---: | ---: | ---: |
+| Session snapshot | 7.20 to 7.51 | 3.18 to 3.63 | 5 |
+| Announcement snapshot | 3.95 to 4.04 | 1.93 to 1.98 | 2.8 |
+
+Each bound lies midway, so a reader that names the resolver in each section again fails. The bounds come from these runs, not from a stated requirement. This is a judgment for the owner to review. The test compares timings, so it runs in `npm run test:d1`, one file at a time. `vite.config.ts` excludes it from `npm test`, so a busy Workers Builds runner cannot fail a deploy with it.
+
+### Not fixed
+
+- **The resolver's own compile cost.** A reader that names the resolver once still compiles a resolver that costs 2.2 to 2.7 times as much as `currentAccessSql`. So the sessions list, the avatar list, and the live socket check compile 1.3 to 2.4 times as long as on `main` (measured, local SQLite). They are small statements.
+- **`visible_issues`.** Five sections still read it, so the session snapshot compiles the resolver about 6 times. A later phase that adds a section reading `visible_issues` adds one more.
+- **The first-run socket failures.** The `ws-ready` timeouts of A1 and B1 are not explained. This fix does not claim to address them.
+
+### Corrections to the hosted half
+
+- [What limits the numbers](#what-limits-the-numbers) infers that one serial D1 executor was not saturated, from `queryDurationMs`. That time is mostly compile time, and D1 work outside it is not measured. So the inference is not supported. The latency of `/api/auth/session`, whose SQL is the same on both sides, grew from 267 to 284 ms at 50 users to 446 to 782 ms at 200 users on `main` (measured, hosted). D1 calls already wait in a queue on `main`.
+- The same section says that D1 statement time for each request matched. It did match in total, but the total also depends on the request mix. In the crossover of [Rows read per request](#rows-read-per-request), the branch read 16.5 to 27.8 fewer rows for each request than `main`, while locally it reads 0 to 6 more for each request type. So the hosted totals cannot show a change of about 0.6 ms for each request, which is 3 times the local compile change (inferred from the fit).
+
+### What a hosted rerun must confirm
+
+1. Run a crossover on one installation, with `main` and the fixed branch in turn and matched database sizes.
+2. Compare the D1 mean of each statement that embeds the resolver. The announcement snapshot should fall from 1.8 to 2.4 ms to about the 1.1 to 1.2 ms of `main` (inferred from the fit and the local compile times).
+3. Compare the snapshot p95 at 200 users with the 10 percent limit of the gate.
+4. If the gap stays, measure the wait of each D1 call from the Worker. That needs a token with Observability Read for Workers Logs. It would also test the competing cause, a per-call cost that grows with SQL text length.
+5. Run a first run on each side, to see whether the `ws-ready` timeouts belong to the code.
+
+### Diagnosis commands
+
+The local numbers come from throwaway scripts in `/tmp/diag-scripts` on the measuring machine. They are not in the repository. They do these things:
+
+- They add `meta.duration`, SQL length, and the state counts above to a copy of `scripts/d1-read-volume.mjs`, and save each executed SQL text with its bound values.
+- They compile each saved text in `node:sqlite` on a database with the migrations of its side, alternating the sides.
+- They replace the resolver in a text with a constant row and compile both texts.
+
+The repository commands are these:
+
+```sh
+npm run perf:reads -- --plan=full --out=/tmp/diag-out/final-full-1.json
+node scripts/compare-read-volume.mjs --base=/tmp/scoped-gate/main-1.json,/tmp/scoped-gate/main-2.json,/tmp/scoped-gate/main-3.json \
+  --head=/tmp/diag-out/final-full-1.json,/tmp/diag-out/final-full-2.json,/tmp/diag-out/final-full-3.json --limit=10
+npm run test:d1
+```

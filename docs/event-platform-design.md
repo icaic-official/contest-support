@@ -165,18 +165,18 @@ export const snapshotSql = `WITH login AS (${currentReadyLoginSql}),
   visible_issues AS MATERIALIZED (...unchanged, reads a.team_id and a.staff...)
 SELECT json_object(
   'session', (SELECT json_object('id', s.id, 'event_id', s.event_id, 'name', s.name,
-    'kind', s.kind, 'type', s.contest_type, ...) FROM sessions s WHERE s.id = ? AND EXISTS (SELECT 1 FROM access)),
-  'access', (SELECT json_object('manage', manage) FROM access),
+    'kind', s.kind, 'type', s.contest_type, ...) FROM sessions s WHERE s.id = ? AND c.account_id IS NOT NULL),
+  'access', (SELECT json_object('manage', c.manage) WHERE c.account_id IS NOT NULL),
   'clock', (SELECT json_object('time_zone', e.time_zone, 'starts_at', s.starts_at, 'ends_at', s.ends_at,
-      'grace_minutes', s.grace_minutes, 'intake', json(${intakeStateSql('s', 'a.team_id')}),
-      'personal_end_at', ${personalEndSql('s', 'a.team_id')})
-    FROM access a JOIN sessions s ON s.id = a.session_id JOIN events e ON e.id = s.event_id),
+      'grace_minutes', s.grace_minutes, 'intake', json(${intakeStateSql('s', 'c.team_id')}),
+      'personal_end_at', ${personalEndSql('s', 'c.team_id')})
+    FROM sessions s JOIN events e ON e.id = s.event_id WHERE s.id = c.session_id),
   'contest_awards', ...,
   ...the other sections are unchanged...
-) AS snapshot WHERE EXISTS (SELECT 1 FROM login)`;
+) AS snapshot FROM login LEFT JOIN access c ON true`;
 ```
 
-Only the `access` line and the new sections change. `contestDataSql` keeps the column names that embedders read from `CurrentAccessRow` (`src/server/adapters/cloudflare/application.ts:9-26`), and its bindings keep the order of `currentAccessBindings` (`src/server/adapters/cloudflare/application.ts:58-60`). `contestDataSql` is the only export of the contest resolver. The unfiltered row stays private to `authority.ts`, so an embedder cannot skip the webmaster restriction.
+Only the `access` line and the new sections change. Each section reads `c`, the one resolver row in the FROM clause. D1 compiles every statement on every call, and SQLite compiles a CTE again at each place that names it. So a section that names `access` again adds a compile of the resolver to every snapshot. See [the diagnosis of the read gate](history/scoped-authority-gate.md#diagnosis). `contestDataSql` keeps the column names that embedders read from `CurrentAccessRow` (`src/server/adapters/cloudflare/application.ts:9-26`), and its bindings keep the order of `currentAccessBindings` (`src/server/adapters/cloudflare/application.ts:58-60`). `contestDataSql` is the only export of the contest resolver. The unfiltered row stays private to `authority.ts`, so an embedder cannot skip the webmaster restriction.
 
 #### Sign-in in the browser and on the server
 

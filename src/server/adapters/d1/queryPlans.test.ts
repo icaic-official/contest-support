@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { openStoreDatabase } from '../cloudflare/tooling/store-database.mjs';
 import { snapshotSql as announcementSnapshotSql } from '../cloudflare/announcements';
-import { currentAccessSql, sessionsListSql, snapshotSql } from '../cloudflare/application';
+import { currentAccessForLoginsSql, currentAccessSql, sessionsListSql, snapshotSql } from '../cloudflare/application';
 import { claimSql } from '../cloudflare/live';
 import type { D1Connection } from './connection';
 import { applyMigrations } from './testFixture';
@@ -15,6 +15,7 @@ const queries: Record<string, string> = {
   'session snapshot': snapshotSql,
   'announcement snapshot': announcementSnapshotSql,
   'current access': currentAccessSql,
+  'current access for live logins': currentAccessForLoginsSql,
   'sessions list': sessionsListSql,
 };
 
@@ -69,6 +70,15 @@ describe('D1 query plans', () => {
 
   it('finds the sessions of an account through the account index', async () => {
     expect(await plan(sessionsListSql)).toContain('USING COVERING INDEX memberships_account_session (account_id=?)');
+  });
+
+  it('finds the grants of a caller through the grant indexes', async () => {
+    for (const sql of [currentAccessSql, currentAccessForLoginsSql]) {
+      const text = await plan(sql);
+      expect(text).toContain('USING COVERING INDEX grants_event (event_id=? AND account_id=?)');
+      expect(text).toMatch(/USING COVERING INDEX grants_(?:site|by_account) \(account_id=\?/);
+      expect(text).toContain('USING COVERING INDEX grants_contest (session_id=? AND account_id=?)');
+    }
   });
 
   it('finds the issues of one team and the images of visible issues through indexes', async () => {

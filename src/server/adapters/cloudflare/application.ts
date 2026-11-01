@@ -5,55 +5,34 @@ import { snapshotSchema, type Snapshot } from '../../../connected/model';
 import type { Caller } from '../../authentication';
 import { AuthenticationError } from '../../authentication';
 import type { D1Connection, D1Statement, D1Value } from '../d1/connection';
+import { contestDataSql } from './authority';
 
+/** One row of the contest resolver in authority.ts. Embedders read these names. */
 export interface CurrentAccessRow {
   account_id: string;
   account_name: string;
   login_id: string;
   login_expires_at: number;
   identity_expires_at: string;
-  access_version: number;
-  credential_generation: number;
-  login_version: number;
-  membership_version: number;
-  session_version: number;
-  event_version: number;
+  session_id: string;
+  event_id: string;
   archived: number;
   team_id: string | null;
   is_admin: number;
   staff: number;
   roles: string;
+  entrant_kind: 'team';
+  manage: 'none' | 'contest' | 'event' | 'site';
+  data: number;
+  stamp: string;
 }
-
-// Every use checks both identity-session and application-login expiry against
-// database time, including inside write batches.
-const accessSql = (selection: string) => `SELECT a.id AS account_id, a.name AS account_name, l.id AS login_id,
-  l.expires_at AS login_expires_at, b.expiresAt AS identity_expires_at,
-  a.access_version, a.credential_generation, l.version AS login_version,
-  m.version AS membership_version, s.version AS session_version,
-  e.version AS event_version, e.archived, m.team_id, m.is_admin,
-  (m.team_id IS NULL AND (m.is_admin = 1 OR EXISTS (
-    SELECT 1 FROM membership_roles mr WHERE mr.session_id = m.session_id
-      AND mr.account_id = m.account_id))) AS staff,
-  (SELECT json_group_array(role) FROM (SELECT role FROM membership_roles mr
-    WHERE mr.session_id = m.session_id AND mr.account_id = m.account_id ORDER BY role)) AS roles
-  FROM accounts a JOIN logins l ON l.account_id = a.id
-  JOIN ba_session b ON b.id = l.identity_session_id AND b.userId = a.id
-  JOIN memberships m ON m.account_id = a.id
-  JOIN sessions s ON s.id = m.session_id JOIN events e ON e.id = s.event_id
-  WHERE ${selection}
-    AND a.disabled = 0 AND a.must_change = 0 AND a.credential_state = 'ready'
-    AND l.revoked = 0 AND l.expires_at > unixepoch()
-    AND l.credential_generation = a.credential_generation
-    AND b.expiresAt > strftime('%Y-%m-%dT%H:%M:%fZ', 'now')`;
 
 // Bind accountId, loginId, sessionId in this order. Callers must come from the
 // trusted authentication service.
-export const currentAccessSql = accessSql('a.id = ? AND l.id = ? AND m.session_id = ?');
+export const currentAccessSql = contestDataSql('caller');
 
-// Bind sessionId, then a JSON array of login IDs. One JSON value stays under
-// D1's 100 bound-parameter limit. Match each row on account_id and login_id.
-export const currentAccessForLoginsSql = accessSql('m.session_id = ? AND l.id IN (SELECT value FROM json_each(?))');
+// Bind sessionId, then a JSON array of login IDs. Match each row on account_id and login_id.
+export const currentAccessForLoginsSql = contestDataSql('logins');
 
 export function currentAccessBindings(caller: Caller, sessionId: string): D1Value[] {
   return [caller.accountId, caller.loginId, sessionId];
@@ -224,11 +203,7 @@ export class D1ApplicationService {
     }
     const id = crypto.randomUUID();
     return { id, caller, statements: [this.assertion(id, `SELECT 1 FROM (${currentAccessSql})
-      WHERE is_admin = 1 AND access_version = ? AND credential_generation = ?
-        AND login_version = ? AND membership_version = ? AND session_version = ? AND event_version = ?
-        AND EXISTS (SELECT 1 FROM events e JOIN sessions s ON s.event_id = e.id WHERE s.id = ? AND e.archived = 0)`,
-    ...currentAccessBindings(caller, sessionId), current.access_version, current.credential_generation,
-    current.login_version, current.membership_version, current.session_version, current.event_version, sessionId)] };
+      WHERE is_admin = 1 AND archived = 0 AND stamp = ?`, ...currentAccessBindings(caller, sessionId), current.stamp)] };
   }
 
   private async commit(gate: AdminGate, statements: D1Statement[]): Promise<void> {

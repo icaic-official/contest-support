@@ -257,7 +257,7 @@ describe('avatar reads match the reference rule for every caller, session, and a
   const people = {
     admin: person(), volunteer: person(), jury: person(), contestant: person(), teammate: person(),
     otherTeam: person(), plainMember: person(), staffAndContestant: person(), otherSessionStaff: person(),
-    archivedStaff: person(), noAvatar: person(), disabled: person(), mustChange: person(),
+    archivedStaff: person(), archivedJury: person(), noAvatar: person(), disabled: person(), mustChange: person(),
     revokedLogin: person(), removedMember: person(),
   };
   const sessions = { main: randomUUID(), second: randomUUID(), archived: randomUUID(), unknown: randomUUID() };
@@ -304,7 +304,7 @@ describe('avatar reads match the reference rule for every caller, session, and a
       ...staff(people.disabled, sessions.main, 'volunteer'), ...staff(people.mustChange, sessions.main, 'volunteer'),
       ...staff(people.revokedLogin, sessions.main, 'volunteer'), ...staff(people.removedMember, sessions.main, 'volunteer'),
       ...staff(people.admin, sessions.second, null, 1), ...staff(people.otherSessionStaff, sessions.second, 'volunteer'),
-      ...staff(people.archivedStaff, sessions.archived, 'volunteer'), ...staff(people.volunteer, sessions.archived, 'jury'),
+      ...staff(people.archivedStaff, sessions.archived, 'volunteer'), ...staff(people.archivedJury, sessions.archived, 'jury'),
     ]) await write;
     await run('DELETE FROM memberships WHERE session_id = ? AND account_id = ?', sessions.main, people.removedMember.accountId);
     const avatar = async (caller: Caller, state: string) => {
@@ -345,7 +345,7 @@ describe('avatar reads match the reference rule for every caller, session, and a
     expect(await owners(people.contestant, sessions.main)).toEqual([people.contestant.accountId]);
     expect(await owners(people.staffAndContestant, sessions.second)).toEqual([people.staffAndContestant.accountId]);
     expect(await owners(people.archivedStaff, sessions.archived))
-      .toEqual([people.archivedStaff.accountId, people.volunteer.accountId].sort());
+      .toEqual([people.archivedStaff.accountId, people.archivedJury.accountId].sort());
     expect(await owners(people.disabled, sessions.main)).toEqual([]);
   });
 

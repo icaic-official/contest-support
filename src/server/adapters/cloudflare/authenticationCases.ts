@@ -454,10 +454,11 @@ export function registerAuthenticationCases(group: AuthenticationCases) {
 
       it('blocks reset when a different assigned session is archived', async () => {
         const archivedEvent = randomUUID();
+        // D1 refuses a membership in another event, so the membership comes before the move.
         await db.batch([
           stmt('INSERT INTO events (id, archived) VALUES (?, 1)', archivedEvent),
-          stmt('UPDATE sessions SET event_id = ? WHERE id = ?', archivedEvent, fixture.secondSessionId),
           stmt('INSERT INTO memberships (session_id, account_id) VALUES (?, ?)', fixture.secondSessionId, fixture.contestant.accountId),
+          stmt('UPDATE sessions SET event_id = ? WHERE id = ?', archivedEvent, fixture.secondSessionId),
         ]);
         try {
           await expectFailure(service.account(adminHeaders, fixture.sessionId, { action: 'reset_password', userId: fixture.contestant.accountId })).toMatchObject({ status: 403 });

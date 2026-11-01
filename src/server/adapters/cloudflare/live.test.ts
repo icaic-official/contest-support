@@ -303,9 +303,9 @@ function fixture() {
     const caller = { accountId: randomUUID(), loginId: randomUUID() };
     db.access.set([caller.accountId, caller.loginId, sessionId].join(':'), {
       account_id: caller.accountId, account_name: 'Fictional person', login_id: caller.loginId,
-      access_version: 1, credential_generation: 1, login_version: 1, membership_version: 1,
-      session_version: 1, event_version: 1, archived: 0, team_id: team, is_admin: 0,
-      staff: Number(staff), roles: staff ? '["volunteer"]' : '[]',
+      session_id: sessionId, event_id: eventId, archived: 0, team_id: team, is_admin: 0,
+      staff: Number(staff), roles: staff ? '["volunteer"]' : '[]', entrant_kind: 'team',
+      manage: 'none', data: 1, stamp: '[1,1,1,1,1,1,0]',
       login_expires_at: Math.floor(Date.now() / 1000) + 3600,
       identity_expires_at: new Date(Date.now() + 3600_000).toISOString(),
     });

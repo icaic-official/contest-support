@@ -20,10 +20,12 @@ const audits = 1200;
  * 31 are contestants on team 8, which owns 4 issues. The login of account 9
  * is revoked. Account 1201 is a session member with no team, role or admin
  * flag, 1202 belongs to no session, and 1203 is staff of the second session only.
+ * Account 1204 is an event admin and 1205 a webmaster. Neither holds a membership.
  */
 const callers = {
   admin: 1, volunteer: 2, jury: 3, contestant: 7, teammate: 31,
   revokedLogin: 9, plainMember: 1201, outsider: 1202, otherSessionStaff: 1203,
+  eventAdmin: 1204, webmaster: 1205,
 };
 
 /**
@@ -32,7 +34,7 @@ const callers = {
  * avatar. Every id is fictional.
  */
 async function seed(db: D1Connection, teamCount: number): Promise<void> {
-  const people = accounts + 3;
+  const people = accounts + 5;
   const series = (count: number) => `WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < ${count})`;
   const now = "strftime('%Y-%m-%dT%H:%M:%fZ', 'now')";
   const later = "strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '+1 day')";
@@ -61,6 +63,9 @@ async function seed(db: D1Connection, teamCount: number): Promise<void> {
     ('sess-1', 'acc-${callers.plainMember}', NULL), ('sess-2', 'acc-${callers.otherSessionStaff}', NULL)`);
   await run(`INSERT INTO membership_roles (session_id, account_id, role) VALUES ('sess-1', 'acc-2', 'volunteer'),
     ('sess-1', 'acc-3', 'jury'), ('sess-2', 'acc-${callers.otherSessionStaff}', 'volunteer')`);
+  await run(`UPDATE accounts SET event_id = 'ev-1' WHERE id = 'acc-${callers.eventAdmin}'`);
+  await run(`INSERT INTO grants (account_id, scope, event_id, granted_by) VALUES ('acc-${callers.eventAdmin}', 'event', 'ev-1', 'acc-1')`);
+  await run(`INSERT INTO grants (account_id, scope, granted_by) VALUES ('acc-${callers.webmaster}', 'site', 'acc-1')`);
   await run(`${series(issues)} INSERT INTO issues (id, session_id, team_id, status, number, reporter, reporter_name, category, description, created_at)
     SELECT 'issue-' || i, 'sess-1', 'team-' || (1 + i % ${teamCount}), 'open', i, 'acc-' || (1 + i), 'Person', 'Devices', 'Fictional issue ' || i, ${now} FROM n`);
   await run(`${series(issues * 5)} INSERT INTO history (id, issue_id, actor, at, text, visibility, actor_name)
@@ -287,6 +292,16 @@ describe('rows read for a session with 1,200 accounts and 100 issues', () => {
     expect(body!.pending_removals).toEqual([]);
     expect(body!.audit).toHaveLength(50);
     expect(rowsRead).toBeLessThan(6_800);
+  });
+
+  it('reads the admin snapshot for an event admin and a webmaster within the admin ceiling', async () => {
+    const admin = (await snapshot(db, callers.admin)).body!;
+    for (const n of [callers.eventAdmin, callers.webmaster]) {
+      const { rowsRead, body } = await snapshot(db, n);
+      expect(body!.membership).toMatchObject({ team_id: null, roles: [], is_admin: true });
+      expect({ ...body!, membership: admin.membership }, `account ${n}`).toEqual(admin);
+      expect(rowsRead, `account ${n}`).toBeLessThan(6_800);
+    }
   });
 
   // Measured on 2026-10-26. While the list checked every ready avatar of the

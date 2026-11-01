@@ -5,7 +5,7 @@ description: Set up a checkout, run the app, and run the checks.
 
 ## Set up
 
-Use Node.js 22.13+ (22.x) or 24+. The docs need 22.22+.
+Use Node.js 22.13+ (22.x) or 24+. The docs need 22.23.4+.
 
 ```sh
 npm ci

@@ -79,8 +79,9 @@ That command reads `wrangler.jsonc` and would publish `minsky-dev`.
     Ordinary checks do not use those values.
 12. Leave **Settings > Build > Build watch paths** at the default, which includes every file.
 
-Both `minsky-ci` triggers pin the build variable `NODE_VERSION` to `22.23.2`.
+Both `minsky-ci` triggers pin the build variable `NODE_VERSION` to `22.23.4`.
 That value is set in Cloudflare, and a read-back confirmed it.
+The `minsky-dev` and `minsky-preview` triggers pin the same value. Their builds run `npm run ci` on `main`, and that command runs the docs build.
 `.nvmrc` contains `22` and stays for local tools.
 See [the build image](https://developers.cloudflare.com/workers/ci-cd/builds/build-image/) and [build configuration](https://developers.cloudflare.com/workers/ci-cd/builds/configuration/).
 
@@ -120,7 +121,7 @@ To recreate the triggers, open **Workers & Pages > minsky-docs > Settings > Buil
 3. Set the deploy command to `npx wrangler deploy --config wrangler.docs.jsonc`.
 4. Enable preview builds. Set the preview command to `npx wrangler versions upload --config wrangler.docs.jsonc`.
 5. Leave the root directory empty. Keep the default dependency install. It installs the root lockfile, which provides Wrangler.
-6. Add build variable `NODE_VERSION` with value `22.23.2` to both triggers.
+6. Add build variable `NODE_VERSION` with value `22.23.4` to both triggers.
 7. Do not add application secrets. The docs build does not use them.
 
 ## Publish the application
@@ -176,7 +177,7 @@ You need access to Cloudflare account `458ad6a930b0fb717796dfa19ca6a2b1`.
    | Name | Value |
    | --- | --- |
    | `SKIP_DEPENDENCY_INSTALL` | `1` |
-   | `NODE_VERSION` | `22.23.2` |
+   | `NODE_VERSION` | `22.23.4` |
    | `CLOUDFLARE_ACCOUNT_ID` | `458ad6a930b0fb717796dfa19ca6a2b1` |
    | `VITE_ENVIRONMENT` | `development` |
    | `MINSKY_DEV_CLOUDFLARE_CONFIG` | `src/server/adapters/cloudflare/deploy/development.wrangler.jsonc` |
@@ -359,7 +360,7 @@ In that case, the preview needs its own Cloudflare account. That is an account d
    | Name | Value |
    | --- | --- |
    | `SKIP_DEPENDENCY_INSTALL` | `1` |
-   | `NODE_VERSION` | `22.23.2` |
+   | `NODE_VERSION` | `22.23.4` |
    | `CLOUDFLARE_ACCOUNT_ID` | `458ad6a930b0fb717796dfa19ca6a2b1` |
    | `VITE_ENVIRONMENT` | `preview` |
    | `MINSKY_PREVIEW_DATABASE_ID` | `3189b257-13f9-4e73-9bd1-bf211c7cbb25` |

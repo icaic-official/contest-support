@@ -144,7 +144,7 @@ Outside CI, Playwright reuses a server that already listens on the port. Give ea
 
 ### Write and publish the site
 
-Use Node.js 22.22 or later for the documentation tools.
+Use Node.js 22.23.4 or later for the documentation tools.
 The public guides are Markdown files in `site/src/content/docs/`.
 
 ```sh

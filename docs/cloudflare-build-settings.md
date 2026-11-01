@@ -25,11 +25,11 @@ See [Workers pricing](https://developers.cloudflare.com/workers/platform/pricing
 | Deploy command | `npm run ci:worker` |
 | Preview command | `npm run ci:worker` |
 | Build variable | `SKIP_DEPENDENCY_INSTALL=1` |
-| Node.js | `NODE_VERSION=22.23.2` on both `minsky-ci` triggers. `.nvmrc` contains `22`. |
+| Node.js | `NODE_VERSION=22.23.4` on both `minsky-ci` triggers. `.nvmrc` contains `22`. |
 
-Both `minsky-ci` triggers set the build variable `NODE_VERSION` to `22.23.2`.
+Both `minsky-ci` triggers set the build variable `NODE_VERSION` to `22.23.4`.
 That value is already set in Cloudflare.
-It keeps CI on Node.js 22.23.2 when the build image's default Node.js changes.
+It keeps CI on Node.js 22.23.4 when the build image's default Node.js changes.
 
 `npm run ci` installs both lockfiles, then runs the app production build, ESLint, unit tests, the provider scenario list, the docs build, both `npm audit` checks, and a checksum-verified Gitleaks scan.
 The app build starts with `tsc -b`, so it is also the type check. It runs first so that type errors fail early.
@@ -70,7 +70,7 @@ The `minsky-docs` Worker has these two triggers since 2026-10-24.
 | Deploy command | `npx wrangler deploy --config wrangler.docs.jsonc` | `npx wrangler versions upload --config wrangler.docs.jsonc` |
 | Root directory | Repository root | Same |
 | Dependency install | Default `npm clean-install` of the root lockfile | Same |
-| Build variable | `NODE_VERSION=22.23.2` | Same |
+| Build variable | `NODE_VERSION=22.23.4` | Same |
 | Build token and repository connection | Same as `minsky-ci` | Same |
 
 ## Application Workers Builds
@@ -106,7 +106,7 @@ The owner connected this trigger on 2026-10-24 and switched off its branch build
 | Deploy command | `npm run deploy` for every branch |
 | Root directory | Repository root |
 | API token | Account token in [Prepare the preview token](cloudflare-builds.md#prepare-the-preview-token), limited to `minsky-preview` and `minsky-preview-images`. Never the `minsky-dev` token. |
-| Build variables | `SKIP_DEPENDENCY_INSTALL=1`, `NODE_VERSION=22.23.2`, `CLOUDFLARE_ACCOUNT_ID`, `VITE_ENVIRONMENT=preview`, `MINSKY_PREVIEW_DATABASE_ID=3189b257-13f9-4e73-9bd1-bf211c7cbb25` |
+| Build variables | `SKIP_DEPENDENCY_INSTALL=1`, `NODE_VERSION=22.23.4`, `CLOUDFLARE_ACCOUNT_ID`, `VITE_ENVIRONMENT=preview`, `MINSKY_PREVIEW_DATABASE_ID=3189b257-13f9-4e73-9bd1-bf211c7cbb25` |
 
 The preview resources are D1 database `minsky-preview` and private bucket `minsky-preview-images`, both in APAC.
 They hold only test data.

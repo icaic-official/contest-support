@@ -76,11 +76,12 @@ export function isGuardFailure(error: unknown): boolean {
 interface ReceiptRow { session_id: string; command: string; announcement_id: string }
 interface AnnouncementRow { revision: number; removed_at: string | null }
 
-export const snapshotSql = `WITH access AS (${contestDataSql('caller')}),
-  manager AS (SELECT 1 FROM access WHERE ${announcementManager('access')}),
-  visible AS (SELECT a.* FROM announcements a WHERE a.session_id = ? AND EXISTS (SELECT 1 FROM access)
-    AND a.removed_at IS NULL
-    AND (EXISTS (SELECT 1 FROM manager) OR a.expires_at IS NULL OR a.expires_at > ${announcementNow}))
+// SQLite compiles a CTE again at each place that names it, and D1 compiles every
+// statement on every call. So `visible` names the resolver once, as `c`, and
+// MATERIALIZED generates the resolver's code once for the three places.
+export const snapshotSql = `WITH access AS MATERIALIZED (${contestDataSql('caller')}),
+  visible AS (SELECT a.* FROM access c CROSS JOIN announcements a WHERE a.session_id = ? AND a.removed_at IS NULL
+    AND (${announcementManager('c')} OR a.expires_at IS NULL OR a.expires_at > ${announcementNow}))
 SELECT json_object(
   'announcements', json(COALESCE((SELECT json_group_array(json(row)) FROM (
     SELECT json_object('id', a.id, 'session_id', a.session_id, 'title', a.title, 'details', a.details,
@@ -93,10 +94,10 @@ SELECT json_object(
     SELECT json_object('id', x.id, 'session_id', x.session_id, 'announcement_id', x.announcement_id,
       'uploader', x.uploader, 'uploader_name', x.uploader_name, 'name', x.name, 'bytes', x.byte_size,
       'content_type', x.content_type, 'uploaded_at', x.uploaded_at) AS row
-    FROM announcement_images x JOIN visible a ON a.id = x.announcement_id
-    WHERE x.state = 'ready' ORDER BY x.uploaded_at, x.id)), '[]')),
+    FROM visible a CROSS JOIN announcement_images x
+    WHERE x.announcement_id = a.id AND x.state = 'ready' ORDER BY x.uploaded_at, x.id)), '[]')),
   'server_time', ${announcementNow}) AS snapshot
-WHERE EXISTS (SELECT 1 FROM access)`;
+FROM access`;
 
 /** D1 owns announcement access, expiry, revisions, and atomic publication. */
 export class D1AnnouncementService {

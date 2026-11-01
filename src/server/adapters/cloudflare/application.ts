@@ -36,30 +36,33 @@ export function currentReadyLoginBindings(caller: Caller): D1Value[] {
 
 interface AdminGate { id: string; caller: Caller; statements: D1Statement[] }
 
-// Each section reads the one `access` row once. As the inner table of a join,
-// it would be read again for every row of the section. The audit section takes
-// its key from `access`, so a caller who is not an admin reads no audit row.
-// A team member reads the own team by key. The memberships foreign key keeps
-// that team in the same session.
+// D1 compiles every statement on every call, and SQLite compiles a CTE again at
+// each place that names it. So the resolver is named twice: once as `c` in the
+// FROM clause, whose columns every section reads, and once in visible_issues,
+// because a CTE cannot read `c`. Without a seat, `c` is NULL and every section
+// is empty. visible_issues reads each side of its OR through its own index.
+// The audit section takes its key from `c`, so a caller who is not an admin
+// reads no audit row. A team member reads the own team by key. The memberships
+// foreign key keeps that team in the same session.
 export const snapshotSql = `WITH login AS (${currentReadyLoginSql}), access AS MATERIALIZED (${contestDataSql('caller')}),
-  visible_issues AS MATERIALIZED (
-    SELECT i.* FROM access a CROSS JOIN issues i WHERE i.session_id = ? AND i.team_id = a.team_id
-    UNION ALL SELECT i.* FROM access a CROSS JOIN issues i WHERE a.staff = 1 AND i.session_id = ?)
+  visible_issues AS MATERIALIZED (SELECT i.* FROM access a CROSS JOIN issues i
+    WHERE (i.session_id = ? AND i.team_id = a.team_id) OR (a.staff = 1 AND i.session_id = ?))
 SELECT json_object(
   'session', (SELECT json_object('id', s.id, 'event_id', s.event_id, 'name', s.name,
     'intake_open', json(CASE WHEN s.intake_open THEN 'true' ELSE 'false' END),
     'categories', json(s.categories), 'revision', s.version,
     'max_image_bytes', s.max_image_bytes, 'max_images_per_issue', s.max_images_per_issue,
-    'max_image_bytes_per_issue', s.max_image_bytes_per_issue) FROM sessions s WHERE s.id = ? AND EXISTS (SELECT 1 FROM access)),
+    'max_image_bytes_per_issue', s.max_image_bytes_per_issue) FROM sessions s WHERE s.id = ? AND c.account_id IS NOT NULL),
   'event', (SELECT json_object('id', e.id, 'name', e.name,
     'archived', json(CASE WHEN e.archived THEN 'true' ELSE 'false' END))
-    FROM events e JOIN sessions s ON s.event_id = e.id WHERE s.id = ? AND EXISTS (SELECT 1 FROM access)),
-  'membership', (SELECT json_object('session_id', ?, 'user_id', account_id,
-    'team_id', team_id, 'roles', json(roles), 'is_admin', json(CASE WHEN is_admin THEN 'true' ELSE 'false' END)) FROM access),
+    FROM events e JOIN sessions s ON s.event_id = e.id WHERE s.id = ? AND c.account_id IS NOT NULL),
+  'membership', (SELECT json_object('session_id', ?, 'user_id', c.account_id,
+    'team_id', c.team_id, 'roles', json(c.roles), 'is_admin', json(CASE WHEN c.is_admin THEN 'true' ELSE 'false' END))
+    WHERE c.account_id IS NOT NULL),
   'teams', json(COALESCE((SELECT json_group_array(json(row)) FROM (
     SELECT json_object('id', id, 'session_id', session_id, 'name', name, 'location', location) AS row FROM (
-      SELECT t.* FROM access a CROSS JOIN teams t WHERE a.staff = 1 AND t.session_id = ?
-      UNION ALL SELECT t.* FROM access a JOIN teams t ON t.id = a.team_id) ORDER BY name, id)), '[]')),
+      SELECT t.* FROM teams t WHERE c.staff = 1 AND t.session_id = ?
+      UNION ALL SELECT t.* FROM teams t WHERE t.id = c.team_id) ORDER BY name, id)), '[]')),
   'issues', json(COALESCE((SELECT json_group_array(json(row)) FROM (
     SELECT json_object('id', i.id, 'number', i.number, 'session_id', i.session_id,
       'team_id', i.team_id, 'reporter', i.reporter, 'reporter_name', i.reporter_name,
@@ -77,7 +80,7 @@ SELECT json_object(
     SELECT json_object('id', h.id, 'issue_id', h.issue_id, 'at', h.at,
       'actor', h.actor, 'actor_name', h.actor_name, 'text', h.text, 'visibility', h.visibility) AS row
     FROM history h JOIN visible_issues i ON i.id = h.issue_id
-    WHERE h.visibility = 'public' OR (SELECT staff FROM access) = 1 ORDER BY h.at, h.id)), '[]')),
+    WHERE h.visibility = 'public' OR c.staff = 1 ORDER BY h.at, h.id)), '[]')),
   'awards', json(COALESCE((SELECT json_group_array(json(row)) FROM (
     SELECT json_object('id', w.id, 'issue_id', w.issue_id, 'resolution_id', w.resolution_id,
       'minutes', w.minutes, 'explanation', w.explanation, 'actor_name', w.actor_name,
@@ -89,26 +92,26 @@ SELECT json_object(
       'visibility', x.visibility, 'byte_size', x.byte_size, 'content_type', x.content_type,
       'original_name', x.original_name) AS row
     FROM visible_issues i CROSS JOIN issue_images x
-    WHERE x.issue_id = i.id AND x.state = 'ready' AND (x.visibility = 'public' OR (SELECT staff FROM access) = 1)
+    WHERE x.issue_id = i.id AND x.state = 'ready' AND (x.visibility = 'public' OR c.staff = 1)
     ORDER BY x.uploaded_at, x.id)), '[]')),
   'pending_removals', json(COALESCE((SELECT json_group_array(json(row)) FROM (
     SELECT json_object('id', x.id, 'issue_id', x.issue_id, 'original_name', x.original_name) AS row
-    FROM access a CROSS JOIN issue_images x WHERE a.staff = 1 AND x.session_id = ?
-      AND x.state IN ('deleting', 'deleted') AND x.files_removed_at IS NULL AND x.deleted_by = a.account_id
+    FROM issue_images x WHERE c.staff = 1 AND x.session_id = ?
+      AND x.state IN ('deleting', 'deleted') AND x.files_removed_at IS NULL AND x.deleted_by = c.account_id
     ORDER BY x.deleted_at, x.id)), '[]')),
   'members', json(COALESCE((SELECT json_group_array(json(row)) FROM (
     SELECT json_object('membership', json_object('session_id', m.session_id, 'user_id', m.account_id,
       'team_id', m.team_id, 'roles', json(m.roles),
       'is_admin', json(CASE WHEN m.is_admin THEN 'true' ELSE 'false' END)),
       'person', json_object('id', p.id, 'name', p.name, 'username', p.username)) AS row
-    FROM access a CROSS JOIN (${contestSeatsSql}) m JOIN accounts p ON p.id = m.account_id
-    WHERE a.is_admin = 1 ORDER BY p.name, p.id)), '[]')),
+    FROM (${contestSeatsSql}) m JOIN accounts p ON p.id = m.account_id
+    WHERE c.is_admin = 1 ORDER BY p.name, p.id)), '[]')),
   'audit', json(COALESCE((SELECT json_group_array(json(row)) FROM (
     SELECT json_object('id', d.id, 'actor', d.actor, 'at', d.at, 'action', d.action, 'target', d.target) AS row
-    FROM admin_audit d WHERE d.session_id = (SELECT ? FROM access WHERE is_admin = 1)
+    FROM admin_audit d WHERE d.session_id = (SELECT ? WHERE c.is_admin = 1)
     ORDER BY d.at DESC, d.id DESC LIMIT 50)), '[]')),
   'server_time', strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
-) AS snapshot WHERE EXISTS (SELECT 1 FROM login)`;
+) AS snapshot FROM login LEFT JOIN access c ON true`;
 
 /** Appends opaque invalidations to the same transaction as the changed data. */
 export function notificationStatements(db: D1Connection, sessionId: string, audiences: readonly string[]): D1Statement[] {

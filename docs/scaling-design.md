@@ -381,6 +381,7 @@ Scale-out runs many contests and organizations on one service. The [multi-compet
 ### One database for each organization
 
 Keep one D1 database for each organization, as PR #80 proposes. Do not put all organizations in one database.
+On 2026-10-27 the owner chose one shared installation for all organizers for now and deferred scale, so the measured limits below stay as risks of that choice ([event platform design](event-platform-design.md)).
 
 - One D1 database runs one query at a time. The 2026-10-25 prototype held 119 requests per second, which is a lower bound for one database (measured, hosted). The ceiling is not measured. Measure it with the harness after scale-up item 3, so that the live channel does not stop the run first. One busy contest must not slow another organization's contest.
 - A D1 database holds at most 10 GB, and that limit cannot be raised. Workers Paid allows 50,000 databases for each account, and Cloudflare raises that on request ([D1 limits](https://developers.cloudflare.com/d1/platform/limits/)).

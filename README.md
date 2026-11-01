@@ -195,7 +195,7 @@ Backend:
 - [Session announcements](docs/session-announcements.md) is the reference for announcement behavior in the Cloudflare implementation.
 - [Cloudflare backend design](docs/cloudflare-backend-design.md) explains the implemented server boundaries.
 - [Scaling design](docs/scaling-design.md) explains where one installation saturates under load and ranks the changes that raise capacity.
-- [Multiple competitions per installation](docs/multi-competition-design.md) is a proposed design. It is not implemented.
+- [Webmaster, event, and contest platform](docs/event-platform-design.md) is a proposed design. It is not implemented. The [sketches page](docs/event-platform-sketches.md) holds its type and migration sketches.
 - [Cloudflare authentication reference](docs/cloudflare-authentication.md) and the [authentication choice](docs/cloudflare-authentication-choice.md).
 - [Add a backend provider](docs/add-provider.md) gives contributor interfaces, registration points, installation, cleanup, and required shared verification.
 

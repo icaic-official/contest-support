@@ -3,6 +3,34 @@
 This file records the current agreed scope, newest first.
 Earlier requests, approvals, branch exceptions, and the original demo plan are in the [planning log](docs/history/plan-log.md).
 
+**Webmaster, event, and contest platform, 2026-10-27.** The owner settled GitHub issues #119 and #136 and answered the open questions of the design that followed.
+The [event platform design](docs/event-platform-design.md) explains the proposed implementation. It is proposed and not implemented.
+
+1. Minsky stays a contest support desk. It gets no problems, submissions, judging, or scoreboard.
+2. One shared installation, with one Worker and one D1 database, hosts the events of many organizers for free. Self-hosters run the same code. The owner will revisit the system design for scale later.
+3. Webmasters have full authority over the site. They create events, create and reset any account, delete events permanently, and add or remove webmasters. The last webmaster cannot be removed.
+   By default, webmasters see all contest data. A site setting can switch on a restriction. With it on, a webmaster sees a contest's data only after joining that contest, and the join is audited. A join stays when the setting is switched off and on again. Webmasters do not appear in contest member lists.
+4. An event, such as "XXXX Olympiad 2026", has one time zone, can span several days, and has its own event admins. A webmaster appoints the first event admin. Event admins can add more.
+   Every account that is not a webmaster belongs to one event. A username is unique only inside its event. Sign-in names the event. The sign-in screen does not show the event name.
+5. A contest is today's `sessions` row. An event has many contests. Each contest has a scheduled start and end, runs continuously with no pause, and can overlap other contests of its event.
+   Each contest has its own type: singles only, mixed, or teams only. The practice and live kinds stay. Existing development contests become practice contests.
+6. Event admins and optional contest admins both stay, with no setting. Only event admins and webmasters create accounts and assign people, entrants and staff, to contests.
+   A contest admin manages only their own contest. That covers settings, categories, announcements, the intake override, the issue workflow, and password reissue and handle changes for accounts that belong only to that contest. A contest admin does not add or remove staff. An event that wants no contest admins assigns none.
+   Staff switch between contests one at a time. The roles stay administrator, jury, volunteer, and specialist.
+7. A team keeps one shared sign-in. A single contestant has a personal sign-in. A person who competes alone in one contest and in a team in another uses two sign-ins. Organizers create every account. There is no self sign-up, payment, or plan.
+8. The 2026-10-25 live password rule stays, and it covers single contestants too. A live contest gets fresh passwords, and its intake stays closed until every contestant has one. The manual override cannot open it earlier.
+9. Intake opens at the scheduled start and closes at the scheduled end plus a grace period, with a manual override. A contestant's personal end time is the scheduled end plus the award minutes that staff confirmed as applied. That contestant can report until the personal end time plus the grace period.
+   A contest-wide time award gives minutes to every contestant of one contest, with no exceptions.
+10. A calendar shows each member the contests of their own events. Webmasters see every event. There is no public listing yet.
+11. Announcements, categories, and image limits stay per contest. The product names become Webmaster, Event, and Contest. They replace Organization and Competition from the 2026-10-25 design.
+12. A webmaster deletes an event permanently after a typed confirmation that names what is lost. The deletion does not wait for the export in issue #116. It shows "done" after 65 minutes.
+13. The development accounts `organizer` and `playtest-admin` become webmasters. A migration promotes them by name, and only when each is a contest admin with no team seat. On a database without them, it promotes nobody.
+
+This decision supersedes these earlier statements:
+
+- In the 2026-10-25 [multi-competition design](docs/history/multi-competition-design.md): one installation per organization, usernames unique across the installation, rosters copied between contests, Decision 4's audited join as the default for organization admins, and "Minsky deletes no contest data".
+- In [product direction](docs/product-direction.md): one contest type per event, and intake that staff open and close by hand.
+
 **Cloudflare only, agent tokens, and production, 2026-10-25.** The owner made three decisions.
 
 1. Remove the Supabase implementation completely. Cloudflare is the only backend.

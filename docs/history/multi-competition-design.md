@@ -1,5 +1,7 @@
 # Multiple competitions per installation
 
+**Superseded on 2026-10-27.** The owner's decisions of 2026-10-27 replace this design with the [webmaster, event, and contest platform design](../event-platform-design.md). This page is a dated record. It is not a current instruction.
+
 **Status.** Proposed. Phases 0 and 1 are built in draft pull requests #95 and #96. No other part is built.
 This page explains how one Minsky installation runs several competitions. Each competition holds an ordered list of contests, for example Practice 1, Live 1, Practice 2, and Live 2.
 The owner made the main [decisions](#decisions) on 2026-10-25.

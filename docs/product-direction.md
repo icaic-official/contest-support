@@ -41,7 +41,8 @@ The broader organizer tools below remain incomplete.
 
 ## Agreed direction
 
-- Each event has one contest type: individual or group. Sessions have separate rosters, schedules, issues, and awards.
+- One shared installation hosts the events of many organizers. Webmasters run the site and can do everything in it. Each event has one time zone, its own accounts, its own event admins, and one or more contests. A username is unique only inside its event. Event admins and webmasters create accounts and assign entrants and staff to contests. A contest admin manages one contest, and an event can have no contest admins. This direction was agreed on 2026-10-27. It is not implemented. The [event platform design](event-platform-design.md) explains the proposal.
+- Each contest has its own type: singles only, mixed, or teams only. This replaces one type for each event. Each contest has its own entries, schedule, issues, and awards. This direction was agreed on 2026-10-27. It is not implemented.
 - Organizers create username and password accounts. They distribute temporary credentials securely. Users change temporary passwords before they access contest data. Organizers verify identity and reset lost passwords. This flow does not require personal email or SMTP.
 
   Group contestants share a team account. Staff have individual accounts.
@@ -51,7 +52,7 @@ The broader organizer tools below remain incomplete.
   T0002 first implemented this behavior in the retired local demo. The connected product keeps it. Volunteer and specialist roles confer support membership. Jury alone does not. Role and permission administration remain deferred.
 
   On 2026-10-26 the owner decided that a session admin without other roles can reply to a team, write internal notes, and add images. That admin still cannot claim, hand off, accept, or reopen an issue. Those actions need the Volunteer or Specialist role.
-- Contestants and staff can report issues. Staff manually open and close contestant intake.
+- Contestants and staff can report issues. Today staff open and close contestant intake by hand. The agreed direction of 2026-10-27 is that intake follows each contest's schedule. It opens at the scheduled start and closes at the scheduled end plus a grace period, and staff can override it. A live contest stays closed until every contestant has a fresh password, and the override cannot open it earlier. This direction is not implemented.
 - Volunteers, specialists, jury members, and session admins can search team names and locations in the current session. T0008 matches text inside words from the first letter, letters typed in order (such as "ialp" for "Installation Alpha"), either word order, accents, small spelling mistakes, and whole table numbers. An empty search box lists the teams by name when staff click it. Suggestions show the unresolved-issue count. The queue filter combines with the status filter. Jury-only members still see resolved issues only. Every staff member can report an issue for a team: volunteers, specialists, jury members, and session admins. The reporter can add several teams. Minsky then creates one issue per team, each with its own timer, owner, and award. The choice uses each team's database id. Team codes, aliases, and institutions are not part of this search.
 - The current owner retains ownership during escalation until a specialist accepts the handoff. Timers run continuously while an issue remains unresolved. After reopening, unresolved time excludes resolved intervals. Recurrences become linked new reports. Duplicates link to a canonical report.
 - Contestants and helpers must be able to reopen resolved issues. T0002 implements reopening on the same issue and retains its history. Reopening continues an issue whose resolution needs review. A separate recurrence may still use a linked new report in future work. Linked-report controls remain outside T0002. The ticket records the implemented rules for ownership, timing, and awards.
@@ -59,9 +60,9 @@ The broader organizer tools below remain incomplete.
 - Public replies and private notes are separate. The agreed direction includes photos, session announcements, in-app alerts, and browser push that users explicitly enable.
 - Staff upload JPEG, PNG, or WebP images on an issue. Each image records its uploader and time. The uploader chooses team-visible or staff-only visibility, and the choice stays fixed. Every staff member can upload while the event is active. Only the uploader can remove an image during that time. Contestants can view team-visible images on their own team's issues. Session admins set the per-session size and count limits. Resolved issues keep their images. Archived events keep the files for preview and download. The Cloudflare implementation uses private R2. Contestant uploads remain out of scope.
 - Session admins and jury publish announcements for a session. Every member reads the active ones above the issue workspace. Titles expand to plain-text details and up to four private images. Expiry hides an announcement from readers, and managers keep it. Removal hides it from everyone and keeps the record. A later export of the contest support log is future work. See [session announcements](session-announcements.md).
-- Shared incidents use explicit affected rosters, selective closure of linked reports, and bulk awards with recipient exceptions.
+- Shared incidents use explicit affected rosters, selective closure of linked reports, and bulk awards with recipient exceptions. A contest-wide time award is a separate feature. It gives minutes to every contestant of one contest, with no exceptions. That direction was agreed on 2026-10-27 and is not implemented.
 - Awards use a separate ledger. One authorized decision precedes separate confirmation of external application. Contestants see the decision and application status. Minsky permits explicit zero-minute decisions with a public explanation. It also supports preset and custom award amounts.
-- The agreed direction includes CSV roster imports and editing forms. Reporting uses dashboards only. Archived events permit reading only. The app does not automatically delete archived events.
+- The agreed direction includes CSV roster imports and editing forms. Reporting uses dashboards only. Archived events permit reading only. The app does not automatically delete archived events. A webmaster can delete an event permanently after a typed confirmation that names what is lost. That direction was agreed on 2026-10-27 and is not implemented.
 
 ## Platform and capacity targets
 
@@ -75,7 +76,7 @@ On 2026-10-02, the user prioritized working cloud features and deferred resilien
 Assume connectivity during development. Outage planning does not block backend work.
 Start with free tiers. Necessary paid services are acceptable after the need and cost are identified.
 A developer pilot and production capacity validation are separate milestones.
-Session admins edit teams and categories in the app. Event editors remain future work.
+Session admins edit teams and categories in the app. Event editors remain future work. Under the agreed direction of 2026-10-27, event admins and webmasters create accounts and assign people to contests, and contest admins keep categories and team locations. That direction is not implemented.
 
 Production targets on a healthy venue connection are:
 

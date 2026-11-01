@@ -81,6 +81,7 @@ Anyone who can read that log can sign in as that admin. Use only fictional data 
 | `npm run ci` | Run the Workers Builds check: installs, type checking, lint, unit tests, both builds, audits, and the Gitleaks scan. |
 | `npm test` | Run unit and script tests without cloud credentials. |
 | `npm run test:d1` | Run every D1 workflow case with local emulation and current identity guards. |
+| `node scripts/rollback-check.mjs` | Run the previous release's `npm run test:d1` against this checkout's D1 migrations. The script checks out `origin/main` into a temporary Git worktree outside the repository, adds this checkout's new migration files, and installs packages there. Add `--base=<revision>` to name another previous release. It uses only temporary local resources. |
 | `npm run test:connector:runtime` | Run the complete connector through a temporary local HTTPS Worker, D1, R2, and Durable Objects. |
 | `npm run test:connector:ui:local` | Build a temporary Cloudflare frontend and run the complete React journey on local HTTPS and real emulated bindings. |
 | `npm run test:connector:ui -- --config=… --account=… --database=… --origin=…` | Run the complete React journey against the confirmed hosted Cloudflare CI application. |

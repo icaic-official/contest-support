@@ -370,7 +370,8 @@ describe('rows read in a session of 480 teams', () => {
   // Each command is the store's read and its commit batch. Measured on
   // 2026-10-26, while every command built the session's team list four times,
   // a claim read 1,494 rows. With only the named team, the four commands read
-  // 49 to 55 rows.
+  // 49 to 55 rows. By 2026-11-02 they read 52 to 58 rows. Deleting a batch's
+  // assertion rows by key range lowered that to 47 to 53 rows.
   it('reads no team list for a workflow command, and only the named team for a submit', async () => {
     await db.prepare("UPDATE sessions SET intake_open = 1 WHERE id = 'sess-1'").run();
     const commands: Array<[number, Command]> = [

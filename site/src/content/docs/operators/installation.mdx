@@ -130,7 +130,8 @@ npm run cloudflare:install -- bootstrap --config="$MINSKY_INSTALL_CONFIG" --acco
 
 `owner.json` (mode `0600`) holds the owner's temporary password and the installation IDs. Move it to your password manager. Never commit or share it.
 Bootstrap is atomic, leaves intake closed, and refuses a database that already has data.
-The owner is the site's first webmaster. A webmaster adds other webmasters on the **Site** page, which the console sidebar links to.
+The owner is the site's first webmaster. `adminUsername` is the username that the owner types with **Site sign-in**. A webmaster adds other webmasters on the **Site** page, which the console sidebar links to.
+Bootstrap gives the event a random event code, such as `e1a2b3c4d5e6f7a8b`. Staff and teams sign in with it. Their sign-in sheets carry the link `<origin>/?event=<code>`, which fills it in.
 
 ## 7. Enable sign-in
 
@@ -142,7 +143,7 @@ This sets a random `AUTH_SECRET` without printing it. It refuses to replace an e
 
 ## 8. Verify
 
-1. Sign in as the owner and change the password.
+1. Open the sign-in page, select **Site sign-in**, sign in as the owner, and change the password.
 2. Check the event, session, categories, teams, and closed intake.
 3. Check that private paths return `404`:
    ```sh

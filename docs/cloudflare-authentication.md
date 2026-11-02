@@ -28,15 +28,17 @@ Authenticated endpoints read the HttpOnly cookie. Request bodies cannot supply a
 
 | Method and path | Request | Result |
 | --- | --- | --- |
-| `POST /api/auth/sign-in` | `username`, `password` | Sets the session cookie. Returns an empty object. |
+| `POST /api/auth/sign-in` | `event`, `handle`, `password` | Sets the session cookie. Returns an empty object. `event` is the event code, or `null` for a site sign-in. |
 | `GET /api/auth/session` | Cookie | Returns `user`, `status`, and `csrf`. An absent or invalid login returns 401. |
 | `POST /api/auth/sign-out` | Empty object | Revokes the login, deletes its identity session, and clears the cookie. |
 | `POST /api/auth/change-password` | `currentPassword`, `newPassword` | Changes the password and replaces the cookie. Revokes every earlier login. |
-| `POST /api/accounts` | `sessionId`, `command` | Performs `create_account`, `set_username`, or `reset_password`. Uses existing `AccountCommand` fields. |
+| `POST /api/accounts` | `sessionId`, `command` | Performs `create_account` or `reset_password`. Uses the `AccountCommand` fields. |
 
 The historical authentication Worker uses the session ID as its summary name.
 The complete application Worker routes session reads through the named application schema.
-Account creation and reset return `temporaryPassword` only in their authorized success response.
+Account creation and reset return `temporaryPassword` and `signIn` only in their authorized success response.
+`signIn` names the event code, or the site, that the account signs in with.
+A handle change is the `set_handle` command of `POST /api/manage`.
 No endpoint retrieves an earlier temporary password.
 Passwords and password hashes do not appear in audit records, responses for other actions, or application logs.
 
@@ -53,9 +55,21 @@ Errors use fixed messages and these status codes:
 
 ## Credentials and permissions
 
-Usernames contain 3 to 32 lowercase letters, digits, underscores, or hyphens.
-The first character must be a letter or digit. Login trims spaces and normalizes letter case.
-An assigned username cannot be replaced. An administrator can assign a missing username.
+Each account has two names:
+
+- The **handle** is the username that a person types. It is unique inside one event, or among site accounts. The screens call it the username.
+- The **login key** is the name that Better Auth knows, in `accounts.username` and `ba_user.username`. It is globally unique. Nobody types or sees it. A new account's login key is its ID without dashes. An account from before event sign-in keeps its old username as login key, and its handle starts equal to it.
+
+A sign-in names an event code and a handle. A webmaster belongs to no event, so a webmaster chooses **Site sign-in**, which names no event code.
+The server reads the account through the unique index of that namespace, and passes only the login key to Better Auth.
+A wrong event code, handle, or password gives the same 401 message.
+
+Handles contain 3 to 32 lowercase letters, digits, underscores, or hyphens.
+The first character must be a letter or digit. Sign-in trims spaces and normalizes letter case.
+`set_handle` changes only the handle. The password, the login key, and open sessions stay.
+A staff account can change its own handle. A contestant account cannot, because venue staff read its handle from the credential sheet.
+An account that the caller may manage can also get a new handle.
+An account without a login key gets one with its first temporary password.
 The synthetic identity email is not a mailbox. SMTP and personal email are unnecessary.
 
 New passwords contain 12 to 128 characters.
@@ -72,7 +86,7 @@ Signed cookies, browser identity, and cached UI roles cannot grant contest acces
 Account creation requires current admin membership in the selected active contest session.
 A contestant account receives a team. A staff account receives roles, admin membership, or both.
 The team must belong to that session.
-Account-wide username assignment and resets require admin access to every contest session assigned to the target account.
+Account-wide handle changes and resets by a contest admin require admin access to every contest session assigned to the target account. An event admin manages every other account of the event. A webmaster manages every other account.
 Any archived assigned event blocks those actions.
 Self-resets are rejected. An account holder uses `changePassword()` instead.
 Organizers verify the account holder's identity before issuing a recovery reset.
@@ -144,7 +158,7 @@ Each limit uses a fixed 15-minute window that starts at its first failure:
 
 | Limit | Maximum failures | Effect at the maximum |
 | --- | --- | --- |
-| Normalized username | 10 | The Worker refuses that username with status 429. Other usernames are not affected. |
+| Handle in one event, or among site accounts | 10 | The Worker refuses that handle in that event with status 429. Other handles, and the same handle in another event, are not affected. A wrong event code counts against the typed code, so the limit does not show which codes exist. |
 | Source IP | 200 | The Worker refuses every sign-in from that IP with status 429, even with a correct password. |
 
 The Worker checks both counters before it verifies a password. It adds to them only after a rejected credential.
@@ -153,7 +167,7 @@ Requests that pass the check at the same time can all fail, so a count can pass 
 The excess is at most the number of requests in flight when the count reaches the maximum.
 The constants are in `signInFailureLimits` in `src/server/adapters/cloudflare/authentication.ts`.
 The hosted Worker stores a secret-salted IP digest rather than the address.
-One person who sends many failures can still lock one username for the rest of its window.
+One person who sends many failures can still lock one handle of one event for the rest of its window.
 A person at a shared address needs more than 200 failures in 15 minutes to block that address.
 
 Self password verification uses a separate ten-attempt account window. Every request counts, so this limit does not depend on the outcome.

@@ -3,6 +3,8 @@ title: Report and follow an issue
 description: Submit a report, read replies, and understand time awards.
 ---
 
+Sign in from the link on your team's sign-in sheet. The link fills in your event code. See [Sign in](/guides/getting-started/).
+
 ## Report a problem
 
 1. Select **Report an issue**.

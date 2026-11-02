@@ -25,6 +25,9 @@ These are development installations that require connectivity. Live-contest read
 
 ## User interfaces
 
+A person signs in with an event code, a username, and a password. The sign-in link on a credential sheet, `/?event=<code>`, fills in the code, and the device remembers it. A webmaster belongs to no event and selects **Site sign-in** instead.
+A username is unique inside its event. Staff can change their own username on the account page. A team account cannot.
+
 T0015 ([PR #44](https://github.com/GiftedNovaHD/minsky/pull/44), merged at `a25f9f1` on 2026-10-21) gives three UIs. After sign-in, the membership selects one:
 
 - **Contestant desktop app.** A membership with a team gets this app. It shows the team's reports, a live timer, a progress tracker, public messages, team-visible images and the report form. It has no phone layout and needs a window at least 1024 px wide.
@@ -61,7 +64,7 @@ Use the hosted development app for the shared development data.
 The preview uses only local emulation of D1, R2, and Durable Objects in `.lapiz/state/`. It never connects to hosted Cloudflare resources.
 On the first start, `.lapiz/bootstrap.ts` bootstraps the installation from `src/server/adapters/cloudflare/tooling/competition.example.json`.
 
-The preview prints the first admin's username and temporary password in its start log on each start. This is deliberate, for debugging.
+The preview prints the first admin's username and temporary password in its start log on each start. This is deliberate, for debugging. The first admin is a webmaster and signs in with **Site sign-in**.
 Anyone who can read that log can sign in as that admin. Use only fictional data in the preview.
 
 `npm run typecheck` does not check `.lapiz/bootstrap.ts`. The preview setup bundles it with esbuild, which does not check types.
@@ -196,7 +199,7 @@ Backend:
 - [Session announcements](docs/session-announcements.md) is the reference for announcement behavior in the Cloudflare implementation.
 - [Cloudflare backend design](docs/cloudflare-backend-design.md) explains the implemented server boundaries.
 - [Scaling design](docs/scaling-design.md) explains where one installation saturates under load and ranks the changes that raise capacity.
-- [Webmaster, event, and contest platform](docs/event-platform-design.md) is the design for one shared site. Its first two phases, one authority resolver and webmaster management, are built on stacked branches that wait for review. The hosted read gate of the first phase has not passed. The later phases are proposed. The [sketches page](docs/event-platform-sketches.md) holds its type and migration sketches.
+- [Webmaster, event, and contest platform](docs/event-platform-design.md) is the design for one shared site. Its first two phases, one authority resolver and webmaster management, are merged. Phase 3, sign-in by event code, waits for review on `feature/event-sign-in`. The later phases are proposed. The [sketches page](docs/event-platform-sketches.md) holds its type and migration sketches.
 - [Cloudflare authentication reference](docs/cloudflare-authentication.md) and the [authentication choice](docs/cloudflare-authentication-choice.md).
 - [Add a backend provider](docs/add-provider.md) gives contributor interfaces, registration points, installation, cleanup, and required shared verification.
 

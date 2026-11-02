@@ -13,6 +13,7 @@ import { D1ApplicationService } from '../../src/server/adapters/cloudflare/appli
 import { D1AnnouncementService } from '../../src/server/adapters/cloudflare/announcements';
 import { R2AnnouncementImageService } from '../../src/server/adapters/cloudflare/announcementImages';
 import { R2AvatarService } from '../../src/server/adapters/cloudflare/avatars';
+import { D1ManageService } from '../../src/server/adapters/cloudflare/manage';
 import { R2ImageService, type PrivateBucket } from '../../src/server/adapters/cloudflare/images';
 import { type FixtureAccount, FixtureWorker, type WorkerServices, test as base } from './worker';
 
@@ -71,6 +72,7 @@ export class LocalWorker extends FixtureWorker {
     this.services = {
       application: new D1ApplicationService(db),
       workflow: this.workflow,
+      manage: new D1ManageService(db),
       announcements: new D1AnnouncementService(db),
       announcementImages: new R2AnnouncementImageService(db, knownLength(bucket)),
       images: new R2ImageService(db, knownLength(bucket)),

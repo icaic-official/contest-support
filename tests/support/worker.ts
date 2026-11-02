@@ -275,6 +275,10 @@ export class FakeWorker extends FixtureWorker {
       editRoster: async (_caller, sessionId, command) => this.roster(sessionId, rosterCommandSchema.parse(command)),
     },
     workflow: { execute: (_caller, _sessionId, requestId, command) => this.workflow(command as Command, requestId) },
+    manage: {
+      site: async () => { throw new AuthenticationError(403, 'Only a webmaster can open the site settings.'); },
+      execute: async () => { throw new AuthenticationError(403, 'Only a webmaster can change the site.'); },
+    },
     announcements: {
       snapshot: async () => this.announcements,
       execute: async () => randomUUID(),

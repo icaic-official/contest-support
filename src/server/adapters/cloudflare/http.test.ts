@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createApplicationHandler, type ApplicationHttpServices } from './http';
 import type { Snapshot } from '../../../connected/model';
-import type { AuthenticationSession } from '../../authentication';
+import { AuthenticationError, type AuthenticationSession } from '../../authentication';
 import { ImageRequestError } from '../../../backend/errors';
 import { AnnouncementCommandError } from './announcements';
 
@@ -27,6 +27,10 @@ function services() {
       editRoster: vi.fn<ApplicationHttpServices['application']['editRoster']>(),
     },
     workflow: { execute: vi.fn<ApplicationHttpServices['workflow']['execute']>().mockResolvedValue({ outcome: 'committed', issueId: requestId }) },
+    manage: {
+      site: vi.fn<ApplicationHttpServices['manage']['site']>(),
+      execute: vi.fn<ApplicationHttpServices['manage']['execute']>().mockResolvedValue({}),
+    },
     images: {
       begin: vi.fn<ApplicationHttpServices['images']['begin']>(),
       upload: vi.fn<ApplicationHttpServices['images']['upload']>(),
@@ -105,6 +109,22 @@ describe('Cloudflare application HTTP boundary', () => {
     const invalid = await handle(post('/api/admin', { action: 'edit_roster', sessionId, command, extra: true }));
     expect(invalid.status).toBe(400);
     expect(deps.application.editRoster).toHaveBeenCalledTimes(1);
+  });
+
+  it('passes a site change with the trusted caller and returns its refusal', async () => {
+    const deps = services();
+    const handle = createApplicationHandler(deps, origin);
+    const command = { type: 'set_webmaster_reads', restricted: true };
+    const response = await handle(post('/api/manage', { requestId, command }));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({});
+    expect(deps.manage.execute).toHaveBeenCalledWith(identity.caller, requestId, command);
+    expect((await handle(post('/api/manage', { requestId, command, caller: identity.caller }))).status).toBe(400);
+    deps.manage.execute.mockRejectedValueOnce(new AuthenticationError(409, 'The last webmaster cannot be removed.'));
+    const refused = await handle(post('/api/manage', { requestId, command: { type: 'remove_webmaster', accountId: requestId } }));
+    expect(refused.status).toBe(409);
+    expect(await refused.json()).toEqual({ error: 'The last webmaster cannot be removed.' });
+    expect(deps.manage.execute).toHaveBeenCalledTimes(2);
   });
 
   it('bounds UTF-8 JSON bodies before invoking a command', async () => {

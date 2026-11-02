@@ -11,6 +11,7 @@ import { R2ImageService, type PrivateBucket } from './images';
 import { D1AnnouncementService } from './announcements';
 import { R2AnnouncementImageService } from './announcementImages';
 import { R2AvatarService } from './avatars';
+import { D1ManageService } from './manage';
 import { createApplicationHandler, privateJson } from './http';
 import { logEvent, requestFields } from './log';
 import { withSecurityHeaders } from './securityHeaders';
@@ -78,6 +79,7 @@ export default {
           announcementImages: new R2AnnouncementImageService(env.DB, env.IMAGES),
           avatars: new R2AvatarService(env.DB, env.IMAGES),
           workflow: new WorkflowService(new D1ApplicationStore(env.DB)),
+          manage: new D1ManageService(env.DB),
           connect: (input, caller, sessionId) => connectLive(input, env, caller, sessionId),
         }, env.AUTH_ORIGIN)(request);
       }

@@ -137,17 +137,17 @@ export const contestSeatsSql = `SELECT m.session_id, m.account_id, m.team_id, m.
     WHERE mr.session_id = m.session_id AND mr.account_id = m.account_id ORDER BY role)) AS roles
   FROM memberships m WHERE m.session_id = ?`;
 
-/** What an authority question names: one contest. */
-export interface Target {
-  readonly scope: 'contest';
-  readonly contestId: string;
-}
+/** What an authority question names: the site or one contest. */
+export type Target =
+  | { readonly scope: 'site' }
+  | { readonly scope: 'contest'; readonly contestId: string };
 
-/** The resolved answer to "what may this account do in this contest". Built only by `resolveAuthority`. */
+/** The resolved answer to "what may this account do here". Built only by `resolveAuthority`. */
 export interface Authority {
   readonly caller: Caller;
   readonly target: Target;
-  readonly eventId: string;
+  /** The target's event. Null for the site. */
+  readonly eventId: string | null;
   readonly manage: ManageLevel;
   /** Null when the caller may manage but not read contest data, or holds a seat with no team, role, or admin. */
   readonly seat: Seat | null;
@@ -156,6 +156,18 @@ export interface Authority {
   /** Opaque. Compared inside the write batch by `authorityGuard`. Never sent to the browser. */
   readonly stamp: string;
 }
+
+/**
+ * The site resolver. A row exists only for a live login of a webmaster. The
+ * stamp holds the site setting's version, so a change of the setting fails
+ * every site command that read the older one. Binds accountId, loginId.
+ */
+const siteAuthoritySql = `SELECT a.id AS account_id,
+    json_array(a.access_version, a.credential_generation, l.version, ${siteVersionSql}) AS stamp
+  FROM accounts a JOIN logins l ON l.account_id = a.id
+  JOIN ba_session b ON b.id = l.identity_session_id AND b.userId = a.id
+  JOIN grants gs ON gs.scope = 'site' AND gs.account_id = a.id
+  WHERE a.id = ? AND l.id = ? AND ${liveLoginSql}`;
 
 /** The only constructor of a seat on the server. A row without data access has no seat. */
 export function seatFromRow(row: Pick<ContestAuthorityRow, 'data' | 'team_id' | 'staff' | 'is_admin' | 'roles' | 'entrant_kind'>): Seat | null {
@@ -170,13 +182,24 @@ export function seatFromRow(row: Pick<ContestAuthorityRow, 'data' | 'team_id' | 
  * webmaster read restriction. Undefined means no authority at all.
  */
 export async function resolveAuthority(db: D1Connection, caller: Caller, target: Target): Promise<Authority | undefined> {
-  const row = await db.prepare(contestAuthoritySql('caller')).bind(...contestDataBindings(caller, target.contestId))
-    .first<ContestAuthorityRow>();
+  const { sql, values } = authorityRead(caller, target);
+  if (target.scope === 'site') {
+    const row = await db.prepare(sql).bind(...values).first<{ stamp: string }>();
+    if (!row) return undefined;
+    return { caller, target, eventId: null, manage: 'site', seat: null, writable: true, stamp: row.stamp };
+  }
+  const row = await db.prepare(sql).bind(...values).first<ContestAuthorityRow>();
   if (!row) return undefined;
   return {
     caller, target, eventId: row.event_id, manage: row.manage, seat: seatFromRow(row),
     writable: row.archived === 0, stamp: row.stamp,
   };
+}
+
+function authorityRead(caller: Caller, target: Target): { sql: string; values: D1Value[] } {
+  return target.scope === 'site'
+    ? { sql: siteAuthoritySql, values: [caller.accountId, caller.loginId] }
+    : { sql: contestAuthoritySql('caller'), values: contestDataBindings(caller, target.contestId) };
 }
 
 const manageRank: { readonly [L in ManageLevel]: number } = { none: 0, contest: 1, event: 2, site: 3 };
@@ -192,10 +215,8 @@ export function reaches(authority: Authority, level: ManageLevel): boolean {
  * contest, event, or site setting change since the read fails the batch.
  */
 export function authorityCheck(authority: Authority): { sql: string; values: D1Value[] } {
-  return {
-    sql: `SELECT 1 FROM (${contestAuthoritySql('caller')}) WHERE stamp = ?`,
-    values: [...contestDataBindings(authority.caller, authority.target.contestId), authority.stamp],
-  };
+  const { sql, values } = authorityRead(authority.caller, authority.target);
+  return { sql: `SELECT 1 FROM (${sql}) WHERE stamp = ?`, values: [...values, authority.stamp] };
 }
 
 /** Inserts the command assertion `id`, which fails the batch when `authorityCheck` no longer holds. */
@@ -229,3 +250,28 @@ export const manageAccountSql = `SELECT 1 FROM accounts t WHERE t.id = ? AND t.i
 export function manageAccountBindings(actor: string, target: string): D1Value[] {
   return [target, actor, actor, actor, actor];
 }
+
+/** Every webmaster, enabled or not, by name. `ready` is false until a password is issued. */
+export const webmastersSql = `SELECT a.id, a.name, a.username, a.disabled,
+    a.credential_state = 'ready' AS ready
+  FROM grants g JOIN accounts a ON a.id = g.account_id
+  WHERE g.scope = 'site' ORDER BY a.name, a.id`;
+
+/**
+ * The contests of unarchived events that a webmaster has not joined, while the
+ * site restricts webmaster reads. Empty while webmasters read every contest.
+ * Binds accountId.
+ */
+export const contestsToJoinSql = `SELECT s.id, s.name, e.name AS event_name
+  FROM sessions s JOIN events e ON e.id = s.event_id
+  WHERE ${readsRestrictedSql} AND e.archived = 0 AND NOT EXISTS (SELECT 1 FROM grants gj
+    WHERE gj.scope = 'contest' AND gj.session_id = s.id AND gj.account_id = ?)
+  ORDER BY e.name, s.name, s.id`;
+
+/**
+ * `manageAccountSql` for a target that must be a webmaster. Webmasters issue
+ * passwords only for other webmasters until events have their own consoles.
+ * Bind with manageAccountBindings.
+ */
+export const manageWebmasterSql = `${manageAccountSql}
+  AND EXISTS (SELECT 1 FROM grants g WHERE g.scope = 'site' AND g.account_id = t.id)`;

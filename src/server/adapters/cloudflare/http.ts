@@ -10,6 +10,7 @@ import type { R2ImageService } from './images';
 import { AnnouncementCommandError, type D1AnnouncementService } from './announcements';
 import type { R2AnnouncementImageService } from './announcementImages';
 import type { R2AvatarService } from './avatars';
+import type { D1ManageService } from './manage';
 import { logEvent, requestFields } from './log';
 import { baseSecurityHeaders } from './securityHeaders';
 
@@ -23,6 +24,7 @@ const adminSchema = z.discriminatedUnion('action', [
   z.strictObject({ action: z.literal('edit_roster'), sessionId: uuid, command: z.unknown() }),
 ]);
 const workflowSchema = z.strictObject({ sessionId: uuid, requestId: uuid, command: z.unknown() });
+const manageSchema = z.strictObject({ requestId: uuid, command: z.unknown() });
 const imageSchema = z.discriminatedUnion('action', [
   z.strictObject({ action: z.literal('begin'), sessionId: uuid, requestId: uuid, issueId: uuid,
     visibility: z.enum(['public', 'internal']), name: z.string(), bytes: z.number() }),
@@ -57,6 +59,7 @@ export interface ApplicationHttpServices {
   auth: Pick<AuthenticationService, 'current'>;
   application: Pick<D1ApplicationService, 'sessions' | 'snapshot' | 'setIntake' | 'setImageLimits' | 'saveMember' | 'removeMember' | 'editRoster'>;
   workflow: Pick<WorkflowService, 'execute'>;
+  manage: Pick<D1ManageService, 'site' | 'execute'>;
   images: Pick<R2ImageService, 'begin' | 'upload' | 'finish' | 'remove' | 'download'>;
   announcements: Pick<D1AnnouncementService, 'snapshot' | 'execute'>;
   announcementImages: Pick<R2AnnouncementImageService, 'begin' | 'upload' | 'finish' | 'remove' | 'download'>;
@@ -82,6 +85,7 @@ export function createApplicationHandler(services: ApplicationHttpServices, orig
       const caller = current.caller;
       if (request.method === 'GET') {
         if (url.pathname === '/api/sessions') return privateJson(await services.application.sessions(caller));
+        if (url.pathname === '/api/site') return privateJson(await services.manage.site(caller));
         if (url.pathname === '/api/snapshot' || url.pathname === '/api/updates') {
           const sessionId = uuid.parse(url.searchParams.get('sessionId'));
           if (url.pathname === '/api/snapshot') return privateJson(await services.application.snapshot(caller, sessionId));
@@ -150,6 +154,10 @@ export function createApplicationHandler(services: ApplicationHttpServices, orig
         let snapshot: Awaited<ReturnType<ApplicationHttpServices['application']['snapshot']>> | undefined;
         try { snapshot = await services.application.snapshot(caller, parsed.data.sessionId); } catch { /* The client reads again. */ }
         return privateJson(snapshot ? { ...result, snapshot } : result, 200);
+      }
+      if (url.pathname === '/api/manage') {
+        const parsed = manageSchema.parse(body);
+        return privateJson(await services.manage.execute(caller, parsed.requestId, parsed.command));
       }
       if (url.pathname === '/api/announcements') {
         const parsed = announcementSchema.safeParse(body);

@@ -6,10 +6,12 @@ import { applyMigrations } from './testFixture';
 
 const configPath = 'src/server/adapters/cloudflare/deploy/connector-store-ci.wrangler.jsonc';
 const scopedAuthority = '0017_scoped_authority.sql';
+const eventSignIn = '0018_event_sign_in.sql';
 
 /**
- * The previous Worker's statements, copied from the release before the scoped
- * authority schema. They stay fixed when the current code changes.
+ * The previous Worker's statements, copied from the releases before the scoped
+ * authority schema and before the event sign-in schema. They stay fixed when
+ * the current code changes.
  */
 const previousWorker = {
   createAccount: (db: D1Connection, actor: string, sessionId: string, account: { id: string; username: string; teamId?: string }) => [
@@ -37,6 +39,16 @@ const previousWorker = {
     ];
   },
   signInSql: 'SELECT * FROM accounts WHERE username = ?',
+  setUsername: (db: D1Connection, actor: string, sessionId: string, target: string, username: string) => [
+    db.prepare('UPDATE accounts SET username = ? WHERE id = ?').bind(username, target),
+    db.prepare(`INSERT INTO account_operations (id, account_id, actor, session_id, action, state, completed_at)
+      VALUES (?, ?, ?, ?, 'set_username', 'completed', unixepoch())`).bind(randomUUID(), target, actor, sessionId),
+  ],
+  addWebmaster: (db: D1Connection, actor: string, account: { id: string; username: string }) => [
+    db.prepare(`INSERT INTO accounts (id, name, username, must_change, credential_state)
+      VALUES (?, ?, ?, 1, 'pending')`).bind(account.id, `Fictional ${account.username}`, account.username),
+    db.prepare(`INSERT INTO grants (account_id, scope, granted_by) VALUES (?, 'site', ?)`).bind(account.id, actor),
+  ],
 };
 
 async function open(): Promise<{ db: D1Connection; dispose: () => Promise<void> }> {
@@ -225,6 +237,101 @@ describe('the previous Worker on the scoped authority schema', () => {
       await db.batch(previousWorker.resetPassword(db, people.webmaster, contest, people.eventAdmin));
       expect((await credentials(people.volunteer))?.credential_state).toBe('pending');
       expect((await credentials(people.eventAdmin))?.credential_state).toBe('pending');
+    });
+  });
+
+  describe('on the event sign-in schema', () => {
+    let db: D1Connection;
+    let dispose: () => Promise<void>;
+    const ids = {
+      first: randomUUID(), second: randomUUID(), firstContest: randomUUID(), secondContest: randomUUID(),
+      staff: randomUUID(), webmaster: randomUUID(), orphan: randomUUID(), unnamed: randomUUID(), current: randomUUID(),
+    };
+
+    beforeAll(async () => {
+      ({ db, dispose } = await open());
+      await applyMigrations(db, (name) => name < eventSignIn);
+      const { run } = writer(db);
+      await run('INSERT INTO events (id, name) VALUES (?, ?), (?, ?)', ids.first, 'First event', ids.second, 'Second event');
+      await run('INSERT INTO sessions (id, event_id, name) VALUES (?, ?, ?), (?, ?, ?)',
+        ids.firstContest, ids.first, 'First contest', ids.secondContest, ids.second, 'Second contest');
+      await addAccount(db, ids.staff, 'staff');
+      await run('INSERT INTO memberships (session_id, account_id, is_admin) VALUES (?, ?, 1)', ids.firstContest, ids.staff);
+      await db.batch(previousWorker.addWebmaster(db, ids.webmaster, { id: ids.webmaster, username: 'webmaster' }));
+      await addAccount(db, ids.orphan, 'orphan');
+      await run('INSERT INTO accounts (id, name, must_change) VALUES (?, ?, 0)', ids.unnamed, 'Fictional unnamed');
+      await run('INSERT INTO memberships (session_id, account_id) VALUES (?, ?)', ids.firstContest, ids.unnamed);
+      await run(`INSERT INTO membership_roles (session_id, account_id, role) VALUES (?, ?, 'volunteer')`, ids.firstContest, ids.unnamed);
+      await applyMigrations(db, (name) => name >= eventSignIn);
+      // An account that the new Worker creates: an opaque login key and a typed handle.
+      await run('INSERT INTO accounts (id, name, username, handle, event_id, must_change) VALUES (?, ?, ?, ?, ?, 0)',
+        ids.current, 'Fictional current', ids.current.replaceAll('-', ''), 'team01', ids.first);
+    });
+    afterAll(async () => { await dispose?.(); });
+
+    it('gives every event a distinct random code and the UTC time zone', async () => {
+      const events = await writer(db).all<{ code: string; time_zone: string }>('SELECT code, time_zone FROM events');
+      expect(events).toHaveLength(2);
+      for (const event of events) {
+        expect(event.code).toMatch(/^e[0-9a-f]{16}$/);
+        expect(event.time_zone).toBe('UTC');
+      }
+      expect(new Set(events.map((event) => event.code)).size).toBe(2);
+    });
+
+    it('gives each legacy account its username as handle, except an account with no event and no site grant', async () => {
+      const handles = await writer(db).all<{ id: string; username: string | null; handle: string | null }>(
+        'SELECT id, username, handle FROM accounts WHERE id IN (?, ?, ?, ?)', ids.staff, ids.webmaster, ids.orphan, ids.unnamed);
+      expect(Object.fromEntries(handles.map((row) => [row.id, [row.username, row.handle]]))).toEqual({
+        [ids.staff]: ['staff', 'staff'], [ids.webmaster]: ['webmaster', 'webmaster'],
+        [ids.orphan]: ['orphan', null], [ids.unnamed]: [null, null],
+      });
+    });
+
+    it('gives an event that the previous Worker inserts a code', async () => {
+      const event = randomUUID();
+      await writer(db).run('INSERT INTO events (id, name) VALUES (?, ?)', event, 'Previous Worker event');
+      expect((await writer(db).first<{ code: string }>('SELECT code FROM events WHERE id = ?', event))?.code)
+        .toMatch(/^e[0-9a-f]{16}$/);
+    });
+
+    it('gives an account that the previous Worker creates its username as handle in the event of its contest', async () => {
+      const created = randomUUID();
+      await db.batch(previousWorker.createAccount(db, ids.staff, ids.firstContest, { id: created, username: 'newstaff' }));
+      expect(await writer(db).first('SELECT event_id, handle FROM accounts WHERE id = ?', created))
+        .toEqual({ event_id: ids.first, handle: 'newstaff' });
+    });
+
+    it('refuses a previous Worker account whose username is a handle in the same event, and accepts it in another', async () => {
+      const refused = randomUUID();
+      await expect(db.batch(previousWorker.createAccount(db, ids.staff, ids.firstContest, { id: refused, username: 'team01' })))
+        .rejects.toThrow(/UNIQUE constraint failed: accounts\.event_id, accounts\.handle/);
+      expect(await writer(db).first('SELECT id FROM accounts WHERE id = ?', refused)).toBeNull();
+      const elsewhere = randomUUID();
+      await db.batch(previousWorker.createAccount(db, ids.staff, ids.secondContest, { id: elsewhere, username: 'team01' }));
+      expect(await writer(db).first('SELECT event_id, handle FROM accounts WHERE id = ?', elsewhere))
+        .toEqual({ event_id: ids.second, handle: 'team01' });
+    });
+
+    it('gives a username that the previous Worker sets to the handle', async () => {
+      await db.batch(previousWorker.setUsername(db, ids.staff, ids.firstContest, ids.unnamed, 'named-later'));
+      expect(await writer(db).first('SELECT username, handle FROM accounts WHERE id = ?', ids.unnamed))
+        .toEqual({ username: 'named-later', handle: 'named-later' });
+    });
+
+    it('gives a webmaster that the previous Worker adds a site handle', async () => {
+      const added = randomUUID();
+      await db.batch(previousWorker.addWebmaster(db, ids.webmaster, { id: added, username: 'second-webmaster' }));
+      expect(await writer(db).first('SELECT event_id, handle FROM accounts WHERE id = ?', added))
+        .toEqual({ event_id: null, handle: 'second-webmaster' });
+    });
+
+    it('signs in a legacy account by username, and finds no account by the handle of a newer account', async () => {
+      const plan = await db.prepare(`EXPLAIN QUERY PLAN ${previousWorker.signInSql}`).bind('staff').all<{ detail: string }>();
+      expect(plan.results.map((row) => row.detail).join('\n')).toContain('accounts_username (username=?)');
+      expect(await writer(db).all(previousWorker.signInSql, 'staff')).toHaveLength(1);
+      const typed = await writer(db).all<{ id: string }>(previousWorker.signInSql, 'team01');
+      expect(typed.map((row) => row.id)).not.toContain(ids.current);
     });
   });
 });

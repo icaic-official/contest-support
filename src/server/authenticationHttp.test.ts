@@ -18,7 +18,7 @@ function setup() {
     signIn: vi.fn<AuthenticationService['signIn']>().mockResolvedValue({ cookie: 'opaque=fixture; Secure; HttpOnly; SameSite=Strict; Path=/' }),
     signOut: vi.fn<AuthenticationService['signOut']>().mockResolvedValue({ cookie: 'opaque=; Max-Age=0; Path=/' }),
     changePassword: vi.fn<AuthenticationService['changePassword']>().mockResolvedValue({ cookie: 'opaque=changed; Secure; HttpOnly; SameSite=Strict; Path=/' }),
-    account: vi.fn<AuthenticationService['account']>().mockResolvedValue({ temporaryPassword: 'fictional-temporary-password' }),
+    account: vi.fn<AuthenticationService['account']>().mockResolvedValue({ temporaryPassword: 'fictional-temporary-password', signIn: { kind: 'site' } }),
   };
   return { service, handle: createAuthenticationHandler(service, { origins: [ORIGIN] }) };
 }
@@ -145,7 +145,7 @@ describe('authentication HTTP boundary', () => {
     const command = { action: 'reset_password', userId: ACCOUNT_ID } as const;
     const request = post('/api/accounts', { sessionId: SESSION_ID, command });
     const response = await handle(request);
-    expect(await response.json()).toEqual({ temporaryPassword: 'fictional-temporary-password' });
+    expect(await response.json()).toEqual({ temporaryPassword: 'fictional-temporary-password', signIn: { kind: 'site' } });
     expect(service.account).toHaveBeenCalledExactlyOnceWith(request.headers, SESSION_ID, command);
     service.account.mockRejectedValue(new AuthenticationError(403, 'Admin access to every assigned session is required.'));
     const rejected = await handle(post('/api/accounts', { sessionId: SESSION_ID, command }));

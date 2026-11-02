@@ -14,7 +14,7 @@ const signInSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('event'), code: z.string().transform((code) => code as EventCode) }),
   z.object({ kind: z.literal('site') }),
 ]);
-const resultSchema = z.object({ temporaryPassword: z.string().exactOptional(), signIn: signInSchema.exactOptional() });
+const resultSchema = z.object({ temporaryPassword: z.string(), signIn: signInSchema });
 const errorSchema = z.object({ error: z.string() });
 
 export interface CloudflareAuthentication extends Authentication {

@@ -158,7 +158,10 @@ describe('hosted-origin browser bridge boundaries', () => {
       const path = new URL(input).pathname;
       if (path === '/api/auth/session') return globalThis.Response.json({ user: { id: userId },
         status: { handle: 'fictional', must_change: false, session_valid: true }, csrf: 'fictional-csrf' });
-      if (path === '/api/accounts') { creations++; return globalThis.Response.json({ temporaryPassword: 'private-fixture-password' }); }
+      if (path === '/api/accounts') {
+        creations++;
+        return globalThis.Response.json({ temporaryPassword: 'private-fixture-password', signIn: { kind: 'site' } });
+      }
       return globalThis.Response.json({});
     }));
     const provider = createBrowserProvider({ origin: connectorTarget.origin });
@@ -167,7 +170,8 @@ describe('hosted-origin browser bridge boundaries', () => {
     provider.discardNextAccountResponse();
     await expect(provider.backend.admin.account(randomUUID(), command)).rejects.toThrow('discarded the committed account response');
     expect(creations).toBe(1);
-    await expect(provider.backend.admin.account(randomUUID(), command)).resolves.toEqual({ temporaryPassword: 'private-fixture-password' });
+    await expect(provider.backend.admin.account(randomUUID(), command)).resolves
+      .toEqual({ temporaryPassword: 'private-fixture-password', signIn: { kind: 'site' } });
     expect(creations).toBe(2);
     await provider.close();
   });

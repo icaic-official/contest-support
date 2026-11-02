@@ -1,6 +1,6 @@
 import { test as base, expect, type BrowserContext, type Page, type WebSocketRoute } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
-import type { EventCode, PersonAvatar, RosterCommand, SignInTarget } from '../../src/backend/contracts';
+import type { AccountResult, EventCode, PersonAvatar, RosterCommand, SignInTarget } from '../../src/backend/contracts';
 import { rosterCommandSchema } from '../../src/connected/roster';
 import type { AnnouncementSnapshot } from '../../src/connected/announcementModel';
 import type { Command, Membership, Snapshot } from '../../src/connected/model';
@@ -43,7 +43,7 @@ const loginCookie = 'minsky_fixture_login';
  * HttpOnly cookie carries it, so every browser context signs in separately.
  */
 class FixtureIdentity implements AuthenticationService {
-  constructor(private readonly accounts: () => readonly FixtureAccount[]) {}
+  constructor(private readonly accounts: () => readonly FixtureAccount[], private readonly eventCode: () => EventCode) {}
 
   async current(headers: Headers): Promise<AuthenticationSession | undefined> {
     const loginId = headers.get('Cookie')?.split(';').map((part) => part.trim().split('='))
@@ -74,8 +74,9 @@ class FixtureIdentity implements AuthenticationService {
     return { cookie: `${loginCookie}=${session.caller.loginId}; Path=/; HttpOnly; SameSite=Strict` };
   }
 
-  async account(): Promise<{ temporaryPassword?: string }> {
-    return {};
+  /** A fictional credential of the fixture's event. No account changes. */
+  async account(): Promise<AccountResult> {
+    return { temporaryPassword: 'fictional-temporary-password', signIn: { kind: 'event', code: this.eventCode() } };
   }
 }
 
@@ -140,7 +141,7 @@ export abstract class FixtureWorker {
         }
       }, { key: eventCodeStorageKey, code: this.eventCodeOfDevice() });
     }
-    const identity = new FixtureIdentity(() => this.accounts());
+    const identity = new FixtureIdentity(() => this.accounts(), () => this.eventCodeOfDevice());
     const authentication = createAuthenticationHandler(identity, { origins: [this.origin] });
     const application = createApplicationHandler({
       ...this.services,

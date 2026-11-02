@@ -211,7 +211,7 @@ function Webmasters({
     const issued = await state.issue(webmaster.id);
     if (!issued) return;
     if (issued.temporaryPassword) {
-      setCredentials({ username: issued.handle, password: issued.temporaryPassword });
+      setCredentials({ username: issued.handle, password: issued.temporaryPassword, signIn: { kind: "site" } });
     } else {
       setNotice("The password was issued, but this page did not receive it. Choose Reset password to issue a new one.");
     }

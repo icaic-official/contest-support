@@ -87,9 +87,10 @@ describe('Cloudflare browser authentication transport', () => {
     let reads = 0;
     const { auth, requests } = setup((request) => request.method === 'GET'
       ? json({ user, status, csrf: `csrf-${++reads}` })
-      : json({ temporaryPassword: 'fictional-temporary-password' }));
+      : json({ temporaryPassword: 'fictional-temporary-password', signIn: { kind: 'event', code: 'xxxx-2026' } }));
     const command = { action: 'reset_password', userId: ACCOUNT_ID } as const;
-    await expect(auth.account(SESSION_ID, command)).resolves.toEqual({ temporaryPassword: 'fictional-temporary-password' });
+    await expect(auth.account(SESSION_ID, command)).resolves
+      .toEqual({ temporaryPassword: 'fictional-temporary-password', signIn: { kind: 'event', code: 'xxxx-2026' } });
     await auth.account(SESSION_ID, command);
     const writes = requests.filter((request) => request.method === 'POST');
     expect(writes.map((request) => request.headers.get('X-CSRF-Token'))).toEqual(['csrf-1', 'csrf-1']);
@@ -97,11 +98,13 @@ describe('Cloudflare browser authentication transport', () => {
     expect(await writes[0]!.json()).toEqual({ sessionId: SESSION_ID, command });
   });
 
+  const issued = { temporaryPassword: 'fictional-temporary-password', signIn: { kind: 'site' } };
+
   it('reads a new token after the login changes', async () => {
     let reads = 0;
     const { auth, requests } = setup((request) => request.method === 'GET'
       ? json({ user, status, csrf: `csrf-${++reads}` })
-      : json({}));
+      : json(new URL(request.url).pathname === '/api/accounts' ? issued : {}));
     const command = { action: 'reset_password', userId: ACCOUNT_ID } as const;
     await auth.account(SESSION_ID, command);
     await auth.signOut();
@@ -114,7 +117,7 @@ describe('Cloudflare browser authentication transport', () => {
     const pending: Array<(response: Response) => void> = [];
     let deferReads = false;
     const { auth, requests } = setup((request) => {
-      if (request.method === 'POST') return json({});
+      if (request.method === 'POST') return json(new URL(request.url).pathname === '/api/accounts' ? issued : {});
       if (deferReads) return new Promise<Response>((resolve) => { pending.push(resolve); });
       return json({ user, status, csrf: 'csrf-new' });
     });

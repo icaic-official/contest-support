@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { backend } from "@/backend";
-import type { AccountCommand, RosterCommand } from "@/backend/contracts";
+import type { AccountCommand, RosterCommand, SignInTarget } from "@/backend/contracts";
 import { errorMessage } from "@/backend/errors";
 import type { Snapshot } from "@/connected/model";
 import {
@@ -19,6 +19,8 @@ import { rosterNotice } from "./rosterModel";
 export interface Credentials {
   username: string;
   password: string;
+  /** The event code or the site that the account names to sign in. */
+  signIn: SignInTarget;
 }
 
 /** Session administration requests and their shared feedback. */
@@ -94,17 +96,15 @@ export function useSessionAdmin(
   }
 
   /**
-   * Sends an account command. A new temporary password becomes the one-time
+   * Sends an account command. Its temporary password becomes the one-time
    * credentials, with the username of the account.
    */
   async function account(
     command: AccountCommand,
     username: string,
-  ): Promise<Credentials | undefined> {
+  ): Promise<Credentials> {
     const result = await backend.admin.account(sessionId, command);
-    return result.temporaryPassword
-      ? { username, password: result.temporaryPassword }
-      : undefined;
+    return { username, password: result.temporaryPassword, signIn: result.signIn };
   }
 
   function usernameOf(userId: string): string {

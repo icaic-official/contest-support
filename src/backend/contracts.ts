@@ -129,10 +129,11 @@ export type AccountCommand =
   | CreateAccountCommand
   | { action: 'reset_password'; userId: string };
 
+/** A new temporary password, shown once and never stored. */
 export interface AccountResult {
-  temporaryPassword?: string;
-  /** Present with a temporary password: the event code or the site that the account names to sign in. */
-  signIn?: SignInTarget;
+  temporaryPassword: string;
+  /** The event code or the site that the account names to sign in. */
+  signIn: SignInTarget;
 }
 
 /** A team of a roster edit. The browser chooses the ID, so a retry adds no second team. */

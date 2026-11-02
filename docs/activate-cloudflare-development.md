@@ -198,11 +198,12 @@ No assertion, timeout, or protection changed. The initial wait failure has no co
 The [run log](history/run-log.md) owns detailed verification results and remaining manual checks.
 No data or identifiers transferred from the earlier backend.
 
-## Recover a Cloudflare admin password
+## Recover a webmaster password
 
-The development admin is `organizer`.
+The development webmaster is `organizer`. Migration `0017` made that account a webmaster.
 
-Use `npm run cloudflare:recover-admin` when a Cloudflare admin cannot sign in.
+Use `npm run cloudflare:recover-admin` when a webmaster cannot sign in.
+Another webmaster can also reset the password on the **Site** page.
 Run it in a private terminal on your computer.
 The command refuses CI.
 It also refuses a terminal whose output is redirected, because the temporary password must stay on that screen.
@@ -222,17 +223,19 @@ From the repository root, run:
 npm run cloudflare:recover-admin -- --config src/server/adapters/cloudflare/deploy/development.wrangler.jsonc --username organizer
 ```
 
-Pass `--user ACCOUNT_ID` instead of `--username` when you know the account ID.
-Pass exactly one of those selectors.
 You can pass `--config` with another Wrangler file when the account is in a different remote `DB` binding.
 The binding must set `"remote": true`.
 The file must not define Wrangler environment overrides.
 
-The command checks that the account exists and is not disabled.
-The account must be an admin of an active event, or the installation owner.
-It then writes the same credential rows as **Reset password** in the application.
+The command checks that the account exists, is a webmaster, and is not disabled.
+A webmaster is an account that holds a site grant.
+The command refuses a contest admin who is not a webmaster.
+A webmaster resets that contest admin's password on the contest's **Accounts** page.
+The command hashes the new password first and then writes every credential row in one batch.
+If the batch fails, the old password stays valid.
 It sets `must_change`, increases `credential_generation`, and database triggers increase `access_version`.
 It revokes every login and Better Auth session for that account.
+It records the recovery in the site audit, `authority_audit`.
 It records a completed `reset_password` row in `account_operations`.
 The actor on that row is the recovered account, because the maintainer has no Minsky account.
 All of those writes commit in one database batch.

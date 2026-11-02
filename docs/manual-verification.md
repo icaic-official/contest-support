@@ -22,7 +22,7 @@ The live development app is the Cloudflare Worker at https://minsky-dev.icaic-mi
 Use an organizer-provided username and password.
 Docker and persona switching are not required.
 For a separate Cloudflare installation, create the first admin through its bootstrap step.
-Use `npm run cloudflare:recover-admin` when the Cloudflare development admin cannot sign in.
+Use `npm run cloudflare:recover-admin` when the development webmaster cannot sign in.
 Use a separate browser or profile for each account: contestant, volunteer, specialist, jury, and admin.
 Work only in a clearly identified development or test session.
 

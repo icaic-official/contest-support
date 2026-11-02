@@ -130,6 +130,7 @@ npm run cloudflare:install -- bootstrap --config="$MINSKY_INSTALL_CONFIG" --acco
 
 `owner.json` (mode `0600`) holds the owner's temporary password and the installation IDs. Move it to your password manager. Never commit or share it.
 Bootstrap is atomic, leaves intake closed, and refuses a database that already has data.
+The owner is the site's first webmaster. A webmaster adds other webmasters on the **Site** page, which the console sidebar links to.
 
 ## 7. Enable sign-in
 
@@ -179,5 +180,6 @@ MINSKY_RECOVERY_PRIVATE_DIR="$(mktemp -d)" && chmod 700 "$MINSKY_RECOVERY_PRIVAT
 npm run cloudflare:install -- recover --config="$MINSKY_INSTALL_CONFIG" --account="$MINSKY_INSTALL_ACCOUNT_ID" --database="$MINSKY_INSTALL_DATABASE_ID" --installation='INSTALLATION_UUID' --owner='OWNER_ACCOUNT_UUID' --credentials="$MINSKY_RECOVERY_PRIVATE_DIR/owner-recovery.json"
 ```
 
+Another webmaster can instead reset the owner's password on the **Site** page.
 Recovery keeps the owner's ID, history, and memberships, signs out old sessions, and issues a new temporary password.
 It does not re-enable a disabled owner or restore removed admin rights, and the first session must still be active. If it stops midway, run it again with a new output file.

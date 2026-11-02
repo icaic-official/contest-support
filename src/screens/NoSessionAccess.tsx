@@ -17,10 +17,12 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import type { SessionData } from "@/connected/hooks/useSessionSnapshot";
+import { WebmasterAccess } from "@/site/WebmasterAccess";
 
 /**
  * Shows while no session snapshot is available: during the first load, after
- * a refresh error, or when the account has no membership yet.
+ * a refresh error, or when the account has no membership yet. A webmaster
+ * who must join a contest first sees the contests to join.
  */
 export function NoSessionAccess({
   data,
@@ -40,6 +42,75 @@ export function NoSessionAccess({
 }) {
   const { sessions, sessionId, loaded, refreshError } = data;
   const [refreshing, setRefreshing] = useState(false);
+  const access = (
+    <Card className="w-full max-w-md">
+      <CardHeader>
+        <CardTitle>
+          <h1 className="text-2xl font-semibold tracking-tight">
+            Session access
+          </h1>
+        </CardTitle>
+        <CardDescription>
+          {refreshError
+            ? "Minsky could not load your session."
+            : "No session data is available. If your account was just created, ask an organizer to assign your membership."}
+        </CardDescription>
+      </CardHeader>
+      {(refreshError || error || sessions.length > 1) && (
+        <CardContent className="grid gap-4">
+          {refreshError && (
+            <Alert variant="destructive">
+              <AlertDescription>{refreshError}</AlertDescription>
+            </Alert>
+          )}
+          {error && (
+            <Alert variant="destructive">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+          {sessions.length > 1 && (
+            <div className="grid gap-2">
+              <Label htmlFor="access-session">Contest session</Label>
+              <select
+                id="access-session"
+                value={sessionId}
+                disabled={!!onRetry}
+                onChange={(event) =>
+                  data.selectSession(event.target.value)
+                }
+                className="h-11 rounded-md border border-input bg-transparent px-3 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:bg-input/30"
+              >
+                {sessions.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+        </CardContent>
+      )}
+      <CardFooter className="flex flex-wrap gap-2">
+        <Button
+          className="h-11"
+          disabled={refreshing}
+          loading={refreshing}
+          onClick={() => {
+            setRefreshing(true);
+            void data.refresh().finally(() => setRefreshing(false));
+          }}
+        >
+          <RefreshCw />
+          Refresh access
+        </Button>
+        {onRetry && (
+          <Button variant="outline" className="h-11" onClick={onRetry}>
+            Retry last request
+          </Button>
+        )}
+      </CardFooter>
+    </Card>
+  );
   return (
     <div className="flex min-h-dvh flex-col">
       <header className="flex items-center justify-between gap-4 border-b px-4 py-3 sm:px-6">
@@ -71,74 +142,12 @@ export function NoSessionAccess({
               <Skeleton className="h-4 w-1/2" />
             </CardContent>
           </Card>
+        ) : refreshError || error ? (
+          access
         ) : (
-          <Card className="w-full max-w-md">
-            <CardHeader>
-              <CardTitle>
-                <h1 className="text-2xl font-semibold tracking-tight">
-                  Session access
-                </h1>
-              </CardTitle>
-              <CardDescription>
-                {refreshError
-                  ? "Minsky could not load your session."
-                  : "No session data is available. If your account was just created, ask an organizer to assign your membership."}
-              </CardDescription>
-            </CardHeader>
-            {(refreshError || error || sessions.length > 1) && (
-              <CardContent className="grid gap-4">
-                {refreshError && (
-                  <Alert variant="destructive">
-                    <AlertDescription>{refreshError}</AlertDescription>
-                  </Alert>
-                )}
-                {error && (
-                  <Alert variant="destructive">
-                    <AlertDescription>{error}</AlertDescription>
-                  </Alert>
-                )}
-                {sessions.length > 1 && (
-                  <div className="grid gap-2">
-                    <Label htmlFor="access-session">Contest session</Label>
-                    <select
-                      id="access-session"
-                      value={sessionId}
-                      disabled={!!onRetry}
-                      onChange={(event) =>
-                        data.selectSession(event.target.value)
-                      }
-                      className="h-11 rounded-md border border-input bg-transparent px-3 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:bg-input/30"
-                    >
-                      {sessions.map((item) => (
-                        <option key={item.id} value={item.id}>
-                          {item.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-              </CardContent>
-            )}
-            <CardFooter className="flex flex-wrap gap-2">
-              <Button
-                className="h-11"
-                disabled={refreshing}
-                loading={refreshing}
-                onClick={() => {
-                  setRefreshing(true);
-                  void data.refresh().finally(() => setRefreshing(false));
-                }}
-              >
-                <RefreshCw />
-                Refresh access
-              </Button>
-              {onRetry && (
-                <Button variant="outline" className="h-11" onClick={onRetry}>
-                  Retry last request
-                </Button>
-              )}
-            </CardFooter>
-          </Card>
+          // Mounted only once a read finished without a contest, so the
+          // ordinary first load of every account makes no site read.
+          <WebmasterAccess data={data} fallback={access} />
         )}
       </div>
       <p className="px-4 py-2 text-center text-xs text-muted-foreground">

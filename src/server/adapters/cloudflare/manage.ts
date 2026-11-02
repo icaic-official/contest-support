@@ -140,10 +140,9 @@ export class D1ManageService {
     return this.db.prepare(sql).bind(...values);
   }
 
-  async site(caller: Caller): Promise<SiteOverview> {
-    if (!(await resolveAuthority(this.db, caller, { scope: 'site' }))) {
-      throw new AuthenticationError(403, 'Only a webmaster can open the site settings.');
-    }
+  /** Null for a caller who is not a webmaster, so asking is not an error. */
+  async site(caller: Caller): Promise<SiteOverview | null> {
+    if (!(await resolveAuthority(this.db, caller, { scope: 'site' }))) return null;
     const [webmasters, restricted, contests] = await Promise.all([
       this.webmasters(),
       this.readsRestricted(),

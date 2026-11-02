@@ -56,6 +56,7 @@ import type { Issue, Membership, Snapshot } from "@/connected/model";
 import { searchTeams, unresolvedLabel } from "@/connected/teamSearch";
 import { type ThemePreference, useTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
+import { SiteLink } from "@/site/SiteLink";
 import {
   ConnectionBadge,
   PersonAvatar,
@@ -323,6 +324,17 @@ export function ConsoleSidebar({
           </div>
         ))}
       </nav>
+      {member.is_admin && (
+        <div className="px-2 pb-2">
+          <SiteLink
+            collapsed={collapsed}
+            className={cn(
+              "text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+              collapsed && "justify-center",
+            )}
+          />
+        </div>
+      )}
       {intake && !collapsed && (
         <div className="mx-2 mb-2 rounded-lg border bg-background p-3">
           <div className="flex items-center justify-between gap-2">

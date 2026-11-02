@@ -26,6 +26,11 @@ describe('site commands for webmasters', () => {
 
   const run = (sql: string, ...values: D1Value[]) => db.prepare(sql).bind(...values).run();
   const rows = async <T>(sql: string, ...values: D1Value[]) => (await db.prepare(sql).bind(...values).all<T>()).results;
+  const siteOf = async (person: Person) => {
+    const site = await manage.site(caller(person));
+    if (!site) throw new Error(`${person} is not a webmaster.`);
+    return site;
+  };
   const execute = (person: Person, command: ManageCommand, requestId: string = randomUUID()) =>
     manage.execute(caller(person), requestId, command);
 
@@ -72,7 +77,7 @@ describe('site commands for webmasters', () => {
     expect(receipt.accountIds).toHaveLength(1);
     const [added] = receipt.accountIds!;
     expect(await execute('first', command, requestId)).toEqual(receipt);
-    expect((await manage.site(caller('first'))).webmasters).toContainEqual(
+    expect((await siteOf('first')).webmasters).toContainEqual(
       { id: added, name: 'Fictional newcomer', username: 'new-webmaster', ready: false });
     expect(await rows('SELECT action, actor, actor_name, target, event_id FROM authority_audit')).toEqual([{
       action: 'add_webmaster', actor: caller('first').accountId, actor_name: 'Fictional first', target: added, event_id: null,
@@ -100,7 +105,7 @@ describe('site commands for webmasters', () => {
   });
 
   it('refuses everyone but webmasters', async () => {
-    await expect(manage.site(caller('contestAdmin'))).rejects.toMatchObject({ status: 403 });
+    expect(await manage.site(caller('contestAdmin'))).toBeNull();
     for (const command of [
       { type: 'set_webmaster_reads', restricted: true },
       { type: 'remove_webmaster', accountId: caller('first').accountId },
@@ -120,10 +125,10 @@ describe('site commands for webmasters', () => {
       .rejects.toMatchObject({ status: 409, message: joinNeedsRestriction });
     await expect(run(`INSERT INTO grants (account_id, scope, session_id, granted_by) VALUES (?, 'contest', ?, 'fixture')`,
       caller('first').accountId, ids.contest)).rejects.toThrow(/only while the site restricts their reads/);
-    expect((await manage.site(caller('first'))).contestsToJoin).toEqual([]);
+    expect((await siteOf('first')).contestsToJoin).toEqual([]);
 
     await execute('second', { type: 'set_webmaster_reads', restricted: true });
-    const site = await manage.site(caller('first'));
+    const site = await siteOf('first');
     expect(site.restrictWebmasterReads).toBe(true);
     expect(site.contestsToJoin).toEqual([
       { id: ids.contest, name: 'Live 1', eventName: 'Fictional event' },
@@ -141,12 +146,12 @@ describe('site commands for webmasters', () => {
       FROM authority_audit WHERE action = 'webmaster_join'`)).toEqual([{
       actor: caller('first').accountId, actor_name: 'Fictional first', target: ids.contest, event_id: null, contest_event: ids.event,
     }]);
-    expect((await manage.site(caller('first'))).contestsToJoin.map((contest) => contest.id)).toEqual([ids.otherContest]);
+    expect((await siteOf('first')).contestsToJoin.map((contest) => contest.id)).toEqual([ids.otherContest]);
     expect((await application.snapshot(caller('second'), ids.contest)).membership).toBeNull();
 
     // A join persists while the restriction is off and on again (owner decision 9).
     await execute('second', { type: 'set_webmaster_reads', restricted: false });
-    expect((await manage.site(caller('first'))).contestsToJoin).toEqual([]);
+    expect((await siteOf('first')).contestsToJoin).toEqual([]);
     await execute('second', { type: 'set_webmaster_reads', restricted: true });
     expect((await application.snapshot(caller('first'), ids.contest)).membership).toMatchObject({ is_admin: true });
     expect(await rows("SELECT action, json_extract(detail, '$.restricted') AS restricted FROM authority_audit WHERE action = 'set_webmaster_reads' ORDER BY at, rowid"))
@@ -158,10 +163,10 @@ describe('site commands for webmasters', () => {
     await execute('first', { type: 'set_webmaster_reads', restricted: true });
     await execute('second', { type: 'join_contest', contestId: ids.contest });
     await execute('first', { type: 'remove_webmaster', accountId: caller('second').accountId });
-    await expect(manage.site(caller('second'))).rejects.toMatchObject({ status: 403 });
+    expect(await manage.site(caller('second'))).toBeNull();
     expect(await rows('SELECT revoked FROM logins WHERE account_id = ?', caller('second').accountId)).toEqual([{ revoked: 1 }]);
     expect(await rows('SELECT scope FROM grants WHERE account_id = ?', caller('second').accountId)).toEqual([]);
-    expect((await manage.site(caller('first'))).webmasters.map((webmaster) => webmaster.id)).toEqual([caller('first').accountId]);
+    expect((await siteOf('first')).webmasters.map((webmaster) => webmaster.id)).toEqual([caller('first').accountId]);
 
     await expect(execute('first', { type: 'remove_webmaster', accountId: caller('first').accountId })).rejects.toMatchObject(lastWebmaster);
     await expect(execute('first', { type: 'remove_webmaster', accountId: caller('contestAdmin').accountId }))
@@ -174,7 +179,7 @@ describe('site commands for webmasters', () => {
       .rejects.toMatchObject({ status: 409, message: 'Give another webmaster a password before you remove yourself.' });
     await run("UPDATE accounts SET credential_state = 'ready' WHERE id = ?", accountIds![0]!);
     await execute('first', { type: 'remove_webmaster', accountId: caller('first').accountId });
-    await expect(manage.site(caller('first'))).rejects.toMatchObject({ status: 403 });
+    expect(await manage.site(caller('first'))).toBeNull();
     expect(await rows('SELECT revoked FROM logins WHERE account_id = ?', caller('first').accountId)).toEqual([{ revoked: 0 }]);
     expect(await rows("SELECT action, actor, target FROM authority_audit WHERE action = 'remove_webmaster' ORDER BY at, rowid")).toEqual([
       { action: 'remove_webmaster', actor: caller('first').accountId, target: caller('second').accountId },
@@ -190,7 +195,7 @@ describe('site commands for webmasters', () => {
     const [issued] = await issuing.issueCredentials(caller('first'), requestId, [added]);
     expect(issued).toMatchObject({ accountId: added, username: 'newcomer' });
     expect(issued!.temporaryPassword).toMatch(/^.{12,}$/);
-    expect((await manage.site(caller('first'))).webmasters).toContainEqual(expect.objectContaining({ id: added, ready: true }));
+    expect((await siteOf('first')).webmasters).toContainEqual(expect.objectContaining({ id: added, ready: true }));
     const authentication = new D1AuthenticationService(db, createBetterAuthIdentity(db, {
       origin: 'http://127.0.0.1:8788', secret: randomSecret(), secureCookies: false,
     }), passwordHasher);

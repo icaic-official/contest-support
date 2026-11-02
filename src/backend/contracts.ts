@@ -192,7 +192,8 @@ export interface SiteOverview {
 
 /** Site administration. Only webmasters may call it. */
 export interface Management {
-  site(): Promise<SiteOverview>;
+  /** Null when the signed-in account is not a webmaster. */
+  site(): Promise<SiteOverview | null>;
   /**
    * Reusing a request ID with the same command returns the first receipt.
    * A rejection carries the reason. Other failures leave the outcome unknown,
@@ -298,6 +299,7 @@ export interface Backend {
   auth: Authentication;
   workflows: Workflows;
   admin: Administration;
+  manage: Management;
   images: ImageTransport;
   announcements: Announcements;
   avatars: Avatars;

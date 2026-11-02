@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { SiteLink } from "@/site/SiteLink";
 import { ActionSheet } from "../actions/ActionSheet";
 import {
   AccountList,
@@ -156,6 +157,7 @@ export function SessionTab({ state, shell }: PhoneTabProps) {
       <Collapsible title="Recent administration activity">
         <AdminActivity state={state} />
       </Collapsible>
+      <SiteLink className="h-12 rounded-xl border bg-card px-4 text-[15px] font-medium" />
       <ActionSheet
         open={open}
         onOpenChange={setOpen}

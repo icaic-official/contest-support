@@ -779,7 +779,7 @@ Then I deleted the token `minsky-agent-preview-rerun-20261102` with `npm run tok
 
 ## Extended hosted run
 
-**Status.** In progress. Added on 2026-11-02 on branch `feature/scoped-authority`. It repeats the [hosted rerun](#hosted-rerun) with more alternating runs, to test the 10 percent limit of the gate. The rerun could not test it, because its `main` runs varied from -28 to +37 percent.
+**Status.** Stopped before any load run, so this section holds no data. Added on 2026-11-02 on branch `feature/scoped-authority`. The owner accepted the gate on 2026-11-02 (see [Owner decision](#owner-decision)), and the run stopped. Its preview resources and token were deleted. It repeats the [hosted rerun](#hosted-rerun) with more alternating runs, to test the 10 percent limit of the gate. The rerun could not test it, because its `main` runs varied from -28 to +37 percent.
 All numbers in this section are measured on hosted D1 from one small preview installation (measured, hosted). The installation has free-tier scale and at most 200 simulated users. The numbers do not establish production capacity.
 
 ### Pre-registration
@@ -841,3 +841,9 @@ The design's literal rule, the better run of each Worker, is not used. It compar
 - W0 is a first run on `main` code. It fills a gap in the rerun's "Not run" list. I report its `ws-ready` timeouts next to B0 of the rerun, and the installations differ.
 - Another session uses this machine. The event-loop and load-average rules limit its effect, and the load average of each run is recorded.
 - Hosted D1 at this scale does not establish production capacity.
+
+## Owner decision
+
+On 2026-11-02 the owner accepted the Phase 1 performance gate on the evidence of the [hosted rerun](#hosted-rerun) and the [diagnosis](#diagnosis). The rerun was inconclusive against the 10 percent p95 rule, because `main` itself varied from -28 to +37 percent between runs. After the compile-time fix, the branch's snapshot p50 was below `main` in all four runs, and its snapshot p95 was a median 3.4 percent below `main`. Rows read, Worker CPU, and D1 query counts matched `main`.
+
+Before the merge, the owner ran two read-only queries on `minsky-development`. Both `organizer` and `playtest-admin` hold a contest admin membership and no team seat, so migration `0017` promotes both to webmasters. No account was reported with memberships in two events.

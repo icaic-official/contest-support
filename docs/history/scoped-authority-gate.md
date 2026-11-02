@@ -776,3 +776,68 @@ Before the deletion, the API listed exactly one resource with the prefix `minsky
 After the deletion, the same four lists showed 0 resources with the prefix (6, 3, 6, and 3 listed). So the namespace went with the Worker. The Worker delete command printed a warning about reading membership roles and still deleted the Worker.
 
 Then I deleted the token `minsky-agent-preview-rerun-20261102` with `npm run token:delete`. `npm run token:list` then listed no agent token. I removed the token file, the owner file, and the fixture file. The result files stay on the measuring machine in `/tmp/rerun-private/results`.
+
+## Extended hosted run
+
+**Status.** In progress. Added on 2026-11-02 on branch `feature/scoped-authority`. It repeats the [hosted rerun](#hosted-rerun) with more alternating runs, to test the 10 percent limit of the gate. The rerun could not test it, because its `main` runs varied from -28 to +37 percent.
+All numbers in this section are measured on hosted D1 from one small preview installation (measured, hosted). The installation has free-tier scale and at most 200 simulated users. The numbers do not establish production capacity.
+
+### Pre-registration
+
+I finished this section at 12:36 UTC on 2026-11-02, before I created any resource and before the first load run. I commit it before I collect data, and I do not change it after I see data. Any analysis that I add later is labelled post hoc where it appears.
+
+**Claim.** At the 200-user step on hosted D1, the snapshot read p95 of the branch is less than 10 percent above the p95 of the merge-base `main` code, at the same database size.
+
+**Design.**
+
+1. One installation. It has one Worker, one D1 database, one R2 bucket, and one Durable Object namespace. Every name starts with `minsky-preview-extend`. Both sides deploy to the same Worker.
+2. M is the merge-base code `6ecc656`. B is `35d0ae2`, the tip of `origin/feature/scoped-authority` at 12:30 UTC. Its code equals that of `d4c0232`, because only this record differs. I build B from my own checkout. If code commits reach the branch while I run, the record names the commit that I tested. I apply migration `0017` before the first run, so M runs on the schema of B.
+3. Run order: W0, M0, B1, M1, B2, M2, and so on to B10, M10. W0 is a first run on M code. Its accounts change their temporary passwords. No statistic uses W0. Pair j is run B_j with the runs M_(j-1) and M_j next to it.
+4. Every run is `npm run load -- run --steps=50,200 --step-seconds=120` with every other option at its default.
+5. Region. I create the D1 database with `--location=apac`. The hosted rerun served its primary from SIN, so I accept only a database that serves from SIN. I read the data centre from the `meta` of `wrangler d1 execute --remote --json`. Otherwise I delete the database and try again, up to 5 tries in all. A try is named `minsky-preview-extend-db-N`. If the fifth try is not SIN either, I keep it, and the record names its data centre as a difference from the rerun. The Worker uses the placement region `aws:ap-southeast-1`, as in the rerun.
+6. Slots. A slot starts every 9 minutes on a fixed clock from W0, whatever the side. In a slot I do these steps in this order: check that no notification waits for delivery and count the rows of the `issues` table, deploy the side, wait exactly 30 s, check the live script name against the checkout, and start the load. If a notification waits, I check again each 15 s until none does. If the slot time has passed, the slot starts at once, and the lateness is logged. The time from the deploy to the load start is the same for both sides. The size of a run is the mean of the issue count before it and the count before the next run, or after the last run.
+7. Eight minutes after each run ends, I add Cloudflare analytics to its results with `npm run load -- analytics`.
+
+**Statistic.** For each pair j:
+
+- `m_j` is the linear interpolation, by size, of the snapshot p95 of M_(j-1) and M_j, evaluated at the size of B_j.
+- `g_j = p95(B_j) / m_j - 1`. The p95 is the `snapshot` row of the 200-user step in the results file.
+
+**Decision rule.** Let n be the number of valid pairs.
+
+- `ḡ` is the mean of `g_j`. `s` is the standard deviation of `g_j`.
+- `r` is the lag-1 autocorrelation of `g_j` in time order, limited to the range 0 to 0.5. Adjacent pairs share one M run, so the structure allows no more than 0.5.
+- `SE = s × sqrt((1 + 2r(n-1)/n) / n)`.
+- `U = ḡ + t × SE` and `L = ḡ - t × SE`, with `t` the 95th percentile of the t distribution with n - 1 degrees of freedom.
+- **PASS** when `U` is below 10 percent. **FAIL** when `L` is above 10 percent. **INCONCLUSIVE** in every other case.
+
+The design's literal rule, the better run of each Worker, is not used. It compares runs of different sizes and selects on the outcome.
+
+**Valid runs.** No rule for a valid run uses a latency of the `snapshot` row, so the sides cannot bias it.
+
+- A run is invalid when its 200-user step stopped at the error limit, when its event-loop delay p99 is above 50 ms in either step, when the 1-minute load average of the machine is above 8 at the end of either step, when its live script name did not match its side, or when its `load` command failed. The machine has 16 logical cores.
+- `canary:static` is reported and is not a rule. This Worker runs first for every request, so its own code serves the canary, and the canary does not measure the network alone.
+- No run is dropped for a high or low latency.
+- An invalid M run leaves the M series, and the pairs next to it use the nearest valid M run on each side. A B run with no valid M run on one side leaves the pairs, and W0 does not fill in. An invalid B run leaves the pairs.
+- If fewer than 10 valid pairs remain after B10, I append B and M runs in the same alternating order until 10 valid pairs exist or 14 B runs have run.
+- The verdict is INCONCLUSIVE, whatever the statistic, in each of these cases. One side has 5 or more `server` or `edge` failures in total and the other side has none. More than 30 percent of the runs are invalid.
+
+**One extension.** If the verdict at 10 valid pairs is INCONCLUSIVE and neither of those two cases applies, I add 6 pairs and apply the rule once more to all 16. The verdict of the 16 is final. I report both. The stop after the first 10 is a second look at the data, so the 95 percent level is slightly optimistic for the final verdict.
+
+**Reported, not deciding.**
+
+- The mean and the median of `g_j`, and the count of B runs above 10 percent.
+- The same statistic with no run dropped.
+- The same statistic for the snapshot p50 and for the `workflow:submit` p95. The submit row holds 10 to 20 requests in a run, so its p95 is close to a maximum.
+- Rows read per request, the difference of B and the interpolated M. It is the analytics `rowsRead` divided by Worker `requests` for the whole minutes of the 200-user step. The local `perf:reads` result stays the evidence for the rows condition.
+- `ws-ready` timeouts, failures by class, `canary:static`, and the D1 mean time of the sessions-list statement and of the announcement snapshot, by side.
+- The first half and the second half of the pairs, to see whether the growth depends on database size.
+
+**Limits that I state before the data.**
+
+- The verdict covers only the snapshot half of the design's rule. The issue submit half is not decided, because its p95 rests on 10 to 20 requests in a run.
+- A PASS needs `ḡ` well below 10 percent. If `s` is 12 points, `r` is 0.25, and n is 10, then `U` is `ḡ` + 8.4, so PASS needs `ḡ` below 1.6 percent. The pairs share M runs, so noisy M runs widen the bound.
+- The database grows by about 15 issues in each run, to about 330 after M10 and to about 500 after the extension. The rows read for each snapshot grow with it, and the added resolver cost does not, so the relative growth can shrink in late pairs. In the rerun, `network` failures rose with database size on both sides (103 in B4 and 46 in M5 at about 150 issues). If late steps reach the 5 percent error stop, the invalid-run rule applies, and the verdict can become INCONCLUSIVE for that reason.
+- W0 is a first run on `main` code. It fills a gap in the rerun's "Not run" list. I report its `ws-ready` timeouts next to B0 of the rerun, and the installations differ.
+- Another session uses this machine. The event-loop and load-average rules limit its effect, and the load average of each run is recorded.
+- Hosted D1 at this scale does not establish production capacity.

@@ -4,7 +4,7 @@ This file records the current agreed scope, newest first.
 Earlier requests, approvals, branch exceptions, and the original demo plan are in the [planning log](docs/history/plan-log.md).
 
 **Webmaster, event, and contest platform, 2026-10-27.** The owner settled GitHub issues #119 and #136 and answered the open questions of the design that followed.
-The [event platform design](docs/event-platform-design.md) explains the proposed implementation. It is proposed and not implemented.
+The [event platform design](docs/event-platform-design.md) explains the implementation. Its first two phases are built on stacked branches that wait for review. The later phases are proposed and not implemented.
 
 1. Minsky stays a contest support desk. It gets no problems, submissions, judging, or scoreboard.
 2. One shared installation, with one Worker and one D1 database, hosts the events of many organizers for free. Self-hosters run the same code. The owner will revisit the system design for scale later.

@@ -127,7 +127,6 @@ interface CreateAccountCommand extends MembershipInput {
 
 export type AccountCommand =
   | CreateAccountCommand
-  | { action: 'set_username'; userId: string; username: string }
   | { action: 'reset_password'; userId: string };
 
 export interface AccountResult {
@@ -178,16 +177,23 @@ export interface PersonInput {
 }
 
 /**
- * Every site change. The server derives each command's requirement from the
- * command alone, resolves the caller's authority once, and checks it again
- * inside the write batch. Callers never name their own authority.
+ * Every site change, and a handle change. The server derives each command's
+ * requirement from the command alone, resolves the caller's authority once,
+ * and checks it again inside the write batch. Callers never name their own
+ * authority.
  */
 export type ManageCommand =
   | { readonly type: 'add_webmaster'; readonly person: PersonInput }
   | { readonly type: 'remove_webmaster'; readonly accountId: string }
   | { readonly type: 'set_webmaster_reads'; readonly restricted: boolean }
   /** A webmaster's audited join. D1 accepts it only while the site restricts webmaster reads. */
-  | { readonly type: 'join_contest'; readonly contestId: string };
+  | { readonly type: 'join_contest'; readonly contestId: string }
+  /**
+   * Changes the handle of an account of the event. The login key and open
+   * sessions stay. Staff may change their own handle. Contestants may not,
+   * because venue staff read it from the credential sheet.
+   */
+  | { readonly type: 'set_handle'; readonly eventId: string; readonly accountId: string; readonly handle: string };
 
 /** Created IDs, so a retry with the same request ID returns the same IDs. Never a password. */
 export interface ManageReceipt {
@@ -224,7 +230,7 @@ export interface SiteOverview {
   }>;
 }
 
-/** Site administration. Only webmasters may call it. */
+/** Site administration for webmasters, and handle changes for the accounts that a caller may manage. */
 export interface Management {
   /** Null when the signed-in account is not a webmaster. */
   site(): Promise<SiteOverview | null>;

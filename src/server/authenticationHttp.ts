@@ -17,7 +17,6 @@ const accountSchema = z.strictObject({
       name: z.string().min(1).max(256), teamId: z.uuid().nullable(),
       roles: z.array(roleSchema).max(3), isAdmin: z.boolean(),
     }),
-    z.strictObject({ action: z.literal('set_username'), userId: z.uuid(), username: usernameSchema }),
     z.strictObject({ action: z.literal('reset_password'), userId: z.uuid() }),
   ]),
 });

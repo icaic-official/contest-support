@@ -406,22 +406,15 @@ export function registerAuthenticationCases(group: AuthenticationCases) {
     const restrictions = ['expired_login', 'expired_identity', 'revoked', 'generation', 'must_change', 'disabled', 'pending', 'permission'];
 
     if (group === 'initiation') {
-      for (const action of ['set_username', 'create_account', 'reset_password'] as const) {
+      for (const action of ['create_account', 'reset_password'] as const) {
         it.each(restrictions)(`rolls back ${action} initiation when %s changes at the final check`, async (restriction) => {
           await signIn();
           const accountUsername = `late_${randomSecret().slice(0, 20)}`;
-          if (action === 'set_username') {
-            await db.batch([
-              stmt('UPDATE accounts SET username = NULL WHERE id = ?', fixture.contestant.accountId),
-              stmt('UPDATE ba_user SET username = NULL WHERE id = ?', fixture.contestant.accountId),
-            ]);
-          }
           const before = await credentialEffects();
           const racing = changeAtFinalGuard(await actorRestriction(restriction));
           const command = action === 'create_account'
             ? { action, username: accountUsername, name: `auth-fixture:${fixture.eventId}`, teamId: fixture.teamId, roles: [], isAdmin: false }
-            : action === 'set_username' ? { action, userId: fixture.contestant.accountId, username: accountUsername }
-              : { action, userId: fixture.contestant.accountId };
+            : { action, userId: fixture.contestant.accountId };
           await expectFailure(racing.account(adminHeaders, fixture.sessionId, command)).toMatchObject({ status: 409 });
           expect(await credentialEffects()).toBe(before);
           expect((await service.current(adminHeaders))?.status.must_change).toBe(false);
@@ -735,9 +728,8 @@ export function registerAuthenticationCases(group: AuthenticationCases) {
         expect((await stmt("SELECT count(*) n FROM account_operations WHERE account_id = ? AND state = 'completed'", fixture.contestant.accountId).first<{n: number}>())?.n).toBe(1);
       });
 
-      it('rejects self-reset, archived accounts, and replacement of an assigned username', async () => {
+      it('rejects self-reset and archived accounts', async () => {
         await expectFailure(service.account(adminHeaders, fixture.sessionId, { action: 'reset_password', userId: fixture.staff.accountId })).toMatchObject({ status: 400 });
-        await expectFailure(service.account(adminHeaders, fixture.sessionId, { action: 'set_username', userId: fixture.contestant.accountId, username: 'replacement' })).toMatchObject({ status: 409 });
         await stmt('UPDATE events SET archived = 1 WHERE id = ?', fixture.eventId).run();
         await expectFailure(service.account(adminHeaders, fixture.sessionId, { action: 'reset_password', userId: fixture.contestant.accountId })).toMatchObject({ status: 403 });
       });

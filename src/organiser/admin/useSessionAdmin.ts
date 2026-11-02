@@ -11,7 +11,7 @@ import {
   imageLimitsInput,
   membershipInput,
   resetPasswordCommand,
-  setUsernameCommand,
+  setHandleCommand,
 } from "./adminModel";
 import { rosterNotice } from "./rosterModel";
 
@@ -36,6 +36,7 @@ export interface SessionAdmin {
   setIntake: (open: boolean) => Promise<boolean>;
   saveImageLimits: (limits: ImageLimits) => Promise<boolean>;
   createAccount: (account: NewAccount) => Promise<boolean>;
+  /** Changes a username. The password and open sessions stay. */
   setUsername: (userId: string, username: string) => Promise<boolean>;
   saveMembership: (userId: string, draft: MembershipDraft) => Promise<boolean>;
   resetPassword: (userId: string) => Promise<boolean>;
@@ -137,12 +138,12 @@ export function useSessionAdmin(
         ),
       ),
     setUsername: (userId, username) =>
-      run(() =>
-        account(
-          setUsernameCommand(userId, username),
-          username.trim().toLowerCase(),
-        ),
-      ),
+      run(async () => {
+        await backend.manage.execute(
+          crypto.randomUUID(),
+          setHandleCommand(state.event?.id ?? "", userId, username),
+        );
+      }, "Username changed."),
     saveMembership: (userId, draft) =>
       run(() =>
         backend.admin.saveMember(

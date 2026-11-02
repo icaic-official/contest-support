@@ -95,7 +95,7 @@ it('runs the complete application through isolated HTTPS, D1, R2, and Durable Ob
   }
 
   async function session(actor: Actor) {
-    const current = await json<{ user: { id: string }; status: { must_change: boolean }; csrf: string }>(actor, '/api/auth/session');
+    const current = await json<{ user: { id: string }; status: { handle: string | null; must_change: boolean }; csrf: string }>(actor, '/api/auth/session');
     actor.csrf = current.csrf;
     actor.id = current.user.id;
     return current;
@@ -258,8 +258,8 @@ it('runs the complete application through isolated HTTPS, D1, R2, and Durable Ob
     const other = await createAccount(organizer, 'other', { teamId: installation.teamIds[1]!, roles: [], isAdmin: false });
     const assignedUsername = `rt_${unique}_assigned`;
     usernames.push(assignedUsername);
-    await json(organizer, '/api/accounts', { sessionId: installation.sessionId,
-      command: { action: 'set_username', userId: legacyId, username: assignedUsername } });
+    await json(organizer, '/api/manage', { requestId: randomUUID(),
+      command: { type: 'set_handle', eventId: installation.eventId, accountId: legacyId, handle: assignedUsername } });
     expect((await snapshot(organizer)).members.find((member) => member.person.id === legacyId)?.person.username).toBe(assignedUsername);
     const sessions = await json<Array<{ id: string; name: string }>>(contestant, '/api/sessions');
     expect(sessions).toEqual([{ id: installation.sessionId, name: 'Fictional contest' }]);
@@ -360,11 +360,13 @@ it('runs the complete application through isolated HTTPS, D1, R2, and Durable Ob
     const recovered = await authenticated(specialist.username, reset.temporaryPassword);
     expect(recovered.id).toBe(specialist.id);
     expect((await snapshot(recovered)).issues.find((issue) => issue.id === issueId)?.owner).toBe(specialist.id);
-    await json(organizer, '/api/accounts', { sessionId: installation.sessionId,
-      command: { action: 'set_username', userId: recovered.id, username: recovered.username } });
-    await json(organizer, '/api/accounts', { sessionId: installation.sessionId,
-      command: { action: 'set_username', userId: recovered.id, username: `rt_${unique}_renamed` } }, 409);
-    expect((await snapshot(organizer)).members.find((member) => member.person.id === recovered.id)?.person.username).toBe(recovered.username);
+    const renamed = `rt_${unique}_renamed`;
+    usernames.push(renamed);
+    await json(organizer, '/api/manage', { requestId: randomUUID(),
+      command: { type: 'set_handle', eventId: installation.eventId, accountId: recovered.id, handle: renamed } });
+    expect((await snapshot(organizer)).members.find((member) => member.person.id === recovered.id)?.person.username).toBe(renamed);
+    // A handle change keeps the open session.
+    expect((await session(recovered)).status.handle).toBe(renamed);
     await json(contestant, '/api/auth/sign-out', {});
     await expect.poll(async () => (await socketState(contestant, 'team')).closed, { timeout: 15_000 }).toBe(true);
     await json(contestant, '/api/auth/session', undefined, 401);

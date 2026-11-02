@@ -1,4 +1,4 @@
-import type { AccountCommand, MembershipInput } from "@/backend/contracts";
+import type { AccountCommand, ManageCommand, MembershipInput } from "@/backend/contracts";
 import { statusNames } from "@/connected/labels";
 import type { Issue, Membership, Role, Snapshot } from "@/connected/model";
 
@@ -139,12 +139,13 @@ export function createAccountCommand(account: NewAccount): AccountCommand {
   };
 }
 
-/** The account command that gives an account its first username. */
-export function setUsernameCommand(
-  userId: string,
+/** The command that changes the username of an account of the event. */
+export function setHandleCommand(
+  eventId: string,
+  accountId: string,
   username: string,
-): AccountCommand {
-  return { action: "set_username", userId, username: username.trim() };
+): ManageCommand {
+  return { type: "set_handle", eventId, accountId, handle: username.trim() };
 }
 
 /** The account command that issues a new temporary password. */

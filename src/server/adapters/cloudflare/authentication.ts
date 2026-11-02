@@ -24,7 +24,6 @@ const memberSchema = z.object({
 });
 const commandSchema = z.discriminatedUnion('action', [
   memberSchema.extend({ action: z.literal('create_account'), username: handleSchema, name: z.string().trim().min(1).max(200) }).strict(),
-  z.object({ action: z.literal('set_username'), userId: z.string().uuid(), username: handleSchema }).strict(),
   z.object({ action: z.literal('reset_password'), userId: z.string().uuid() }).strict(),
 ]);
 
@@ -253,20 +252,6 @@ export class D1AuthenticationService implements AuthenticationService {
     if (command.action === 'reset_password' && target === current.user.id) throw new AuthenticationError(400, 'Use Change password for your own account.');
     const gate = await this.adminAssertions(current, sessionId, command.action === 'create_account' ? undefined : target);
     const operationId = crypto.randomUUID();
-    if (command.action === 'set_username') {
-      await this.guarded([
-        ...gate.statements,
-        this.assertion(`${operationId}:username`, 'SELECT 1 FROM accounts WHERE id = ? AND (username IS NULL OR username = ?)', target, command.username),
-        this.statement('UPDATE accounts SET username = ? WHERE id = ?', command.username, target),
-        this.statement(`UPDATE ba_user SET username = ?, email = ?, updatedAt = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ?`, command.username, `${command.username}@accounts.minsky.invalid`, target),
-        this.statement(`INSERT INTO account_operations (id, account_id, actor, session_id, action, state, completed_at)
-          VALUES (?, ?, ?, ?, 'set_username', 'completed', unixepoch())`, operationId, target, gate.current.user.id, sessionId),
-        this.statement('DELETE FROM command_assertions WHERE id = ?', `${operationId}:username`),
-        this.assertion(`${gate.assertionId}:final`, gate.finalCheck.sql, ...gate.finalCheck.values),
-        this.cleanupAssertions(gate.assertionId),
-      ]);
-      return {};
-    }
     if (command.action === 'create_account') {
       if (command.teamId ? command.roles.length > 0 || command.isAdmin : command.roles.length === 0 && !command.isAdmin) {
         throw new AuthenticationError(400, 'Choose a contestant team or staff roles or admin membership.');
@@ -281,6 +266,9 @@ export class D1AuthenticationService implements AuthenticationService {
         ...[...new Set(command.roles)].map((role) => this.statement('INSERT INTO membership_roles (session_id, account_id, role) VALUES (?, ?, ?)', sessionId, target, role)),
       );
     } else {
+      // Check before the reset begins, so that a refusal leaves the old password valid.
+      const named = await this.statement('SELECT handle FROM accounts WHERE id = ?', target).first<{ handle: Handle | null }>();
+      if (!named?.handle) throw new AuthenticationError(409, 'Set a username before resetting this account.');
       // Superseding a failed operation is safe: its final batch checks this ID.
       gate.statements.push(...beginCredentialReset(this.db, target, operationId));
     }
@@ -302,7 +290,9 @@ export class D1AuthenticationService implements AuthenticationService {
     // revoked sessions intact. An organizer can issue another reset.
     const hash = prepared?.hash ?? await this.passwords.hash(password);
     const account = await this.statement('SELECT * FROM accounts WHERE id = ?', target).first<Account>();
-    if (!account?.username) throw new AuthenticationError(409, 'Set a username before resetting this account.');
+    if (!account) throw new AuthenticationError(409, 'Account changed. Check its status before retrying.');
+    // An account from before usernames gets its login key with its first password.
+    const loginKey = account.username ?? loginKeyFor(target);
     const assertions: D1Statement[] = prepared?.statements ?? [];
     let adminAssertion: string | undefined;
     let finalCheck = prepared?.finalCheck;
@@ -318,7 +308,8 @@ export class D1AuthenticationService implements AuthenticationService {
     assertions.push(
       this.assertion(assertionId, `SELECT 1 FROM accounts WHERE id = ? AND credential_operation = ?
         AND credential_generation = ? AND credential_state = 'pending' AND disabled = 0`, target, operationId, generation),
-      ...completeCredentialReset(this.db, { id: target, name: account.name, loginKey: account.username }, operationId, hash, temporary),
+      ...(account.username ? [] : [this.statement('UPDATE accounts SET username = ? WHERE id = ? AND username IS NULL', loginKey, target)]),
+      ...completeCredentialReset(this.db, { id: target, name: account.name, loginKey }, operationId, hash, temporary),
       this.statement('DELETE FROM command_assertions WHERE id = ?', assertionId),
     );
     if (adminAssertion) assertions.push(this.cleanupAssertions(adminAssertion));

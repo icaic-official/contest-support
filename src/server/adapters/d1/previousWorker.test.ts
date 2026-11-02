@@ -333,5 +333,15 @@ describe('the previous Worker on the scoped authority schema', () => {
       const typed = await writer(db).all<{ id: string }>(previousWorker.signInSql, 'team01');
       expect(typed.map((row) => row.id)).not.toContain(ids.current);
     });
+
+    it('signs a renamed legacy account in by its old username, even after another account takes that handle', async () => {
+      const { run, all } = writer(db);
+      // set_handle writes only the handle.
+      await run('UPDATE accounts SET handle = ? WHERE id = ?', 'desk-staff', ids.staff);
+      const taker = randomUUID();
+      await run('INSERT INTO accounts (id, name, username, handle, event_id, must_change) VALUES (?, ?, ?, ?, ?, 0)',
+        taker, 'Fictional taker', taker.replaceAll('-', ''), 'staff', ids.first);
+      expect((await all<{ id: string }>(previousWorker.signInSql, 'staff')).map((row) => row.id)).toEqual([ids.staff]);
+    });
   });
 });

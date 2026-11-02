@@ -4,6 +4,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { getPlatformProxy } from 'wrangler';
+import type { ManageCommand, ManageReceipt } from '../../src/backend/contracts';
 import type { Command, Role, Snapshot } from '../../src/connected/model';
 import { WorkflowService } from '../../src/server/workflow';
 import { D1ApplicationStore } from '../../src/server/adapters/d1/store';
@@ -106,6 +107,11 @@ export class LocalWorker extends FixtureWorker {
   /** The session as the Worker shows it to `user`. */
   snapshot(user: string = this.users.jury, session: string = this.sessions[0]): Promise<Snapshot> {
     return this.services.application.snapshot(this.caller(user), session);
+  }
+
+  /** Runs a site command as `user`, as the site page sends it. */
+  manage(user: string, command: ManageCommand): Promise<ManageReceipt> {
+    return this.services.manage.execute(this.caller(user), randomUUID(), command);
   }
 
   /** Commits a workflow command as `user` and notifies live clients. Returns the issue ID. */

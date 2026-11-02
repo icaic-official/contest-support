@@ -12,6 +12,8 @@ import {
   MessageSquare,
   Trash2,
 } from "lucide-react";
+import { backend } from "@/backend";
+import { errorMessage } from "@/backend/errors";
 import { BuildId } from "@/components/build-id";
 import { themeOptions } from "@/components/theme-toggle";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -28,8 +30,11 @@ import { Separator } from "@/components/ui/separator";
 import { documentationUrl } from "@/lib/links";
 import { useTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
+import { UsernameForm } from "@/organiser/admin/AccountForms";
+import { setHandleCommand } from "@/organiser/admin/adminModel";
 import { PersonAvatar } from "@/organiser/components/issueDisplay";
 import { PasswordChangeForm } from "@/screens/PasswordForm";
+import { useSite } from "@/site/useSite";
 import {
   type AccountActivityItem,
   accountActivity,
@@ -149,8 +154,54 @@ function CopyButton({ value, label }: { value: string; label: string }) {
   );
 }
 
+/**
+ * The account's username. A staff account may change its own (owner decision
+ * 14, 2026-11-01). A team account may not, because venue staff read its
+ * username from the sign-in sheet. A webmaster belongs to no event, so its
+ * username stays.
+ */
+function OwnUsername({ shell, state, kind }: AccountSectionProps) {
+  const site = useSite();
+  const [username, setUsername] = useState(shell.username);
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<{ failed: boolean; text: string }>();
+  const shown = <span className="font-mono">{username ?? shell.user.email ?? "Not set"}</span>;
+  const event = state.event;
+  if (kind.kind === "team" || !event || !site.loaded || site.site) return shown;
+  return (
+    <div className="grid max-w-sm gap-3">
+      {shown}
+      <UsernameForm
+        key={username ?? ""}
+        current={username}
+        disabled={busy || event.archived}
+        onSubmit={(next) => {
+          setBusy(true);
+          setResult(undefined);
+          void backend.manage.execute(crypto.randomUUID(), setHandleCommand(event.id, shell.user.id, next))
+            .then(async () => {
+              const changed = next.trim().toLowerCase();
+              setUsername(changed);
+              setResult({ failed: false, text: `Username changed. Sign in with ${changed} next time.` });
+              await shell.data.refresh();
+            })
+            .catch((cause: unknown) => setResult({ failed: true, text: errorMessage(cause) }))
+            .finally(() => setBusy(false));
+        }}
+      />
+      {result && (
+        <p role={result.failed ? "alert" : "status"} className={cn("text-sm", result.failed ? "text-destructive" : "text-muted-foreground")}>
+          {result.text}
+        </p>
+      )}
+    </div>
+  );
+}
+
 export function ProfileSection({
   shell,
+  state,
+  member,
   kind,
   name,
   title,
@@ -160,7 +211,7 @@ export function ProfileSection({
   title: string;
   picture: AvatarEditorControls;
 }) {
-  const { user, username } = shell;
+  const { user } = shell;
   return (
     <Section
       id="profile"
@@ -217,7 +268,7 @@ export function ProfileSection({
           <Field label="Name">{name}</Field>
         )}
         <Field label="Username">
-          <span className="font-mono">{username ?? user.email ?? "Not set"}</span>
+          <OwnUsername shell={shell} state={state} member={member} kind={kind} />
         </Field>
         <Field label="Account ID">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2">

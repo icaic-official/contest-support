@@ -132,12 +132,14 @@ export class D1AuthenticationService implements AuthenticationService {
     if (typeof password !== 'string' || password.length > 128 || password.length < 1) throw signInRefused(target.kind);
     const row = await this.statement(signInAccountSql[target.kind],
       ...(target.kind === 'event' ? [handle, target.code] : [handle])).first<SignInRow>();
-    // An unknown event code has no handle counter. The HTTP Worker's IP limit counts it.
-    if (!row && target.kind === 'event') throw signInRefused(target.kind);
+    // An unknown event code counts against the typed code. Its refusals then
+    // reach the limit as a known code's do, so the limit never shows which
+    // codes exist.
+    const scope = row?.event_id ?? (target.kind === 'event' ? `code:${target.code}` : 'site');
     // Refuse before the expensive password check when the handle already has
     // its maximum failures. Only a failure adds to the count, so a correct
     // password never uses an attempt. The HTTP Worker adds the IP limit.
-    const key = signInLimitKey(row?.event_id ?? 'site', handle);
+    const key = signInLimitKey(scope, handle);
     await this.assertBelowLimit(key, signInFailureLimits.perUsername);
     try {
       // Better Auth looks up the text that it receives as a login key, and a

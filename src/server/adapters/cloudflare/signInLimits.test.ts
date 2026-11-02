@@ -132,14 +132,15 @@ describe('sign-in failure limits at the Worker boundary with real local D1', () 
     expect(await signIn(ip, target!)).toBe(200);
   }, timeout);
 
-  it('counts a wrong or malformed event code against the IP and against no handle', async () => {
+  it('counts a wrong event code against the IP and the typed code, and a malformed one against the IP only', async () => {
     const [name] = await createAccounts('code', 1);
     const ip = '198.51.100.6';
     expect(await signIn(ip, name!, password, `absent-${run}`)).toBe(401);
     expect(await signIn(ip, name!, password, 'no')).toBe(401);
     const key = await ipKey(ip);
     expect(await counter(key)).toEqual([{ key, attempts: 2 }]);
-    expect((await counters()).filter((row) => row.key.endsWith(`:${name!}`))).toEqual([]);
+    expect((await counters()).filter((row) => row.key.endsWith(`:${name!}`)))
+      .toEqual([{ key: `handle:code:absent-${run}:${name!}`, attempts: 1 }]);
     expect(await signIn(ip, name!)).toBe(200);
   }, timeout);
 });

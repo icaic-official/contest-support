@@ -6,7 +6,7 @@ import { D1Fixture, applyMigrations } from '../d1/testFixture';
 import { measureD1 } from '../d1/testMetrics';
 import { parseHandle, type EventCode } from '../../../backend/contracts';
 import { D1ApplicationService, notificationStatements } from './application';
-import { D1AuthenticationService } from './authentication';
+import { D1AuthenticationService, signInFailureLimits } from './authentication';
 import { loginKeyFor } from './credentials';
 import { createBetterAuthIdentity, type IdentityProvider } from './identity';
 import { passwordHasher, randomSecret, type PasswordHasher } from './password';
@@ -263,11 +263,18 @@ export function registerAuthenticationCases(group: AuthenticationCases) {
         }
       });
 
-      it('refuses an unknown event code with the one message and counts no handle failure', async () => {
+      it('refuses an unknown event code with the one message, and limits it as it limits a known code', async () => {
         const refusal = { status: 401, message: 'The event code, username, or password is incorrect.' };
-        await expectFailure(signIn(username, password, service, `absent-${randomSecret().slice(0, 12)}` as EventCode)).toMatchObject(refusal);
-        expect((await stmt('SELECT count(*) AS n FROM authentication_limits WHERE key LIKE ?', `%:${username}`).first<{ n: number }>())?.n).toBe(0);
-        await expectFailure(signIn(username, randomSecret())).toMatchObject(refusal);
+        const absent = `absent-${randomSecret().slice(0, 12).toLowerCase().replace(/[^a-z0-9-]/g, '0')}` as EventCode;
+        for (const code of [absent, eventCode]) {
+          for (let attempt = 0; attempt < signInFailureLimits.perUsername; attempt++) {
+            await expectFailure(signIn(username, randomSecret(), service, code)).toMatchObject(refusal);
+          }
+          await expectFailure(signIn(username, randomSecret(), service, code)).toMatchObject({ status: 429 });
+        }
+        expect(await stmt('SELECT attempts FROM authentication_limits WHERE key = ?', `handle:code:${absent}:${username}`).first())
+          .toEqual({ attempts: signInFailureLimits.perUsername });
+        await stmt('DELETE FROM authentication_limits WHERE key = ?', limitKey(username)).run();
         await expectFailure(signIn(`absent_${randomSecret().slice(0, 15)}`)).toMatchObject(refusal);
       });
 

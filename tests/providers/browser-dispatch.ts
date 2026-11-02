@@ -75,7 +75,7 @@ async function execute(request: Request): Promise<unknown> {
     case 'currentUser':
       return backend.auth.currentUser();
     case 'signIn':
-      return backend.auth.signIn(request.username, request.password);
+      return backend.auth.signIn(request.target, request.handle, request.password);
     case 'signOut':
       return backend.auth.signOut();
     case 'accountStatus':

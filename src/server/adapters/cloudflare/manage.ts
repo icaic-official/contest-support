@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import {
-  ISSUE_BATCH, type IssuedCredential, type ManageCommand, type ManageLevel, type ManageReceipt, type SiteOverview,
+  ISSUE_BATCH, type IssuedCredential, type LoginKey, type ManageCommand, type ManageLevel, type ManageReceipt,
+  type SiteOverview,
 } from '../../../backend/contracts';
 import { AuthenticationError, type Caller } from '../../authentication';
 import type { D1Connection, D1Statement, D1Value } from '../d1/connection';
@@ -9,14 +10,13 @@ import {
   authorityGuard, contestsToJoinSql, manageAccountBindings, manageWebmasterSql, reaches, resolveAuthority, webmastersSql,
   type Authority, type Target,
 } from './authority';
-import { replaceCredentialStatements } from './credentials';
+import { handleSchema, loginKeyFor, replaceCredentialStatements } from './credentials';
 import { randomSecret, type PasswordHasher } from './password';
 
-const usernameSchema = z.string().trim().toLowerCase().regex(/^[a-z0-9][a-z0-9_-]{2,31}$/);
 const commandSchema = z.discriminatedUnion('type', [
   z.strictObject({
     type: z.literal('add_webmaster'),
-    person: z.strictObject({ username: usernameSchema, name: z.string().trim().min(1).max(200) }),
+    person: z.strictObject({ handle: handleSchema, name: z.string().trim().min(1).max(200) }),
   }),
   z.strictObject({ type: z.literal('remove_webmaster'), accountId: z.uuid() }),
   z.strictObject({ type: z.literal('set_webmaster_reads'), restricted: z.boolean() }),
@@ -70,7 +70,7 @@ const usernameTaken = 'That username is taken. Choose another.';
 const refusals: ReadonlyArray<readonly [cause: string, message: string]> = [
   ['The last webmaster cannot be removed', lastWebmaster],
   ['Webmasters join a contest only while the site restricts their reads', joinNeedsRestriction],
-  ['UNIQUE constraint failed: accounts.username', usernameTaken],
+  ['UNIQUE constraint failed: accounts.handle', usernameTaken],
 ];
 
 /** Maps a failed batch to a message without SQL or provider detail. */
@@ -122,7 +122,8 @@ class Assertions {
 interface WebmasterRow {
   id: string;
   name: string;
-  username: string;
+  handle: string;
+  loginKey: LoginKey;
   disabled: number;
   credential_generation: number;
   ready: number;
@@ -149,7 +150,7 @@ export class D1ManageService {
       this.statement(contestsToJoinSql, caller.accountId).all<{ id: string; name: string; event_name: string }>(),
     ]);
     return {
-      webmasters: webmasters.map(({ id, name, username, ready }) => ({ id, name, username, ready: ready === 1 })),
+      webmasters: webmasters.map(({ id, name, handle, ready }) => ({ id, name, handle, ready: ready === 1 })),
       restrictWebmasterReads: restricted,
       contestsToJoin: contests.results.map((contest) => ({ id: contest.id, name: contest.name, eventName: contest.event_name })),
     };
@@ -217,11 +218,11 @@ export class D1ManageService {
   }
 
   private async issued(accountIds: readonly string[], passwords: ReadonlyMap<string, string>): Promise<IssuedCredential[]> {
-    const accounts = await this.statement(`SELECT id, COALESCE(username, '') AS username FROM accounts
-      WHERE id IN (SELECT value FROM json_each(?))`, JSON.stringify(accountIds)).all<{ id: string; username: string }>();
-    const usernames = new Map(accounts.results.map((account) => [account.id, account.username]));
+    const accounts = await this.statement(`SELECT id, COALESCE(handle, '') AS handle FROM accounts
+      WHERE id IN (SELECT value FROM json_each(?))`, JSON.stringify(accountIds)).all<{ id: string; handle: string }>();
+    const handles = new Map(accounts.results.map((account) => [account.id, account.handle]));
     return accountIds.map((accountId) => ({
-      accountId, username: usernames.get(accountId) ?? '', temporaryPassword: passwords.get(accountId) ?? null,
+      accountId, handle: handles.get(accountId) ?? '', temporaryPassword: passwords.get(accountId) ?? null,
     }));
   }
 
@@ -269,7 +270,8 @@ export class D1ManageService {
   }
 
   private async webmasters(): Promise<WebmasterRow[]> {
-    return (await this.statement(webmastersSql).all<WebmasterRow>()).results;
+    const rows = await this.statement(webmastersSql).all<Omit<WebmasterRow, 'loginKey'> & { login_key: LoginKey }>();
+    return rows.results.map(({ login_key, ...row }) => ({ ...row, loginKey: login_key }));
   }
 
   private async readsRestricted(): Promise<boolean> {
@@ -282,19 +284,19 @@ export class D1ManageService {
     const actor = authority.caller.accountId;
     switch (command.type) {
       case 'add_webmaster': {
-        const { username, name } = command.person;
-        if (await this.statement('SELECT 1 FROM accounts WHERE username = ?', username).first()) {
+        const { handle, name } = command.person;
+        if (await this.statement('SELECT 1 FROM accounts WHERE event_id IS NULL AND handle = ?', handle).first()) {
           throw new AuthenticationError(409, usernameTaken);
         }
         const accountId = crypto.randomUUID();
         return {
           statements: [
             // The account cannot sign in until issueCredentials gives it a password.
-            this.statement(`INSERT INTO accounts (id, name, username, must_change, credential_state)
-              VALUES (?, ?, ?, 1, 'pending')`, accountId, name, username),
+            this.statement(`INSERT INTO accounts (id, name, username, handle, must_change, credential_state)
+              VALUES (?, ?, ?, ?, 1, 'pending')`, accountId, name, loginKeyFor(accountId), handle),
             this.statement(`INSERT INTO grants (account_id, scope, granted_by) VALUES (?, 'site', ?)`, accountId, actor),
           ],
-          audit: { action: 'add_webmaster', target: accountId, detail: { username, name } },
+          audit: { action: 'add_webmaster', target: accountId, detail: { handle, name } },
           notify: [],
           receipt: { accountIds: [accountId] },
         };

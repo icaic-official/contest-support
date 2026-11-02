@@ -93,8 +93,8 @@ test('provider bridge isolates HttpOnly sessions for different actors', async ({
   const first = await connection(browser, baseURL);
   const second = await connection(browser, baseURL);
   try {
-    await first.client.backend.auth.signIn('first-account', 'fixture-only');
-    await second.client.backend.auth.signIn('second-account', 'fixture-only');
+    await first.client.backend.auth.signIn({ kind: 'site' }, 'first-account', 'fixture-only');
+    await second.client.backend.auth.signIn({ kind: 'site' }, 'second-account', 'fixture-only');
     expect(await first.client.backend.auth.currentUser()).toEqual({
       id: 'first-account',
     });
@@ -190,7 +190,7 @@ test('provider bridge stops immediate subscriptions once and retains active call
     await expect.poll(async () =>
       (await statistics(context)).authenticationStops
     ).toBe(1);
-    await client.backend.auth.signIn('fixture-account', 'fixture-only');
+    await client.backend.auth.signIn({ kind: 'site' }, 'fixture-account', 'fixture-only');
     expect(authenticationChanges).toBe(0);
 
     let connected = false;

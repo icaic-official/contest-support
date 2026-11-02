@@ -140,7 +140,12 @@ describe('Cloudflare authorized application and administration', () => {
   }
 
   it('returns complete permitted timing, resolutions, awards, image metadata, and identity names', async () => {
+    // A handle that differs from the login key. The member list shows the handle, and no response shows the key.
+    const loginKey = (await fixture.rows('SELECT username FROM accounts WHERE id = ?', fixture.specialist.accountId))[0]!.username;
+    await statement('UPDATE accounts SET handle = ? WHERE id = ?', 'shown-handle', fixture.specialist.accountId).run();
     const view = await service.snapshot(fixture.staff, fixture.sessionId);
+    expect(view.members.find((member) => member.person.id === fixture.specialist.accountId)?.person.username).toBe('shown-handle');
+    expect(JSON.stringify(view)).not.toContain(String(loginKey));
     expect(view.session).toMatchObject({ name: 'Fictional session', max_image_bytes: 10485760, max_images_per_issue: 12 });
     expect(view.event).toMatchObject({ name: 'Fictional event', archived: false });
     expect(view.membership).toMatchObject({ is_admin: true, roles: ['volunteer'] });

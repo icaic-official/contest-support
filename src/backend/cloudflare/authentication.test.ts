@@ -1,11 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createCloudflareAuthentication } from './authentication';
+import type { EventCode } from '../contracts';
 
 const ORIGIN = 'https://auth.minsky.test';
 const ACCOUNT_ID = '00000000-0000-4000-8000-000000000001';
 const SESSION_ID = '00000000-0000-4000-8000-000000000002';
 const user = { id: ACCOUNT_ID, name: 'Fictional helper' };
-const status = { username: 'helper', must_change: false, session_valid: true };
+const status = { handle: 'helper', must_change: false, session_valid: true };
 
 function json(body: unknown, statusCode = 200) {
   return new Response(JSON.stringify(body), { status: statusCode, headers: { 'Content-Type': 'application/json' } });
@@ -52,7 +53,7 @@ describe('Cloudflare browser authentication transport', () => {
   it('returns no user for expired or revoked sessions and validates server status', async () => {
     const unauthorized = setup(() => json({ error: 'Sign in to continue.' }, 401));
     await expect(unauthorized.auth.currentUser()).resolves.toBeUndefined();
-    expect(await unauthorized.auth.accountStatus()).toEqual({ username: null, must_change: true, session_valid: false });
+    expect(await unauthorized.auth.accountStatus()).toEqual({ handle: null, must_change: true, session_valid: false });
     const malformed = setup(() => json({ user, status: { ...status, must_change: 'no' }, csrf: 'test' }));
     await expect(malformed.auth.currentUser()).rejects.toThrow();
   });
@@ -62,10 +63,13 @@ describe('Cloudflare browser authentication transport', () => {
     const changed = vi.fn();
     const stop = auth.subscribe(changed);
     try {
-      await auth.signIn('helper', 'fictional-password');
+      await auth.signIn({ kind: 'event', code: 'xxxx-2026' as EventCode }, 'helper', 'fictional-password');
       expect(changed).toHaveBeenLastCalledWith(user);
       const login = requests.find((request) => request.method === 'POST');
-      expect(await login?.json()).toEqual({ username: 'helper', password: 'fictional-password' });
+      expect(await login?.json()).toEqual({ event: 'xxxx-2026', handle: 'helper', password: 'fictional-password' });
+      await auth.signIn({ kind: 'site' }, 'webmaster', 'fictional-password');
+      const site = requests.filter((request) => request.method === 'POST').at(-1);
+      expect(await site?.json()).toEqual({ event: null, handle: 'webmaster', password: 'fictional-password' });
       expect(login?.headers.get('X-Minsky-Request')).toBe('1');
       expect(login?.headers.has('X-CSRF-Token')).toBe(false);
       expect(login?.url).toBe(`${ORIGIN}/api/auth/sign-in`);
@@ -176,7 +180,7 @@ describe('Cloudflare browser authentication transport', () => {
         await vi.advanceTimersByTimeAsync(0);
         changed.mockClear();
         const mutations = {
-          signIn: () => auth.signIn('helper', 'fictional-password'),
+          signIn: () => auth.signIn({ kind: 'site' }, 'helper', 'fictional-password'),
           signOut: () => auth.signOut(),
           changePassword: () => auth.changePassword('fictional-old', 'fictional-new'),
         };

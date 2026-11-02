@@ -1,6 +1,7 @@
 import { expect, it } from 'vitest';
 import { getPlatformProxy } from 'wrangler';
 import type { D1Binding } from './connection';
+import type { EventCode } from '../../../backend/contracts';
 import { measureD1 } from './testMetrics';
 import { D1Fixture, applyMigrations } from './testFixture';
 import { D1AuthenticationService } from '../cloudflare/authentication';
@@ -67,7 +68,8 @@ it('keeps native D1 capabilities used by the maintained identity adapter', async
       origin: 'http://127.0.0.1:8788', secret: randomSecret(), secureCookies: false,
     });
     const service = new D1AuthenticationService(db, identity, passwordHasher);
-    const signed = await service.signIn(username, password);
+    const { code } = (await fixture.statement('SELECT code FROM events WHERE id = ?', fixture.eventId).first<{ code: EventCode }>())!;
+    const signed = await service.signIn({ kind: 'event', code }, username, password);
     const current = await service.current(new Headers({ cookie: signed.cookie.split(';')[0]! }));
     expect(current?.user.id).toBe(id);
     expect(lines.join('\n')).not.toContain(password);
@@ -75,7 +77,7 @@ it('keeps native D1 capabilities used by the maintained identity adapter', async
   } finally {
     if (created) {
       await fixture.statement('DELETE FROM ba_user WHERE id = ?', fixture.staff.accountId).run();
-      await fixture.statement('DELETE FROM authentication_limits WHERE key = ?', `username:${username}`).run();
+      await fixture.statement('DELETE FROM authentication_limits WHERE key = ?', `handle:${fixture.eventId}:${username}`).run();
       await fixture.cleanup();
     }
     await platform.dispose();

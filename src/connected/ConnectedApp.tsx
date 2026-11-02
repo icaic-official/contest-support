@@ -141,7 +141,7 @@ export function ConnectedApp() {
       <Workspace
         key={user.id}
         user={user}
-        username={status.username}
+        username={status.handle}
         changePassword={() => {
           navigate("/account");
           setPasswordSetup(true);

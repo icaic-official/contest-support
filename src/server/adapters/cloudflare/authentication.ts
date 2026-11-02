@@ -1,10 +1,12 @@
 import { z } from 'zod';
-import type { AccountCommand, AccountResult } from '../../../backend/contracts';
-import { AuthenticationError, type AuthenticationService, type AuthenticationSession } from '../../authentication';
+import type { AccountCommand, AccountResult, EventCode, Handle, LoginKey, SignInTarget } from '../../../backend/contracts';
+import {
+  AuthenticationError, signInRefused, type AuthenticationService, type AuthenticationSession,
+} from '../../authentication';
 import type { D1Connection, D1Statement, D1Value } from '../d1/connection';
 import type { IdentityProvider } from './identity';
-import { authorityCheck, manageAccountBindings, manageAccountSql, reaches, resolveAuthority } from './authority';
-import { beginCredentialReset, completeCredentialReset } from './credentials';
+import { authorityCheck, manageAccountBindings, manageAccountSql, reaches, resolveAuthority, signInAccountSql } from './authority';
+import { beginCredentialReset, completeCredentialReset, handleSchema, loginKeyFor } from './credentials';
 import { randomSecret, type PasswordHasher } from './password';
 
 /**
@@ -14,7 +16,6 @@ import { randomSecret, type PasswordHasher } from './password';
  */
 export const signInFailureLimits = { windowSeconds: 900, perIp: 200, perUsername: 10 } as const;
 
-const usernameSchema = z.string().trim().toLowerCase().regex(/^[a-z0-9][a-z0-9_-]{2,31}$/);
 const passwordSchema = z.string().min(12).max(128);
 const memberSchema = z.object({
   teamId: z.string().uuid().nullable(),
@@ -22,15 +23,17 @@ const memberSchema = z.object({
   isAdmin: z.boolean(),
 });
 const commandSchema = z.discriminatedUnion('action', [
-  memberSchema.extend({ action: z.literal('create_account'), username: usernameSchema, name: z.string().trim().min(1).max(200) }).strict(),
-  z.object({ action: z.literal('set_username'), userId: z.string().uuid(), username: usernameSchema }).strict(),
+  memberSchema.extend({ action: z.literal('create_account'), username: handleSchema, name: z.string().trim().min(1).max(200) }).strict(),
+  z.object({ action: z.literal('set_username'), userId: z.string().uuid(), username: handleSchema }).strict(),
   z.object({ action: z.literal('reset_password'), userId: z.string().uuid() }).strict(),
 ]);
 
 interface Account {
   id: string;
   name: string;
-  username: string | null;
+  /** The login key. Only Better Auth reads it. */
+  username: LoginKey | null;
+  handle: Handle | null;
   must_change: number;
   disabled: number;
   credential_generation: number;
@@ -48,6 +51,18 @@ interface Login extends Account {
 interface SqlCheck {
   sql: string;
   values: D1Value[];
+}
+
+/** The account that a sign-in names. `event_id` is set for an event code that exists. */
+interface SignInRow {
+  event_id: string | null;
+  account_id: string | null;
+  login_key: LoginKey | null;
+}
+
+/** The failure counter of one handle. The same handle in two events has two counters. */
+function signInLimitKey(scope: string, handle: Handle): string {
+  return `handle:${scope}:${handle}`;
 }
 
 // This query is also evaluated inside each privileged batch. No browser claim
@@ -78,7 +93,11 @@ export class D1AuthenticationService implements AuthenticationService {
       await this.db.batch(statements);
     } catch (error) {
       // Do not expose SQL, password hashes, or provider error text.
-      const rollback = error instanceof Error && /(?:CHECK|UNIQUE|FOREIGN KEY|NOT NULL) constraint failed/.test(error.message);
+      const message = error instanceof Error ? error.message : '';
+      if (message.includes('UNIQUE constraint failed: accounts.event_id, accounts.handle')) {
+        throw new AuthenticationError(409, 'That username is taken in this event. Choose another.');
+      }
+      const rollback = /(?:CHECK|UNIQUE|FOREIGN KEY|NOT NULL) constraint failed/.test(message);
       throw new AuthenticationError(409, rollback
         ? 'Account changed. Check its status before retrying.'
         : 'The account request outcome is unknown. Check its status before retrying.');
@@ -97,7 +116,7 @@ export class D1AuthenticationService implements AuthenticationService {
     return {
       caller: { accountId: row.id, loginId: row.login_id },
       user: { id: row.id, name: row.name },
-      status: { username: row.username, must_change: !!row.must_change, session_valid: true },
+      status: { handle: row.handle, must_change: !!row.must_change, session_valid: true },
       csrf: row.csrf,
     };
   }
@@ -109,30 +128,40 @@ export class D1AuthenticationService implements AuthenticationService {
     return current;
   }
 
-  async signIn(username: string, password: string): Promise<{ cookie: string }> {
-    const parsed = usernameSchema.safeParse(username);
+  async signIn(target: SignInTarget, input: string, password: string): Promise<{ cookie: string }> {
+    const parsed = handleSchema.safeParse(input);
     if (!parsed.success || typeof password !== 'string' || password.length > 128 || password.length < 1) {
-      throw new AuthenticationError(401, 'Username or password is incorrect.');
+      throw signInRefused(target.kind);
     }
-    // Refuse before the expensive password check when the username already has
+    const handle = parsed.data;
+    const row = await this.statement(signInAccountSql[target.kind],
+      ...(target.kind === 'event' ? [handle, target.code] : [handle])).first<SignInRow>();
+    // An unknown event code has no handle counter. The HTTP Worker's IP limit counts it.
+    if (!row && target.kind === 'event') throw signInRefused(target.kind);
+    // Refuse before the expensive password check when the handle already has
     // its maximum failures. Only a failure adds to the count, so a correct
     // password never uses an attempt. The HTTP Worker adds the IP limit.
-    const key = `username:${parsed.data}`;
+    const key = signInLimitKey(row?.event_id ?? 'site', handle);
     await this.assertBelowLimit(key, signInFailureLimits.perUsername);
     try {
-      return await this.createLogin(parsed.data, password);
+      // Better Auth looks up the text that it receives as a login key, and a
+      // legacy login key in another event can equal this handle. So an unknown
+      // handle never reaches it.
+      if (!row?.login_key) throw signInRefused(target.kind);
+      return await this.createLogin(row.login_key, password);
     } catch (error) {
-      if (error instanceof AuthenticationError && error.status === 401) await this.recordFailure(key);
-      throw error;
+      if (!(error instanceof AuthenticationError) || error.status !== 401) throw error;
+      await this.recordFailure(key);
+      throw signInRefused(target.kind);
     }
   }
 
-  private async createLogin(username: string, password: string): Promise<{ cookie: string }> {
-    const before = await this.statement('SELECT * FROM accounts WHERE username = ?', username).first<Account>();
+  private async createLogin(loginKey: LoginKey, password: string): Promise<{ cookie: string }> {
+    const before = await this.statement('SELECT * FROM accounts WHERE username = ?', loginKey).first<Account>();
     if (before && (before.disabled || before.credential_state !== 'ready')) {
       throw new AuthenticationError(401, 'Username or password is incorrect.');
     }
-    const signed = await this.identity.signIn(username, password);
+    const signed = await this.identity.signIn(loginKey, password);
     const loginId = crypto.randomUUID();
     const assertionId = crypto.randomUUID();
     // A reset can race Better Auth password verification. Only the generation
@@ -245,8 +274,11 @@ export class D1AuthenticationService implements AuthenticationService {
         throw new AuthenticationError(400, 'Choose a contestant team or staff roles or admin membership.');
       }
       gate.statements.push(
-        this.statement(`INSERT INTO accounts (id, name, username, must_change, credential_state, credential_operation)
-          VALUES (?, ?, ?, 1, 'pending', ?)`, target, command.name, command.username, operationId),
+        // The account takes the contest's event at once, so its handle never
+        // passes through the site namespace inside the batch.
+        this.statement(`INSERT INTO accounts (id, name, username, handle, event_id, must_change, credential_state, credential_operation)
+          SELECT ?, ?, ?, ?, event_id, 1, 'pending', ? FROM sessions WHERE id = ?`,
+        target, command.name, loginKeyFor(target), command.username, operationId, sessionId),
         this.statement('INSERT INTO memberships (session_id, account_id, team_id, is_admin) VALUES (?, ?, ?, ?)', sessionId, target, command.teamId, Number(command.isAdmin)),
         ...[...new Set(command.roles)].map((role) => this.statement('INSERT INTO membership_roles (session_id, account_id, role) VALUES (?, ?, ?)', sessionId, target, role)),
       );
@@ -262,7 +294,9 @@ export class D1AuthenticationService implements AuthenticationService {
     await this.guarded(gate.statements);
     const password = randomSecret() + 'A9!';
     await this.completeCredentials(headers, target, operationId, password, true, sessionId);
-    return { temporaryPassword: password };
+    const event = await this.statement(`SELECT e.code FROM accounts a LEFT JOIN events e ON e.id = a.event_id
+      WHERE a.id = ?`, target).first<{ code: EventCode | null }>();
+    return { temporaryPassword: password, signIn: event?.code ? { kind: 'event', code: event.code } : { kind: 'site' } };
   }
 
   private async completeCredentials(headers: Headers, target: string, operationId: string, password: string, temporary: boolean, sessionId?: string, prepared?: { hash: string; statements: D1Statement[]; finalCheck: SqlCheck }): Promise<void> {
@@ -286,7 +320,7 @@ export class D1AuthenticationService implements AuthenticationService {
     assertions.push(
       this.assertion(assertionId, `SELECT 1 FROM accounts WHERE id = ? AND credential_operation = ?
         AND credential_generation = ? AND credential_state = 'pending' AND disabled = 0`, target, operationId, generation),
-      ...completeCredentialReset(this.db, { id: target, name: account.name, username: account.username }, operationId, hash, temporary),
+      ...completeCredentialReset(this.db, { id: target, name: account.name, loginKey: account.username }, operationId, hash, temporary),
       this.statement('DELETE FROM command_assertions WHERE id = ?', assertionId),
     );
     if (adminAssertion) assertions.push(this.cleanupAssertions(adminAssertion));

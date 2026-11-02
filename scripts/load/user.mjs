@@ -66,12 +66,12 @@ class VirtualUser {
 
   /** Resolves true when the account had to replace its temporary password. */
   async signIn() {
-    const { username, temporary, changed } = this.account;
+    const { event, username, temporary, changed } = this.account;
     const derived = derivePassword(secret, username);
     let used;
     for (const password of changed ? [derived, temporary] : [temporary, derived]) {
       try {
-        await this.client.request('sign-in', '/api/auth/sign-in', { method: 'POST', body: { username, password } });
+        await this.client.request('sign-in', '/api/auth/sign-in', { method: 'POST', body: { event, handle: username, password } });
         used = password;
         break;
       } catch (error) {

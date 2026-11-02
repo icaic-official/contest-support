@@ -3,6 +3,7 @@ import type {
   AccountIdentity,
   Backend,
   MembershipInput,
+  SignInTarget,
 } from '../../src/backend/contracts';
 import type { Command } from '../../src/connected/model';
 
@@ -30,7 +31,7 @@ export type Request =
       | 'discardNextAccountResponse'
       | 'close';
   }
-  | { type: 'signIn'; username: string; password: string }
+  | { type: 'signIn'; target: SignInTarget; handle: string; password: string }
   | { type: 'changePassword'; currentPassword: string; newPassword: string }
   | { type: 'authSubscribe'; id: string }
   | { type: 'stop'; id: string }

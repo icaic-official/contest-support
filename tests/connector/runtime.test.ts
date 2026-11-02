@@ -64,6 +64,8 @@ it('runs the complete application through isolated HTTPS, D1, R2, and Durable Ob
   let browser: Browser | undefined;
   let worker: Awaited<ReturnType<typeof unstable_dev>> | undefined;
   let installation: Awaited<ReturnType<typeof bootstrapInstallation>> | undefined;
+  /** The installation event's code, which D1 chose. Created accounts sign in with it. */
+  let eventCode = '';
   let cleanupVerified = false;
   let scenarioCompleted = false;
 
@@ -99,13 +101,14 @@ it('runs the complete application through isolated HTTPS, D1, R2, and Durable Ob
     return current;
   }
 
-  async function authenticated(username: string, temporaryPassword: string): Promise<Actor> {
+  /** `event` null is a site sign-in, as the bootstrap webmaster uses. */
+  async function authenticated(username: string, temporaryPassword: string, event: string | null = eventCode): Promise<Actor> {
     if (!browser) throw new Error('The local browser did not start.');
     const context = await browser.newContext({ ignoreHTTPSErrors: true });
     accountContexts.push(context);
     const page = await context.newPage();
     const actor: Actor = { context, page, id: '', username, csrf: '' };
-    await json(actor, '/api/auth/sign-in', { username, password: temporaryPassword });
+    await json(actor, '/api/auth/sign-in', { event, handle: username, password: temporaryPassword });
     const before = await session(actor);
     expect(before.status.must_change).toBe(true);
     await json(actor, '/api/sessions', undefined, 403);
@@ -225,6 +228,8 @@ it('runs the complete application through isolated HTTPS, D1, R2, and Durable Ob
         eventName: `runtime:${unique}`, sessionName: 'Fictional contest', categories: ['Devices', 'Other'],
         teams: [{ name: 'Fictional Alpha', location: 'Desk A' }, { name: 'Fictional Beta', location: 'Desk B' }] });
       accountIds.push(installation.accountId);
+      eventCode = (await setup.env.DB.prepare('SELECT code FROM events WHERE id = ?').bind(installation.eventId)
+        .first<{ code: string }>())!.code;
       await setup.env.DB.batch([
         setup.env.DB.prepare('INSERT INTO events (id, name) VALUES (?, ?)').bind(sentinel.event, sentinel.name),
         setup.env.DB.prepare('INSERT INTO accounts (id, name) VALUES (?, ?)').bind(sentinel.account, sentinel.name),
@@ -244,7 +249,7 @@ it('runs the complete application through isolated HTTPS, D1, R2, and Durable Ob
       experimental: { disableExperimentalWarning: true, testScheduled: true },
     });
     browser = await chromium.launch({ headless: true });
-    const organizer = await authenticated(installation.adminUsername, installation.temporaryPassword);
+    const organizer = await authenticated(installation.adminUsername, installation.temporaryPassword, null);
     await admin(organizer, { action: 'save_member', userId: organizer.id, member: { teamId: null, roles: ['volunteer', 'jury'], isAdmin: true } });
     await admin(organizer, { action: 'set_intake', open: true });
     await admin(organizer, { action: 'set_image_limits', limits: { fileMegabytes: 1, count: 3, totalMegabytes: 3 } });
@@ -379,7 +384,7 @@ it('runs the complete application through isolated HTTPS, D1, R2, and Durable Ob
           id: installation.installationId, owner_account_id: installation.accountId,
           event_id: installation.eventId, session_id: installation.sessionId,
         });
-        const discovered = await db.prepare('SELECT id FROM accounts WHERE username LIKE ?').bind(`rt_${unique}_%`).all<{ id: string }>();
+        const discovered = await db.prepare('SELECT id FROM accounts WHERE handle LIKE ?').bind(`rt_${unique}_%`).all<{ id: string }>();
         const ownedAccounts = [...new Set([...accountIds, ...discovered.results.map((row) => row.id)])];
         const images = await db.prepare('SELECT original_path, thumbnail_path FROM issue_images WHERE session_id = ?').bind(installation.sessionId)
           .all<{ original_path: string; thumbnail_path: string }>();
@@ -394,7 +399,8 @@ it('runs the complete application through isolated HTTPS, D1, R2, and Durable Ob
         if (scenarioCompleted) expect((await cleanup.env.IMAGES.list({})).objects.map((object) => object.key)).toEqual([sentinel.name]);
         const limits = await db.prepare('SELECT key FROM authentication_limits').all<{ key: string }>();
         const ownedLimits = limits.results.filter(({ key }) => fixtureIpKeys.includes(key) ||
-          ownedAccounts.some((id) => key === `change:${id}`) || usernames.some((username) => key === `username:${username}`));
+          ownedAccounts.some((id) => key === `change:${id}`) ||
+          usernames.some((username) => [`handle:${installation!.eventId}:${username}`, `handle:site:${username}`].includes(key)));
         await db.batch([
           db.prepare('DELETE FROM installation WHERE id = ? AND owner_account_id = ?').bind(installation.installationId, installation.accountId),
           db.prepare('DELETE FROM events WHERE id = ? AND name = ?').bind(installation.eventId, `runtime:${unique}`),

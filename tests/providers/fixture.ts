@@ -60,6 +60,7 @@ export const test = base.extend<
         if (actor) {
           const account = prepared.data.accounts[actor];
           await connection.backend.auth.signIn(
+            account.target,
             account.username,
             account.password,
           );

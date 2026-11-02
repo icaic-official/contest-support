@@ -72,21 +72,24 @@ describe('site commands for webmasters', () => {
 
   it('adds a webmaster who waits for a password, and answers a retry with the first receipt', async () => {
     const requestId = randomUUID();
-    const command: ManageCommand = { type: 'add_webmaster', person: { username: 'New-Webmaster', name: 'Fictional newcomer' } };
+    const command: ManageCommand = { type: 'add_webmaster', person: { handle: 'New-Webmaster', name: 'Fictional newcomer' } };
     const receipt = await execute('first', command, requestId);
     expect(receipt.accountIds).toHaveLength(1);
     const [added] = receipt.accountIds!;
     expect(await execute('first', command, requestId)).toEqual(receipt);
     expect((await siteOf('first')).webmasters).toContainEqual(
-      { id: added, name: 'Fictional newcomer', username: 'new-webmaster', ready: false });
+      { id: added, name: 'Fictional newcomer', handle: 'new-webmaster', ready: false });
     expect(await rows('SELECT action, actor, actor_name, target, event_id FROM authority_audit')).toEqual([{
       action: 'add_webmaster', actor: caller('first').accountId, actor_name: 'Fictional first', target: added, event_id: null,
     }]);
     await expect(execute('first', { type: 'set_webmaster_reads', restricted: true }, requestId))
       .rejects.toMatchObject({ status: 409, message: 'This request was already used for another change. Refresh and try again.' });
-    await expect(execute('second', { type: 'add_webmaster', person: { username: 'new-webmaster', name: 'Copy' } }))
+    await expect(execute('second', { type: 'add_webmaster', person: { handle: 'new-webmaster', name: 'Copy' } }))
       .rejects.toMatchObject({ status: 409, message: 'That username is taken. Choose another.' });
-    expect(await rows("SELECT count(*) AS n FROM accounts WHERE username = 'new-webmaster'")).toEqual([{ n: 1 }]);
+    expect(await rows("SELECT count(*) AS n FROM accounts WHERE handle = 'new-webmaster'")).toEqual([{ n: 1 }]);
+    // The new webmaster types the handle. Better Auth knows only the login key.
+    expect(await rows('SELECT username, event_id FROM accounts WHERE id = ?', added!))
+      .toEqual([{ username: added!.replaceAll('-', ''), event_id: null }]);
   });
 
   it('returns the stored receipt when the response to a committed change is lost', async () => {
@@ -98,10 +101,10 @@ describe('site commands for webmasters', () => {
       },
     };
     const requestId = randomUUID();
-    const command: ManageCommand = { type: 'add_webmaster', person: { username: 'lost-response', name: 'Fictional' } };
+    const command: ManageCommand = { type: 'add_webmaster', person: { handle: 'lost-response', name: 'Fictional' } };
     const receipt = await new D1ManageService(lossy, fastPasswords).execute(caller('first'), requestId, command);
     expect(await execute('first', command, requestId)).toEqual(receipt);
-    expect(await rows("SELECT id FROM accounts WHERE username = 'lost-response'")).toEqual([{ id: receipt.accountIds![0] }]);
+    expect(await rows("SELECT id FROM accounts WHERE handle = 'lost-response'")).toEqual([{ id: receipt.accountIds![0] }]);
   });
 
   it('refuses everyone but webmasters', async () => {
@@ -174,7 +177,7 @@ describe('site commands for webmasters', () => {
     await expect(run(`DELETE FROM grants WHERE scope = 'site' AND account_id = ?`, caller('first').accountId))
       .rejects.toThrow(/The last webmaster cannot be removed/);
 
-    const { accountIds } = await execute('first', { type: 'add_webmaster', person: { username: 'pending', name: 'Fictional pending' } });
+    const { accountIds } = await execute('first', { type: 'add_webmaster', person: { handle: 'pending', name: 'Fictional pending' } });
     await expect(execute('first', { type: 'remove_webmaster', accountId: caller('first').accountId }))
       .rejects.toMatchObject({ status: 409, message: 'Give another webmaster a password before you remove yourself.' });
     await run("UPDATE accounts SET credential_state = 'ready' WHERE id = ?", accountIds![0]!);
@@ -188,23 +191,23 @@ describe('site commands for webmasters', () => {
   });
 
   it('issues a new webmaster a password in one batch, and a retry returns the account without it', async () => {
-    const { accountIds } = await execute('first', { type: 'add_webmaster', person: { username: 'newcomer', name: 'Fictional newcomer' } });
+    const { accountIds } = await execute('first', { type: 'add_webmaster', person: { handle: 'newcomer', name: 'Fictional newcomer' } });
     const added = accountIds![0]!;
     const requestId = randomUUID();
     const issuing = new D1ManageService(db, passwordHasher);
     const [issued] = await issuing.issueCredentials(caller('first'), requestId, [added]);
-    expect(issued).toMatchObject({ accountId: added, username: 'newcomer' });
+    expect(issued).toMatchObject({ accountId: added, handle: 'newcomer' });
     expect(issued!.temporaryPassword).toMatch(/^.{12,}$/);
     expect((await siteOf('first')).webmasters).toContainEqual(expect.objectContaining({ id: added, ready: true }));
     const authentication = new D1AuthenticationService(db, createBetterAuthIdentity(db, {
       origin: 'http://127.0.0.1:8788', secret: randomSecret(), secureCookies: false,
     }), passwordHasher);
-    const signed = await authentication.signIn('newcomer', issued!.temporaryPassword!);
+    const signed = await authentication.signIn({ kind: 'site' }, 'newcomer', issued!.temporaryPassword!);
     const current = await authentication.current(new Headers({ cookie: signed.cookie.split(';')[0]! }));
     expect(current?.user.id).toBe(added);
     expect(current?.status.must_change).toBe(true);
     expect(await issuing.issueCredentials(caller('first'), requestId, [added]))
-      .toEqual([{ accountId: added, username: 'newcomer', temporaryPassword: null }]);
+      .toEqual([{ accountId: added, handle: 'newcomer', temporaryPassword: null }]);
     expect(await rows("SELECT action, state, actor FROM account_operations WHERE account_id = ?", added))
       .toEqual([{ action: 'reset_password', state: 'completed', actor: caller('first').accountId }]);
     expect(await rows("SELECT json_extract(detail, '$.accountIds') AS accounts FROM authority_audit WHERE action = 'issue_passwords'"))

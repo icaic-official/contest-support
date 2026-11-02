@@ -65,7 +65,8 @@ async function signInAdmin(fixtures, path) {
   const { admin } = fixtures;
   const derived = derivePassword(fixtures.secret, admin.username);
   const password = admin.changed ? derived : admin.temporary;
-  await client.request('sign-in', '/api/auth/sign-in', { method: 'POST', body: { username: admin.username, password } });
+  // The bootstrap account is a webmaster, so it signs in to the site.
+  await client.request('sign-in', '/api/auth/sign-in', { method: 'POST', body: { event: null, handle: admin.username, password } });
   const session = (await client.request('auth-session', '/api/auth/session')).body;
   if (session.status.must_change) {
     await client.request('change-password', '/api/auth/change-password', {
@@ -132,7 +133,8 @@ async function setup(options) {
   ];
   const members = new Map(current.members.map((member) => [member.person.username, member.person.id]));
   const known = new Map(fixtures.accounts.map((account) => [account.username, account]));
-  const todo = wanted.filter((account) => !known.has(account.username) || !members.has(account.username));
+  // An account from a fixture file older than event sign-in has no event code, so it gets a reset.
+  const todo = wanted.filter((account) => !known.get(account.username)?.event || !members.has(account.username));
   log(`${wanted.length - todo.length} of ${wanted.length} accounts exist. Creating or resetting ${todo.length}.`);
   let done = 0;
   const work = async (account) => {
@@ -141,7 +143,7 @@ async function setup(options) {
       : { action: 'create_account', username: account.username, name: `Fictional ${account.username}`,
           teamId: account.teamId, roles: account.kind === 'staff' ? ['volunteer'] : [], isAdmin: false };
     const result = await post(client, '/api/accounts', { sessionId: fixtures.sessionId, command });
-    known.set(account.username, { ...account, temporary: result.temporaryPassword, changed: false });
+    known.set(account.username, { ...account, event: result.signIn.code, temporary: result.temporaryPassword, changed: false });
     if (++done % 50 === 0) {
       fixtures.accounts = [...known.values()];
       await writeFixtures(options.fixtures, fixtures);

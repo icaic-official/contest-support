@@ -319,9 +319,10 @@ async function measureShape(name, shape) {
     }
 
     const logins = {};
+    const { code } = await raw.prepare('SELECT code FROM events WHERE id = ?').bind(id('event', 1)).first();
     for (const [caller, n] of Object.entries(roles)) {
       const { response } = await http('/api/auth/sign-in', `${caller}${Object.keys(logins).length ? '' : ' (cold)'}`, {
-        method: 'POST', body: { username: `user${n}`, password } });
+        method: 'POST', body: { event: code, handle: `user${n}`, password } });
       logins[caller] = { cookie: response.headers.get('set-cookie').split(';')[0], account: id('account', n) };
     }
     const drained = await lib.dispatchNotifications({ DB: raw, LIVE_UPDATES: env.LIVE_UPDATES });

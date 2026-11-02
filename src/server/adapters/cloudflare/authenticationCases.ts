@@ -4,8 +4,10 @@ import { openStoreDatabase } from './tooling/store-database.mjs';
 import type { D1Binding, D1Connection, D1Statement, D1Value } from '../d1/connection';
 import { D1Fixture, applyMigrations } from '../d1/testFixture';
 import { measureD1 } from '../d1/testMetrics';
+import type { EventCode } from '../../../backend/contracts';
 import { D1ApplicationService, notificationStatements } from './application';
 import { D1AuthenticationService } from './authentication';
+import { loginKeyFor } from './credentials';
 import { createBetterAuthIdentity, type IdentityProvider } from './identity';
 import { passwordHasher, randomSecret, type PasswordHasher } from './password';
 import { createAuthenticationHandler } from '../../authenticationHttp';
@@ -56,6 +58,7 @@ export function registerAuthenticationCases(group: AuthenticationCases) {
     let service: D1AuthenticationService;
     let password: string;
     let username: string;
+    let eventCode: EventCode;
     let adminHeaders: Headers;
     let extraIds: string[];
     let usernames: string[];
@@ -89,11 +92,14 @@ export function registerAuthenticationCases(group: AuthenticationCases) {
       return results.map((result) => result.results);
     }
 
-    async function signIn(accountUsername = username, accountPassword = password, instance = service): Promise<Headers> {
+    async function signIn(accountUsername = username, accountPassword = password, instance = service, code = eventCode): Promise<Headers> {
       usernames.push(accountUsername.trim().toLowerCase());
-      const signed = await instance.signIn(accountUsername, accountPassword);
+      const signed = await instance.signIn({ kind: 'event', code }, accountUsername, accountPassword);
       return new Headers({ cookie: signed.cookie.split(';')[0]! });
     }
+
+    /** The failure counter of a handle in the fixture event. */
+    const limitKey = (handle: string, eventId = fixture.eventId) => `handle:${eventId}:${handle}`;
 
     async function credentialEffects(): Promise<string> {
       const people = `SELECT id FROM accounts WHERE id IN (?, ?) OR name = ?`;
@@ -145,6 +151,7 @@ export function registerAuthenticationCases(group: AuthenticationCases) {
       fixture = new D1Fixture(db, configPath);
       await fixture.create();
       created = true;
+      eventCode = (await stmt('SELECT code FROM events WHERE id = ?', fixture.eventId).first<{ code: EventCode }>())!.code;
       password = randomSecret();
       username = `auth_${fixture.eventId.replaceAll('-', '').slice(0, 20)}`;
       const hash = await hasher.hash(password);
@@ -169,7 +176,7 @@ export function registerAuthenticationCases(group: AuthenticationCases) {
       if (!created) return;
       // Remove only this UUID's identity records. The proof fixture independently
       // checks account markers, event ownership, and all application relationships.
-      const extra = await stmt('SELECT id, username FROM accounts WHERE name = ?', `auth-fixture:${fixture.eventId}`).all<{ id: string; username: string }>();
+      const extra = await stmt('SELECT id, handle AS username FROM accounts WHERE name = ?', `auth-fixture:${fixture.eventId}`).all<{ id: string; username: string }>();
       extraIds = [...new Set([...extraIds, ...extra.results.map((row) => row.id)])];
       usernames.push(...extra.results.map((row) => row.username));
       const uniqueUsernames = [...new Set(usernames)];
@@ -181,8 +188,8 @@ export function registerAuthenticationCases(group: AuthenticationCases) {
         ...ids.map((id) => stmt('DELETE FROM account_operations WHERE account_id = ?', id)),
         ...extraIds.map((id) => stmt('DELETE FROM accounts WHERE id = ? AND name = ?', id, `auth-fixture:${fixture.eventId}`)),
         ...ids.map((id) => stmt('DELETE FROM ba_user WHERE id = ?', id)),
-        stmt('DELETE FROM authentication_limits WHERE key IN (?, ?, ?, ?)', `username:${username}`, `username:${username}_a`, `change:${fixture.staff.accountId}`, `change:${fixture.contestant.accountId}`),
-        ...uniqueUsernames.map((name) => stmt('DELETE FROM authentication_limits WHERE key = ?', `username:${name}`)),
+        stmt('DELETE FROM authentication_limits WHERE key IN (?, ?, ?, ?)', limitKey(username), limitKey(`${username}_a`), `change:${fixture.staff.accountId}`, `change:${fixture.contestant.accountId}`),
+        ...uniqueUsernames.map((name) => stmt('DELETE FROM authentication_limits WHERE key = ?', limitKey(name))),
       ]);
       const checks = await rowsBatch([
         ...ids.flatMap((id) => [
@@ -190,7 +197,7 @@ export function registerAuthenticationCases(group: AuthenticationCases) {
           stmt('SELECT count(*) AS n FROM ba_session WHERE userId = ?', id),
           stmt('SELECT count(*) AS n FROM ba_account WHERE userId = ?', id),
         ]),
-        ...uniqueUsernames.map((name) => stmt('SELECT key FROM authentication_limits WHERE key = ?', `username:${name}`)),
+        ...uniqueUsernames.map((name) => stmt('SELECT key FROM authentication_limits WHERE key = ?', limitKey(name))),
       ]);
       for (let index = 0; index < ids.length; index++) {
         expect(checks[index * 3]![0]?.n).toBe(0);
@@ -201,12 +208,98 @@ export function registerAuthenticationCases(group: AuthenticationCases) {
       await fixture.cleanup();
     }, 120_000);
 
+    /**
+     * One account in a second event, with a password. A legacy account passes
+     * its handle as the login key. The test removes it.
+     */
+    async function otherEventAccount(handle: string, accountPassword: string, loginKey?: string) {
+      const ids = { event: randomUUID(), account: randomUUID() };
+      const key = loginKey ?? loginKeyFor(ids.account);
+      const now = new Date().toISOString();
+      await db.batch([
+        stmt('INSERT INTO events (id) VALUES (?)', ids.event),
+        stmt('INSERT INTO accounts (id, name, username, handle, event_id, must_change) VALUES (?, ?, ?, ?, ?, 0)',
+          ids.account, 'Fictional other event account', key, handle, ids.event),
+        stmt(`INSERT INTO ba_user (id, name, username, email, emailVerified, createdAt, updatedAt) VALUES (?, ?, ?, ?, 1, ?, ?)`,
+          ids.account, 'Fictional account', key, `${key}@accounts.minsky.invalid`, now, now),
+        stmt(`INSERT INTO ba_account (id, accountId, providerId, userId, password, createdAt, updatedAt) VALUES (?, ?, 'credential', ?, ?, ?, ?)`,
+          randomUUID(), ids.account, ids.account, await hasher.hash(accountPassword), now, now),
+      ]);
+      const { code } = (await stmt('SELECT code FROM events WHERE id = ?', ids.event).first<{ code: EventCode }>())!;
+      return {
+        ...ids, code,
+        remove: () => db.batch([
+          stmt('DELETE FROM ba_user WHERE id = ?', ids.account),
+          stmt('DELETE FROM accounts WHERE id = ?', ids.account),
+          stmt('DELETE FROM events WHERE id = ?', ids.event),
+          stmt('DELETE FROM authentication_limits WHERE key = ?', limitKey(handle, ids.event)),
+        ]),
+      };
+    }
+
     if (group === 'sessions') {
       it('logs in with a normalized username and restores the stable account ID', async () => {
         const headers = await signIn(` ${username.toUpperCase()} `);
         const current = await service.current(headers);
         expect(current?.user.id).toBe(fixture.contestant.accountId);
-        expect(current?.status).toMatchObject({ must_change: false, session_valid: true });
+        expect(current?.status).toMatchObject({ handle: username, must_change: false, session_valid: true });
+        // A legacy account signs in with its old username, which is both its handle and its login key.
+        expect(await stmt('SELECT username, handle FROM accounts WHERE id = ?', fixture.contestant.accountId).first())
+          .toEqual({ username, handle: username });
+      });
+
+      it('signs the same handle in to the account of the named event', async () => {
+        const otherPassword = randomSecret();
+        const other = await otherEventAccount(username, otherPassword);
+        try {
+          expect((await service.current(await signIn(username, otherPassword, service, other.code)))?.user.id).toBe(other.account);
+          expect((await service.current(await signIn()))?.user.id).toBe(fixture.contestant.accountId);
+          await expectFailure(signIn(username, password, service, other.code)).toMatchObject({ status: 401 });
+        } finally {
+          await other.remove();
+        }
+      });
+
+      it('refuses an unknown event code with the one message and counts no handle failure', async () => {
+        const refusal = { status: 401, message: 'The event code, username, or password is incorrect.' };
+        await expectFailure(signIn(username, password, service, `absent-${randomSecret().slice(0, 12)}` as EventCode)).toMatchObject(refusal);
+        expect((await stmt('SELECT count(*) AS n FROM authentication_limits WHERE key LIKE ?', `%:${username}`).first<{ n: number }>())?.n).toBe(0);
+        await expectFailure(signIn(username, randomSecret())).toMatchObject(refusal);
+        await expectFailure(signIn(`absent_${randomSecret().slice(0, 15)}`)).toMatchObject(refusal);
+      });
+
+      it('never gives Better Auth an unknown handle, even when it is a login key in another event', async () => {
+        const legacy = `legacy_${randomSecret().slice(0, 20)}`;
+        const otherPassword = randomSecret();
+        const other = await otherEventAccount(legacy, otherPassword, legacy);
+        let calls = 0;
+        const counting: IdentityProvider = { ...identity, signIn: async (key, value) => {
+          calls++;
+          return identity.signIn(key, value);
+        } };
+        const watched = new D1AuthenticationService(db, counting, hasher);
+        try {
+          await expectFailure(signIn(legacy, otherPassword, watched)).toMatchObject({ status: 401 });
+          expect(calls).toBe(0);
+          expect(await stmt('SELECT attempts FROM authentication_limits WHERE key = ?', limitKey(legacy)).first()).toEqual({ attempts: 1 });
+          expect((await watched.current(await signIn(legacy, otherPassword, watched, other.code)))?.user.id).toBe(other.account);
+          expect(calls).toBe(1);
+        } finally {
+          await other.remove();
+        }
+      });
+
+      it('counts sign-in failures for each event separately', async () => {
+        const otherPassword = randomSecret();
+        const other = await otherEventAccount(username, otherPassword);
+        try {
+          await stmt('INSERT INTO authentication_limits (key, window_start, attempts) VALUES (?, unixepoch(), 10)',
+            limitKey(username, other.event)).run();
+          await expectFailure(signIn(username, otherPassword, service, other.code)).toMatchObject({ status: 429 });
+          expect((await service.current(await signIn()))?.user.id).toBe(fixture.contestant.accountId);
+        } finally {
+          await other.remove();
+        }
       });
 
       it.each(['expired_login', 'expired_identity', 'revoked', 'generation', 'disabled', 'pending'])(
@@ -339,7 +432,7 @@ export function registerAuthenticationCases(group: AuthenticationCases) {
           await expectFailure(racing.account(adminHeaders, fixture.sessionId, command)).toMatchObject({ status: 409 });
           expect(pending).toBeDefined();
           expect(await credentialEffects()).toBe(pending);
-          const account = await stmt('SELECT credential_state, must_change FROM accounts WHERE username = ?',
+          const account = await stmt('SELECT credential_state, must_change FROM accounts WHERE handle = ?',
             action === 'create_account' ? accountUsername : username).first<{ credential_state: string; must_change: number }>();
           expect(account).toMatchObject({ credential_state: 'pending', must_change: 1 });
           expect((await service.current(adminHeaders))?.status.must_change).toBe(false);
@@ -348,7 +441,7 @@ export function registerAuthenticationCases(group: AuthenticationCases) {
         it(`rolls back ${action} completion when the target credential generation changes at the final check`, async () => {
           const accountUsername = action === 'create_account' ? `late_${randomSecret().slice(0, 20)}` : username;
           let pending: string | undefined;
-          const racing = changeAtFinalGuard(stmt('UPDATE accounts SET credential_generation = credential_generation + 1 WHERE username = ?', accountUsername),
+          const racing = changeAtFinalGuard(stmt('UPDATE accounts SET credential_generation = credential_generation + 1 WHERE handle = ?', accountUsername),
             2, async () => { pending = await credentialEffects(); });
           const command = action === 'create_account'
             ? { action, username: accountUsername, name: `auth-fixture:${fixture.eventId}`, teamId: fixture.teamId, roles: [], isAdmin: false }
@@ -445,7 +538,7 @@ export function registerAuthenticationCases(group: AuthenticationCases) {
         usernames.push(accountUsername);
         const interrupted = new D1AuthenticationService(db, identity, { ...hasher, hash: async () => { throw new Error('Interrupted creation'); } });
         await expectFailure(interrupted.account(adminHeaders, fixture.sessionId, { action: 'create_account', username: accountUsername, name: `auth-fixture:${fixture.eventId}`, teamId: fixture.teamId, roles: [], isAdmin: false })).toThrow('Interrupted creation');
-        const row = await stmt('SELECT id, credential_state FROM accounts WHERE username = ?', accountUsername).first<{id: string; credential_state: string}>();
+        const row = await stmt('SELECT id, credential_state FROM accounts WHERE handle = ?', accountUsername).first<{id: string; credential_state: string}>();
         extraIds.push(row!.id);
         expect(row?.credential_state).toBe('pending');
         const recovered = await service.account(adminHeaders, fixture.sessionId, { action: 'reset_password', userId: row!.id });
@@ -470,7 +563,7 @@ export function registerAuthenticationCases(group: AuthenticationCases) {
 
     if (group === 'sessions') {
       it('bounds password attempts and releases an expired rate window', async () => {
-        const key = `username:${username}`;
+        const key = limitKey(username);
         await service.limit(key, 2);
         await service.limit(key, 2);
         await expectFailure(service.limit(key, 2)).toMatchObject({ status: 429 });
@@ -511,7 +604,7 @@ export function registerAuthenticationCases(group: AuthenticationCases) {
       });
 
       it('does not count a successful sign-in or password change toward the username limit', async () => {
-        const key = `username:${username}`;
+        const key = limitKey(username);
         const attempts = async () => (await stmt('SELECT attempts FROM authentication_limits WHERE key = ?', key).first<{ attempts: number }>())?.attempts;
         await db.batch([
           stmt('UPDATE accounts SET must_change = 1 WHERE id = ?', fixture.contestant.accountId),
@@ -644,7 +737,7 @@ export function registerAuthenticationCases(group: AuthenticationCases) {
         const signals = async (audience: string) => (await stmt('SELECT count(*) AS n FROM notifications WHERE session_id = ? AND audience = ?', fixture.sessionId, audience).first<{ n: number }>())!.n;
         const staffBefore = await signals('staff');
         const result = await service.account(adminHeaders, fixture.sessionId, { action: 'create_account', username: accountUsername, name: `auth-fixture:${fixture.eventId}`, teamId: fixture.teamId, roles: [], isAdmin: false });
-        const row = await stmt('SELECT id FROM accounts WHERE username = ?', accountUsername).first<{id: string}>();
+        const row = await stmt('SELECT id FROM accounts WHERE handle = ?', accountUsername).first<{id: string}>();
         extraIds.push(row!.id);
         // A new account has no login, so setup writes one staff notification and no account notification.
         expect(await signals(`account:${row!.id}`)).toBe(0);
@@ -652,6 +745,15 @@ export function registerAuthenticationCases(group: AuthenticationCases) {
         const current = await service.current(await signIn(accountUsername, result.temporaryPassword));
         expect(current?.user.id).toBe(row!.id);
         expect(current?.status.must_change).toBe(true);
+        // Only Better Auth knows the login key. No response shows it.
+        const loginKey = loginKeyFor(row!.id);
+        expect(await stmt('SELECT username, event_id FROM accounts WHERE id = ?', row!.id).first())
+          .toEqual({ username: loginKey, event_id: fixture.eventId });
+        expect(result.signIn).toEqual({ kind: 'event', code: eventCode });
+        expect(JSON.stringify([result, current])).not.toContain(loginKey);
+        await expectFailure(service.account(adminHeaders, fixture.sessionId, { action: 'create_account', username: accountUsername,
+          name: `auth-fixture:${fixture.eventId}`, teamId: fixture.teamId, roles: [], isAdmin: false }))
+          .toMatchObject({ status: 409, message: 'That username is taken in this event. Choose another.' });
       });
 
       it('leaves a failed password update restricted and recoverable by another reset', async () => {
@@ -708,7 +810,7 @@ export function registerAuthenticationCases(group: AuthenticationCases) {
             return response;
           },
         });
-        await verifyTemporaryAuthentication(auth, { id: fixture.contestant.accountId, username, password }, {
+        await verifyTemporaryAuthentication(auth, { id: fixture.contestant.accountId, target: { kind: 'event', code: eventCode }, username, password }, {
           restricted: async () => { expect((await auth.accountStatus()).must_change).toBe(true); },
           ready: async () => { expect(await auth.accountStatus()).toMatchObject({ must_change: false, session_valid: true }); },
         });

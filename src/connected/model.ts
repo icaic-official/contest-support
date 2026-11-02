@@ -117,6 +117,7 @@ export const snapshotSchema = z.object({
   members: z.array(
     z.object({
       membership: membershipSchema,
+      /** `username` is the handle, which the person types to sign in. */
       person: z.object({ id: uuid, name: z.string(), username: z.string().nullable() }),
     }),
   ),

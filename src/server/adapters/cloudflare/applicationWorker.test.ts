@@ -32,12 +32,13 @@ describe('full Worker installation boundary with real local D1', () => {
   }, timeout);
   afterAll(async () => { if (dispose) await dispose(); }, timeout);
 
-  async function signIn(username: string, password: string) {
+  /** A site sign-in, as the bootstrap webmaster uses. */
+  async function signIn(handle: string, password: string) {
     const pending: Promise<unknown>[] = [];
     const response = await applicationWorker.fetch(new Request(`${origin}/api/auth/sign-in`, {
       method: 'POST', headers: { Origin: origin, 'Content-Type': 'application/json',
         'X-Minsky-Request': '1', 'Sec-Fetch-Site': 'same-origin', 'CF-Connecting-IP': '192.0.2.10' },
-      body: JSON.stringify({ username, password }),
+      body: JSON.stringify({ event: null, handle, password }),
     }), env, { waitUntil: (operation) => { pending.push(operation); } });
     await Promise.all(pending);
     return response;

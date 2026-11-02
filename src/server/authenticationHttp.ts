@@ -1,11 +1,13 @@
 import { z } from 'zod';
 import { hasJsonBody, readJsonBody } from './http';
+import { parseEventCode, type SignInTarget } from '../backend/contracts';
 import { roleSchema } from '../connected/model';
-import { AuthenticationError, type AuthenticationService } from './authentication';
+import { AuthenticationError, signInRefused, type AuthenticationService } from './authentication';
 
 const passwordSchema = z.string().min(1).max(1024);
 const usernameSchema = z.string().min(1).max(128);
-const signInSchema = z.strictObject({ username: usernameSchema, password: passwordSchema });
+/** `event` is the typed event code, or null for a site sign-in. */
+const signInSchema = z.strictObject({ event: z.string().max(128).nullable(), handle: usernameSchema, password: passwordSchema });
 const passwordChangeSchema = z.strictObject({ currentPassword: passwordSchema, newPassword: passwordSchema });
 const accountSchema = z.strictObject({
   sessionId: z.uuid(),
@@ -72,8 +74,13 @@ export function createAuthenticationHandler(
       const body = await readJsonBody(request);
       if (url.pathname === '/api/auth/sign-in') {
         const parsed = signInSchema.safeParse(body);
-        if (!parsed.success) throw new AuthenticationError(400, 'Enter a username and password.');
-        const result = await service.signIn(parsed.data.username, parsed.data.password);
+        if (!parsed.success) throw new AuthenticationError(400, 'Reload the page, then sign in again.');
+        const { event, handle, password } = parsed.data;
+        const code = event === null ? undefined : parseEventCode(event);
+        // A code that cannot exist gets the refusal of a wrong code, so the IP limit counts it.
+        if (event !== null && !code) throw signInRefused('event');
+        const target: SignInTarget = code ? { kind: 'event', code } : { kind: 'site' };
+        const result = await service.signIn(target, handle, password);
         return json({}, 200, result.cookie);
       }
       if (!['/api/auth/sign-out', '/api/auth/change-password', '/api/accounts'].includes(url.pathname)) {

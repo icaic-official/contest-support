@@ -2,6 +2,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { getPlatformProxy } from 'wrangler';
 import type { D1Binding, D1Connection, D1Statement } from '../d1/connection';
+import type { LoginKey } from '../../../backend/contracts';
 import { applyMigrations } from '../d1/testFixture';
 import applicationWorker, { type ApplicationEnvironment } from './applicationWorker';
 import { createBetterAuthIdentity, sharedBetterAuthIdentity } from './identity';
@@ -62,6 +63,7 @@ describe('Better Auth work per request with real local D1', () => {
   const sql: string[] = [];
   const run = randomUUID().replaceAll('-', '').slice(0, 8);
   const username = `statements_${run}`;
+  let eventCode = '';
 
   beforeAll(async () => {
     const platform = await getPlatformProxy<{ DB: D1Binding }>({
@@ -71,8 +73,11 @@ describe('Better Auth work per request with real local D1', () => {
     dispose = platform.dispose;
     await applyMigrations(db);
     const id = randomUUID();
+    const event = randomUUID();
     await db.batch([
-      db.prepare('INSERT INTO accounts (id, name, username, must_change) VALUES (?, ?, ?, 0)').bind(id, 'Fictional account', username),
+      db.prepare('INSERT INTO events (id) VALUES (?)').bind(event),
+      db.prepare('INSERT INTO accounts (id, name, username, handle, event_id, must_change) VALUES (?, ?, ?, ?, ?, 0)')
+        .bind(id, 'Fictional account', username, username, event),
       db.prepare(`INSERT INTO ba_user (id, name, username, email, emailVerified, createdAt, updatedAt)
         VALUES (?, 'Fictional account', ?, ?, 1, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`)
         .bind(id, username, `${username}@accounts.minsky.invalid`),
@@ -80,6 +85,7 @@ describe('Better Auth work per request with real local D1', () => {
         VALUES (?, ?, 'credential', ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`)
         .bind(randomUUID(), id, id, createHash('sha256').update(`fixture:${password}`).digest('hex')),
     ]);
+    eventCode = (await db.prepare('SELECT code FROM events WHERE id = ?').bind(event).first<{ code: string }>())!.code;
     env = {
       DB: recordSql(db, sql), AUTH_ORIGIN: origin, AUTH_SECRET: randomUUID() + randomUUID(),
       ASSETS: { fetch: async () => new Response(null, { status: 404 }) },
@@ -104,7 +110,7 @@ describe('Better Auth work per request with real local D1', () => {
   it('sends about four D1 statements for an authenticated API request and never reads the schema', async () => {
     const signed = await request('/api/auth/sign-in', {
       method: 'POST', headers: { 'Content-Type': 'application/json', 'CF-Connecting-IP': '198.51.100.9' },
-      body: JSON.stringify({ username, password }),
+      body: JSON.stringify({ event: eventCode, handle: username, password }),
     });
     expect(signed.status).toBe(200);
     const cookie = signed.headers.getSetCookie().find((value) => value.startsWith('__Host-minsky-session='))!.split(';')[0]!;
@@ -122,7 +128,7 @@ describe('Better Auth work per request with real local D1', () => {
     const binding = db;
     const first = sharedBetterAuthIdentity(binding, options);
     expect(sharedBetterAuthIdentity(binding, { ...options })).toBe(first);
-    const signed = await first.signIn(username, password);
+    const signed = await first.signIn(username as LoginKey, password);
     const cookie = signed.cookie.split(';')[0]!;
     expect((await first.session(new Headers({ cookie })))?.accountId).toBe(signed.accountId);
     const rotated = sharedBetterAuthIdentity(binding, { ...options, secret: randomUUID() + randomUUID() });

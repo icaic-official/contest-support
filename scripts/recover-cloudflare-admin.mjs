@@ -88,11 +88,11 @@ export function writeTemporaryPassword(result, write) {
     typeof result.temporaryPassword !== "string"
     || result.temporaryPassword.length < 12
     || /[\r\n]/.test(result.temporaryPassword)
-    || result.username.includes(result.temporaryPassword)
+    || result.handle.includes(result.temporaryPassword)
   ) {
     throw new Error("Webmaster recovery did not finish. The account was not changed.");
   }
-  write(`Webmaster recovery completed for ${result.username}. Share this temporary password securely. The next sign-in must change it.`);
+  write(`Webmaster recovery completed for ${result.handle}. Share this temporary password securely. The next sign-in must change it.`);
   write(result.temporaryPassword);
 }
 
@@ -131,7 +131,7 @@ export async function runRecoveryCommand(argv, dependencies = {}) {
   try {
     platform = await (dependencies.openPlatform ?? openRemotePlatform)(configPath);
     if (!platform?.env?.DB) throw new Error("The selected Wrangler configuration has no remote DB binding. Recovery did not start.");
-    writeTemporaryPassword(await prepared.library.recoverWebmaster(platform.env.DB, { username: options.username }), write);
+    writeTemporaryPassword(await prepared.library.recoverWebmaster(platform.env.DB, { handle: options.username }), write);
   } finally {
     await platform?.dispose?.();
     await prepared.dispose?.();

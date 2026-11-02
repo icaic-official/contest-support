@@ -1,4 +1,20 @@
+import { z } from 'zod';
+import type { Handle, LoginKey } from '../../../backend/contracts';
 import type { D1Connection, D1Statement, D1Value } from '../d1/connection';
+
+/** Typed text to a handle: 3 to 32 characters of [a-z0-9_-], the shape of the column CHECK. */
+export const handleSchema = z.string().trim().toLowerCase().regex(/^[a-z0-9][a-z0-9_-]{2,31}$/)
+  .transform((handle) => handle as Handle);
+
+/**
+ * The login key of every account that this Worker creates: its ID without
+ * dashes. 32 characters of [0-9a-f] pass the column CHECK and the Better Auth
+ * validator in identity.ts. Nothing derives a login key from a handle, so a
+ * handle change never touches Better Auth.
+ */
+export function loginKeyFor(accountId: string): LoginKey {
+  return accountId.replaceAll('-', '') as LoginKey;
+}
 
 function statement(db: D1Connection, sql: string, ...values: D1Value[]): D1Statement {
   return db.prepare(sql).bind(...values);
@@ -21,7 +37,7 @@ export function beginCredentialReset(db: D1Connection, target: string, operation
 export interface CredentialAccount {
   id: string;
   name: string;
-  username: string;
+  loginKey: LoginKey;
 }
 
 /**
@@ -39,7 +55,7 @@ export function completeCredentialReset(
     statement(db, `INSERT INTO ba_user (id, name, email, emailVerified, createdAt, updatedAt, username)
         VALUES (?, ?, ?, 1, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), ?)
         ON CONFLICT(id) DO UPDATE SET username = excluded.username, email = excluded.email, updatedAt = excluded.updatedAt`,
-    account.id, account.name, `${account.username}@accounts.minsky.invalid`, account.username),
+    account.id, account.name, `${account.loginKey}@accounts.minsky.invalid`, account.loginKey),
     statement(db, `INSERT INTO ba_account (id, accountId, providerId, userId, password, createdAt, updatedAt)
         VALUES (?, ?, 'credential', ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
         ON CONFLICT(providerId, accountId) DO UPDATE SET password = excluded.password, updatedAt = excluded.updatedAt`,

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { backend } from "@/backend";
+import { parseEventCode } from "@/backend/contracts";
 import { errorMessage } from "@/backend/errors";
 
 /** The public sign-in page. Organizers create every account. */
@@ -39,11 +40,17 @@ export function SignIn() {
         onSubmit={(event) => {
           event.preventDefault();
           const data = new FormData(event.currentTarget);
+          const code = parseEventCode(String(data.get("event") ?? ""));
+          if (!code) {
+            setError("Enter the event code from your sign-in details.");
+            return;
+          }
           setBusy(true);
           setError("");
           void (async () => {
             try {
               await backend.auth.signIn(
+                { kind: "event", code },
                 String(data.get("username") ?? ""),
                 String(data.get("password") ?? ""),
               );
@@ -57,6 +64,19 @@ export function SignIn() {
       >
         <fieldset disabled={busy} className="grid gap-5">
           <legend className="sr-only">Account credentials</legend>
+          <div className="grid gap-2">
+            <Label htmlFor="sign-in-event">Event code</Label>
+            <Input
+              id="sign-in-event"
+              name="event"
+              required
+              autoComplete="off"
+              autoCapitalize="none"
+              spellCheck={false}
+              placeholder="Enter your event code"
+              className="h-11"
+            />
+          </div>
           <div className="grid gap-2">
             <Label htmlFor="sign-in-username">Username</Label>
             <Input

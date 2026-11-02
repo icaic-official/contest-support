@@ -4,7 +4,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { getPlatformProxy } from 'wrangler';
-import type { ManageCommand, ManageReceipt } from '../../src/backend/contracts';
+import type { EventCode, ManageCommand, ManageReceipt, SignInTarget } from '../../src/backend/contracts';
 import type { Command, Role, Snapshot } from '../../src/connected/model';
 import { WorkflowService } from '../../src/server/workflow';
 import { D1ApplicationStore } from '../../src/server/adapters/d1/store';
@@ -58,8 +58,12 @@ export class LocalWorker extends FixtureWorker {
   readonly users = Object.fromEntries(names.map((name) => [name, randomUUID()])) as Record<Name, string>;
   /** Issue IDs in number order. Empty when the test does not seed issues. */
   readonly issues: string[] = [];
-  private readonly logins = new Map<string, FixtureAccount>(names.map((name) =>
+  /** The code that D1 gave the event. `create` reads it. */
+  eventCode = '' as EventCode;
+  private readonly logins = new Map<string, Omit<FixtureAccount, 'target'>>(names.map((name) =>
     [this.users[name], { id: this.users[name], username: name, name: `Test ${name}`, loginId: randomUUID() }]));
+  /** Each account signs in with the event code, and the webmaster with Site sign-in. */
+  private readonly targets = new Map<string, SignInTarget>();
   private readonly workflow: WorkflowService;
   protected readonly services: WorkerServices;
 
@@ -83,7 +87,10 @@ export class LocalWorker extends FixtureWorker {
   }
 
   protected accounts(): readonly FixtureAccount[] {
-    return [...this.logins.values()];
+    return [...this.logins.values()].flatMap((login) => {
+      const target = this.targets.get(login.id);
+      return target ? [{ ...login, target }] : [];
+    });
   }
 
   override async attach(context: BrowserContext): Promise<void> {
@@ -159,6 +166,10 @@ export class LocalWorker extends FixtureWorker {
     );
     if (seedIssues) statements.push(...this.issueRows(write));
     await this.db.batch(statements);
+    this.eventCode = (await this.db.prepare('SELECT code FROM events WHERE id = ?').bind(this.event).first<{ code: EventCode }>())!.code;
+    for (const name of names) {
+      this.targets.set(this.users[name], name === webmaster ? { kind: 'site' } : { kind: 'event', code: this.eventCode });
+    }
   }
 
   /**

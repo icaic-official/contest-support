@@ -8,7 +8,7 @@ const SESSION_ID = '00000000-0000-4000-8000-000000000002';
 const current: AuthenticationSession = {
   caller: { accountId: ACCOUNT_ID, loginId: 'private-login-id' },
   user: { id: ACCOUNT_ID, name: 'Fictional helper' },
-  status: { username: 'helper', must_change: true, session_valid: true },
+  status: { handle: 'helper', must_change: true, session_valid: true },
   csrf: 'fixture-csrf',
 };
 
@@ -67,17 +67,31 @@ describe('authentication HTTP boundary', () => {
 
   it('protects login without a prior session and never echoes submitted credentials', async () => {
     const { handle, service } = setup();
-    const response = await handle(post('/api/auth/sign-in', { username: 'helper', password: 'fictional-password' }, { 'X-CSRF-Token': '' }));
+    const response = await handle(post('/api/auth/sign-in', { event: ' XXXX-2026 ', handle: 'helper', password: 'fictional-password' }, { 'X-CSRF-Token': '' }));
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({});
     expect(response.headers.get('Set-Cookie')).toContain('HttpOnly');
-    expect(service.signIn).toHaveBeenCalledExactlyOnceWith('helper', 'fictional-password');
+    expect(service.signIn).toHaveBeenCalledExactlyOnceWith({ kind: 'event', code: 'xxxx-2026' }, 'helper', 'fictional-password');
     expect(service.current).not.toHaveBeenCalled();
+  });
+
+  it('signs in as a site account when the body names no event', async () => {
+    const { handle, service } = setup();
+    expect((await handle(post('/api/auth/sign-in', { event: null, handle: 'webmaster', password: 'fictional-password' }))).status).toBe(200);
+    expect(service.signIn).toHaveBeenCalledExactlyOnceWith({ kind: 'site' }, 'webmaster', 'fictional-password');
+  });
+
+  it('refuses an event code that cannot exist with the refusal of a wrong code', async () => {
+    const { handle, service } = setup();
+    const response = await handle(post('/api/auth/sign-in', { event: 'no', handle: 'helper', password: 'fictional-password' }));
+    expect(response.status).toBe(401);
+    expect(await response.json()).toEqual({ error: 'The event code, username, or password is incorrect.' });
+    expect(service.signIn).not.toHaveBeenCalled();
   });
 
   it('rejects originless, foreign-origin, form and missing custom-header writes before identity work', async () => {
     const { handle, service } = setup();
-    const body = { username: 'helper', password: 'fictional-password' };
+    const body = { event: 'xxxx-2026', handle: 'helper', password: 'fictional-password' };
     const originless = post('/api/auth/sign-in', body);
     originless.headers.delete('Origin');
     for (const request of [
@@ -134,8 +148,9 @@ describe('authentication HTTP boundary', () => {
     const invalidJSON = new Request(malformed, { body: '{' });
     for (const request of [
       invalidJSON,
-      post('/api/auth/sign-in', { username: 'helper', password: 'test', isAdmin: true }),
-      post('/api/auth/sign-in', { username: 'helper', password: 'x'.repeat(17_000) }),
+      post('/api/auth/sign-in', { event: 'xxxx-2026', handle: 'helper', password: 'test', isAdmin: true }),
+      post('/api/auth/sign-in', { event: 'xxxx-2026', handle: 'helper', password: 'x'.repeat(17_000) }),
+      post('/api/auth/sign-in', { username: 'helper', password: 'fictional-password' }),
       post('/api/accounts', { sessionId: SESSION_ID, command: { action: 'reset_password', userId: ACCOUNT_ID, user: 'forged' } }),
     ]) expect((await handle(request)).status).toBe(400);
     expect(service.signIn).not.toHaveBeenCalled();
@@ -145,11 +160,11 @@ describe('authentication HTTP boundary', () => {
   it('does not expose internal errors or credentials and preserves controlled rejections', async () => {
     const { handle, service } = setup();
     service.signIn.mockRejectedValue(new Error('database password=fictional-private-value'));
-    const failure = await handle(post('/api/auth/sign-in', { username: 'helper', password: 'fictional-password' }));
+    const failure = await handle(post('/api/auth/sign-in', { event: 'xxxx-2026', handle: 'helper', password: 'fictional-password' }));
     expect(failure.status).toBe(503);
     expect(await failure.text()).not.toContain('fictional');
     service.signIn.mockRejectedValue(new AuthenticationError(401, 'The username or password is incorrect.'));
-    expect((await handle(post('/api/auth/sign-in', { username: 'helper', password: 'wrong' }))).status).toBe(401);
+    expect((await handle(post('/api/auth/sign-in', { event: 'xxxx-2026', handle: 'helper', password: 'wrong' }))).status).toBe(401);
   });
 
   it('rejects unsupported routes and methods', async () => {

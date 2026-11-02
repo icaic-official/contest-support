@@ -1,10 +1,12 @@
 import { test as base, expect, type BrowserContext, type Page, type WebSocketRoute } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
-import type { PersonAvatar, RosterCommand } from '../../src/backend/contracts';
+import type { EventCode, PersonAvatar, RosterCommand, SignInTarget } from '../../src/backend/contracts';
 import { rosterCommandSchema } from '../../src/connected/roster';
 import type { AnnouncementSnapshot } from '../../src/connected/announcementModel';
 import type { Command, Membership, Snapshot } from '../../src/connected/model';
-import { AuthenticationError, type AuthenticationService, type AuthenticationSession } from '../../src/server/authentication';
+import {
+  AuthenticationError, signInRefused, type AuthenticationService, type AuthenticationSession,
+} from '../../src/server/authentication';
 import { createAuthenticationHandler } from '../../src/server/authenticationHttp';
 import type { CommandResult } from '../../src/server/workflow';
 import { createApplicationHandler, type ApplicationHttpServices } from '../../src/server/adapters/cloudflare/http';
@@ -12,16 +14,25 @@ import { createApplicationHandler, type ApplicationHttpServices } from '../../sr
 /** The application services behind the Worker routes. Identity and live updates come from the fixture. */
 export type WorkerServices = Omit<ApplicationHttpServices, 'auth' | 'connect'>;
 
-/** A fixture account. Sign-in accepts any password for its username. */
+/** A fixture account. Sign-in accepts any password for its username in its target. */
 export interface FixtureAccount {
   id: string;
+  /** The event or the site that the sign-in form must name. */
+  target: SignInTarget;
   username: string;
   name: string;
   loginId: string;
 }
 
-export function fixtureAccount(id: string, username: string, name: string): FixtureAccount {
-  return { id, username, name, loginId: randomUUID() };
+/** The event of every in-memory fixture account. */
+export const fixtureEvent = { kind: 'event', code: 'fixture-event' as EventCode } as const satisfies SignInTarget;
+
+export function fixtureAccount(id: string, username: string, name: string, target: SignInTarget = fixtureEvent): FixtureAccount {
+  return { id, target, username, name, loginId: randomUUID() };
+}
+
+function sameTarget(account: SignInTarget, typed: SignInTarget): boolean {
+  return account.kind === 'site' ? typed.kind === 'site' : typed.kind === 'event' && typed.code === account.code;
 }
 
 const loginCookie = 'minsky_fixture_login';
@@ -41,14 +52,14 @@ class FixtureIdentity implements AuthenticationService {
     return {
       caller: { accountId: account.id, loginId: account.loginId },
       user: { id: account.id, name: account.name },
-      status: { username: account.username, must_change: false, session_valid: true },
+      status: { handle: account.username, must_change: false, session_valid: true },
       csrf: `csrf-${account.loginId}`,
     };
   }
 
-  async signIn(username: string): Promise<{ cookie: string }> {
-    const account = this.accounts().find((candidate) => candidate.username === username);
-    if (!account) throw new AuthenticationError(401, 'The username or password is incorrect.');
+  async signIn(target: SignInTarget, username: string): Promise<{ cookie: string }> {
+    const account = this.accounts().find((candidate) => candidate.username === username && sameTarget(candidate.target, target));
+    if (!account) throw signInRefused(target.kind);
     return { cookie: `${loginCookie}=${account.loginId}; Path=/; HttpOnly; SameSite=Strict` };
   }
 

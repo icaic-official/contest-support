@@ -1,4 +1,4 @@
-import type { EntrantKind, ManageLevel, Seat } from '../../../backend/contracts';
+import type { EntrantKind, ManageLevel, Seat, SignInTarget } from '../../../backend/contracts';
 import type { Role } from '../../../connected/model';
 import type { Caller } from '../../authentication';
 import type { D1Connection, D1Statement, D1Value } from '../d1/connection';
@@ -251,8 +251,28 @@ export function manageAccountBindings(actor: string, target: string): D1Value[] 
   return [target, actor, actor, actor, actor];
 }
 
-/** Every webmaster, enabled or not, by name. `ready` is false until a password is issued. */
-export const webmastersSql = `SELECT a.id, a.name, COALESCE(a.username, '') AS username, a.disabled,
+/**
+ * The account that a sign-in names, in one statement per target kind. Neither
+ * uses OR, so each reads its own unique index. The event form returns the
+ * event even when the handle is unknown, so that failure counts against the
+ * event's limit. The site form requires a site grant, so an account with no
+ * event and no grant cannot sign in as a webmaster. Bind with the handle, then
+ * for an event the code.
+ */
+export const signInAccountSql: { readonly [K in SignInTarget['kind']]: string } = {
+  event: `SELECT e.id AS event_id, a.id AS account_id, a.username AS login_key
+    FROM events e LEFT JOIN accounts a ON a.event_id = e.id AND a.handle = ?
+    WHERE e.code = ?`,
+  site: `SELECT NULL AS event_id, a.id AS account_id, a.username AS login_key
+    FROM accounts a JOIN grants gs ON gs.scope = 'site' AND gs.account_id = a.id
+    WHERE a.event_id IS NULL AND a.handle = ?`,
+};
+
+/**
+ * Every webmaster, enabled or not, by name. `ready` is false until a password
+ * is issued. The handle is for display. The login key is for Better Auth only.
+ */
+export const webmastersSql = `SELECT a.id, a.name, COALESCE(a.handle, '') AS handle, a.username AS login_key, a.disabled,
     a.credential_generation, a.credential_state = 'ready' AS ready
   FROM grants g JOIN accounts a ON a.id = g.account_id
   WHERE g.scope = 'site' ORDER BY a.name, a.id`;

@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { getPlatformProxy } from 'wrangler';
 import { createCloudflareAuthentication } from '../../../backend/cloudflare/authentication';
+import type { EventCode, SignInTarget } from '../../../backend/contracts';
 import { verifyTemporaryAuthentication } from '../../../../tests/providers/scenarios/authentication-lifecycle';
 import type { D1Connection, D1Statement } from '../d1/connection';
 import { D1Fixture } from '../d1/testFixture';
@@ -73,6 +74,7 @@ describe('isolated hosted Cloudflare authentication HTTP', () => {
   const password = randomSecret();
   let username: string;
   let adminUsername: string;
+  let event: SignInTarget;
 
   function stmt(sql: string, ...values: Array<string | number | null>): D1Statement {
     return db.prepare(sql).bind(...values);
@@ -97,6 +99,7 @@ describe('isolated hosted Cloudflare authentication HTTP', () => {
     fixture = new D1Fixture(db, configPath);
     await fixture.create();
     created = true;
+    event = { kind: 'event', code: (await stmt('SELECT code FROM events WHERE id = ?', fixture.eventId).first<{ code: EventCode }>())!.code };
     username = `http_${fixture.eventId.replaceAll('-', '').slice(0, 20)}`;
     adminUsername = `${username}_a`;
     const hash = await passwordHasher.hash(password);
@@ -125,7 +128,7 @@ describe('isolated hosted Cloudflare authentication HTTP', () => {
           ...ids.map((id) => stmt('DELETE FROM account_operations WHERE account_id = ?', id)),
           ...ids.map((id) => stmt('DELETE FROM ba_user WHERE id = ?', id)),
           stmt('DELETE FROM authentication_limits WHERE key IN (?, ?, ?, ?)',
-            `username:${username}`, `username:${adminUsername}`, `change:${fixture.staff.accountId}`, `change:${fixture.contestant.accountId}`),
+            `handle:${fixture.eventId}:${username}`, `handle:${fixture.eventId}:${adminUsername}`, `change:${fixture.staff.accountId}`, `change:${fixture.contestant.accountId}`),
         ]);
         const checks = await db.batch(ids.map((id) => stmt(`SELECT
             (SELECT count(*) FROM ba_user WHERE id = ?) +
@@ -146,30 +149,30 @@ describe('isolated hosted Cloudflare authentication HTTP', () => {
       method: 'POST', headers: { Origin: origin, 'Content-Type': 'application/json', 'X-Minsky-Request': '1' }, body: '{}', redirect: 'error',
     });
     expect(unauthorized.status).toBe(401);
-    await expectFailure(member.auth.signIn(username, randomSecret())).toThrow();
+    await expectFailure(member.auth.signIn(event, username, randomSecret())).toThrow();
     expect(member.status('/api/auth/sign-in')).toBe(401);
     expect(await member.auth.currentUser()).toBeUndefined();
-    await verifyTemporaryAuthentication(member.auth, { id: fixture.contestant.accountId, username, password }, {
+    await verifyTemporaryAuthentication(member.auth, { id: fixture.contestant.accountId, target: event, username, password }, {
       restricted: async () => { expect((await member.auth.accountStatus()).must_change).toBe(true); },
       ready: async () => { expect(await member.auth.accountStatus()).toMatchObject({ must_change: false, session_valid: true }); },
     });
     expect(member.metadata()).toEqual({ secure: true, httpOnly: true, strict: true, hostOnly: true, root: true });
 
     const admin = cookieClient();
-    await admin.auth.signIn(adminUsername, password);
+    await admin.auth.signIn(event, adminUsername, password);
     await admin.auth.account(fixture.sessionId, { action: 'reset_password', userId: fixture.contestant.accountId });
     // A fresh authorized reset replaces credentials from a lost reset response.
     const recovered = await admin.auth.account(fixture.sessionId, { action: 'reset_password', userId: fixture.contestant.accountId });
     if (!recovered.temporaryPassword) throw new Error('The authorized reset returned no temporary password.');
-    await member.auth.signIn(username, recovered.temporaryPassword);
+    await member.auth.signIn(event, username, recovered.temporaryPassword);
     expect((await member.auth.accountStatus()).must_change).toBe(true);
     const stale = member.capture();
     const reset = await admin.auth.account(fixture.sessionId, { action: 'reset_password', userId: fixture.contestant.accountId });
     expect((await stale('/api/auth/session')).status).toBe(401);
-    await expectFailure(member.auth.signIn(username, recovered.temporaryPassword)).toThrow();
+    await expectFailure(member.auth.signIn(event, username, recovered.temporaryPassword)).toThrow();
     expect(member.status('/api/auth/sign-in')).toBe(401);
     if (!reset.temporaryPassword) throw new Error('The authorized reset returned no temporary password.');
-    await member.auth.signIn(username, reset.temporaryPassword);
+    await member.auth.signIn(event, username, reset.temporaryPassword);
     await member.auth.changePassword(reset.temporaryPassword, randomSecret());
 
     // Add one membership in this fixture's second session, then remove only the
@@ -189,7 +192,7 @@ describe('isolated hosted Cloudflare authentication HTTP', () => {
     expect(csrfRejected.status).toBe(403);
     const foreign = await hostedFetch(`${origin}/api/auth/sign-in`, {
       method: 'POST', headers: { Origin: 'https://untrusted-preview.example', 'Content-Type': 'application/json', 'X-Minsky-Request': '1' },
-      body: JSON.stringify({ username, password }), redirect: 'error',
+      body: JSON.stringify({ event: null, handle: username, password }), redirect: 'error',
     });
     expect(foreign.status).toBe(403);
     const preflight = await hostedFetch(`${origin}/api/auth/sign-out`, {
@@ -201,7 +204,7 @@ describe('isolated hosted Cloudflare authentication HTTP', () => {
     await member.auth.signOut();
     expect((await current('/api/auth/session')).status).toBe(401);
     await admin.auth.signOut();
-    await admin.auth.signIn(adminUsername, password);
+    await admin.auth.signIn(event, adminUsername, password);
     await stmt('UPDATE logins SET expires_at = unixepoch() - 1 WHERE account_id = ? AND revoked = 0', fixture.staff.accountId).run();
     expect(await admin.auth.currentUser()).toBeUndefined();
     expect(admin.status('/api/auth/session')).toBe(401);

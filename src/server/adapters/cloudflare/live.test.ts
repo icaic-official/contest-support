@@ -4,7 +4,8 @@ import { getPlatformProxy } from 'wrangler';
 import type { D1Connection, D1Statement } from '../d1/connection';
 import { D1Fixture, applyMigrations } from '../d1/testFixture';
 import type { Caller } from '../../authentication';
-import { currentAccessBindings, currentAccessForLoginsSql, currentAccessSql, notificationStatements, type CurrentAccessRow } from './application';
+import { notificationStatements } from './application';
+import { type ContestAuthorityRow, contestDataBindings, contestDataSql } from './authority';
 import { connectLive, dispatchNotifications, maintainFixtureSessions, SessionLiveCoordinator, type LiveEnvironment } from './live';
 
 class FakeSocket {
@@ -41,7 +42,7 @@ class FakeState {
 }
 
 class FakeDatabase implements D1Connection {
-  access = new Map<string, CurrentAccessRow>();
+  access = new Map<string, ContestAuthorityRow>();
   sessions = new Map<string, { eventId: string; runId: string }>();
   reads = 0;
   unavailable = false;
@@ -59,7 +60,7 @@ class FakeDatabase implements D1Connection {
         throw new Error(`Unexpected first: ${sql}`);
       },
       all: async <T>() => {
-        if (sql === currentAccessForLoginsSql) {
+        if (sql === contestDataSql('logins')) {
           if (this.unavailable) throw new Error('Database is unavailable.');
           this.reads++;
           const [sessionId, logins] = [String(values[0]), new Set(JSON.parse(String(values[1])) as string[])];
@@ -113,11 +114,11 @@ describe('outbox retry fairness with real local D1', () => {
       const callers = [fixture.staff, fixture.specialist, fixture.contestant, fixture.otherContestant,
         { accountId: fixture.staff.accountId, loginId: fixture.contestant.loginId }];
       for (const sessionId of [fixture.sessionId, fixture.secondSessionId]) {
-        const single = (await Promise.all(callers.map((caller) => db.prepare(currentAccessSql)
-          .bind(...currentAccessBindings(caller, sessionId)).first<CurrentAccessRow>()))).filter((row) => row !== null);
-        const batched = await db.prepare(currentAccessForLoginsSql)
-          .bind(sessionId, JSON.stringify(callers.map((caller) => caller.loginId))).all<CurrentAccessRow>();
-        const byLogin = (rows: CurrentAccessRow[]) => [...rows].sort((left, right) => left.login_id.localeCompare(right.login_id));
+        const single = (await Promise.all(callers.map((caller) => db.prepare(contestDataSql('caller'))
+          .bind(...contestDataBindings(caller, sessionId)).first<ContestAuthorityRow>()))).filter((row) => row !== null);
+        const batched = await db.prepare(contestDataSql('logins'))
+          .bind(sessionId, JSON.stringify(callers.map((caller) => caller.loginId))).all<ContestAuthorityRow>();
+        const byLogin = (rows: ContestAuthorityRow[]) => [...rows].sort((left, right) => left.login_id.localeCompare(right.login_id));
         expect(byLogin(batched.results)).toEqual(byLogin(single));
         expect(single.length).toBe(sessionId === fixture.sessionId ? 3 : 1);
       }
@@ -303,9 +304,9 @@ function fixture() {
     const caller = { accountId: randomUUID(), loginId: randomUUID() };
     db.access.set([caller.accountId, caller.loginId, sessionId].join(':'), {
       account_id: caller.accountId, account_name: 'Fictional person', login_id: caller.loginId,
-      access_version: 1, credential_generation: 1, login_version: 1, membership_version: 1,
-      session_version: 1, event_version: 1, archived: 0, team_id: team, is_admin: 0,
-      staff: Number(staff), roles: staff ? '["volunteer"]' : '[]',
+      session_id: sessionId, session_name: 'Primary', event_id: eventId, archived: 0, team_id: team, is_admin: 0,
+      staff: Number(staff), roles: staff ? '["volunteer"]' : '[]', entrant_kind: 'team',
+      manage: 'none', data: 1, stamp: '[1,1,1,1,1,1,0]',
       login_expires_at: Math.floor(Date.now() / 1000) + 3600,
       identity_expires_at: new Date(Date.now() + 3600_000).toISOString(),
     });

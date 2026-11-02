@@ -8,6 +8,7 @@ import {
   type StatusFilter,
   unresolvedTime,
 } from "@/connected/model";
+import { can, seatOf } from "@/connected/capabilities";
 import { type JuryRow, juryWorklists } from "@/connected/jury";
 import { normalizeTeamText } from "@/connected/teamSearch";
 
@@ -19,8 +20,9 @@ export type OrganiserTab = "queue" | "mine" | "awards" | "find" | "session" | "m
  * only. This is the same rule as before T0015.
  */
 export function isJuryOnly(member: Membership): boolean {
+  const seat = seatOf(member);
   return (
-    member.roles.includes("jury") && !isSupport(member) && !member.is_admin
+    can(seat, "award") && !can(seat, "claim") && !can(seat, "configure_contest")
   );
 }
 
@@ -32,11 +34,12 @@ export function isJuryOnly(member: Membership): boolean {
  */
 export function organiserTabs(member: Membership): OrganiserTab[] {
   const tabs: OrganiserTab[] = [];
-  if (isSupport(member)) tabs.push("queue", "mine");
+  const seat = seatOf(member);
+  if (can(seat, "claim")) tabs.push("queue", "mine");
   else if (!isJuryOnly(member)) tabs.push("queue");
-  if (member.roles.includes("jury")) tabs.push("awards");
+  if (can(seat, "award")) tabs.push("awards");
   tabs.push("find");
-  if (member.is_admin) tabs.push("session");
+  if (can(seat, "configure_contest")) tabs.push("session");
   tabs.push("me");
   return tabs;
 }

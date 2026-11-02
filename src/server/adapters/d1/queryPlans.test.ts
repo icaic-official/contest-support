@@ -1,7 +1,8 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { openStoreDatabase } from '../cloudflare/tooling/store-database.mjs';
 import { snapshotSql as announcementSnapshotSql } from '../cloudflare/announcements';
-import { currentAccessSql, sessionsListSql, snapshotSql } from '../cloudflare/application';
+import { sessionsListSql, snapshotSql } from '../cloudflare/application';
+import { contestDataSql } from '../cloudflare/authority';
 import { claimSql } from '../cloudflare/live';
 import type { D1Connection } from './connection';
 import { applyMigrations } from './testFixture';
@@ -14,15 +15,23 @@ function bindCount(sql: string): number { return (sql.match(/\?/g) ?? []).length
 const queries: Record<string, string> = {
   'session snapshot': snapshotSql,
   'announcement snapshot': announcementSnapshotSql,
-  'current access': currentAccessSql,
+  'current access': contestDataSql('caller'),
+  'current access for live logins': contestDataSql('logins'),
   'sessions list': sessionsListSql,
 };
 
-// The snapshot materializes its `access` and `visible_issues` common table
-// expressions and reads them as the aliases `a` and `i`. A scan of those rows
-// stays in memory. readVolume.test.ts catches a scan of a real table behind an
-// alias with the same name, because it counts rows read on a large session.
-const materializedScans = /^SCAN (?:access|visible_issues|a|i)$/;
+// Both snapshots materialize the resolver row as `access` and read it as `c`.
+// The session snapshot also materializes `visible_issues`, and reads it and
+// `access` as `i` and `a`. A scan of those rows stays in memory.
+// readVolume.test.ts catches a scan of a real table behind an alias with the
+// same name, because it counts rows read on a large session.
+const materializedScans = new Map([
+  [snapshotSql, /^SCAN (?:access|visible_issues|a|i|c)(?: LEFT-JOIN)?$/],
+  [announcementSnapshotSql, /^SCAN (?:access|c)$/],
+]);
+// A webmaster reaches every contest of the site, so that branch of the list reads
+// every contest. readVolume.test.ts shows that other callers do not read them.
+const webmasterContests = /^SCAN every_contest\b/;
 
 describe('D1 query plans', () => {
   let db: D1Connection;
@@ -45,7 +54,8 @@ describe('D1 query plans', () => {
       .all<{ detail: string }>();
     return plan.results.map((row) => row.detail)
       .filter((detail) => detail.startsWith('SCAN ') && !/^SCAN (?:CONSTANT ROW|\(subquery-\d+\)|json_each)/.test(detail))
-      .filter((detail) => sql !== snapshotSql || !materializedScans.test(detail));
+      .filter((detail) => !materializedScans.get(sql)?.test(detail))
+      .filter((detail) => sql !== sessionsListSql || !webmasterContests.test(detail));
   }
 
   async function plan(sql: string): Promise<string> {
@@ -69,6 +79,15 @@ describe('D1 query plans', () => {
 
   it('finds the sessions of an account through the account index', async () => {
     expect(await plan(sessionsListSql)).toContain('USING COVERING INDEX memberships_account_session (account_id=?)');
+  });
+
+  it('finds the grants of a caller through the grant indexes', async () => {
+    for (const sql of [contestDataSql('caller'), contestDataSql('logins')]) {
+      const text = await plan(sql);
+      expect(text).toContain('USING COVERING INDEX grants_event (event_id=? AND account_id=?)');
+      expect(text).toMatch(/USING COVERING INDEX grants_(?:site|by_account) \(account_id=\?/);
+      expect(text).toContain('USING COVERING INDEX grants_contest (session_id=? AND account_id=?)');
+    }
   });
 
   it('finds the issues of one team and the images of visible issues through indexes', async () => {

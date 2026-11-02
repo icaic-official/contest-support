@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { can, seatOf } from "./capabilities.ts";
 
 const uuid = z.string().uuid();
 const time = z.string().datetime({ offset: true });
@@ -184,17 +185,15 @@ export function isRunning(
 }
 
 export function isSupport(member: Membership): boolean {
-  return (
-    member.roles.includes("volunteer") || member.roles.includes("specialist")
-  );
+  return can(seatOf(member), "claim");
 }
 export function isStaff(member: Membership): boolean {
-  return member.roles.length > 0 || member.is_admin;
+  return can(seatOf(member), "read_internal");
 }
 /** The UI for a membership. Team accounts get the contestant UI. */
 export type UiKind = "contestant" | "organiser";
 export function uiKindFor(member: Membership): UiKind {
-  return member.team_id ? "contestant" : "organiser";
+  return seatOf(member)?.kind === "contestant" ? "contestant" : "organiser";
 }
 export function unresolvedTime(
   issue: Issue,

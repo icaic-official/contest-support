@@ -5,7 +5,8 @@ import { attachmentPath, imageKind, THUMBNAIL_BYTES } from '../../../connected/i
 import type { Caller } from '../../authentication';
 import { equalWorkflowJson } from '../../workflow';
 import type { D1Connection, D1Statement, D1Value } from '../d1/connection';
-import { currentAccessBindings, currentAccessSql, currentReadyLoginBindings, currentReadyLoginSql, notificationStatements } from './application';
+import { currentReadyLoginBindings, currentReadyLoginSql, notificationStatements } from './application';
+import { contestDataBindings, contestDataSql } from './authority';
 
 export interface PrivateObject {
   size: number;
@@ -48,7 +49,7 @@ const imageSql = `SELECT x.*, i.team_id, s.max_image_bytes, s.max_images_per_iss
   s.max_image_bytes_per_issue, e.archived, c.staff, (x.expires_at <= unixepoch()) AS expired
   FROM issue_images x JOIN issues i ON i.id = x.issue_id
   JOIN sessions s ON s.id = x.session_id JOIN events e ON e.id = s.event_id
-  JOIN (${currentAccessSql}) c ON c.staff = 1 OR c.team_id = i.team_id OR (? = 1 AND x.uploader = c.account_id)
+  JOIN (${contestDataSql('caller')}) c ON c.staff = 1 OR c.team_id = i.team_id OR (? = 1 AND x.uploader = c.account_id)
   WHERE x.session_id = ? AND x.id = ?`;
 
 /**
@@ -99,7 +100,7 @@ export class R2ImageService {
     if (!z.uuid().safeParse(sessionId).success || !z.uuid().safeParse(id).success) {
       throw new ImageRequestError('Image unavailable.', { validation: true });
     }
-    const row = await this.statement(imageSql, ...currentAccessBindings(caller, sessionId), Number(ownedCleanup), sessionId, id).first<Image>();
+    const row = await this.statement(imageSql, ...contestDataBindings(caller, sessionId), Number(ownedCleanup), sessionId, id).first<Image>();
     if (!row || write && (!row.staff || row.uploader !== caller.accountId)) {
       throw new ImageRequestError('You do not have permission to change this image.', { validation: true });
     }
@@ -112,9 +113,8 @@ export class R2ImageService {
   }
 
   private guard(id: string, caller: Caller, sessionId: string): D1Statement {
-    return this.assertion(id, `SELECT 1 FROM (${currentAccessSql}) c JOIN sessions s ON s.id = ?
-      JOIN events e ON e.id = s.event_id WHERE c.staff = 1 AND e.archived = 0`,
-    ...currentAccessBindings(caller, sessionId), sessionId);
+    return this.assertion(id, `SELECT 1 FROM (${contestDataSql('caller')}) c WHERE c.staff = 1 AND c.archived = 0`,
+      ...contestDataBindings(caller, sessionId));
   }
 
   private async batch(id: string, caller: Caller, statements: D1Statement[]): Promise<void> {
@@ -141,8 +141,8 @@ export class R2ImageService {
     const cleanName = cleanImageName(value.name);
     if (!cleanName.trim()) throw new ImageRequestError('Choose a JPEG, PNG, or WebP image.', { validation: true });
     const repeat = async (): Promise<StartedImage | undefined> => {
-      const prior = await this.statement(`SELECT x.id FROM issue_images x JOIN (${currentAccessSql}) c ON c.staff = 1
-        WHERE x.uploader = ? AND x.request_id = ?`, ...currentAccessBindings(caller, value.sessionId), caller.accountId, value.requestId).first<{ id: string }>();
+      const prior = await this.statement(`SELECT x.id FROM issue_images x JOIN (${contestDataSql('caller')}) c ON c.staff = 1
+        WHERE x.uploader = ? AND x.request_id = ?`, ...contestDataBindings(caller, value.sessionId), caller.accountId, value.requestId).first<{ id: string }>();
       if (!prior) return undefined;
       const image = await this.image(caller, value.sessionId, prior.id, true);
       if (!equalWorkflowJson(JSON.parse(image.request_command), value)) throw new ImageRequestError('This image request ID has different content.', { validation: true });
@@ -154,9 +154,8 @@ export class R2ImageService {
     const repeated = await repeat();
     if (repeated) return repeated;
     // The batch guard also rejects an archived event, but it cannot say why.
-    const archived = await this.statement(`SELECT 1 FROM (${currentAccessSql}) c JOIN sessions s ON s.id = ?
-      JOIN events e ON e.id = s.event_id WHERE c.staff = 1 AND e.archived = 1`,
-    ...currentAccessBindings(caller, value.sessionId), value.sessionId).first();
+    const archived = await this.statement(`SELECT 1 FROM (${contestDataSql('caller')}) c WHERE c.staff = 1 AND c.archived = 1`,
+      ...contestDataBindings(caller, value.sessionId)).first();
     if (archived) throw archivedError();
     const id = crypto.randomUUID();
     const assertion = crypto.randomUUID();
@@ -281,7 +280,7 @@ export class R2ImageService {
       if (row.state !== (abandon ? 'pending' : 'ready')) throw new ImageRequestError('Image unavailable.', { validation: true });
       const assertion = crypto.randomUUID();
       await this.batch(assertion, caller, [
-        abandon ? this.assertion(assertion, currentAccessSql, ...currentAccessBindings(caller, sessionId)) : this.guard(assertion, caller, sessionId),
+        abandon ? this.assertion(assertion, contestDataSql('caller'), ...contestDataBindings(caller, sessionId)) : this.guard(assertion, caller, sessionId),
         this.assertion(`${assertion}:state`, 'SELECT 1 FROM issue_images WHERE id = ? AND state = ?', id, abandon ? 'pending' : 'ready'),
         this.statement(`UPDATE issue_images SET state = ?, deleted_by = ?, deleted_at = ${now} WHERE id = ?`, abandon ? 'abandoned' : 'deleting', caller.accountId, id),
         this.statement('INSERT INTO image_deletions (attachment_id) VALUES (?) ON CONFLICT DO NOTHING', id),

@@ -2,7 +2,7 @@ import { z } from 'zod';
 import type { Caller } from '../../authentication';
 import type { D1Connection } from '../d1/connection';
 import { logEvent, requestFields } from './log';
-import { currentAccessForLoginsSql, type CurrentAccessRow } from './application';
+import { type ContestAuthorityRow, contestDataSql } from './authority';
 
 interface LiveSocket {
   readonly readyState: number;
@@ -59,7 +59,7 @@ const signalSchema = z.object({
 type Signal = z.infer<typeof signalSchema>;
 type SocketAttachment = z.infer<typeof attachmentSchema>;
 
-type LiveAccess = CurrentAccessRow;
+type LiveAccess = ContestAuthorityRow;
 type Grantee = Caller & { sessionId: string };
 
 interface Grant {
@@ -109,7 +109,7 @@ export class SessionLiveCoordinator {
     for (const [sessionId, ids] of logins) {
       const list = [...ids];
       for (let start = 0; start < list.length; start += accessBatchSize) {
-        const { results } = await this.env.DB.prepare(currentAccessForLoginsSql)
+        const { results } = await this.env.DB.prepare(contestDataSql('logins'))
           .bind(sessionId, JSON.stringify(list.slice(start, start + accessBatchSize))).all<LiveAccess>();
         for (const row of results) {
           if (row.staff || row.team_id) rows.set(grantKey({ sessionId, accountId: row.account_id, loginId: row.login_id }), row);

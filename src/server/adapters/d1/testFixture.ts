@@ -12,9 +12,12 @@ type Row = Record<string, unknown>;
 
 const migrations = fileURLToPath(new URL("./migrations", import.meta.url));
 
-/** Apply every repository migration, in order, to an empty local database. Returns the file names. */
-export async function applyMigrations(db: D1Connection): Promise<string[]> {
-  const names = readdirSync(migrations).filter((file) => file.endsWith(".sql")).sort();
+/**
+ * Apply the repository migrations, in order, to a local database. Returns the file names.
+ * `include` selects files, so a test can write data between two migrations.
+ */
+export async function applyMigrations(db: D1Connection, include: (name: string) => boolean = () => true): Promise<string[]> {
+  const names = readdirSync(migrations).filter((file) => file.endsWith(".sql") && include(file)).sort();
   for (const name of names) {
     await db.batch(splitSqlQuery(readFileSync(join(migrations, name), "utf8")).map((sql) => db.prepare(sql)));
   }

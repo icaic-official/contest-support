@@ -1188,6 +1188,8 @@ CREATE TABLE manage_receipts (
 -- The event that owns the account. NULL means a site account (a webmaster), or a legacy
 -- account that no membership placed. A REFERENCES column added by ALTER must default to NULL.
 -- No ON DELETE action: event deletion removes the event's accounts before the event row.
+-- The repository's 0017 adds DEFERRABLE INITIALLY DEFERRED, because test cleanups delete
+-- an event before its accounts in one batch.
 ALTER TABLE accounts ADD COLUMN event_id TEXT REFERENCES events(id);
 CREATE INDEX accounts_event ON accounts(event_id);
 CREATE INDEX sessions_event ON sessions(event_id);

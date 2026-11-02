@@ -44,7 +44,9 @@ export default defineConfig({
   },
   test: {
     include: ["src/**/*.test.ts", "src/**/*.test.mjs", "scripts/**/*.test.mjs"],
-    exclude: ["**/hostedHttp.test.ts"],
+    // readerCompile.test.ts compares timings. It runs in `npm run test:d1`, one file
+    // at a time, so a busy Workers Builds runner cannot fail a deploy with it.
+    exclude: ["**/hostedHttp.test.ts", "**/readerCompile.test.ts"],
     // Some tests start miniflare, esbuild, embedded PostgreSQL, or a child process.
     // A slow Workers Builds runner can pass Vitest's 5 s default. Longer explicit limits still apply.
     testTimeout: 30_000,

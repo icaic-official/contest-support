@@ -113,7 +113,8 @@ export class LocalWorker extends FixtureWorker {
     return result.issueId;
   }
 
-  async create(seedIssues: boolean): Promise<void> {
+  /** `webmaster` holds a site grant before its membership, as migration 0017 promotes an account. */
+  async create(seedIssues: boolean, webmaster: Name | null = null): Promise<void> {
     const write = (sql: string, ...values: Array<string | number | null>) => this.db.prepare(sql).bind(...values);
     const now = "strftime('%Y-%m-%dT%H:%M:%fZ', 'now')";
     const statements = [
@@ -131,6 +132,7 @@ export class LocalWorker extends FixtureWorker {
       const username = `${name}-${login.replaceAll('-', '').slice(0, 20)}`;
       statements.push(
         write('INSERT INTO accounts (id, name, username, must_change) VALUES (?, ?, ?, 0)', id, `Test ${name}`, username),
+        ...(name === webmaster ? [write(`INSERT INTO grants (account_id, scope, granted_by) VALUES (?, 'site', 'fixture')`, id)] : []),
         write(`INSERT INTO ba_user (id, name, email, username, emailVerified, createdAt, updatedAt) VALUES (?, ?, ?, ?, 1, ${now}, ${now})`,
           id, `Test ${name}`, `${username}@accounts.minsky.invalid`, username),
         write(`INSERT INTO ba_session (id, userId, token, expiresAt, createdAt, updatedAt)
@@ -192,8 +194,9 @@ export class LocalWorker extends FixtureWorker {
  * worker starts one local D1 and R2 runtime and applies every migration once.
  * Tests share it, and each test's records have their own UUIDs.
  */
-export const test = base.extend<{ seedIssues: boolean; local: LocalWorker }, { platform: Bindings }>({
+export const test = base.extend<{ seedIssues: boolean; webmaster: Name | null; local: LocalWorker }, { platform: Bindings }>({
   seedIssues: [true, { option: true }],
+  webmaster: [null, { option: true }],
   // eslint-disable-next-line no-empty-pattern -- Playwright reads fixture dependencies from this pattern. There are none.
   platform: [async ({}, provide) => {
     const directory = mkdtempSync(join(tmpdir(), 'minsky-browser-worker-'));
@@ -214,9 +217,9 @@ export const test = base.extend<{ seedIssues: boolean; local: LocalWorker }, { p
       rmSync(directory, { recursive: true, force: true });
     }
   }, { scope: 'worker' }],
-  local: async ({ platform, seedIssues, baseURL, context, guard }, provide) => {
+  local: async ({ platform, seedIssues, webmaster, baseURL, context, guard }, provide) => {
     const local = new LocalWorker(new URL(baseURL!).origin, platform.DB, platform.IMAGES, guard);
-    await local.create(seedIssues);
+    await local.create(seedIssues, webmaster);
     await local.attach(context);
     await provide(local);
   },

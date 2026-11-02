@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { useLocation } from "react-router";
-import { isSupport, type Membership } from "./model";
+import { can, seatOf } from "./capabilities";
+import type { Membership } from "./model";
 
 /** Shared addresses for the contestant, phone, and desktop screens. */
 export const workspacePaths = {
@@ -38,17 +39,18 @@ export function pageForPath(pathname: string): WorkspacePage | undefined {
 /** Backend permissions remain authoritative for every read and write. */
 export function canOpenPage(page: WorkspacePage, member: Membership): boolean {
   if (page === "queue" || page === "account") return true;
-  if (member.team_id) return false;
-  if (page === "awards") return member.roles.includes("jury");
+  const seat = seatOf(member);
+  if (seat?.kind === "contestant") return false;
+  if (page === "awards") return can(seat, "award");
   if (
     page === "overview" ||
     page === "accounts" ||
     page === "roster" ||
     page === "settings"
   ) {
-    return member.is_admin;
+    return can(seat, "configure_contest");
   }
-  if (page === "mine" || page === "handoffs") return isSupport(member);
+  if (page === "mine" || page === "handoffs") return can(seat, "claim");
   return true;
 }
 

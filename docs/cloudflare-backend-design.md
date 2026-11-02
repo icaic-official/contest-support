@@ -127,6 +127,22 @@ The store assembles snapshots in one consistent database operation.
 It excludes other teams' records and staff-only records before they leave the server.
 Account status, login revocation, and mandatory password changes also guard file reads and live connections.
 
+One resolver in [authority.ts](../src/server/adapters/cloudflare/authority.ts) decides what an account may do in a contest.
+Every reader and writer of contest data embeds it: snapshots, workflow commands, images, announcements, avatars, live connections, the contest list, contest settings, and account changes.
+The resolver merges three sources:
+
+- A membership and its roles in the contest.
+- An event grant for the contest's event. The holder is an event admin.
+- A site grant. The holder is a webmaster.
+
+Event admins and webmasters resolve to an admin seat in every contest that they reach, so the rules for contest admins apply to them unchanged.
+An account belongs to one event. D1 refuses a membership or an event grant that crosses events.
+While the site setting `restrict_webmaster_reads` is on, a webmaster reads a contest's data only after an audited join. Contest settings and account changes ignore that setting.
+Each answer carries a stamp of every version that it depends on. A write batch evaluates the resolver again and compares the stamp.
+[capabilities.ts](../src/connected/capabilities.ts) holds the one table of what a seat may do. Workflow decisions and the browser's page gates both read it.
+No command creates a grant yet. Migration `0017` promotes the accounts named `organizer` and `playtest-admin` to webmasters when each is a contest admin with no team seat. They keep their admin memberships.
+The [event platform design](event-platform-design.md) describes the later phases.
+
 The implementation uses primary database reads for authorization and snapshots.
 Cloudflare routes binding queries to the primary unless the application uses the Sessions API for replication.
 Replica reads require a tested consistency rule for revocation and reads after writes before adoption.

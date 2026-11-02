@@ -1,6 +1,13 @@
 # Webmaster, event, and contest platform
 
-**Status.** Proposed. Not implemented. No part of this design is built.
+**Status.** Proposed. Phase 1, `feature/scoped-authority`, implements the contest resolver, migration `0017`, and its gate. The local half of the gate passed. The hosted runs were inconclusive against the 10 percent p95 rule, because `main` itself varied between runs. After a compile-time fix, the branch read faster than `main` at the median, and the owner accepted the gate on 2026-11-02. The [gate record](history/scoped-authority-gate.md) holds the measurements and the decision. Phases 2 to 8 are not built.
+
+Phase 1 differs from this page and the sketches in these points:
+
+- The foreign key on `accounts.event_id` is `DEFERRABLE INITIALLY DEFERRED`. Test cleanups delete an event and then its accounts in one batch, and an immediate key refuses that order.
+- The resolver starts from the contest and its event, then joins the login tables, so the live form reads them once. Only a webmaster's stamp reads `site_settings`.
+- `/api/sessions` lists every contest that the caller can read. For a webmaster, that is every contest of the site.
+- `authorityCopies.test.ts` also refuses `FROM grants`. It exempts the two trusted terminal commands, `installation.ts` and `adminRecovery.ts`, which check an admin membership without a login.
 
 This page explains how one shared Minsky installation can host the events of many organizers. It settles GitHub issues #119 and #136 under the owner's decisions of 2026-10-27, which [PLAN.md](../PLAN.md) records. It supersedes the [earlier multi-competition design](history/multi-competition-design.md).
 The [sketches page](event-platform-sketches.md) holds the full type sketch and migration sketch.
@@ -158,18 +165,18 @@ export const snapshotSql = `WITH login AS (${currentReadyLoginSql}),
   visible_issues AS MATERIALIZED (...unchanged, reads a.team_id and a.staff...)
 SELECT json_object(
   'session', (SELECT json_object('id', s.id, 'event_id', s.event_id, 'name', s.name,
-    'kind', s.kind, 'type', s.contest_type, ...) FROM sessions s WHERE s.id = ? AND EXISTS (SELECT 1 FROM access)),
-  'access', (SELECT json_object('manage', manage) FROM access),
+    'kind', s.kind, 'type', s.contest_type, ...) FROM sessions s WHERE s.id = ? AND c.account_id IS NOT NULL),
+  'access', (SELECT json_object('manage', c.manage) WHERE c.account_id IS NOT NULL),
   'clock', (SELECT json_object('time_zone', e.time_zone, 'starts_at', s.starts_at, 'ends_at', s.ends_at,
-      'grace_minutes', s.grace_minutes, 'intake', json(${intakeStateSql('s', 'a.team_id')}),
-      'personal_end_at', ${personalEndSql('s', 'a.team_id')})
-    FROM access a JOIN sessions s ON s.id = a.session_id JOIN events e ON e.id = s.event_id),
+      'grace_minutes', s.grace_minutes, 'intake', json(${intakeStateSql('s', 'c.team_id')}),
+      'personal_end_at', ${personalEndSql('s', 'c.team_id')})
+    FROM sessions s JOIN events e ON e.id = s.event_id WHERE s.id = c.session_id),
   'contest_awards', ...,
   ...the other sections are unchanged...
-) AS snapshot WHERE EXISTS (SELECT 1 FROM login)`;
+) AS snapshot FROM login LEFT JOIN access c ON true`;
 ```
 
-Only the `access` line and the new sections change. `contestDataSql` keeps the column names that embedders read from `CurrentAccessRow` (`src/server/adapters/cloudflare/application.ts:9-26`), and its bindings keep the order of `currentAccessBindings` (`src/server/adapters/cloudflare/application.ts:58-60`). `contestDataSql` is the only export of the contest resolver. The unfiltered row stays private to `authority.ts`, so an embedder cannot skip the webmaster restriction.
+Only the `access` line and the new sections change. Each section reads `c`, the one resolver row in the FROM clause. D1 compiles every statement on every call, and SQLite compiles a CTE again at each place that names it. So a section that names `access` again adds a compile of the resolver to every snapshot. See [the diagnosis of the read gate](history/scoped-authority-gate.md#diagnosis). `contestDataSql` keeps the column names that embedders read from `CurrentAccessRow` (`src/server/adapters/cloudflare/application.ts:9-26`), and its bindings keep the order of `currentAccessBindings` (`src/server/adapters/cloudflare/application.ts:58-60`). `contestDataSql` is the only export of the contest resolver. The unfiltered row stays private to `authority.ts`, so an embedder cannot skip the webmaster restriction.
 
 #### Sign-in in the browser and on the server
 

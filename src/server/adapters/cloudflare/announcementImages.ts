@@ -8,7 +8,8 @@ import type { D1Connection, D1Statement, D1Value } from '../d1/connection';
 import {
   announcementAssertion, announcementManager, announcementNow, guardedAnnouncementBatch, sessionAudiences,
 } from './announcements';
-import { currentAccessBindings, currentAccessSql, notificationStatements } from './application';
+import { notificationStatements } from './application';
+import { contestDataBindings, contestDataSql } from './authority';
 import { cleanImageName, putVerifiedImage, storedImage, type PrivateBucket } from './images';
 
 interface Image {
@@ -39,7 +40,7 @@ const imageSql = `SELECT x.id, x.session_id, x.announcement_id, x.uploader, x.up
   (a.removed_at IS NOT NULL) AS announcement_removed,
   (a.expires_at IS NOT NULL AND a.expires_at <= ${announcementNow}) AS announcement_expired
   FROM announcement_images x JOIN announcements a ON a.id = x.announcement_id
-  JOIN (${currentAccessSql}) c WHERE x.session_id = ? AND x.id = ?`;
+  JOIN (${contestDataSql('caller')}) c WHERE x.session_id = ? AND x.id = ?`;
 
 /** Private announcement files share the image bucket under keys that start with the session ID. */
 export class R2AnnouncementImageService {
@@ -51,7 +52,7 @@ export class R2AnnouncementImageService {
     if (!z.uuid().safeParse(sessionId).success || !z.uuid().safeParse(id).success) {
       throw new ImageRequestError('Image unavailable.', { validation: true });
     }
-    const row = await this.statement(imageSql, ...currentAccessBindings(caller, sessionId), sessionId, id).first<Image>();
+    const row = await this.statement(imageSql, ...contestDataBindings(caller, sessionId), sessionId, id).first<Image>();
     if (!row) throw new ImageRequestError('Image unavailable.', { validation: true });
     return row;
   }
@@ -82,9 +83,9 @@ export class R2AnnouncementImageService {
     const cleanName = cleanImageName(value.name);
     if (!cleanName.trim()) throw new ImageRequestError('Choose an image with a file name.', { validation: true });
     const repeat = async (): Promise<{ id: string; path: string } | undefined> => {
-      const prior = await this.statement(`SELECT x.id FROM announcement_images x JOIN (${currentAccessSql}) c
+      const prior = await this.statement(`SELECT x.id FROM announcement_images x JOIN (${contestDataSql('caller')}) c
         WHERE x.uploader = ? AND x.request_id = ? AND x.session_id = ?`,
-      ...currentAccessBindings(caller, value.sessionId), caller.accountId, value.requestId, value.sessionId).first<{ id: string }>();
+      ...contestDataBindings(caller, value.sessionId), caller.accountId, value.requestId, value.sessionId).first<{ id: string }>();
       if (!prior) return undefined;
       const image = await this.image(caller, value.sessionId, prior.id);
       this.manage(image);

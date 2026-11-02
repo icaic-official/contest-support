@@ -1,3 +1,4 @@
+import { can, seatOf } from '../connected/capabilities.ts';
 import type { Command, IssueStatus, Role } from '../connected/model.ts';
 import type { Caller } from './authentication.ts';
 
@@ -98,21 +99,21 @@ export function equalWorkflowJson(left: unknown, right: unknown): boolean {
 
 /** Existing workflow decisions. Persistence must reject changes to the captured state. */
 export function decideWorkflow(state: WorkflowState, command: Command): WorkflowDecision | Rejection {
-  const { membership: member, issue, actor } = state;
+  const { issue, actor } = state;
   if (state.archived) {
     return reject('access');
   }
-  const hasSupportRole = member.roles.includes('volunteer') || member.roles.includes('specialist');
-  const hasJuryRole = member.roles.includes('jury');
-  const isStaff = member.is_admin || member.roles.length > 0;
+  const seat = seatOf(state.membership);
+  const ownTeam = seat?.kind === 'contestant' ? seat.entryId : null;
+  const isStaff = can(seat, 'read_internal');
 
   if (command.type === 'submit') {
-    const lacksSubmissionRole = member.team_id === null && !isStaff;
-    const teamIntakeClosed = member.team_id !== null && !state.session.intake_open;
+    const lacksSubmissionRole = !can(seat, 'submit_own') && !can(seat, 'submit_for_any_entry');
+    const teamIntakeClosed = can(seat, 'submit_own') && !state.session.intake_open;
     if (lacksSubmissionRole || teamIntakeClosed) {
       return reject('access');
     }
-    const teamId = member.team_id ?? command.team_id;
+    const teamId = ownTeam ?? command.team_id;
     if (!teamId || !state.teams.includes(teamId) || !state.session.categories.includes(command.category)) {
       return reject('input');
     }
@@ -127,7 +128,7 @@ export function decideWorkflow(state: WorkflowState, command: Command): Workflow
   if (!issue) {
     return reject('access');
   }
-  const isIssueTeam = member.team_id === issue.team_id;
+  const isIssueTeam = ownTeam === issue.team_id;
   if (!isStaff && !isIssueTeam) {
     return reject('access');
   }
@@ -140,21 +141,21 @@ export function decideWorkflow(state: WorkflowState, command: Command): Workflow
   };
   switch (command.type) {
     case 'claim':
-      if (!hasSupportRole || issue.status !== 'open') {
+      if (!can(seat, 'claim') || issue.status !== 'open') {
         return reject('state');
       }
       decision.issue = { status: 'claimed', owner: actor.id };
       decision.history.text = 'Issue claimed.';
       break;
     case 'escalate':
-      if (!hasSupportRole || issue.owner !== actor.id || issue.status !== 'claimed') {
+      if (!can(seat, 'escalate') || issue.owner !== actor.id || issue.status !== 'claimed') {
         return reject('state');
       }
       decision.issue = { status: 'escalated' };
       decision.history.text = 'Specialist handoff requested. Current owner retained.';
       break;
     case 'accept':
-      if (!member.roles.includes('specialist') || issue.status !== 'escalated' || issue.owner === actor.id) {
+      if (!can(seat, 'accept') || issue.status !== 'escalated' || issue.owner === actor.id) {
         return reject('state');
       }
       decision.issue = { status: 'claimed', owner: actor.id };
@@ -169,8 +170,8 @@ export function decideWorkflow(state: WorkflowState, command: Command): Workflow
       break;
     case 'resolve': {
       // Admins can close an assigned issue for an absent owner. The owner stays recorded.
-      const isOwner = hasSupportRole && issue.owner === actor.id;
-      if (!(isOwner || member.is_admin) || !['claimed', 'escalated'].includes(issue.status)) {
+      const isOwner = can(seat, 'claim') && issue.owner === actor.id;
+      if (!(isOwner || can(seat, 'resolve_any')) || !['claimed', 'escalated'].includes(issue.status)) {
         return reject('state');
       }
       decision.issue = { status: 'resolved' };
@@ -179,7 +180,7 @@ export function decideWorkflow(state: WorkflowState, command: Command): Workflow
       break;
     }
     case 'reopen':
-      if (issue.status !== 'resolved' || (!hasSupportRole && !isIssueTeam)) {
+      if (issue.status !== 'resolved' || (!can(seat, 'reopen_any') && !isIssueTeam)) {
         return reject('state');
       }
       decision.issue = { status: 'claimed' };
@@ -187,7 +188,7 @@ export function decideWorkflow(state: WorkflowState, command: Command): Workflow
       decision.history.text = `Reopened: ${decision.reopen.reason}`;
       break;
     case 'award':
-      if (!hasJuryRole || issue.status !== 'resolved' || !state.resolution || state.award) {
+      if (!can(seat, 'award') || issue.status !== 'resolved' || !state.resolution || state.award) {
         return reject('state');
       }
       decision.award = {
@@ -198,8 +199,7 @@ export function decideWorkflow(state: WorkflowState, command: Command): Workflow
       decision.history.text = `${command.minutes} minutes awarded: ${decision.award.explanation}`;
       break;
     case 'apply': {
-      const canConfirmAward = hasSupportRole || hasJuryRole;
-      if (!canConfirmAward || !state.award || state.award.applied_at !== null) {
+      if (!can(seat, 'apply') || !state.award || state.award.applied_at !== null) {
         return reject('state');
       }
       decision.apply = { awardId: state.award.id };

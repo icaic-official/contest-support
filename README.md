@@ -81,6 +81,7 @@ Anyone who can read that log can sign in as that admin. Use only fictional data 
 | `npm run ci` | Run the Workers Builds check: installs, type checking, lint, unit tests, both builds, audits, and the Gitleaks scan. |
 | `npm test` | Run unit and script tests without cloud credentials. |
 | `npm run test:d1` | Run every D1 workflow case with local emulation and current identity guards. |
+| `node scripts/rollback-check.mjs` | Run the previous release's `npm run test:d1` against this checkout's D1 migrations. The script checks out `origin/main` into a temporary Git worktree outside the repository, adds this checkout's new migration files, and installs packages there. Add `--base=<revision>` to name another previous release. It uses only temporary local resources. |
 | `npm run test:connector:runtime` | Run the complete connector through a temporary local HTTPS Worker, D1, R2, and Durable Objects. |
 | `npm run test:connector:ui:local` | Build a temporary Cloudflare frontend and run the complete React journey on local HTTPS and real emulated bindings. |
 | `npm run test:connector:ui -- --config=… --account=… --database=… --origin=…` | Run the complete React journey against the confirmed hosted Cloudflare CI application. |
@@ -93,7 +94,7 @@ Anyone who can read that log can sign in as that admin. Use only fictional data 
 | `npm run test:auth:http -- --account=… --database=… --origin=…` | Check the isolated deployed authentication Worker. |
 | `npm run test:auth:hash` | Measure password cost in a temporary local Worker. |
 | `npm run load -- <command>` | Run a load test against an isolated installation: `competition`, `setup`, `run`, `analytics`, and `cleanup`. See [Run a load test](docs/run-load-tests.md). |
-| `npm run perf:reads` | Count the D1 calls, statements, rows read and rows written of each API request at several data sizes. It uses a temporary local database with fictional data and no Cloudflare credentials. Add `-- --plan=base` for the 1,200-account shape only, `-- --explain` for query plans, and `-- --out=<file.json>` for the raw records. |
+| `npm run perf:reads` | Count the D1 calls, statements, rows read and rows written of each API request at several data sizes. It uses a temporary local database with fictional data and no Cloudflare credentials. Add `-- --plan=base` for the 1,200-account shape only, `-- --explain` for query plans, and `-- --out=<file.json>` for the raw records. Compare saved records with `node scripts/compare-read-volume.mjs --base=<files> --head=<files>`. |
 | `npm run test:e2e:smoke` | Run the critical-path browser files `tests/landing.spec.ts` and `tests/journey.spec.ts`. |
 | `npm run test:e2e` | Run every mocked browser test, including the smoke files. The specs use the Cloudflare client. They serve the real Worker routes from the test process. See [the browser suite](#the-mocked-browser-suite). |
 | `npm run test:providers:list` | List the shared provider scenarios without hosted credentials. |

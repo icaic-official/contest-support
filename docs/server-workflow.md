@@ -26,8 +26,10 @@ The shared rules retain these decisions:
 
 Support means volunteer or specialist.
 Assigned roles combine capabilities.
+Event admins and webmasters act as admins in every contest that they reach, with the roles of any membership that they also hold.
+[capabilities.ts](../src/connected/capabilities.ts) holds these rules as one table.
 An administrator flag alone grants no support or jury capability. It grants replies, internal notes, image uploads, and the resolution of a claimed or escalated issue.
-Contestant membership and staff membership are mutually exclusive.
+Contestant membership and staff membership are mutually exclusive. A membership with a team is a contestant seat, even if it also holds roles.
 Staff can read every team in their session.
 Contestants can read only their own team.
 

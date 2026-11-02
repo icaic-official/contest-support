@@ -3,7 +3,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { Command, Snapshot } from '../../../connected/model';
 import { decideWorkflow } from '../../workflow';
 import { openStoreDatabase } from '../cloudflare/tooling/store-database.mjs';
-import { currentAccessBindings, currentAccessSql, currentReadyLoginSql, sessionsListSql, snapshotSql } from '../cloudflare/application';
+import { currentReadyLoginSql, sessionsListSql, snapshotSql } from '../cloudflare/application';
+import { contestDataBindings, contestDataSql, contestListBindings } from '../cloudflare/authority';
 import { R2AvatarService } from '../cloudflare/avatars';
 import type { PrivateBucket } from '../cloudflare/images';
 import type { D1Connection, D1Statement } from './connection';
@@ -20,10 +21,12 @@ const audits = 1200;
  * 31 are contestants on team 8, which owns 4 issues. The login of account 9
  * is revoked. Account 1201 is a session member with no team, role or admin
  * flag, 1202 belongs to no session, and 1203 is staff of the second session only.
+ * Account 1204 is an event admin and 1205 a webmaster. Neither holds a membership.
  */
 const callers = {
   admin: 1, volunteer: 2, jury: 3, contestant: 7, teammate: 31,
   revokedLogin: 9, plainMember: 1201, outsider: 1202, otherSessionStaff: 1203,
+  eventAdmin: 1204, webmaster: 1205,
 };
 
 /**
@@ -32,7 +35,7 @@ const callers = {
  * avatar. Every id is fictional.
  */
 async function seed(db: D1Connection, teamCount: number): Promise<void> {
-  const people = accounts + 3;
+  const people = accounts + 5;
   const series = (count: number) => `WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < ${count})`;
   const now = "strftime('%Y-%m-%dT%H:%M:%fZ', 'now')";
   const later = "strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '+1 day')";
@@ -61,6 +64,9 @@ async function seed(db: D1Connection, teamCount: number): Promise<void> {
     ('sess-1', 'acc-${callers.plainMember}', NULL), ('sess-2', 'acc-${callers.otherSessionStaff}', NULL)`);
   await run(`INSERT INTO membership_roles (session_id, account_id, role) VALUES ('sess-1', 'acc-2', 'volunteer'),
     ('sess-1', 'acc-3', 'jury'), ('sess-2', 'acc-${callers.otherSessionStaff}', 'volunteer')`);
+  await run(`UPDATE accounts SET event_id = 'ev-1' WHERE id = 'acc-${callers.eventAdmin}'`);
+  await run(`INSERT INTO grants (account_id, scope, event_id, granted_by) VALUES ('acc-${callers.eventAdmin}', 'event', 'ev-1', 'acc-1')`);
+  await run(`INSERT INTO grants (account_id, scope, granted_by) VALUES ('acc-${callers.webmaster}', 'site', 'acc-1')`);
   await run(`${series(issues)} INSERT INTO issues (id, session_id, team_id, status, number, reporter, reporter_name, category, description, created_at)
     SELECT 'issue-' || i, 'sess-1', 'team-' || (1 + i % ${teamCount}), 'open', i, 'acc-' || (1 + i), 'Person', 'Devices', 'Fictional issue ' || i, ${now} FROM n`);
   await run(`${series(issues * 5)} INSERT INTO history (id, issue_id, actor, at, text, visibility, actor_name)
@@ -89,7 +95,7 @@ async function seed(db: D1Connection, teamCount: number): Promise<void> {
  * once for every row. It is the reference for the permission filters.
  * Replace it when the snapshot gains or loses a field.
  */
-const referenceSnapshotSql = `WITH login AS (${currentReadyLoginSql}), access AS MATERIALIZED (${currentAccessSql}),
+const referenceSnapshotSql = `WITH login AS (${currentReadyLoginSql}), access AS MATERIALIZED (${contestDataSql('caller')}),
   visible_issues AS MATERIALIZED (
     SELECT i.* FROM access a CROSS JOIN issues i WHERE i.session_id = ? AND i.team_id = a.team_id
     UNION ALL SELECT i.* FROM access a CROSS JOIN issues i WHERE a.staff = 1 AND i.session_id = ?)
@@ -171,7 +177,7 @@ type ReadBody = Omit<Snapshot, 'server_time'> & { server_time?: string };
 async function snapshot(db: D1Connection, n: number, sql = snapshotSql) {
   const caller = { accountId: `acc-${n}`, loginId: `login-${n}` };
   const result = await db.prepare(sql)
-    .bind(caller.accountId, caller.loginId, ...currentAccessBindings(caller, 'sess-1'), ...Array<string>(9).fill('sess-1'))
+    .bind(caller.accountId, caller.loginId, ...contestDataBindings(caller, 'sess-1'), ...Array<string>(9).fill('sess-1'))
     .all<{ snapshot: string }>();
   const row = result.results[0];
   const body = row ? (JSON.parse(row.snapshot) as ReadBody) : null;
@@ -289,6 +295,16 @@ describe('rows read for a session with 1,200 accounts and 100 issues', () => {
     expect(rowsRead).toBeLessThan(6_800);
   });
 
+  it('reads the admin snapshot for an event admin and a webmaster within the admin ceiling', async () => {
+    const admin = (await snapshot(db, callers.admin)).body!;
+    for (const n of [callers.eventAdmin, callers.webmaster]) {
+      const { rowsRead, body } = await snapshot(db, n);
+      expect(body!.membership).toMatchObject({ team_id: null, roles: [], is_admin: true });
+      expect({ ...body!, membership: admin.membership }, `account ${n}`).toEqual(admin);
+      expect(rowsRead, `account ${n}`).toBeLessThan(6_800);
+    }
+  });
+
   // Measured on 2026-10-26. While the list checked every ready avatar of the
   // installation, it read 6,015 rows for a contestant, 8,430 for the volunteer
   // and 7,229 for the admin. From the caller and the session staff, it read 12,
@@ -321,10 +337,14 @@ describe('rows read for a session with 1,200 accounts and 100 issues', () => {
   });
 
   it('reads a handful of rows for the sessions list', async () => {
-    const result = await db.prepare(sessionsListSql).bind(`acc-${callers.contestant}`, `login-${callers.contestant}`)
-      .all<{ id: string }>();
+    const list = async (n: number) => db.prepare(sessionsListSql)
+      .bind(...contestListBindings({ accountId: `acc-${n}`, loginId: `login-${n}` })).all<{ id: string }>();
+    const result = await list(callers.contestant);
     expect(result.results).toEqual([{ id: 'sess-1', name: 'Scale session' }]);
     expect(result.meta?.rows_read ?? Infinity).toBeLessThan(30);
+    for (const n of [callers.eventAdmin, callers.webmaster]) {
+      expect((await list(n)).results.map((row) => row.id), `account ${n}`).toEqual(['sess-2', 'sess-1']);
+    }
   });
 });
 

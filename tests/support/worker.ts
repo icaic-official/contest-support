@@ -8,6 +8,7 @@ import {
   AuthenticationError, signInRefused, type AuthenticationService, type AuthenticationSession,
 } from '../../src/server/authentication';
 import { createAuthenticationHandler } from '../../src/server/authenticationHttp';
+import { eventCodeStorageKey } from '../../src/screens/eventCodeMemory';
 import type { CommandResult } from '../../src/server/workflow';
 import { createApplicationHandler, type ApplicationHttpServices } from '../../src/server/adapters/cloudflare/http';
 
@@ -99,6 +100,11 @@ export abstract class FixtureWorker {
 
   constructor(readonly origin: string) {}
 
+  /** The event code of the fixture's accounts. */
+  protected eventCodeOfDevice(): EventCode {
+    return fixtureEvent.code;
+  }
+
   /** The bodies of the writes to one path, in order. */
   bodies<T = unknown>(path: string): T[] {
     return this.writes.filter((write) => write.path === path).map((write) => write.body as T);
@@ -118,7 +124,22 @@ export abstract class FixtureWorker {
     for (const socket of this.sockets) socket.send('{"type":"change"}');
   }
 
-  async attach(context: BrowserContext): Promise<void> {
+  /**
+   * Serves the Worker to one browser context. By default the browser acts as
+   * a device that last signed in to the fixture's event, so the sign-in form
+   * fills in the code. `newDevice` starts with no remembered code. A later
+   * attach of the same context names its own event, because its script runs last.
+   */
+  async attach(context: BrowserContext, options: { newDevice?: boolean } = {}): Promise<void> {
+    if (!options.newDevice) {
+      await context.addInitScript(({ key, code }) => {
+        try {
+          window.localStorage.setItem(key, code);
+        } catch {
+          // A page without storage starts with an empty code.
+        }
+      }, { key: eventCodeStorageKey, code: this.eventCodeOfDevice() });
+    }
     const identity = new FixtureIdentity(() => this.accounts());
     const authentication = createAuthenticationHandler(identity, { origins: [this.origin] });
     const application = createApplicationHandler({

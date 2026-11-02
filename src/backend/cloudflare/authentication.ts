@@ -123,7 +123,9 @@ export function createCloudflareAuthentication(options: {
     const response = await checked(authenticated ? await withCsrf(send) : await send());
     if (response.status === 401) {
       notify(undefined);
-      throw new Error('Sign in to continue.');
+      // A refused sign-in shows the server's one message. Elsewhere a 401 means that the session ended.
+      const refused = authenticated ? undefined : errorSchema.safeParse(await response.json().catch(() => undefined)).data;
+      throw new Error(refused?.error ?? 'Sign in to continue.');
     }
     return response;
   }

@@ -179,6 +179,9 @@ export async function runUiJourney(browser: Browser, fixture: UiFixture, options
     // Establish the selected adapter before entering a fixture credential. A
     // frontend built for another provider must fail before any login attempt.
     await expect.poll(() => currentOriginAuthentication).toBe(true);
+    const target = fixture.accounts[actor].target;
+    if (target.kind === 'site') await page.getByRole('button', { name: 'Site sign-in', exact: true }).click();
+    else await page.getByLabel('Event code', { exact: true }).fill(target.code);
     await privateFill(page.getByLabel('Username', { exact: true }), fixture.accounts[actor].username);
     await privateFill(page.getByLabel('Password', { exact: true }), password ?? fixture.accounts[actor].password);
     await page.getByRole('button', { name: 'Sign in', exact: true }).click();

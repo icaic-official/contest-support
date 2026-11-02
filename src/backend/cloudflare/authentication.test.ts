@@ -76,6 +76,13 @@ describe('Cloudflare browser authentication transport', () => {
     } finally { stop(); }
   });
 
+  it('shows the server refusal of a sign-in, and treats a 401 elsewhere as an ended session', async () => {
+    const refusal = 'The event code, username, or password is incorrect.';
+    const refused = setup((request) => request.method === 'POST' ? json({ error: refusal }, 401) : json({ user, status, csrf: 'csrf' }));
+    await expect(refused.auth.signIn({ kind: 'event', code: 'xxxx-2026' as EventCode }, 'helper', 'wrong')).rejects.toThrow(refusal);
+    await expect(refused.auth.signOut()).rejects.toThrow('Sign in to continue.');
+  });
+
   it('reads the CSRF token once and reuses it for later writes', async () => {
     let reads = 0;
     const { auth, requests } = setup((request) => request.method === 'GET'

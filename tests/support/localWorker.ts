@@ -93,9 +93,13 @@ export class LocalWorker extends FixtureWorker {
     });
   }
 
-  override async attach(context: BrowserContext): Promise<void> {
+  protected override eventCodeOfDevice(): EventCode {
+    return this.eventCode;
+  }
+
+  override async attach(context: BrowserContext, options: { newDevice?: boolean } = {}): Promise<void> {
     await this.guard(context);
-    await super.attach(context);
+    await super.attach(context, options);
   }
 
   private caller(user: string) {

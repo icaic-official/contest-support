@@ -1,4 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto';
+import type { EventCode } from '../../src/backend/contracts';
 import type { D1Connection } from '../../src/server/adapters/d1/connection';
 import { passwordHasher, randomSecret } from '../../src/server/adapters/cloudflare/password';
 import { avatarKey } from '../../src/server/adapters/cloudflare/avatars';
@@ -23,12 +24,15 @@ export async function createLocalUiFixture(env: LocalUiEnvironment, origin: stri
   const sessionIds: [string, string] = [randomUUID(), randomUUID()];
   const teamIds: [string, string, string] = [randomUUID(), randomUUID(), randomUUID()];
   const control = { event: randomUUID(), session: randomUUID(), account: randomUUID(), key: `control:${randomUUID()}` };
-  const accounts = Object.fromEntries(actors.map((actor) => [actor, {
-    id: randomUUID(), username: `local-${runId.slice(0, 12)}-${actor.toLowerCase()}`, password: randomSecret() + 'A9!',
+  const code = `local-${runId.slice(0, 12)}` as EventCode;
+  const accounts = Object.fromEntries(actors.map((actor): [Actor, TestAccount] => [actor, {
+    id: randomUUID(), target: { kind: 'event', code }, username: `local-${runId.slice(0, 12)}-${actor.toLowerCase()}`,
+    password: randomSecret() + 'A9!',
   }])) as Record<Actor, TestAccount>;
   const write = (sql: string, ...values: Array<string | number | null>) => db.prepare(sql).bind(...values);
   const queries = [
-    write('INSERT INTO events (id, name) VALUES (?, ?), (?, ?)', eventId, `Provider contract ${runId}`, control.event, 'Unrelated local control'),
+    write('INSERT INTO events (id, name, code) VALUES (?, ?, ?), (?, ?, NULL)',
+      eventId, `Provider contract ${runId}`, code, control.event, 'Unrelated local control'),
     ...sessionIds.map((id, index) => write('INSERT INTO sessions (id, event_id, name, intake_open) VALUES (?, ?, ?, 1)',
       id, eventId, index === 0 ? 'Provider primary' : 'Provider isolation')),
     write('INSERT INTO sessions (id, event_id) VALUES (?, ?)', control.session, control.event),
@@ -86,7 +90,7 @@ export async function createLocalUiFixture(env: LocalUiEnvironment, origin: stri
       const keys = [...images.flatMap((image) => [image.original_path, image.thumbnail_path]),
         ...avatars.map((avatar) => avatarKey(avatar.account_id, avatar.id))];
       if (keys.length) await env.IMAGES.delete(keys);
-      const rateKeys = Object.values(accounts).flatMap((account) => [`username:${account.username}`, `change:${account.id}`]);
+      const rateKeys = Object.values(accounts).flatMap((account) => [`handle:${eventId}:${account.username}`, `change:${account.id}`]);
       rateKeys.push(...['127.0.0.1', '::1', '198.51.100.17'].map((ip) => `ip:${createHash('sha256').update(`${secret}:${ip}`).digest('hex')}`));
       await db.batch([
         write('DELETE FROM events WHERE id = ?', eventId),

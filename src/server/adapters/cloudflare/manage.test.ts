@@ -6,9 +6,13 @@ import type { Caller } from '../../authentication';
 import type { D1Binding, D1Connection, D1Value } from '../d1/connection';
 import { applyMigrations } from '../d1/testFixture';
 import { D1ApplicationService } from './application';
+import { D1AuthenticationService } from './authentication';
+import { createBetterAuthIdentity } from './identity';
 import { D1ManageService } from './manage';
+import { passwordHasher, randomSecret, type PasswordHasher } from './password';
 
 const people = ['first', 'second', 'contestAdmin'] as const;
+const fastPasswords: PasswordHasher = { hash: async () => 'fictional-test-hash', verify: async () => false };
 type Person = typeof people[number];
 
 describe('site commands for webmasters', () => {
@@ -33,7 +37,7 @@ describe('site commands for webmasters', () => {
     db = platform.env.DB;
     dispose = platform.dispose;
     await applyMigrations(db);
-    manage = new D1ManageService(db);
+    manage = new D1ManageService(db, fastPasswords);
     application = new D1ApplicationService(db);
     Object.assign(ids, { event: randomUUID(), contest: randomUUID(), otherContest: randomUUID() });
     await run('INSERT INTO events (id, name) VALUES (?, ?)', ids.event, 'Fictional event');
@@ -90,7 +94,7 @@ describe('site commands for webmasters', () => {
     };
     const requestId = randomUUID();
     const command: ManageCommand = { type: 'add_webmaster', person: { username: 'lost-response', name: 'Fictional' } };
-    const receipt = await new D1ManageService(lossy).execute(caller('first'), requestId, command);
+    const receipt = await new D1ManageService(lossy, fastPasswords).execute(caller('first'), requestId, command);
     expect(await execute('first', command, requestId)).toEqual(receipt);
     expect(await rows("SELECT id FROM accounts WHERE username = 'lost-response'")).toEqual([{ id: receipt.accountIds![0] }]);
   });
@@ -176,5 +180,55 @@ describe('site commands for webmasters', () => {
       { action: 'remove_webmaster', actor: caller('first').accountId, target: caller('second').accountId },
       { action: 'remove_webmaster', actor: caller('first').accountId, target: caller('first').accountId },
     ]);
+  });
+
+  it('issues a new webmaster a password in one batch, and a retry returns the account without it', async () => {
+    const { accountIds } = await execute('first', { type: 'add_webmaster', person: { username: 'newcomer', name: 'Fictional newcomer' } });
+    const added = accountIds![0]!;
+    const requestId = randomUUID();
+    const issuing = new D1ManageService(db, passwordHasher);
+    const [issued] = await issuing.issueCredentials(caller('first'), requestId, [added]);
+    expect(issued).toMatchObject({ accountId: added, username: 'newcomer' });
+    expect(issued!.temporaryPassword).toMatch(/^.{12,}$/);
+    expect((await manage.site(caller('first'))).webmasters).toContainEqual(expect.objectContaining({ id: added, ready: true }));
+    const authentication = new D1AuthenticationService(db, createBetterAuthIdentity(db, {
+      origin: 'http://127.0.0.1:8788', secret: randomSecret(), secureCookies: false,
+    }), passwordHasher);
+    const signed = await authentication.signIn('newcomer', issued!.temporaryPassword!);
+    const current = await authentication.current(new Headers({ cookie: signed.cookie.split(';')[0]! }));
+    expect(current?.user.id).toBe(added);
+    expect(current?.status.must_change).toBe(true);
+    expect(await issuing.issueCredentials(caller('first'), requestId, [added]))
+      .toEqual([{ accountId: added, username: 'newcomer', temporaryPassword: null }]);
+    expect(await rows("SELECT action, state, actor FROM account_operations WHERE account_id = ?", added))
+      .toEqual([{ action: 'reset_password', state: 'completed', actor: caller('first').accountId }]);
+    expect(await rows("SELECT json_extract(detail, '$.accountIds') AS accounts FROM authority_audit WHERE action = 'issue_passwords'"))
+      .toEqual([{ accounts: JSON.stringify([added]) }]);
+    await expect(issuing.issueCredentials(caller('first'), requestId, [caller('second').accountId]))
+      .rejects.toMatchObject({ status: 409, message: 'This request was already used for another change. Refresh and try again.' });
+  });
+
+  it('resets another webmaster and refuses the own account, other accounts, and other callers', async () => {
+    const issue = (person: Person, accountIds: unknown) => manage.issueCredentials(caller(person), randomUUID(), accountIds);
+    await expect(issue('first', [caller('first').accountId])).rejects.toMatchObject({ status: 400 });
+    await expect(issue('first', [caller('contestAdmin').accountId])).rejects.toMatchObject({ status: 409 });
+    await expect(issue('contestAdmin', [caller('first').accountId])).rejects.toMatchObject({ status: 403 });
+    await expect(issue('first', Array.from({ length: 9 }, () => randomUUID()))).rejects.toMatchObject({ status: 400 });
+    const second = caller('second').accountId;
+    const failing = new D1ManageService({ prepare: (sql) => db.prepare(sql), batch: () => Promise.reject(new Error('private detail')) },
+      fastPasswords);
+    await expect(failing.issueCredentials(caller('first'), randomUUID(), [second]))
+      .rejects.toMatchObject({ status: 409, message: 'The request outcome is unknown. Refresh before retrying.' });
+    expect(await rows('SELECT credential_generation, must_change FROM accounts WHERE id = ?', second))
+      .toEqual([{ credential_generation: 1, must_change: 0 }]);
+
+    const [reset] = await issue('first', [second]);
+    expect(reset!.temporaryPassword).toMatch(/^.{12,}$/);
+    expect(await rows('SELECT credential_generation, credential_state, must_change FROM accounts WHERE id = ?', second))
+      .toEqual([{ credential_generation: 2, credential_state: 'ready', must_change: 1 }]);
+    expect(await rows('SELECT revoked FROM logins WHERE account_id = ?', second)).toEqual([{ revoked: 1 }]);
+    expect(await rows('SELECT count(*) AS n FROM ba_session WHERE userId = ?', second)).toEqual([{ n: 0 }]);
+    expect(await rows('SELECT password FROM ba_account WHERE userId = ?', second)).toEqual([{ password: 'fictional-test-hash' }]);
+    expect(await rows('SELECT count(*) AS n FROM command_assertions')).toEqual([{ n: 0 }]);
   });
 });

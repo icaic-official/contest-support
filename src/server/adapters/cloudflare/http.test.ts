@@ -30,6 +30,7 @@ function services() {
     manage: {
       site: vi.fn<ApplicationHttpServices['manage']['site']>(),
       execute: vi.fn<ApplicationHttpServices['manage']['execute']>().mockResolvedValue({}),
+      issueCredentials: vi.fn<ApplicationHttpServices['manage']['issueCredentials']>().mockResolvedValue([]),
     },
     images: {
       begin: vi.fn<ApplicationHttpServices['images']['begin']>(),
@@ -111,7 +112,7 @@ describe('Cloudflare application HTTP boundary', () => {
     expect(deps.application.editRoster).toHaveBeenCalledTimes(1);
   });
 
-  it('passes a site change with the trusted caller and returns its refusal', async () => {
+  it('passes site changes and credential issues with the trusted caller and returns a refusal', async () => {
     const deps = services();
     const handle = createApplicationHandler(deps, origin);
     const command = { type: 'set_webmaster_reads', restricted: true };
@@ -125,6 +126,8 @@ describe('Cloudflare application HTTP boundary', () => {
     expect(refused.status).toBe(409);
     expect(await refused.json()).toEqual({ error: 'The last webmaster cannot be removed.' });
     expect(deps.manage.execute).toHaveBeenCalledTimes(2);
+    expect((await handle(post('/api/credentials', { requestId, accountIds: [sessionId] }))).status).toBe(200);
+    expect(deps.manage.issueCredentials).toHaveBeenCalledWith(identity.caller, requestId, [sessionId]);
   });
 
   it('bounds UTF-8 JSON bodies before invoking a command', async () => {

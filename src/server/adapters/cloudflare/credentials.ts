@@ -68,3 +68,23 @@ export function completeCredentialReset(
     statement(db, `UPDATE account_operations SET state = 'completed', completed_at = unixepoch() WHERE id = ?`, operationId),
   ];
 }
+
+/**
+ * Replace a password in one batch: begin the reset, record the operation, and
+ * complete it. The caller hashes before the batch, so an interrupted issue
+ * changes nothing and the old password stays valid. The account_operations
+ * insert runs the takeover trigger, so a refused actor rolls back every write.
+ */
+export function replaceCredentialStatements(
+  db: D1Connection,
+  account: CredentialAccount,
+  hash: string,
+  options: { operationId: string; actor: string; temporary: boolean },
+): D1Statement[] {
+  return [
+    ...beginCredentialReset(db, account.id, options.operationId),
+    statement(db, `INSERT INTO account_operations (id, account_id, actor, action, state) VALUES (?, ?, ?, 'reset_password', 'pending')`,
+      options.operationId, account.id, options.actor),
+    ...completeCredentialReset(db, account, options.operationId, hash, options.temporary),
+  ];
+}

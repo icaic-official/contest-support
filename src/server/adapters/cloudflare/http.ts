@@ -25,6 +25,7 @@ const adminSchema = z.discriminatedUnion('action', [
 ]);
 const workflowSchema = z.strictObject({ sessionId: uuid, requestId: uuid, command: z.unknown() });
 const manageSchema = z.strictObject({ requestId: uuid, command: z.unknown() });
+const credentialsSchema = z.strictObject({ requestId: uuid, accountIds: z.unknown() });
 const imageSchema = z.discriminatedUnion('action', [
   z.strictObject({ action: z.literal('begin'), sessionId: uuid, requestId: uuid, issueId: uuid,
     visibility: z.enum(['public', 'internal']), name: z.string(), bytes: z.number() }),
@@ -59,7 +60,7 @@ export interface ApplicationHttpServices {
   auth: Pick<AuthenticationService, 'current'>;
   application: Pick<D1ApplicationService, 'sessions' | 'snapshot' | 'setIntake' | 'setImageLimits' | 'saveMember' | 'removeMember' | 'editRoster'>;
   workflow: Pick<WorkflowService, 'execute'>;
-  manage: Pick<D1ManageService, 'site' | 'execute'>;
+  manage: Pick<D1ManageService, 'site' | 'execute' | 'issueCredentials'>;
   images: Pick<R2ImageService, 'begin' | 'upload' | 'finish' | 'remove' | 'download'>;
   announcements: Pick<D1AnnouncementService, 'snapshot' | 'execute'>;
   announcementImages: Pick<R2AnnouncementImageService, 'begin' | 'upload' | 'finish' | 'remove' | 'download'>;
@@ -158,6 +159,10 @@ export function createApplicationHandler(services: ApplicationHttpServices, orig
       if (url.pathname === '/api/manage') {
         const parsed = manageSchema.parse(body);
         return privateJson(await services.manage.execute(caller, parsed.requestId, parsed.command));
+      }
+      if (url.pathname === '/api/credentials') {
+        const parsed = credentialsSchema.parse(body);
+        return privateJson(await services.manage.issueCredentials(caller, parsed.requestId, parsed.accountIds));
       }
       if (url.pathname === '/api/announcements') {
         const parsed = announcementSchema.safeParse(body);

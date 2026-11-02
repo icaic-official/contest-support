@@ -79,7 +79,7 @@ export default {
           announcementImages: new R2AnnouncementImageService(env.DB, env.IMAGES),
           avatars: new R2AvatarService(env.DB, env.IMAGES),
           workflow: new WorkflowService(new D1ApplicationStore(env.DB)),
-          manage: new D1ManageService(env.DB),
+          manage: new D1ManageService(env.DB, passwordHasher),
           connect: (input, caller, sessionId) => connectLive(input, env, caller, sessionId),
         }, env.AUTH_ORIGIN)(request);
       }

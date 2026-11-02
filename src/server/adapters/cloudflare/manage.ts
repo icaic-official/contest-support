@@ -1,11 +1,16 @@
 import { z } from 'zod';
-import type { ManageCommand, ManageLevel, ManageReceipt, SiteOverview } from '../../../backend/contracts';
+import {
+  ISSUE_BATCH, type IssuedCredential, type ManageCommand, type ManageLevel, type ManageReceipt, type SiteOverview,
+} from '../../../backend/contracts';
 import { AuthenticationError, type Caller } from '../../authentication';
 import type { D1Connection, D1Statement, D1Value } from '../d1/connection';
 import { currentReadyLoginBindings, currentReadyLoginSql, notificationStatements } from './application';
 import {
-  authorityGuard, contestsToJoinSql, reaches, resolveAuthority, webmastersSql, type Authority, type Target,
+  authorityGuard, contestsToJoinSql, manageAccountBindings, manageWebmasterSql, reaches, resolveAuthority, webmastersSql,
+  type Authority, type Target,
 } from './authority';
+import { replaceCredentialStatements } from './credentials';
+import { randomSecret, type PasswordHasher } from './password';
 
 const usernameSchema = z.string().trim().toLowerCase().regex(/^[a-z0-9][a-z0-9_-]{2,31}$/);
 const commandSchema = z.discriminatedUnion('type', [
@@ -17,6 +22,8 @@ const commandSchema = z.discriminatedUnion('type', [
   z.strictObject({ type: z.literal('set_webmaster_reads'), restricted: z.boolean() }),
   z.strictObject({ type: z.literal('join_contest'), contestId: z.uuid() }),
 ]) satisfies z.ZodType<ManageCommand>;
+const accountIdsSchema = z.array(z.uuid()).min(1).max(ISSUE_BATCH)
+  .refine((accountIds) => new Set(accountIds).size === accountIds.length);
 
 /** What a command needs: at least this level of authority over one target. */
 interface ManageRequirement {
@@ -112,7 +119,14 @@ class Assertions {
   }
 }
 
-interface WebmasterRow { id: string; name: string; username: string; disabled: number; ready: number }
+interface WebmasterRow {
+  id: string;
+  name: string;
+  username: string;
+  disabled: number;
+  credential_generation: number;
+  ready: number;
+}
 
 /**
  * Site administration. Every change runs one path: parse, receipt replay,
@@ -120,7 +134,7 @@ interface WebmasterRow { id: string; name: string; username: string; disabled: n
  * again before its writes and stores the receipt with them.
  */
 export class D1ManageService {
-  constructor(private readonly db: D1Connection) {}
+  constructor(private readonly db: D1Connection, private readonly passwords: PasswordHasher) {}
 
   private statement(sql: string, ...values: D1Value[]): D1Statement {
     return this.db.prepare(sql).bind(...values);
@@ -158,6 +172,58 @@ export class D1ManageService {
     const assertions = new Assertions(this.db);
     const plan = await this.plan(command, authority, assertions);
     return this.commit(authority, requestId, record, plan, assertions);
+  }
+
+  /**
+   * Issues a temporary password for each of up to ISSUE_BATCH other
+   * webmasters. Hashing runs before one batch that holds every write. The
+   * passwords are returned once and never stored. A retry of a committed
+   * request returns the same accounts without passwords.
+   */
+  async issueCredentials(caller: Caller, requestId: string, input: unknown): Promise<IssuedCredential[]> {
+    const parsed = accountIdsSchema.safeParse(input);
+    if (!parsed.success) throw new AuthenticationError(400, `Choose 1 to ${ISSUE_BATCH} different webmasters.`);
+    const accountIds = parsed.data;
+    const record = JSON.stringify({ type: 'issue_credentials', accountIds });
+    const replayed = await this.replay(caller, requestId, record);
+    if (replayed) return this.issued(accountIds, new Map());
+    if (accountIds.includes(caller.accountId)) throw new AuthenticationError(400, 'Use Change password for your own account.');
+    const authority = await resolveAuthority(this.db, caller, { scope: 'site' });
+    if (!authority) throw new AuthenticationError(403, 'Only a webmaster can issue webmaster passwords.');
+    const targets = (await this.webmasters()).filter((webmaster) => accountIds.includes(webmaster.id));
+    if (targets.length !== accountIds.length) {
+      throw new AuthenticationError(409, 'That account is not a webmaster. Refresh the page.');
+    }
+    const assertions = new Assertions(this.db);
+    const passwords = new Map<string, string>();
+    const statements: D1Statement[] = [];
+    for (const target of targets) {
+      const password = randomSecret() + 'A9!';
+      passwords.set(target.id, password);
+      statements.push(
+        // A reset or a change of authority since the read fails the batch.
+        assertions.check(`${manageWebmasterSql} AND t.disabled = 0 AND t.credential_generation = ?`,
+          ...manageAccountBindings(caller.accountId, target.id), target.credential_generation),
+        ...replaceCredentialStatements(this.db, target, await this.passwords.hash(password),
+          { operationId: crypto.randomUUID(), actor: caller.accountId, temporary: true }),
+      );
+    }
+    await this.commit(authority, requestId, record, {
+      statements,
+      audit: { action: 'issue_passwords', target: null, detail: { accountIds } },
+      notify: [],
+      receipt: { accountIds },
+    }, assertions);
+    return this.issued(accountIds, passwords);
+  }
+
+  private async issued(accountIds: readonly string[], passwords: ReadonlyMap<string, string>): Promise<IssuedCredential[]> {
+    const accounts = await this.statement(`SELECT id, COALESCE(username, '') AS username FROM accounts
+      WHERE id IN (SELECT value FROM json_each(?))`, JSON.stringify(accountIds)).all<{ id: string; username: string }>();
+    const usernames = new Map(accounts.results.map((account) => [account.id, account.username]));
+    return accountIds.map((accountId) => ({
+      accountId, username: usernames.get(accountId) ?? '', temporaryPassword: passwords.get(accountId) ?? null,
+    }));
   }
 
   /**

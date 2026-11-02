@@ -278,6 +278,7 @@ export class FakeWorker extends FixtureWorker {
     manage: {
       site: async () => { throw new AuthenticationError(403, 'Only a webmaster can open the site settings.'); },
       execute: async () => { throw new AuthenticationError(403, 'Only a webmaster can change the site.'); },
+      issueCredentials: async () => { throw new AuthenticationError(403, 'Only a webmaster can issue webmaster passwords.'); },
     },
     announcements: {
       snapshot: async () => this.announcements,

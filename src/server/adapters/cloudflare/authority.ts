@@ -252,8 +252,8 @@ export function manageAccountBindings(actor: string, target: string): D1Value[] 
 }
 
 /** Every webmaster, enabled or not, by name. `ready` is false until a password is issued. */
-export const webmastersSql = `SELECT a.id, a.name, a.username, a.disabled,
-    a.credential_state = 'ready' AS ready
+export const webmastersSql = `SELECT a.id, a.name, COALESCE(a.username, '') AS username, a.disabled,
+    a.credential_generation, a.credential_state = 'ready' AS ready
   FROM grants g JOIN accounts a ON a.id = g.account_id
   WHERE g.scope = 'site' ORDER BY a.name, a.id`;
 

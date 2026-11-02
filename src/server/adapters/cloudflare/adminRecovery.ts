@@ -1,5 +1,5 @@
 import type { D1Connection, D1Statement, D1Value } from '../d1/connection';
-import { beginCredentialReset, completeCredentialReset, insertPendingReset } from './credentialReset';
+import { beginCredentialReset, completeCredentialReset, insertPendingReset } from './credentials';
 import { passwordHasher, randomSecret, type PasswordHasher } from './password';
 
 const usernamePattern = /^[a-z0-9][a-z0-9_-]{2,31}$/;

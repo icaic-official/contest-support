@@ -6,7 +6,7 @@ function statement(db: D1Connection, sql: string, ...values: D1Value[]): D1State
 
 /**
  * Start a password replacement.
- * An application reset and maintainer recovery both use these statements.
+ * An application reset and the one-batch replacement both use these statements.
  */
 export function beginCredentialReset(db: D1Connection, target: string, operationId: string): D1Statement[] {
   return [
@@ -16,24 +16,6 @@ export function beginCredentialReset(db: D1Connection, target: string, operation
     statement(db, 'UPDATE logins SET revoked = 1 WHERE account_id = ?', target),
     statement(db, 'DELETE FROM ba_session WHERE userId = ?', target),
   ];
-}
-
-/** Record the pending reset that a normal admin reset inserts before the password write. */
-export function insertPendingReset(
-  db: D1Connection,
-  operationId: string,
-  target: string,
-  actor: string,
-  sessionId: string,
-): D1Statement {
-  return statement(
-    db,
-    `INSERT INTO account_operations (id, account_id, actor, session_id, action, state) VALUES (?, ?, ?, ?, 'reset_password', 'pending')`,
-    operationId,
-    target,
-    actor,
-    sessionId,
-  );
 }
 
 export interface CredentialAccount {

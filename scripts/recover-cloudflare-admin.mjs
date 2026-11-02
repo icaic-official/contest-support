@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import { bundleProviderModule } from "../src/server/adapters/cloudflare/tooling/bundle.mjs";
 import { enforceWranglerEnvironment } from "../src/server/adapters/cloudflare/tooling/safe-environment.mjs";
 
-const usage = "Usage: npm run cloudflare:recover-admin -- [--config WRANGLER_CONFIG] (--username NAME | --user ACCOUNT_ID)";
+const usage = "Usage: npm run cloudflare:recover-admin -- [--config WRANGLER_CONFIG] --username NAME";
 
 function valueAfter(argv, flag) {
   const index = argv.indexOf(flag);
@@ -17,7 +17,7 @@ function valueAfter(argv, flag) {
 
 /** Read a maintainer command. The password is never an argument. */
 export function parseRecoveryArguments(argv) {
-  const known = ["--config", "--username", "--user"];
+  const known = ["--config", "--username"];
   if (argv.some((argument) => argument.startsWith("--") && !known.includes(argument))) throw new Error(usage);
   const consumed = new Set();
   for (const flag of known) {
@@ -28,24 +28,17 @@ export function parseRecoveryArguments(argv) {
   }
   if (argv.some((_, index) => !consumed.has(index))) throw new Error(usage);
   const username = valueAfter(argv, "--username");
-  const userId = valueAfter(argv, "--user");
-  if ((username === undefined) === (userId === undefined)) {
-    throw new Error("Provide either --username or --user. Recovery did not start.");
-  }
-  return {
-    config: valueAfter(argv, "--config") ?? "wrangler.jsonc",
-    username,
-    userId,
-  };
+  if (username === undefined) throw new Error("Provide the webmaster's --username. Recovery did not start.");
+  return { config: valueAfter(argv, "--config") ?? "wrangler.jsonc", username };
 }
 
 /** Refuse CI and any stdout that is not an interactive terminal. */
 export function assertMaintainerTerminal(env, stdout) {
   if (env.CI || env.GITHUB_ACTIONS || env.GITHUB_WORKFLOW) {
-    throw new Error("Admin recovery runs only in a maintainer terminal. It refuses CI.");
+    throw new Error("Webmaster recovery runs only in a maintainer terminal. It refuses CI.");
   }
   if (!stdout?.isTTY) {
-    throw new Error("Admin recovery prints the temporary password only on an interactive terminal.");
+    throw new Error("Webmaster recovery prints the temporary password only on an interactive terminal.");
   }
 }
 
@@ -83,14 +76,28 @@ function publicError(error) {
     message === usage
     || message.endsWith("Recovery did not start.")
     || message.endsWith("The account was not changed.")
-    || message.startsWith("Admin recovery runs only")
-    || message.startsWith("Admin recovery prints")
+    || message.startsWith("Webmaster recovery runs only")
+    || message.startsWith("Webmaster recovery prints")
   ) return message;
-  return `Admin recovery failed. The temporary password was not shown.${publicFailureHint(error)}`;
+  return `Webmaster recovery failed. The temporary password was not shown.${publicFailureHint(error)}`;
+}
+
+/** Print the temporary password once. The message line does not contain it. */
+export function writeTemporaryPassword(result, write) {
+  if (
+    typeof result.temporaryPassword !== "string"
+    || result.temporaryPassword.length < 12
+    || /[\r\n]/.test(result.temporaryPassword)
+    || result.username.includes(result.temporaryPassword)
+  ) {
+    throw new Error("Webmaster recovery did not finish. The account was not changed.");
+  }
+  write(`Webmaster recovery completed for ${result.username}. Share this temporary password securely. The next sign-in must change it.`);
+  write(result.temporaryPassword);
 }
 
 export function loadRecoveryLibrary() {
-  return bundleProviderModule("src/server/adapters/cloudflare/adminRecovery.ts", "admin-recovery-");
+  return bundleProviderModule("src/server/adapters/cloudflare/installation.ts", "webmaster-recovery-");
 }
 
 async function openRemotePlatform(configPath) {
@@ -101,7 +108,7 @@ async function openRemotePlatform(configPath) {
 }
 
 /**
- * Reset one Cloudflare admin password.
+ * Reset one webmaster password.
  * Tests inject the database and writer. The real command uses remote D1.
  */
 export async function runRecoveryCommand(argv, dependencies = {}) {
@@ -118,17 +125,13 @@ export async function runRecoveryCommand(argv, dependencies = {}) {
   }
   const target = readRecoveryTarget(text);
   const write = dependencies.write ?? ((line) => { stdout.write(`${line}\n`); });
-  write(`Recovering an admin in remote D1 database ${target.databaseName}.`);
+  write(`Recovering a webmaster in remote D1 database ${target.databaseName}.`);
   const prepared = await (dependencies.loadLibrary ?? loadRecoveryLibrary)();
   let platform;
   try {
     platform = await (dependencies.openPlatform ?? openRemotePlatform)(configPath);
     if (!platform?.env?.DB) throw new Error("The selected Wrangler configuration has no remote DB binding. Recovery did not start.");
-    const result = await prepared.library.recoverCloudflareAdmin(platform.env.DB, {
-      username: options.username,
-      userId: options.userId,
-    });
-    prepared.library.writeTemporaryPassword(result, write);
+    writeTemporaryPassword(await prepared.library.recoverWebmaster(platform.env.DB, { username: options.username }), write);
   } finally {
     await platform?.dispose?.();
     await prepared.dispose?.();

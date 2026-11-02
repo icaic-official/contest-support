@@ -16,7 +16,7 @@ const accessJoin = /JOIN memberships|FROM memberships m\b|JOIN grants|(?<!DELETE
  * Trusted terminal commands that check an admin membership without a login.
  * The resolver needs a login, so it cannot answer for them.
  */
-const terminalCommands = new Set(['adapters/cloudflare/installation.ts', 'adapters/cloudflare/adminRecovery.ts']);
+const terminalCommands = new Set(['adapters/cloudflare/installation.ts']);
 
 function serverFiles(directory: string): string[] {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {

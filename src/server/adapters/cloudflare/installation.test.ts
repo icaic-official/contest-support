@@ -5,7 +5,7 @@ import type { D1Binding, D1Connection, D1Statement } from '../d1/connection';
 import { applyMigrations } from '../d1/testFixture';
 import { D1AuthenticationService } from './authentication';
 import { createBetterAuthIdentity } from './identity';
-import { bootstrapInstallation, recoverInstallationOwner, validateCompetitionConfiguration } from './installation';
+import { bootstrapInstallation, recoverInstallationOwner, recoverWebmaster, validateCompetitionConfiguration } from './installation';
 import { passwordHasher, randomSecret, type PasswordHasher } from './password';
 
 const competition = {
@@ -81,6 +81,19 @@ describe('trusted Cloudflare installation and owner recovery', () => {
     return row!.n;
   }
 
+  /** A webmaster outside every contest, as the Webmasters screen adds one. */
+  async function addWebmaster(username: string): Promise<string> {
+    const id = randomUUID();
+    await db.batch([
+      stmt('INSERT INTO accounts (id, name, username, must_change) VALUES (?, ?, ?, 0)', id, 'Fictional webmaster', username),
+      stmt(`INSERT INTO grants (account_id, scope, granted_by) VALUES (?, 'site', 'fixture')`, id),
+      stmt(`INSERT INTO ba_user (id, name, email, emailVerified, createdAt, updatedAt, username)
+        VALUES (?, 'Fictional webmaster', ?, 1, '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z', ?)`,
+      id, `${username}@accounts.minsky.invalid`, username),
+    ]);
+    return id;
+  }
+
   async function applicationRecords(): Promise<Record<string, unknown[]>> {
     const tables = ['events', 'sessions', 'teams', 'memberships', 'membership_roles', 'issues', 'history', 'resolutions', 'awards', 'installation'];
     return Object.fromEntries(await Promise.all(tables.map(async (table) => [table,
@@ -107,6 +120,8 @@ describe('trusted Cloudflare installation and owner recovery', () => {
       name: competition.sessionName, categories: JSON.stringify(competition.categories), intake_open: 0,
     });
     expect(await stmt('SELECT is_admin, team_id FROM memberships WHERE account_id = ?', result.accountId).first()).toEqual({ is_admin: 1, team_id: null });
+    expect(await stmt(`SELECT a.event_id, g.granted_by FROM accounts a JOIN grants g ON g.account_id = a.id AND g.scope = 'site'
+      WHERE a.id = ?`, result.accountId).first()).toEqual({ event_id: null, granted_by: 'trusted_bootstrap' });
     expect(await stmt("SELECT action, actor, target FROM admin_audit WHERE action = 'trusted_bootstrap'").first()).toEqual({
       action: 'trusted_bootstrap', actor: result.accountId, target: result.accountId,
     });
@@ -293,6 +308,8 @@ describe('trusted Cloudflare installation and owner recovery', () => {
   it('rechecks owner membership after hashing and cannot recover a different or disabled account', async () => {
     const result = await bootstrap();
     await expectFailure(recoverInstallationOwner(db, { installationId: result.installationId, accountId: randomUUID() }, { passwords: fastPasswords })).toThrow('not the active installation owner');
+    await expectFailure(stmt('UPDATE accounts SET disabled = 1 WHERE id = ?', result.accountId).run()).toThrow(/last webmaster/);
+    await addWebmaster('second_webmaster');
     await stmt('UPDATE accounts SET disabled = 1 WHERE id = ?', result.accountId).run();
     await expectFailure(recoverInstallationOwner(db, result, { passwords: fastPasswords })).toThrow('not the active installation owner');
     await stmt('UPDATE accounts SET disabled = 0 WHERE id = ?', result.accountId).run();
@@ -302,5 +319,64 @@ describe('trusted Cloudflare installation and owner recovery', () => {
     } } })).toThrow('Owner recovery did not finish.');
     expect(await stmt('SELECT credential_state FROM accounts WHERE id = ?', result.accountId).first()).toEqual({ credential_state: 'pending' });
     expect((await stmt('SELECT password FROM ba_account WHERE userId = ?', result.accountId).first<{ password: string }>())?.password === 'fictional-test-hash').toBe(true);
+  });
+
+  it('recovers a webmaster in one batch, and the old password and sessions stop working', async () => {
+    const installed = await bootstrap(db, passwordHasher);
+    const identity = createBetterAuthIdentity(db, { origin: 'http://127.0.0.1:8788', secret: randomSecret(), secureCookies: false });
+    const authentication = new D1AuthenticationService(db, identity, passwordHasher);
+    const first = await authentication.signIn(installed.adminUsername, installed.temporaryPassword);
+    const oldHeaders = new Headers({ cookie: first.cookie.split(';')[0]! });
+    expect((await authentication.current(oldHeaders))?.user.id).toBe(installed.accountId);
+    const recovered = await recoverWebmaster(db, { username: ' COMPETITION_OWNER ' });
+    expect(recovered).toMatchObject({ accountId: installed.accountId, username: installed.adminUsername });
+    expect(await authentication.current(oldHeaders)).toBeUndefined();
+    await expectFailure(authentication.signIn(installed.adminUsername, installed.temporaryPassword)).toMatchObject({ status: 401 });
+    const next = await authentication.signIn(installed.adminUsername, recovered.temporaryPassword);
+    expect((await authentication.current(new Headers({ cookie: next.cookie.split(';')[0]! })))?.status.must_change).toBe(true);
+    expect(await stmt('SELECT credential_generation, credential_state, must_change FROM accounts WHERE id = ?', installed.accountId).first())
+      .toEqual({ credential_generation: 2, credential_state: 'ready', must_change: 1 });
+    expect(await stmt(`SELECT action, state, actor, session_id FROM account_operations
+      WHERE account_id = ? ORDER BY created_at DESC, rowid DESC LIMIT 1`, installed.accountId).first())
+      .toEqual({ action: 'reset_password', state: 'completed', actor: installed.accountId, session_id: null });
+    expect(await stmt("SELECT actor, target FROM authority_audit WHERE action = 'trusted_webmaster_recovery'").first())
+      .toEqual({ actor: installed.accountId, target: installed.accountId });
+    expect(await count('command_assertions')).toBe(0);
+  }, 180_000);
+
+  it('recovers a webmaster who holds no contest membership', async () => {
+    await bootstrap();
+    const webmaster = await addWebmaster('site_only');
+    const recovered = await recoverWebmaster(db, { username: 'site_only' }, { passwords: fastPasswords });
+    expect(recovered.accountId).toBe(webmaster);
+    expect(await stmt('SELECT password FROM ba_account WHERE userId = ?', webmaster).first()).toEqual({ password: 'fictional-test-hash' });
+  });
+
+  it('refuses a contest admin, a disabled webmaster, and an unknown username before hashing', async () => {
+    const installed = await bootstrap();
+    const contestAdmin = randomUUID();
+    await db.batch([
+      stmt(`INSERT INTO accounts (id, name, username, must_change) VALUES (?, 'Duty admin', 'duty_admin', 0)`, contestAdmin),
+      stmt('INSERT INTO memberships (session_id, account_id, is_admin) VALUES (?, ?, 1)', installed.sessionId, contestAdmin),
+    ]);
+    const disabled = await addWebmaster('disabled_webmaster');
+    await stmt('UPDATE accounts SET disabled = 1 WHERE id = ?', disabled).run();
+    let hashes = 0;
+    const passwords: PasswordHasher = { ...fastPasswords, hash: async () => { hashes += 1; return 'uncommitted-hash'; } };
+    await expectFailure(recoverWebmaster(db, { username: 'duty_admin' }, { passwords })).toThrow('The account is not a webmaster.');
+    await expectFailure(recoverWebmaster(db, { username: 'disabled_webmaster' }, { passwords })).toThrow('The account is disabled.');
+    await expectFailure(recoverWebmaster(db, { username: 'missing' }, { passwords })).toThrow('No account matches that username.');
+    await expectFailure(recoverWebmaster(db, { username: 'not a username' }, { passwords })).toThrow('The username is invalid.');
+    expect(hashes).toBe(0);
+    expect(await stmt("SELECT count(*) AS n FROM account_operations WHERE action = 'reset_password'").first()).toEqual({ n: 0 });
+  });
+
+  it('leaves the previous password in place when the recovery batch fails', async () => {
+    const installed = await bootstrap();
+    const failing: D1Connection = { prepare: (sql) => db.prepare(sql), batch: () => Promise.reject(new Error('private SQL detail')) };
+    await expectFailure(recoverWebmaster(failing, { username: installed.adminUsername }, { passwords: fastPasswords }))
+      .toThrow('Webmaster recovery did not finish. The account was not changed.');
+    expect(await stmt('SELECT credential_generation, credential_state FROM accounts WHERE id = ?', installed.accountId).first())
+      .toEqual({ credential_generation: 1, credential_state: 'ready' });
   });
 });

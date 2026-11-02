@@ -228,6 +228,9 @@ it('runs the complete application through isolated HTTPS, D1, R2, and Durable Ob
       await setup.env.DB.batch([
         setup.env.DB.prepare('INSERT INTO events (id, name) VALUES (?, ?)').bind(sentinel.event, sentinel.name),
         setup.env.DB.prepare('INSERT INTO accounts (id, name) VALUES (?, ?)').bind(sentinel.account, sentinel.name),
+        // D1 keeps the last webmaster. The sentinel is the shared site's other
+        // webmaster, so cleanup can delete the webmaster that bootstrap made.
+        setup.env.DB.prepare(`INSERT INTO grants (account_id, scope, granted_by) VALUES (?, 'site', 'fixture')`).bind(sentinel.account),
         setup.env.DB.prepare('INSERT INTO authentication_limits (key, window_start, attempts) VALUES (?, unixepoch(), 1)').bind(sentinelLimit),
         setup.env.DB.prepare('INSERT INTO accounts (id, name) VALUES (?, ?)').bind(legacyId, `Fictional unconfigured ${unique}`),
         setup.env.DB.prepare('INSERT INTO memberships (session_id, account_id) VALUES (?, ?)').bind(installation.sessionId, legacyId),

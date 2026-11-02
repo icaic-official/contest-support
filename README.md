@@ -113,7 +113,7 @@ These commands connect to provider accounts. Several of them change hosted data 
 
 | Command | Purpose |
 | --- | --- |
-| `npm run cloudflare:recover-admin` | Reset the password of an existing Cloudflare admin. Prints the temporary password once in that terminal. |
+| `npm run cloudflare:recover-admin -- --username <name>` | Reset the password of a webmaster in the remote `DB` database. Prints the temporary password once in that terminal. |
 | `npm run cloud:hosting-login` | Sign in to Cloudflare with Wrangler. |
 | `npm run token:create -- <request.json> --out <file>` | Create a scoped Cloudflare API token for an agent task. Needs `CLOUDFLARE_TOKEN_ADMIN`. See [API tokens for agents](AGENTS.md#api-tokens-for-agents). |
 | `npm run token:list` | List the tokens that agents created, with their permissions and expiry. |
@@ -196,7 +196,7 @@ Backend:
 - [Session announcements](docs/session-announcements.md) is the reference for announcement behavior in the Cloudflare implementation.
 - [Cloudflare backend design](docs/cloudflare-backend-design.md) explains the implemented server boundaries.
 - [Scaling design](docs/scaling-design.md) explains where one installation saturates under load and ranks the changes that raise capacity.
-- [Webmaster, event, and contest platform](docs/event-platform-design.md) is a proposed design. It is not implemented. The [sketches page](docs/event-platform-sketches.md) holds its type and migration sketches.
+- [Webmaster, event, and contest platform](docs/event-platform-design.md) is the design for one shared site. Its first two phases, one authority resolver and webmaster management, are built on stacked branches that wait for review. The hosted read gate of the first phase has not passed. The later phases are proposed. The [sketches page](docs/event-platform-sketches.md) holds its type and migration sketches.
 - [Cloudflare authentication reference](docs/cloudflare-authentication.md) and the [authentication choice](docs/cloudflare-authentication-choice.md).
 - [Add a backend provider](docs/add-provider.md) gives contributor interfaces, registration points, installation, cleanup, and required shared verification.
 

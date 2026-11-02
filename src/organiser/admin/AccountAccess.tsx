@@ -301,7 +301,7 @@ export function AdminActivity({ state }: { state: Snapshot }) {
             {auditEntryText(state.members, entry)}
           </span>
           <span className="block text-xs text-muted-foreground">
-            {actorName(state.members, entry.actor)} · {formatDate(entry.at)}
+            {actorName(state.members, entry)} · {formatDate(entry.at)}
           </span>
         </li>
       ))}

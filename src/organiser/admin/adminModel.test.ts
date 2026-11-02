@@ -258,8 +258,19 @@ describe("display helpers", () => {
     const members = [
       { membership: member(), person: { id: userId, name: "Alex", username: null } },
     ];
-    expect(actorName(members, userId)).toBe("Alex");
-    expect(actorName(members, "someone")).toBe("someone");
+    expect(actorName(members, { action: "set_intake", actor: userId })).toBe("Alex");
+    expect(actorName(members, { action: "set_intake", actor: "someone" })).toBe("someone");
+  });
+
+  it("describes a webmaster's join without the webmaster's account ID", () => {
+    const webmaster = "00000000-0000-4000-8000-0000000000d1";
+    const join = { action: "webmaster_join", actor: webmaster, target: webmaster };
+    expect(auditEntryText([], join)).toBe("joined to read this contest");
+    expect(actorName([], join)).toBe("A webmaster");
+    const members = [
+      { membership: member(), person: { id: webmaster, name: "Alex", username: null } },
+    ];
+    expect(actorName(members, join)).toBe("Alex");
   });
 
   it("names the person that an audit entry changed", () => {

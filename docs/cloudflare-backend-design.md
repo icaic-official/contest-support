@@ -140,7 +140,15 @@ An account belongs to one event. D1 refuses a membership or an event grant that 
 While the site setting `restrict_webmaster_reads` is on, a webmaster reads a contest's data only after an audited join. Contest settings and account changes ignore that setting.
 Each answer carries a stamp of every version that it depends on. A write batch evaluates the resolver again and compares the stamp.
 [capabilities.ts](../src/connected/capabilities.ts) holds the one table of what a seat may do. Workflow decisions and the browser's page gates both read it.
-No command creates a grant yet. Migration `0017` promotes the accounts named `organizer` and `playtest-admin` to webmasters when each is a contest admin with no team seat. They keep their admin memberships.
+Migration `0017` promotes the accounts named `organizer` and `playtest-admin` to webmasters when each is a contest admin with no team seat. They keep their admin memberships. Bootstrap gives its one account a site grant.
+
+[manage.ts](../src/server/adapters/cloudflare/manage.ts) serves site administration to webmasters:
+
+- `GET /api/site` returns the webmasters, the read restriction, and the contests that the caller has not joined. It returns `null` for an account that is not a webmaster.
+- `POST /api/manage` runs one command: `add_webmaster`, `remove_webmaster`, `set_webmaster_reads`, or `join_contest`. A table keyed by command type gives each command's requirement. One batch checks the caller's stamp before its writes, and stores the receipt and a site audit row with them. A retry with the same request ID returns the first receipt.
+- `POST /api/credentials` issues a temporary password for up to eight other webmasters. The hashes run first, then one batch replaces every password. A retry with the same request ID returns the accounts without passwords.
+
+D1 keeps the last enabled webmaster, refuses a join while webmasters read every contest, and writes both audit rows of a join.
 The [event platform design](event-platform-design.md) describes the later phases.
 
 The implementation uses primary database reads for authorization and snapshots.

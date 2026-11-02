@@ -109,6 +109,11 @@ export function createBrowserProvider(configuration: unknown): BrowserProvider {
         return image;
       },
     },
+    manage: {
+      site: async () => unsupported(),
+      execute: async () => unsupported(),
+      issueCredentials: async () => unsupported(),
+    },
     announcements: {
       snapshot: async () => unsupported(),
       execute: async () => unsupported(),

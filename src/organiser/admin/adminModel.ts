@@ -201,15 +201,22 @@ export function auditEntryText(
   members: readonly SessionMember[],
   entry: Pick<Snapshot["audit"][number], "action" | "target">,
 ): string {
+  // A join names its own webmaster as target, so it names nobody else.
+  if (entry.action === "webmaster_join") return "joined to read this contest";
   const action = entry.action.replaceAll("_", " ");
   const name = members.find((item) => item.person.id === entry.target)?.person.name;
   return name ? `${action} for ${name}` : action;
 }
 
-/** The name of an audit actor, or the account ID when it left the session. */
+/**
+ * The name of an audit actor. A webmaster who joined is not a member of the
+ * session, so the entry says "A webmaster". Another actor who left the
+ * session shows as the account ID.
+ */
 export function actorName(
   members: readonly SessionMember[],
-  actor: string,
+  entry: Pick<Snapshot["audit"][number], "action" | "actor">,
 ): string {
-  return members.find((item) => item.person.id === actor)?.person.name ?? actor;
+  const name = members.find((item) => item.person.id === entry.actor)?.person.name;
+  return name ?? (entry.action === "webmaster_join" ? "A webmaster" : entry.actor);
 }

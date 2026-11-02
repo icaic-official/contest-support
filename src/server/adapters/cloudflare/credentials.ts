@@ -6,7 +6,7 @@ function statement(db: D1Connection, sql: string, ...values: D1Value[]): D1State
 
 /**
  * Start a password replacement.
- * An application reset and maintainer recovery both use these statements.
+ * An application reset and the one-batch replacement both use these statements.
  */
 export function beginCredentialReset(db: D1Connection, target: string, operationId: string): D1Statement[] {
   return [
@@ -16,24 +16,6 @@ export function beginCredentialReset(db: D1Connection, target: string, operation
     statement(db, 'UPDATE logins SET revoked = 1 WHERE account_id = ?', target),
     statement(db, 'DELETE FROM ba_session WHERE userId = ?', target),
   ];
-}
-
-/** Record the pending reset that a normal admin reset inserts before the password write. */
-export function insertPendingReset(
-  db: D1Connection,
-  operationId: string,
-  target: string,
-  actor: string,
-  sessionId: string,
-): D1Statement {
-  return statement(
-    db,
-    `INSERT INTO account_operations (id, account_id, actor, session_id, action, state) VALUES (?, ?, ?, ?, 'reset_password', 'pending')`,
-    operationId,
-    target,
-    actor,
-    sessionId,
-  );
 }
 
 export interface CredentialAccount {
@@ -66,5 +48,25 @@ export function completeCredentialReset(
     statement(db, 'UPDATE logins SET revoked = 1 WHERE account_id = ?', account.id),
     statement(db, `UPDATE accounts SET credential_state = 'ready', credential_operation = NULL, must_change = ? WHERE id = ?`, Number(temporary), account.id),
     statement(db, `UPDATE account_operations SET state = 'completed', completed_at = unixepoch() WHERE id = ?`, operationId),
+  ];
+}
+
+/**
+ * Replace a password in one batch: begin the reset, record the operation, and
+ * complete it. The caller hashes before the batch, so an interrupted issue
+ * changes nothing and the old password stays valid. The account_operations
+ * insert runs the takeover trigger, so a refused actor rolls back every write.
+ */
+export function replaceCredentialStatements(
+  db: D1Connection,
+  account: CredentialAccount,
+  hash: string,
+  options: { operationId: string; actor: string; temporary: boolean },
+): D1Statement[] {
+  return [
+    ...beginCredentialReset(db, account.id, options.operationId),
+    statement(db, `INSERT INTO account_operations (id, account_id, actor, action, state) VALUES (?, ?, ?, 'reset_password', 'pending')`,
+      options.operationId, account.id, options.actor),
+    ...completeCredentialReset(db, account, options.operationId, hash, options.temporary),
   ];
 }

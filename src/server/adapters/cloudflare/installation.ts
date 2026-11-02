@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { D1Connection, D1Statement, D1Value } from '../d1/connection';
+import { replaceCredentialStatements } from './credentials';
 import { passwordHasher, randomSecret, type PasswordHasher } from './password';
 
 // Retain PR #21's competition fields and normalized-name checks. Credentials
@@ -116,6 +117,9 @@ export async function bootstrapInstallation(
       statement(db, `INSERT INTO accounts (id, name, username, must_change) VALUES (?, ?, ?, 1)`,
         accountId, config.adminName, config.adminUsername),
       ...identityStatements(db, accountId, hash),
+      // The one webmaster of the site. The grant comes before the membership,
+      // so membership_adopts_event leaves the account outside every event.
+      statement(db, `INSERT INTO grants (account_id, scope, granted_by) VALUES (?, 'site', 'trusted_bootstrap')`, accountId),
       statement(db, 'INSERT INTO events (id, name) VALUES (?, ?)', eventId, config.eventName),
       statement(db, 'INSERT INTO sessions (id, event_id, name, categories, intake_open) VALUES (?, ?, ?, ?, 0)',
         sessionId, eventId, config.sessionName, JSON.stringify(config.categories)),
@@ -201,4 +205,56 @@ export async function recoverInstallationOwner(
     throw new Error('Owner recovery did not finish. Inspect the account before retrying trusted recovery.');
   }
   return { accountId: target.accountId, adminUsername: owner.username, temporaryPassword: password };
+}
+
+export interface WebmasterRecoveryResult {
+  accountId: string;
+  username: string;
+  temporaryPassword: string;
+}
+
+/**
+ * Trusted terminal recovery of one webmaster, found by username. It replaces
+ * the password in one batch after hashing, so a failure leaves the old password
+ * valid. Never expose it through an HTTP route. The result holds the only copy
+ * of the password.
+ */
+export async function recoverWebmaster(
+  db: D1Connection,
+  input: { username: string },
+  options: InstallationOptions = {},
+): Promise<WebmasterRecoveryResult> {
+  const username = input.username.trim().toLowerCase();
+  if (!/^[a-z0-9][a-z0-9_-]{2,31}$/.test(username)) throw new Error('The username is invalid. Recovery did not start.');
+  const target = await statement(db, `SELECT a.id, a.name, a.username, a.disabled, a.credential_generation,
+      EXISTS (SELECT 1 FROM grants g WHERE g.scope = 'site' AND g.account_id = a.id) AS webmaster
+    FROM accounts a WHERE a.username = ?`, username)
+    .first<{ id: string; name: string; username: string; disabled: number; credential_generation: number; webmaster: number }>();
+  if (!target) throw new Error('No account matches that username. Recovery did not start.');
+  if (!target.webmaster) throw new Error('The account is not a webmaster. Recovery did not start.');
+  if (target.disabled) throw new Error('The account is disabled. Recovery did not start.');
+  const password = randomSecret() + 'A9!';
+  let hash: string;
+  try {
+    hash = await (options.passwords ?? passwordHasher).hash(password);
+  } catch {
+    throw new Error('Password preparation failed. Recovery did not start.');
+  }
+  const assertionId = crypto.randomUUID();
+  const operationId = crypto.randomUUID();
+  try {
+    await db.batch([
+      assertion(db, assertionId, `EXISTS (SELECT 1 FROM accounts a JOIN grants g ON g.account_id = a.id AND g.scope = 'site'
+        WHERE a.id = ? AND a.disabled = 0 AND a.credential_generation = ?)`, target.id, target.credential_generation),
+      // The webmaster acts on the own account, which the takeover trigger allows.
+      ...replaceCredentialStatements(db, target, hash, { operationId, actor: target.id, temporary: true }),
+      statement(db, `INSERT INTO authority_audit (id, event_id, actor, actor_name, action, target, detail)
+        VALUES (?, NULL, ?, ?, 'trusted_webmaster_recovery', ?, ?)`, crypto.randomUUID(), target.id, target.name, target.id,
+      JSON.stringify({ operationId })),
+      statement(db, 'DELETE FROM command_assertions WHERE id = ?', assertionId),
+    ]);
+  } catch {
+    throw new Error('Webmaster recovery did not finish. The account was not changed.');
+  }
+  return { accountId: target.id, username: target.username, temporaryPassword: password };
 }

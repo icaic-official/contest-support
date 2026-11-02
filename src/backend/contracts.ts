@@ -134,6 +134,80 @@ export interface Administration {
   editRoster(sessionId: string, command: RosterCommand): Promise<void>;
 }
 
+/**
+ * A new webmaster. Until handles exist, the username is the name that the
+ * webmaster types to sign in.
+ */
+export interface PersonInput {
+  readonly username: string;
+  readonly name: string;
+}
+
+/**
+ * Every site change. The server derives each command's requirement from the
+ * command alone, resolves the caller's authority once, and checks it again
+ * inside the write batch. Callers never name their own authority.
+ */
+export type ManageCommand =
+  | { readonly type: 'add_webmaster'; readonly person: PersonInput }
+  | { readonly type: 'remove_webmaster'; readonly accountId: string }
+  | { readonly type: 'set_webmaster_reads'; readonly restricted: boolean }
+  /** A webmaster's audited join. D1 accepts it only while the site restricts webmaster reads. */
+  | { readonly type: 'join_contest'; readonly contestId: string };
+
+/** Created IDs, so a retry with the same request ID returns the same IDs. Never a password. */
+export interface ManageReceipt {
+  readonly accountIds?: readonly string[];
+}
+
+/** The most accounts that one credential request issues. Each password hash costs Worker CPU time. */
+export const ISSUE_BATCH = 8;
+
+export interface IssuedCredential {
+  readonly accountId: string;
+  readonly username: string;
+  /**
+   * Shown once and never stored. Null when a retry of the same request finds
+   * the issue already done. Issue again with a new request ID.
+   */
+  readonly temporaryPassword: string | null;
+}
+
+export interface SiteOverview {
+  readonly webmasters: ReadonlyArray<{
+    readonly id: string;
+    readonly name: string;
+    readonly username: string;
+    /** False until a password is issued, and while a reset waits for its password. */
+    readonly ready: boolean;
+  }>;
+  readonly restrictWebmasterReads: boolean;
+  /** Contests that the caller has not joined. Empty while webmasters read every contest. */
+  readonly contestsToJoin: ReadonlyArray<{
+    readonly id: string;
+    readonly name: string;
+    readonly eventName: string;
+  }>;
+}
+
+/** Site administration. Only webmasters may call it. */
+export interface Management {
+  /** Null when the signed-in account is not a webmaster. */
+  site(): Promise<SiteOverview | null>;
+  /**
+   * Reusing a request ID with the same command returns the first receipt.
+   * A rejection carries the reason. Other failures leave the outcome unknown,
+   * and the caller retries with the same request ID.
+   */
+  execute(requestId: string, command: ManageCommand): Promise<ManageReceipt>;
+  /**
+   * Issues a new temporary password for each of up to ISSUE_BATCH other
+   * webmasters, in one batch. Reusing the request ID returns the accounts
+   * without passwords.
+   */
+  issueCredentials(requestId: string, accountIds: readonly string[]): Promise<readonly IssuedCredential[]>;
+}
+
 export interface StartedImage {
   id: string;
   original_path: string;
@@ -225,6 +299,7 @@ export interface Backend {
   auth: Authentication;
   workflows: Workflows;
   admin: Administration;
+  manage: Management;
   images: ImageTransport;
   announcements: Announcements;
   avatars: Avatars;

@@ -22,6 +22,9 @@ export type WorkspacePage = keyof typeof workspacePaths;
 /** The sign-in page. The landing page at `/` links here. */
 export const signInPath = "/sign-in";
 
+/** The webmasters' site page. It belongs to no contest. */
+export const sitePath = "/site";
+
 /** True for the signed-out entry addresses, which a signed-in person leaves for the queue. */
 export function isEntryPath(pathname: string): boolean {
   const path = pathname.replace(/\/+$/u, "");

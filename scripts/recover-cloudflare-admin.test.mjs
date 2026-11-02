@@ -11,6 +11,7 @@ import {
   publicError,
   readRecoveryTarget,
   runRecoveryCommand,
+  writeTemporaryPassword,
 } from "./recover-cloudflare-admin.mjs";
 
 const directories = [];
@@ -41,14 +42,11 @@ it("reads the development database and rejects a config without a remote DB bind
   expect(() => readRecoveryTarget(JSON.stringify({ env: { production: {} }, d1_databases: [] }))).toThrow("environment overrides");
 });
 
-it("requires exactly one account selector", () => {
-  expect(parseRecoveryArguments(["--username", "organizer"])).toEqual({
-    config: "wrangler.jsonc", username: "organizer", userId: undefined,
-  });
-  expect(parseRecoveryArguments(["--config", "worker.jsonc", "--user", "e102228c-f5c8-4180-962f-3a8b87d99b13"]).userId)
-    .toBe("e102228c-f5c8-4180-962f-3a8b87d99b13");
-  expect(() => parseRecoveryArguments([])).toThrow("either --username or --user");
-  expect(() => parseRecoveryArguments(["--username", "organizer", "--user", "e102228c-f5c8-4180-962f-3a8b87d99b13"])).toThrow("either --username or --user");
+it("requires the webmaster's username", () => {
+  expect(parseRecoveryArguments(["--username", "organizer"])).toEqual({ config: "wrangler.jsonc", username: "organizer" });
+  expect(parseRecoveryArguments(["--config", "worker.jsonc", "--username", "organizer"]).config).toBe("worker.jsonc");
+  expect(() => parseRecoveryArguments([])).toThrow("--username");
+  expect(() => parseRecoveryArguments(["--user", "e102228c-f5c8-4180-962f-3a8b87d99b13"])).toThrow("Usage:");
   expect(() => parseRecoveryArguments(["--password", "secret"])).toThrow("Usage:");
 });
 
@@ -79,25 +77,20 @@ it("prints the temporary password once and hides provider errors", async () => {
     openPlatform: async () => ({ env: { DB: { marker: true } }, dispose: async () => { disposed = true; } }),
     loadLibrary: async () => ({
       library: {
-        recoverCloudflareAdmin: async (database, selector) => {
+        recoverWebmaster: async (database, selector) => {
           expect(database.marker).toBe(true);
-          expect(selector.username).toBe("organizer");
-          expect(selector.userId).toBeUndefined();
+          expect(selector).toEqual({ username: "organizer" });
           return { accountId: "e102228c-f5c8-4180-962f-3a8b87d99b13", username: "organizer", temporaryPassword: password };
-        },
-        writeTemporaryPassword: (result, write) => {
-          write(`Admin recovery completed for ${result.username}. Share this temporary password securely. The next sign-in must change it.`);
-          write(result.temporaryPassword);
         },
       },
       dispose: async () => undefined,
     }),
   });
   expect(disposed).toBe(true);
-  expect(lines[0]).toBe("Recovering an admin in remote D1 database minsky-development.");
+  expect(lines[0]).toBe("Recovering a webmaster in remote D1 database minsky-development.");
   expect(passwordAppearsOnce(lines, password)).toBe(true);
   const hidden = publicError(new Error("provider output includes password hunter2"));
-  expect(hidden.startsWith("Admin recovery failed")).toBe(true);
+  expect(hidden.startsWith("Webmaster recovery failed")).toBe(true);
   expect(hidden.includes("hunter2")).toBe(false);
 });
 
@@ -115,18 +108,25 @@ it("does not print a password when recovery refuses the account", async () => {
     openPlatform: async () => ({ env: { DB: {} }, dispose: async () => undefined }),
     loadLibrary: async () => ({
       library: {
-        recoverCloudflareAdmin: async () => { throw new Error("The account is not an admin of an active event or the installation owner. Recovery did not start."); },
-        writeTemporaryPassword: () => { throw new Error("printed"); },
+        recoverWebmaster: async () => { throw new Error("The account is not a webmaster. Recovery did not start."); },
       },
       dispose: async () => undefined,
     }),
-  })).rejects.toThrow("not an admin");
-  expect(lines).toEqual(["Recovering an admin in remote D1 database minsky-development."]);
+  })).rejects.toThrow("not a webmaster");
+  expect(lines).toEqual(["Recovering a webmaster in remote D1 database minsky-development."]);
+});
+
+it("does not print a rejected password", () => {
+  expect(() => writeTemporaryPassword({ username: "organizer", temporaryPassword: "short" }, () => undefined)).toThrow("was not changed");
+  const lines = [];
+  writeTemporaryPassword({ username: "organizer", temporaryPassword: "fixture-temporary-password" }, (line) => lines.push(line));
+  expect(passwordAppearsOnce(lines, "fixture-temporary-password")).toBe(true);
+  expect(lines[0].includes("fixture-temporary-password")).toBe(false);
 });
 
 async function recoveryBundles() {
   const names = await readdir(".wrangler").catch(() => []);
-  return names.filter((name) => name.startsWith("admin-recovery-"));
+  return names.filter((name) => name.startsWith("webmaster-recovery-"));
 }
 
 // Vitest resolves packages from the repository root, so only plain Node shows where the bundle can find them.
@@ -134,13 +134,13 @@ const loadInNode = `
 import { loadRecoveryLibrary } from "./scripts/recover-cloudflare-admin.mjs";
 const { library, dispose } = await loadRecoveryLibrary();
 await dispose();
-console.log(typeof library.recoverCloudflareAdmin, typeof library.writeTemporaryPassword);
+console.log(typeof library.recoverWebmaster);
 `;
 
 it("loads the recovery library in Node without a database or a password", async () => {
   const before = await recoveryBundles();
   const { stdout } = await promisify(execFile)(process.execPath, ["--input-type=module", "--eval", loadInNode]);
-  expect(stdout.trim()).toBe("function function");
+  expect(stdout.trim()).toBe("function");
   expect(await recoveryBundles()).toEqual(before);
 });
 
@@ -148,14 +148,14 @@ it("adds an error code or class and omits messages, stacks, and secrets", () => 
   const missing = new Error("Cannot find package 'better-auth' imported from /tmp/minsky-admin-recovery/admin-recovery.mjs");
   missing.code = "ERR_MODULE_NOT_FOUND";
   missing.stack = "Error: hunter2\n    at load (/tmp/secret-token)";
-  expect(publicError(missing)).toBe("Admin recovery failed. The temporary password was not shown. The error code is ERR_MODULE_NOT_FOUND.");
+  expect(publicError(missing)).toBe("Webmaster recovery failed. The temporary password was not shown. The error code is ERR_MODULE_NOT_FOUND.");
 
   const named = new TypeError("session token sk-live");
-  expect(publicError(named)).toBe("Admin recovery failed. The temporary password was not shown. The error class is TypeError.");
+  expect(publicError(named)).toBe("Webmaster recovery failed. The temporary password was not shown. The error class is TypeError.");
 
   const unsafe = new Error("hunter2");
   unsafe.code = "hunter2";
-  expect(publicError(unsafe)).toBe("Admin recovery failed. The temporary password was not shown.");
+  expect(publicError(unsafe)).toBe("Webmaster recovery failed. The temporary password was not shown.");
   expect(publicError(new Error("The username is invalid. Recovery did not start.")))
     .toBe("The username is invalid. Recovery did not start.");
 });

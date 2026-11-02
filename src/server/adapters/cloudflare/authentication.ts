@@ -4,7 +4,7 @@ import { AuthenticationError, type AuthenticationService, type AuthenticationSes
 import type { D1Connection, D1Statement, D1Value } from '../d1/connection';
 import type { IdentityProvider } from './identity';
 import { authorityCheck, manageAccountBindings, manageAccountSql, reaches, resolveAuthority } from './authority';
-import { beginCredentialReset, completeCredentialReset } from './credentialReset';
+import { beginCredentialReset, completeCredentialReset } from './credentials';
 import { randomSecret, type PasswordHasher } from './password';
 
 /**

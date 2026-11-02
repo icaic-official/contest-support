@@ -6,14 +6,17 @@ import { describe, expect, it } from 'vitest';
 const serverRoot = fileURLToPath(new URL('.', import.meta.url));
 const resolver = 'adapters/cloudflare/authority.ts';
 
-/** The text of a hand-written access check. Readers embed contestDataSql instead. */
-const accessJoin = /JOIN memberships|FROM memberships m\b|JOIN grants|FROM grants/g;
+/**
+ * The text of a hand-written access check. Readers embed contestDataSql instead.
+ * A delete reads nothing, so `DELETE FROM grants` is not a copy.
+ */
+const accessJoin = /JOIN memberships|FROM memberships m\b|JOIN grants|(?<!DELETE )FROM grants/g;
 
 /**
  * Trusted terminal commands that check an admin membership without a login.
  * The resolver needs a login, so it cannot answer for them.
  */
-const terminalCommands = new Set(['adapters/cloudflare/installation.ts', 'adapters/cloudflare/adminRecovery.ts']);
+const terminalCommands = new Set(['adapters/cloudflare/installation.ts']);
 
 function serverFiles(directory: string): string[] {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
@@ -52,5 +55,7 @@ describe('one access check', () => {
     expect(accessJoins('SELECT 1 FROM memberships m WHERE m.is_admin = 1')).toEqual(['FROM memberships m']);
     expect(accessJoins('LEFT JOIN grants g ON g.account_id = a.id')).toEqual(['JOIN grants']);
     expect(accessJoins('SELECT team_id FROM memberships WHERE session_id = ?')).toEqual([]);
+    expect(accessJoins("SELECT 1 FROM grants WHERE scope = 'site'")).toEqual(['FROM grants']);
+    expect(accessJoins("DELETE FROM grants WHERE scope = 'site' AND account_id = ?")).toEqual([]);
   });
 });

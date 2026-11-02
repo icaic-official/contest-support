@@ -7,6 +7,13 @@ import { type Command, snapshotSchema, type Snapshot } from '../../connected/mod
 import { createCloudflareAuthentication } from './authentication';
 
 const sessionsSchema = z.array(z.object({ id: z.uuid(), name: z.string() }));
+const siteSchema = z.object({
+  webmasters: z.array(z.object({ id: z.uuid(), name: z.string(), username: z.string(), ready: z.boolean() })),
+  restrictWebmasterReads: z.boolean(),
+  contestsToJoin: z.array(z.object({ id: z.uuid(), name: z.string(), eventName: z.string() })),
+});
+const receiptSchema = z.object({ accountIds: z.array(z.uuid()).exactOptional() });
+const issuedSchema = z.array(z.object({ accountId: z.uuid(), username: z.string(), temporaryPassword: z.string().nullable() }));
 const startedSchema = z.object({ id: z.uuid(), original_path: z.string(), thumbnail_path: z.string() });
 const workflowSchema = z.discriminatedUnion('outcome', [
   // The snapshot is optional and checked apart, so a bad one never hides a committed command.
@@ -262,6 +269,15 @@ export function createCloudflareBackend(options: {
       async saveMember(sessionId, userId, member) { await readJson(await post('/api/admin', { action: 'save_member', sessionId, userId, member })); },
       async removeMember(sessionId, userId) { await readJson(await post('/api/admin', { action: 'remove_member', sessionId, userId })); },
       async editRoster(sessionId, command) { await readJson(await post('/api/admin', { action: 'edit_roster', sessionId, command })); },
+    },
+    manage: {
+      async site() { return siteSchema.nullable().parse(await readJson(await send('/api/site'))); },
+      async execute(requestId, command) {
+        return receiptSchema.parse(await readJson(await post('/api/manage', { requestId, command })));
+      },
+      async issueCredentials(requestId, accountIds) {
+        return issuedSchema.parse(await readJson(await post('/api/credentials', { requestId, accountIds })));
+      },
     },
     images: {
       async begin(input) { return startedSchema.parse(await imageResult(await post('/api/images', { action: 'begin', ...input }))); },

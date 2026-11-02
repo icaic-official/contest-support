@@ -12,7 +12,8 @@ import { useCommand } from "./hooks/useCommand";
 import { useSessionSnapshot } from "./hooks/useSessionSnapshot";
 import { type UiKind, uiKindFor } from "./model";
 import type { ShellProps } from "./shell";
-import { canOpenPage, isEntryPath, pageForPath } from "./navigation";
+import { canOpenPage, isEntryPath, pageForPath, sitePath } from "./navigation";
+import { SiteDashboard } from "@/site/SiteDashboard";
 
 /**
  * Loads the session data and selects the UI from the membership: team
@@ -41,6 +42,11 @@ export function Workspace({
   const [kind, setKind] = useState<UiKind>();
   if (current && current !== kind) setKind(current);
   const page = pageForPath(pathname);
+  // The site page needs no readable contest, so a webmaster who must join
+  // first can still reach the setting that asks for the join.
+  if (pathname.replace(/\/+$/u, "") === sitePath) {
+    return <SiteDashboard user={props.user} data={data} signOut={props.signOut} />;
+  }
   if (isEntryPath(pathname)) return <Navigate to="/issues" replace />;
   if (!page) {
     return (

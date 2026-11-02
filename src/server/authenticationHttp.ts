@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { hasJsonBody, readJsonBody } from './http';
-import { parseEventCode, type SignInTarget } from '../backend/contracts';
+import { parseEventCode, parseHandle, type SignInTarget } from '../backend/contracts';
 import { roleSchema } from '../connected/model';
 import { AuthenticationError, signInRefused, type AuthenticationService } from './authentication';
 
@@ -75,10 +75,12 @@ export function createAuthenticationHandler(
       if (url.pathname === '/api/auth/sign-in') {
         const parsed = signInSchema.safeParse(body);
         if (!parsed.success) throw new AuthenticationError(400, 'Reload the page, then sign in again.');
-        const { event, handle, password } = parsed.data;
+        const { event, password } = parsed.data;
         const code = event === null ? undefined : parseEventCode(event);
-        // A code that cannot exist gets the refusal of a wrong code, so the IP limit counts it.
-        if (event !== null && !code) throw signInRefused('event');
+        const handle = parseHandle(parsed.data.handle);
+        // Text that cannot be a code or a handle gets the refusal of a wrong
+        // one, so the IP limit counts it.
+        if ((event !== null && !code) || !handle) throw signInRefused(event === null ? 'site' : 'event');
         const target: SignInTarget = code ? { kind: 'event', code } : { kind: 'site' };
         const result = await service.signIn(target, handle, password);
         return json({}, 200, result.cookie);

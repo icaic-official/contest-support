@@ -1,4 +1,4 @@
-import type { AccountCommand, AccountIdentity, AccountResult, AccountStatus, SignInTarget } from '../backend/contracts.ts';
+import type { AccountCommand, AccountIdentity, AccountResult, AccountStatus, Handle, SignInTarget } from '../backend/contracts.ts';
 
 export interface Caller {
   /** Supplied by a trusted identity adapter, never accepted from a request body. */
@@ -16,8 +16,7 @@ export interface AuthenticationSession {
 
 export interface AuthenticationService {
   current(headers: Headers): Promise<AuthenticationSession | undefined>;
-  /** `handle` is the typed text. Parse it before any lookup. */
-  signIn(target: SignInTarget, handle: string, password: string): Promise<{ cookie: string }>;
+  signIn(target: SignInTarget, handle: Handle, password: string): Promise<{ cookie: string }>;
   signOut(headers: Headers): Promise<{ cookie: string }>;
   changePassword(headers: Headers, currentPassword: string, newPassword: string): Promise<{ cookie: string }>;
   account(headers: Headers, sessionId: string, command: AccountCommand): Promise<AccountResult>;

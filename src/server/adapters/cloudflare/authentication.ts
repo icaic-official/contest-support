@@ -128,12 +128,8 @@ export class D1AuthenticationService implements AuthenticationService {
     return current;
   }
 
-  async signIn(target: SignInTarget, input: string, password: string): Promise<{ cookie: string }> {
-    const parsed = handleSchema.safeParse(input);
-    if (!parsed.success || typeof password !== 'string' || password.length > 128 || password.length < 1) {
-      throw signInRefused(target.kind);
-    }
-    const handle = parsed.data;
+  async signIn(target: SignInTarget, handle: Handle, password: string): Promise<{ cookie: string }> {
+    if (typeof password !== 'string' || password.length > 128 || password.length < 1) throw signInRefused(target.kind);
     const row = await this.statement(signInAccountSql[target.kind],
       ...(target.kind === 'event' ? [handle, target.code] : [handle])).first<SignInRow>();
     // An unknown event code has no handle counter. The HTTP Worker's IP limit counts it.

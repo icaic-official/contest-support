@@ -32,7 +32,7 @@ export interface InstallationResult {
   eventId: string;
   sessionId: string;
   teamIds: string[];
-  adminUsername: string;
+  adminUsername: Handle;
   temporaryPassword: string;
 }
 
@@ -155,13 +155,13 @@ export async function recoverInstallationOwner(
   db: D1Connection,
   target: { installationId: string; accountId: string },
   options: InstallationOptions = {},
-): Promise<{ accountId: string; adminUsername: string; temporaryPassword: string }> {
+): Promise<{ accountId: string; adminUsername: Handle; temporaryPassword: string }> {
   if (!z.object({ installationId: z.string().uuid(), accountId: z.string().uuid() }).safeParse(target).success) {
     throw new Error('Select the installation and owner by UUID.');
   }
   const owner = await statement(db, `SELECT a.handle FROM installation i JOIN accounts a ON a.id = i.owner_account_id
     WHERE i.id = ? AND a.id = ? AND ${ownerCondition}`,
-  target.installationId, target.accountId, target.installationId, target.accountId).first<{ handle: string }>();
+  target.installationId, target.accountId, target.installationId, target.accountId).first<{ handle: Handle }>();
   if (!owner) throw new Error('The selected account is not the active installation owner. Recovery did not start.');
   const operationId = crypto.randomUUID();
   const assertionId = crypto.randomUUID();

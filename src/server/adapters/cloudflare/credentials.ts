@@ -1,10 +1,13 @@
 import { z } from 'zod';
-import type { Handle, LoginKey } from '../../../backend/contracts';
+import { parseHandle, type LoginKey } from '../../../backend/contracts';
 import type { D1Connection, D1Statement, D1Value } from '../d1/connection';
 
-/** Typed text to a handle: 3 to 32 characters of [a-z0-9_-], the shape of the column CHECK. */
-export const handleSchema = z.string().trim().toLowerCase().regex(/^[a-z0-9][a-z0-9_-]{2,31}$/)
-  .transform((handle) => handle as Handle);
+/** Typed text to a handle, through `parseHandle`. */
+export const handleSchema = z.string().transform((text, context) => {
+  const handle = parseHandle(text);
+  if (!handle) context.addIssue({ code: 'custom', message: 'Use 3 to 32 letters, digits, hyphens, or underscores.' });
+  return handle ?? z.NEVER;
+});
 
 /**
  * The login key of every account that this Worker creates: its ID without

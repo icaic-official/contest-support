@@ -4,7 +4,7 @@ import { openStoreDatabase } from './tooling/store-database.mjs';
 import type { D1Binding, D1Connection, D1Statement, D1Value } from '../d1/connection';
 import { D1Fixture, applyMigrations } from '../d1/testFixture';
 import { measureD1 } from '../d1/testMetrics';
-import type { EventCode } from '../../../backend/contracts';
+import { parseHandle, type EventCode } from '../../../backend/contracts';
 import { D1ApplicationService, notificationStatements } from './application';
 import { D1AuthenticationService } from './authentication';
 import { loginKeyFor } from './credentials';
@@ -94,7 +94,10 @@ export function registerAuthenticationCases(group: AuthenticationCases) {
 
     async function signIn(accountUsername = username, accountPassword = password, instance = service, code = eventCode): Promise<Headers> {
       usernames.push(accountUsername.trim().toLowerCase());
-      const signed = await instance.signIn({ kind: 'event', code }, accountUsername, accountPassword);
+      // The HTTP boundary parses typed text the same way.
+      const handle = parseHandle(accountUsername);
+      if (!handle) throw new Error(`The fixture handle ${accountUsername} is not a handle.`);
+      const signed = await instance.signIn({ kind: 'event', code }, handle, accountPassword);
       return new Headers({ cookie: signed.cookie.split(';')[0]! });
     }
 

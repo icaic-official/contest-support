@@ -67,7 +67,7 @@ describe('authentication HTTP boundary', () => {
 
   it('protects login without a prior session and never echoes submitted credentials', async () => {
     const { handle, service } = setup();
-    const response = await handle(post('/api/auth/sign-in', { event: ' XXXX-2026 ', handle: 'helper', password: 'fictional-password' }, { 'X-CSRF-Token': '' }));
+    const response = await handle(post('/api/auth/sign-in', { event: ' XXXX-2026 ', handle: ' Helper ', password: 'fictional-password' }, { 'X-CSRF-Token': '' }));
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({});
     expect(response.headers.get('Set-Cookie')).toContain('HttpOnly');
@@ -86,6 +86,17 @@ describe('authentication HTTP boundary', () => {
     const response = await handle(post('/api/auth/sign-in', { event: 'no', handle: 'helper', password: 'fictional-password' }));
     expect(response.status).toBe(401);
     expect(await response.json()).toEqual({ error: 'The event code, username, or password is incorrect.' });
+    expect(service.signIn).not.toHaveBeenCalled();
+  });
+
+  it('refuses a handle that cannot exist with the refusal of a wrong handle, before the service', async () => {
+    const { handle, service } = setup();
+    const event = await handle(post('/api/auth/sign-in', { event: 'xxxx-2026', handle: 'a b', password: 'fictional-password' }));
+    expect(event.status).toBe(401);
+    expect(await event.json()).toEqual({ error: 'The event code, username, or password is incorrect.' });
+    const site = await handle(post('/api/auth/sign-in', { event: null, handle: 'x', password: 'fictional-password' }));
+    expect(site.status).toBe(401);
+    expect(await site.json()).toEqual({ error: 'The username or password is incorrect.' });
     expect(service.signIn).not.toHaveBeenCalled();
   });
 

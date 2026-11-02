@@ -1,7 +1,7 @@
 import { expect, it } from 'vitest';
 import { getPlatformProxy } from 'wrangler';
 import type { D1Binding } from './connection';
-import type { EventCode } from '../../../backend/contracts';
+import type { EventCode, Handle } from '../../../backend/contracts';
 import { measureD1 } from './testMetrics';
 import { D1Fixture, applyMigrations } from './testFixture';
 import { D1AuthenticationService } from '../cloudflare/authentication';
@@ -69,7 +69,7 @@ it('keeps native D1 capabilities used by the maintained identity adapter', async
     });
     const service = new D1AuthenticationService(db, identity, passwordHasher);
     const { code } = (await fixture.statement('SELECT code FROM events WHERE id = ?', fixture.eventId).first<{ code: EventCode }>())!;
-    const signed = await service.signIn({ kind: 'event', code }, username, password);
+    const signed = await service.signIn({ kind: 'event', code }, username as Handle, password);
     const current = await service.current(new Headers({ cookie: signed.cookie.split(';')[0]! }));
     expect(current?.user.id).toBe(id);
     expect(lines.join('\n')).not.toContain(password);

@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { getPlatformProxy } from 'wrangler';
-import type { ManageCommand } from '../../../backend/contracts';
+import type { Handle, ManageCommand } from '../../../backend/contracts';
 import type { Caller } from '../../authentication';
 import type { D1Binding, D1Connection, D1Value } from '../d1/connection';
 import { applyMigrations } from '../d1/testFixture';
@@ -202,7 +202,7 @@ describe('site commands for webmasters', () => {
     const authentication = new D1AuthenticationService(db, createBetterAuthIdentity(db, {
       origin: 'http://127.0.0.1:8788', secret: randomSecret(), secureCookies: false,
     }), passwordHasher);
-    const signed = await authentication.signIn({ kind: 'site' }, 'newcomer', issued!.temporaryPassword!);
+    const signed = await authentication.signIn({ kind: 'site' }, 'newcomer' as Handle, issued!.temporaryPassword!);
     const current = await authentication.current(new Headers({ cookie: signed.cookie.split(';')[0]! }));
     expect(current?.user.id).toBe(added);
     expect(current?.status.must_change).toBe(true);

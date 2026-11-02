@@ -49,6 +49,12 @@ export function parseEventCode(text: string): EventCode | undefined {
   return /^[a-z0-9][a-z0-9-]{2,39}$/.test(code) ? code as EventCode : undefined;
 }
 
+/** Normalizes typed text to a handle, the shape of the column CHECK. Undefined when the text cannot be one. */
+export function parseHandle(text: string): Handle | undefined {
+  const handle = text.trim().toLowerCase();
+  return /^[a-z0-9][a-z0-9_-]{2,31}$/.test(handle) ? handle as Handle : undefined;
+}
+
 export interface AccountIdentity {
   id: string;
   email?: string;

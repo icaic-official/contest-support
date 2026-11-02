@@ -128,15 +128,7 @@ test("the landing page links to sign-in and the guides", async ({ page }) => {
   await expect(
     page.getByText("Organizers create every account. There is no public sign-up."),
   ).toBeVisible();
-  await expect(
-    page.getByRole("heading", { level: 2, name: "How an issue moves" }),
-  ).toBeVisible();
-  await expect(
-    page.getByRole("heading", { level: 2, name: "Who uses Minsky" }),
-  ).toBeVisible();
-  await expect(
-    page.getByRole("heading", { name: "Replies and notes stay apart" }),
-  ).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2 })).toHaveCount(0);
   await expect(page.getByLabel("Username", { exact: true })).toHaveCount(0);
   await expect(
     page.getByRole("button", { name: "Sign in", exact: true }),

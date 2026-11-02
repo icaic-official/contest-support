@@ -4,18 +4,13 @@ import {
   ArrowRight,
   BookOpen,
   Clock,
-  Hand,
   Lock,
-  Scale,
-  UserCog,
-  Wrench,
-  type LucideIcon,
 } from "lucide-react";
 import { BrandMark } from "@/components/brand";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { useMediaQuery } from "@/connected/hooks/useMediaQuery";
 import type { Issue } from "@/connected/model";
 import { signInPath } from "@/connected/navigation";
@@ -138,35 +133,6 @@ const statusDots: Record<Issue["status"], string> = {
   resolved: "bg-status-resolved",
 };
 
-interface Audience {
-  icon: LucideIcon;
-  title: string;
-  text: string;
-}
-
-const audiences: readonly Audience[] = [
-  {
-    icon: Hand,
-    title: "Contestants",
-    text: "Report a problem from your desk and follow replies from staff.",
-  },
-  {
-    icon: Wrench,
-    title: "Volunteers and specialists",
-    text: "Work the shared queue from a phone or a desktop console.",
-  },
-  {
-    icon: Scale,
-    title: "Jury",
-    text: "Award time for minutes a team lost. Staff then confirm that the contest clock applied it.",
-  },
-  {
-    icon: UserCog,
-    title: "Administrators",
-    text: "Create accounts, assign roles, and set image limits for each session.",
-  },
-];
-
 /** The public landing page for signed-out visitors. */
 export function Landing() {
   const position = useDemoPosition();
@@ -227,87 +193,7 @@ export function Landing() {
           <DemoCard position={position} />
         </section>
       </div>
-      <Section id="lifecycle-heading" title="How an issue moves">
-        <ol className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {steps.map((step, index) => (
-            <li
-              key={step.status}
-              data-active={index === position.step}
-              className="relative overflow-hidden rounded-xl border bg-card p-5 text-card-foreground motion-safe:transition-[transform,box-shadow,border-color] data-[active=true]:border-foreground/30 data-[active=true]:shadow-md motion-safe:data-[active=true]:-translate-y-0.5"
-            >
-              <span
-                aria-hidden="true"
-                className={cn(
-                  "absolute inset-x-0 top-0 h-1",
-                  statusDots[step.status],
-                )}
-              />
-              <StatusBadge status={step.status} />
-              <p className="mt-3 text-sm text-muted-foreground">
-                {step.summary}
-              </p>
-            </li>
-          ))}
-        </ol>
-      </Section>
-      <Section id="roles-heading" title="Who uses Minsky">
-        <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {audiences.map(({ icon: Icon, title, text }) => (
-            <li key={title}>
-              <Card className="h-full">
-                <CardContent>
-                  <span className="grid size-9 place-items-center rounded-lg bg-secondary text-secondary-foreground">
-                    <Icon aria-hidden="true" className="size-4" />
-                  </span>
-                  <h3 className="mt-4 font-semibold">{title}</h3>
-                  <p className="mt-1 text-sm text-muted-foreground">{text}</p>
-                </CardContent>
-              </Card>
-            </li>
-          ))}
-        </ul>
-        <Card className="mt-4">
-          <CardContent className="grid items-center gap-6 md:grid-cols-2">
-            <div>
-              <h3 className="font-semibold">Replies and notes stay apart</h3>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Teams see public replies. Only staff see internal notes and
-                staff-only images.
-              </p>
-            </div>
-            <div aria-hidden="true" className="grid gap-3">
-              <ReplyBubble>{replyText}</ReplyBubble>
-              <InternalNote>{noteText}</InternalNote>
-            </div>
-          </CardContent>
-        </Card>
-      </Section>
     </div>
-  );
-}
-
-function Section({
-  id,
-  title,
-  children,
-}: {
-  id: string;
-  title: string;
-  children: ReactNode;
-}) {
-  return (
-    <section
-      aria-labelledby={id}
-      className="mx-auto w-full max-w-6xl px-4 py-12 sm:px-6 sm:py-16"
-    >
-      <h2
-        id={id}
-        className="mb-8 text-2xl font-semibold tracking-tight sm:text-3xl"
-      >
-        {title}
-      </h2>
-      {children}
-    </section>
   );
 }
 

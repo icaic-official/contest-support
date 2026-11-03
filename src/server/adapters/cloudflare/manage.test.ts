@@ -822,6 +822,10 @@ describe('event, roster, and contest commands', () => {
     }
     await expect(manage.event(caller('eventAdmin'), 'not-an-event')).rejects.toMatchObject({ status: 400 });
     await expect(manage.event(caller('eventAdmin'), randomUUID())).rejects.toMatchObject({ status: 403 });
+    // Without an ID, an event admin reads the own event. A webmaster has none, and a volunteer may not read it.
+    expect((await manage.event(caller('eventAdmin'))).event.id).toBe(ids.event);
+    await expect(manage.event(caller('webmaster'))).rejects.toMatchObject({ status: 400 });
+    await expect(manage.event(caller('volunteer'))).rejects.toMatchObject({ status: 403 });
   });
 
   /** One valid command of every type, so a new type fails to compile until it has a sample here. */

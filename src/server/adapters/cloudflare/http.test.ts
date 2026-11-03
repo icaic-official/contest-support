@@ -121,7 +121,10 @@ describe('Cloudflare application HTTP boundary', () => {
     deps.manage.event.mockRejectedValueOnce(new AuthenticationError(403, 'Only an event admin or a webmaster can change this event.'));
     expect((await get(`/api/event?eventId=${requestId}`)).status).toBe(403);
     expect(deps.manage.event).toHaveBeenCalledWith(identity.caller, requestId);
+    deps.manage.event.mockRejectedValueOnce(new AuthenticationError(400, 'Choose an event.'));
     expect((await get('/api/event')).status).toBe(400);
+    expect(deps.manage.event).toHaveBeenLastCalledWith(identity.caller, undefined);
+    expect((await get('/api/event?eventId=nope')).status).toBe(400);
     expect((await handle(post('/api/admin', { action: 'set_intake', sessionId, open: true }))).status).toBe(404);
   });
 

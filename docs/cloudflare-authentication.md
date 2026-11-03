@@ -63,11 +63,17 @@ Each account has two names:
 A sign-in names an event code and a handle. A webmaster belongs to no event, so a webmaster chooses **Site sign-in**, which names no event code.
 The server reads the account through the unique index of that namespace, and passes only the login key to Better Auth.
 A wrong event code, handle, or password gives the same 401 message.
+Every refusal spends one password hash or check.
+The server refuses an unknown code or handle, and a disabled or pending account, before Better Auth runs. That refusal hashes the typed password, as Better Auth does for a login key that it does not know.
+An unknown code and an unknown handle take the same path, so the refusal time does not show which codes exist.
+A wrong password for a real account still takes slightly longer, because Better Auth reads the account from D1 before its check.
 
 Handles contain 3 to 32 lowercase letters, digits, underscores, or hyphens.
 The first character must be a letter or digit. Sign-in trims spaces and normalizes letter case.
 `set_handle` changes only the handle. The password, the login key, and open sessions stay.
-A staff account can change its own handle. A contestant account cannot, because venue staff read its handle from the credential sheet.
+An account of an event can change its own handle when it holds no team seat in any contest. A contestant account cannot, because venue staff read its handle from the credential sheet. A webmaster cannot, because a webmaster belongs to no event.
+`status.can_change_handle` in `GET /api/auth/session` reports this rule, so the account page shows the form only when `set_handle` accepts the change.
+After a handle change, the open screens of each contest that seats the account refresh for staff and for the account.
 An account that the caller may manage can also get a new handle.
 An account without a login key gets one with its first temporary password.
 The synthetic identity email is not a mailbox. SMTP and personal email are unnecessary.

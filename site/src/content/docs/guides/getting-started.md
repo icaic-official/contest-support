@@ -75,6 +75,7 @@ The picture belongs to your account, so it is the same in every session. Other s
 
 Staff can change their own username on the account page, in the **Username** field. Your password stays, and you stay signed in. Use the new username at your next sign-in.
 A team account cannot change its username, because venue staff read it from the team's sign-in sheet. Ask an admin instead.
+An account that is on a team in any session cannot change its username either.
 
 ## Forgot your password
 

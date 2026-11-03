@@ -163,7 +163,7 @@ Workers Builds also publishes the docs. See [Publish the docs](cloudflare-builds
 Require these results:
 
 1. `/minsky-revision.json` reports the approved revision, Cloudflare backend, D1 UUID, bucket, and origin.
-2. Anonymous `/api/sessions` returns `401` with `Cache-Control: no-store`. Private source paths return `404`.
+2. Anonymous `/api/contests` returns `401` with `Cache-Control: no-store`. Private source paths return `404`.
 3. The new owner can sign in. Temporary-password changes and recovery restrictions hold.
 4. The fictional application journey passes at the stable URL, including jury decisions, persisted timers, private images, internal-note separation, and reconnects.
 5. Live metadata matches the approved D1, R2, live class, origin, cron, CPU cap, and `AUTH_SECRET` name. Record the newly created stable namespace ID.

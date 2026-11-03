@@ -21,13 +21,13 @@ You need:
 
 ## Create the installation
 
-1. Generate a competition file with enough fictional teams. Two accounts per team and 20% staff need 0.4 teams per user. For 1,200 users, use 480 teams.
+1. Print a site file for the load-test webmaster.
 
    ```sh
-   npm run load -- competition --teams=480 > "$PRIVATE_DIR/competition.json"
+   npm run load -- site > "$PRIVATE_DIR/site.json"
    ```
 
-2. Follow [Install on Cloudflare](../site/src/content/docs/operators/installation.mdx) with that competition file. Keep the owner file in `$PRIVATE_DIR`, outside the checkout.
+2. Follow [Install on Cloudflare](../site/src/content/docs/operators/installation.mdx) with that site file. Keep the webmaster file in `$PRIVATE_DIR`, outside the checkout. The `setup` command then creates the run's event, its event admin, a contest, and the accounts. An entrant has one sign-in, so a team has one account.
 
 The harness uses only the installation's normal HTTP API. It needs no Cloudflare credential to create accounts or to run the load.
 

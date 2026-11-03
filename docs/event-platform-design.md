@@ -1,6 +1,6 @@
 # Webmaster, event, and contest platform
 
-**Status.** Proposed. Phase 1, `feature/scoped-authority`, implements the contest resolver, migration `0017`, and its gate. The local half of the gate passed. The hosted runs were inconclusive against the 10 percent p95 rule, because `main` itself varied between runs. After a compile-time fix, the branch read faster than `main` at the median, and the owner accepted the gate on 2026-11-02. The [gate record](history/scoped-authority-gate.md) holds the measurements and the decision. Phase 2, `feature/webmaster-management`, implements webmaster management with no migration. Both phases are merged. Phase 3, `feature/event-sign-in`, implements migration `0018`, sign-in by event code or site and handle, and `set_handle`. Phase 1 merged as #152, Phase 2 as #153, and Phase 3 as #156. Phases 4 to 8 are not built.
+**Status.** Proposed. Phase 4 implements `0019` and waits for review. Phase 1, `feature/scoped-authority`, implements the contest resolver, migration `0017`, and its gate. The local half of the gate passed. The hosted runs were inconclusive against the 10 percent p95 rule, because `main` itself varied between runs. After a compile-time fix, the branch read faster than `main` at the median, and the owner accepted the gate on 2026-11-02. The [gate record](history/scoped-authority-gate.md) holds the measurements and the decision. Phase 2, `feature/webmaster-management`, implements webmaster management with no migration. Both phases are merged. Phase 3, `feature/event-sign-in`, implements migration `0018`, sign-in by event code or site and handle, and `set_handle`. Phase 1 merged as #152, Phase 2 as #153, and Phase 3 as #156. Phase 4, `feature/event-console`, implements migrations `0019` and `0020`, the event console, and the one-webmaster bootstrap, and waits for review. Phases 5 to 8 are not built.
 
 Phase 1 differs from this page and the sketches in these points:
 
@@ -17,7 +17,7 @@ Phase 2 differs from this page and the sketches in these points:
 - `/api/sessions` and `snapshotSql` are unchanged, so the Phase 1 gate measures the same readers. A webmaster who must join a contest finds it on the **Site** page and on the no-access screen. The site read feeds both.
 - A webmaster can remove themselves while another enabled webmaster who holds a password remains. They keep their own login, because the batch checks the caller's login after its writes. A webmaster removed by another loses every open session.
 - A contest's activity shows a join as "Joined to read this contest" by "A webmaster" when the webmaster holds no membership there. `admin_audit` stores no actor name, and decision 12 keeps webmasters out of the member list. Showing the name needs a change to `snapshotSql`, which waits for the hosted rerun of the Phase 1 gate.
-- `recoverWebmaster` finds a webmaster by username, and `npm run cloudflare:recover-admin` calls it. `adminRecovery.ts` is deleted, so the command no longer recovers a contest admin who is not a webmaster. `recoverInstallationOwner` stays until Phase 4.
+- `recoverWebmaster` finds a webmaster by username, and `npm run cloudflare:recover-admin` calls it. `adminRecovery.ts` is deleted, so the command no longer recovers a contest admin who is not a webmaster. `recoverInstallationOwner` was deleted in Phase 4.
 - `credentialReset.ts` is now `credentials.ts`. Its `replaceCredentialStatements` puts the existing begin and complete statements into one batch.
 - `authorityCopies.test.ts` does not count `DELETE FROM grants` as a copy of the access check, because a delete reads nothing. Every read of `grants` stays in `authority.ts`.
 
@@ -35,6 +35,22 @@ Phase 3 differs from this page and the sketches in these points:
 - The credential sheet shows the link `<origin>/?event=<code>` for an event account. For a site account, it shows the sign-in page and says to choose **Site sign-in**.
 - The sign-in form remembers the last event code in the browser's `localStorage`, under `minsky-event-code`. It does not remember **Site sign-in**.
 - Two checks need hosted Cloudflare resources and did not run: the sign-in burst at the 200-user step on `minsky-preview` (see "Risks"), and the rehearsal of `0018` on an empty D1 database and on a `minsky-preview` copy.
+
+Phase 4 differs from this page and the sketches in these points:
+
+- Entrant foreign keys are deferred (`teams.entrant_id`, `accounts.entrant_id`), like `accounts.event_id`, because test cleanups delete an event and then its teams and accounts in one batch.
+- The backfill gives a team its own entrant when an older team of the same contest shares its name. It creates the `teams_entrant` unique index after the backfill, so legacy anomalies stay and are not refused.
+- `session_changes` keeps `categories`. A contest keeps its category list in `sessions.categories`.
+- The `memberships_team` index is part of `0019`. Unassigning an entrant scanned 2,443 rows of a contest of 1,200 members without it. `0020` is a separate file for databases that applied an earlier `0019`.
+- `set_intake`, `set_image_limits`, and `update_contest` read 74 to 156 rows, above the 60-row command target, because they notify every team of the contest.
+- `issueCredentials` takes `{ eventId | null, accountIds }` and replaces `reset_password`. A contest admin reissues through it for accounts that `manageAccountSql` allows. The contest panel's reveal omits the sign-in link, because the snapshot does not carry the event code.
+- `ContestSummary` is `{ id, name, eventId, manage }`. `Management.event(eventId?)` reads the caller's own event when it has no ID, so an event admin whose event has no contest yet still finds the console. The snapshot's teams carry `entrant_id`, because `set_location` names the entrant, not the entry.
+- `bootstrapSite` takes a site file `{ webmasterHandle, webmasterName }` (`--site`) and creates one webmaster, its site grant, and one `authority_audit` row. It writes no `installation` row. The `recover` install command is gone. `npm run cloudflare:recover-admin` recovers a webmaster.
+- `rollback-check.mjs` reports three failures from the previous release's own tests: two in `authority.test.ts` that seed same-named teams, and one in `store.test.ts` that moves a contestant seat. The new triggers refuse those writes by design.
+- `set_event_admin` may remove the last event admin of an event. A webmaster can then name another.
+- The contest panels keep intake, image limits, categories, team locations, username change, and password reissue. The nav item and the page are named **Team locations**. Contest admins no longer create accounts, edit teams, or assign people.
+- The module map lists three files under `src/event/`. Phase 4 also adds `PeopleTabs.tsx`, `ContestTabs.tsx`, `forms.tsx`, `eventModel.ts`, `EventLink.tsx`, and `useOwnEvent.ts`.
+- `ContestPicker` replaces the pickers of the contestant top bar, the console sidebar, the phone Session tab, and the no-access screen. The Sessions section of the account page keeps its own list, because it shows a Switch button per row.
 
 A Worker rollback after Phase 3 loses these:
 

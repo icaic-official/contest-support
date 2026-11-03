@@ -43,7 +43,7 @@ Copy the example settings and set your values. Use new names that no other deplo
 mkdir -p .wrangler/installation
 cp src/server/adapters/cloudflare/tooling/provision.example.jsonc .wrangler/installation/provision.jsonc
 cp src/server/adapters/cloudflare/tooling/provider.example.json .wrangler/installation/provider.json
-cp src/server/adapters/cloudflare/tooling/competition.example.json .wrangler/installation/competition.json
+cp src/server/adapters/cloudflare/tooling/site.example.json .wrangler/installation/site.json
 
 MINSKY_INSTALL_ACCOUNT_ID='REPLACE_WITH_ACCOUNT_ID'
 MINSKY_INSTALL_DATABASE='my-contest-database'
@@ -118,44 +118,24 @@ npx wrangler deploy --config="$MINSKY_INSTALL_CONFIG"
 
 Before the real deploy, check in **Workers & Pages** that no Worker has your `workerName`. Never replace an existing Worker.
 
-## 6. Create the first owner
+## 6. Create the first webmaster
 
-Edit `competition.json`: event, session, categories, teams, owner name, and `adminUsername`.
-Usernames are 3–32 lowercase letters, digits, `_`, or `-`, starting with a letter or digit. Add the first teams here. A session admin adds more teams and edits categories later in the app.
+Bootstrap creates exactly one webmaster and nothing else. It makes no event, contest, or team.
+Edit `site.json`: `webmasterName` and `webmasterHandle`.
+A handle is 3–32 lowercase letters, digits, `_`, or `-`, starting with a letter or digit.
 
 ```sh
 MINSKY_INSTALL_PRIVATE_DIR="$(mktemp -d)" && chmod 700 "$MINSKY_INSTALL_PRIVATE_DIR"
-npm run cloudflare:install -- bootstrap --config="$MINSKY_INSTALL_CONFIG" --account="$MINSKY_INSTALL_ACCOUNT_ID" --database="$MINSKY_INSTALL_DATABASE_ID" --competition=.wrangler/installation/competition.json --credentials="$MINSKY_INSTALL_PRIVATE_DIR/owner.json"
+npm run cloudflare:install -- bootstrap --config="$MINSKY_INSTALL_CONFIG" --account="$MINSKY_INSTALL_ACCOUNT_ID" --database="$MINSKY_INSTALL_DATABASE_ID" --site=.wrangler/installation/site.json --credentials="$MINSKY_INSTALL_PRIVATE_DIR/webmaster.json"
 ```
 
-`owner.json` (mode `0600`) holds the owner's temporary password and the installation IDs. Move it to your password manager. Never commit or share it.
-Bootstrap is atomic, leaves intake closed, and refuses a database that already has data.
-The owner is the site's first webmaster. `adminUsername` is the username that the owner types with **Site sign-in**. A webmaster adds other webmasters on the **Site** page, which the console sidebar links to.
-Bootstrap gives the event a random event code, such as `e1a2b3c4d5e6f7a8b`. Staff and teams sign in with it. Their sign-in sheets carry the link `<origin>/?event=<code>`, which fills it in.
+`webmaster.json` (mode `0600`) holds the webmaster's account ID, handle, and temporary password. Move it to your password manager. Never commit or share it.
+Bootstrap is atomic and refuses a database that already has data.
+The webmaster types the handle with **Site sign-in**.
 
-## 7. Enable sign-in
-
-```sh
-npm run cloudflare:install -- secret --config="$MINSKY_INSTALL_CONFIG" --account="$MINSKY_INSTALL_ACCOUNT_ID" --database="$MINSKY_INSTALL_DATABASE_ID"
-```
-
-This sets a random `AUTH_SECRET` without printing it. It refuses to replace an existing secret.
-
-## 8. Verify
-
-1. Open the sign-in page, select **Site sign-in**, sign in as the owner, and change the password.
-2. Check the event, session, categories, teams, and closed intake.
-3. Check that private paths return `404`:
-   ```sh
-   curl -s -o /dev/null -w '%{http_code}\n' "$MINSKY_INSTALL_ORIGIN/.env"
-   ```
-4. Run the [full workflow check](/operators/verification/).
-
-Record the source revision, Worker version, resource IDs, and results.
-
-## If something fails
-
-The installer prints a fixed message and hides provider output. It never deletes resources.
+Then the webmaster opens the **Site** page and chooses **Create event**. The form takes the event name, an event code, a time zone, and the first event admin. Minsky shows that admin's temporary password once.
+The event admin runs the event in the **event console** (`/event`): **People**, **Entrants**, **Contests**, and **Assignments**. Staff and teams sign in with the event code. Their credential sheets carry the link `<origin>/?event=<code>`.
+Only event admins and webmasters create accounts and assign people. A contest admin keeps the contest settings, announcements, and the issue workflow.
 
 | Problem | Do this |
 | --- | --- |
@@ -163,24 +143,23 @@ The installer prints a fixed message and hides provider output. It never deletes
 | R2 error `10042` | Activate R2. Check whether the bucket exists before you retry. |
 | Migration fails | Inspect the applied migrations. Do not reset the database or rerun bootstrap. |
 | Secret fails | Check that the Worker exists. The command never rotates an existing `AUTH_SECRET`. |
-| Bootstrap fails or its output is lost | Keep any result file. Check the marker (below). If it exists, use owner recovery. |
+| Bootstrap fails or its output is lost | Keep any result file. Check for a webmaster (below). If one exists, recover the webmaster. |
 | Output file exists | Keep it. Choose a new path. Files are never overwritten. |
 
 Check whether bootstrap committed. The query shows IDs only:
 
 ```sh
-npx wrangler d1 execute "$MINSKY_INSTALL_DATABASE" --remote --config="$MINSKY_INSTALL_CONFIG" --command='SELECT id, owner_account_id, event_id, session_id FROM installation'
+npx wrangler d1 execute "$MINSKY_INSTALL_DATABASE" --remote --config="$MINSKY_INSTALL_CONFIG" --command="SELECT account_id FROM grants WHERE scope = 'site'"
 ```
 
-## Recover the owner
+## Recover the webmaster
 
-If the only owner loses access, use the marker's IDs:
+If the only webmaster loses access, run this in a maintainer terminal. It finds the webmaster by handle and prints a new temporary password:
 
 ```sh
-MINSKY_RECOVERY_PRIVATE_DIR="$(mktemp -d)" && chmod 700 "$MINSKY_RECOVERY_PRIVATE_DIR"
-npm run cloudflare:install -- recover --config="$MINSKY_INSTALL_CONFIG" --account="$MINSKY_INSTALL_ACCOUNT_ID" --database="$MINSKY_INSTALL_DATABASE_ID" --installation='INSTALLATION_UUID' --owner='OWNER_ACCOUNT_UUID' --credentials="$MINSKY_RECOVERY_PRIVATE_DIR/owner-recovery.json"
+npm run cloudflare:recover-admin -- --config="$MINSKY_INSTALL_CONFIG" --username=WEBMASTER_HANDLE
 ```
 
-Another webmaster can instead reset the owner's password on the **Site** page.
+Another webmaster can instead reset the password on the **Site** page.
 Recovery keeps the owner's ID, history, and memberships, signs out old sessions, and issues a new temporary password.
 It does not re-enable a disabled owner or restore removed admin rights, and the first session must still be active. If it stops midway, run it again with a new output file.

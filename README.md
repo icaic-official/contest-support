@@ -62,7 +62,7 @@ Use the hosted development app for the shared development data.
 
 [`lapiz.deploy.json`](lapiz.deploy.json) and [`.lapiz/`](.lapiz) run a preview of the Cloudflare application on a Lapiz host.
 The preview uses only local emulation of D1, R2, and Durable Objects in `.lapiz/state/`. It never connects to hosted Cloudflare resources.
-On the first start, `.lapiz/bootstrap.ts` bootstraps the installation from `src/server/adapters/cloudflare/tooling/competition.example.json`.
+On the first start, `.lapiz/bootstrap.ts` bootstraps one webmaster from `src/server/adapters/cloudflare/tooling/site.example.json`.
 
 The preview prints the first admin's username and temporary password in its start log on each start. This is deliberate, for debugging. The first admin is a webmaster and signs in with **Site sign-in**.
 Anyone who can read that log can sign in as that admin. Use only fictional data in the preview.
@@ -96,7 +96,7 @@ Anyone who can read that log can sign in as that admin. Use only fictional data 
 | `npm run test:auth:hosted -- --account=… --database=…` | Run account cases on the explicit isolated hosted authentication D1 target. |
 | `npm run test:auth:http -- --account=… --database=… --origin=…` | Check the isolated deployed authentication Worker. |
 | `npm run test:auth:hash` | Measure password cost in a temporary local Worker. |
-| `npm run load -- <command>` | Run a load test against an isolated installation: `competition`, `setup`, `run`, `analytics`, and `cleanup`. See [Run a load test](docs/run-load-tests.md). |
+| `npm run load -- <command>` | Run a load test against an isolated installation: `site`, `setup`, `run`, `analytics`, and `cleanup`. See [Run a load test](docs/run-load-tests.md). |
 | `npm run perf:reads` | Count the D1 calls, statements, rows read and rows written of each API request at several data sizes. It uses a temporary local database with fictional data and no Cloudflare credentials. Add `-- --plan=base` for the 1,200-account shape only, `-- --explain` for query plans, and `-- --out=<file.json>` for the raw records. Compare saved records with `node scripts/compare-read-volume.mjs --base=<files> --head=<files>`. |
 | `npm run test:e2e:smoke` | Run the critical-path browser files `tests/landing.spec.ts` and `tests/journey.spec.ts`. |
 | `npm run test:e2e` | Run every mocked browser test, including the smoke files. The specs use the Cloudflare client. They serve the real Worker routes from the test process. See [the browser suite](#the-mocked-browser-suite). |

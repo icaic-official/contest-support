@@ -28,14 +28,9 @@ interface EntryDetail {
   text: string;
 }
 
-/**
- * One stage of the example issue. The table drives both the animated demo
- * and the lifecycle rail, so the two cannot disagree.
- */
+/** One stage of the example issue that the animated demo replays. */
 interface Step {
   status: Issue["status"];
-  /** The lifecycle rail text. */
-  summary: string;
   /** The demo activity entry. */
   entry: { text: string; detail?: EntryDetail };
   /** Simulated seconds on the issue timer when this step happens. */
@@ -45,13 +40,11 @@ interface Step {
 const steps: readonly Step[] = [
   {
     status: "open",
-    summary: "A team reports a problem. The timer starts.",
     entry: { text: "Team Blue Herons reported the issue." },
     at: 0,
   },
   {
     status: "claimed",
-    summary: "A volunteer takes the issue and replies to the team.",
     entry: {
       text: "Ana claimed the issue.",
       detail: { kind: "reply", text: replyText },
@@ -60,8 +53,6 @@ const steps: readonly Step[] = [
   },
   {
     status: "escalated",
-    summary:
-      "A specialist accepts the handoff. The volunteer stays the owner until then.",
     entry: {
       text: "Ana asked Hardware for help. Ana stays the owner until a specialist accepts.",
       detail: { kind: "note", text: noteText },
@@ -70,7 +61,6 @@ const steps: readonly Step[] = [
   },
   {
     status: "resolved",
-    summary: "The timer stops. The summary and every action stay in the history.",
     entry: {
       text: "Ravi resolved the issue.",
       detail: { kind: "summary", text: "Summary: replaced the cable." },

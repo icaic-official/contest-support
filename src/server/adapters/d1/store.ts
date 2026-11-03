@@ -209,8 +209,8 @@ export class D1ApplicationStore implements WorkflowPersistence {
       // Recheck access after all effects to reject expiry during a long batch.
       // Do not compare dependencies changed by this command.
       assertion('access', currentAccess, ...parameters),
-      this.statement(`DELETE FROM command_assertions WHERE id IN (?, ?, ?, ?, ?)`,
-        `${assertionId}:read`, `${assertionId}:write`, `${assertionId}:reopen`, `${assertionId}:apply`, `${assertionId}:access`),
+      // This batch's assertion IDs are `<id>:<suffix>`. ';' follows ':' in byte order.
+      this.statement('DELETE FROM command_assertions WHERE id > ? AND id < ?', `${assertionId}:`, `${assertionId};`),
       this.statement('DELETE FROM workflow_commit_times WHERE id = ?', assertionId),
     );
     try {

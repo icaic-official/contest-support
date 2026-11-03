@@ -637,35 +637,78 @@ describe("D1 workflow persistence", () => {
       expect(durable.issue_sequences).toEqual([{ session_id: fixture.sessionId, number: 3 }]);
     });
 
-    it('rolls back a batch when its identity expires after the first access check', async () => {
-      const before = await fixture.durableState();
-      workflow = workflowService({
+    const credentialChanges = ['generation', 'login_generation', 'pending', 'must_change', 'disabled', 'revoked', 'login_expiry',
+      'identity_expiry', 'identity_removed', 'identity_account', 'identity_missing'] as const;
+    async function changeCredential(change: typeof credentialChanges[number]) {
+      await credentialChange(change).run();
+    }
+    function credentialChange(change: typeof credentialChanges[number]): D1Statement {
+      const statements: Record<typeof credentialChanges[number], D1Statement> = {
+        generation: fixture.statement('UPDATE accounts SET credential_generation = credential_generation + 1 WHERE id = ?', fixture.staff.accountId),
+        login_generation: fixture.statement('UPDATE logins SET credential_generation = credential_generation + 1 WHERE id = ?', fixture.staff.loginId),
+        pending: fixture.statement("UPDATE accounts SET credential_state = 'pending' WHERE id = ?", fixture.staff.accountId),
+        must_change: fixture.statement('UPDATE accounts SET must_change = 1 WHERE id = ?', fixture.staff.accountId),
+        disabled: fixture.statement('UPDATE accounts SET disabled = 1 WHERE id = ?', fixture.staff.accountId),
+        revoked: fixture.statement('UPDATE logins SET revoked = 1 WHERE id = ?', fixture.staff.loginId),
+        login_expiry: fixture.statement('UPDATE logins SET expires_at = unixepoch() - 1 WHERE id = ?', fixture.staff.loginId),
+        identity_expiry: fixture.statement("UPDATE ba_session SET expiresAt = '2000-01-01T00:00:00.000Z' WHERE id = ?", fixture.staff.loginId),
+        identity_removed: fixture.statement('DELETE FROM ba_session WHERE id = ?', fixture.staff.loginId),
+        identity_account: fixture.statement('UPDATE ba_session SET userId = ? WHERE id = ?', fixture.specialist.accountId, fixture.staff.loginId),
+        identity_missing: fixture.statement('UPDATE logins SET identity_session_id = NULL WHERE id = ?', fixture.staff.loginId),
+      };
+      return statements[change];
+    }
+
+    /** Runs `change` inside the commit batch, after every effect and before the final access recheck. */
+    function duringBatch(change: typeof credentialChanges[number]): D1Connection {
+      return {
         prepare: (sql) => db.prepare(sql),
-        batch: (statements) => db.batch([
-          ...statements.slice(0, -3),
-          fixture.statement("UPDATE ba_session SET expiresAt = '2000-01-01T00:00:00.000Z' WHERE id = ?", fixture.staff.loginId),
-          ...statements.slice(-3),
-        ]),
-      });
+        batch: (statements) => db.batch([...statements.slice(0, -3), credentialChange(change), ...statements.slice(-3)]),
+      };
+    }
+
+    it.each(credentialChanges)('rolls back a batch when %s changes after the first access check', async (change) => {
+      const before = await fixture.durableState();
+      workflow = workflowService(duringBatch(change));
       expect(await command(claim())).toEqual({ outcome: 'unknown' });
       expect(await fixture.durableState()).toEqual(before);
       expect(await fixture.rows('SELECT * FROM workflow_commit_times')).toEqual([]);
       await expectNoAssertions();
     });
 
-    const credentialChanges = ['generation', 'login_generation', 'pending', 'identity_expiry', 'identity_removed', 'identity_account', 'identity_missing'] as const;
-    async function changeCredential(change: typeof credentialChanges[number]) {
-      const statements: Record<typeof credentialChanges[number], D1Statement> = {
-        generation: fixture.statement('UPDATE accounts SET credential_generation = credential_generation + 1 WHERE id = ?', fixture.staff.accountId),
-        login_generation: fixture.statement('UPDATE logins SET credential_generation = credential_generation + 1 WHERE id = ?', fixture.staff.loginId),
-        pending: fixture.statement("UPDATE accounts SET credential_state = 'pending' WHERE id = ?", fixture.staff.accountId),
-        identity_expiry: fixture.statement("UPDATE ba_session SET expiresAt = '2000-01-01T00:00:00.000Z' WHERE id = ?", fixture.staff.loginId),
-        identity_removed: fixture.statement('DELETE FROM ba_session WHERE id = ?', fixture.staff.loginId),
-        identity_account: fixture.statement('UPDATE ba_session SET userId = ? WHERE id = ?', fixture.specialist.accountId, fixture.staff.loginId),
-        identity_missing: fixture.statement('UPDATE logins SET identity_session_id = NULL WHERE id = ?', fixture.staff.loginId),
-      };
-      await statements[change].run();
-    }
+    it('rejects a command when the access version changes before its batch, and every retry', async () => {
+      const before = await fixture.durableState();
+      workflow = workflowService(beforeBatch(db, async () => {
+        await fixture.statement('UPDATE accounts SET access_version = access_version + 1 WHERE id = ?', fixture.staff.accountId).run();
+      }, true));
+      expect(await command(claim())).toEqual({ outcome: 'unknown' });
+      expect(await fixture.durableState()).toEqual(before);
+      await expectNoAssertions();
+    });
+
+    it('removes only its own assertion rows when the batch ends', async () => {
+      // Rows of other requests that sort next to this batch's IDs, inserted while its own rows exist.
+      const neighbours = fixture.statement(`INSERT INTO command_assertions (id, valid)
+        SELECT substr(a.id, 1, 36) || n.column1, 1 FROM command_assertions a
+        JOIN (VALUES (''), ('9'), (';'), (';read'), ('~')) n WHERE a.id LIKE '%:read' AND length(a.id) = 41`);
+      const otherBatch = fixture.statement(`INSERT INTO command_assertions (id, valid)
+        SELECT substr(a.id, 1, 35) || CASE substr(a.id, 36, 1) WHEN '0' THEN '1' ELSE '0' END || ':read', 1
+        FROM command_assertions a WHERE a.id LIKE '%:read' AND length(a.id) = 41`);
+      workflow = workflowService({
+        prepare: (sql) => db.prepare(sql),
+        batch: (statements) => db.batch([...statements.slice(0, -3), neighbours, otherBatch, ...statements.slice(-3)]),
+      });
+      const result = await command(claim());
+      const ids = (await fixture.rows('SELECT id FROM command_assertions ORDER BY id')).map((row) => row.id as string);
+      try {
+        expect(result).toEqual({ outcome: 'committed', issueId: fixture.issueId });
+        const own = ids.find((id) => id.length === 36)!;
+        const other = `${own.slice(0, 35)}${own[35] === '0' ? '1' : '0'}:read`;
+        expect(ids).toEqual([own, `${own}9`, `${own};`, `${own};read`, `${own}~`, other].sort());
+      } finally {
+        await db.batch(ids.map((id) => fixture.statement('DELETE FROM command_assertions WHERE id = ?', id)));
+      }
+    });
 
     it.each(credentialChanges)('checks %s at the atomic write boundary', async (change) => {
       const before = await fixture.durableState();

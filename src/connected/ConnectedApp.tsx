@@ -144,6 +144,8 @@ export function ConnectedApp() {
         key={user.id}
         user={user}
         username={status.handle}
+        canChangeUsername={status.can_change_handle}
+        refreshAccount={account.refresh}
         changePassword={() => {
           navigate("/account");
           setPasswordSetup(true);

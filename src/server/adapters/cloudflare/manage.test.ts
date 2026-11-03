@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { getPlatformProxy } from 'wrangler';
-import type { EventCode, Handle, ManageCommand } from '../../../backend/contracts';
+import type { EventCode, Handle, ManageCommand, SignInTarget } from '../../../backend/contracts';
 import type { Caller } from '../../authentication';
 import type { D1Binding, D1Connection, D1Value } from '../d1/connection';
 import { applyMigrations } from '../d1/testFixture';
@@ -324,7 +324,8 @@ describe('handle changes', () => {
     const signedIn = (await authentication.current(headers))!;
     expect(await manage.execute(signedIn.caller, randomUUID(),
       { type: 'set_handle', eventId: ids.event, accountId: signedIn.caller.accountId, handle: ' Desk-Volunteer ' })).toEqual({});
-    expect((await authentication.current(headers))?.status).toEqual({ handle: 'desk-volunteer', must_change: false, session_valid: true });
+    expect((await authentication.current(headers))?.status)
+      .toEqual({ handle: 'desk-volunteer', must_change: false, session_valid: true, can_change_handle: true });
     expect(await rows('SELECT username FROM ba_user WHERE id = ?', signedIn.caller.accountId)).toEqual([{ username: 'volunteer' }]);
     expect((await authentication.current(await signIn('desk-volunteer')))?.user.id).toBe(signedIn.caller.accountId);
     await expect(signIn('volunteer')).rejects.toMatchObject({ status: 401 });
@@ -350,6 +351,27 @@ describe('handle changes', () => {
     // An event admin holds no seat, so no contest lists its handle.
     expect(await renameAccount('eventAdmin', 'eventAdmin', 'event-own')).toEqual({});
     expect(await rows('SELECT count(*) AS n FROM notifications')).toEqual([{ n: 4 }]);
+  });
+
+  it('reports in the account status whether set_handle accepts the own handle', async () => {
+    const own = async (handle: string, target?: SignInTarget) => {
+      const headers = target
+        ? new Headers({ cookie: (await authentication.signIn(target, handle as Handle, password)).cookie.split(';')[0]! })
+        : await signIn(handle);
+      return (await authentication.current(headers))?.status.can_change_handle;
+    };
+    expect({
+      volunteer: await own('volunteer'), eventAdmin: await own('eventadmin'),
+      contestant: await own('contestant'), webmaster: await own('webmaster', { kind: 'site' }),
+    }).toEqual({ volunteer: true, eventAdmin: true, contestant: false, webmaster: false });
+    // A team seat in any contest of the event takes the change away.
+    const second = randomUUID();
+    const team = randomUUID();
+    await run(`INSERT INTO sessions (id, event_id, name) VALUES (?, ?, 'Live 2')`, second, ids.event);
+    await run(`INSERT INTO teams (id, session_id, name) VALUES (?, ?, 'Borealis')`, team, second);
+    await run('INSERT INTO memberships (session_id, account_id, team_id) VALUES (?, ?, ?)', second, caller('volunteer').accountId, team);
+    expect(await own('volunteer')).toBe(false);
+    await expect(renameAccount('volunteer', 'volunteer', 'two-seats')).rejects.toMatchObject({ status: 403 });
   });
 
   it('refuses a contestant its own handle, because venue staff read it from the sheet', async () => {

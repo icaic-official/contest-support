@@ -14,6 +14,7 @@ import { D1ApplicationService } from '../../src/server/adapters/cloudflare/appli
 import { D1AnnouncementService } from '../../src/server/adapters/cloudflare/announcements';
 import { R2AnnouncementImageService } from '../../src/server/adapters/cloudflare/announcementImages';
 import { R2AvatarService } from '../../src/server/adapters/cloudflare/avatars';
+import { ownHandleSql } from '../../src/server/adapters/cloudflare/authority';
 import { D1ManageService } from '../../src/server/adapters/cloudflare/manage';
 import { passwordHasher } from '../../src/server/adapters/cloudflare/password';
 import { R2ImageService, type PrivateBucket } from '../../src/server/adapters/cloudflare/images';
@@ -95,6 +96,13 @@ export class LocalWorker extends FixtureWorker {
 
   protected override eventCodeOfDevice(): EventCode {
     return this.eventCode;
+  }
+
+  /** The rule that the Worker's account status applies. */
+  protected override async canChangeHandle(accountId: string): Promise<boolean> {
+    const row = await this.db.prepare(`SELECT (${ownHandleSql}) AS own FROM accounts t WHERE t.id = ?`).bind(accountId)
+      .first<{ own: number }>();
+    return row?.own === 1;
   }
 
   override async attach(context: BrowserContext, options: { newDevice?: boolean } = {}): Promise<void> {

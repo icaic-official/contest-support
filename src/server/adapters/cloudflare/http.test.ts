@@ -11,7 +11,7 @@ const requestId = '202b3701-33c9-4662-89dd-5c27ca0d12d1';
 const identity: AuthenticationSession = {
   caller: { accountId: '3be3c103-e098-4f97-87ec-f2317ec8c67b', loginId: 'bd5a5689-eb24-44e9-8020-06442b2d6038' },
   user: { id: '3be3c103-e098-4f97-87ec-f2317ec8c67b' },
-  status: { handle: 'fictional', must_change: false, session_valid: true }, csrf: 'protected-token',
+  status: { handle: 'fictional', must_change: false, session_valid: true, can_change_handle: true }, csrf: 'protected-token',
 };
 
 function services() {

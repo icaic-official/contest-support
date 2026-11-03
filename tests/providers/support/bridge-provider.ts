@@ -49,7 +49,7 @@ export function createBrowserProvider(configuration: unknown): BrowserProvider {
         for (const notify of authentication) notify(undefined);
       },
       async accountStatus() {
-        return { handle: null, must_change: false, session_valid: true };
+        return { handle: null, must_change: false, session_valid: true, can_change_handle: false };
       },
       changePassword: async () => unsupported(),
       subscribe(onChange) {

@@ -6,7 +6,7 @@ const ORIGIN = 'https://auth.minsky.test';
 const ACCOUNT_ID = '00000000-0000-4000-8000-000000000001';
 const SESSION_ID = '00000000-0000-4000-8000-000000000002';
 const user = { id: ACCOUNT_ID, name: 'Fictional helper' };
-const status = { handle: 'helper', must_change: false, session_valid: true };
+const status = { handle: 'helper', must_change: false, session_valid: true, can_change_handle: true };
 
 function json(body: unknown, statusCode = 200) {
   return new Response(JSON.stringify(body), { status: statusCode, headers: { 'Content-Type': 'application/json' } });
@@ -53,7 +53,10 @@ describe('Cloudflare browser authentication transport', () => {
   it('returns no user for expired or revoked sessions and validates server status', async () => {
     const unauthorized = setup(() => json({ error: 'Sign in to continue.' }, 401));
     await expect(unauthorized.auth.currentUser()).resolves.toBeUndefined();
-    expect(await unauthorized.auth.accountStatus()).toEqual({ handle: null, must_change: true, session_valid: false });
+    expect(await unauthorized.auth.accountStatus()).toEqual({ handle: null, must_change: true, session_valid: false, can_change_handle: false });
+    const older = { handle: 'helper', must_change: false, session_valid: true };
+    expect(await setup(() => json({ user, status: older, csrf: 'test' })).auth.accountStatus())
+      .toEqual({ ...older, can_change_handle: false });
     const malformed = setup(() => json({ user, status: { ...status, must_change: 'no' }, csrf: 'test' }));
     await expect(malformed.auth.currentUser()).rejects.toThrow();
   });

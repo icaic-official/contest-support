@@ -8,7 +8,7 @@ const SESSION_ID = '00000000-0000-4000-8000-000000000002';
 const current: AuthenticationSession = {
   caller: { accountId: ACCOUNT_ID, loginId: 'private-login-id' },
   user: { id: ACCOUNT_ID, name: 'Fictional helper' },
-  status: { handle: 'helper', must_change: true, session_valid: true },
+  status: { handle: 'helper', must_change: true, session_valid: true, can_change_handle: true },
   csrf: 'fixture-csrf',
 };
 

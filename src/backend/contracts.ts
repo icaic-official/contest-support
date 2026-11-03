@@ -65,6 +65,8 @@ export interface AccountStatus {
   handle: string | null;
   must_change: boolean;
   session_valid: boolean;
+  /** True when the account may change its own handle. The server applies the same rule to the change. */
+  can_change_handle: boolean;
 }
 
 /** Cleanup is idempotent. No callback may run after cleanup returns. */

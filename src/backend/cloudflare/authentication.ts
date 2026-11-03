@@ -7,7 +7,11 @@ import type {
 const identitySchema = z.object({ id: z.uuid(), name: z.string().exactOptional(), email: z.string().exactOptional() });
 const sessionSchema = z.object({
   user: identitySchema,
-  status: z.object({ handle: z.string().nullable(), must_change: z.boolean(), session_valid: z.boolean() }),
+  status: z.object({
+    handle: z.string().nullable(), must_change: z.boolean(), session_valid: z.boolean(),
+    // A Worker from before the field shows no username form.
+    can_change_handle: z.boolean().default(false),
+  }),
   csrf: z.string().min(1),
 });
 const signInSchema = z.discriminatedUnion('kind', [
@@ -183,7 +187,7 @@ export function createCloudflareAuthentication(options: {
       const current = await session();
       // A reset removes the identity session. Report a restricted status without
       // recovering an account ID from an invalid cookie or browser memory.
-      if (!current) return { handle: null, must_change: true, session_valid: false };
+      if (!current) return { handle: null, must_change: true, session_valid: false, can_change_handle: false };
       return current.status;
     },
     async changePassword(currentPassword, newPassword) {

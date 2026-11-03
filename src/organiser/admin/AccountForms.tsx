@@ -1,5 +1,6 @@
 import { type ReactNode, useId, useState } from "react";
 import { UserRound, Users } from "lucide-react";
+import { type Handle, parseHandle } from "@/backend/contracts";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -293,15 +294,17 @@ export function UsernameForm({
   /** The account's username. Null when the account has none. */
   current: string | null;
   disabled: boolean;
-  onSubmit: (username: string) => void;
+  onSubmit: (username: Handle) => void;
 }) {
   const id = useId();
   const [username, setUsername] = useState(current ?? "");
+  const handle = parseHandle(username);
   return (
     <form
       onSubmit={(event) => {
         event.preventDefault();
-        onSubmit(username);
+        // The input's pattern stops a submit of text that is not a handle.
+        if (handle) onSubmit(handle);
       }}
     >
       <fieldset disabled={disabled} className="space-y-3">
@@ -322,7 +325,7 @@ export function UsernameForm({
           type="submit"
           variant="secondary"
           className="h-11 w-full"
-          disabled={username.trim().toLowerCase() === current}
+          disabled={handle === current}
         >
           {current ? "Change username" : "Set username"}
         </Button>

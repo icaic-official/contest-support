@@ -6,7 +6,8 @@ import {
 import type { D1Connection, D1Statement, D1Value } from '../d1/connection';
 import type { IdentityProvider } from './identity';
 import {
-  authorityCheck, loginAccountColumns, manageAccountBindings, manageAccountSql, reaches, resolveAuthority, signInAccountSql,
+  authorityCheck, loginAccountColumns, manageAccountBindings, manageAccountSql, ownHandleSql, reaches, resolveAuthority,
+  signInAccountSql,
 } from './authority';
 import { beginCredentialReset, completeCredentialReset, handleSchema, loginKeyFor } from './credentials';
 import { randomSecret, type PasswordHasher } from './password';
@@ -122,12 +123,13 @@ export class D1AuthenticationService implements AuthenticationService {
   async current(headers: Headers): Promise<AuthenticationSession | undefined> {
     const identity = await this.identity.session(headers);
     if (!identity) return undefined;
-    const row = await this.statement(currentLoginSql, identity.identitySessionId, identity.accountId).first<Login>();
+    const row = await this.statement(`SELECT t.*, (${ownHandleSql}) AS own_handle FROM (${currentLoginSql}) t`,
+      identity.identitySessionId, identity.accountId).first<Login & { own_handle: number }>();
     if (!row) return undefined;
     return {
       caller: { accountId: row.id, loginId: row.login_id },
       user: { id: row.id, name: row.name },
-      status: { handle: row.handle, must_change: !!row.must_change, session_valid: true },
+      status: { handle: row.handle, must_change: !!row.must_change, session_valid: true, can_change_handle: !!row.own_handle },
       csrf: row.csrf,
     };
   }

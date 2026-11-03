@@ -273,14 +273,20 @@ export function manageAccountBindings(actor: string, target: string): D1Value[] 
 }
 
 /**
+ * Account `t` may change its own handle: it belongs to an event and holds no
+ * contestant seat in any contest (owner decision 14, 2026-11-01). A
+ * contestant's handle is printed on the sheet that venue staff use. A
+ * webmaster belongs to no event. The account page reads the same condition.
+ */
+export const ownHandleSql = `t.event_id IS NOT NULL
+  AND NOT EXISTS (SELECT 1 FROM memberships m WHERE m.account_id = t.id AND m.team_id IS NOT NULL)`;
+
+/**
  * Who may change a handle: `manageAccountSql`, or the actor's own account
- * when it holds no contestant seat (owner decision 14, 2026-11-01). A
- * contestant's handle is printed on the sheet that venue staff use. Bind with
- * manageHandleBindings.
+ * under `ownHandleSql`. Bind with manageHandleBindings.
  */
 export const manageHandleSql = `${manageAccountSql}
-  UNION ALL SELECT 1 FROM accounts t WHERE t.id = ? AND t.id = ?
-    AND NOT EXISTS (SELECT 1 FROM memberships m WHERE m.account_id = t.id AND m.team_id IS NOT NULL)`;
+  UNION ALL SELECT 1 FROM accounts t WHERE t.id = ? AND t.id = ? AND ${ownHandleSql}`;
 
 export function manageHandleBindings(actor: string, target: string): D1Value[] {
   return [...manageAccountBindings(actor, target), target, actor];

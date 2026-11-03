@@ -34,7 +34,6 @@ import { UsernameForm } from "@/organiser/admin/AccountForms";
 import { setHandleCommand } from "@/organiser/admin/adminModel";
 import { PersonAvatar } from "@/organiser/components/issueDisplay";
 import { PasswordChangeForm } from "@/screens/PasswordForm";
-import { useSite } from "@/site/useSite";
 import {
   type AccountActivityItem,
   accountActivity,
@@ -155,35 +154,31 @@ function CopyButton({ value, label }: { value: string; label: string }) {
 }
 
 /**
- * The account's username. A staff account may change its own (owner decision
- * 14, 2026-11-01). A team account may not, because venue staff read its
- * username from the sign-in sheet. A webmaster belongs to no event, so its
- * username stays.
+ * The account's username. The server says whether the account may change it
+ * (owner decision 14, 2026-11-01): a team account may not, because venue
+ * staff read its username from the sign-in sheet, and a webmaster belongs to
+ * no event.
  */
-function OwnUsername({ shell, state, kind }: AccountSectionProps) {
-  const site = useSite();
-  const [username, setUsername] = useState(shell.username);
+function OwnUsername({ shell, state }: AccountSectionProps) {
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<{ failed: boolean; text: string }>();
-  const shown = <span className="font-mono">{username ?? shell.user.email ?? "Not set"}</span>;
+  const shown = <span className="font-mono">{shell.username ?? shell.user.email ?? "Not set"}</span>;
   const event = state.event;
-  if (kind.kind === "team" || !event || !site.loaded || site.site) return shown;
+  if (!shell.canChangeUsername || !event) return shown;
   return (
     <div className="grid max-w-sm gap-3">
       {shown}
       <UsernameForm
-        key={username ?? ""}
-        current={username}
+        key={shell.username ?? ""}
+        current={shell.username}
         disabled={busy || event.archived}
         onSubmit={(next) => {
           setBusy(true);
           setResult(undefined);
           void backend.manage.execute(crypto.randomUUID(), setHandleCommand(event.id, shell.user.id, next))
             .then(async () => {
-              const changed = next.trim().toLowerCase();
-              setUsername(changed);
-              setResult({ failed: false, text: `Username changed. Sign in with ${changed} next time.` });
-              await shell.data.refresh();
+              setResult({ failed: false, text: `Username changed. Sign in with ${next} next time.` });
+              await Promise.all([shell.refreshAccount(), shell.data.refresh()]);
             })
             .catch((cause: unknown) => setResult({ failed: true, text: errorMessage(cause) }))
             .finally(() => setBusy(false));

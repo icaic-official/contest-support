@@ -11,6 +11,8 @@ export interface AccountState {
   error: string;
   /** Clears the result and checks the account again. */
   recheck: () => void;
+  /** Checks the account again and keeps the shown result until the answer arrives. */
+  refresh: () => Promise<void>;
 }
 
 /**
@@ -25,7 +27,7 @@ export function useAccountStatus(
   const [account, setAccount] = useState<AccountStatus>();
   const [error, setError] = useState("");
   const [attempt, setAttempt] = useState(0);
-  const check = useRef<() => void>(undefined);
+  const check = useRef<() => Promise<void>>(undefined);
   useEffect(() => {
     if (!userId) return;
     let active = true;
@@ -41,7 +43,7 @@ export function useAccountStatus(
       }
     }
     void refreshAccount();
-    check.current = () => void refreshAccount();
+    check.current = refreshAccount;
     return () => {
       active = false;
       check.current = undefined;
@@ -50,7 +52,7 @@ export function useAccountStatus(
   useEffect(() => {
     if (!userId) return;
     return startRefreshSchedule({
-      refresh: () => check.current?.(),
+      refresh: () => void check.current?.(),
       connected: live,
       window,
       document,
@@ -60,5 +62,6 @@ export function useAccountStatus(
     account,
     error,
     recheck: () => setAttempt((value) => value + 1),
+    refresh: () => check.current?.() ?? Promise.resolve(),
   };
 }

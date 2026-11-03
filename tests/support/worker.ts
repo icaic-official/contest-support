@@ -43,7 +43,11 @@ const loginCookie = 'minsky_fixture_login';
  * HttpOnly cookie carries it, so every browser context signs in separately.
  */
 class FixtureIdentity implements AuthenticationService {
-  constructor(private readonly accounts: () => readonly FixtureAccount[], private readonly eventCode: () => EventCode) {}
+  constructor(
+    private readonly accounts: () => readonly FixtureAccount[],
+    private readonly eventCode: () => EventCode,
+    private readonly canChangeHandle: (accountId: string) => Promise<boolean>,
+  ) {}
 
   async current(headers: Headers): Promise<AuthenticationSession | undefined> {
     const loginId = headers.get('Cookie')?.split(';').map((part) => part.trim().split('='))
@@ -53,7 +57,7 @@ class FixtureIdentity implements AuthenticationService {
     return {
       caller: { accountId: account.id, loginId: account.loginId },
       user: { id: account.id, name: account.name },
-      status: { handle: account.username, must_change: false, session_valid: true },
+      status: { handle: account.username, must_change: false, session_valid: true, can_change_handle: await this.canChangeHandle(account.id) },
       csrf: `csrf-${account.loginId}`,
     };
   }
@@ -97,6 +101,8 @@ export abstract class FixtureWorker {
   private readonly losses: Array<{ path: string; stage: 'request' | 'response' }> = [];
 
   protected abstract accounts(): readonly FixtureAccount[];
+  /** Whether an account may change its own username, as the account status reports it. */
+  protected abstract canChangeHandle(accountId: string): Promise<boolean>;
   protected abstract readonly services: WorkerServices;
 
   constructor(readonly origin: string) {}
@@ -141,7 +147,7 @@ export abstract class FixtureWorker {
         }
       }, { key: eventCodeStorageKey, code: this.eventCodeOfDevice() });
     }
-    const identity = new FixtureIdentity(() => this.accounts(), () => this.eventCodeOfDevice());
+    const identity = new FixtureIdentity(() => this.accounts(), () => this.eventCodeOfDevice(), (id) => this.canChangeHandle(id));
     const authentication = createAuthenticationHandler(identity, { origins: [this.origin] });
     const application = createApplicationHandler({
       ...this.services,
@@ -288,6 +294,11 @@ export class FakeWorker extends FixtureWorker {
 
   protected accounts(): readonly FixtureAccount[] {
     return this.account ? [this.account] : [];
+  }
+
+  /** The fake Worker refuses every username change. */
+  protected async canChangeHandle(): Promise<boolean> {
+    return false;
   }
 
   private read(sessionId: string): Snapshot {

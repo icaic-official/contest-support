@@ -11,11 +11,10 @@ import {
   DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { ContestPicker } from "@/connected/ContestPicker";
 import type { SessionSummary } from "@/connected/hooks/useSessionSnapshot";
 import { cn } from "@/lib/utils";
 
@@ -80,32 +79,23 @@ export function ContestantTopBar({
           {eventName ?? "Your contest"}
         </p>
         {sessions.length > 1 ? (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
+          <ContestPicker
+            variant="menu"
+            contests={sessions}
+            value={sessionId}
+            disabled={locked}
+            onSelect={onSelectSession}
+            trigger={
               <button
                 type="button"
-                disabled={locked}
                 className="flex items-center gap-1 rounded-sm text-xs text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:opacity-50"
                 aria-label={`Contest session: ${sessionName}. Change session`}
               >
                 {sessionName}
                 <ChevronDown className="size-3" aria-hidden="true" />
               </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start">
-              <DropdownMenuLabel>Contest session</DropdownMenuLabel>
-              <DropdownMenuRadioGroup
-                value={sessionId}
-                onValueChange={onSelectSession}
-              >
-                {sessions.map((item) => (
-                  <DropdownMenuRadioItem key={item.id} value={item.id}>
-                    {item.name}
-                  </DropdownMenuRadioItem>
-                ))}
-              </DropdownMenuRadioGroup>
-            </DropdownMenuContent>
-          </DropdownMenu>
+            }
+          />
         ) : (
           <p className="truncate text-xs text-muted-foreground">
             {sessionName}

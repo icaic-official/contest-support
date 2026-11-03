@@ -305,9 +305,15 @@ export class D1ManageService {
     };
   }
 
-  /** The console of one event. Requires an event admin of the event, or a webmaster. */
-  async event(caller: Caller, id: string): Promise<EventConsole> {
-    if (!uuid.safeParse(id).success) throw new AuthenticationError(400, 'Choose an event.');
+  /**
+   * The console of one event. Requires an event admin of the event, or a
+   * webmaster. Without an ID, the caller's own event, so an event admin whose
+   * event has no contest yet still finds the console.
+   */
+  async event(caller: Caller, eventId?: string): Promise<EventConsole> {
+    const id = eventId ?? (await this.statement('SELECT event_id FROM accounts WHERE id = ?', caller.accountId)
+      .first<{ event_id: string | null }>())?.event_id;
+    if (!id || !uuid.safeParse(id).success) throw new AuthenticationError(400, 'Choose an event.');
     const authority = await resolveAuthority(this.db, caller, { scope: 'event', eventId: id });
     if (!authority || !reaches(authority, 'event')) throw new AuthenticationError(403, deniedMessage.event);
     const read = <T>(sql: string) => this.statement(sql, id).all<T>().then((result) => result.results);

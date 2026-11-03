@@ -1,4 +1,4 @@
-import type { AccountCommand, Handle, ManageCommand, MembershipInput } from "@/backend/contracts";
+import type { Handle, ManageCommand } from "@/backend/contracts";
 import { statusNames } from "@/connected/labels";
 import type { Issue, Membership, Role, Snapshot } from "@/connected/model";
 
@@ -64,81 +64,6 @@ export function imageLimitsInput(limits: ImageLimits) {
   };
 }
 
-/**
- * The membership that an admin edits. A team account has no staff roles and
- * no admin rights, as in the form from before T0015.
- */
-export interface MembershipDraft {
-  kind: "staff" | "team";
-  /** The team of a team account. It is empty until the admin chooses one. */
-  teamId: string;
-  roles: readonly Role[];
-  isAdmin: boolean;
-}
-
-/** The draft of an existing membership, or of a new staff account. */
-export function draftOfMembership(
-  member?: Membership,
-  defaultRoles: readonly Role[] = [],
-): MembershipDraft {
-  if (!member) {
-    return { kind: "staff", teamId: "", roles: defaultRoles, isAdmin: false };
-  }
-  return {
-    kind: member.team_id ? "team" : "staff",
-    teamId: member.team_id ?? "",
-    roles: staffRoles.filter((role) => member.roles.includes(role)),
-    isAdmin: member.is_admin,
-  };
-}
-
-/** Whether a draft can be sent. A team account needs its team. */
-export function isCompleteMembership(draft: MembershipDraft): boolean {
-  return draft.kind === "staff" || draft.teamId !== "";
-}
-
-/** Adds or removes one role and keeps the roles in form order. */
-export function toggleRole(
-  draft: MembershipDraft,
-  role: Role,
-  on: boolean,
-): MembershipDraft {
-  const roles = new Set(draft.roles);
-  if (on) roles.add(role);
-  else roles.delete(role);
-  return { ...draft, roles: staffRoles.filter((item) => roles.has(item)) };
-}
-
-/**
- * The membership fields that the server stores for a draft. A team account
- * has no staff roles and no admin rights.
- */
-export function membershipInput(draft: MembershipDraft): MembershipInput {
-  const teamId = draft.kind === "team" && draft.teamId ? draft.teamId : null;
-  return {
-    teamId,
-    roles: teamId ? [] : [...draft.roles],
-    isAdmin: teamId ? false : draft.isAdmin,
-  };
-}
-
-/** A new account as the create form holds it. */
-export interface NewAccount {
-  name: string;
-  username: string;
-  membership: MembershipDraft;
-}
-
-/** The account command that creates an account. */
-export function createAccountCommand(account: NewAccount): AccountCommand {
-  return {
-    action: "create_account",
-    username: account.username.trim(),
-    name: account.name.trim(),
-    ...membershipInput(account.membership),
-  };
-}
-
 /** The command that changes the username of an account of the event. */
 export function setHandleCommand(
   eventId: string,
@@ -146,11 +71,6 @@ export function setHandleCommand(
   handle: Handle,
 ): ManageCommand {
   return { type: "set_handle", eventId, accountId, handle };
-}
-
-/** The account command that issues a new temporary password. */
-export function resetPasswordCommand(userId: string): AccountCommand {
-  return { action: "reset_password", userId };
 }
 
 /** One session member as the snapshot holds it. */

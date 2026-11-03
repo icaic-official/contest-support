@@ -27,6 +27,7 @@ import {
   type Membership,
   type Snapshot,
 } from "@/connected/model";
+import { ContestPicker } from "@/connected/ContestPicker";
 import { PictureEditor } from "@/connected/PictureEditor";
 import type { ShellProps } from "@/connected/shell";
 import { searchTeams, unresolvedCount } from "@/connected/teamSearch";
@@ -537,28 +538,17 @@ export function MeTab(props: PhoneTabProps & { onSessionChange: () => void }) {
           Contest session
         </h2>
         {data.sessions.length > 1 ? (
-          <fieldset
+          <ContestPicker
+            variant="radios"
+            legend="Choose a contest session"
+            contests={data.sessions}
+            value={data.sessionId}
             disabled={workflow.command.locked}
-            className="divide-y rounded-xl border bg-card"
-          >
-            <legend className="sr-only">Choose a contest session</legend>
-            {data.sessions.map((session) => (
-              <label key={session.id} className={cn(rowClass, "cursor-pointer")}>
-                <input
-                  type="radio"
-                  name={`${id}-sessions`}
-                  value={session.id}
-                  checked={session.id === data.sessionId}
-                  onChange={() => {
-                    data.selectSession(session.id);
-                    props.onSessionChange();
-                  }}
-                  className="size-4 accent-current"
-                />
-                <span className="flex-1">{session.name}</span>
-              </label>
-            ))}
-          </fieldset>
+            onSelect={(sessionId) => {
+              data.selectSession(sessionId);
+              props.onSessionChange();
+            }}
+          />
         ) : (
           <p className="rounded-xl border bg-card p-3 text-[15px]">
             {state.session?.name}

@@ -30,9 +30,11 @@ export function CredentialReveal({
   const { origin } = window.location;
   const { signIn } = credentials;
   const rows = [
-    signIn.kind === "event"
-      ? { key: "link", label: "Sign-in link", value: `${origin}/?event=${signIn.code}` }
-      : { key: "link", label: "Sign-in page", value: `${origin}/sign-in` },
+    ...(signIn?.kind === "event"
+      ? [{ key: "link", label: "Sign-in link", value: `${origin}/?event=${signIn.code}` }]
+      : signIn?.kind === "site"
+        ? [{ key: "link", label: "Sign-in page", value: `${origin}/sign-in` }]
+        : []),
     { key: "username", label: "Username", value: credentials.username },
     {
       key: "password",
@@ -48,7 +50,7 @@ export function CredentialReveal({
       <p className="text-sm text-muted-foreground">
         This password is shown for this action only. If it is lost, issue a
         new one. The user must change it at the first sign-in.
-        {signIn.kind === "site" && " On the sign-in page, the user selects Site sign-in."}
+        {signIn?.kind === "site" && " On the sign-in page, the user selects Site sign-in."}
       </p>
       <div className="divide-y rounded-xl border">
         {rows.map(({ key, label, value }) => (

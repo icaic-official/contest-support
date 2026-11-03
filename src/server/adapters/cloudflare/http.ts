@@ -81,7 +81,7 @@ export function createApplicationHandler(services: ApplicationHttpServices, orig
           return privateJson(await services.application.contests(caller, eventId === null ? undefined : uuid.parse(eventId)));
         }
         if (url.pathname === '/api/site') return privateJson(await services.manage.site(caller));
-        if (url.pathname === '/api/event') return privateJson(await services.manage.event(caller, uuid.parse(url.searchParams.get('eventId'))));
+        if (url.pathname === '/api/event') return privateJson(await services.manage.event(caller, url.searchParams.has('eventId') ? uuid.parse(url.searchParams.get('eventId')) : undefined));
         if (url.pathname === '/api/snapshot' || url.pathname === '/api/updates') {
           const sessionId = uuid.parse(url.searchParams.get('sessionId'));
           if (url.pathname === '/api/snapshot') return privateJson(await services.application.snapshot(caller, sessionId));

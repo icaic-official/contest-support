@@ -1,6 +1,4 @@
 import { useState } from "react";
-import { UserPlus } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { SiteLink } from "@/site/SiteLink";
 import { ActionSheet } from "../actions/ActionSheet";
 import {
@@ -10,9 +8,8 @@ import {
   Collapsible,
   MemberActions,
 } from "../admin/AccountAccess";
-import { AssignByIdForm, CreateAccountForm } from "../admin/AccountForms";
 import { CredentialReveal } from "../admin/CredentialReveal";
-import { CategoryEditor, TeamRosterEditor } from "../admin/RosterEditors";
+import { CategoryEditor, TeamLocationEditor } from "../admin/RosterEditors";
 import {
   ImageLimitsForm,
   IntakeSwitch,
@@ -23,16 +20,17 @@ import { type SessionAdmin, useSessionAdmin } from "../admin/useSessionAdmin";
 import type { PhoneTabProps } from "./PhoneTabs";
 
 /**
- * The content of the Session tab sheet: a new account, or one account. The
- * member copy keeps the sheet filled while it closes after a removal.
+ * The content of the Session tab sheet: one account. The member copy keeps the
+ * sheet filled while it closes.
  */
-type AdminSheet =
-  | { type: "create" }
-  | { type: "member"; userId: string; member: SessionMember };
+interface AdminSheet {
+  userId: string;
+  member: SessionMember;
+}
 
 /**
  * Session administration for admins: status counts, contestant intake,
- * image limits, accounts, teams and categories. New accounts and password resets end on a
+ * image limits, accounts, team locations and categories. Password resets end on a
  * one-time credential screen in the same sheet. In an archived event every
  * change is disabled. `PhoneStatus` above the tab shows the archived banner.
  */
@@ -52,12 +50,11 @@ export function SessionTab({ state, shell }: PhoneTabProps) {
   };
   const admin: SessionAdmin = {
     ...requests,
-    createAccount: (account) => requests.createAccount(account).then(reveal),
     resetPassword: (userId) => requests.resetPassword(userId).then(reveal),
   };
   const disabled = admin.busy || admin.archived;
   const selected =
-    sheet?.type === "member"
+    sheet
       ? (state.members.find((item) => item.person.id === sheet.userId) ??
         sheet.member)
       : undefined;
@@ -67,9 +64,8 @@ export function SessionTab({ state, shell }: PhoneTabProps) {
     setOpen(true);
   };
   const closeSheet = () => setOpen(false);
-  let title = "New account";
-  let description: string | undefined =
-    "One account per team. Individual accounts for staff.";
+  let title = "Account";
+  let description: string | undefined;
   if (admin.credentials) {
     title = "Share these credentials securely";
     description = undefined;
@@ -113,16 +109,6 @@ export function SessionTab({ state, shell }: PhoneTabProps) {
           >
             Accounts · {state.members.length}
           </h2>
-          <Button
-            type="button"
-            variant="ghost"
-            className="h-11"
-            disabled={disabled}
-            onClick={() => openSheet({ type: "create" })}
-          >
-            <UserPlus aria-hidden="true" />
-            New account
-          </Button>
         </div>
         <AccountList
           members={state.members}
@@ -131,28 +117,18 @@ export function SessionTab({ state, shell }: PhoneTabProps) {
             const member = state.members.find(
               (item) => item.person.id === userId,
             );
-            if (member) openSheet({ type: "member", userId, member });
+            if (member) openSheet({ userId, member });
           }}
         />
         <p className="px-1 text-xs text-muted-foreground">
-          Open an account to update permissions or reset access.
+          Open an account to change its username or reset its password.
         </p>
       </section>
-      <Collapsible title={`Teams · ${state.teams.length}`}>
-        <TeamRosterEditor state={state} admin={admin} titled={false} />
+      <Collapsible title={`Team locations · ${state.teams.length}`}>
+        <TeamLocationEditor state={state} admin={admin} />
       </Collapsible>
       <Collapsible title="Categories">
         <CategoryEditor state={state} admin={admin} />
-      </Collapsible>
-      <Collapsible title="Assign an existing account by ID">
-        <p className="mb-3 text-sm text-muted-foreground">
-          For trusted provisioning and accounts that already exist.
-        </p>
-        <AssignByIdForm
-          teams={state.teams}
-          disabled={disabled}
-          onAssign={admin.saveMembership}
-        />
       </Collapsible>
       <Collapsible title="Recent administration activity">
         <AdminActivity state={state} />
@@ -185,18 +161,9 @@ export function SessionTab({ state, shell }: PhoneTabProps) {
               <MemberActions
                 key={selected.person.id}
                 member={selected}
-                teams={state.teams}
                 selfId={state.membership?.user_id}
                 admin={admin}
                 onDone={closeSheet}
-              />
-            )}
-            {sheet?.type === "create" && (
-              <CreateAccountForm
-                teams={state.teams}
-                disabled={disabled}
-                busy={admin.busy}
-                onCreate={admin.createAccount}
               />
             )}
           </>

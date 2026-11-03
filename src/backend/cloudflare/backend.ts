@@ -296,7 +296,7 @@ export function createCloudflareBackend(options: {
     manage: {
       async site() { return siteSchema.nullable().parse(await readJson(await send('/api/site'))); },
       async event(eventId) {
-        return consoleSchema.parse(await readJson(await send(`/api/event?eventId=${encodeURIComponent(eventId)}`)));
+        return consoleSchema.parse(await readJson(await send(eventId === undefined ? '/api/event' : `/api/event?eventId=${encodeURIComponent(eventId)}`)));
       },
       async execute(requestId, command) {
         return receiptSchema.parse(await readJson(await post('/api/manage', { requestId, command })));

@@ -5,18 +5,12 @@ import {
   accountKind,
   actorName,
   auditEntryText,
-  createAccountCommand,
-  draftOfMembership,
   imageLimitsInput,
-  isCompleteMembership,
   isValidLimit,
   limitsOfSession,
-  membershipInput,
-  resetPasswordCommand,
   setHandleCommand,
   statusCounts,
   stepLimit,
-  toggleRole,
   usernamePattern,
 } from "./adminModel";
 
@@ -99,124 +93,13 @@ describe("image limits", () => {
   });
 });
 
-describe("membership drafts", () => {
-  it("starts a new account as staff with the default roles", () => {
-    expect(draftOfMembership(undefined, ["volunteer"])).toEqual({
-      kind: "staff",
-      teamId: "",
-      roles: ["volunteer"],
-      isAdmin: false,
-    });
-  });
-
-  it("reads an existing membership in form order", () => {
-    expect(
-      draftOfMembership(member({ roles: ["jury", "volunteer"], is_admin: true })),
-    ).toEqual({
-      kind: "staff",
-      teamId: "",
-      roles: ["volunteer", "jury"],
-      isAdmin: true,
-    });
-    expect(draftOfMembership(member({ team_id: teamId }))).toMatchObject({
-      kind: "team",
-      teamId,
-    });
-  });
-
-  it("needs a team for a team account", () => {
-    const staff = draftOfMembership();
-    expect(isCompleteMembership(staff)).toBe(true);
-    expect(isCompleteMembership({ ...staff, kind: "team" })).toBe(false);
-    expect(isCompleteMembership({ ...staff, kind: "team", teamId })).toBe(true);
-  });
-
-  it("toggles roles and keeps form order", () => {
-    const draft = draftOfMembership(undefined, ["jury"]);
-    const added = toggleRole(draft, "volunteer", true);
-    expect(added.roles).toEqual(["volunteer", "jury"]);
-    expect(toggleRole(added, "jury", false).roles).toEqual(["volunteer"]);
-  });
-
-  it("maps a staff draft to a membership", () => {
-    expect(
-      membershipInput({
-        kind: "staff",
-        teamId: "",
-        roles: ["specialist"],
-        isAdmin: true,
-      }),
-    ).toEqual({ teamId: null, roles: ["specialist"], isAdmin: true });
-  });
-
-  it("drops staff roles and admin rights from a team account", () => {
-    expect(
-      membershipInput({
-        kind: "team",
-        teamId,
-        roles: ["volunteer"],
-        isAdmin: true,
-      }),
-    ).toEqual({ teamId, roles: [], isAdmin: false });
-    expect(
-      membershipInput({
-        kind: "staff",
-        teamId,
-        roles: ["jury"],
-        isAdmin: false,
-      }),
-    ).toEqual({ teamId: null, roles: ["jury"], isAdmin: false });
-  });
-});
-
 describe("account commands", () => {
-  it("creates a staff account", () => {
-    expect(
-      createAccountCommand({
-        name: " Alex Morgan ",
-        username: " alex-morgan ",
-        membership: {
-          kind: "staff",
-          teamId: "",
-          roles: ["volunteer", "jury"],
-          isAdmin: false,
-        },
-      }),
-    ).toEqual({
-      action: "create_account",
-      username: "alex-morgan",
-      name: "Alex Morgan",
-      teamId: null,
-      roles: ["volunteer", "jury"],
-      isAdmin: false,
-    });
-  });
-
-  it("creates a team account without staff roles", () => {
-    expect(
-      createAccountCommand({
-        name: "Team Aurora",
-        username: "team-aurora",
-        membership: {
-          kind: "team",
-          teamId,
-          roles: ["volunteer"],
-          isAdmin: true,
-        },
-      }),
-    ).toMatchObject({ teamId, roles: [], isAdmin: false });
-  });
-
-  it("changes a username and resets a password", () => {
+  it("changes a username", () => {
     expect(setHandleCommand("event", userId, "alex" as Handle)).toEqual({
       type: "set_handle",
       eventId: "event",
       accountId: userId,
       handle: "alex",
-    });
-    expect(resetPasswordCommand(userId)).toEqual({
-      action: "reset_password",
-      userId,
     });
   });
 });

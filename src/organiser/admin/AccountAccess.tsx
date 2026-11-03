@@ -1,5 +1,5 @@
 import { type ReactNode, useState } from "react";
-import { ChevronDown, ChevronRight, KeyRound, UserMinus } from "lucide-react";
+import { ChevronDown, ChevronRight, KeyRound } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -15,7 +15,7 @@ import { formatDate } from "@/connected/labels";
 import type { Snapshot } from "@/connected/model";
 import { cn } from "@/lib/utils";
 import { PersonAvatar } from "../components/issueDisplay";
-import { MembershipForm, UsernameForm } from "./AccountForms";
+import { UsernameForm } from "./AccountForms";
 import {
   type SessionMember,
   accountKind,
@@ -168,94 +168,62 @@ export function AccountList({
 }
 
 /**
- * The actions for one account: the username, the membership, a
- * password reset and the removal of session access. A reset and a removal
- * need confirmation. An admin cannot reset their own password here.
+ * The actions for one account: the username of a staff account and a
+ * password reset. A contestant sign-in has no username form, because venue
+ * staff read it from the credential sheet. A reset needs confirmation, and an
+ * admin cannot reset their own password here.
  */
 export function MemberActions({
   member,
-  teams,
   selfId,
   admin,
   onDone,
 }: {
   member: SessionMember;
-  teams: Snapshot["teams"];
   selfId: string | undefined;
   admin: SessionAdmin;
   /** Runs after a recorded change that has no credentials to show. */
   onDone: () => void;
 }) {
-  const [confirm, setConfirm] = useState<"reset" | "revoke">();
+  const [confirm, setConfirm] = useState(false);
   const { person, membership } = member;
   const disabled = admin.busy || admin.archived;
   return (
     <div className="space-y-5">
-      <UsernameForm
-        key={person.username}
-        current={person.username}
-        disabled={disabled}
-        onSubmit={(username) => {
-          void admin.setUsername(person.id, username).then((done) => {
-            if (done) onDone();
-          });
-        }}
-      />
-      <MembershipForm
-        key={JSON.stringify(membership)}
-        member={membership}
-        teams={teams}
-        disabled={disabled}
-        onSave={(draft) =>
-          admin.saveMembership(person.id, draft).then((done) => {
-            if (done) onDone();
-          })
-        }
-      />
-      <div className="space-y-2 border-t pt-4">
-        {person.id !== selfId && (
+      {!membership.team_id && (
+        <UsernameForm
+          key={person.username}
+          current={person.username}
+          disabled={disabled}
+          onSubmit={(username) => {
+            void admin.setUsername(person.id, username).then((done) => {
+              if (done) onDone();
+            });
+          }}
+        />
+      )}
+      {person.id !== selfId && (
+        <div className="space-y-2 border-t pt-4">
           <Button
             type="button"
             variant="outline"
             className="h-11 w-full"
             disabled={disabled}
-            onClick={() => setConfirm("reset")}
+            onClick={() => setConfirm(true)}
           >
             <KeyRound aria-hidden="true" />
             Reset password
           </Button>
-        )}
-        <Button
-          type="button"
-          variant="outline"
-          className="h-11 w-full text-destructive"
-          disabled={disabled}
-          onClick={() => setConfirm("revoke")}
-        >
-          <UserMinus aria-hidden="true" />
-          Revoke session access
-        </Button>
-      </div>
+        </div>
+      )}
       <ConfirmDialog
-        open={confirm === "reset"}
-        onOpenChange={(open) => !open && setConfirm(undefined)}
+        open={confirm}
+        onOpenChange={setConfirm}
         title={`Reset ${person.name}'s password?`}
         description="Verify their identity first. Existing sessions will lose access. You receive a new temporary password to share."
         confirmLabel="Reset password"
         onConfirm={() => {
           void admin.resetPassword(person.id);
-        }}
-      />
-      <ConfirmDialog
-        open={confirm === "revoke"}
-        onOpenChange={(open) => !open && setConfirm(undefined)}
-        title={`Revoke ${person.name}'s access to this session?`}
-        description="The account can no longer open this session."
-        confirmLabel="Revoke access"
-        onConfirm={() => {
-          void admin.revokeAccess(person.id).then((done) => {
-            if (done) onDone();
-          });
         }}
       />
     </div>

@@ -1,26 +1,16 @@
 import { useRef, useState } from "react";
 import { backend } from "@/backend";
-import { type AccountCommand, type Handle, parseHandle, type RosterCommand, type SignInTarget } from "@/backend/contracts";
+import { type Handle, type ManageCommand, type SignInTarget } from "@/backend/contracts";
 import { errorMessage } from "@/backend/errors";
 import type { Snapshot } from "@/connected/model";
-import {
-  type ImageLimits,
-  type MembershipDraft,
-  type NewAccount,
-  createAccountCommand,
-  imageLimitsInput,
-  membershipInput,
-  resetPasswordCommand,
-  setHandleCommand,
-} from "./adminModel";
-import { rosterNotice } from "./rosterModel";
+import { type ImageLimits, imageLimitsInput, setHandleCommand } from "./adminModel";
 
 /** A temporary password that the admin shares once with the account owner. */
 export interface Credentials {
   username: string;
   password: string;
-  /** The event code or the site that the account names to sign in. */
-  signIn: SignInTarget;
+  /** The event code that the account names to sign in. Unknown inside a contest, so the link is left out. */
+  signIn?: SignInTarget | undefined;
 }
 
 /** Session administration requests and their shared feedback. */
@@ -37,19 +27,19 @@ export interface SessionAdmin {
   /** Each request resolves to true when the server records it. */
   setIntake: (open: boolean) => Promise<boolean>;
   saveImageLimits: (limits: ImageLimits) => Promise<boolean>;
-  createAccount: (account: NewAccount) => Promise<boolean>;
   /** Changes a username. The password and open sessions stay. */
   setUsername: (userId: string, username: Handle) => Promise<boolean>;
-  saveMembership: (userId: string, draft: MembershipDraft) => Promise<boolean>;
   resetPassword: (userId: string) => Promise<boolean>;
-  revokeAccess: (userId: string) => Promise<boolean>;
-  /** Adds, renames or deletes teams, or replaces the category list. */
-  editRoster: (command: RosterCommand) => Promise<boolean>;
+  /** Replaces the whole ordered category list. */
+  setCategories: (categories: readonly string[]) => Promise<boolean>;
+  /** Changes the location of a team that sits in this contest. */
+  setLocation: (entrantId: string, location: string) => Promise<boolean>;
 }
 
 /**
  * Runs the session administration requests of the admin pages: intake, image
- * limits, accounts and memberships. Only one request runs at a time. A
+ * limits, categories, team locations, username changes and password reissue.
+ * Accounts and assignments belong to the event console. Only one request runs at a time. A
  * recorded request refreshes the snapshot. The phone Session tab and the
  * desktop console share it.
  */
@@ -95,23 +85,19 @@ export function useSessionAdmin(
     }
   }
 
-  /**
-   * Sends an account command. Its temporary password becomes the one-time
-   * credentials, with the username of the account.
-   */
-  async function account(
-    command: AccountCommand,
-    username: string,
-  ): Promise<Credentials> {
-    const result = await backend.admin.account(sessionId, command);
-    return { username, password: result.temporaryPassword, signIn: result.signIn };
+  /** Runs a contest command. */
+  async function contest(command: ManageCommand): Promise<void> {
+    await backend.manage.execute(crypto.randomUUID(), command);
   }
 
-  function usernameOf(userId: string): string {
-    return (
-      state.members.find((item) => item.person.id === userId)?.person
-        .username ?? "Existing email login"
-    );
+  /** Issues a new temporary password. It becomes the one-time credentials. */
+  async function reissue(userId: string): Promise<Credentials> {
+    const [issued] = await backend.manage.issueCredentials(crypto.randomUUID(), {
+      eventId: state.event?.id ?? null,
+      accountIds: [userId],
+    });
+    if (!issued?.temporaryPassword) throw new Error("The password was not issued. Try again.");
+    return { username: issued.handle, password: issued.temporaryPassword };
   }
 
   return {
@@ -122,44 +108,24 @@ export function useSessionAdmin(
     credentials,
     dismissCredentials: () => setCredentials(undefined),
     setIntake: (open) =>
-      run(() => backend.admin.setIntake(sessionId, open)),
+      run(() => contest({ type: "set_intake", contestId: sessionId, open })),
     saveImageLimits: (limits) =>
-      run(() =>
-        backend.admin.setImageLimits(
-          sessionId,
-          imageLimitsInput(limits),
-        ),
-      ),
-    createAccount: (input) =>
-      run(async () => {
-        const username = parseHandle(input.username);
-        if (!username) throw new Error("Use 3 to 32 letters, digits, hyphens, or underscores.");
-        return account(createAccountCommand(input), username);
-      }),
+      run(() => contest({ type: "set_image_limits", contestId: sessionId, ...imageLimitsInput(limits) })),
     setUsername: (userId, username) =>
       run(async () => {
         if (!state.event) throw new Error("Refresh the page, then change the username again.");
-        await backend.manage.execute(
-          crypto.randomUUID(),
-          setHandleCommand(state.event.id, userId, username),
-        );
+        await contest(setHandleCommand(state.event.id, userId, username));
       }, "Username changed."),
-    saveMembership: (userId, draft) =>
-      run(() =>
-        backend.admin.saveMember(
-          sessionId,
-          userId.trim(),
-          membershipInput(draft),
-        ),
-      ),
-    resetPassword: (userId) =>
-      run(() => account(resetPasswordCommand(userId), usernameOf(userId))),
-    revokeAccess: (userId) =>
-      run(() => backend.admin.removeMember(sessionId, userId)),
-    editRoster: (command) =>
+    resetPassword: (userId) => run(() => reissue(userId)),
+    setCategories: (categories) =>
       run(
-        () => backend.admin.editRoster(sessionId, command),
-        rosterNotice(command),
+        () => contest({ type: "set_categories", contestId: sessionId, categories }),
+        "Categories saved.",
+      ),
+    setLocation: (entrantId, location) =>
+      run(
+        () => contest({ type: "set_location", contestId: sessionId, entrantId, location }),
+        "Location saved.",
       ),
   };
 }

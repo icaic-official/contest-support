@@ -122,30 +122,6 @@ export interface Workflows {
   ): Promise<{ issueId: string; snapshot?: Snapshot | undefined }>;
 }
 
-export interface MembershipInput {
-  teamId: string | null;
-  roles: Role[];
-  isAdmin: boolean;
-}
-
-/** A team of a roster edit. The browser chooses the ID, so a retry adds no second team. */
-export interface NewTeam {
-  id: string;
-  name: string;
-  location: string;
-}
-
-/**
- * One roster edit by a session admin. A team that has an issue or an account
- * stays. A category that an issue uses stays. `set_categories` replaces the
- * whole ordered list.
- */
-export type RosterCommand =
-  | { type: 'add_teams'; teams: NewTeam[] }
-  | { type: 'update_team'; teamId: string; name: string; location: string }
-  | { type: 'delete_team'; teamId: string }
-  | { type: 'set_categories'; categories: string[] };
-
 /** A staff account or a webmaster. The server gives it a login key that nobody sees. */
 export interface PersonInput {
   readonly handle: string;
@@ -305,8 +281,11 @@ export interface CredentialIssue {
 export interface Management {
   /** Null when the signed-in account is not a webmaster. */
   site(): Promise<SiteOverview | null>;
-  /** Requires an event admin of the event, or a webmaster. */
-  event(eventId: string): Promise<EventConsole>;
+  /**
+   * Requires an event admin of the event, or a webmaster. Without an event ID,
+   * the console of the caller's own event.
+   */
+  event(eventId?: string): Promise<EventConsole>;
   /**
    * Reusing a request ID with the same command returns the first receipt.
    * A rejection carries the reason. Other failures leave the outcome unknown,

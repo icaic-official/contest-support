@@ -360,8 +360,9 @@ export class D1ManageService {
         };
       case 'set_handle': {
         const { accountId, eventId, handle } = command;
-        const account = await this.statement('SELECT handle FROM accounts WHERE id = ? AND event_id = ?', accountId, eventId)
-          .first<{ handle: string | null }>();
+        const account = await this.statement(`SELECT handle, (SELECT json_group_array(session_id) FROM memberships
+            WHERE account_id = a.id) AS contests FROM accounts a WHERE id = ? AND event_id = ?`, accountId, eventId)
+          .first<{ handle: string | null; contests: string }>();
         if (!account) throw new AuthenticationError(409, 'That account is not in this event. Refresh the page.');
         const allowed = await this.statement(`SELECT EXISTS (${manageHandleSql}) AS allowed`,
           ...manageHandleBindings(actor, accountId)).first<{ allowed: number }>();
@@ -381,7 +382,9 @@ export class D1ManageService {
               VALUES (?, ?, ?, 'set_username', 'completed', unixepoch())`, crypto.randomUUID(), accountId, actor),
           ],
           audit: { action: 'set_handle', target: accountId, detail: { from: account.handle, to: handle } },
-          notify: [],
+          // Staff read the handle in each contest that seats the account.
+          notify: (JSON.parse(account.contests) as string[])
+            .map((contestId) => ({ contestId, audiences: ['staff', `account:${accountId}`] })),
           receipt: {},
         };
       }

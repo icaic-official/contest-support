@@ -336,6 +336,22 @@ describe('handle changes', () => {
     }]);
   });
 
+  it('refreshes the staff and the account in every contest that seats the renamed account', async () => {
+    const second = randomUUID();
+    const volunteer = caller('volunteer').accountId;
+    await run(`INSERT INTO sessions (id, event_id, name) VALUES (?, ?, 'Live 2')`, second, ids.event);
+    await run('INSERT INTO memberships (session_id, account_id) VALUES (?, ?)', second, volunteer);
+    await run('DELETE FROM notifications');
+    expect(await renameAccount('volunteer', 'volunteer', 'desk-two')).toEqual({});
+    expect(await rows('SELECT session_id, audience FROM notifications ORDER BY session_id, audience'))
+      .toEqual([ids.contest, second].sort().flatMap((contest) => [
+        { session_id: contest, audience: `account:${volunteer}` }, { session_id: contest, audience: 'staff' },
+      ]));
+    // An event admin holds no seat, so no contest lists its handle.
+    expect(await renameAccount('eventAdmin', 'eventAdmin', 'event-own')).toEqual({});
+    expect(await rows('SELECT count(*) AS n FROM notifications')).toEqual([{ n: 4 }]);
+  });
+
   it('refuses a contestant its own handle, because venue staff read it from the sheet', async () => {
     await expect(renameAccount('contestant', 'contestant', 'renamed-team'))
       .rejects.toMatchObject({ status: 403, message: 'You cannot change this account.' });

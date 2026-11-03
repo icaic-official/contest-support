@@ -4,7 +4,7 @@ import { openStoreDatabase } from './tooling/store-database.mjs';
 import type { D1Binding, D1Connection, D1Statement, D1Value } from '../d1/connection';
 import { D1Fixture, applyMigrations } from '../d1/testFixture';
 import { measureD1 } from '../d1/testMetrics';
-import { parseHandle, type EventCode } from '../../../backend/contracts';
+import { parseHandle, type EventCode, type Handle, type SignInTarget } from '../../../backend/contracts';
 import { D1ApplicationService, notificationStatements } from './application';
 import { D1AuthenticationService, signInFailureLimits } from './authentication';
 import { loginKeyFor } from './credentials';
@@ -276,6 +276,39 @@ export function registerAuthenticationCases(group: AuthenticationCases) {
           .toEqual({ attempts: signInFailureLimits.perUsername });
         await stmt('DELETE FROM authentication_limits WHERE key = ?', limitKey(username)).run();
         await expectFailure(signIn(`absent_${randomSecret().slice(0, 15)}`)).toMatchObject(refusal);
+      });
+
+      it('spends one password check on every refusal, so its time does not show which codes and handles exist', async () => {
+        let work = 0;
+        const counting: PasswordHasher = {
+          hash: async (value) => { work++; return hasher.hash(value); },
+          verify: async (value, stored) => { work++; return hasher.verify(value, stored); },
+        };
+        const watched = new D1AuthenticationService(db, createBetterAuthIdentity(db, {
+          origin, secret: randomSecret(), secureCookies: false, hasher: counting,
+        }), counting);
+        const known = parseHandle(username)!;
+        const absent = parseHandle(`absent_${randomSecret().slice(0, 15)}`)!;
+        const absentCode = `absent-${randomSecret().slice(0, 12).toLowerCase().replace(/[^a-z0-9-]/g, '0')}` as EventCode;
+        const event: SignInTarget = { kind: 'event', code: eventCode };
+        usernames.push(absent);
+        const workOf = async (target: SignInTarget, handle: Handle) => {
+          work = 0;
+          await expectFailure(watched.signIn(target, handle, randomSecret())).toMatchObject({ status: 401 });
+          return work;
+        };
+        const spent: Record<string, number> = {
+          wrongPassword: await workOf(event, known),
+          unknownHandle: await workOf(event, absent),
+          unknownCode: await workOf({ kind: 'event', code: absentCode }, known),
+          unknownSiteHandle: await workOf({ kind: 'site' }, absent),
+        };
+        await stmt('UPDATE accounts SET disabled = 1 WHERE id = ?', fixture.contestant.accountId).run();
+        spent.disabled = await workOf(event, known);
+        await stmt("UPDATE accounts SET disabled = 0, must_change = 1, credential_state = 'pending' WHERE id = ?", fixture.contestant.accountId).run();
+        spent.pending = await workOf(event, known);
+        await stmt('DELETE FROM authentication_limits WHERE key IN (?, ?)', `handle:code:${absentCode}:${known}`, `handle:site:${absent}`).run();
+        expect(spent).toEqual({ wrongPassword: 1, unknownHandle: 1, unknownCode: 1, unknownSiteHandle: 1, disabled: 1, pending: 1 });
       });
 
       it('never gives Better Auth an unknown handle, even when it is a login key in another event', async () => {

@@ -32,7 +32,7 @@ export async function confirmFixtureTarget(target, run = wranglerRunner(target, 
 export async function checkCloudflareBackend(options, dependencies = {}) {
   const target = await readFixtureTarget(options);
   await confirmFixtureTarget(target, dependencies.runWrangler ?? wranglerRunner(target, target.configPath));
-  const response = await (dependencies.request ?? globalThis.fetch)(new globalThis.URL('/api/sessions', target.origin), {
+  const response = await (dependencies.request ?? globalThis.fetch)(new globalThis.URL('/api/contests', target.origin), {
     cache: 'no-store', redirect: 'error', signal: globalThis.AbortSignal.timeout(30_000), headers: { Accept: 'application/json' },
   });
   const body = await response.json().catch(() => undefined);

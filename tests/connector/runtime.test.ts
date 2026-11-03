@@ -299,7 +299,7 @@ it('runs the complete application through isolated HTTPS, D1, R2, and Durable Ob
     const other = await createTeam(eventAdmin, 'other', 'Fictional Beta', 'Desk B');
     const assignedUsername = `rt_${unique}_assigned`;
     usernames.push(assignedUsername);
-    await manage(eventAdmin, { type: 'set_handle', eventId: fixture.event, accountId: legacyId, handle: assignedUsername as never });
+    await manage(eventAdmin, { type: 'set_handle', eventId: fixture.event, accountId: legacyId, handle: assignedUsername });
     expect((await snapshot(organizer)).members.find((member) => member.person.id === legacyId)?.person.username).toBe(assignedUsername);
     const contests = await json<Array<{ id: string; name: string; eventId: string; manage: string }>>(contestant, '/api/contests');
     expect(contests).toEqual([{ id: fixture.session, name: 'Fictional contest', eventId: fixture.event, manage: 'none' }]);
@@ -406,7 +406,7 @@ it('runs the complete application through isolated HTTPS, D1, R2, and Durable Ob
     expect((await snapshot(recovered)).issues.find((issue) => issue.id === issueId)?.owner).toBe(specialist.id);
     const renamed = `rt_${unique}_renamed`;
     usernames.push(renamed);
-    await manage(eventAdmin, { type: 'set_handle', eventId: fixture.event, accountId: recovered.id, handle: renamed as never });
+    await manage(eventAdmin, { type: 'set_handle', eventId: fixture.event, accountId: recovered.id, handle: renamed });
     expect((await snapshot(organizer)).members.find((member) => member.person.id === recovered.id)?.person.username).toBe(renamed);
     // A handle change keeps the open session.
     expect((await session(recovered)).status.handle).toBe(renamed);

@@ -1,4 +1,5 @@
-import type { Backend } from '../../../src/backend/contracts';
+import type { Backend, ManageCommand, ManageReceipt } from '../../../src/backend/contracts';
+import type { Role } from '../../../src/connected/model';
 import type { Command, Issue } from '../../../src/connected/model';
 
 export function check(condition: unknown, message: string): asserts condition {
@@ -69,4 +70,32 @@ export async function eventually(
     await new Promise((resolve) => setTimeout(resolve, 100));
   } while (Date.now() < deadline);
   throw new Error(message);
+}
+
+/** Runs one management command with a fresh request ID. */
+export function manage(backend: Backend, command: ManageCommand): Promise<ManageReceipt> {
+  return backend.manage.execute(crypto.randomUUID(), command);
+}
+
+/** An event admin seats a person in a contest, or changes the seat. */
+export function assignStaff(
+  eventAdmin: Backend,
+  contestId: string,
+  accountId: string,
+  roles: readonly Role[],
+  admin = false,
+): Promise<ManageReceipt> {
+  return manage(eventAdmin, { type: 'assign_staff', contestId, accountId, roles, admin });
+}
+
+export function setImageLimits(
+  backend: Backend,
+  contestId: string,
+  limits: { fileMegabytes: number; count: number; totalMegabytes: number },
+): Promise<ManageReceipt> {
+  return manage(backend, { type: 'set_image_limits', contestId, ...limits });
+}
+
+export function setIntake(backend: Backend, contestId: string, open: boolean): Promise<ManageReceipt> {
+  return manage(backend, { type: 'set_intake', contestId, open });
 }

@@ -97,6 +97,8 @@ async function openRoster(
       case "set_categories":
         roster.categories = [...command.categories];
         break;
+      default:
+        throw new AuthenticationError(403, "The fixture takes only contest commands.");
     }
     return {};
   };

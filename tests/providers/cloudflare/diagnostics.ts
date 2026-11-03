@@ -50,7 +50,7 @@ function endpoint(url: string): Endpoint | undefined {
   const paths: Record<string, Endpoint> = {
     '/api/auth/session': 'auth_session', '/api/auth/sign-in': 'sign_in',
     '/api/auth/sign-out': 'sign_out', '/api/auth/change-password': 'change_password',
-    '/api/accounts': 'accounts', '/api/sessions': 'sessions',
+    '/api/credentials': 'accounts', '/api/contests': 'sessions',
     '/api/snapshot': 'snapshot', '/api/workflow': 'workflow', '/api/admin': 'admin',
     '/api/images': 'images', '/api/updates': 'updates',
   };

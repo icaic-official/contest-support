@@ -1,9 +1,9 @@
 import { WorkflowRejectedError } from '../../../src/backend/errors';
 import type { ScenarioContext } from '../contracts';
-import { change, check, issue, rejects, submit } from './assertions';
+import { assignStaff, change, check, issue, rejects, setIntake, submit } from './assertions';
 
 export type WorkflowScenarioContext = Pick<ScenarioContext,
-  'sessionId' | 'otherSessionId' | 'teamId' | 'accounts' | 'connect' | 'discardNextWorkflowResponse' | 'close'>;
+  'eventId' | 'sessionId' | 'otherSessionId' | 'teamId' | 'accounts' | 'connect' | 'discardNextWorkflowResponse' | 'close'>;
 
 export async function lifecycle(context: WorkflowScenarioContext): Promise<void> {
   const contestant = await context.connect('contestant');
@@ -43,22 +43,14 @@ export async function lifecycle(context: WorkflowScenarioContext): Promise<void>
     escalated.owner === claimed.owner && escalated.status === 'escalated',
     'Escalation must retain the current owner.',
   );
-  const admin = await context.connect('admin');
-  await admin.admin.saveMember(session, context.accounts.volunteer.id, {
-    teamId: null,
-    roles: ['volunteer', 'specialist'],
-    isAdmin: false,
-  });
+  const eventAdmin = await context.connect('eventAdmin');
+  await assignStaff(eventAdmin, session, context.accounts.volunteer.id, ['volunteer', 'specialist']);
   try {
     await rejects(() =>
       change(volunteer, session, id, { ...base, type: 'accept' })
     );
   } finally {
-    await admin.admin.saveMember(session, context.accounts.volunteer.id, {
-      teamId: null,
-      roles: ['volunteer'],
-      isAdmin: false,
-    });
+    await assignStaff(eventAdmin, session, context.accounts.volunteer.id, ['volunteer']);
   }
   await change(specialist, session, id, { ...base, type: 'accept' });
   check(
@@ -209,10 +201,14 @@ export async function accessSeparation(
     (await isolated.workflows.snapshot(context.sessionId)).issues.length === 0,
     'A different session member must not see the issue.',
   );
-  const spoofed = await isolated.workflows.sessions(context.accounts.admin.id);
+  const listed = await isolated.workflows.contests();
   check(
-    !spoofed.some((item) => item.id === context.sessionId),
-    'Supplying another account ID must not grant its sessions.',
+    !listed.some((item) => item.id === context.sessionId),
+    'A member of another contest must not list this contest.',
+  );
+  check(
+    (await isolated.workflows.contests({ eventId: context.eventId })).every((item) => item.id !== context.sessionId),
+    'Naming the event must not grant its contests.',
   );
   await rejects(async () =>
     other.workflows.execute(context.sessionId, crypto.randomUUID(), {
@@ -222,7 +218,7 @@ export async function accessSeparation(
       text: 'Unauthorized reply.',
     })
   );
-  await rejects(() => contestant.admin.setIntake(context.sessionId, false));
+  await rejects(() => setIntake(contestant, context.sessionId, false));
 }
 
 export async function idempotency(context: WorkflowScenarioContext): Promise<void> {

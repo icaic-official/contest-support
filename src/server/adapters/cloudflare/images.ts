@@ -4,7 +4,8 @@ import { ImageRequestError } from '../../../backend/errors';
 import { attachmentPath, imageKind, THUMBNAIL_BYTES } from '../../../connected/imageFile';
 import type { Caller } from '../../authentication';
 import { equalWorkflowJson } from '../../workflow';
-import type { D1Connection, D1Statement, D1Value } from '../d1/connection';
+import { assertion, bound, deleteAssertions, isAssertionFailure } from '../d1/assertions';
+import type { D1Connection, D1Statement } from '../d1/connection';
 import { currentReadyLoginBindings, currentReadyLoginSql, notificationStatements } from './application';
 import { contestDataBindings, contestDataSql } from './authority';
 
@@ -94,13 +95,11 @@ export async function storedImage(bucket: PrivateBucket, path: string): Promise<
 export class R2ImageService {
   constructor(private readonly db: D1Connection, private readonly bucket: PrivateBucket) {}
 
-  private statement(sql: string, ...values: D1Value[]): D1Statement { return this.db.prepare(sql).bind(...values); }
-
   private async image(caller: Caller, sessionId: string, id: string, write = false, ownedCleanup = false): Promise<Image> {
     if (!z.uuid().safeParse(sessionId).success || !z.uuid().safeParse(id).success) {
       throw new ImageRequestError('Image unavailable.', { validation: true });
     }
-    const row = await this.statement(imageSql, ...contestDataBindings(caller, sessionId), Number(ownedCleanup), sessionId, id).first<Image>();
+    const row = await bound(this.db, imageSql, ...contestDataBindings(caller, sessionId), Number(ownedCleanup), sessionId, id).first<Image>();
     if (!row || write && (!row.staff || row.uploader !== caller.accountId)) {
       throw new ImageRequestError('You do not have permission to change this image.', { validation: true });
     }
@@ -108,22 +107,18 @@ export class R2ImageService {
     return row;
   }
 
-  private assertion(id: string, sql: string, ...values: D1Value[]): D1Statement {
-    return this.statement(`INSERT INTO command_assertions (id, valid) VALUES (?, CASE WHEN EXISTS (${sql}) THEN 1 ELSE 0 END)`, id, ...values);
-  }
-
   private guard(id: string, caller: Caller, sessionId: string): D1Statement {
-    return this.assertion(id, `SELECT 1 FROM (${contestDataSql('caller')}) c WHERE c.staff = 1 AND c.archived = 0`,
+    return assertion(this.db, id, `SELECT 1 FROM (${contestDataSql('caller')}) c WHERE c.staff = 1 AND c.archived = 0`,
       ...contestDataBindings(caller, sessionId));
   }
 
   private async batch(id: string, caller: Caller, statements: D1Statement[]): Promise<void> {
     try {
       await this.db.batch([...statements,
-        this.assertion(`${id}:access`, currentReadyLoginSql, ...currentReadyLoginBindings(caller)),
-        this.statement('DELETE FROM command_assertions WHERE id IN (?, ?, ?)', id, `${id}:state`, `${id}:access`)]);
+        assertion(this.db, `${id}:access`, currentReadyLoginSql, ...currentReadyLoginBindings(caller)),
+        deleteAssertions(this.db, id)]);
     } catch (error) {
-      if (error instanceof Error && error.message.includes('CHECK constraint failed: valid = 1')) {
+      if (isAssertionFailure(error)) {
         throw new ImageRequestError('Image access or limits changed. Refresh and try again.', { validation: true });
       }
       throw new ImageRequestError('The image request failed. Check its state before retrying.');
@@ -141,7 +136,7 @@ export class R2ImageService {
     const cleanName = cleanImageName(value.name);
     if (!cleanName.trim()) throw new ImageRequestError('Choose a JPEG, PNG, or WebP image.', { validation: true });
     const repeat = async (): Promise<StartedImage | undefined> => {
-      const prior = await this.statement(`SELECT x.id FROM issue_images x JOIN (${contestDataSql('caller')}) c ON c.staff = 1
+      const prior = await bound(this.db, `SELECT x.id FROM issue_images x JOIN (${contestDataSql('caller')}) c ON c.staff = 1
         WHERE x.uploader = ? AND x.request_id = ?`, ...contestDataBindings(caller, value.sessionId), caller.accountId, value.requestId).first<{ id: string }>();
       if (!prior) return undefined;
       const image = await this.image(caller, value.sessionId, prior.id, true);
@@ -154,17 +149,17 @@ export class R2ImageService {
     const repeated = await repeat();
     if (repeated) return repeated;
     // The batch guard also rejects an archived event, but it cannot say why.
-    const archived = await this.statement(`SELECT 1 FROM (${contestDataSql('caller')}) c WHERE c.staff = 1 AND c.archived = 1`,
+    const archived = await bound(this.db, `SELECT 1 FROM (${contestDataSql('caller')}) c WHERE c.staff = 1 AND c.archived = 1`,
       ...contestDataBindings(caller, value.sessionId)).first();
     if (archived) throw archivedError();
     const id = crypto.randomUUID();
-    const assertion = crypto.randomUUID();
+    const batchId = crypto.randomUUID();
     const original = attachmentPath(value.sessionId, value.issueId, id, 'original');
     const thumbnail = attachmentPath(value.sessionId, value.issueId, id, 'thumbnail');
     try {
-      await this.batch(assertion, caller, [
-        this.guard(assertion, caller, value.sessionId),
-        this.assertion(`${assertion}:state`, `SELECT 1 FROM sessions s JOIN issues i ON i.session_id = s.id
+      await this.batch(batchId, caller, [
+        this.guard(batchId, caller, value.sessionId),
+        assertion(this.db, `${batchId}:state`, `SELECT 1 FROM sessions s JOIN issues i ON i.session_id = s.id
           WHERE s.id = ? AND i.id = ? AND ? <= s.max_image_bytes
             AND (SELECT count(*) FROM issue_images x WHERE x.issue_id = i.id
               AND (x.state = 'ready' OR x.state = 'pending' AND x.expires_at > unixepoch())) < s.max_images_per_issue
@@ -172,7 +167,7 @@ export class R2ImageService {
               FROM issue_images x WHERE x.issue_id = i.id AND (x.state = 'ready' OR x.state = 'pending'
                 AND x.expires_at > unixepoch())), 0) <= s.max_image_bytes_per_issue`,
         value.sessionId, value.issueId, value.bytes, value.bytes),
-        this.statement(`INSERT INTO issue_images (id, session_id, issue_id, uploader, uploader_name, request_id,
+        bound(this.db, `INSERT INTO issue_images (id, session_id, issue_id, uploader, uploader_name, request_id,
           visibility, declared_bytes, original_name, original_path, thumbnail_path, request_command)
           SELECT ?, ?, ?, id, name, ?, ?, ?, ?, ?, ?, ? FROM accounts WHERE id = ?`,
         id, value.sessionId, value.issueId, value.requestId, value.visibility, value.bytes, cleanName,
@@ -215,7 +210,7 @@ export class R2ImageService {
       // Authorization can fail before image() returns the tombstone. Inspect
       // metadata independently so a late PUT cannot survive scoped deletion.
       // Revocation alone must not delete an image still published for others.
-      const current = await this.statement(`SELECT state, expires_at <= unixepoch() AS expired
+      const current = await bound(this.db, `SELECT state, expires_at <= unixepoch() AS expired
         FROM issue_images WHERE id = ? AND session_id = ? AND (original_path = ? OR thumbnail_path = ?)`,
       id, sessionId, path, path).first<{ state: string; expired: number }>();
       if (!current || !['pending', 'ready'].includes(current.state) || current.state === 'pending' && current.expired) {
@@ -230,8 +225,8 @@ export class R2ImageService {
   private activity(row: Image, caller: Caller, text: string): D1Statement[] {
     const visible = row.visibility === 'public';
     return [
-      this.statement(`UPDATE issues SET public_revision = public_revision + ?, write_version = write_version + 1 WHERE id = ?`, Number(visible), row.issue_id),
-      this.statement(`INSERT INTO history (id, issue_id, actor, actor_name, at, text, visibility) VALUES (?, ?, ?, ?, ${now}, ?, ?)`,
+      bound(this.db, `UPDATE issues SET public_revision = public_revision + ?, write_version = write_version + 1 WHERE id = ?`, Number(visible), row.issue_id),
+      bound(this.db, `INSERT INTO history (id, issue_id, actor, actor_name, at, text, visibility) VALUES (?, ?, ?, ?, ${now}, ?, ?)`,
         crypto.randomUUID(), row.issue_id, caller.accountId, row.uploader_name, text, row.visibility),
       ...notificationStatements(this.db, row.session_id, visible ? ['staff', `team:${row.team_id}`] : ['staff']),
     ];
@@ -245,11 +240,11 @@ export class R2ImageService {
     if (!original.size || original.size > row.declared_bytes || thumb.size < 1 || thumb.size > THUMBNAIL_BYTES) {
       throw new ImageRequestError('Choose a JPEG, PNG, or WebP image within the reserved size.', { validation: true });
     }
-    const assertion = crypto.randomUUID();
+    const batchId = crypto.randomUUID();
     try {
-      await this.batch(assertion, caller, [
-        this.guard(assertion, caller, sessionId),
-        this.assertion(`${assertion}:state`, `SELECT 1 FROM issue_images x JOIN sessions s ON s.id = x.session_id
+      await this.batch(batchId, caller, [
+        this.guard(batchId, caller, sessionId),
+        assertion(this.db, `${batchId}:state`, `SELECT 1 FROM issue_images x JOIN sessions s ON s.id = x.session_id
           WHERE x.id = ? AND x.state = 'pending' AND x.uploader = ? AND x.expires_at > unixepoch()
             AND ? <= s.max_image_bytes
             AND (SELECT count(*) FROM issue_images o WHERE o.issue_id = x.issue_id AND o.state = 'ready') < s.max_images_per_issue
@@ -257,7 +252,7 @@ export class R2ImageService {
               FROM issue_images o WHERE o.issue_id = x.issue_id AND o.id <> x.id AND
                 (o.state = 'ready' OR o.state = 'pending' AND o.expires_at > unixepoch())), 0) <= s.max_image_bytes_per_issue`,
         id, caller.accountId, original.size, original.size),
-        this.statement(`UPDATE issue_images SET state = 'ready', byte_size = ?, content_type = ?,
+        bound(this.db, `UPDATE issue_images SET state = 'ready', byte_size = ?, content_type = ?,
           original_digest = ?, thumbnail_digest = ?, thumbnail_content_type = ?, uploaded_at = ${now} WHERE id = ?`,
         original.size, original.kind, original.digest, thumb.digest, thumb.kind, id),
         ...this.activity(row, caller, 'Image added.'),
@@ -278,12 +273,12 @@ export class R2ImageService {
       }
       if (!abandon && row.archived) throw archivedError();
       if (row.state !== (abandon ? 'pending' : 'ready')) throw new ImageRequestError('Image unavailable.', { validation: true });
-      const assertion = crypto.randomUUID();
-      await this.batch(assertion, caller, [
-        abandon ? this.assertion(assertion, contestDataSql('caller'), ...contestDataBindings(caller, sessionId)) : this.guard(assertion, caller, sessionId),
-        this.assertion(`${assertion}:state`, 'SELECT 1 FROM issue_images WHERE id = ? AND state = ?', id, abandon ? 'pending' : 'ready'),
-        this.statement(`UPDATE issue_images SET state = ?, deleted_by = ?, deleted_at = ${now} WHERE id = ?`, abandon ? 'abandoned' : 'deleting', caller.accountId, id),
-        this.statement('INSERT INTO image_deletions (attachment_id) VALUES (?) ON CONFLICT DO NOTHING', id),
+      const batchId = crypto.randomUUID();
+      await this.batch(batchId, caller, [
+        abandon ? assertion(this.db, batchId, contestDataSql('caller'), ...contestDataBindings(caller, sessionId)) : this.guard(batchId, caller, sessionId),
+        assertion(this.db, `${batchId}:state`, 'SELECT 1 FROM issue_images WHERE id = ? AND state = ?', id, abandon ? 'pending' : 'ready'),
+        bound(this.db, `UPDATE issue_images SET state = ?, deleted_by = ?, deleted_at = ${now} WHERE id = ?`, abandon ? 'abandoned' : 'deleting', caller.accountId, id),
+        bound(this.db, 'INSERT INTO image_deletions (attachment_id) VALUES (?) ON CONFLICT DO NOTHING', id),
         ...(abandon ? [] : this.activity(row, caller, 'Image removed.')),
       ]);
     }
@@ -293,9 +288,9 @@ export class R2ImageService {
   private async deleteObjects(row: Pick<Image, 'id' | 'original_path' | 'thumbnail_path'>): Promise<void> {
     // Count an attempt before R2 can fail. Failed keys must not permanently
     // occupy the first recovery batch and starve other cleanup tasks.
-    await this.statement('UPDATE image_deletions SET attempts = attempts + 1 WHERE attachment_id = ?', row.id).run();
+    await bound(this.db, 'UPDATE image_deletions SET attempts = attempts + 1 WHERE attachment_id = ?', row.id).run();
     await this.bucket.delete([row.original_path, row.thumbnail_path]);
-    await this.statement(`UPDATE issue_images SET files_removed_at = ${now}, state = CASE WHEN state = 'deleting' THEN 'deleted' ELSE state END WHERE id = ?`, row.id).run();
+    await bound(this.db, `UPDATE issue_images SET files_removed_at = ${now}, state = CASE WHEN state = 'deleting' THEN 'deleted' ELSE state END WHERE id = ?`, row.id).run();
   }
 
   async download(caller: Caller, path: string): Promise<{ body: ReadableStream<Uint8Array>; contentType: string }> {
@@ -325,13 +320,13 @@ export class R2ImageService {
     const scope = sessionId ? ' AND session_id = ?' : '';
     const bindings = sessionId ? [sessionId] : [];
     await this.db.batch([
-      this.statement(`UPDATE issue_images SET state = 'expired' WHERE state = 'pending' AND expires_at <= unixepoch()${scope}`, ...bindings),
+      bound(this.db, `UPDATE issue_images SET state = 'expired' WHERE state = 'pending' AND expires_at <= unixepoch()${scope}`, ...bindings),
       // Queue the persisted expired set. A second clock check could otherwise
       // expire a reservation without retaining the keys needed for cleanup.
-      this.statement(`INSERT INTO image_deletions (attachment_id) SELECT id FROM issue_images
+      bound(this.db, `INSERT INTO image_deletions (attachment_id) SELECT id FROM issue_images
         WHERE state = 'expired'${scope} ON CONFLICT DO NOTHING`, ...bindings),
     ]);
-    const pending = await this.statement(`SELECT x.id, x.original_path, x.thumbnail_path FROM issue_images x
+    const pending = await bound(this.db, `SELECT x.id, x.original_path, x.thumbnail_path FROM issue_images x
       JOIN image_deletions d ON d.attachment_id = x.id WHERE x.state IN ('deleting', 'deleted', 'expired', 'abandoned')
       ${sessionId ? 'AND x.session_id = ?' : ''} ORDER BY d.attempts, COALESCE(x.files_removed_at, ''), x.id LIMIT 100`, ...bindings).all<Image>();
     const results = await Promise.allSettled(pending.results.map((row) => this.deleteObjects(row)));

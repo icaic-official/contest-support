@@ -3,7 +3,8 @@ import type { PersonAvatar } from '../../../backend/contracts';
 import { ImageRequestError } from '../../../backend/errors';
 import { AVATAR_MAX_BYTES, imageKind } from '../../../connected/imageFile';
 import type { Caller } from '../../authentication';
-import type { D1Connection, D1Statement, D1Value } from '../d1/connection';
+import { assertion, bound, deleteAssertions, isAssertionFailure } from '../d1/assertions';
+import type { D1Connection, D1Statement } from '../d1/connection';
 import { currentReadyLoginBindings, currentReadyLoginSql } from './application';
 import { contestDataBindings, contestDataSql, contestStaffSql } from './authority';
 import { putVerifiedImage, type PrivateBucket } from './images';
@@ -38,17 +39,11 @@ const visibleSql = `WITH login AS (${currentReadyLoginSql}), access AS (${contes
 export class R2AvatarService {
   constructor(private readonly db: D1Connection, private readonly bucket: PrivateBucket) {}
 
-  private statement(sql: string, ...values: D1Value[]): D1Statement { return this.db.prepare(sql).bind(...values); }
-
   private visible(caller: Caller, sessionId: string, avatarId?: string): D1Statement {
     const bindings = [...currentReadyLoginBindings(caller), ...contestDataBindings(caller, sessionId), sessionId];
     return avatarId === undefined
-      ? this.statement(`${visibleSql} ORDER BY person_id`, ...bindings)
-      : this.statement(`${visibleSql} WHERE avatar_id = ?`, ...bindings, avatarId);
-  }
-
-  private assertion(id: string, sql: string, ...values: D1Value[]): D1Statement {
-    return this.statement(`INSERT INTO command_assertions (id, valid) VALUES (?, CASE WHEN EXISTS (${sql}) THEN 1 ELSE 0 END)`, id, ...values);
+      ? bound(this.db, `${visibleSql} ORDER BY person_id`, ...bindings)
+      : bound(this.db, `${visibleSql} WHERE avatar_id = ?`, ...bindings, avatarId);
   }
 
   /** Time can pass between batch statements, so the login check follows the writes. */
@@ -56,10 +51,10 @@ export class R2AvatarService {
     const guard = crypto.randomUUID();
     try {
       await this.db.batch([...statements(guard),
-        this.assertion(guard, currentReadyLoginSql, ...currentReadyLoginBindings(caller)),
-        this.statement('DELETE FROM command_assertions WHERE id IN (?, ?)', guard, `${guard}:state`)]);
+        assertion(this.db, guard, currentReadyLoginSql, ...currentReadyLoginBindings(caller)),
+        deleteAssertions(this.db, guard)]);
     } catch (error) {
-      if (error instanceof Error && error.message.includes('CHECK constraint failed: valid = 1')) {
+      if (isAssertionFailure(error)) {
         throw new ImageRequestError('Your sign-in or this picture changed. Refresh and try again.', { validation: true });
       }
       throw new ImageRequestError('The picture request failed. Check your picture before retrying.');
@@ -68,12 +63,12 @@ export class R2AvatarService {
 
   /** Selects the current avatar by state, so concurrent uploads still leave one ready avatar. */
   private retire(accountId: string): D1Statement {
-    return this.statement(`UPDATE account_avatars SET state = 'retired', retired_at = ${now}
+    return bound(this.db, `UPDATE account_avatars SET state = 'retired', retired_at = ${now}
       WHERE account_id = ? AND state = 'ready'`, accountId);
   }
 
   private async prior(caller: Caller, requestId: string, digest: string): Promise<{ id: string; state: AvatarState } | undefined> {
-    const row = await this.statement(`SELECT id, digest, state, expires_at <= unixepoch() AS expired
+    const row = await bound(this.db, `SELECT id, digest, state, expires_at <= unixepoch() AS expired
       FROM account_avatars WHERE account_id = ? AND request_id = ?`, caller.accountId, requestId)
       .first<{ id: string; digest: string; state: AvatarState; expired: number }>();
     if (!row) return undefined;
@@ -102,7 +97,7 @@ export class R2AvatarService {
     if (!row) {
       const id = crypto.randomUUID();
       try {
-        await this.commit(caller, () => [this.statement(`INSERT INTO account_avatars
+        await this.commit(caller, () => [bound(this.db, `INSERT INTO account_avatars
           (id, account_id, request_id, byte_size, content_type, digest) VALUES (?, ?, ?, ?, ?, ?)`,
         id, caller.accountId, requestId, bytes.byteLength, kind, digest)]);
         row = { id, state: 'pending' };
@@ -118,13 +113,13 @@ export class R2AvatarService {
     try {
       await putVerifiedImage(this.bucket, key, bytes, { contentType: kind, digest, length: bytes.byteLength }, 'Select the picture again.');
       await this.commit(caller, (guard) => [
-        this.assertion(`${guard}:state`, `SELECT 1 FROM account_avatars WHERE id = ? AND state = 'pending'
+        assertion(this.db, `${guard}:state`, `SELECT 1 FROM account_avatars WHERE id = ? AND state = 'pending'
           AND expires_at > unixepoch()`, id),
         this.retire(caller.accountId),
-        this.statement(`UPDATE account_avatars SET state = 'ready', ready_at = ${now} WHERE id = ?`, id),
+        bound(this.db, `UPDATE account_avatars SET state = 'ready', ready_at = ${now} WHERE id = ?`, id),
       ]);
     } catch (error) {
-      const current = await this.statement(`SELECT state, expires_at <= unixepoch() AS expired FROM account_avatars WHERE id = ?`, id)
+      const current = await bound(this.db, `SELECT state, expires_at <= unixepoch() AS expired FROM account_avatars WHERE id = ?`, id)
         .first<{ state: AvatarState; expired: number }>();
       // A concurrent retry of this request ID can commit first.
       if (current?.state === 'ready' || current?.state === 'retired') return avatar;
@@ -162,22 +157,22 @@ export class R2AvatarService {
 
   private async deleteObject(row: StoredAvatar): Promise<void> {
     // Count the attempt first so one failing key cannot starve other cleanup.
-    await this.statement('UPDATE account_avatars SET cleanup_attempts = cleanup_attempts + 1 WHERE id = ?', row.id).run();
+    await bound(this.db, 'UPDATE account_avatars SET cleanup_attempts = cleanup_attempts + 1 WHERE id = ?', row.id).run();
     await this.bucket.delete([avatarKey(row.account_id, row.id)]);
-    await this.statement(`UPDATE account_avatars SET files_removed_at = ${now} WHERE id = ?`, row.id).run();
+    await bound(this.db, `UPDATE account_avatars SET files_removed_at = ${now} WHERE id = ?`, row.id).run();
   }
 
   /** The avatar change has already committed. `recover()` retries a failed deletion. */
   private async deleteRetired(accountId: string): Promise<void> {
-    const rows = await this.statement(`SELECT id, account_id FROM account_avatars
+    const rows = await bound(this.db, `SELECT id, account_id FROM account_avatars
       WHERE account_id = ? AND state IN ('retired', 'expired') AND files_removed_at IS NULL`, accountId).all<StoredAvatar>();
     await Promise.allSettled(rows.results.map((row) => this.deleteObject(row)));
   }
 
   /** Expire abandoned uploads and repeat exact deletions, so an interrupted late transfer is found. */
   async recover(): Promise<void> {
-    await this.statement(`UPDATE account_avatars SET state = 'expired' WHERE state = 'pending' AND expires_at <= unixepoch()`).run();
-    const tasks = await this.statement(`SELECT id, account_id FROM account_avatars WHERE state IN ('retired', 'expired')
+    await bound(this.db, `UPDATE account_avatars SET state = 'expired' WHERE state = 'pending' AND expires_at <= unixepoch()`).run();
+    const tasks = await bound(this.db, `SELECT id, account_id FROM account_avatars WHERE state IN ('retired', 'expired')
       ORDER BY cleanup_attempts, COALESCE(files_removed_at, ''), id LIMIT 100`).all<StoredAvatar>();
     const results = await Promise.allSettled(tasks.results.map((row) => this.deleteObject(row)));
     if (results.some((result) => result.status === 'rejected')) throw new Error('Stored avatar cleanup requires another attempt.');

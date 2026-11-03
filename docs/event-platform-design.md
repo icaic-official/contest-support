@@ -1,6 +1,6 @@
 # Webmaster, event, and contest platform
 
-**Status.** Proposed. Phase 1, `feature/scoped-authority`, implements the contest resolver, migration `0017`, and its gate. The local half of the gate passed. The hosted runs were inconclusive against the 10 percent p95 rule, because `main` itself varied between runs. After a compile-time fix, the branch read faster than `main` at the median, and the owner accepted the gate on 2026-11-02. The [gate record](history/scoped-authority-gate.md) holds the measurements and the decision. Phase 2, `feature/webmaster-management`, implements webmaster management with no migration. Both phases are merged. Phase 3, `feature/event-sign-in`, implements migration `0018`, sign-in by event code or site and handle, and `set_handle`. It waits for review. Phases 4 to 8 are not built.
+**Status.** Proposed. Phase 1, `feature/scoped-authority`, implements the contest resolver, migration `0017`, and its gate. The local half of the gate passed. The hosted runs were inconclusive against the 10 percent p95 rule, because `main` itself varied between runs. After a compile-time fix, the branch read faster than `main` at the median, and the owner accepted the gate on 2026-11-02. The [gate record](history/scoped-authority-gate.md) holds the measurements and the decision. Phase 2, `feature/webmaster-management`, implements webmaster management with no migration. Both phases are merged. Phase 3, `feature/event-sign-in`, implements migration `0018`, sign-in by event code or site and handle, and `set_handle`. Phase 1 merged as #152, Phase 2 as #153, and Phase 3 as #156. Phases 4 to 8 are not built.
 
 Phase 1 differs from this page and the sketches in these points:
 
@@ -777,6 +777,7 @@ The owner made these decisions on 2026-10-27, after the first draft of this desi
 12. **Member lists.** Webmasters do not appear in a contest's member list. The member list shows assigned members, and the audit shows joins.
 13. **Deletion progress.** A deletion shows "done" after 65 minutes. That covers upload reservations that live 3,600 s (`src/server/adapters/d1/migrations/0006_application.sql:34`).
 14. **Own handle.** Decided 2026-11-01. A staff account, admins included, may change its own handle with `set_handle` in Phase 3. A contestant account may not, because its handle is printed on the credential sheet that venue staff use. No setting controls this. Today `set_username` only assigns a username to an account that has none (`src/server/adapters/cloudflare/authentication.ts:238`), so nobody can rename an assigned username before Phase 3.
+15. **Sign-in timing gap.** Decided 2026-11-04. The owner accepted the remaining timing gap of Phase 3 sign-in. A real handle with a wrong password is refused about 26 ms slower than other refusals (local medians, real hasher), because only that path reaches the database reads of Better Auth. An attacker needs the event code first, and the failure limits apply. No code change follows.
 
 ## Risks
 

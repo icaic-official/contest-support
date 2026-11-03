@@ -49,6 +49,7 @@ import type { Issue, Membership, Snapshot } from "@/connected/model";
 import { searchTeams, unresolvedLabel } from "@/connected/teamSearch";
 import { type ThemePreference, useTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
+import { EventLink } from "@/event/EventLink";
 import { SiteLink } from "@/site/SiteLink";
 import {
   ConnectionBadge,
@@ -313,6 +314,14 @@ export function ConsoleSidebar({
       </nav>
       {member.is_admin && (
         <div className="px-2 pb-2">
+          <EventLink
+            data={data}
+            collapsed={collapsed}
+            className={cn(
+              "text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+              collapsed && "justify-center",
+            )}
+          />
           <SiteLink
             collapsed={collapsed}
             className={cn(

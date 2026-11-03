@@ -23,8 +23,11 @@ export interface SiteState {
   reload: () => Promise<void>;
   /** Resolves to the receipt, or to undefined after an error. */
   execute: (command: ManageCommand) => Promise<ManageReceipt | undefined>;
-  /** Resolves to the issued credential, or to undefined after an error. */
-  issue: (accountId: string) => Promise<IssuedCredential | undefined>;
+  /**
+   * Resolves to the issued credential, or to undefined after an error. Without
+   * an event ID, the account is another webmaster.
+   */
+  issue: (accountId: string, eventId?: string) => Promise<IssuedCredential | undefined>;
 }
 
 /**
@@ -84,10 +87,10 @@ export function useSite(): SiteState {
     [run],
   );
   const issue = useCallback(
-    async (accountId: string) =>
+    async (accountId: string, eventId?: string) =>
       (
         await run(`issue:${accountId}`, (requestId) =>
-          backend.manage.issueCredentials(requestId, { eventId: null, accountIds: [accountId] }),
+          backend.manage.issueCredentials(requestId, { eventId: eventId ?? null, accountIds: [accountId] }),
         )
       )?.[0],
     [run],

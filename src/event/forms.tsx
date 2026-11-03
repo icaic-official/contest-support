@@ -1,0 +1,125 @@
+import { type ReactNode, useId, useState } from "react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
+import { type LineRules, type PersonLine, linesError, parsePersonLines } from "./eventModel";
+
+export const fieldClass = "h-11 text-base md:text-sm";
+
+/** A card with a heading for one task of a tab. */
+export function Panel({
+  title,
+  description,
+  children,
+  className,
+}: {
+  title: string;
+  description?: string;
+  children: ReactNode;
+  className?: string;
+}) {
+  const id = useId();
+  return (
+    <section aria-labelledby={id} className={cn("rounded-xl border bg-card p-4 sm:p-5", className)}>
+      <h2 id={id} className="text-sm font-semibold">
+        {title}
+      </h2>
+      {description && <p className="mt-1 text-sm text-muted-foreground">{description}</p>}
+      <div className="mt-4">{children}</div>
+    </section>
+  );
+}
+
+/** The error of the last command, shown in an alert. */
+export function CommandError({ message }: { message: string }) {
+  if (!message) return null;
+  return (
+    <Alert variant="destructive">
+      <AlertDescription>
+        <p role="alert">{message}</p>
+      </AlertDescription>
+    </Alert>
+  );
+}
+
+/**
+ * A box of pasted "name, username" lines with a live check of every line. The
+ * box keeps its text until the command succeeds, so a failed request loses
+ * nothing. `onSubmit` resolves to true when the server recorded the lines.
+ */
+export function LinesForm({
+  label,
+  help,
+  submitLabel,
+  rules,
+  disabled,
+  onSubmit,
+  children,
+}: {
+  label: string;
+  help: string;
+  submitLabel: string;
+  rules: LineRules;
+  disabled: boolean;
+  onSubmit: (lines: PersonLine[]) => Promise<boolean>;
+  children?: ReactNode;
+}) {
+  const id = useId();
+  const [text, setText] = useState("");
+  const lines = parsePersonLines(text, rules);
+  const problem = linesError(lines);
+  const flagged = lines.filter((line) => line.problem);
+  return (
+    <form
+      className="space-y-3"
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (disabled || problem) return;
+        void onSubmit(lines).then((done) => {
+          if (done) setText("");
+        });
+      }}
+    >
+      {children}
+      <div className="space-y-1.5">
+        <Label htmlFor={id}>{label}</Label>
+        <Textarea
+          id={id}
+          value={text}
+          rows={5}
+          spellCheck={false}
+          autoCapitalize="none"
+          autoComplete="off"
+          aria-describedby={`${id}-help`}
+          disabled={disabled}
+          onChange={(event) => setText(event.target.value)}
+          className="font-mono text-base md:text-sm"
+        />
+        <p id={`${id}-help`} className="text-xs text-muted-foreground">
+          {help}
+        </p>
+      </div>
+      {flagged.length > 0 && (
+        <ul aria-label="Lines with a problem" className="space-y-1 text-xs text-destructive">
+          {flagged.slice(0, 5).map((line) => (
+            <li key={line.line}>
+              Line {line.line}: {line.problem}
+            </li>
+          ))}
+          {flagged.length > 5 && <li>{flagged.length - 5} more lines have a problem.</li>}
+        </ul>
+      )}
+      <Button
+        type="submit"
+        variant="secondary"
+        className="h-11 w-full sm:w-auto"
+        disabled={disabled || Boolean(problem)}
+      >
+        {submitLabel}
+        {lines.length > 0 && !problem ? ` (${lines.length})` : ""}
+      </Button>
+    </form>
+  );
+}

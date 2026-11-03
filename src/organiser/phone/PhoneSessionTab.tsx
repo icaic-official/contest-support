@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { EventLink } from "@/event/EventLink";
 import { SiteLink } from "@/site/SiteLink";
 import { ActionSheet } from "../actions/ActionSheet";
 import {
@@ -133,6 +134,7 @@ export function SessionTab({ state, shell }: PhoneTabProps) {
       <Collapsible title="Recent administration activity">
         <AdminActivity state={state} />
       </Collapsible>
+      <EventLink data={shell.data} className="h-12 rounded-xl border bg-card px-4 text-[15px] font-medium" />
       <SiteLink className="h-12 rounded-xl border bg-card px-4 text-[15px] font-medium" />
       <ActionSheet
         open={open}

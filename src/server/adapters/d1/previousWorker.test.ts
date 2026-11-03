@@ -344,4 +344,84 @@ describe('the previous Worker on the scoped authority schema', () => {
       expect((await all<{ id: string }>(previousWorker.signInSql, 'staff')).map((row) => row.id)).toEqual([ids.staff]);
     });
   });
+
+  describe('on the event roster schema', () => {
+    let db: D1Connection;
+    let dispose: () => Promise<void>;
+    const ids = {
+      event: randomUUID(), first: randomUUID(), second: randomUUID(), third: randomUUID(),
+      aurora: randomUUID(), auroraAgain: randomUUID(), borealis: randomUUID(), staff: randomUUID(), member: randomUUID(),
+    };
+    const rosterMigration = '0019_event_roster.sql';
+    /** The previous Worker's roster statements, as they were before entrants. */
+    const addTeam = (id: string, sessionId: string, name: string) => db.prepare(`INSERT INTO teams (id, session_id, name, location)
+      VALUES (?, ?, ?, ?) ON CONFLICT(id) DO NOTHING`).bind(id, sessionId, name, 'Desk');
+    const renameTeam = (id: string, sessionId: string, name: string) => db.prepare('UPDATE teams SET name = ?, location = ? WHERE id = ? AND session_id = ?')
+      .bind(name, 'Desk', id, sessionId);
+
+    beforeAll(async () => {
+      ({ db, dispose } = await open());
+      await applyMigrations(db, (name) => name < rosterMigration);
+      const { run } = writer(db);
+      await run('INSERT INTO events (id, name) VALUES (?, ?)', ids.event, 'Roster event');
+      await run('INSERT INTO sessions (id, event_id, name) VALUES (?, ?, ?), (?, ?, ?), (?, ?, ?)',
+        ids.first, ids.event, 'First', ids.second, ids.event, 'Second', ids.third, ids.event, 'Third');
+      await run('INSERT INTO teams (id, session_id, name, location) VALUES (?, ?, ?, ?), (?, ?, ?, ?), (?, ?, ?, ?)',
+        ids.aurora, ids.first, 'Aurora', 'A', ids.auroraAgain, ids.second, ' aurora ', 'B', ids.borealis, ids.first, 'Borealis', 'C');
+      await addAccount(db, ids.staff, 'staff');
+      await run('INSERT INTO memberships (session_id, account_id, is_admin) VALUES (?, ?, 1)', ids.first, ids.staff);
+      await applyMigrations(db, (name) => name >= rosterMigration);
+    });
+    afterAll(async () => { await dispose?.(); });
+
+    it('gives each team an entrant, and one entrant to a name that two contests of an event share', async () => {
+      const { all } = writer(db);
+      const teams = await all<{ id: string; entrant_id: string; name: string }>('SELECT id, entrant_id, name FROM teams');
+      const byId = Object.fromEntries(teams.map((team) => [team.id, team]));
+      expect(byId[ids.aurora]!.entrant_id).toBe(byId[ids.auroraAgain]!.entrant_id);
+      expect(byId[ids.borealis]!.entrant_id).not.toBe(byId[ids.aurora]!.entrant_id);
+      expect(byId[ids.auroraAgain]!.name).toBe('Aurora');
+      expect(await all('SELECT kind FROM entrants WHERE event_id = ?', ids.event)).toEqual([{ kind: 'team' }, { kind: 'team' }]);
+      expect(await all('SELECT contest_type FROM sessions WHERE event_id = ? GROUP BY contest_type', ids.event)).toEqual([{ contest_type: 'teams' }]);
+    });
+
+    it('gives a team that the previous Worker adds an entrant of the same event', async () => {
+      const added = randomUUID();
+      await db.batch([addTeam(added, ids.third, 'Cygnus')]);
+      await db.batch([addTeam(added, ids.third, 'Cygnus')]);
+      expect(await writer(db).all(`SELECT e.id, e.event_id, e.kind, e.name, t.entrant_id FROM teams t JOIN entrants e ON e.id = t.entrant_id WHERE t.id = ?`, added))
+        .toEqual([{ id: added, event_id: ids.event, kind: 'team', name: 'Cygnus', entrant_id: added }]);
+    });
+
+    it('renames the entrant and its other entries when the previous Worker renames a team', async () => {
+      await db.batch([renameTeam(ids.aurora, ids.first, 'Aurora Prime')]);
+      const { all } = writer(db);
+      expect(await all('SELECT name FROM teams WHERE id IN (?, ?) ORDER BY id', ids.aurora, ids.auroraAgain))
+        .toEqual([{ name: 'Aurora Prime' }, { name: 'Aurora Prime' }]);
+      expect(await all('SELECT name FROM entrants WHERE id = (SELECT entrant_id FROM teams WHERE id = ?)', ids.aurora))
+        .toEqual([{ name: 'Aurora Prime' }]);
+    });
+
+    it('links a contestant that the previous Worker seats to the entrant, and seats it in the entrant\'s other entries', async () => {
+      await db.batch(previousWorker.createAccount(db, ids.staff, ids.first, { id: ids.member, username: 'member', teamId: ids.aurora }));
+      const { first, all } = writer(db);
+      const entrant = (await first<{ entrant_id: string }>('SELECT entrant_id FROM teams WHERE id = ?', ids.aurora))!.entrant_id;
+      expect(await first('SELECT entrant_id, event_id FROM accounts WHERE id = ?', ids.member)).toEqual({ entrant_id: entrant, event_id: ids.event });
+      expect(await all('SELECT session_id, team_id FROM memberships WHERE account_id = ? ORDER BY session_id', ids.member))
+        .toEqual([{ session_id: ids.first, team_id: ids.aurora }, { session_id: ids.second, team_id: ids.auroraAgain }]
+          .sort((left, right) => left.session_id.localeCompare(right.session_id)));
+    });
+
+    it('refuses the previous Worker a staff seat or a team move for an entrant sign-in, and leaves its staff alone', async () => {
+      // Its save_member inserts a seat with no team, or moves the seat to a team.
+      await expect(db.batch([previousWorker.saveMember(db, ids.third, ids.member)]))
+        .rejects.toThrow(/An entrant sign-in holds only its own entries/);
+      await expect(db.batch([previousWorker.saveMember(db, ids.first, ids.member)]))
+        .rejects.toThrow(/An entrant sign-in holds only its own entries/);
+      await expect(db.batch([db.prepare(`INSERT INTO membership_roles (session_id, account_id, role) VALUES (?, ?, 'jury')`).bind(ids.first, ids.member)]))
+        .rejects.toThrow(/A contestant holds no staff role/);
+      await db.batch([previousWorker.saveMember(db, ids.second, ids.staff)]);
+      expect(await writer(db).all('SELECT team_id FROM memberships WHERE session_id = ? AND account_id = ?', ids.second, ids.staff)).toEqual([{ team_id: null }]);
+    });
+  });
 });

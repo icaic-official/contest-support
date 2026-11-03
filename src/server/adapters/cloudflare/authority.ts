@@ -286,6 +286,10 @@ export function manageHandleBindings(actor: string, target: string): D1Value[] {
   return [...manageAccountBindings(actor, target), target, actor];
 }
 
+/** What a sign-in reads of account `a` before the password check. */
+export const loginAccountColumns = `a.id AS account_id, a.username AS login_key, a.disabled,
+  a.credential_state, a.credential_generation`;
+
 /**
  * The account that a sign-in names, in one statement per target kind. Neither
  * uses OR, so each reads its own unique index. The event form returns the
@@ -295,10 +299,10 @@ export function manageHandleBindings(actor: string, target: string): D1Value[] {
  * for an event the code.
  */
 export const signInAccountSql: { readonly [K in SignInTarget['kind']]: string } = {
-  event: `SELECT e.id AS event_id, a.id AS account_id, a.username AS login_key
+  event: `SELECT e.id AS event_id, ${loginAccountColumns}
     FROM events e LEFT JOIN accounts a ON a.event_id = e.id AND a.handle = ?
     WHERE e.code = ?`,
-  site: `SELECT NULL AS event_id, a.id AS account_id, a.username AS login_key
+  site: `SELECT NULL AS event_id, ${loginAccountColumns}
     FROM accounts a JOIN grants gs ON gs.scope = 'site' AND gs.account_id = a.id
     WHERE a.event_id IS NULL AND a.handle = ?`,
 };

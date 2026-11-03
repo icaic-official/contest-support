@@ -5,7 +5,9 @@ import {
 } from '../../authentication';
 import type { D1Connection, D1Statement, D1Value } from '../d1/connection';
 import type { IdentityProvider } from './identity';
-import { authorityCheck, manageAccountBindings, manageAccountSql, reaches, resolveAuthority, signInAccountSql } from './authority';
+import {
+  authorityCheck, loginAccountColumns, manageAccountBindings, manageAccountSql, reaches, resolveAuthority, signInAccountSql,
+} from './authority';
 import { beginCredentialReset, completeCredentialReset, handleSchema, loginKeyFor } from './credentials';
 import { randomSecret, type PasswordHasher } from './password';
 
@@ -52,11 +54,21 @@ interface SqlCheck {
   values: D1Value[];
 }
 
-/** The account that a sign-in names. `event_id` is set for an event code that exists. */
-interface SignInRow {
-  event_id: string | null;
+/**
+ * The account that a sign-in names, read once before the password check
+ * (`loginAccountColumns`). Each column is null when no account matches.
+ */
+interface LoginAccount {
   account_id: string | null;
   login_key: LoginKey | null;
+  disabled: number | null;
+  credential_state: string | null;
+  credential_generation: number | null;
+}
+
+/** `event_id` is set for an event code that exists. */
+interface SignInRow extends LoginAccount {
+  event_id: string | null;
 }
 
 /** The failure counter of one handle. The same handle in two events has two counters. */
@@ -141,11 +153,7 @@ export class D1AuthenticationService implements AuthenticationService {
     const key = signInLimitKey(scope, handle);
     await this.assertBelowLimit(key, signInFailureLimits.perUsername);
     try {
-      // Better Auth looks up the text that it receives as a login key, and a
-      // legacy login key in another event can equal this handle. So an unknown
-      // handle never reaches it.
-      if (!row?.login_key) throw signInRefused(target.kind);
-      return await this.createLogin(row.login_key, password);
+      return await this.createLogin(row, password);
     } catch (error) {
       if (!(error instanceof AuthenticationError) || error.status !== 401) throw error;
       await this.recordFailure(key);
@@ -153,12 +161,18 @@ export class D1AuthenticationService implements AuthenticationService {
     }
   }
 
-  private async createLogin(loginKey: LoginKey, password: string): Promise<{ cookie: string }> {
-    const before = await this.statement('SELECT * FROM accounts WHERE username = ?', loginKey).first<Account>();
-    if (before && (before.disabled || before.credential_state !== 'ready')) {
+  private async createLogin(before: LoginAccount | null, password: string): Promise<{ cookie: string }> {
+    // Better Auth looks up the text that it receives as a login key, and a
+    // legacy login key in another event can equal a typed handle. So an
+    // unknown handle never reaches it.
+    if (!before?.login_key || before.disabled || before.credential_state !== 'ready') {
+      // Better Auth hashes the password for a login key that it does not
+      // know. This refusal does the same work, so its time does not show
+      // whether the event code or the handle exists.
+      await this.passwords.hash(password);
       throw new AuthenticationError(401, 'Username or password is incorrect.');
     }
-    const signed = await this.identity.signIn(loginKey, password);
+    const signed = await this.identity.signIn(before.login_key, password);
     const loginId = crypto.randomUUID();
     const assertionId = crypto.randomUUID();
     // A reset can race Better Auth password verification. Only the generation
@@ -167,13 +181,13 @@ export class D1AuthenticationService implements AuthenticationService {
       this.assertion(assertionId, `SELECT 1 FROM accounts a JOIN ba_session b ON b.userId = a.id
         WHERE a.id = ? AND a.id = ? AND a.credential_generation = ?
           AND a.disabled = 0 AND a.credential_state = 'ready' AND b.id = ? AND b.expiresAt > strftime('%Y-%m-%dT%H:%M:%fZ', 'now')`,
-      signed.accountId, before?.id ?? '', before?.credential_generation ?? -1, signed.identitySessionId),
+      signed.accountId, before.account_id, before.credential_generation, signed.identitySessionId),
       this.statement(`INSERT INTO logins (id, account_id, expires_at, identity_session_id, credential_generation, csrf)
         SELECT ?, a.id, unixepoch(b.expiresAt), b.id, a.credential_generation, ?
         FROM accounts a JOIN ba_session b ON b.userId = a.id WHERE a.id = ? AND b.id = ?`,
       loginId, randomSecret(), signed.accountId, signed.identitySessionId),
       this.assertion(`${assertionId}:final`, `SELECT 1 FROM (${currentLoginSql}) WHERE login_id = ? AND credential_generation = ?`,
-        signed.identitySessionId, signed.accountId, loginId, before?.credential_generation ?? -1),
+        signed.identitySessionId, signed.accountId, loginId, before.credential_generation),
       this.cleanupAssertions(assertionId),
     ]);
     return { cookie: signed.cookie };
@@ -361,7 +375,8 @@ export class D1AuthenticationService implements AuthenticationService {
     ] });
     // The authenticated change uses its own attempt limit. Replacing the login
     // must also succeed when the public username window is already exhausted.
-    return this.createLogin(username, newPassword);
+    return this.createLogin(await this.statement(`SELECT ${loginAccountColumns} FROM accounts a WHERE a.id = ?`,
+      current.user.id).first<LoginAccount>(), newPassword);
   }
 
 }

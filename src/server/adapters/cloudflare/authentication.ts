@@ -169,8 +169,8 @@ export class D1AuthenticationService implements AuthenticationService {
     // unknown handle never reaches it.
     if (!before?.login_key || before.disabled || before.credential_state !== 'ready') {
       // Better Auth hashes the password for a login key that it does not
-      // know. This refusal does the same work, so its time does not show
-      // whether the event code or the handle exists.
+      // know. This refusal does the same, so an unknown code, an unknown
+      // handle, and a wrong password each cost one password hash or check.
       await this.passwords.hash(password);
       throw new AuthenticationError(401, 'Username or password is incorrect.');
     }

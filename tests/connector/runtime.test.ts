@@ -9,10 +9,11 @@ import { getPlatformProxy, unstable_dev } from 'wrangler';
 import { snapshotSchema, type Command, type Snapshot } from '../../src/connected/model';
 import type { D1Connection } from '../../src/server/adapters/d1/connection';
 import { applyMigrations } from '../../src/server/adapters/d1/testFixture';
-import { bootstrapInstallation } from '../../src/server/adapters/cloudflare/installation';
+import { bootstrapSite } from '../../src/server/adapters/cloudflare/installation';
+import { loginKeyFor } from '../../src/server/adapters/cloudflare/credentials';
 import { randomSecret } from '../../src/server/adapters/cloudflare/password';
 import { avatarKey } from '../../src/server/adapters/cloudflare/avatars';
-import type { AccountCommand, PersonAvatar, StartedImage } from '../../src/backend/contracts';
+import type { IssuedCredential, ManageCommand, ManageReceipt, PersonAvatar, StartedImage } from '../../src/backend/contracts';
 
 const imageBytes = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a7t0AAAAASUVORK5CYII=', 'base64');
 
@@ -52,7 +53,7 @@ it('runs the complete application through isolated HTTPS, D1, R2, and Durable Ob
   const port = await unusedPort();
   const origin = `https://127.0.0.1:${port}`;
   const unique = randomUUID().replaceAll('-', '').slice(0, 16);
-  const usernames: string[] = [`rt_${unique}_admin`];
+  const usernames: string[] = [`rt_${unique}_webmaster`];
   const legacyId = randomUUID();
   const accountIds: string[] = [legacyId];
   const accountContexts: BrowserContext[] = [];
@@ -63,8 +64,11 @@ it('runs the complete application through isolated HTTPS, D1, R2, and Durable Ob
     `ip:${createHash('sha256').update(`${authenticationSecret}:${ip}`).digest('hex')}`);
   let browser: Browser | undefined;
   let worker: Awaited<ReturnType<typeof unstable_dev>> | undefined;
-  let installation: Awaited<ReturnType<typeof bootstrapInstallation>> | undefined;
-  /** The installation event's code, which D1 chose. Created accounts sign in with it. */
+  let installation: Awaited<ReturnType<typeof bootstrapSite>> | undefined;
+  /** Direct fixture rows: bootstrap makes only the webmaster, so the event, the contest, and its admin come from SQL. */
+  const fixture = { event: randomUUID(), session: randomUUID(), eventAdmin: randomUUID() };
+  const eventAdminHandle = `rt_${unique}_eadmin`;
+  /** The fixture event's code, which D1 chose. Created accounts sign in with it. */
   let eventCode = '';
   let cleanupVerified = false;
   let scenarioCompleted = false;
@@ -111,7 +115,7 @@ it('runs the complete application through isolated HTTPS, D1, R2, and Durable Ob
     await json(actor, '/api/auth/sign-in', { event, handle: username, password: temporaryPassword });
     const before = await session(actor);
     expect(before.status.must_change).toBe(true);
-    await json(actor, '/api/sessions', undefined, 403);
+    await json(actor, '/api/contests', undefined, 403);
     await json(actor, '/api/auth/change-password', { currentPassword: temporaryPassword, newPassword: randomSecret() + 'A9!' });
     expect((await session(actor)).status.must_change).toBe(false);
     await page.goto(origin);
@@ -119,26 +123,48 @@ it('runs the complete application through isolated HTTPS, D1, R2, and Durable Ob
   }
 
   async function snapshot(actor: Actor): Promise<Snapshot> {
-    return snapshotSchema.parse(await json(actor, `/api/snapshot?sessionId=${installation!.sessionId}`));
+    return snapshotSchema.parse(await json(actor, `/api/snapshot?sessionId=${fixture.session}`));
   }
 
-  async function admin(actor: Actor, command: Record<string, unknown>) {
-    await json(actor, '/api/admin', { ...command, sessionId: installation!.sessionId });
+  /** One management command. Resolves to the receipt of created IDs. */
+  async function manage(actor: Actor, command: ManageCommand): Promise<ManageReceipt> {
+    return json<ManageReceipt>(actor, '/api/manage', { requestId: randomUUID(), command });
+  }
+
+  /** Issues temporary passwords for accounts of the fixture event. */
+  async function issue(actor: Actor, accountIds: string[]): Promise<IssuedCredential[]> {
+    const issued = await json<IssuedCredential[]>(actor, '/api/credentials', { requestId: randomUUID(), eventId: fixture.event, accountIds });
+    if (issued.some((item) => typeof item.temporaryPassword !== 'string')) throw new Error('A credential request did not return its temporary credential.');
+    return issued;
   }
 
   async function workflow(actor: Actor, command: Command, requestId = randomUUID()): Promise<string> {
-    const result = await json<{ outcome: string; issueId: string }>(actor, '/api/workflow', { sessionId: installation!.sessionId, requestId, command });
+    const result = await json<{ outcome: string; issueId: string }>(actor, '/api/workflow', { sessionId: fixture.session, requestId, command });
     expect(result.outcome).toBe('committed');
     return result.issueId;
   }
 
-  async function createAccount(adminActor: Actor, suffix: string, command: Omit<Extract<AccountCommand, { action: 'create_account' }>, 'action' | 'username' | 'name'>): Promise<Actor> {
+  /** A staff person of the event who sits in the contest with the given seat. */
+  async function createStaff(eventAdmin: Actor, suffix: string, seat: { roles: Array<'volunteer' | 'specialist' | 'jury'>; admin: boolean }): Promise<Actor> {
     const username = `rt_${unique}_${suffix}`;
     usernames.push(username);
-    const result = await json<{ temporaryPassword?: string }>(adminActor, '/api/accounts', { sessionId: installation!.sessionId,
-      command: { action: 'create_account', username, name: `Fictional ${suffix}`, ...command } });
-    if (typeof result.temporaryPassword !== 'string') throw new Error('Account creation did not return its temporary credential.');
-    const actor = await authenticated(username, result.temporaryPassword);
+    const created = await manage(eventAdmin, { type: 'create_people', eventId: fixture.event, people: [{ handle: username, name: `Fictional ${suffix}` }] });
+    const [accountId] = created.accountIds!;
+    await manage(eventAdmin, { type: 'assign_staff', contestId: fixture.session, accountId: accountId!, ...seat });
+    const [credential] = await issue(eventAdmin, [accountId!]);
+    const actor = await authenticated(username, credential!.temporaryPassword!);
+    accountIds.push(actor.id);
+    return actor;
+  }
+
+  /** A team of the event, seated in the contest at the given location. */
+  async function createTeam(eventAdmin: Actor, suffix: string, name: string, location: string): Promise<Actor> {
+    const username = `rt_${unique}_${suffix}`;
+    usernames.push(username);
+    const created = await manage(eventAdmin, { type: 'create_entrants', eventId: fixture.event, entrants: [{ kind: 'team', name, handle: username }] });
+    await manage(eventAdmin, { type: 'assign_entrants', contestId: fixture.session, entries: [{ entrantId: created.entrantIds![0]!, location }] });
+    const [credential] = await issue(eventAdmin, [created.accountIds![0]!]);
+    const actor = await authenticated(username, credential!.temporaryPassword!);
     accountIds.push(actor.id);
     return actor;
   }
@@ -156,7 +182,7 @@ it('runs the complete application through isolated HTTPS, D1, R2, and Durable Ob
       socket.onmessage = (event) => { state.messages.push(JSON.parse(String(event.data)) as { type: string }); };
       socket.onclose = () => { state.closed = true; };
       socket.onerror = () => { state.closed = true; };
-    }, { sessionId: installation!.sessionId, key });
+    }, { sessionId: fixture.session, key });
     await expect.poll(async () => socketState(actor, key), { timeout: 15_000 }).toMatchObject({ messages: [{ type: 'ready' }], closed: false });
   }
 
@@ -190,16 +216,16 @@ it('runs the complete application through isolated HTTPS, D1, R2, and Durable Ob
   }
 
   async function avatars(actor: Actor): Promise<PersonAvatar[]> {
-    return json<PersonAvatar[]>(actor, `/api/avatars?sessionId=${installation!.sessionId}`);
+    return json<PersonAvatar[]>(actor, `/api/avatars?sessionId=${fixture.session}`);
   }
 
   async function image(actor: Actor, issueId: string, visibility: 'public' | 'internal'): Promise<StartedImage> {
-    const begin = { action: 'begin', sessionId: installation!.sessionId,
+    const begin = { action: 'begin', sessionId: fixture.session,
       requestId: randomUUID(), issueId, visibility, name: `fictional-${visibility}.png`, bytes: imageBytes.length };
     const started = await json<StartedImage>(actor, '/api/images', begin);
     expect(await json<StartedImage>(actor, '/api/images', begin)).toEqual(started);
     for (const path of [started.original_path, started.thumbnail_path]) await transfer(actor, path);
-    const finish = { action: 'finish', sessionId: installation!.sessionId, attachmentId: started.id };
+    const finish = { action: 'finish', sessionId: fixture.session, attachmentId: started.id };
     await json(actor, '/api/images', finish);
     await json(actor, '/api/images', finish);
     return started;
@@ -224,11 +250,20 @@ it('runs the complete application through isolated HTTPS, D1, R2, and Durable Ob
     const setup = await proxy();
     try {
       await applyMigrations(setup.env.DB);
-      installation = await bootstrapInstallation(setup.env.DB, { adminUsername: usernames[0], adminName: 'Fictional organizer',
-        eventName: `runtime:${unique}`, sessionName: 'Fictional contest', categories: ['Devices', 'Other'],
-        teams: [{ name: 'Fictional Alpha', location: 'Desk A' }, { name: 'Fictional Beta', location: 'Desk B' }] });
-      accountIds.push(installation.accountId);
-      eventCode = (await setup.env.DB.prepare('SELECT code FROM events WHERE id = ?').bind(installation.eventId)
+      installation = await bootstrapSite(setup.env.DB, { webmasterHandle: usernames[0], webmasterName: 'Fictional webmaster' });
+      accountIds.push(installation.accountId, fixture.eventAdmin);
+      await setup.env.DB.batch([
+        setup.env.DB.prepare('INSERT INTO events (id, name) VALUES (?, ?)').bind(fixture.event, `runtime:${unique}`),
+        setup.env.DB.prepare('INSERT INTO sessions (id, event_id, name, categories, intake_open) VALUES (?, ?, ?, ?, 0)')
+          .bind(fixture.session, fixture.event, 'Fictional contest', JSON.stringify(['Devices', 'Other'])),
+        // The event admin that create_event would make. It waits for a password from the webmaster.
+        setup.env.DB.prepare(`INSERT INTO accounts (id, name, username, handle, event_id, must_change, credential_state)
+          VALUES (?, 'Fictional event admin', ?, ?, ?, 1, 'pending')`).bind(fixture.eventAdmin, loginKeyFor(fixture.eventAdmin), eventAdminHandle, fixture.event),
+        setup.env.DB.prepare(`INSERT INTO grants (account_id, scope, event_id, granted_by) VALUES (?, 'event', ?, 'fixture')`)
+          .bind(fixture.eventAdmin, fixture.event),
+      ]);
+      usernames.push(eventAdminHandle);
+      eventCode = (await setup.env.DB.prepare('SELECT code FROM events WHERE id = ?').bind(fixture.event)
         .first<{ code: string }>())!.code;
       await setup.env.DB.batch([
         setup.env.DB.prepare('INSERT INTO events (id, name) VALUES (?, ?)').bind(sentinel.event, sentinel.name),
@@ -238,8 +273,8 @@ it('runs the complete application through isolated HTTPS, D1, R2, and Durable Ob
         setup.env.DB.prepare(`INSERT INTO grants (account_id, scope, granted_by) VALUES (?, 'site', 'fixture')`).bind(sentinel.account),
         setup.env.DB.prepare('INSERT INTO authentication_limits (key, window_start, attempts) VALUES (?, unixepoch(), 1)').bind(sentinelLimit),
         setup.env.DB.prepare('INSERT INTO accounts (id, name) VALUES (?, ?)').bind(legacyId, `Fictional unconfigured ${unique}`),
-        setup.env.DB.prepare('INSERT INTO memberships (session_id, account_id) VALUES (?, ?)').bind(installation.sessionId, legacyId),
-        setup.env.DB.prepare("INSERT INTO membership_roles (session_id, account_id, role) VALUES (?, ?, 'volunteer')").bind(installation.sessionId, legacyId),
+        setup.env.DB.prepare('INSERT INTO memberships (session_id, account_id) VALUES (?, ?)').bind(fixture.session, legacyId),
+        setup.env.DB.prepare("INSERT INTO membership_roles (session_id, account_id, role) VALUES (?, ?, 'volunteer')").bind(fixture.session, legacyId),
       ]);
       await setup.env.IMAGES.put(sentinel.name, Uint8Array.from([1, 2, 3]));
     } finally { await setup.dispose(); }
@@ -249,27 +284,38 @@ it('runs the complete application through isolated HTTPS, D1, R2, and Durable Ob
       experimental: { disableExperimentalWarning: true, testScheduled: true },
     });
     browser = await chromium.launch({ headless: true });
-    const organizer = await authenticated(installation.adminUsername, installation.temporaryPassword, null);
-    await admin(organizer, { action: 'save_member', userId: organizer.id, member: { teamId: null, roles: ['volunteer', 'jury'], isAdmin: true } });
-    await admin(organizer, { action: 'set_intake', open: true });
-    await admin(organizer, { action: 'set_image_limits', limits: { fileMegabytes: 1, count: 3, totalMegabytes: 3 } });
-    const specialist = await createAccount(organizer, 'specialist', { teamId: null, roles: ['specialist'], isAdmin: false });
-    const contestant = await createAccount(organizer, 'team', { teamId: installation.teamIds[0]!, roles: [], isAdmin: false });
-    const other = await createAccount(organizer, 'other', { teamId: installation.teamIds[1]!, roles: [], isAdmin: false });
+    const webmaster = await authenticated(installation.handle, installation.temporaryPassword, null);
+    // The webmaster gives the event admin a first password, as the site page does after create_event.
+    const [adminCredential] = await issue(webmaster, [fixture.eventAdmin]);
+    const eventAdmin = await authenticated(eventAdminHandle, adminCredential!.temporaryPassword!);
+    expect(eventAdmin.id).toBe(fixture.eventAdmin);
+    const organizer = await createStaff(eventAdmin, 'organizer', { roles: ['volunteer', 'jury'], admin: true });
+    // A contest admin sets the contest's own settings.
+    await manage(organizer, { type: 'set_intake', contestId: fixture.session, open: true });
+    await manage(organizer, { type: 'set_image_limits', contestId: fixture.session, fileMegabytes: 1, count: 3, totalMegabytes: 3 });
+    const specialist = await createStaff(eventAdmin, 'specialist', { roles: ['specialist'], admin: false });
+    const leaver = await createStaff(eventAdmin, 'leaver', { roles: ['volunteer'], admin: false });
+    const contestant = await createTeam(eventAdmin, 'team', 'Fictional Alpha', 'Desk A');
+    const other = await createTeam(eventAdmin, 'other', 'Fictional Beta', 'Desk B');
     const assignedUsername = `rt_${unique}_assigned`;
     usernames.push(assignedUsername);
-    await json(organizer, '/api/manage', { requestId: randomUUID(),
-      command: { type: 'set_handle', eventId: installation.eventId, accountId: legacyId, handle: assignedUsername } });
+    await manage(eventAdmin, { type: 'set_handle', eventId: fixture.event, accountId: legacyId, handle: assignedUsername as never });
     expect((await snapshot(organizer)).members.find((member) => member.person.id === legacyId)?.person.username).toBe(assignedUsername);
-    const sessions = await json<Array<{ id: string; name: string }>>(contestant, '/api/sessions');
-    expect(sessions).toEqual([{ id: installation.sessionId, name: 'Fictional contest' }]);
-    expect((await snapshot(contestant)).session).toMatchObject({ max_image_bytes: 1_048_576, max_images_per_issue: 3 });
+    const contests = await json<Array<{ id: string; name: string; eventId: string; manage: string }>>(contestant, '/api/contests');
+    expect(contests).toEqual([{ id: fixture.session, name: 'Fictional contest', eventId: fixture.event, manage: 'none' }]);
+    expect((await json<Array<{ manage: string }>>(eventAdmin, '/api/contests')).map((item) => item.manage)).toEqual(['event']);
+    await json(contestant, '/api/sessions', undefined, 404);
+    await json(organizer, '/api/admin', {}, 404);
+    await json(contestant, '/api/manage', { requestId: randomUUID(), command: { type: 'set_intake', contestId: fixture.session, open: false } }, 403);
+    expect((await json<{ event: { id: string } }>(eventAdmin, '/api/event')).event.id).toBe(fixture.event);
+    await json(organizer, '/api/event', undefined, 403);
     const issueId = await workflow(contestant, { type: 'submit', category: 'Devices', description: 'Fictional device failure' });
     const unrelated = await workflow(other, { type: 'submit', category: 'Other', description: 'Other fictional team' });
     expect((await snapshot(contestant)).issues.map((issue) => issue.id)).toEqual([issueId]);
     expect((await snapshot(other)).issues.map((issue) => issue.id)).toEqual([unrelated]);
     await flush();
     await connect(organizer, 'staff');
+    await connect(leaver, 'leaver');
     await connect(contestant, 'team');
     await connect(other, 'other');
     const privateBefore = await socketState(contestant, 'team');
@@ -315,24 +361,24 @@ it('runs the complete application through isolated HTTPS, D1, R2, and Durable Ob
     expect((await download.body()).byteLength).toBeGreaterThan(0);
     const deniedDownload = await network(contestant.context, `/api/image/${privateImage.original_path}`);
     expect(deniedDownload.status()).toBe(409);
-    await json(specialist, '/api/images', { action: 'remove', sessionId: installation.sessionId, attachmentId: publicImage.id }, 409);
+    await json(specialist, '/api/images', { action: 'remove', sessionId: fixture.session, attachmentId: publicImage.id }, 409);
     for (const image of [publicImage, privateImage]) {
-      const remove = { action: 'remove', sessionId: installation.sessionId, attachmentId: image.id };
+      const remove = { action: 'remove', sessionId: fixture.session, attachmentId: image.id };
       await json(organizer, '/api/images', remove);
       await json(organizer, '/api/images', remove);
     }
-    const pending = await json<StartedImage>(organizer, '/api/images', { action: 'begin', sessionId: installation.sessionId,
+    const pending = await json<StartedImage>(organizer, '/api/images', { action: 'begin', sessionId: fixture.session,
       requestId: randomUUID(), issueId, visibility: 'internal', name: 'fictional-partial.png', bytes: imageBytes.length });
     await transfer(organizer, pending.original_path);
-    await json(organizer, '/api/images', { action: 'finish', sessionId: installation.sessionId, attachmentId: pending.id }, 409);
-    await json(organizer, '/api/images', { action: 'abandon', sessionId: installation.sessionId, attachmentId: pending.id });
+    await json(organizer, '/api/images', { action: 'finish', sessionId: fixture.session, attachmentId: pending.id }, 409);
+    await json(organizer, '/api/images', { action: 'abandon', sessionId: fixture.session, attachmentId: pending.id });
     expect((await snapshot(organizer)).attachments).toEqual([]);
     const replacedAvatar = await avatar(organizer);
     const organizerAvatar = await avatar(organizer);
     const teamAvatar = await avatar(contestant);
     expect(await avatars(specialist)).toEqual([organizerAvatar]);
     expect(await avatars(contestant)).toEqual([teamAvatar]);
-    const avatarPath = (picture: PersonAvatar) => `/api/avatar/${installation!.sessionId}/${picture.avatar_id}`;
+    const avatarPath = (picture: PersonAvatar) => `/api/avatar/${fixture.session}/${picture.avatar_id}`;
     const avatarDownload = await network(specialist.context, avatarPath(organizerAvatar));
     expect(avatarDownload.status()).toBe(200);
     expect(avatarDownload.headers()).toMatchObject({ 'content-type': 'image/png', 'cache-control': 'private, no-store' });
@@ -343,27 +389,24 @@ it('runs the complete application through isolated HTTPS, D1, R2, and Durable Ob
     await json(specialist, '/api/avatars', { action: 'remove' });
     await json(organizer, '/api/avatars', { action: 'remove' });
     expect(await avatars(specialist)).toEqual([]);
-    await admin(organizer, { action: 'set_intake', open: false });
-    await json(contestant, '/api/workflow', { sessionId: installation.sessionId, requestId: randomUUID(),
+    await manage(organizer, { type: 'set_intake', contestId: fixture.session, open: false });
+    await json(contestant, '/api/workflow', { sessionId: fixture.session, requestId: randomUUID(),
       command: { type: 'submit', category: 'Devices', description: 'Closed fictional intake' } }, 409);
-    await admin(organizer, { action: 'set_intake', open: true });
+    await manage(organizer, { type: 'set_intake', contestId: fixture.session, open: true });
     await organizer.page.evaluate(() => (window as RuntimeWindow).fixtureSockets!.staff!.socket.close());
     await connect(organizer, 'reconnected');
     expect((await snapshot(organizer)).issues).toHaveLength(2);
-    await admin(organizer, { action: 'remove_member', userId: other.id });
-    await expect.poll(async () => (await socketState(other, 'other')).closed, { timeout: 15_000 }).toBe(true);
-    expect((await snapshot(other)).membership).toBeNull();
-    const reset = await json<{ temporaryPassword?: string }>(organizer, '/api/accounts', { sessionId: installation.sessionId,
-      command: { action: 'reset_password', userId: specialist.id } });
-    if (typeof reset.temporaryPassword !== 'string') throw new Error('Account recovery did not return a temporary credential.');
+    await manage(eventAdmin, { type: 'unassign_staff', contestId: fixture.session, accountId: leaver.id });
+    await expect.poll(async () => (await socketState(leaver, 'leaver')).closed, { timeout: 15_000 }).toBe(true);
+    expect((await snapshot(leaver)).membership).toBeNull();
+    const [reset] = await issue(eventAdmin, [specialist.id]);
     await json(specialist, '/api/auth/session', undefined, 401);
-    const recovered = await authenticated(specialist.username, reset.temporaryPassword);
+    const recovered = await authenticated(specialist.username, reset!.temporaryPassword!);
     expect(recovered.id).toBe(specialist.id);
     expect((await snapshot(recovered)).issues.find((issue) => issue.id === issueId)?.owner).toBe(specialist.id);
     const renamed = `rt_${unique}_renamed`;
     usernames.push(renamed);
-    await json(organizer, '/api/manage', { requestId: randomUUID(),
-      command: { type: 'set_handle', eventId: installation.eventId, accountId: recovered.id, handle: renamed } });
+    await manage(eventAdmin, { type: 'set_handle', eventId: fixture.event, accountId: recovered.id, handle: renamed as never });
     expect((await snapshot(organizer)).members.find((member) => member.person.id === recovered.id)?.person.username).toBe(renamed);
     // A handle change keeps the open session.
     expect((await session(recovered)).status.handle).toBe(renamed);
@@ -380,15 +423,11 @@ it('runs the complete application through isolated HTTPS, D1, R2, and Durable Ob
       const cleanup = await proxy();
       try {
         const db = cleanup.env.DB;
-        const state = await db.prepare('SELECT id, owner_account_id, event_id, session_id FROM installation WHERE id = ?').bind(installation.installationId)
-          .first<{ id: string; owner_account_id: string; event_id: string; session_id: string }>();
-        expect(state, 'Fixture ownership must match before scoped cleanup.').toEqual({
-          id: installation.installationId, owner_account_id: installation.accountId,
-          event_id: installation.eventId, session_id: installation.sessionId,
-        });
+        const owned = await db.prepare('SELECT id FROM events WHERE id = ? AND name = ?').bind(fixture.event, `runtime:${unique}`).first();
+        expect(owned, 'Fixture ownership must match before scoped cleanup.').toEqual({ id: fixture.event });
         const discovered = await db.prepare('SELECT id FROM accounts WHERE handle LIKE ?').bind(`rt_${unique}_%`).all<{ id: string }>();
         const ownedAccounts = [...new Set([...accountIds, ...discovered.results.map((row) => row.id)])];
-        const images = await db.prepare('SELECT original_path, thumbnail_path FROM issue_images WHERE session_id = ?').bind(installation.sessionId)
+        const images = await db.prepare('SELECT original_path, thumbnail_path FROM issue_images WHERE session_id = ?').bind(fixture.session)
           .all<{ original_path: string; thumbnail_path: string }>();
         const ownedAvatars = await db.prepare(`SELECT id, account_id FROM account_avatars WHERE account_id IN (${ownedAccounts.map(() => '?').join(', ')})`)
           .bind(...ownedAccounts).all<{ id: string; account_id: string }>();
@@ -396,16 +435,16 @@ it('runs the complete application through isolated HTTPS, D1, R2, and Durable Ob
         const keys = [...images.results.flatMap((row) => [row.original_path, row.thumbnail_path]),
           ...ownedAvatars.results.map((row) => avatarKey(row.account_id, row.id))];
         if (keys.length) await cleanup.env.IMAGES.delete(keys);
-        const remainingObjects = await cleanup.env.IMAGES.list({ prefix: installation.sessionId });
+        const remainingObjects = await cleanup.env.IMAGES.list({ prefix: fixture.session });
         expect(remainingObjects.objects).toEqual([]);
         if (scenarioCompleted) expect((await cleanup.env.IMAGES.list({})).objects.map((object) => object.key)).toEqual([sentinel.name]);
         const limits = await db.prepare('SELECT key FROM authentication_limits').all<{ key: string }>();
         const ownedLimits = limits.results.filter(({ key }) => fixtureIpKeys.includes(key) ||
           ownedAccounts.some((id) => key === `change:${id}`) ||
-          usernames.some((username) => [`handle:${installation!.eventId}:${username}`, `handle:site:${username}`].includes(key)));
+          usernames.some((username) => [`handle:${fixture.event}:${username}`, `handle:site:${username}`].includes(key)));
         await db.batch([
-          db.prepare('DELETE FROM installation WHERE id = ? AND owner_account_id = ?').bind(installation.installationId, installation.accountId),
-          db.prepare('DELETE FROM events WHERE id = ? AND name = ?').bind(installation.eventId, `runtime:${unique}`),
+          db.prepare('DELETE FROM events WHERE id = ? AND name = ?').bind(fixture.event, `runtime:${unique}`),
+          ...ownedAccounts.map((id) => db.prepare('DELETE FROM authority_audit WHERE actor = ?').bind(id)),
           ...ownedAccounts.map((id) => db.prepare('DELETE FROM account_operations WHERE account_id = ?').bind(id)),
           ...ownedAccounts.map((id) => db.prepare('DELETE FROM ba_user WHERE id = ?').bind(id)),
           ...ownedAccounts.map((id) => db.prepare('DELETE FROM account_avatars WHERE account_id = ?').bind(id)),
@@ -416,7 +455,7 @@ it('runs the complete application through isolated HTTPS, D1, R2, and Durable Ob
         const events = await db.prepare('SELECT id, name FROM events').all<{ id: string; name: string }>();
         expect(accounts.results).toEqual([{ id: sentinel.account, name: sentinel.name }]);
         expect(events.results).toEqual([{ id: sentinel.event, name: sentinel.name }]);
-        const tables = ['installation', 'sessions', 'teams', 'memberships', 'membership_roles', 'logins', 'ba_user', 'ba_session', 'ba_account',
+        const tables = ['entrants', 'authority_audit', 'manage_receipts', 'sessions', 'teams', 'memberships', 'membership_roles', 'logins', 'ba_user', 'ba_session', 'ba_account',
           'ba_verification', 'issues', 'history', 'resolutions', 'awards', 'issue_images', 'image_deletions', 'command_receipts',
           'audience_sequences', 'notifications', 'admin_audit', 'account_operations', 'command_assertions', 'workflow_commit_times', 'session_issue_sequences',
           'account_avatars'];

@@ -134,13 +134,12 @@ export function parseArguments(arguments_) {
   const required = {
     plan: ['settings', 'config'],
     configure: ['settings', 'config'],
-    bootstrap: ['config', 'account', 'database', 'competition', 'credentials'],
-    recover: ['config', 'account', 'database', 'installation', 'owner', 'credentials'],
+    bootstrap: ['config', 'account', 'database', 'site', 'credentials'],
     secret: ['config', 'account', 'database'],
     migrate: ['config', 'account', 'database'],
   };
   if (!Object.hasOwn(required, command)) {
-    throw new Error('Choose plan, configure, bootstrap, recover, secret, or migrate.');
+    throw new Error('Choose plan, configure, bootstrap, secret, or migrate.');
   }
   const result = { command };
   for (const argument of argumentsRest) {
@@ -155,10 +154,7 @@ export function parseArguments(arguments_) {
     result[match[1]] = match[2];
   }
   if (required[command].some((key) => !result[key])) throw new Error('Supply every required public option for the selected command.');
-  if (result.installation && (!uuid.test(result.installation) || !uuid.test(result.owner))) {
-    throw new Error('Select the installation and owner by UUID.');
-  }
-  for (const field of ['config', 'settings', 'competition', 'credentials']) {
+  for (const field of ['config', 'settings', 'site', 'credentials']) {
     if (result[field]) result[field] = resolve(result[field]);
   }
   return result;

@@ -47,7 +47,7 @@ export async function runCli(arguments_, dependencies = {}) {
   if (result.error || result.status !== 0) {
     throw new Error('The confirmed-target operation did not finish normally. Provider output was withheld. Inspect any retained private result before recovery.');
   }
-  report(['bootstrap', 'recover'].includes(options.command)
+  report(options.command === 'bootstrap'
     ? 'The operation completed. Credentials were saved to the requested private file.'
     : 'The operation completed for the confirmed Cloudflare account and database.');
 }

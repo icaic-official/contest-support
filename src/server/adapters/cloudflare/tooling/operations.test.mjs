@@ -20,7 +20,7 @@ const settings = {
   databaseName: 'fictional-contest-database', databaseId: '00000000-0000-4000-8000-000000000001',
   bucketName: 'fictional-contest-images', origin: 'https://fictional-contest-app.fictional-account.workers.dev',
 };
-const owner = { installationId: '00000000-0000-4000-8000-000000000002', accountId: '00000000-0000-4000-8000-000000000003' };
+const webmaster = { accountId: '00000000-0000-4000-8000-000000000003' };
 const migrationNames = await currentMigrationNames();
 const migrationArguments = ['d1', 'execute', settings.databaseName, '--remote', '--json',
   '--command', 'SELECT name FROM d1_migrations ORDER BY id'];
@@ -33,17 +33,17 @@ async function fixture() {
   const path = await mkdtemp(join(tmpdir(), 'minsky-install-operations-'));
   temporaryDirectories.push(path);
   const config = join(path, 'wrangler.jsonc');
-  const competition = join(path, 'competition.json');
+  const site = join(path, 'site.json');
   await writeFile(config, JSON.stringify(renderWranglerConfiguration(settings, config)));
-  await writeFile(competition, JSON.stringify({ adminUsername: 'organizer' }));
-  return { command: 'bootstrap', config, competition, credentials: join(path, 'private-result.json'),
+  await writeFile(site, JSON.stringify({ webmasterHandle: 'organizer' }));
+  return { command: 'bootstrap', config, site, credentials: join(path, 'private-result.json'),
     account: settings.accountId, database: settings.databaseId };
 }
 
 function dependencies(overrides = {}) {
   const state = { calls: [], connected: 0, disposed: 0, invoked: 0, unbundled: 0 };
   const db = {};
-  const result = { ...owner, adminUsername: 'organizer', temporaryPassword: 'fictional-private-credential' };
+  const result = { ...webmaster, handle: 'organizer', temporaryPassword: 'fictional-private-credential' };
   return {
     state,
     runWrangler: async (args, options) => {
@@ -60,15 +60,9 @@ function dependencies(overrides = {}) {
     },
     loadLibrary: async () => ({
       library: {
-        validateCompetitionConfiguration: () => undefined,
-        bootstrapInstallation: async (connection) => {
+        validateSiteConfiguration: () => undefined,
+        bootstrapSite: async (connection) => {
           assert.equal(connection, db);
-          state.invoked += 1;
-          return result;
-        },
-        recoverInstallationOwner: async (connection, target) => {
-          assert.equal(connection, db);
-          assert.deepEqual(target, owner);
           state.invoked += 1;
           return result;
         },
@@ -85,7 +79,7 @@ test('explicit account and database must match before any provider command', asy
   for (const options of [
     { account: settings.accountId },
     { account: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb', database: settings.databaseId },
-    { account: settings.accountId, database: owner.accountId },
+    { account: settings.accountId, database: webmaster.accountId },
   ]) await assert.rejects(confirmTarget(options, settings, run), /exactly match/);
   assert.equal(calls, 0);
 });
@@ -138,7 +132,7 @@ test('target checks require current Wrangler access and matching hosted D1 metad
   const options = { account: settings.accountId, database: settings.databaseId };
   await assert.rejects(confirmTarget(options, settings, async () => 'wrong account'), /could not be confirmed/);
   await assert.rejects(confirmTarget(options, settings, async (args) => args[0] === 'whoami'
-    ? settings.accountId : JSON.stringify({ uuid: owner.accountId, name: settings.databaseName })), /does not match/);
+    ? settings.accountId : JSON.stringify({ uuid: webmaster.accountId, name: settings.databaseName })), /does not match/);
   await assert.rejects(confirmTarget(options, settings, async () => { throw new Error('private-provider-diagnostic'); }), (error) => {
     assert.equal(error.message.includes('private-provider'), false);
     return true;
@@ -152,7 +146,7 @@ test('bootstrap writes credentials only to a new 0600 file after target confirma
   const result = JSON.parse(await readFile(options.credentials, 'utf8'));
   assert.equal(result.status, 'completed');
   assert.equal(Boolean(result.temporaryPassword), true);
-  assert.equal(result.accountId, owner.accountId);
+  assert.equal(result.accountId, webmaster.accountId);
   assert.equal((await stat(options.credentials)).mode & 0o777, 0o600);
   assert.deepEqual(injected.state.calls.map(({ args }) => args), [['whoami'], ['d1', 'info', settings.databaseName, '--json'], migrationArguments]);
   assert.equal(injected.state.connected, 1);
@@ -161,10 +155,10 @@ test('bootstrap writes credentials only to a new 0600 file after target confirma
   assert.equal(injected.state.unbundled, 1);
 });
 
-test('missing or extra migrations block bootstrap, recovery, and initial secret creation', async () => {
-  for (const command of ['bootstrap', 'recover', 'secret']) {
+test('missing or extra migrations block bootstrap and initial secret creation', async () => {
+  for (const command of ['bootstrap', 'secret']) {
     for (const names of [migrationNames.slice(0, -1), [...migrationNames, '9999_foreign.sql']]) {
-      const options = { ...await fixture(), command, installation: owner.installationId, owner: owner.accountId };
+      const options = { ...await fixture(), command };
       const injected = dependencies();
       const original = injected.runWrangler;
       injected.runWrangler = async (args, input) => args[0] === 'd1' && args[1] === 'execute'
@@ -216,7 +210,7 @@ test('failed and unknown credential operations retain their private file and red
   const originalLoader = injected.loadLibrary;
   injected.loadLibrary = async () => {
     const prepared = await originalLoader();
-    prepared.library.bootstrapInstallation = async () => { throw new Error('private-provider-diagnostic'); };
+    prepared.library.bootstrapSite = async () => { throw new Error('private-provider-diagnostic'); };
     return prepared;
   };
   await assert.rejects(runTrustedCommand(options, injected), (error) => {
@@ -230,15 +224,14 @@ test('failed and unknown credential operations retain their private file and red
   assert.equal(injected.state.disposed, 1);
 });
 
-test('recovery uses the explicit owner and retains saved credentials if proxy cleanup fails', async () => {
-  const original = await fixture();
-  const options = { ...original, command: 'recover', installation: owner.installationId, owner: owner.accountId };
+test('bootstrap retains saved credentials if proxy cleanup fails', async () => {
+  const options = await fixture();
   const injected = dependencies({ openPlatform: async () => ({ env: { DB: {} }, dispose: async () => { throw new Error('private-cleanup-detail'); } }) });
   injected.loadLibrary = async () => ({
-    library: { recoverInstallationOwner: async (_db, target) => {
-      assert.deepEqual(target, owner);
-      return { ...owner, temporaryPassword: 'fictional-private-credential' };
-    } },
+    library: {
+      validateSiteConfiguration: () => undefined,
+      bootstrapSite: async () => ({ ...webmaster, handle: 'organizer', temporaryPassword: 'fictional-private-credential' }),
+    },
     dispose: async () => undefined,
   });
   await assert.rejects(runTrustedCommand(options, injected), /Credentials were saved/);
@@ -302,9 +295,8 @@ test('migration command follows exact target checks and never selects a local or
 test('installation library bundles from current provider source without provider access', async () => {
   const prepared = await loadInstallationLibrary();
   try {
-    assert.equal(typeof prepared.library.bootstrapInstallation, 'function');
-    assert.equal(typeof prepared.library.recoverInstallationOwner, 'function');
-    assert.equal(typeof prepared.library.validateCompetitionConfiguration, 'function');
+    assert.equal(typeof prepared.library.bootstrapSite, 'function');
+    assert.equal(typeof prepared.library.validateSiteConfiguration, 'function');
   } finally {
     await prepared.dispose();
   }

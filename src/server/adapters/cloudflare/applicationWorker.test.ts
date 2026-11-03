@@ -4,7 +4,7 @@ import { getPlatformProxy } from 'wrangler';
 import type { D1Binding } from '../d1/connection';
 import { applyMigrations } from '../d1/testFixture';
 import applicationWorker, { type ApplicationEnvironment } from './applicationWorker';
-import { bootstrapInstallation } from './installation';
+import { bootstrapSite } from './installation';
 
 vi.mock('cloudflare:workers', () => ({ WorkerEntrypoint: class {} }));
 
@@ -52,13 +52,9 @@ describe('full Worker installation boundary with real local D1', () => {
     expect((await db.prepare('SELECT count(*) AS count FROM authentication_limits').first<{ count: number }>())?.count).toBe(0);
     expect((await db.prepare('SELECT count(*) AS count FROM accounts').first<{ count: number }>())?.count).toBe(0);
     expect((await db.prepare('SELECT count(*) AS count FROM ba_session').first<{ count: number }>())?.count).toBe(0);
-    const installed = await bootstrapInstallation(db, {
-      adminUsername: 'fictional-owner', adminName: 'Fictional owner',
-      eventName: `Installation boundary ${randomUUID()}`, sessionName: 'Fictional session',
-      categories: ['Other'], teams: [{ name: 'Fictional team', location: 'Fixture desk' }],
-    });
+    const installed = await bootstrapSite(db, { webmasterHandle: 'fictional-owner', webmasterName: 'Fictional owner' });
     expect(installed.accountId).toBeTruthy();
-    const signed = await signIn(installed.adminUsername, installed.temporaryPassword);
+    const signed = await signIn(installed.handle, installed.temporaryPassword);
     expect(signed.status).toBe(200);
     expect(signed.headers.get('Set-Cookie')).toContain('__Host-minsky-session=');
     // A successful sign-in does not count toward the username or IP limit.

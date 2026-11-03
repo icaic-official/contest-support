@@ -117,7 +117,7 @@ test('origins are exact, use HTTPS, and match their workers.dev name', () => {
 });
 
 test('argument parser accepts public options once and never echoes rejected secrets', () => {
-  const parsed = parseArguments(['bootstrap', '--config=config.jsonc', `--account=${settings.accountId}`, `--database=${settings.databaseId}`, '--competition=competition.json', '--credentials=/tmp/new-private-file.json']);
+  const parsed = parseArguments(['bootstrap', '--config=config.jsonc', `--account=${settings.accountId}`, `--database=${settings.databaseId}`, '--site=site.json', '--credentials=/tmp/new-private-file.json']);
   assert.equal(parsed.config, resolve('config.jsonc'));
   assert.equal(parsed.credentials, '/tmp/new-private-file.json');
   for (const args of [

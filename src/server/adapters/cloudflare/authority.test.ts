@@ -75,8 +75,9 @@ describe('one authority resolver for every reader', () => {
     await run(`INSERT INTO sessions (id, event_id, name, intake_open, categories) VALUES (?, ?, 'First', 1, '["Devices"]'),
       (?, ?, 'Second', 1, '["Devices"]'), (?, ?, 'Other', 1, '["Devices"]')`,
     contestIds.first, ids.event, contestIds.second, ids.event, contestIds.other, ids.otherEvent);
+    // Distinct names: 0019 makes teams that share a name inside an event one entrant.
     for (const contest of contests) {
-      await run("INSERT INTO teams (id, session_id, name, location) VALUES (?, ?, 'Team', 'A1')", teams[contest], contestIds[contest]);
+      await run("INSERT INTO teams (id, session_id, name, location) VALUES (?, ?, ?, 'A1')", teams[contest], contestIds[contest], `Team ${contest}`);
     }
     for (const person of people) {
       const { accountId, loginId } = callers[person];

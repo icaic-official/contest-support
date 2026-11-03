@@ -68,7 +68,8 @@ function contestAuthoritySql(selection: ContestSelection): string {
       OR EXISTS (SELECT 1 FROM membership_roles mr WHERE mr.session_id = s.id AND mr.account_id = a.id))) AS staff,
     (SELECT json_group_array(role) FROM (SELECT role FROM membership_roles mr
       WHERE mr.session_id = s.id AND mr.account_id = a.id ORDER BY role)) AS roles,
-    'team' AS entrant_kind,
+    CASE WHEN m.team_id IS NULL THEN 'team' ELSE COALESCE((SELECT en.kind FROM teams t
+      JOIN entrants en ON en.id = t.entrant_id WHERE t.id = m.team_id), 'team') END AS entrant_kind,
     CASE WHEN gs.account_id IS NOT NULL THEN 'site' WHEN ge.account_id IS NOT NULL THEN 'event'
       WHEN m.is_admin = 1 THEN 'contest' ELSE 'none' END AS manage,
     CASE WHEN gs.account_id IS NOT NULL THEN (NOT (${readsRestrictedSql}) OR EXISTS (SELECT 1 FROM grants gj

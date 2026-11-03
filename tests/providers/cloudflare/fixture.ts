@@ -198,6 +198,12 @@ export async function createFixture(path: string, dependencies: Dependencies = {
         statement(db, "INSERT INTO membership_roles (session_id, account_id, role) VALUES (?, ?, 'volunteer')", journal.sessionIds[1], account.id),
       );
     }
+    // A team's default entrant has the team's ID. Linking the sign-in lets an event admin move the seat.
+    for (const actor of actors) {
+      const team = actor === 'contestant' || actor === 'temporary' ? journal.teamIds[0]
+        : actor === 'otherTeam' ? journal.teamIds[1] : actor === 'isolated' ? journal.teamIds[2] : undefined;
+      if (team) queries.push(statement(db, 'UPDATE accounts SET entrant_id = ? WHERE id = ?', team, accounts[actor].id));
+    }
     await db.batch(queries);
     return { eventId: journal.eventId, sessionId: journal.sessionIds[0], otherSessionId: journal.sessionIds[1], teamId: journal.teamIds[0], accounts, createdAccounts, signIn, origin: target.origin };
   } catch {

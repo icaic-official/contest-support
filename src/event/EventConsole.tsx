@@ -91,14 +91,20 @@ export function EventConsolePage({
         </div>
         {data ? (
           <Tabs defaultValue="people" className="gap-4">
-            <div className="overflow-x-auto">
-              <TabsList aria-label="Event console" id={tabsId} className="w-full min-w-max sm:w-fit">
-                <TabsTrigger value="people" className="min-h-9 px-3">People</TabsTrigger>
-                <TabsTrigger value="entrants" className="min-h-9 px-3">Entrants</TabsTrigger>
-                <TabsTrigger value="contests" className="min-h-9 px-3">Contests</TabsTrigger>
-                <TabsTrigger value="assignments" className="min-h-9 px-3">Assignments</TabsTrigger>
-              </TabsList>
-            </div>
+            <TabsList aria-label="Event console" id={tabsId} className="w-full sm:w-fit">
+              {(
+                [
+                  ["people", "People"],
+                  ["entrants", "Entrants"],
+                  ["contests", "Contests"],
+                  ["assignments", "Assignments"],
+                ] as const
+              ).map(([value, label]) => (
+                <TabsTrigger key={value} value={value} className="min-h-9 px-1 text-[13px] sm:px-3 sm:text-sm">
+                  {label}
+                </TabsTrigger>
+              ))}
+            </TabsList>
             <TabsContent value="people">
               <PeopleTab data={data} state={state} />
             </TabsContent>

@@ -61,8 +61,13 @@ export class LocalWorker extends FixtureWorker {
   readonly issues: string[] = [];
   /** The code that D1 gave the event. `create` reads it. */
   eventCode = '' as EventCode;
-  private readonly logins = new Map<string, Omit<FixtureAccount, 'target'>>(names.map((name) =>
-    [this.users[name], { id: this.users[name], username: name, name: `Test ${name}`, loginId: randomUUID() }]));
+  /** An event admin of the event. It holds no seat, and exists only after `create(..., true)`. */
+  readonly eventAdmin = randomUUID();
+  private readonly logins = new Map<string, Omit<FixtureAccount, 'target'>>([
+    ...names.map((name): [string, Omit<FixtureAccount, 'target'>] =>
+      [this.users[name], { id: this.users[name], username: name, name: `Test ${name}`, loginId: randomUUID() }]),
+    [this.eventAdmin, { id: this.eventAdmin, username: 'eventadmin', name: 'Test event admin', loginId: randomUUID() }],
+  ]);
   /** Each account signs in with the event code, and the webmaster with Site sign-in. */
   private readonly targets = new Map<string, SignInTarget>();
   private readonly workflow: WorkflowService;
@@ -114,6 +119,34 @@ export class LocalWorker extends FixtureWorker {
     return { accountId: user, loginId: this.logins.get(user)!.loginId };
   }
 
+  /**
+   * Lets an account that the app created sign in through the fixture identity.
+   * The fixture skips Better Auth, so this adds the login rows and clears the
+   * temporary-password gate, as a completed password change would. Resolves to
+   * the account ID.
+   */
+  async adopt(handle: string): Promise<string> {
+    const account = await this.db.prepare('SELECT id, name FROM accounts WHERE handle = ? AND event_id = ?').bind(handle, this.event)
+      .first<{ id: string; name: string }>();
+    if (!account) throw new Error(`No account of the fixture event has the handle ${handle}.`);
+    const login = randomUUID();
+    const now = "strftime('%Y-%m-%dT%H:%M:%fZ', 'now')";
+    await this.db.batch([
+      this.db.prepare("UPDATE accounts SET must_change = 0, credential_state = 'ready' WHERE id = ?").bind(account.id),
+      // An account whose password nobody issued yet has no identity row.
+      this.db.prepare(`INSERT OR IGNORE INTO ba_user (id, name, email, emailVerified, createdAt, updatedAt, username)
+        SELECT id, name, username || '@accounts.minsky.invalid', 1, ${now}, ${now}, username FROM accounts WHERE id = ?`).bind(account.id),
+      this.db.prepare(`INSERT INTO ba_session (id, userId, token, expiresAt, createdAt, updatedAt)
+        VALUES (?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '+1 hour'), ${now}, ${now})`).bind(login, account.id, randomUUID()),
+      // A login carries the credential generation of the password that opened it.
+      this.db.prepare(`INSERT INTO logins (id, account_id, expires_at, identity_session_id, credential_generation)
+        SELECT ?, id, unixepoch() + 3600, ?, credential_generation FROM accounts WHERE id = ?`).bind(login, login, account.id),
+    ]);
+    this.logins.set(account.id, { id: account.id, username: handle, name: account.name, loginId: login });
+    this.targets.set(account.id, { kind: 'event', code: this.eventCode });
+    return account.id;
+  }
+
   /** Runs one SQL statement against the fixture database. */
   async run(sql: string, ...values: Array<string | number | null>): Promise<void> {
     await this.db.prepare(sql).bind(...values).run();
@@ -142,7 +175,7 @@ export class LocalWorker extends FixtureWorker {
   }
 
   /** `webmaster` holds a site grant before its membership, as migration 0017 promotes an account. */
-  async create(seedIssues: boolean, webmaster: Name | null = null): Promise<void> {
+  async create(seedIssues: boolean, webmaster: Name | null = null, eventAdmin = false): Promise<void> {
     const write = (sql: string, ...values: Array<string | number | null>) => this.db.prepare(sql).bind(...values);
     const now = "strftime('%Y-%m-%dT%H:%M:%fZ', 'now')";
     const statements = [
@@ -172,6 +205,20 @@ export class LocalWorker extends FixtureWorker {
           this.sessions[0], id, role)),
       );
     }
+    if (eventAdmin) {
+      const login = this.logins.get(this.eventAdmin)!.loginId;
+      const username = `eventadmin-${login.replaceAll('-', '').slice(0, 20)}`;
+      statements.push(
+        write('INSERT INTO accounts (id, name, username, handle, event_id, must_change) VALUES (?, ?, ?, ?, ?, 0)',
+          this.eventAdmin, 'Test event admin', username, username, this.event),
+        write(`INSERT INTO grants (account_id, scope, event_id, granted_by) VALUES (?, 'event', ?, 'fixture')`, this.eventAdmin, this.event),
+        write(`INSERT INTO ba_user (id, name, email, username, emailVerified, createdAt, updatedAt) VALUES (?, ?, ?, ?, 1, ${now}, ${now})`,
+          this.eventAdmin, 'Test event admin', `${username}@accounts.minsky.invalid`, username),
+        write(`INSERT INTO ba_session (id, userId, token, expiresAt, createdAt, updatedAt)
+          VALUES (?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '+1 hour'), ${now}, ${now})`, login, this.eventAdmin, randomUUID()),
+        write('INSERT INTO logins (id, account_id, expires_at, identity_session_id) VALUES (?, ?, unixepoch() + 3600, ?)', login, this.eventAdmin, login),
+      );
+    }
     statements.push(
       write('INSERT INTO memberships (session_id, account_id) VALUES (?, ?)', this.sessions[1], this.users.jury),
       write(`INSERT INTO membership_roles (session_id, account_id, role) VALUES (?, ?, 'volunteer')`, this.sessions[1], this.users.jury),
@@ -182,6 +229,7 @@ export class LocalWorker extends FixtureWorker {
     for (const name of names) {
       this.targets.set(this.users[name], name === webmaster ? { kind: 'site' } : { kind: 'event', code: this.eventCode });
     }
+    if (eventAdmin) this.targets.set(this.eventAdmin, { kind: 'event', code: this.eventCode });
   }
 
   /**
@@ -226,8 +274,10 @@ export class LocalWorker extends FixtureWorker {
  * worker starts one local D1 and R2 runtime and applies every migration once.
  * Tests share it, and each test's records have their own UUIDs.
  */
-export const test = base.extend<{ seedIssues: boolean; webmaster: Name | null; local: LocalWorker }, { platform: Bindings }>({
+export const test = base.extend<{ seedIssues: boolean; webmaster: Name | null; withEventAdmin: boolean; local: LocalWorker }, { platform: Bindings }>({
   seedIssues: [true, { option: true }],
+  /** Adds an event admin who signs in as `eventadmin`. */
+  withEventAdmin: [false, { option: true }],
   webmaster: [null, { option: true }],
   // eslint-disable-next-line no-empty-pattern -- Playwright reads fixture dependencies from this pattern. There are none.
   platform: [async ({}, provide) => {
@@ -249,9 +299,9 @@ export const test = base.extend<{ seedIssues: boolean; webmaster: Name | null; l
       rmSync(directory, { recursive: true, force: true });
     }
   }, { scope: 'worker' }],
-  local: async ({ platform, seedIssues, webmaster, baseURL, context, guard }, provide) => {
+  local: async ({ platform, seedIssues, webmaster, withEventAdmin, baseURL, context, guard }, provide) => {
     const local = new LocalWorker(new URL(baseURL!).origin, platform.DB, platform.IMAGES, guard);
-    await local.create(seedIssues, webmaster);
+    await local.create(seedIssues, webmaster, withEventAdmin);
     await local.attach(context);
     await provide(local);
   },

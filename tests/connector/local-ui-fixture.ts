@@ -18,7 +18,7 @@ export interface LocalUiEnvironment extends LiveEnvironment { IMAGES: LocalBucke
 export async function createLocalUiFixture(env: LocalUiEnvironment, origin: string, secret: string): Promise<UiFixture & { close(): Promise<void> }> {
   if (!/^https:\/\/127\.0\.0\.1:\d+$/.test(origin)) throw new Error('The local UI fixture requires loopback HTTPS.');
   const db: D1Connection = env.DB;
-  const actors: Actor[] = ['admin', 'otherAdmin', 'contestant', 'otherTeam', 'volunteer', 'specialist', 'jury', 'isolated', 'temporary', 'revoked'];
+  const actors: Actor[] = ['eventAdmin', 'admin', 'otherAdmin', 'contestant', 'otherTeam', 'volunteer', 'specialist', 'jury', 'isolated', 'temporary', 'revoked'];
   const runId = randomUUID();
   const eventId = randomUUID();
   const sessionIds: [string, string] = [randomUUID(), randomUUID()];
@@ -50,17 +50,27 @@ export async function createLocalUiFixture(env: LocalUiEnvironment, origin: stri
     const role = actor === 'volunteer' || actor === 'revoked' ? 'volunteer'
       : actor === 'specialist' ? 'specialist' : actor === 'jury' ? 'jury' : undefined;
     queries.push(
-      write('INSERT INTO accounts (id, name, username, must_change) VALUES (?, ?, ?, ?)', account.id, name, account.username, Number(actor === 'temporary')),
+      write('INSERT INTO accounts (id, name, username, handle, event_id, must_change) VALUES (?, ?, ?, ?, ?, ?)',
+        account.id, name, account.username, account.username, eventId, Number(actor === 'temporary')),
       write(`INSERT INTO ba_user (id, name, email, username, emailVerified, createdAt, updatedAt)
         VALUES (?, ?, ?, ?, 1, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`,
       account.id, name, `${account.username}@accounts.minsky.invalid`, account.username),
       write(`INSERT INTO ba_account (id, accountId, providerId, userId, password, createdAt, updatedAt)
         VALUES (?, ?, 'credential', ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`,
       randomUUID(), account.id, account.id, await passwordHasher.hash(account.password)),
-      write('INSERT INTO memberships (session_id, account_id, team_id, is_admin) VALUES (?, ?, ?, ?)',
-        sessionId, account.id, team, Number(actor === 'admin' || actor === 'otherAdmin')),
+      actor === 'eventAdmin'
+        // The event admin holds no seat. Its grant reaches every contest of the event.
+        ? write(`INSERT INTO grants (account_id, scope, event_id, granted_by) VALUES (?, 'event', ?, 'fixture')`, account.id, eventId)
+        : write('INSERT INTO memberships (session_id, account_id, team_id, is_admin) VALUES (?, ?, ?, ?)',
+          sessionId, account.id, team, Number(actor === 'admin' || actor === 'otherAdmin')),
     );
     if (role) queries.push(write('INSERT INTO membership_roles (session_id, account_id, role) VALUES (?, ?, ?)', sessionId, account.id, role));
+  }
+  // A team's default entrant has the team's ID. Linking the sign-in lets an event admin move the seat.
+  for (const actor of actors) {
+    const team = actor === 'contestant' || actor === 'temporary' ? teamIds[0]
+      : actor === 'otherTeam' ? teamIds[1] : actor === 'isolated' ? teamIds[2] : undefined;
+    if (team) queries.push(write('UPDATE accounts SET entrant_id = ? WHERE id = ?', team, accounts[actor].id));
   }
   await db.batch(queries);
   await env.IMAGES.put(control.key, Uint8Array.from([1, 2, 3]));
@@ -94,6 +104,7 @@ export async function createLocalUiFixture(env: LocalUiEnvironment, origin: stri
       rateKeys.push(...['127.0.0.1', '::1', '198.51.100.17'].map((ip) => `ip:${createHash('sha256').update(`${secret}:${ip}`).digest('hex')}`));
       await db.batch([
         write('DELETE FROM events WHERE id = ?', eventId),
+        write(`DELETE FROM authority_audit WHERE actor IN (${marks})`, ...ids),
         write(`DELETE FROM account_operations WHERE account_id IN (${marks}) OR actor IN (${marks})`, ...ids, ...ids),
         write(`DELETE FROM ba_user WHERE id IN (${marks})`, ...ids),
         write(`DELETE FROM authentication_limits WHERE key IN (${rateKeys.map(() => '?').join(',')})`, ...rateKeys),
@@ -105,7 +116,7 @@ export async function createLocalUiFixture(env: LocalUiEnvironment, origin: stri
       const expected: Record<string, number> = { accounts: 1, events: 1, sessions: 1, authentication_limits: 1 };
       const tables = ['accounts', 'events', 'sessions', 'authentication_limits', 'teams', 'issues', 'history', 'resolutions', 'awards',
         'memberships', 'membership_roles', 'admin_audit', 'command_receipts', 'audience_sequences', 'notifications', 'session_issue_sequences',
-        'issue_images', 'image_deletions', 'logins', 'ba_user', 'ba_account', 'ba_session', 'account_operations', 'installation',
+        'issue_images', 'image_deletions', 'logins', 'ba_user', 'ba_account', 'ba_session', 'account_operations', 'entrants', 'authority_audit', 'manage_receipts',
         'account_avatars'];
       for (const table of tables) {
         const row = await db.prepare(`SELECT count(*) AS count FROM ${table}`).first<{ count: number }>();

@@ -58,7 +58,7 @@ function LocationRow({ team, admin }: { team: Team; admin: SessionAdmin }) {
         className="space-y-2"
         onSubmit={(event) => {
           event.preventDefault();
-          if (!locked && changed) void admin.setLocation(team.id, location.trim());
+          if (!locked && changed) void admin.setLocation(team.entrant_id ?? team.id, location.trim());
         }}
       >
         <Label htmlFor={id} className="block truncate font-medium">

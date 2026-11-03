@@ -114,7 +114,7 @@ async function openRoster(
 /** Opens the team locations. A laptop has the Roster page. A phone has a section of the Session tab. */
 async function showTeams(page: Page) {
   if ((page.viewportSize()?.width ?? 0) >= 1024) {
-    await page.getByRole("navigation", { name: "Console pages" }).getByRole("button", { name: "Roster", exact: true }).click();
+    await page.getByRole("navigation", { name: "Console pages" }).getByRole("button", { name: "Team locations", exact: true }).click();
     await expect(page.getByRole("heading", { level: 1, name: "Team locations", exact: true })).toBeVisible();
   } else {
     await page.getByRole("navigation", { name: "Organizer sections" }).getByRole("button", { name: "Session", exact: true }).click();

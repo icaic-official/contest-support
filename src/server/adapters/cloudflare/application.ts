@@ -42,7 +42,7 @@ SELECT json_object(
     'team_id', c.team_id, 'roles', json(c.roles), 'is_admin', json(CASE WHEN c.is_admin THEN 'true' ELSE 'false' END))
     WHERE c.account_id IS NOT NULL),
   'teams', json(COALESCE((SELECT json_group_array(json(row)) FROM (
-    SELECT json_object('id', id, 'session_id', session_id, 'name', name, 'location', location) AS row FROM (
+    SELECT json_object('id', id, 'session_id', session_id, 'name', name, 'location', location, 'entrant_id', entrant_id) AS row FROM (
       SELECT t.* FROM teams t WHERE c.staff = 1 AND t.session_id = ?
       UNION ALL SELECT t.* FROM teams t WHERE t.id = c.team_id) ORDER BY name, id)), '[]')),
   'issues', json(COALESCE((SELECT json_group_array(json(row)) FROM (

@@ -1,4 +1,4 @@
-import type { AccountCommand, AccountIdentity, AccountResult, AccountStatus } from '../backend/contracts.ts';
+import type { AccountCommand, AccountIdentity, AccountResult, AccountStatus, Handle, SignInTarget } from '../backend/contracts.ts';
 
 export interface Caller {
   /** Supplied by a trusted identity adapter, never accepted from a request body. */
@@ -16,7 +16,7 @@ export interface AuthenticationSession {
 
 export interface AuthenticationService {
   current(headers: Headers): Promise<AuthenticationSession | undefined>;
-  signIn(username: string, password: string): Promise<{ cookie: string }>;
+  signIn(target: SignInTarget, handle: Handle, password: string): Promise<{ cookie: string }>;
   signOut(headers: Headers): Promise<{ cookie: string }>;
   changePassword(headers: Headers, currentPassword: string, newPassword: string): Promise<{ cookie: string }>;
   account(headers: Headers, sessionId: string, command: AccountCommand): Promise<AccountResult>;
@@ -27,4 +27,14 @@ export class AuthenticationError extends Error {
     super(message);
     this.name = 'AuthenticationError';
   }
+}
+
+/**
+ * The one refusal of a sign-in. A wrong event code, handle, or password gives
+ * the same answer, so a sign-in never reveals whether an event code exists.
+ */
+export function signInRefused(kind: SignInTarget['kind']): AuthenticationError {
+  return new AuthenticationError(401, kind === 'event'
+    ? 'The event code, username, or password is incorrect.'
+    : 'The username or password is incorrect.');
 }

@@ -21,6 +21,40 @@ export type Seat =
   | { readonly kind: 'contestant'; readonly entryId: string; readonly entrantKind: EntrantKind }
   | { readonly kind: 'staff'; readonly admin: boolean; readonly roles: readonly Role[] };
 
+/** Site-unique, 3 to 40 characters of [a-z0-9-], for example `xxxx-olympiad-2026`. */
+export type EventCode = string & { readonly __brand: 'EventCode' };
+
+/**
+ * What a person types to sign in (`accounts.handle`). It is unique inside one
+ * event, or among site accounts. The screens call it the username.
+ */
+export type Handle = string & { readonly __brand: 'Handle' };
+
+/**
+ * `accounts.username` and `ba_user.username`: the only name that Better Auth
+ * knows. It is globally unique, and it is never shown or typed. Server only.
+ */
+export type LoginKey = string & { readonly __brand: 'LoginKey' };
+
+/**
+ * The handle namespace that a sign-in names. Webmasters belong to no event, so
+ * they choose `site`. Everyone else names the event, usually from the
+ * `?event=` link on their credentials.
+ */
+export type SignInTarget = { readonly kind: 'event'; readonly code: EventCode } | { readonly kind: 'site' };
+
+/** Normalizes typed text to an event code. Undefined when the text cannot be one. */
+export function parseEventCode(text: string): EventCode | undefined {
+  const code = text.trim().toLowerCase();
+  return /^[a-z0-9][a-z0-9-]{2,39}$/.test(code) ? code as EventCode : undefined;
+}
+
+/** Normalizes typed text to a handle, the shape of the column CHECK. Undefined when the text cannot be one. */
+export function parseHandle(text: string): Handle | undefined {
+  const handle = text.trim().toLowerCase();
+  return /^[a-z0-9][a-z0-9_-]{2,31}$/.test(handle) ? handle as Handle : undefined;
+}
+
 export interface AccountIdentity {
   id: string;
   email?: string;
@@ -28,9 +62,11 @@ export interface AccountIdentity {
 }
 
 export interface AccountStatus {
-  username: string | null;
+  handle: string | null;
   must_change: boolean;
   session_valid: boolean;
+  /** True when the account may change its own handle. The server applies the same rule to the change. */
+  can_change_handle: boolean;
 }
 
 /** Cleanup is idempotent. No callback may run after cleanup returns. */
@@ -39,7 +75,8 @@ export type Unsubscribe = () => void;
 export interface Authentication {
   currentUser(): Promise<AccountIdentity | undefined>;
   subscribe(onChange: (user: AccountIdentity | undefined) => void): Unsubscribe;
-  signIn(username: string, password: string): Promise<void>;
+  /** A wrong event code, handle, or password gives the same refusal. */
+  signIn(target: SignInTarget, handle: string, password: string): Promise<void>;
   signOut(): Promise<void>;
   accountStatus(): Promise<AccountStatus>;
   /** Resolves only after the password changes and the access gate is cleared. */
@@ -92,11 +129,13 @@ interface CreateAccountCommand extends MembershipInput {
 
 export type AccountCommand =
   | CreateAccountCommand
-  | { action: 'set_username'; userId: string; username: string }
   | { action: 'reset_password'; userId: string };
 
+/** A new temporary password, shown once and never stored. */
 export interface AccountResult {
-  temporaryPassword?: string;
+  temporaryPassword: string;
+  /** The event code or the site that the account names to sign in. */
+  signIn: SignInTarget;
 }
 
 /** A team of a roster edit. The browser chooses the ID, so a retry adds no second team. */
@@ -134,26 +173,30 @@ export interface Administration {
   editRoster(sessionId: string, command: RosterCommand): Promise<void>;
 }
 
-/**
- * A new webmaster. Until handles exist, the username is the name that the
- * webmaster types to sign in.
- */
+/** A new webmaster. The server gives the account a login key that nobody sees. */
 export interface PersonInput {
-  readonly username: string;
+  readonly handle: string;
   readonly name: string;
 }
 
 /**
- * Every site change. The server derives each command's requirement from the
- * command alone, resolves the caller's authority once, and checks it again
- * inside the write batch. Callers never name their own authority.
+ * Every site change, and a handle change. The server derives each command's
+ * requirement from the command alone, resolves the caller's authority once,
+ * and checks it again inside the write batch. Callers never name their own
+ * authority.
  */
 export type ManageCommand =
   | { readonly type: 'add_webmaster'; readonly person: PersonInput }
   | { readonly type: 'remove_webmaster'; readonly accountId: string }
   | { readonly type: 'set_webmaster_reads'; readonly restricted: boolean }
   /** A webmaster's audited join. D1 accepts it only while the site restricts webmaster reads. */
-  | { readonly type: 'join_contest'; readonly contestId: string };
+  | { readonly type: 'join_contest'; readonly contestId: string }
+  /**
+   * Changes the handle of an account of the event. The login key and open
+   * sessions stay. Staff may change their own handle. Contestants may not,
+   * because venue staff read it from the credential sheet.
+   */
+  | { readonly type: 'set_handle'; readonly eventId: string; readonly accountId: string; readonly handle: string };
 
 /** Created IDs, so a retry with the same request ID returns the same IDs. Never a password. */
 export interface ManageReceipt {
@@ -165,7 +208,7 @@ export const ISSUE_BATCH = 8;
 
 export interface IssuedCredential {
   readonly accountId: string;
-  readonly username: string;
+  readonly handle: string;
   /**
    * Shown once and never stored. Null when a retry of the same request finds
    * the issue already done. Issue again with a new request ID.
@@ -177,7 +220,7 @@ export interface SiteOverview {
   readonly webmasters: ReadonlyArray<{
     readonly id: string;
     readonly name: string;
-    readonly username: string;
+    readonly handle: string;
     /** False until a password is issued, and while a reset waits for its password. */
     readonly ready: boolean;
   }>;
@@ -190,7 +233,7 @@ export interface SiteOverview {
   }>;
 }
 
-/** Site administration. Only webmasters may call it. */
+/** Site administration for webmasters, and handle changes for the accounts that a caller may manage. */
 export interface Management {
   /** Null when the signed-in account is not a webmaster. */
   site(): Promise<SiteOverview | null>;

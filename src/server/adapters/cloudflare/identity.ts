@@ -1,6 +1,7 @@
 import { betterAuth } from "better-auth";
 import { username } from "better-auth/plugins/username";
 import { isAPIError } from "better-auth/api";
+import type { LoginKey } from "../../../backend/contracts";
 import { AuthenticationError } from "../../authentication";
 import type { D1Binding } from "../d1/connection";
 import { passwordHasher, type PasswordHasher } from "./password";
@@ -13,7 +14,8 @@ export interface IdentitySession {
 }
 
 export interface IdentityProvider {
-  signIn(username: string, password: string): Promise<IdentitySession & { cookie: string }>;
+  /** Better Auth knows only the login key. A typed handle never reaches it. */
+  signIn(loginKey: LoginKey, password: string): Promise<IdentitySession & { cookie: string }>;
   session(headers: Headers): Promise<IdentitySession | undefined>;
   signOut(headers: Headers): Promise<string>;
 }
@@ -129,11 +131,11 @@ export function createBetterAuthIdentity(
   }
 
   return {
-    async signIn(accountUsername, password) {
+    async signIn(loginKey, password) {
       const result = await (async () => {
         try {
           return await auth.api.signInUsername({
-            body: { username: accountUsername, password, rememberMe: true },
+            body: { username: loginKey, password, rememberMe: true },
             headers: new Headers({ origin: options.origin }),
             returnHeaders: true,
           });

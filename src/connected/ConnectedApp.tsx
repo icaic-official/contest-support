@@ -66,7 +66,7 @@ const mainClasses: Record<Layout, string> = {
  */
 export function ConnectedApp() {
   const navigate = useNavigate();
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
   const auth = useAuthSession();
   const { user } = auth;
   const [live, setLive] = useState(false);
@@ -81,8 +81,10 @@ export function ConnectedApp() {
     !status.must_change &&
     !passwordSetup &&
     !account.error;
-  // Every other signed-out path is a deep link and goes through sign-in.
-  const showLanding = !auth.loading && !user && pathname === "/";
+  // Every other signed-out path is a deep link and goes through sign-in. So
+  // is `/?event=`, the link on a credential sheet.
+  const showLanding =
+    !auth.loading && !user && pathname === "/" && !new URLSearchParams(search).has("event");
   const layout: Layout = dashboardReady
     ? "dashboard"
     : showLanding
@@ -141,7 +143,9 @@ export function ConnectedApp() {
       <Workspace
         key={user.id}
         user={user}
-        username={status.username}
+        username={status.handle}
+        canChangeUsername={status.can_change_handle}
+        refreshAccount={account.refresh}
         changePassword={() => {
           navigate("/account");
           setPasswordSetup(true);

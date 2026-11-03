@@ -1,11 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createCloudflareAuthentication } from './authentication';
+import type { EventCode } from '../contracts';
 
 const ORIGIN = 'https://auth.minsky.test';
 const ACCOUNT_ID = '00000000-0000-4000-8000-000000000001';
 const SESSION_ID = '00000000-0000-4000-8000-000000000002';
 const user = { id: ACCOUNT_ID, name: 'Fictional helper' };
-const status = { username: 'helper', must_change: false, session_valid: true };
+const status = { handle: 'helper', must_change: false, session_valid: true, can_change_handle: true };
 
 function json(body: unknown, statusCode = 200) {
   return new Response(JSON.stringify(body), { status: statusCode, headers: { 'Content-Type': 'application/json' } });
@@ -52,7 +53,10 @@ describe('Cloudflare browser authentication transport', () => {
   it('returns no user for expired or revoked sessions and validates server status', async () => {
     const unauthorized = setup(() => json({ error: 'Sign in to continue.' }, 401));
     await expect(unauthorized.auth.currentUser()).resolves.toBeUndefined();
-    expect(await unauthorized.auth.accountStatus()).toEqual({ username: null, must_change: true, session_valid: false });
+    expect(await unauthorized.auth.accountStatus()).toEqual({ handle: null, must_change: true, session_valid: false, can_change_handle: false });
+    const older = { handle: 'helper', must_change: false, session_valid: true };
+    expect(await setup(() => json({ user, status: older, csrf: 'test' })).auth.accountStatus())
+      .toEqual({ ...older, can_change_handle: false });
     const malformed = setup(() => json({ user, status: { ...status, must_change: 'no' }, csrf: 'test' }));
     await expect(malformed.auth.currentUser()).rejects.toThrow();
   });
@@ -62,23 +66,34 @@ describe('Cloudflare browser authentication transport', () => {
     const changed = vi.fn();
     const stop = auth.subscribe(changed);
     try {
-      await auth.signIn('helper', 'fictional-password');
+      await auth.signIn({ kind: 'event', code: 'xxxx-2026' as EventCode }, 'helper', 'fictional-password');
       expect(changed).toHaveBeenLastCalledWith(user);
       const login = requests.find((request) => request.method === 'POST');
-      expect(await login?.json()).toEqual({ username: 'helper', password: 'fictional-password' });
+      expect(await login?.json()).toEqual({ event: 'xxxx-2026', handle: 'helper', password: 'fictional-password' });
+      await auth.signIn({ kind: 'site' }, 'webmaster', 'fictional-password');
+      const site = requests.filter((request) => request.method === 'POST').at(-1);
+      expect(await site?.json()).toEqual({ event: null, handle: 'webmaster', password: 'fictional-password' });
       expect(login?.headers.get('X-Minsky-Request')).toBe('1');
       expect(login?.headers.has('X-CSRF-Token')).toBe(false);
       expect(login?.url).toBe(`${ORIGIN}/api/auth/sign-in`);
     } finally { stop(); }
   });
 
+  it('shows the server refusal of a sign-in, and treats a 401 elsewhere as an ended session', async () => {
+    const refusal = 'The event code, username, or password is incorrect.';
+    const refused = setup((request) => request.method === 'POST' ? json({ error: refusal }, 401) : json({ user, status, csrf: 'csrf' }));
+    await expect(refused.auth.signIn({ kind: 'event', code: 'xxxx-2026' as EventCode }, 'helper', 'wrong')).rejects.toThrow(refusal);
+    await expect(refused.auth.signOut()).rejects.toThrow('Sign in to continue.');
+  });
+
   it('reads the CSRF token once and reuses it for later writes', async () => {
     let reads = 0;
     const { auth, requests } = setup((request) => request.method === 'GET'
       ? json({ user, status, csrf: `csrf-${++reads}` })
-      : json({ temporaryPassword: 'fictional-temporary-password' }));
+      : json({ temporaryPassword: 'fictional-temporary-password', signIn: { kind: 'event', code: 'xxxx-2026' } }));
     const command = { action: 'reset_password', userId: ACCOUNT_ID } as const;
-    await expect(auth.account(SESSION_ID, command)).resolves.toEqual({ temporaryPassword: 'fictional-temporary-password' });
+    await expect(auth.account(SESSION_ID, command)).resolves
+      .toEqual({ temporaryPassword: 'fictional-temporary-password', signIn: { kind: 'event', code: 'xxxx-2026' } });
     await auth.account(SESSION_ID, command);
     const writes = requests.filter((request) => request.method === 'POST');
     expect(writes.map((request) => request.headers.get('X-CSRF-Token'))).toEqual(['csrf-1', 'csrf-1']);
@@ -86,11 +101,13 @@ describe('Cloudflare browser authentication transport', () => {
     expect(await writes[0]!.json()).toEqual({ sessionId: SESSION_ID, command });
   });
 
+  const issued = { temporaryPassword: 'fictional-temporary-password', signIn: { kind: 'site' } };
+
   it('reads a new token after the login changes', async () => {
     let reads = 0;
     const { auth, requests } = setup((request) => request.method === 'GET'
       ? json({ user, status, csrf: `csrf-${++reads}` })
-      : json({}));
+      : json(new URL(request.url).pathname === '/api/accounts' ? issued : {}));
     const command = { action: 'reset_password', userId: ACCOUNT_ID } as const;
     await auth.account(SESSION_ID, command);
     await auth.signOut();
@@ -103,7 +120,7 @@ describe('Cloudflare browser authentication transport', () => {
     const pending: Array<(response: Response) => void> = [];
     let deferReads = false;
     const { auth, requests } = setup((request) => {
-      if (request.method === 'POST') return json({});
+      if (request.method === 'POST') return json(new URL(request.url).pathname === '/api/accounts' ? issued : {});
       if (deferReads) return new Promise<Response>((resolve) => { pending.push(resolve); });
       return json({ user, status, csrf: 'csrf-new' });
     });
@@ -176,7 +193,7 @@ describe('Cloudflare browser authentication transport', () => {
         await vi.advanceTimersByTimeAsync(0);
         changed.mockClear();
         const mutations = {
-          signIn: () => auth.signIn('helper', 'fictional-password'),
+          signIn: () => auth.signIn({ kind: 'site' }, 'helper', 'fictional-password'),
           signOut: () => auth.signOut(),
           changePassword: () => auth.changePassword('fictional-old', 'fictional-new'),
         };

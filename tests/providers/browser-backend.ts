@@ -192,8 +192,8 @@ export async function createBrowserBackend(
   const backend: Backend = {
     auth: {
       currentUser: () => call({ type: 'currentUser' }),
-      signIn: (username, password) =>
-        call({ type: 'signIn', username, password }),
+      signIn: (target, handle, password) =>
+        call({ type: 'signIn', target, handle, password }),
       signOut: () => call({ type: 'signOut' }),
       accountStatus: () => call({ type: 'accountStatus' }),
       changePassword: (currentPassword, newPassword) =>

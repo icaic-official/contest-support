@@ -1,4 +1,23 @@
+import { z } from 'zod';
+import { parseHandle, type LoginKey } from '../../../backend/contracts';
 import type { D1Connection, D1Statement, D1Value } from '../d1/connection';
+
+/** Typed text to a handle, through `parseHandle`. */
+export const handleSchema = z.string().transform((text, context) => {
+  const handle = parseHandle(text);
+  if (!handle) context.addIssue({ code: 'custom', message: 'Use 3 to 32 letters, digits, hyphens, or underscores.' });
+  return handle ?? z.NEVER;
+});
+
+/**
+ * The login key of every account that this Worker creates: its ID without
+ * dashes. 32 characters of [0-9a-f] pass the column CHECK and the Better Auth
+ * validator in identity.ts. Nothing derives a login key from a handle, so a
+ * handle change never touches Better Auth.
+ */
+export function loginKeyFor(accountId: string): LoginKey {
+  return accountId.replaceAll('-', '') as LoginKey;
+}
 
 function statement(db: D1Connection, sql: string, ...values: D1Value[]): D1Statement {
   return db.prepare(sql).bind(...values);
@@ -21,7 +40,7 @@ export function beginCredentialReset(db: D1Connection, target: string, operation
 export interface CredentialAccount {
   id: string;
   name: string;
-  username: string;
+  loginKey: LoginKey;
 }
 
 /**
@@ -39,7 +58,7 @@ export function completeCredentialReset(
     statement(db, `INSERT INTO ba_user (id, name, email, emailVerified, createdAt, updatedAt, username)
         VALUES (?, ?, ?, 1, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), ?)
         ON CONFLICT(id) DO UPDATE SET username = excluded.username, email = excluded.email, updatedAt = excluded.updatedAt`,
-    account.id, account.name, `${account.username}@accounts.minsky.invalid`, account.username),
+    account.id, account.name, `${account.loginKey}@accounts.minsky.invalid`, account.loginKey),
     statement(db, `INSERT INTO ba_account (id, accountId, providerId, userId, password, createdAt, updatedAt)
         VALUES (?, ?, 'credential', ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
         ON CONFLICT(providerId, accountId) DO UPDATE SET password = excluded.password, updatedAt = excluded.updatedAt`,

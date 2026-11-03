@@ -19,7 +19,7 @@ The account reference records current cookie, origin, recovery, and session rest
 ## Connected application
 
 The live development app is the Cloudflare Worker at https://minsky-dev.icaic-minsky.workers.dev.
-Use an organizer-provided username and password.
+Use an organizer-provided sign-in link, username, and password. A webmaster uses **Site sign-in** instead of an event code.
 Docker and persona switching are not required.
 For a separate Cloudflare installation, create the first admin through its bootstrap step.
 Use `npm run cloudflare:recover-admin` when the development webmaster cannot sign in.
@@ -37,7 +37,7 @@ Section 7 lists the checks for each UI.
 
 ## 1. Login and session access
 
-1. Sign in with a username that uses different letter case.
+1. Open the sign-in link `/?event=<code>`. Check that the form shows the event code. Sign in with a username that uses different letter case.
 2. Refresh the page.
 3. Check that the session returns.
 4. Sign out.
@@ -68,7 +68,7 @@ Expected result: the app rejects removal of the last admin.
 Check the admin screens of T0015 in both organizer layouts:
 
 1. In the phone **Session** tab, check the status counts, the intake switch and the image limits with the − and + buttons.
-2. Select **New account**. Create a staff account. Check that the sheet shows the username and the temporary password once, with copy buttons and **Done**.
+2. Select **New account**. Create a staff account. Check that the sheet shows the sign-in link, the username, and the temporary password once, with copy buttons and **Done**. Check that the link names the event code.
 3. Select **Done**. Open the account again. Check that the credentials do not show again.
 4. Reset the password of another account. Check that a confirmation dialog shows first. Check that the new credentials show once.
 5. Check that your own account has no password reset.
@@ -181,9 +181,11 @@ Review the sign-in page at 1280 × 800, 390 × 844 and 320 × 740.
 
 1. Toggle **Show password** and **Hide password** with the keyboard.
 2. Check that organizer access and recovery guidance remain visible.
-3. Sign in with an account without membership. Check that the access screen shows **Refresh access** and **Sign out**.
-4. Sign in with a member account. Disconnect the network and wait up to 10 seconds for the access screen. Check that it asks you to check the connection and does not mention an organizer. Select **Refresh access**. Check that the button stays disabled while the read runs. Connect again and select the button. Check that the workspace returns.
-5. Press Tab once after sign-in. Check that **Skip to main content** appears and moves focus to the main content.
+3. Select **Site sign-in** with the keyboard. Check that the event code field disappears and the heading reads **Site sign-in**. Select **Sign in to an event**. Check that the code returns.
+4. Sign in with a wrong event code, then a wrong username, then a wrong password. Check that each gives the same message.
+5. Sign in with an account without membership. Check that the access screen shows **Refresh access** and **Sign out**.
+6. Sign in with a member account. Disconnect the network and wait up to 10 seconds for the access screen. Check that it asks you to check the connection and does not mention an organizer. Select **Refresh access**. Check that the button stays disabled while the read runs. Connect again and select the button. Check that the workspace returns.
+7. Press Tab once after sign-in. Check that **Skip to main content** appears and moves focus to the main content.
 
 ### Organizer phone app (390 × 844)
 

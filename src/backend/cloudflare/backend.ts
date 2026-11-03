@@ -8,12 +8,12 @@ import { createCloudflareAuthentication } from './authentication';
 
 const sessionsSchema = z.array(z.object({ id: z.uuid(), name: z.string() }));
 const siteSchema = z.object({
-  webmasters: z.array(z.object({ id: z.uuid(), name: z.string(), username: z.string(), ready: z.boolean() })),
+  webmasters: z.array(z.object({ id: z.uuid(), name: z.string(), handle: z.string(), ready: z.boolean() })),
   restrictWebmasterReads: z.boolean(),
   contestsToJoin: z.array(z.object({ id: z.uuid(), name: z.string(), eventName: z.string() })),
 });
 const receiptSchema = z.object({ accountIds: z.array(z.uuid()).exactOptional() });
-const issuedSchema = z.array(z.object({ accountId: z.uuid(), username: z.string(), temporaryPassword: z.string().nullable() }));
+const issuedSchema = z.array(z.object({ accountId: z.uuid(), handle: z.string(), temporaryPassword: z.string().nullable() }));
 const startedSchema = z.object({ id: z.uuid(), original_path: z.string(), thumbnail_path: z.string() });
 const workflowSchema = z.discriminatedUnion('outcome', [
   // The snapshot is optional and checked apart, so a bad one never hides a committed command.

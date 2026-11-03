@@ -39,8 +39,8 @@ export function createBrowserProvider(configuration: unknown): BrowserProvider {
   const backend: Backend = {
     auth: {
       currentUser,
-      async signIn(username) {
-        await fetch('/bridge-auth', { method: 'POST', body: username });
+      async signIn(_target, handle) {
+        await fetch('/bridge-auth', { method: 'POST', body: handle });
         const user = await currentUser();
         for (const notify of authentication) notify(user);
       },
@@ -49,7 +49,7 @@ export function createBrowserProvider(configuration: unknown): BrowserProvider {
         for (const notify of authentication) notify(undefined);
       },
       async accountStatus() {
-        return { username: null, must_change: false, session_valid: true };
+        return { handle: null, must_change: false, session_valid: true, can_change_handle: false };
       },
       changePassword: async () => unsupported(),
       subscribe(onChange) {

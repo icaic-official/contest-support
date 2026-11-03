@@ -13,7 +13,7 @@ const command = { type: 'claim' as const, issue_id: issueId, revision: 1 };
 
 const sessionBody = {
   user: { id: issueId }, csrf: 'fresh-token',
-  status: { username: 'fictional', must_change: false, session_valid: true },
+  status: { handle: 'fictional', must_change: false, session_valid: true, can_change_handle: true },
 };
 
 function transport(result: () => Response | Promise<Response>) {

@@ -154,7 +154,7 @@ SELECT json_object(
       'team_id', m.team_id, 'roles', json((SELECT json_group_array(role) FROM (SELECT role
         FROM membership_roles mr WHERE mr.session_id = m.session_id AND mr.account_id = m.account_id ORDER BY role))),
       'is_admin', json(CASE WHEN m.is_admin THEN 'true' ELSE 'false' END)),
-      'person', json_object('id', p.id, 'name', p.name, 'username', p.username)) AS row
+      'person', json_object('id', p.id, 'name', p.name, 'username', p.handle)) AS row
     FROM access a CROSS JOIN memberships m JOIN accounts p ON p.id = m.account_id
     WHERE a.is_admin = 1 AND m.session_id = ? ORDER BY p.name, p.id)), '[]')),
   'audit', json(COALESCE((SELECT json_group_array(json(row)) FROM (

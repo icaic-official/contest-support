@@ -1,4 +1,4 @@
-import type { EntrantKind, ManageLevel, Seat } from '../../../backend/contracts';
+import type { EntrantKind, ManageLevel, Seat, SignInTarget } from '../../../backend/contracts';
 import type { Role } from '../../../connected/model';
 import type { Caller } from '../../authentication';
 import type { D1Connection, D1Statement, D1Value } from '../d1/connection';
@@ -137,9 +137,10 @@ export const contestSeatsSql = `SELECT m.session_id, m.account_id, m.team_id, m.
     WHERE mr.session_id = m.session_id AND mr.account_id = m.account_id ORDER BY role)) AS roles
   FROM memberships m WHERE m.session_id = ?`;
 
-/** What an authority question names: the site or one contest. */
+/** What an authority question names: the site, one event, or one contest. */
 export type Target =
   | { readonly scope: 'site' }
+  | { readonly scope: 'event'; readonly eventId: string }
   | { readonly scope: 'contest'; readonly contestId: string };
 
 /** The resolved answer to "what may this account do here". Built only by `resolveAuthority`. */
@@ -169,6 +170,22 @@ const siteAuthoritySql = `SELECT a.id AS account_id,
   JOIN grants gs ON gs.scope = 'site' AND gs.account_id = a.id
   WHERE a.id = ? AND l.id = ? AND ${liveLoginSql}`;
 
+/**
+ * The event resolver. A row exists for a live login of an account of the
+ * event, and of a webmaster. Webmaster structure authority ignores the read
+ * restriction, which covers contest data only. Binds accountId, loginId, eventId.
+ */
+const eventAuthoritySql = `SELECT a.id AS account_id, e.id AS event_id, e.archived,
+    CASE WHEN gs.account_id IS NOT NULL THEN 'site' WHEN ge.account_id IS NOT NULL THEN 'event' ELSE 'none' END AS manage,
+    json_array(a.access_version, a.credential_generation, l.version, e.version,
+      CASE WHEN gs.account_id IS NOT NULL THEN ${siteVersionSql} ELSE 0 END) AS stamp
+  FROM events e CROSS JOIN accounts a JOIN logins l ON l.account_id = a.id
+  JOIN ba_session b ON b.id = l.identity_session_id AND b.userId = a.id
+  LEFT JOIN grants ge ON ge.scope = 'event' AND ge.event_id = e.id AND ge.account_id = a.id
+  LEFT JOIN grants gs ON gs.scope = 'site' AND gs.account_id = a.id
+  WHERE a.id = ? AND l.id = ? AND e.id = ? AND ${liveLoginSql}
+    AND (a.event_id = e.id OR gs.account_id IS NOT NULL)`;
+
 /** The only constructor of a seat on the server. A row without data access has no seat. */
 export function seatFromRow(row: Pick<ContestAuthorityRow, 'data' | 'team_id' | 'staff' | 'is_admin' | 'roles' | 'entrant_kind'>): Seat | null {
   if (row.data !== 1) return null;
@@ -183,23 +200,27 @@ export function seatFromRow(row: Pick<ContestAuthorityRow, 'data' | 'team_id' | 
  */
 export async function resolveAuthority(db: D1Connection, caller: Caller, target: Target): Promise<Authority | undefined> {
   const { sql, values } = authorityRead(caller, target);
-  if (target.scope === 'site') {
-    const row = await db.prepare(sql).bind(...values).first<{ stamp: string }>();
-    if (!row) return undefined;
-    return { caller, target, eventId: null, manage: 'site', seat: null, writable: true, stamp: row.stamp };
-  }
+  // Each branch reads only the columns that its statement selects.
   const row = await db.prepare(sql).bind(...values).first<ContestAuthorityRow>();
   if (!row) return undefined;
-  return {
-    caller, target, eventId: row.event_id, manage: row.manage, seat: seatFromRow(row),
-    writable: row.archived === 0, stamp: row.stamp,
-  };
+  switch (target.scope) {
+    case 'site': return { caller, target, eventId: null, manage: 'site', seat: null, writable: true, stamp: row.stamp };
+    case 'event': return {
+      caller, target, eventId: row.event_id, manage: row.manage, seat: null, writable: row.archived === 0, stamp: row.stamp,
+    };
+    case 'contest': return {
+      caller, target, eventId: row.event_id, manage: row.manage, seat: seatFromRow(row),
+      writable: row.archived === 0, stamp: row.stamp,
+    };
+  }
 }
 
 function authorityRead(caller: Caller, target: Target): { sql: string; values: D1Value[] } {
-  return target.scope === 'site'
-    ? { sql: siteAuthoritySql, values: [caller.accountId, caller.loginId] }
-    : { sql: contestAuthoritySql('caller'), values: contestDataBindings(caller, target.contestId) };
+  switch (target.scope) {
+    case 'site': return { sql: siteAuthoritySql, values: [caller.accountId, caller.loginId] };
+    case 'event': return { sql: eventAuthoritySql, values: [caller.accountId, caller.loginId, target.eventId] };
+    case 'contest': return { sql: contestAuthoritySql('caller'), values: contestDataBindings(caller, target.contestId) };
+  }
 }
 
 const manageRank: { readonly [L in ManageLevel]: number } = { none: 0, contest: 1, event: 2, site: 3 };
@@ -251,8 +272,52 @@ export function manageAccountBindings(actor: string, target: string): D1Value[] 
   return [target, actor, actor, actor, actor];
 }
 
-/** Every webmaster, enabled or not, by name. `ready` is false until a password is issued. */
-export const webmastersSql = `SELECT a.id, a.name, COALESCE(a.username, '') AS username, a.disabled,
+/**
+ * Account `t` may change its own handle: it belongs to an event and holds no
+ * contestant seat in any contest (owner decision 14, 2026-11-01). A
+ * contestant's handle is printed on the sheet that venue staff use. A
+ * webmaster belongs to no event. The account page reads the same condition.
+ */
+export const ownHandleSql = `t.event_id IS NOT NULL
+  AND NOT EXISTS (SELECT 1 FROM memberships m WHERE m.account_id = t.id AND m.team_id IS NOT NULL)`;
+
+/**
+ * Who may change a handle: `manageAccountSql`, or the actor's own account
+ * under `ownHandleSql`. Bind with manageHandleBindings.
+ */
+export const manageHandleSql = `${manageAccountSql}
+  UNION ALL SELECT 1 FROM accounts t WHERE t.id = ? AND t.id = ? AND ${ownHandleSql}`;
+
+export function manageHandleBindings(actor: string, target: string): D1Value[] {
+  return [...manageAccountBindings(actor, target), target, actor];
+}
+
+/** What a sign-in reads of account `a` before the password check. */
+export const loginAccountColumns = `a.id AS account_id, a.username AS login_key, a.disabled,
+  a.credential_state, a.credential_generation`;
+
+/**
+ * The account that a sign-in names, in one statement per target kind. Neither
+ * uses OR, so each reads its own unique index. The event form returns the
+ * event even when the handle is unknown, so that failure counts against the
+ * event's limit. The site form requires a site grant, so an account with no
+ * event and no grant cannot sign in as a webmaster. Bind with the handle, then
+ * for an event the code.
+ */
+export const signInAccountSql: { readonly [K in SignInTarget['kind']]: string } = {
+  event: `SELECT e.id AS event_id, ${loginAccountColumns}
+    FROM events e LEFT JOIN accounts a ON a.event_id = e.id AND a.handle = ?
+    WHERE e.code = ?`,
+  site: `SELECT NULL AS event_id, ${loginAccountColumns}
+    FROM accounts a JOIN grants gs ON gs.scope = 'site' AND gs.account_id = a.id
+    WHERE a.event_id IS NULL AND a.handle = ?`,
+};
+
+/**
+ * Every webmaster, enabled or not, by name. `ready` is false until a password
+ * is issued. The handle is for display. The login key is for Better Auth only.
+ */
+export const webmastersSql = `SELECT a.id, a.name, COALESCE(a.handle, '') AS handle, a.username AS login_key, a.disabled,
     a.credential_generation, a.credential_state = 'ready' AS ready
   FROM grants g JOIN accounts a ON a.id = g.account_id
   WHERE g.scope = 'site' ORDER BY a.name, a.id`;

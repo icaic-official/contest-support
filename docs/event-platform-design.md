@@ -1,6 +1,6 @@
 # Webmaster, event, and contest platform
 
-**Status.** Proposed. Phase 1, `feature/scoped-authority`, implements the contest resolver, migration `0017`, and its gate. The local half of the gate passed. The hosted runs were inconclusive against the 10 percent p95 rule, because `main` itself varied between runs. After a compile-time fix, the branch read faster than `main` at the median, and the owner accepted the gate on 2026-11-02. The [gate record](history/scoped-authority-gate.md) holds the measurements and the decision. Phase 2, `feature/webmaster-management`, implements webmaster management with no migration. It stacks on Phase 1. Phases 3 to 8 are not built.
+**Status.** Proposed. Phase 1, `feature/scoped-authority`, implements the contest resolver, migration `0017`, and its gate. The local half of the gate passed. The hosted runs were inconclusive against the 10 percent p95 rule, because `main` itself varied between runs. After a compile-time fix, the branch read faster than `main` at the median, and the owner accepted the gate on 2026-11-02. The [gate record](history/scoped-authority-gate.md) holds the measurements and the decision. Phase 2, `feature/webmaster-management`, implements webmaster management with no migration. Both phases are merged. Phase 3, `feature/event-sign-in`, implements migration `0018`, sign-in by event code or site and handle, and `set_handle`. It waits for review. Phases 4 to 8 are not built.
 
 Phase 1 differs from this page and the sketches in these points:
 
@@ -20,6 +20,28 @@ Phase 2 differs from this page and the sketches in these points:
 - `recoverWebmaster` finds a webmaster by username, and `npm run cloudflare:recover-admin` calls it. `adminRecovery.ts` is deleted, so the command no longer recovers a contest admin who is not a webmaster. `recoverInstallationOwner` stays until Phase 4.
 - `credentialReset.ts` is now `credentials.ts`. Its `replaceCredentialStatements` puts the existing begin and complete statements into one batch.
 - `authorityCopies.test.ts` does not count `DELETE FROM grants` as a copy of the access check, because a delete reads nothing. Every read of `grants` stays in `authority.ts`.
+
+Phase 3 differs from this page and the sketches in these points:
+
+- `0018` adds a second convergence trigger, `site_handle_default`. The previous Worker's `add_webmaster` and bootstrap give a site account a username and a site grant, but no membership. `accounts_handle_default` alone would leave that account without a handle.
+- The HTTP route parses the event code and the handle with `parseEventCode` and `parseHandle`, so `AuthenticationService.signIn` takes a `Handle`. Text that cannot be a code or a handle gets the refusal of a wrong one, and the IP limit counts it.
+- A wrong event code counts against the key `handle:code:<typed code>:<handle>`. This page gave it no key. Then only a code that exists reached 429 after ten failures, so the limit showed which codes exist.
+- The sign-in page shows the server's refusal. Before Phase 3, every refused sign-in showed "Sign in to continue."
+- `set_handle` resolves authority through an event resolver, `eventAuthoritySql`, which Phase 1 did not build. `manageHandleSql` holds decision 14. It is `manageAccountSql`, plus the caller's own account under `ownHandleSql`. That condition requires an account of an event with no contestant seat. The account status reads `ownHandleSql` too, as `can_change_handle`, and the account page shows its form only when that is true.
+- An unknown event code or handle is refused before Better Auth runs, because a legacy login key in another event can equal the typed handle. That refusal, and the refusal of a disabled or pending account, hashes the typed password first. Without the hash, the median refusal took 32 to 45 ms in local D1, and a wrong password took 132 ms. So the time showed which codes and handles exist. With the hash, the median refusal took 93 to 95 ms, and a wrong password took 120 ms. The remaining gap matches the two D1 reads that Better Auth makes for a known login key.
+- A webmaster cannot change its own handle, because `set_handle` names an event and a webmaster has none.
+- The account operation of `set_handle` names no contest. So a contest's activity no longer lists a username change. `authority_audit` records it with the event, the old handle, and the new handle. The command notifies staff and the account in each contest that seats the account, because the `0014` trigger notifies only for an operation that names a contest.
+- An account from before usernames has no login key. Its first temporary password gives it `loginKeyFor(id)`. A reset of an account without a handle is refused before it begins, so the old password stays valid.
+- The credential sheet shows the link `<origin>/?event=<code>` for an event account. For a site account, it shows the sign-in page and says to choose **Site sign-in**.
+- The sign-in form remembers the last event code in the browser's `localStorage`, under `minsky-event-code`. It does not remember **Site sign-in**.
+- Two checks need hosted Cloudflare resources and did not run: the sign-in burst at the 200-user step on `minsky-preview` (see "Risks"), and the rehearsal of `0018` on an empty D1 database and on a `minsky-preview` copy.
+
+A Worker rollback after Phase 3 loses these:
+
+- Accounts that the Phase 3 Worker creates cannot sign in to the previous Worker until roll-forward. Their login key is their ID without dashes, and nobody types it. These include contest accounts, added webmasters, and a newly bootstrapped webmaster. The previous Worker's member list shows that login key as their username.
+- A legacy account without a username, which got a handle and then its login key at a Phase 3 reset, cannot sign in there either.
+- A legacy account whose handle changed signs in there with its old username. If another account later took that old handle, the old username still opens the legacy account there (`previousWorker.test.ts`).
+- The previous Worker ignores event codes and time zones, and its sign-in form asks for no event code.
 
 This page explains how one shared Minsky installation can host the events of many organizers. It settles GitHub issues #119 and #136 under the owner's decisions of 2026-10-27, which [PLAN.md](../PLAN.md) records. It supersedes the [earlier multi-competition design](history/multi-competition-design.md).
 The [sketches page](event-platform-sketches.md) holds the full type sketch and migration sketch.

@@ -16,7 +16,7 @@ export async function verifyTemporaryAuthentication(
     notifications++;
   });
   try {
-    await auth.signIn(account.username, account.password);
+    await auth.signIn(account.target, account.username, account.password);
     check((await auth.currentUser())?.id === account.id, 'Sign-in must identify the fixture account.');
     await eventually(() => currentId === account.id, 'Authentication must notify subscribers after sign-in.');
     check((await auth.accountStatus()).must_change, 'Temporary credentials must require a password change.');
@@ -29,11 +29,11 @@ export async function verifyTemporaryAuthentication(
     await auth.signOut();
     check(await auth.currentUser() === undefined, 'Sign-out must clear the current identity.');
     await eventually(() => currentId === undefined, 'Authentication must notify subscribers after sign-out.');
-    await rejects(() => auth.signIn(account.username, account.password));
+    await rejects(() => auth.signIn(account.target, account.username, account.password));
     stop();
     stop();
     const stoppedAt = notifications;
-    await auth.signIn(account.username, password);
+    await auth.signIn(account.target, account.username, password);
     await auth.signOut();
     check(notifications === stoppedAt, 'Authentication cleanup must suppress later callbacks.');
   } finally {

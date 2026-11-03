@@ -26,6 +26,8 @@ describe('sign-in failure limits at the Worker boundary with real local D1', () 
   let dispose: () => Promise<void>;
   let env: ApplicationEnvironment;
   const run = randomUUID().replaceAll('-', '').slice(0, 8);
+  const event = randomUUID();
+  let eventCode = '';
 
   async function createAccounts(prefix: string, count: number): Promise<string[]> {
     const names = Array.from({ length: count }, (_, index) => `${prefix}_${run}_${index}`);
@@ -34,7 +36,8 @@ describe('sign-in failure limits at the Worker boundary with real local D1', () 
       await db.batch(names.slice(start, start + 10).flatMap((name) => {
         const id = randomUUID();
         return [
-          db.prepare('INSERT INTO accounts (id, name, username, must_change) VALUES (?, ?, ?, 0)').bind(id, 'Fictional account', name),
+          db.prepare('INSERT INTO accounts (id, name, username, handle, event_id, must_change) VALUES (?, ?, ?, ?, ?, 0)')
+            .bind(id, 'Fictional account', name, name, event),
           db.prepare(`INSERT INTO ba_user (id, name, username, email, emailVerified, createdAt, updatedAt)
             VALUES (?, 'Fictional account', ?, ?, 1, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`)
             .bind(id, name, `${name}@accounts.minsky.invalid`),
@@ -47,12 +50,12 @@ describe('sign-in failure limits at the Worker boundary with real local D1', () 
     return names;
   }
 
-  async function signIn(ip: string, username: string, attempt = password): Promise<number> {
+  async function signIn(ip: string, username: string, attempt = password, code = eventCode): Promise<number> {
     const pending: Promise<unknown>[] = [];
     const response = await applicationWorker.fetch(new Request(`${origin}/api/auth/sign-in`, {
       method: 'POST', headers: { Origin: origin, 'Content-Type': 'application/json',
         'X-Minsky-Request': '1', 'Sec-Fetch-Site': 'same-origin', 'CF-Connecting-IP': ip },
-      body: JSON.stringify({ username, password: attempt }),
+      body: JSON.stringify({ event: code, handle: username, password: attempt }),
     }), env, { waitUntil: (operation) => { pending.push(operation); } });
     await Promise.all(pending);
     return response.status;
@@ -71,6 +74,8 @@ describe('sign-in failure limits at the Worker boundary with real local D1', () 
     db = platform.env.DB;
     dispose = platform.dispose;
     await applyMigrations(db);
+    await db.prepare('INSERT INTO events (id) VALUES (?)').bind(event).run();
+    eventCode = (await db.prepare('SELECT code FROM events WHERE id = ?').bind(event).first<{ code: string }>())!.code;
     env = {
       DB: db, AUTH_ORIGIN: origin, AUTH_SECRET: randomUUID() + randomUUID(),
       ASSETS: { fetch: async () => new Response(null, { status: 404 }) },
@@ -111,7 +116,7 @@ describe('sign-in failure limits at the Worker boundary with real local D1', () 
     expect(await signIn(ip, names[0]!)).toBe(200);
   }, timeout);
 
-  it('locks only the username with 10 failures and leaves other users on the same IP alone', async () => {
+  it('locks only the handle in its event with 10 failures and leaves other users on the same IP alone', async () => {
     const [target, other] = await createAccounts('lock', 2);
     const ip = '198.51.100.4';
     for (let index = 0; index < signInFailureLimits.perUsername; index++) {
@@ -123,7 +128,19 @@ describe('sign-in failure limits at the Worker boundary with real local D1', () 
     // The IP count is far below its ceiling, so only the username refuses.
     const key = await ipKey(ip);
     expect(await counter(key)).toEqual([{ key, attempts: signInFailureLimits.perUsername }]);
-    await db.prepare('UPDATE authentication_limits SET window_start = unixepoch() - 901 WHERE key = ?').bind(`username:${target}`).run();
+    await db.prepare('UPDATE authentication_limits SET window_start = unixepoch() - 901 WHERE key = ?').bind(`handle:${event}:${target}`).run();
     expect(await signIn(ip, target!)).toBe(200);
+  }, timeout);
+
+  it('counts a wrong event code against the IP and the typed code, and a malformed one against the IP only', async () => {
+    const [name] = await createAccounts('code', 1);
+    const ip = '198.51.100.6';
+    expect(await signIn(ip, name!, password, `absent-${run}`)).toBe(401);
+    expect(await signIn(ip, name!, password, 'no')).toBe(401);
+    const key = await ipKey(ip);
+    expect(await counter(key)).toEqual([{ key, attempts: 2 }]);
+    expect((await counters()).filter((row) => row.key.endsWith(`:${name!}`)))
+      .toEqual([{ key: `handle:code:absent-${run}:${name!}`, attempts: 1 }]);
+    expect(await signIn(ip, name!)).toBe(200);
   }, timeout);
 });

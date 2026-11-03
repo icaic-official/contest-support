@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { backend } from "@/backend";
-import type { AccountCommand, RosterCommand } from "@/backend/contracts";
+import { type AccountCommand, type Handle, parseHandle, type RosterCommand, type SignInTarget } from "@/backend/contracts";
 import { errorMessage } from "@/backend/errors";
 import type { Snapshot } from "@/connected/model";
 import {
@@ -11,7 +11,7 @@ import {
   imageLimitsInput,
   membershipInput,
   resetPasswordCommand,
-  setUsernameCommand,
+  setHandleCommand,
 } from "./adminModel";
 import { rosterNotice } from "./rosterModel";
 
@@ -19,6 +19,8 @@ import { rosterNotice } from "./rosterModel";
 export interface Credentials {
   username: string;
   password: string;
+  /** The event code or the site that the account names to sign in. */
+  signIn: SignInTarget;
 }
 
 /** Session administration requests and their shared feedback. */
@@ -36,7 +38,8 @@ export interface SessionAdmin {
   setIntake: (open: boolean) => Promise<boolean>;
   saveImageLimits: (limits: ImageLimits) => Promise<boolean>;
   createAccount: (account: NewAccount) => Promise<boolean>;
-  setUsername: (userId: string, username: string) => Promise<boolean>;
+  /** Changes a username. The password and open sessions stay. */
+  setUsername: (userId: string, username: Handle) => Promise<boolean>;
   saveMembership: (userId: string, draft: MembershipDraft) => Promise<boolean>;
   resetPassword: (userId: string) => Promise<boolean>;
   revokeAccess: (userId: string) => Promise<boolean>;
@@ -93,17 +96,15 @@ export function useSessionAdmin(
   }
 
   /**
-   * Sends an account command. A new temporary password becomes the one-time
+   * Sends an account command. Its temporary password becomes the one-time
    * credentials, with the username of the account.
    */
   async function account(
     command: AccountCommand,
     username: string,
-  ): Promise<Credentials | undefined> {
+  ): Promise<Credentials> {
     const result = await backend.admin.account(sessionId, command);
-    return result.temporaryPassword
-      ? { username, password: result.temporaryPassword }
-      : undefined;
+    return { username, password: result.temporaryPassword, signIn: result.signIn };
   }
 
   function usernameOf(userId: string): string {
@@ -130,19 +131,19 @@ export function useSessionAdmin(
         ),
       ),
     createAccount: (input) =>
-      run(() =>
-        account(
-          createAccountCommand(input),
-          input.username.trim().toLowerCase(),
-        ),
-      ),
+      run(async () => {
+        const username = parseHandle(input.username);
+        if (!username) throw new Error("Use 3 to 32 letters, digits, hyphens, or underscores.");
+        return account(createAccountCommand(input), username);
+      }),
     setUsername: (userId, username) =>
-      run(() =>
-        account(
-          setUsernameCommand(userId, username),
-          username.trim().toLowerCase(),
-        ),
-      ),
+      run(async () => {
+        if (!state.event) throw new Error("Refresh the page, then change the username again.");
+        await backend.manage.execute(
+          crypto.randomUUID(),
+          setHandleCommand(state.event.id, userId, username),
+        );
+      }, "Username changed."),
     saveMembership: (userId, draft) =>
       run(() =>
         backend.admin.saveMember(

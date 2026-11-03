@@ -1,35 +1,39 @@
 import { z } from 'zod';
 import {
-  ISSUE_BATCH, type IssuedCredential, type ManageCommand, type ManageLevel, type ManageReceipt, type SiteOverview,
+  ISSUE_BATCH, type IssuedCredential, type LoginKey, type ManageCommand, type ManageLevel, type ManageReceipt,
+  type SiteOverview,
 } from '../../../backend/contracts';
 import { AuthenticationError, type Caller } from '../../authentication';
 import type { D1Connection, D1Statement, D1Value } from '../d1/connection';
 import { currentReadyLoginBindings, currentReadyLoginSql, notificationStatements } from './application';
 import {
-  authorityGuard, contestsToJoinSql, manageAccountBindings, manageWebmasterSql, reaches, resolveAuthority, webmastersSql,
-  type Authority, type Target,
+  authorityGuard, contestsToJoinSql, manageAccountBindings, manageHandleBindings, manageHandleSql, manageWebmasterSql,
+  reaches, resolveAuthority, webmastersSql, type Authority, type Target,
 } from './authority';
-import { replaceCredentialStatements } from './credentials';
+import { handleSchema, loginKeyFor, replaceCredentialStatements } from './credentials';
 import { randomSecret, type PasswordHasher } from './password';
 
-const usernameSchema = z.string().trim().toLowerCase().regex(/^[a-z0-9][a-z0-9_-]{2,31}$/);
 const commandSchema = z.discriminatedUnion('type', [
   z.strictObject({
     type: z.literal('add_webmaster'),
-    person: z.strictObject({ username: usernameSchema, name: z.string().trim().min(1).max(200) }),
+    person: z.strictObject({ handle: handleSchema, name: z.string().trim().min(1).max(200) }),
   }),
   z.strictObject({ type: z.literal('remove_webmaster'), accountId: z.uuid() }),
   z.strictObject({ type: z.literal('set_webmaster_reads'), restricted: z.boolean() }),
   z.strictObject({ type: z.literal('join_contest'), contestId: z.uuid() }),
+  z.strictObject({ type: z.literal('set_handle'), eventId: z.uuid(), accountId: z.uuid(), handle: handleSchema }),
 ]) satisfies z.ZodType<ManageCommand>;
 const accountIdsSchema = z.array(z.uuid()).min(1).max(ISSUE_BATCH)
   .refine((accountIds) => new Set(accountIds).size === accountIds.length);
 
-/** What a command needs: at least this level of authority over one target. */
-interface ManageRequirement {
-  readonly target: Target;
-  readonly level: Exclude<ManageLevel, 'none'>;
-}
+/**
+ * What a command needs: at least a level of authority over one target. Or,
+ * for a change to one account, any authority in the account's event, and
+ * the plan checks that account inside the batch.
+ */
+type ManageRequirement =
+  | { readonly target: Target; readonly level: Exclude<ManageLevel, 'none'> }
+  | { readonly target: { readonly scope: 'event'; readonly eventId: string }; readonly account: string };
 
 const site: ManageRequirement = { target: { scope: 'site' }, level: 'site' };
 
@@ -45,6 +49,7 @@ export const requirementOf: {
   set_webmaster_reads: () => site,
   // Only a site grant resolves to `site` in a contest, so only webmasters join.
   join_contest: (command) => ({ target: { scope: 'contest', contestId: command.contestId }, level: 'site' }),
+  set_handle: (command) => ({ target: { scope: 'event', eventId: command.eventId }, account: command.accountId }),
 };
 
 function requirementFor(command: ManageCommand): ManageRequirement {
@@ -55,7 +60,7 @@ function requirementFor(command: ManageCommand): ManageRequirement {
 /** What one command writes after the authority guard, in order. */
 interface Plan {
   readonly statements: readonly D1Statement[];
-  /** A site record in authority_audit. Null when D1 writes the audit itself. */
+  /** A record in authority_audit, of the target's event or of the site. Null when D1 writes the audit itself. */
   readonly audit: { readonly action: string; readonly target: string | null; readonly detail: object } | null;
   /** Audiences per contest whose open screens refresh after the commit. */
   readonly notify: ReadonlyArray<{ readonly contestId: string; readonly audiences: readonly string[] }>;
@@ -65,12 +70,14 @@ interface Plan {
 const lastWebmaster = 'The last webmaster cannot be removed.';
 const joinNeedsRestriction = 'Turn on "Webmasters read contest data only after joining" before you join a contest.';
 const usernameTaken = 'That username is taken. Choose another.';
+const cannotChangeAccount = 'You cannot change this account.';
 
 /** D1 refusals that tell a person what to change. Each rule lives in a D1 trigger or index. */
 const refusals: ReadonlyArray<readonly [cause: string, message: string]> = [
   ['The last webmaster cannot be removed', lastWebmaster],
   ['Webmasters join a contest only while the site restricts their reads', joinNeedsRestriction],
-  ['UNIQUE constraint failed: accounts.username', usernameTaken],
+  ['UNIQUE constraint failed: accounts.handle', usernameTaken],
+  ['UNIQUE constraint failed: accounts.event_id, accounts.handle', usernameTaken],
 ];
 
 /** Maps a failed batch to a message without SQL or provider detail. */
@@ -122,7 +129,8 @@ class Assertions {
 interface WebmasterRow {
   id: string;
   name: string;
-  username: string;
+  handle: string;
+  loginKey: LoginKey;
   disabled: number;
   credential_generation: number;
   ready: number;
@@ -149,7 +157,7 @@ export class D1ManageService {
       this.statement(contestsToJoinSql, caller.accountId).all<{ id: string; name: string; event_name: string }>(),
     ]);
     return {
-      webmasters: webmasters.map(({ id, name, username, ready }) => ({ id, name, username, ready: ready === 1 })),
+      webmasters: webmasters.map(({ id, name, handle, ready }) => ({ id, name, handle, ready: ready === 1 })),
       restrictWebmasterReads: restricted,
       contestsToJoin: contests.results.map((contest) => ({ id: contest.id, name: contest.name, eventName: contest.event_name })),
     };
@@ -164,8 +172,8 @@ export class D1ManageService {
     if (replayed) return replayed;
     const requirement = requirementFor(command);
     const authority = await resolveAuthority(this.db, caller, requirement.target);
-    if (!authority || !reaches(authority, requirement.level)) {
-      throw new AuthenticationError(403, 'Only a webmaster can change the site.');
+    if (!authority || ('level' in requirement && !reaches(authority, requirement.level))) {
+      throw new AuthenticationError(403, 'level' in requirement ? 'Only a webmaster can change the site.' : cannotChangeAccount);
     }
     if (!authority.writable) throw new AuthenticationError(403, 'This event is archived.');
     const assertions = new Assertions(this.db);
@@ -217,11 +225,11 @@ export class D1ManageService {
   }
 
   private async issued(accountIds: readonly string[], passwords: ReadonlyMap<string, string>): Promise<IssuedCredential[]> {
-    const accounts = await this.statement(`SELECT id, COALESCE(username, '') AS username FROM accounts
-      WHERE id IN (SELECT value FROM json_each(?))`, JSON.stringify(accountIds)).all<{ id: string; username: string }>();
-    const usernames = new Map(accounts.results.map((account) => [account.id, account.username]));
+    const accounts = await this.statement(`SELECT id, COALESCE(handle, '') AS handle FROM accounts
+      WHERE id IN (SELECT value FROM json_each(?))`, JSON.stringify(accountIds)).all<{ id: string; handle: string }>();
+    const handles = new Map(accounts.results.map((account) => [account.id, account.handle]));
     return accountIds.map((accountId) => ({
-      accountId, username: usernames.get(accountId) ?? '', temporaryPassword: passwords.get(accountId) ?? null,
+      accountId, handle: handles.get(accountId) ?? '', temporaryPassword: passwords.get(accountId) ?? null,
     }));
   }
 
@@ -250,7 +258,7 @@ export class D1ManageService {
       assertions.authority(authority),
       ...plan.statements,
       ...(plan.audit ? [this.statement(`INSERT INTO authority_audit (id, event_id, actor, actor_name, action, target, detail)
-        SELECT ?, NULL, id, name, ?, ?, ? FROM accounts WHERE id = ?`, crypto.randomUUID(), plan.audit.action,
+        SELECT ?, ?, id, name, ?, ?, ? FROM accounts WHERE id = ?`, crypto.randomUUID(), authority.eventId, plan.audit.action,
       plan.audit.target, JSON.stringify(plan.audit.detail), caller.accountId)] : []),
       this.statement('INSERT INTO manage_receipts (actor, request_id, command, result) VALUES (?, ?, ?, ?)',
         caller.accountId, requestId, record, JSON.stringify(plan.receipt)),
@@ -269,7 +277,8 @@ export class D1ManageService {
   }
 
   private async webmasters(): Promise<WebmasterRow[]> {
-    return (await this.statement(webmastersSql).all<WebmasterRow>()).results;
+    const rows = await this.statement(webmastersSql).all<Omit<WebmasterRow, 'loginKey'> & { login_key: LoginKey }>();
+    return rows.results.map(({ login_key, ...row }) => ({ ...row, loginKey: login_key }));
   }
 
   private async readsRestricted(): Promise<boolean> {
@@ -282,19 +291,19 @@ export class D1ManageService {
     const actor = authority.caller.accountId;
     switch (command.type) {
       case 'add_webmaster': {
-        const { username, name } = command.person;
-        if (await this.statement('SELECT 1 FROM accounts WHERE username = ?', username).first()) {
+        const { handle, name } = command.person;
+        if (await this.statement('SELECT 1 FROM accounts WHERE event_id IS NULL AND handle = ?', handle).first()) {
           throw new AuthenticationError(409, usernameTaken);
         }
         const accountId = crypto.randomUUID();
         return {
           statements: [
             // The account cannot sign in until issueCredentials gives it a password.
-            this.statement(`INSERT INTO accounts (id, name, username, must_change, credential_state)
-              VALUES (?, ?, ?, 1, 'pending')`, accountId, name, username),
+            this.statement(`INSERT INTO accounts (id, name, username, handle, must_change, credential_state)
+              VALUES (?, ?, ?, ?, 1, 'pending')`, accountId, name, loginKeyFor(accountId), handle),
             this.statement(`INSERT INTO grants (account_id, scope, granted_by) VALUES (?, 'site', ?)`, accountId, actor),
           ],
-          audit: { action: 'add_webmaster', target: accountId, detail: { username, name } },
+          audit: { action: 'add_webmaster', target: accountId, detail: { handle, name } },
           notify: [],
           receipt: { accountIds: [accountId] },
         };
@@ -349,6 +358,36 @@ export class D1ManageService {
           notify: [{ contestId: command.contestId, audiences: ['staff'] }],
           receipt: {},
         };
+      case 'set_handle': {
+        const { accountId, eventId, handle } = command;
+        const account = await this.statement(`SELECT handle, (SELECT json_group_array(session_id) FROM memberships
+            WHERE account_id = a.id) AS contests FROM accounts a WHERE id = ? AND event_id = ?`, accountId, eventId)
+          .first<{ handle: string | null; contests: string }>();
+        if (!account) throw new AuthenticationError(409, 'That account is not in this event. Refresh the page.');
+        const allowed = await this.statement(`SELECT EXISTS (${manageHandleSql}) AS allowed`,
+          ...manageHandleBindings(actor, accountId)).first<{ allowed: number }>();
+        if (!allowed?.allowed) throw new AuthenticationError(403, cannotChangeAccount);
+        if (await this.statement('SELECT 1 FROM accounts WHERE event_id = ? AND handle = ? AND id <> ?', eventId, handle, accountId).first()) {
+          throw new AuthenticationError(409, usernameTaken);
+        }
+        return {
+          // Only the handle changes. The login key and Better Auth stay, so
+          // open sessions continue.
+          statements: [
+            assertions.check(manageHandleSql, ...manageHandleBindings(actor, accountId)),
+            this.statement('UPDATE accounts SET handle = ? WHERE id = ? AND event_id = ?', handle, accountId, eventId),
+            assertions.check('SELECT 1 WHERE changes() = 1'),
+            // The 0017 takeover trigger checks this row under every Worker version.
+            this.statement(`INSERT INTO account_operations (id, account_id, actor, action, state, completed_at)
+              VALUES (?, ?, ?, 'set_username', 'completed', unixepoch())`, crypto.randomUUID(), accountId, actor),
+          ],
+          audit: { action: 'set_handle', target: accountId, detail: { from: account.handle, to: handle } },
+          // Staff read the handle in each contest that seats the account.
+          notify: (JSON.parse(account.contests) as string[])
+            .map((contestId) => ({ contestId, audiences: ['staff', `account:${accountId}`] })),
+          receipt: {},
+        };
+      }
     }
   }
 }

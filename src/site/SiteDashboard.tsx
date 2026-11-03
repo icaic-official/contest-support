@@ -1,7 +1,7 @@
 import { type FormEvent, type ReactNode, useId, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { Clock, KeyRound, LogOut, ShieldCheck, UserMinus, UserPlus } from "lucide-react";
-import type { AccountIdentity, SiteOverview } from "@/backend/contracts";
+import type { AccountIdentity, PersonInput, SiteOverview } from "@/backend/contracts";
 import { BrandMark } from "@/components/brand";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -211,7 +211,7 @@ function Webmasters({
     const issued = await state.issue(webmaster.id);
     if (!issued) return;
     if (issued.temporaryPassword) {
-      setCredentials({ username: issued.username, password: issued.temporaryPassword });
+      setCredentials({ username: issued.handle, password: issued.temporaryPassword, signIn: { kind: "site" } });
     } else {
       setNotice("The password was issued, but this page did not receive it. Choose Reset password to issue a new one.");
     }
@@ -237,7 +237,7 @@ function Webmasters({
                   <span className="ml-1 text-xs font-normal text-muted-foreground">(you)</span>
                 )}
               </p>
-              <p className="truncate font-mono text-xs text-muted-foreground">{webmaster.username}</p>
+              <p className="truncate font-mono text-xs text-muted-foreground">{webmaster.handle}</p>
             </div>
             <div className="ml-auto flex items-center gap-1">
               {!webmaster.ready && <Badge variant="secondary">Needs a password</Badge>}
@@ -342,7 +342,7 @@ function AddWebmaster({
   /** The last command error. The form shows it only after its own submission. */
   error: string;
   onOpenChange: (open: boolean) => void;
-  onAdd: (person: { name: string; username: string }) => Promise<void>;
+  onAdd: (person: PersonInput) => Promise<void>;
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -369,7 +369,7 @@ function AddWebmasterForm({
   busy: boolean;
   error: string;
   onCancel: () => void;
-  onAdd: (person: { name: string; username: string }) => Promise<void>;
+  onAdd: (person: PersonInput) => Promise<void>;
 }) {
   const id = useId();
   const [submitted, setSubmitted] = useState(false);
@@ -377,7 +377,7 @@ function AddWebmasterForm({
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     setSubmitted(true);
-    void onAdd({ name: String(form.get("name") ?? ""), username: String(form.get("username") ?? "") });
+    void onAdd({ name: String(form.get("name") ?? ""), handle: String(form.get("username") ?? "") });
   }
   return (
     <>

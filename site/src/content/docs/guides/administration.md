@@ -9,8 +9,11 @@ Use the **Session** tab (phone) or the **Accounts**, **Roster**, and **Session s
 
 1. Select **New account** (phone) or **Create account** (console).
 2. Create a team account for contestants or a personal account for each staff member.
-3. Copy the username and temporary password before you select **Done**. Minsky shows them once.
+3. Copy the sign-in link, the username, and the temporary password before you select **Done**. Minsky shows the password once.
 4. Send them through a private channel.
+
+The sign-in link names your event, for example `https://minsky.example/?event=xxxx-2026`. It fills in the event code on the sign-in form.
+A username is unique inside your event. Another event can use the same username.
 
 Choose the team for a contestant. Give staff any of **Volunteer**, **Specialist**, **Jury**, and **Admin**. Roles combine.
 App access is separate from access to GitHub and to the hosting provider, such as Cloudflare.
@@ -21,8 +24,16 @@ App access is separate from access to GitHub and to the hosting provider, such a
 2. Reset from the account sheet (phone) or **Manage** (console).
 3. Give the new temporary password privately.
 
-The reset signs the account out everywhere. History stays.
+The reset signs the account out everywhere. History stays. The account keeps its username.
 Resets and username changes affect the whole account, so you need admin access to all its sessions.
+
+## Change a username
+
+1. Open the account sheet (phone) or **Manage** (console).
+2. Enter the new username in **Change username**, and select **Change username**.
+3. Tell the person their new username. Print a new sheet for a team.
+
+The password stays, and open sessions stay signed in. An older account without a username gets one here. Then reset its password, so that it can sign in.
 
 ## Remove access
 

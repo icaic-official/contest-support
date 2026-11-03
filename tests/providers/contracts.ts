@@ -1,4 +1,4 @@
-import type { Backend } from '../../src/backend/contracts';
+import type { Backend, SignInTarget } from '../../src/backend/contracts';
 
 export type Actor =
   | 'admin'
@@ -14,6 +14,9 @@ export type Actor =
 
 export interface TestAccount {
   id: string;
+  /** The event or the site whose namespace holds `username`. */
+  target: SignInTarget;
+  /** The handle that the account types. */
   username: string;
   password: string;
 }
@@ -25,6 +28,8 @@ export interface ScenarioData {
   teamId: string;
   accounts: Record<Actor, TestAccount>;
   createdAccounts: Record<'contestant' | 'staff', { name: string; username: string }>;
+  /** The event of every fixture account. Created accounts sign in with it. */
+  signIn: SignInTarget;
 }
 
 /** Exact account markers are saved before the browser can create an account. */

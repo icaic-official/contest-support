@@ -138,7 +138,7 @@ describe('hosted-origin browser bridge boundaries', () => {
     vi.stubGlobal('fetch', vi.fn(async (input) => {
       const path = new URL(input).pathname;
       return globalThis.Response.json(path === '/api/auth/session' ? { user: { id: userId },
-        status: { username: 'fictional', must_change: false, session_valid: true }, csrf: 'fictional-csrf' }
+        status: { handle: 'fictional', must_change: false, session_valid: true }, csrf: 'fictional-csrf' }
         : path === '/api/workflow' ? { outcome: 'committed', issueId } : {});
     }));
     const provider = createBrowserProvider({ origin: connectorTarget.origin });
@@ -157,8 +157,11 @@ describe('hosted-origin browser bridge boundaries', () => {
     vi.stubGlobal('fetch', vi.fn(async (input) => {
       const path = new URL(input).pathname;
       if (path === '/api/auth/session') return globalThis.Response.json({ user: { id: userId },
-        status: { username: 'fictional', must_change: false, session_valid: true }, csrf: 'fictional-csrf' });
-      if (path === '/api/accounts') { creations++; return globalThis.Response.json({ temporaryPassword: 'private-fixture-password' }); }
+        status: { handle: 'fictional', must_change: false, session_valid: true }, csrf: 'fictional-csrf' });
+      if (path === '/api/accounts') {
+        creations++;
+        return globalThis.Response.json({ temporaryPassword: 'private-fixture-password', signIn: { kind: 'site' } });
+      }
       return globalThis.Response.json({});
     }));
     const provider = createBrowserProvider({ origin: connectorTarget.origin });
@@ -167,7 +170,8 @@ describe('hosted-origin browser bridge boundaries', () => {
     provider.discardNextAccountResponse();
     await expect(provider.backend.admin.account(randomUUID(), command)).rejects.toThrow('discarded the committed account response');
     expect(creations).toBe(1);
-    await expect(provider.backend.admin.account(randomUUID(), command)).resolves.toEqual({ temporaryPassword: 'private-fixture-password' });
+    await expect(provider.backend.admin.account(randomUUID(), command)).resolves
+      .toEqual({ temporaryPassword: 'private-fixture-password', signIn: { kind: 'site' } });
     expect(creations).toBe(2);
     await provider.close();
   });
@@ -347,9 +351,9 @@ describe('Cloudflare fixture setup and exact cleanup with real local D1/R2', () 
     const fixture = await createFixture(path, dependencies());
     const marker = fixture.createdAccounts.staff;
     const foreign = randomUUID();
-    const counterKey = `username:${marker.username}`;
+    const counterKey = `handle:${JSON.parse(await readFile(path, 'utf8')).eventId}:${marker.username}`;
     await platform.env.DB.batch([
-      statement('INSERT INTO accounts(id,name,username) VALUES (?,?,?)', foreign, 'Unrelated control account', marker.username),
+      statement('INSERT INTO accounts(id,name,username,handle) VALUES (?,?,?,?)', foreign, 'Unrelated control account', marker.username, marker.username),
       statement('INSERT INTO authentication_limits(key,window_start,attempts) VALUES (?,123,7)', counterKey),
     ]);
     try {
@@ -377,7 +381,8 @@ describe('Cloudflare fixture setup and exact cleanup with real local D1/R2', () 
       origin: 'http://127.0.0.1:8788', secret: randomUUID() + randomUUID(), secureCookies: false,
     });
     const auth = new D1AuthenticationService(platform.env.DB, identity, passwordHasher);
-    const login = await auth.signIn(fixture.accounts.admin.username, fixture.accounts.admin.password);
+    const login = await auth.signIn(fixture.accounts.admin.target, fixture.accounts.admin.username, fixture.accounts.admin.password);
+    const counterKey = `handle:${JSON.parse(await readFile(path, 'utf8')).eventId}:${marker.username}`;
     const headers = new globalThis.Headers({ cookie: login.cookie.split(';')[0] });
     const foreign = randomUUID();
     await statement('INSERT INTO accounts(id,name) VALUES (?,?)', foreign, 'Unrelated control account').run();
@@ -385,10 +390,10 @@ describe('Cloudflare fixture setup and exact cleanup with real local D1/R2', () 
       // Ignore the credential response, as a browser with a lost create response would.
       await auth.account(headers, fixture.sessionId, { action: 'create_account', ...marker,
         teamId: null, roles: ['volunteer', 'jury'], isAdmin: false });
-      const created = await statement('SELECT id FROM accounts WHERE name=? AND username=?', marker.name, marker.username).first();
+      const created = await statement('SELECT id FROM accounts WHERE name=? AND handle=?', marker.name, marker.username).first();
       expect(created?.id).toBeTypeOf('string');
       expect(JSON.parse(await readFile(path, 'utf8')).createdAccounts.every((account) => !account.id)).toBe(true);
-      await statement('INSERT INTO authentication_limits(key,window_start,attempts) VALUES (?,unixepoch(),1)', `username:${marker.username}`).run();
+      await statement('INSERT INTO authentication_limits(key,window_start,attempts) VALUES (?,unixepoch(),1)', counterKey).run();
       let failFinish = true;
       const interrupted = dependencies({ openPlatform: async () => ({ env: { ...platform.env, MAINTENANCE: {
         fetch: async (input, init) => {
@@ -402,7 +407,7 @@ describe('Cloudflare fixture setup and exact cleanup with real local D1/R2', () 
       expect(await statement('SELECT id FROM accounts WHERE id=?', created.id).first()).toBeNull();
       await cleanupFixture(path, dependencies());
       expect(await statement('SELECT id FROM ba_user WHERE id=?', created.id).first()).toBeNull();
-      expect(await statement('SELECT key FROM authentication_limits WHERE key=?', `username:${marker.username}`).first()).toBeNull();
+      expect(await statement('SELECT key FROM authentication_limits WHERE key=?', counterKey).first()).toBeNull();
       expect(await statement('SELECT id FROM accounts WHERE id=?', foreign).first()).toEqual({ id: foreign });
     } finally {
       if (existsSync(path)) await cleanupFixture(path, dependencies());
@@ -493,7 +498,7 @@ describe('Cloudflare fixture setup and exact cleanup with real local D1/R2', () 
         statement(`INSERT INTO account_operations (id, account_id, actor, action, state) VALUES (?, ?, ?, 'change_password', 'completed')`,
           randomUUID(), fixture.accounts.volunteer.id, fixture.accounts.volunteer.id),
         statement('INSERT INTO authentication_limits (key, window_start, attempts) VALUES (?, unixepoch(), 1), (?, unixepoch(), 1), (?, unixepoch(), 1)',
-          `username:${fixture.accounts.volunteer.username}`, `change:${fixture.accounts.volunteer.id}`, rateKey),
+          `handle:${journal.eventId}:${fixture.accounts.volunteer.username}`, `change:${fixture.accounts.volunteer.id}`, rateKey),
         avatar(retiredAvatar, fixture.accounts.volunteer.id, 'retired'),
         avatar(currentAvatar, fixture.accounts.volunteer.id, 'ready'),
         avatar(foreignAvatar, foreignAccount, 'ready'),

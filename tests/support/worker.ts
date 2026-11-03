@@ -1,27 +1,39 @@
 import { test as base, expect, type BrowserContext, type Page, type WebSocketRoute } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
-import type { PersonAvatar, RosterCommand } from '../../src/backend/contracts';
+import type { AccountResult, EventCode, PersonAvatar, RosterCommand, SignInTarget } from '../../src/backend/contracts';
 import { rosterCommandSchema } from '../../src/connected/roster';
 import type { AnnouncementSnapshot } from '../../src/connected/announcementModel';
 import type { Command, Membership, Snapshot } from '../../src/connected/model';
-import { AuthenticationError, type AuthenticationService, type AuthenticationSession } from '../../src/server/authentication';
+import {
+  AuthenticationError, signInRefused, type AuthenticationService, type AuthenticationSession,
+} from '../../src/server/authentication';
 import { createAuthenticationHandler } from '../../src/server/authenticationHttp';
+import { eventCodeStorageKey } from '../../src/screens/eventCodeMemory';
 import type { CommandResult } from '../../src/server/workflow';
 import { createApplicationHandler, type ApplicationHttpServices } from '../../src/server/adapters/cloudflare/http';
 
 /** The application services behind the Worker routes. Identity and live updates come from the fixture. */
 export type WorkerServices = Omit<ApplicationHttpServices, 'auth' | 'connect'>;
 
-/** A fixture account. Sign-in accepts any password for its username. */
+/** A fixture account. Sign-in accepts any password for its username in its target. */
 export interface FixtureAccount {
   id: string;
+  /** The event or the site that the sign-in form must name. */
+  target: SignInTarget;
   username: string;
   name: string;
   loginId: string;
 }
 
-export function fixtureAccount(id: string, username: string, name: string): FixtureAccount {
-  return { id, username, name, loginId: randomUUID() };
+/** The event of every in-memory fixture account. */
+export const fixtureEvent = { kind: 'event', code: 'fixture-event' as EventCode } as const satisfies SignInTarget;
+
+export function fixtureAccount(id: string, username: string, name: string, target: SignInTarget = fixtureEvent): FixtureAccount {
+  return { id, target, username, name, loginId: randomUUID() };
+}
+
+function sameTarget(account: SignInTarget, typed: SignInTarget): boolean {
+  return account.kind === 'site' ? typed.kind === 'site' : typed.kind === 'event' && typed.code === account.code;
 }
 
 const loginCookie = 'minsky_fixture_login';
@@ -31,7 +43,11 @@ const loginCookie = 'minsky_fixture_login';
  * HttpOnly cookie carries it, so every browser context signs in separately.
  */
 class FixtureIdentity implements AuthenticationService {
-  constructor(private readonly accounts: () => readonly FixtureAccount[]) {}
+  constructor(
+    private readonly accounts: () => readonly FixtureAccount[],
+    private readonly eventCode: () => EventCode,
+    private readonly canChangeHandle: (accountId: string) => Promise<boolean>,
+  ) {}
 
   async current(headers: Headers): Promise<AuthenticationSession | undefined> {
     const loginId = headers.get('Cookie')?.split(';').map((part) => part.trim().split('='))
@@ -41,14 +57,14 @@ class FixtureIdentity implements AuthenticationService {
     return {
       caller: { accountId: account.id, loginId: account.loginId },
       user: { id: account.id, name: account.name },
-      status: { username: account.username, must_change: false, session_valid: true },
+      status: { handle: account.username, must_change: false, session_valid: true, can_change_handle: await this.canChangeHandle(account.id) },
       csrf: `csrf-${account.loginId}`,
     };
   }
 
-  async signIn(username: string): Promise<{ cookie: string }> {
-    const account = this.accounts().find((candidate) => candidate.username === username);
-    if (!account) throw new AuthenticationError(401, 'The username or password is incorrect.');
+  async signIn(target: SignInTarget, username: string): Promise<{ cookie: string }> {
+    const account = this.accounts().find((candidate) => candidate.username === username && sameTarget(candidate.target, target));
+    if (!account) throw signInRefused(target.kind);
     return { cookie: `${loginCookie}=${account.loginId}; Path=/; HttpOnly; SameSite=Strict` };
   }
 
@@ -62,8 +78,9 @@ class FixtureIdentity implements AuthenticationService {
     return { cookie: `${loginCookie}=${session.caller.loginId}; Path=/; HttpOnly; SameSite=Strict` };
   }
 
-  async account(): Promise<{ temporaryPassword?: string }> {
-    return {};
+  /** A fictional credential of the fixture's event. No account changes. */
+  async account(): Promise<AccountResult> {
+    return { temporaryPassword: 'fictional-temporary-password', signIn: { kind: 'event', code: this.eventCode() } };
   }
 }
 
@@ -84,9 +101,16 @@ export abstract class FixtureWorker {
   private readonly losses: Array<{ path: string; stage: 'request' | 'response' }> = [];
 
   protected abstract accounts(): readonly FixtureAccount[];
+  /** Whether an account may change its own username, as the account status reports it. */
+  protected abstract canChangeHandle(accountId: string): Promise<boolean>;
   protected abstract readonly services: WorkerServices;
 
   constructor(readonly origin: string) {}
+
+  /** The event code of the fixture's accounts. */
+  protected eventCodeOfDevice(): EventCode {
+    return fixtureEvent.code;
+  }
 
   /** The bodies of the writes to one path, in order. */
   bodies<T = unknown>(path: string): T[] {
@@ -107,8 +131,23 @@ export abstract class FixtureWorker {
     for (const socket of this.sockets) socket.send('{"type":"change"}');
   }
 
-  async attach(context: BrowserContext): Promise<void> {
-    const identity = new FixtureIdentity(() => this.accounts());
+  /**
+   * Serves the Worker to one browser context. By default the browser acts as
+   * a device that last signed in to the fixture's event, so the sign-in form
+   * fills in the code. `newDevice` starts with no remembered code. A later
+   * attach of the same context names its own event, because its script runs last.
+   */
+  async attach(context: BrowserContext, options: { newDevice?: boolean } = {}): Promise<void> {
+    if (!options.newDevice) {
+      await context.addInitScript(({ key, code }) => {
+        try {
+          window.localStorage.setItem(key, code);
+        } catch {
+          // A page without storage starts with an empty code.
+        }
+      }, { key: eventCodeStorageKey, code: this.eventCodeOfDevice() });
+    }
+    const identity = new FixtureIdentity(() => this.accounts(), () => this.eventCodeOfDevice(), (id) => this.canChangeHandle(id));
     const authentication = createAuthenticationHandler(identity, { origins: [this.origin] });
     const application = createApplicationHandler({
       ...this.services,
@@ -255,6 +294,11 @@ export class FakeWorker extends FixtureWorker {
 
   protected accounts(): readonly FixtureAccount[] {
     return this.account ? [this.account] : [];
+  }
+
+  /** The fake Worker refuses every username change. */
+  protected async canChangeHandle(): Promise<boolean> {
+    return false;
   }
 
   private read(sessionId: string): Snapshot {

@@ -35,7 +35,7 @@ describe('Worker failure logging', () => {
   it('logs one structured event for an unhandled failure', async () => {
     const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
     const response = await applicationWorker.fetch(
-      request('/api/auth/sign-in', { method: 'POST', body: JSON.stringify({ username: 'a', password: secret }) }),
+      request('/api/auth/sign-in', { method: 'POST', body: JSON.stringify({ event: null, handle: 'a', password: secret }) }),
       failingEnvironment(), context);
     expect(response.status).toBe(503);
     expect(spy.mock.calls.map(([line]) => JSON.parse(String(line)) as unknown)).toEqual([{
@@ -51,7 +51,7 @@ describe('Worker failure logging', () => {
     }
     const env = failingEnvironment();
     await applicationWorker.fetch(
-      request('/api/auth/sign-in', { method: 'POST', body: JSON.stringify({ username: 'a', password: secret }) }), env, context);
+      request('/api/auth/sign-in', { method: 'POST', body: JSON.stringify({ event: null, handle: 'a', password: secret }) }), env, context);
     await applicationWorker.fetch(request('/api/images', { method: 'POST', body: JSON.stringify({ note: secret }) }), env, context);
     await expect(applicationWorker.scheduled({}, env)).rejects.toThrow();
     expect(output.length).toBeGreaterThan(2);

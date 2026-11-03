@@ -6,7 +6,9 @@ import { join } from 'node:path';
 import { z } from 'zod';
 import type { D1Connection, D1Statement } from '../../../src/server/adapters/d1/connection';
 import { attachmentPath } from '../../../src/connected/imageFile';
+import type { EventCode, SignInTarget } from '../../../src/backend/contracts';
 import { avatarKey } from '../../../src/server/adapters/cloudflare/avatars';
+import { loginKeyFor } from '../../../src/server/adapters/cloudflare/credentials';
 import { passwordHasher, randomSecret } from '../../../src/server/adapters/cloudflare/password';
 import { createdAccountMarkers, type Actor, type ScenarioData, type TestAccount } from '../contracts';
 import { confirmFixtureTarget, readFixtureTarget, type FixtureTarget } from './target.mjs';
@@ -125,6 +127,8 @@ export async function checkFixtureSchema(db: D1Connection): Promise<void> {
 
 function name(journal: Journal, actor: Actor): string { return `Provider ${actor} ${journal.runId}`; }
 function username(journal: Journal, actor: Actor): string { return `pc-${journal.runId.slice(0, 12)}-${actor.toLowerCase()}`; }
+/** The run's event code. Each fixture account and each created account signs in with it. */
+function eventCode(journal: Journal): EventCode { return `pc-${journal.runId}` as EventCode; }
 const marks = (count: number) => Array<string>(count).fill('?').join(',');
 
 /** All IDs exist in a private journal before the first atomic fixture write. */
@@ -142,8 +146,9 @@ export async function createFixture(path: string, dependencies: Dependencies = {
     };
     const createdAccounts = createdAccountMarkers(journal.runId);
     journal.createdAccounts = Object.values(createdAccounts);
+    const signIn: SignInTarget = { kind: 'event', code: eventCode(journal) };
     const accounts = Object.fromEntries(actors.map((actor) => [actor, {
-      id: accountIds[actor], username: username(journal, actor), password: randomSecret() + 'A9!',
+      id: accountIds[actor], target: signIn, username: username(journal, actor), password: randomSecret() + 'A9!',
     }])) as Record<Actor, TestAccount>;
     const hashes = new Map<Actor, string>();
     // Maintained production hashing stays outside D1. Passwords and hashes
@@ -155,7 +160,7 @@ export async function createFixture(path: string, dependencies: Dependencies = {
     saved = true;
     const db = platform.env.DB;
     const queries: D1Statement[] = [
-      statement(db, 'INSERT INTO events (id, name) VALUES (?, ?)', journal.eventId, `Provider contract ${journal.runId}`),
+      statement(db, 'INSERT INTO events (id, name, code) VALUES (?, ?, ?)', journal.eventId, `Provider contract ${journal.runId}`, eventCode(journal)),
       ...journal.sessionIds.map((id, index) => statement(db,
         'INSERT INTO sessions (id, event_id, name, intake_open) VALUES (?, ?, ?, 1)',
         id, journal.eventId, index === 0 ? 'Provider primary' : 'Provider isolation')),
@@ -190,7 +195,7 @@ export async function createFixture(path: string, dependencies: Dependencies = {
       );
     }
     await db.batch(queries);
-    return { sessionId: journal.sessionIds[0], otherSessionId: journal.sessionIds[1], teamId: journal.teamIds[0], accounts, createdAccounts, origin: target.origin };
+    return { sessionId: journal.sessionIds[0], otherSessionId: journal.sessionIds[1], teamId: journal.teamIds[0], accounts, createdAccounts, signIn, origin: target.origin };
   } catch {
     if (saved && existsSync(path)) {
       try {
@@ -240,9 +245,9 @@ function ownedAccountIds(journal: Journal): string[] {
 
 async function discoverCreatedAccounts(db: D1Connection, journal: Journal): Promise<void> {
   for (const marker of journal.createdAccounts) {
-    const rows = (await statement(db, `SELECT id FROM accounts WHERE name = ? AND username = ?
-      UNION SELECT id FROM ba_user WHERE name = ? AND username = ? AND email = ?`,
-    marker.name, marker.username, marker.name, marker.username, `${marker.username}@accounts.minsky.invalid`).all<{ id: string }>()).results;
+    // A created account types its marker as handle. Its login key comes from its ID.
+    const rows = (await statement(db, 'SELECT id FROM accounts WHERE name = ? AND handle = ? AND event_id = ?',
+      marker.name, marker.username, journal.eventId).all<{ id: string }>()).results;
     if (rows.length > 1 || rows.some((row) => !uuid.safeParse(row.id).success || marker.id && row.id !== marker.id || Object.values(journal.accountIds).includes(row.id))) {
       throw new Error('A created fixture account has an ambiguous ownership marker.');
     }
@@ -271,19 +276,21 @@ async function validateOwnership(db: D1Connection, journal: Journal): Promise<Ow
   if (teams.some((row) => !journal.teamIds.includes(row.id) || row.session_id !== journal.sessionIds[journal.teamIds.indexOf(row.id) === 2 ? 1 : 0])) {
     throw new Error('Recovery team does not belong to this run.');
   }
-  const accounts = (await statement(db, `SELECT id, name, username FROM accounts WHERE id IN (${marks(ids.length)})`, ...ids)
-    .all<{ id: string; name: string; username: string }>()).results;
+  const accounts = (await statement(db, `SELECT id, name, username, handle FROM accounts WHERE id IN (${marks(ids.length)})`, ...ids)
+    .all<{ id: string; name: string; username: string; handle: string | null }>()).results;
   for (const row of accounts) {
     const actor = actors.find((actor) => journal.accountIds[actor] === row.id);
     const marker = journal.createdAccounts.find((account) => account.id === row.id);
-    if (row.name !== (actor ? name(journal, actor) : marker?.name) || row.username !== (actor ? username(journal, actor) : marker?.username)) throw new Error('Recovery account does not belong to this run.');
+    const handle = actor ? username(journal, actor) : marker?.username;
+    if (row.name !== (actor ? name(journal, actor) : marker?.name) || row.handle !== handle ||
+        row.username !== (actor ? handle : loginKeyFor(row.id))) throw new Error('Recovery account does not belong to this run.');
   }
   const identities = (await statement(db, `SELECT id, name, username, email FROM ba_user WHERE id IN (${marks(ids.length)})`, ...ids)
     .all<{ id: string; name: string; username: string; email: string }>()).results;
   for (const row of identities) {
     const actor = actors.find((actor) => journal.accountIds[actor] === row.id);
     const marker = journal.createdAccounts.find((account) => account.id === row.id);
-    if (row.name !== (actor ? name(journal, actor) : marker?.name) || row.username !== (actor ? username(journal, actor) : marker?.username) || row.email !== `${row.username}@accounts.minsky.invalid`) {
+    if (row.name !== (actor ? name(journal, actor) : marker?.name) || row.username !== (actor ? username(journal, actor) : loginKeyFor(row.id)) || row.email !== `${row.username}@accounts.minsky.invalid`) {
       throw new Error('Recovery identity does not belong to this run.');
     }
   }
@@ -370,8 +377,8 @@ async function cleanupOnPlatform(path: string, platform: Platform, target: Fixtu
   // No list or prefix deletion can reach another fixture's objects.
   for (let index = 0; index < keys.length; index += 1000) await platform.env.IMAGES.delete(keys.slice(index, index + 1000));
   for (const key of keys) if (await platform.env.IMAGES.head(key)) throw new Error('Fixture image cleanup is incomplete.');
-  const rateKeys = [...actors.map((actor) => `username:${username(journal, actor)}`),
-    ...journal.createdAccounts.filter((account) => account.id).map((account) => `username:${account.username}`), ...ids.map((id) => `change:${id}`)];
+  const rateKeys = [...actors.map((actor) => `handle:${journal.eventId}:${username(journal, actor)}`),
+    ...journal.createdAccounts.filter((account) => account.id).map((account) => `handle:${journal.eventId}:${account.username}`), ...ids.map((id) => `change:${id}`)];
   await db.batch([
     statement(db, 'DELETE FROM events WHERE id = ?', journal.eventId),
     statement(db, `DELETE FROM account_operations WHERE account_id IN (${marks(ids.length)}) OR actor IN (${marks(ids.length)})`, ...ids, ...ids),

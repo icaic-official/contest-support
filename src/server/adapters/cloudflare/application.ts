@@ -103,7 +103,7 @@ SELECT json_object(
     SELECT json_object('membership', json_object('session_id', m.session_id, 'user_id', m.account_id,
       'team_id', m.team_id, 'roles', json(m.roles),
       'is_admin', json(CASE WHEN m.is_admin THEN 'true' ELSE 'false' END)),
-      'person', json_object('id', p.id, 'name', p.name, 'username', p.username)) AS row
+      'person', json_object('id', p.id, 'name', p.name, 'username', p.handle)) AS row
     FROM (${contestSeatsSql}) m JOIN accounts p ON p.id = m.account_id
     WHERE c.is_admin = 1 ORDER BY p.name, p.id)), '[]')),
   'audit', json(COALESCE((SELECT json_group_array(json(row)) FROM (

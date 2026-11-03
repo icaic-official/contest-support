@@ -1,10 +1,15 @@
 import { z } from 'zod';
-import type { AccountCommand, AccountResult } from '../../../backend/contracts';
-import { AuthenticationError, type AuthenticationService, type AuthenticationSession } from '../../authentication';
+import type { AccountCommand, AccountResult, EventCode, Handle, LoginKey, SignInTarget } from '../../../backend/contracts';
+import {
+  AuthenticationError, signInRefused, type AuthenticationService, type AuthenticationSession,
+} from '../../authentication';
 import type { D1Connection, D1Statement, D1Value } from '../d1/connection';
 import type { IdentityProvider } from './identity';
-import { authorityCheck, manageAccountBindings, manageAccountSql, reaches, resolveAuthority } from './authority';
-import { beginCredentialReset, completeCredentialReset } from './credentials';
+import {
+  authorityCheck, loginAccountColumns, manageAccountBindings, manageAccountSql, ownHandleSql, reaches, resolveAuthority,
+  signInAccountSql,
+} from './authority';
+import { beginCredentialReset, completeCredentialReset, handleSchema, loginKeyFor } from './credentials';
 import { randomSecret, type PasswordHasher } from './password';
 
 /**
@@ -14,7 +19,6 @@ import { randomSecret, type PasswordHasher } from './password';
  */
 export const signInFailureLimits = { windowSeconds: 900, perIp: 200, perUsername: 10 } as const;
 
-const usernameSchema = z.string().trim().toLowerCase().regex(/^[a-z0-9][a-z0-9_-]{2,31}$/);
 const passwordSchema = z.string().min(12).max(128);
 const memberSchema = z.object({
   teamId: z.string().uuid().nullable(),
@@ -22,15 +26,16 @@ const memberSchema = z.object({
   isAdmin: z.boolean(),
 });
 const commandSchema = z.discriminatedUnion('action', [
-  memberSchema.extend({ action: z.literal('create_account'), username: usernameSchema, name: z.string().trim().min(1).max(200) }).strict(),
-  z.object({ action: z.literal('set_username'), userId: z.string().uuid(), username: usernameSchema }).strict(),
+  memberSchema.extend({ action: z.literal('create_account'), username: handleSchema, name: z.string().trim().min(1).max(200) }).strict(),
   z.object({ action: z.literal('reset_password'), userId: z.string().uuid() }).strict(),
 ]);
 
 interface Account {
   id: string;
   name: string;
-  username: string | null;
+  /** The login key. Only Better Auth reads it. */
+  username: LoginKey | null;
+  handle: Handle | null;
   must_change: number;
   disabled: number;
   credential_generation: number;
@@ -48,6 +53,28 @@ interface Login extends Account {
 interface SqlCheck {
   sql: string;
   values: D1Value[];
+}
+
+/**
+ * The account that a sign-in names, read once before the password check
+ * (`loginAccountColumns`). Each column is null when no account matches.
+ */
+interface LoginAccount {
+  account_id: string | null;
+  login_key: LoginKey | null;
+  disabled: number | null;
+  credential_state: string | null;
+  credential_generation: number | null;
+}
+
+/** `event_id` is set for an event code that exists. */
+interface SignInRow extends LoginAccount {
+  event_id: string | null;
+}
+
+/** The failure counter of one handle. The same handle in two events has two counters. */
+function signInLimitKey(scope: string, handle: Handle): string {
+  return `handle:${scope}:${handle}`;
 }
 
 // This query is also evaluated inside each privileged batch. No browser claim
@@ -78,7 +105,11 @@ export class D1AuthenticationService implements AuthenticationService {
       await this.db.batch(statements);
     } catch (error) {
       // Do not expose SQL, password hashes, or provider error text.
-      const rollback = error instanceof Error && /(?:CHECK|UNIQUE|FOREIGN KEY|NOT NULL) constraint failed/.test(error.message);
+      const message = error instanceof Error ? error.message : '';
+      if (message.includes('UNIQUE constraint failed: accounts.event_id, accounts.handle')) {
+        throw new AuthenticationError(409, 'That username is taken in this event. Choose another.');
+      }
+      const rollback = /(?:CHECK|UNIQUE|FOREIGN KEY|NOT NULL) constraint failed/.test(message);
       throw new AuthenticationError(409, rollback
         ? 'Account changed. Check its status before retrying.'
         : 'The account request outcome is unknown. Check its status before retrying.');
@@ -92,12 +123,13 @@ export class D1AuthenticationService implements AuthenticationService {
   async current(headers: Headers): Promise<AuthenticationSession | undefined> {
     const identity = await this.identity.session(headers);
     if (!identity) return undefined;
-    const row = await this.statement(currentLoginSql, identity.identitySessionId, identity.accountId).first<Login>();
+    const row = await this.statement(`SELECT t.*, (${ownHandleSql}) AS own_handle FROM (${currentLoginSql}) t`,
+      identity.identitySessionId, identity.accountId).first<Login & { own_handle: number }>();
     if (!row) return undefined;
     return {
       caller: { accountId: row.id, loginId: row.login_id },
       user: { id: row.id, name: row.name },
-      status: { username: row.username, must_change: !!row.must_change, session_valid: true },
+      status: { handle: row.handle, must_change: !!row.must_change, session_valid: true, can_change_handle: !!row.own_handle },
       csrf: row.csrf,
     };
   }
@@ -109,30 +141,40 @@ export class D1AuthenticationService implements AuthenticationService {
     return current;
   }
 
-  async signIn(username: string, password: string): Promise<{ cookie: string }> {
-    const parsed = usernameSchema.safeParse(username);
-    if (!parsed.success || typeof password !== 'string' || password.length > 128 || password.length < 1) {
-      throw new AuthenticationError(401, 'Username or password is incorrect.');
-    }
-    // Refuse before the expensive password check when the username already has
+  async signIn(target: SignInTarget, handle: Handle, password: string): Promise<{ cookie: string }> {
+    if (typeof password !== 'string' || password.length > 128 || password.length < 1) throw signInRefused(target.kind);
+    const row = await this.statement(signInAccountSql[target.kind],
+      ...(target.kind === 'event' ? [handle, target.code] : [handle])).first<SignInRow>();
+    // An unknown event code counts against the typed code. Its refusals then
+    // reach the limit as a known code's do, so the limit never shows which
+    // codes exist.
+    const scope = row?.event_id ?? (target.kind === 'event' ? `code:${target.code}` : 'site');
+    // Refuse before the expensive password check when the handle already has
     // its maximum failures. Only a failure adds to the count, so a correct
     // password never uses an attempt. The HTTP Worker adds the IP limit.
-    const key = `username:${parsed.data}`;
+    const key = signInLimitKey(scope, handle);
     await this.assertBelowLimit(key, signInFailureLimits.perUsername);
     try {
-      return await this.createLogin(parsed.data, password);
+      return await this.createLogin(row, password);
     } catch (error) {
-      if (error instanceof AuthenticationError && error.status === 401) await this.recordFailure(key);
-      throw error;
+      if (!(error instanceof AuthenticationError) || error.status !== 401) throw error;
+      await this.recordFailure(key);
+      throw signInRefused(target.kind);
     }
   }
 
-  private async createLogin(username: string, password: string): Promise<{ cookie: string }> {
-    const before = await this.statement('SELECT * FROM accounts WHERE username = ?', username).first<Account>();
-    if (before && (before.disabled || before.credential_state !== 'ready')) {
+  private async createLogin(before: LoginAccount | null, password: string): Promise<{ cookie: string }> {
+    // Better Auth looks up the text that it receives as a login key, and a
+    // legacy login key in another event can equal a typed handle. So an
+    // unknown handle never reaches it.
+    if (!before?.login_key || before.disabled || before.credential_state !== 'ready') {
+      // Better Auth hashes the password for a login key that it does not
+      // know. This refusal does the same, so an unknown code, an unknown
+      // handle, and a wrong password each cost one password hash or check.
+      await this.passwords.hash(password);
       throw new AuthenticationError(401, 'Username or password is incorrect.');
     }
-    const signed = await this.identity.signIn(username, password);
+    const signed = await this.identity.signIn(before.login_key, password);
     const loginId = crypto.randomUUID();
     const assertionId = crypto.randomUUID();
     // A reset can race Better Auth password verification. Only the generation
@@ -141,13 +183,13 @@ export class D1AuthenticationService implements AuthenticationService {
       this.assertion(assertionId, `SELECT 1 FROM accounts a JOIN ba_session b ON b.userId = a.id
         WHERE a.id = ? AND a.id = ? AND a.credential_generation = ?
           AND a.disabled = 0 AND a.credential_state = 'ready' AND b.id = ? AND b.expiresAt > strftime('%Y-%m-%dT%H:%M:%fZ', 'now')`,
-      signed.accountId, before?.id ?? '', before?.credential_generation ?? -1, signed.identitySessionId),
+      signed.accountId, before.account_id, before.credential_generation, signed.identitySessionId),
       this.statement(`INSERT INTO logins (id, account_id, expires_at, identity_session_id, credential_generation, csrf)
         SELECT ?, a.id, unixepoch(b.expiresAt), b.id, a.credential_generation, ?
         FROM accounts a JOIN ba_session b ON b.userId = a.id WHERE a.id = ? AND b.id = ?`,
       loginId, randomSecret(), signed.accountId, signed.identitySessionId),
       this.assertion(`${assertionId}:final`, `SELECT 1 FROM (${currentLoginSql}) WHERE login_id = ? AND credential_generation = ?`,
-        signed.identitySessionId, signed.accountId, loginId, before?.credential_generation ?? -1),
+        signed.identitySessionId, signed.accountId, loginId, before.credential_generation),
       this.cleanupAssertions(assertionId),
     ]);
     return { cookie: signed.cookie };
@@ -226,31 +268,23 @@ export class D1AuthenticationService implements AuthenticationService {
     if (command.action === 'reset_password' && target === current.user.id) throw new AuthenticationError(400, 'Use Change password for your own account.');
     const gate = await this.adminAssertions(current, sessionId, command.action === 'create_account' ? undefined : target);
     const operationId = crypto.randomUUID();
-    if (command.action === 'set_username') {
-      await this.guarded([
-        ...gate.statements,
-        this.assertion(`${operationId}:username`, 'SELECT 1 FROM accounts WHERE id = ? AND (username IS NULL OR username = ?)', target, command.username),
-        this.statement('UPDATE accounts SET username = ? WHERE id = ?', command.username, target),
-        this.statement(`UPDATE ba_user SET username = ?, email = ?, updatedAt = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ?`, command.username, `${command.username}@accounts.minsky.invalid`, target),
-        this.statement(`INSERT INTO account_operations (id, account_id, actor, session_id, action, state, completed_at)
-          VALUES (?, ?, ?, ?, 'set_username', 'completed', unixepoch())`, operationId, target, gate.current.user.id, sessionId),
-        this.statement('DELETE FROM command_assertions WHERE id = ?', `${operationId}:username`),
-        this.assertion(`${gate.assertionId}:final`, gate.finalCheck.sql, ...gate.finalCheck.values),
-        this.cleanupAssertions(gate.assertionId),
-      ]);
-      return {};
-    }
     if (command.action === 'create_account') {
       if (command.teamId ? command.roles.length > 0 || command.isAdmin : command.roles.length === 0 && !command.isAdmin) {
         throw new AuthenticationError(400, 'Choose a contestant team or staff roles or admin membership.');
       }
       gate.statements.push(
-        this.statement(`INSERT INTO accounts (id, name, username, must_change, credential_state, credential_operation)
-          VALUES (?, ?, ?, 1, 'pending', ?)`, target, command.name, command.username, operationId),
+        // The account takes the contest's event at once, so its handle never
+        // passes through the site namespace inside the batch.
+        this.statement(`INSERT INTO accounts (id, name, username, handle, event_id, must_change, credential_state, credential_operation)
+          SELECT ?, ?, ?, ?, event_id, 1, 'pending', ? FROM sessions WHERE id = ?`,
+        target, command.name, loginKeyFor(target), command.username, operationId, sessionId),
         this.statement('INSERT INTO memberships (session_id, account_id, team_id, is_admin) VALUES (?, ?, ?, ?)', sessionId, target, command.teamId, Number(command.isAdmin)),
         ...[...new Set(command.roles)].map((role) => this.statement('INSERT INTO membership_roles (session_id, account_id, role) VALUES (?, ?, ?)', sessionId, target, role)),
       );
     } else {
+      // Check before the reset begins, so that a refusal leaves the old password valid.
+      const named = await this.statement('SELECT handle FROM accounts WHERE id = ?', target).first<{ handle: Handle | null }>();
+      if (!named?.handle) throw new AuthenticationError(409, 'Set a username before resetting this account.');
       // Superseding a failed operation is safe: its final batch checks this ID.
       gate.statements.push(...beginCredentialReset(this.db, target, operationId));
     }
@@ -262,7 +296,9 @@ export class D1AuthenticationService implements AuthenticationService {
     await this.guarded(gate.statements);
     const password = randomSecret() + 'A9!';
     await this.completeCredentials(headers, target, operationId, password, true, sessionId);
-    return { temporaryPassword: password };
+    const event = await this.statement(`SELECT e.code FROM accounts a LEFT JOIN events e ON e.id = a.event_id
+      WHERE a.id = ?`, target).first<{ code: EventCode | null }>();
+    return { temporaryPassword: password, signIn: event?.code ? { kind: 'event', code: event.code } : { kind: 'site' } };
   }
 
   private async completeCredentials(headers: Headers, target: string, operationId: string, password: string, temporary: boolean, sessionId?: string, prepared?: { hash: string; statements: D1Statement[]; finalCheck: SqlCheck }): Promise<void> {
@@ -270,7 +306,9 @@ export class D1AuthenticationService implements AuthenticationService {
     // revoked sessions intact. An organizer can issue another reset.
     const hash = prepared?.hash ?? await this.passwords.hash(password);
     const account = await this.statement('SELECT * FROM accounts WHERE id = ?', target).first<Account>();
-    if (!account?.username) throw new AuthenticationError(409, 'Set a username before resetting this account.');
+    if (!account) throw new AuthenticationError(409, 'Account changed. Check its status before retrying.');
+    // An account from before usernames gets its login key with its first password.
+    const loginKey = account.username ?? loginKeyFor(target);
     const assertions: D1Statement[] = prepared?.statements ?? [];
     let adminAssertion: string | undefined;
     let finalCheck = prepared?.finalCheck;
@@ -286,7 +324,8 @@ export class D1AuthenticationService implements AuthenticationService {
     assertions.push(
       this.assertion(assertionId, `SELECT 1 FROM accounts WHERE id = ? AND credential_operation = ?
         AND credential_generation = ? AND credential_state = 'pending' AND disabled = 0`, target, operationId, generation),
-      ...completeCredentialReset(this.db, { id: target, name: account.name, username: account.username }, operationId, hash, temporary),
+      ...(account.username ? [] : [this.statement('UPDATE accounts SET username = ? WHERE id = ? AND username IS NULL', loginKey, target)]),
+      ...completeCredentialReset(this.db, { id: target, name: account.name, loginKey }, operationId, hash, temporary),
       this.statement('DELETE FROM command_assertions WHERE id = ?', assertionId),
     );
     if (adminAssertion) assertions.push(this.cleanupAssertions(adminAssertion));
@@ -338,7 +377,8 @@ export class D1AuthenticationService implements AuthenticationService {
     ] });
     // The authenticated change uses its own attempt limit. Replacing the login
     // must also succeed when the public username window is already exhausted.
-    return this.createLogin(username, newPassword);
+    return this.createLogin(await this.statement(`SELECT ${loginAccountColumns} FROM accounts a WHERE a.id = ?`,
+      current.user.id).first<LoginAccount>(), newPassword);
   }
 
 }

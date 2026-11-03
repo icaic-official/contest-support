@@ -26,7 +26,7 @@ export async function accountCreation(context: ScenarioContext): Promise<void> {
   const created = await admin.admin.account(context.sessionId, teamCommand);
   check(created.temporaryPassword, 'The organizer must receive a temporary password for a new account.');
   const teamClient = await context.connect();
-  await teamClient.auth.signIn(contestant.username, created.temporaryPassword);
+  await teamClient.auth.signIn(context.signIn, contestant.username, created.temporaryPassword);
   const teamId = (await teamClient.auth.currentUser())?.id;
   check(teamId, 'The created contestant must have an authenticated identity.');
   check((await teamClient.auth.accountStatus()).must_change, 'New accounts must require a password change.');
@@ -54,7 +54,7 @@ export async function accountCreation(context: ScenarioContext): Promise<void> {
   const recovered = await admin.admin.account(context.sessionId, { action: 'reset_password', userId: staffId });
   check(recovered.temporaryPassword, 'Organizer recovery must recover a password lost with the create response.');
   const staffClient = await context.connect();
-  await staffClient.auth.signIn(staff.username, recovered.temporaryPassword);
+  await staffClient.auth.signIn(context.signIn, staff.username, recovered.temporaryPassword);
   check((await staffClient.auth.currentUser())?.id === staffId, 'Recovery must preserve the created account ID.');
   check((await staffClient.auth.accountStatus()).must_change, 'A recovered created account must require a password change.');
   await rejects(() => submit(staffClient, context.sessionId, context.teamId));
@@ -122,7 +122,7 @@ export async function revocation(context: ScenarioContext): Promise<void> {
   );
   await rejects(() => submit(member, context.sessionId, context.teamId));
   const replacement = await context.connect();
-  await replacement.auth.signIn(user.username, reset.temporaryPassword);
+  await replacement.auth.signIn(user.target, user.username, reset.temporaryPassword);
   check(
     (await replacement.auth.accountStatus()).must_change,
     'The replacement login must require a password change.',

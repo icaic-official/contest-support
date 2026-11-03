@@ -5,7 +5,8 @@ description: Fix common sign-in, access, image, and docs problems.
 
 ## I cannot sign in
 
-Check the address and username with your organizer. After a reset, use the new temporary password.
+Open the sign-in link from your sign-in details, so that the event code is correct. Then check the username with your organizer. A wrong event code, username, or password gives the same message.
+After a reset, use the new temporary password. A webmaster selects **Site sign-in**, which asks for no event code.
 Recovery goes through the organizer; there is no email reset.
 
 ## I see no contest data

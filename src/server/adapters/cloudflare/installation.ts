@@ -1,13 +1,15 @@
 import { z } from 'zod';
+import type { Handle, LoginKey } from '../../../backend/contracts';
 import type { D1Connection, D1Statement, D1Value } from '../d1/connection';
-import { replaceCredentialStatements } from './credentials';
+import { handleSchema, loginKeyFor, replaceCredentialStatements } from './credentials';
 import { passwordHasher, randomSecret, type PasswordHasher } from './password';
 
 // Retain PR #21's competition fields and normalized-name checks. Credentials
 // belong to the trusted operator result, never to the competition file.
 const text = z.string().max(200).trim().min(1).refine((value) => !value.includes('\0'));
 const competitionSchema = z.object({
-  adminUsername: z.string().trim().toLowerCase().regex(/^[a-z0-9][a-z0-9_-]{2,31}$/),
+  /** The webmaster's handle, typed with **Site sign-in**. */
+  adminUsername: handleSchema,
   adminName: text,
   eventName: text,
   sessionName: text,
@@ -30,7 +32,7 @@ export interface InstallationResult {
   eventId: string;
   sessionId: string;
   teamIds: string[];
-  adminUsername: string;
+  adminUsername: Handle;
   temporaryPassword: string;
 }
 
@@ -114,8 +116,8 @@ export async function bootstrapInstallation(
       // The emptiness check runs again inside the atomic batch. Concurrent
       // initializations cannot both commit after an earlier empty read.
       assertion(db, assertionId, empty),
-      statement(db, `INSERT INTO accounts (id, name, username, must_change) VALUES (?, ?, ?, 1)`,
-        accountId, config.adminName, config.adminUsername),
+      statement(db, `INSERT INTO accounts (id, name, username, handle, must_change) VALUES (?, ?, ?, ?, 1)`,
+        accountId, config.adminName, loginKeyFor(accountId), config.adminUsername),
       ...identityStatements(db, accountId, hash),
       // The one webmaster of the site. The grant comes before the membership,
       // so membership_adopts_event leaves the account outside every event.
@@ -153,13 +155,13 @@ export async function recoverInstallationOwner(
   db: D1Connection,
   target: { installationId: string; accountId: string },
   options: InstallationOptions = {},
-): Promise<{ accountId: string; adminUsername: string; temporaryPassword: string }> {
+): Promise<{ accountId: string; adminUsername: Handle; temporaryPassword: string }> {
   if (!z.object({ installationId: z.string().uuid(), accountId: z.string().uuid() }).safeParse(target).success) {
     throw new Error('Select the installation and owner by UUID.');
   }
-  const owner = await statement(db, `SELECT a.username FROM installation i JOIN accounts a ON a.id = i.owner_account_id
+  const owner = await statement(db, `SELECT a.handle FROM installation i JOIN accounts a ON a.id = i.owner_account_id
     WHERE i.id = ? AND a.id = ? AND ${ownerCondition}`,
-  target.installationId, target.accountId, target.installationId, target.accountId).first<{ username: string }>();
+  target.installationId, target.accountId, target.installationId, target.accountId).first<{ handle: Handle }>();
   if (!owner) throw new Error('The selected account is not the active installation owner. Recovery did not start.');
   const operationId = crypto.randomUUID();
   const assertionId = crypto.randomUUID();
@@ -204,33 +206,34 @@ export async function recoverInstallationOwner(
   } catch {
     throw new Error('Owner recovery did not finish. Inspect the account before retrying trusted recovery.');
   }
-  return { accountId: target.accountId, adminUsername: owner.username, temporaryPassword: password };
+  return { accountId: target.accountId, adminUsername: owner.handle, temporaryPassword: password };
 }
 
 export interface WebmasterRecoveryResult {
   accountId: string;
-  username: string;
+  handle: string;
   temporaryPassword: string;
 }
 
 /**
- * Trusted terminal recovery of one webmaster, found by username. It replaces
+ * Trusted terminal recovery of one webmaster, found by site handle. It replaces
  * the password in one batch after hashing, so a failure leaves the old password
  * valid. Never expose it through an HTTP route. The result holds the only copy
  * of the password.
  */
 export async function recoverWebmaster(
   db: D1Connection,
-  input: { username: string },
+  input: { handle: string },
   options: InstallationOptions = {},
 ): Promise<WebmasterRecoveryResult> {
-  const username = input.username.trim().toLowerCase();
-  if (!/^[a-z0-9][a-z0-9_-]{2,31}$/.test(username)) throw new Error('The username is invalid. Recovery did not start.');
-  const target = await statement(db, `SELECT a.id, a.name, a.username, a.disabled, a.credential_generation,
+  const parsed = handleSchema.safeParse(input.handle);
+  if (!parsed.success) throw new Error('The username is invalid. Recovery did not start.');
+  const found = await statement(db, `SELECT a.id, a.name, a.username AS login_key, a.handle, a.disabled, a.credential_generation,
       EXISTS (SELECT 1 FROM grants g WHERE g.scope = 'site' AND g.account_id = a.id) AS webmaster
-    FROM accounts a WHERE a.username = ?`, username)
-    .first<{ id: string; name: string; username: string; disabled: number; credential_generation: number; webmaster: number }>();
-  if (!target) throw new Error('No account matches that username. Recovery did not start.');
+    FROM accounts a WHERE a.event_id IS NULL AND a.handle = ?`, parsed.data)
+    .first<{ id: string; name: string; login_key: LoginKey; handle: Handle; disabled: number; credential_generation: number; webmaster: number }>();
+  if (!found) throw new Error('No account matches that username. Recovery did not start.');
+  const target = { ...found, loginKey: found.login_key };
   if (!target.webmaster) throw new Error('The account is not a webmaster. Recovery did not start.');
   if (target.disabled) throw new Error('The account is disabled. Recovery did not start.');
   const password = randomSecret() + 'A9!';
@@ -256,5 +259,5 @@ export async function recoverWebmaster(
   } catch {
     throw new Error('Webmaster recovery did not finish. The account was not changed.');
   }
-  return { accountId: target.id, username: target.username, temporaryPassword: password };
+  return { accountId: target.id, handle: target.handle, temporaryPassword: password };
 }

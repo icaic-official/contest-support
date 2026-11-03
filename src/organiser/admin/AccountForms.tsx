@@ -1,5 +1,6 @@
 import { type ReactNode, useId, useState } from "react";
 import { UserRound, Users } from "lucide-react";
+import { type Handle, parseHandle } from "@/backend/contracts";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -280,28 +281,39 @@ export function CreateAccountForm({
   );
 }
 
-/** Gives an account without a username its first username. */
+/**
+ * Changes the username of an account, or gives an account without one its
+ * first username. The parent sets a `key` from `current`, so the form
+ * restarts after a change.
+ */
 export function UsernameForm({
+  current,
   disabled,
   onSubmit,
 }: {
+  /** The account's username. Null when the account has none. */
+  current: string | null;
   disabled: boolean;
-  onSubmit: (username: string) => void;
+  onSubmit: (username: Handle) => void;
 }) {
   const id = useId();
-  const [username, setUsername] = useState("");
+  const [username, setUsername] = useState(current ?? "");
+  const handle = parseHandle(username);
   return (
     <form
       onSubmit={(event) => {
         event.preventDefault();
-        onSubmit(username);
+        // The input's pattern stops a submit of text that is not a handle.
+        if (handle) onSubmit(handle);
       }}
     >
       <fieldset disabled={disabled} className="space-y-3">
         <Field
           id={`${id}-username`}
-          label="Assign username"
-          help="The existing password stays the same. Use this username for future logins."
+          label={current ? "Change username" : "Assign username"}
+          help={current
+            ? "The password stays the same, and open sessions stay signed in. Use the new username at the next sign-in."
+            : "Then reset the password, so that the account can sign in."}
         >
           <UsernameInput
             id={`${id}-username`}
@@ -309,8 +321,13 @@ export function UsernameForm({
             onChange={setUsername}
           />
         </Field>
-        <Button type="submit" variant="secondary" className="h-11 w-full">
-          Set username
+        <Button
+          type="submit"
+          variant="secondary"
+          className="h-11 w-full"
+          disabled={handle === current}
+        >
+          {current ? "Change username" : "Set username"}
         </Button>
       </fieldset>
     </form>

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { Handle } from "@/backend/contracts";
 import type { Issue, Membership, Snapshot } from "@/connected/model";
 import {
   accountKind,
@@ -12,7 +13,7 @@ import {
   limitsOfSession,
   membershipInput,
   resetPasswordCommand,
-  setUsernameCommand,
+  setHandleCommand,
   statusCounts,
   stepLimit,
   toggleRole,
@@ -206,11 +207,12 @@ describe("account commands", () => {
     ).toMatchObject({ teamId, roles: [], isAdmin: false });
   });
 
-  it("sets a username and resets a password", () => {
-    expect(setUsernameCommand(userId, " alex ")).toEqual({
-      action: "set_username",
-      userId,
-      username: "alex",
+  it("changes a username and resets a password", () => {
+    expect(setHandleCommand("event", userId, "alex" as Handle)).toEqual({
+      type: "set_handle",
+      eventId: "event",
+      accountId: userId,
+      handle: "alex",
     });
     expect(resetPasswordCommand(userId)).toEqual({
       action: "reset_password",

@@ -3,6 +3,8 @@ import { expect, test, type Page } from '@playwright/test';
 
 interface Fixture {
   id: string;
+  /** The code of the fixture's own event. */
+  event: string;
   username: string;
   password: string;
 }
@@ -50,7 +52,7 @@ test.describe('Worker authentication browser security', () => {
   });
 
   test('keeps cookies private, restores sessions, enforces password changes, and revokes logout', async ({ page, context }) => {
-    expect((await request(page, '/api/auth/sign-in', { username: fixture.username, password: fixture.password })).status).toBe(200);
+    expect((await request(page, '/api/auth/sign-in', { event: fixture.event, handle: fixture.username, password: fixture.password })).status).toBe(200);
     const cookie = (await context.cookies()).find((value) => value.name === '__Host-minsky-session');
     expect(Boolean(cookie)).toBe(true);
     // Assert individual properties so a failed assertion cannot print the token.
@@ -92,10 +94,10 @@ test.describe('Worker authentication browser security', () => {
 
   test('rejects incorrect and stale passwords and revokes another browser after a password change', async ({ page, browser }) => {
     expect((await request(page, '/api/auth/sign-in', {
-      username: fixture.username, password: `${randomUUID()}Wrong!`,
+      event: fixture.event, handle: fixture.username, password: `${randomUUID()}Wrong!`,
     })).status).toBe(401);
     expect((await request(page, '/api/auth/session')).status).toBe(401);
-    expect((await request(page, '/api/auth/sign-in', { username: fixture.username, password: fixture.password })).status).toBe(200);
+    expect((await request(page, '/api/auth/sign-in', { event: fixture.event, handle: fixture.username, password: fixture.password })).status).toBe(200);
     const firstPassword = `${randomUUID()}Aa9!`;
     expect((await request(page, '/api/auth/change-password', {
       currentPassword: fixture.password, newPassword: firstPassword,
@@ -106,10 +108,10 @@ test.describe('Worker authentication browser security', () => {
       const other = await otherContext.newPage();
       await other.goto(origin);
       expect((await request(other, '/api/auth/sign-in', {
-        username: fixture.username, password: fixture.password,
+        event: fixture.event, handle: fixture.username, password: fixture.password,
       })).status).toBe(401);
       expect((await request(other, '/api/auth/sign-in', {
-        username: fixture.username, password: firstPassword,
+        event: fixture.event, handle: fixture.username, password: firstPassword,
       })).status).toBe(200);
       expect((await request(page, '/api/auth/change-password', {
         currentPassword: firstPassword, newPassword: `${randomUUID()}Aa9!`,
@@ -121,7 +123,7 @@ test.describe('Worker authentication browser security', () => {
   });
 
   test('rejects a preview origin, cross-origin preflight, and forged form writes', async ({ page, context }) => {
-    expect((await request(page, '/api/auth/sign-in', { username: fixture.username, password: fixture.password })).status).toBe(200);
+    expect((await request(page, '/api/auth/sign-in', { event: fixture.event, handle: fixture.username, password: fixture.password })).status).toBe(200);
     const hostile = await context.newPage();
     await hostile.goto(hostileOrigin);
     expect((await context.cookies(hostileOrigin)).some((value) => value.name.includes('minsky-session'))).toBe(false);
@@ -155,7 +157,7 @@ test.describe('Worker authentication browser security', () => {
     expect((await request(page, '/api/auth/session')).status).toBe(200);
 
     // A Worker preview has a distinct origin even when it serves the same code.
-    expect((await request(hostile, '/api/auth/sign-in', { username: fixture.username, password: fixture.password })).status).toBe(403);
+    expect((await request(hostile, '/api/auth/sign-in', { event: fixture.event, handle: fixture.username, password: fixture.password })).status).toBe(403);
     expect((await request(hostile, '/api/auth/session')).status).toBe(403);
     await hostile.close();
   });

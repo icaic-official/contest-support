@@ -9,6 +9,7 @@ test('a promoted webmaster opens its contest as an admin, as before', async ({ p
   await local.run('UPDATE sessions SET name = ? WHERE id = ?', contest, local.sessions[0]);
 
   await page.goto('/sign-in');
+  await page.getByRole('button', { name: 'Site sign-in', exact: true }).click();
   await page.getByLabel('Username', { exact: true }).fill('admin');
   await page.getByLabel('Password', { exact: true }).fill(crypto.randomUUID());
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
@@ -34,6 +35,7 @@ test('a webmaster turns the restriction on, joins a contest, and sees the join i
   // The setting is one row for the whole shared database, so the test turns it off again.
   try {
     await page.goto('/sign-in');
+    await page.getByRole('button', { name: 'Site sign-in', exact: true }).click();
     await page.getByLabel('Username', { exact: true }).fill('admin');
     await page.getByLabel('Password', { exact: true }).fill(crypto.randomUUID());
     await page.getByRole('button', { name: 'Sign in', exact: true }).click();

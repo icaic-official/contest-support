@@ -39,14 +39,15 @@ export default {
           env.DB.prepare(`INSERT INTO ba_account (id, accountId, providerId, userId, password, createdAt, updatedAt)
             VALUES (?, ?, 'credential', ?, ?, ?, ?)`).bind(id, id, id, hash, now, now),
         ]);
-        return json({ id, username, password }, 201);
+        const event = await env.DB.prepare('SELECT code FROM events WHERE id = ?').bind(id).first<{ code: string }>();
+        return json({ id, event: event!.code, username, password }, 201);
       }
       if (request.method === 'DELETE') {
         await env.DB.batch([
           env.DB.prepare('DELETE FROM accounts WHERE id = ?').bind(id),
           env.DB.prepare('DELETE FROM ba_user WHERE id = ?').bind(id),
           env.DB.prepare('DELETE FROM events WHERE id = ?').bind(id),
-          env.DB.prepare('DELETE FROM authentication_limits WHERE key IN (?, ?)').bind(`username:${username}`, `change:${id}`),
+          env.DB.prepare('DELETE FROM authentication_limits WHERE key IN (?, ?)').bind(`handle:${id}:${username}`, `change:${id}`),
         ]);
         const remaining = await env.DB.prepare(`SELECT
           (SELECT count(*) FROM accounts WHERE id = ?) +

@@ -168,7 +168,7 @@ export function AccountList({
 }
 
 /**
- * The actions for one account: the first username, the membership, a
+ * The actions for one account: the username, the membership, a
  * password reset and the removal of session access. A reset and a removal
  * need confirmation. An admin cannot reset their own password here.
  */
@@ -191,16 +191,16 @@ export function MemberActions({
   const disabled = admin.busy || admin.archived;
   return (
     <div className="space-y-5">
-      {!person.username && (
-        <UsernameForm
-          disabled={disabled}
-          onSubmit={(username) => {
-            void admin.setUsername(person.id, username).then((done) => {
-              if (done) onDone();
-            });
-          }}
-        />
-      )}
+      <UsernameForm
+        key={person.username}
+        current={person.username}
+        disabled={disabled}
+        onSubmit={(username) => {
+          void admin.setUsername(person.id, username).then((done) => {
+            if (done) onDone();
+          });
+        }}
+      />
       <MembershipForm
         key={JSON.stringify(membership)}
         member={membership}

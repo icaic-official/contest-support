@@ -5,11 +5,18 @@ description: Get your account, change your temporary password, choose a session,
 
 ## Sign in the first time
 
-Your organizer gives you the address, a username, and a temporary password.
+Your organizer gives you a sign-in link, a username, and a temporary password.
+The link looks like `https://minsky.example/?event=xxxx-2026`. The part after `event=` is your event code.
 There is no public registration.
 
-1. Open the address and select **Sign in**.
-2. Set a new password. You cannot see contest data until you do.
+1. Open the sign-in link. The form already shows your event code.
+2. Enter your username and the temporary password, and select **Sign in**.
+3. Set a new password. You cannot see contest data until you do.
+
+The device remembers the event code for the next sign-in. If the form shows no code, type the code from your sign-in details.
+A wrong event code, username, or password gives the same message. Check all three with your organizer.
+
+Webmasters run the whole site and belong to no event. A webmaster selects **Site sign-in** on the sign-in page, which asks for no event code.
 
 Teams share one account. Each staff member has a personal account, so the history shows who acted.
 
@@ -63,6 +70,12 @@ If the save fails and the button reads **Try again**, select it. Minsky does not
 
 To remove your picture, select **Remove picture** and confirm. Your initials show instead.
 The picture belongs to your account, so it is the same in every session. Other staff see a change within about a minute.
+
+## Change your username
+
+Staff can change their own username on the account page, in the **Username** field. Your password stays, and you stay signed in. Use the new username at your next sign-in.
+A team account cannot change its username, because venue staff read it from the team's sign-in sheet. Ask an admin instead.
+An account that is on a team in any session cannot change its username either.
 
 ## Forgot your password
 

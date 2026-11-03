@@ -79,8 +79,8 @@ it("prints the temporary password once and hides provider errors", async () => {
       library: {
         recoverWebmaster: async (database, selector) => {
           expect(database.marker).toBe(true);
-          expect(selector).toEqual({ username: "organizer" });
-          return { accountId: "e102228c-f5c8-4180-962f-3a8b87d99b13", username: "organizer", temporaryPassword: password };
+          expect(selector).toEqual({ handle: "organizer" });
+          return { accountId: "e102228c-f5c8-4180-962f-3a8b87d99b13", handle: "organizer", temporaryPassword: password };
         },
       },
       dispose: async () => undefined,
@@ -117,9 +117,9 @@ it("does not print a password when recovery refuses the account", async () => {
 });
 
 it("does not print a rejected password", () => {
-  expect(() => writeTemporaryPassword({ username: "organizer", temporaryPassword: "short" }, () => undefined)).toThrow("was not changed");
+  expect(() => writeTemporaryPassword({ handle: "organizer", temporaryPassword: "short" }, () => undefined)).toThrow("was not changed");
   const lines = [];
-  writeTemporaryPassword({ username: "organizer", temporaryPassword: "fixture-temporary-password" }, (line) => lines.push(line));
+  writeTemporaryPassword({ handle: "organizer", temporaryPassword: "fixture-temporary-password" }, (line) => lines.push(line));
   expect(passwordAppearsOnce(lines, "fixture-temporary-password")).toBe(true);
   expect(lines[0].includes("fixture-temporary-password")).toBe(false);
 });

@@ -1,16 +1,24 @@
 import { z } from 'zod';
 import type {
-  AccountCommand, AccountIdentity, AccountResult, Authentication,
+  AccountCommand, AccountIdentity, AccountResult, Authentication, EventCode,
   Unsubscribe,
 } from '../contracts';
 
 const identitySchema = z.object({ id: z.uuid(), name: z.string().exactOptional(), email: z.string().exactOptional() });
 const sessionSchema = z.object({
   user: identitySchema,
-  status: z.object({ username: z.string().nullable(), must_change: z.boolean(), session_valid: z.boolean() }),
+  status: z.object({
+    handle: z.string().nullable(), must_change: z.boolean(), session_valid: z.boolean(),
+    // A Worker from before the field shows no username form.
+    can_change_handle: z.boolean().default(false),
+  }),
   csrf: z.string().min(1),
 });
-const resultSchema = z.object({ temporaryPassword: z.string().exactOptional() });
+const signInSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('event'), code: z.string().transform((code) => code as EventCode) }),
+  z.object({ kind: z.literal('site') }),
+]);
+const resultSchema = z.object({ temporaryPassword: z.string(), signIn: signInSchema });
 const errorSchema = z.object({ error: z.string() });
 
 export interface CloudflareAuthentication extends Authentication {
@@ -119,7 +127,9 @@ export function createCloudflareAuthentication(options: {
     const response = await checked(authenticated ? await withCsrf(send) : await send());
     if (response.status === 401) {
       notify(undefined);
-      throw new Error('Sign in to continue.');
+      // A refused sign-in shows the server's one message. Elsewhere a 401 means that the session ended.
+      const refused = authenticated ? undefined : errorSchema.safeParse(await response.json().catch(() => undefined)).data;
+      throw new Error(refused?.error ?? 'Sign in to continue.');
     }
     return response;
   }
@@ -164,8 +174,9 @@ export function createCloudflareAuthentication(options: {
         }
       };
     },
-    async signIn(username, password) {
-      await mutateSession('/api/auth/sign-in', { username, password }, false);
+    async signIn(target, handle, password) {
+      const event = target.kind === 'event' ? target.code : null;
+      await mutateSession('/api/auth/sign-in', { event, handle, password }, false);
       await refresh();
     },
     async signOut() {
@@ -176,7 +187,7 @@ export function createCloudflareAuthentication(options: {
       const current = await session();
       // A reset removes the identity session. Report a restricted status without
       // recovering an account ID from an invalid cookie or browser memory.
-      if (!current) return { username: null, must_change: true, session_valid: false };
+      if (!current) return { handle: null, must_change: true, session_valid: false, can_change_handle: false };
       return current.status;
     },
     async changePassword(currentPassword, newPassword) {

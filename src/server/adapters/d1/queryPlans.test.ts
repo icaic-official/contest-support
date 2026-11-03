@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { openStoreDatabase } from '../cloudflare/tooling/store-database.mjs';
 import { snapshotSql as announcementSnapshotSql } from '../cloudflare/announcements';
 import { sessionsListSql, snapshotSql } from '../cloudflare/application';
-import { contestDataSql } from '../cloudflare/authority';
+import { contestDataSql, signInAccountSql } from '../cloudflare/authority';
 import { claimSql } from '../cloudflare/live';
 import type { D1Connection } from './connection';
 import { applyMigrations } from './testFixture';
@@ -18,6 +18,8 @@ const queries: Record<string, string> = {
   'current access': contestDataSql('caller'),
   'current access for live logins': contestDataSql('logins'),
   'sessions list': sessionsListSql,
+  'event sign-in': signInAccountSql.event,
+  'site sign-in': signInAccountSql.site,
 };
 
 // Both snapshots materialize the resolver row as `access` and read it as `c`.
@@ -88,6 +90,15 @@ describe('D1 query plans', () => {
       expect(text).toMatch(/USING COVERING INDEX grants_(?:site|by_account) \(account_id=\?/);
       expect(text).toContain('USING COVERING INDEX grants_contest (session_id=? AND account_id=?)');
     }
+  });
+
+  it('finds a sign-in account through the unique index of its namespace', async () => {
+    const event = await plan(signInAccountSql.event);
+    expect(event).toContain('USING INDEX events_code (code=?)');
+    expect(event).toContain('USING INDEX accounts_event_handle (event_id=? AND handle=?)');
+    const site = await plan(signInAccountSql.site);
+    expect(site).toContain('USING INDEX accounts_site_handle (handle=?)');
+    expect(site).toMatch(/USING COVERING INDEX grants_(?:site|by_account) \(account_id=\?/);
   });
 
   it('finds the issues of one team and the images of visible issues through indexes', async () => {

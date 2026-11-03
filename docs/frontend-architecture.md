@@ -75,7 +75,7 @@ Its selection, filters and form drafts stay in memory. A shell must not unmount 
 
 `Landing` is the public page at `/` for signed-out visitors. It links to `/sign-in` and to the published guides (`documentationUrl`). `signInPath` in `src/connected/navigation.ts` is the one address of the sign-in page.
 `ConnectedApp` derives one `layout` value (`dashboard`, `centered` or `landing`) from the account state and the path. The layout sets the `<main>` classes, the floating theme toggle and the footer. The landing page has its own header and theme toggle.
-The `steps` table in `src/screens/Landing.tsx` holds one row for each issue status, with the lifecycle text, the demo activity entry and the simulated seconds on the timer. The animated demo card and the lifecycle rail both read it.
+The `steps` table in `src/screens/Landing.tsx` holds one row for each issue status, with the demo activity entry and the simulated seconds on the timer. The animated demo card reads it.
 The demo state is one step index and one tick. The card is decorative, so assistive technology skips it. With `prefers-reduced-motion: reduce` the demo does not run and shows the resolved issue.
 The hero backdrop is the `hero-backdrop` utility in `src/index.css`.
 

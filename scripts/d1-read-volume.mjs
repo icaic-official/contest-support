@@ -48,7 +48,7 @@ async function loadWorker() {
       stdin: { resolveDir: repositoryRoot, loader: 'ts', contents: `
         export { default as worker, SessionLiveCoordinator } from './src/server/adapters/cloudflare/applicationWorker.ts';
         export { claimSql, dispatchNotifications } from './src/server/adapters/cloudflare/live.ts';
-        export { sessionsListSql, snapshotSql } from './src/server/adapters/cloudflare/application.ts';
+        export { contestsListSql, snapshotSql } from './src/server/adapters/cloudflare/application.ts';
         export { contestDataBindings, contestDataSql } from './src/server/adapters/cloudflare/authority.ts';
         export { snapshotSql as announcementSnapshotSql } from './src/server/adapters/cloudflare/announcements.ts';
         export { passwordHasher } from './src/server/adapters/cloudflare/password.ts';
@@ -332,7 +332,7 @@ async function measureShape(name, shape) {
       for (const [caller, login] of Object.entries(logins)) {
         const current = await http('/api/auth/session', caller, { login });
         login.csrf = current.body.csrf;
-        await http('/api/sessions', caller, { login });
+        await http('/api/contests', caller, { login });
         const snapshot = await http(`/api/snapshot?sessionId=${session}`, caller, { login });
         if (!snapshot.body.membership) throw new Error('The snapshot has no membership.');
         login.snapshot = snapshot.body;
@@ -422,7 +422,7 @@ function validate({ metrics, metricLines, log, records, direct }) {
 
 function label(sql) {
   const known = [[lib.snapshotSql, 'application snapshotSql'], [lib.announcementSnapshotSql, 'announcements snapshotSql'],
-    [lib.sessionsListSql, 'sessionsListSql'], [lib.contestDataSql('caller'), "contestDataSql('caller')"],
+    [lib.contestsListSql, 'contestsListSql'], [lib.contestDataSql('caller'), "contestDataSql('caller')"],
     [lib.contestDataSql('logins'), "contestDataSql('logins')"], [lib.claimSql, 'claimSql']];
   return known.find(([text]) => text === sql)?.[1] ?? sql.replace(/\s+/g, ' ').trim().slice(0, 110);
 }
@@ -448,7 +448,7 @@ async function explainAll(raw, records) {
   return plans;
 }
 
-const refreshReads = ['/api/sessions', '/api/snapshot', '/api/announcements', '/api/avatars'];
+const refreshReads = ['/api/contests', '/api/snapshot', '/api/announcements', '/api/avatars'];
 const refreshName = 'screen refresh after a change hint';
 
 /** A live hint makes each screen read these four endpoints (useSessionSnapshot, useAnnouncements, Avatars). */

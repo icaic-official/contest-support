@@ -18,17 +18,14 @@ function services() {
   return {
     auth: { current: vi.fn<ApplicationHttpServices['auth']['current']>().mockResolvedValue(identity) },
     application: {
-      sessions: vi.fn<ApplicationHttpServices['application']['sessions']>().mockResolvedValue([{ id: sessionId, name: 'Fictional' }]),
+      contests: vi.fn<ApplicationHttpServices['application']['contests']>()
+        .mockResolvedValue([{ id: sessionId, name: 'Fictional', eventId: requestId, manage: 'none' }]),
       snapshot: vi.fn<ApplicationHttpServices['application']['snapshot']>(),
-      setIntake: vi.fn<ApplicationHttpServices['application']['setIntake']>(),
-      setImageLimits: vi.fn<ApplicationHttpServices['application']['setImageLimits']>(),
-      saveMember: vi.fn<ApplicationHttpServices['application']['saveMember']>(),
-      removeMember: vi.fn<ApplicationHttpServices['application']['removeMember']>(),
-      editRoster: vi.fn<ApplicationHttpServices['application']['editRoster']>(),
     },
     workflow: { execute: vi.fn<ApplicationHttpServices['workflow']['execute']>().mockResolvedValue({ outcome: 'committed', issueId: requestId }) },
     manage: {
       site: vi.fn<ApplicationHttpServices['manage']['site']>(),
+      event: vi.fn<ApplicationHttpServices['manage']['event']>(),
       execute: vi.fn<ApplicationHttpServices['manage']['execute']>().mockResolvedValue({}),
       issueCredentials: vi.fn<ApplicationHttpServices['manage']['issueCredentials']>().mockResolvedValue([]),
     },
@@ -84,32 +81,48 @@ describe('Cloudflare application HTTP boundary', () => {
   it('checks login, temporary-password state, origin, token, and fetch metadata before mutation', async () => {
     const deps = services();
     const handle = createApplicationHandler(deps, origin);
-    const body = { sessionId, open: true, action: 'set_intake' };
+    const body = { requestId, command: { type: 'set_intake', contestId: sessionId, open: true } };
     const rejectedHeaders: Array<Record<string, string>> = [
       { Origin: 'https://attacker.example' }, { 'X-CSRF-Token': 'stale' },
       { 'X-Minsky-Request': '' }, { 'Sec-Fetch-Site': 'cross-site' },
     ];
     for (const headers of rejectedHeaders) {
-      expect((await handle(post('/api/admin', body, headers))).status).toBe(403);
+      expect((await handle(post('/api/manage', body, headers))).status).toBe(403);
     }
     deps.auth.current.mockResolvedValueOnce(undefined);
-    expect((await handle(post('/api/admin', body))).status).toBe(401);
+    expect((await handle(post('/api/manage', body))).status).toBe(401);
     deps.auth.current.mockResolvedValueOnce({ ...identity, status: { ...identity.status, must_change: true } });
-    expect((await handle(post('/api/admin', body))).status).toBe(403);
-    expect(deps.application.setIntake).not.toHaveBeenCalled();
+    expect((await handle(post('/api/manage', body))).status).toBe(403);
+    expect(deps.manage.execute).not.toHaveBeenCalled();
   });
 
-  it('passes a roster command to the service and accepts 300 teams in one request', async () => {
+  it('accepts 300 entrants in one management request, and keeps the default limit elsewhere', async () => {
     const deps = services();
     const handle = createApplicationHandler(deps, origin);
-    const teams = Array.from({ length: 300 }, (_, index) => ({
-      id: crypto.randomUUID(), name: `Fictional team number ${index + 1}`, location: `Hall ${index % 7} · Table ${index + 1}` }));
-    const command = { type: 'add_teams', teams };
-    expect((await handle(post('/api/admin', { action: 'edit_roster', sessionId, command }))).status).toBe(200);
-    expect(deps.application.editRoster).toHaveBeenCalledWith(identity.caller, sessionId, command);
-    const invalid = await handle(post('/api/admin', { action: 'edit_roster', sessionId, command, extra: true }));
-    expect(invalid.status).toBe(400);
-    expect(deps.application.editRoster).toHaveBeenCalledTimes(1);
+    const entrants = Array.from({ length: 300 }, (_, index) => ({
+      kind: 'team', name: `Fictional team number ${index + 1}`, handle: `team-${index + 1}` }));
+    const command = { type: 'create_entrants', eventId: sessionId, entrants };
+    expect((await handle(post('/api/manage', { requestId, command }))).status).toBe(200);
+    expect(deps.manage.execute).toHaveBeenCalledWith(identity.caller, requestId, command);
+    expect((await handle(post('/api/credentials', { requestId, eventId: null, accountIds: { padding: 'x'.repeat(20_000) } }))).status).toBe(400);
+    expect(deps.manage.issueCredentials).not.toHaveBeenCalled();
+  });
+
+  it('reads contests and the event console with the trusted caller', async () => {
+    const deps = services();
+    const handle = createApplicationHandler(deps, origin);
+    const get = (path: string) => handle(new Request(`${origin}${path}`, { headers: { Origin: origin } }));
+    expect((await get('/api/contests')).status).toBe(200);
+    expect(deps.application.contests).toHaveBeenLastCalledWith(identity.caller, undefined);
+    expect((await get(`/api/contests?eventId=${requestId}`)).status).toBe(200);
+    expect(deps.application.contests).toHaveBeenLastCalledWith(identity.caller, requestId);
+    expect((await get('/api/contests?eventId=nope')).status).toBe(400);
+    expect((await get('/api/sessions')).status).toBe(404);
+    deps.manage.event.mockRejectedValueOnce(new AuthenticationError(403, 'Only an event admin or a webmaster can change this event.'));
+    expect((await get(`/api/event?eventId=${requestId}`)).status).toBe(403);
+    expect(deps.manage.event).toHaveBeenCalledWith(identity.caller, requestId);
+    expect((await get('/api/event')).status).toBe(400);
+    expect((await handle(post('/api/admin', { action: 'set_intake', sessionId, open: true }))).status).toBe(404);
   });
 
   it('passes site changes and credential issues with the trusted caller and returns a refusal', async () => {
@@ -126,8 +139,9 @@ describe('Cloudflare application HTTP boundary', () => {
     expect(refused.status).toBe(409);
     expect(await refused.json()).toEqual({ error: 'The last webmaster cannot be removed.' });
     expect(deps.manage.execute).toHaveBeenCalledTimes(2);
-    expect((await handle(post('/api/credentials', { requestId, accountIds: [sessionId] }))).status).toBe(200);
-    expect(deps.manage.issueCredentials).toHaveBeenCalledWith(identity.caller, requestId, [sessionId]);
+    expect((await handle(post('/api/credentials', { requestId, eventId: requestId, accountIds: [sessionId] }))).status).toBe(200);
+    expect(deps.manage.issueCredentials).toHaveBeenCalledWith(identity.caller, requestId, { eventId: requestId, accountIds: [sessionId] });
+    expect((await handle(post('/api/credentials', { requestId, accountIds: [sessionId] }))).status).toBe(400);
   });
 
   it('bounds UTF-8 JSON bodies before invoking a command', async () => {

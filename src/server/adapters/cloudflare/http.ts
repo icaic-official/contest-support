@@ -1,7 +1,6 @@
 import { z } from 'zod';
 import { ImageRequestError } from '../../../backend/errors';
 import { AVATAR_MAX_BYTES } from '../../../connected/imageFile';
-import { roleSchema } from '../../../connected/model';
 import { hasJsonBody, readBody, readJsonBody } from '../../http';
 import { AuthenticationError, type AuthenticationService, type Caller } from '../../authentication';
 import type { WorkflowService } from '../../workflow';
@@ -15,17 +14,9 @@ import { logEvent, requestFields } from './log';
 import { baseSecurityHeaders } from './securityHeaders';
 
 const uuid = z.uuid();
-const member = z.strictObject({ teamId: uuid.nullable(), roles: z.array(roleSchema).max(3), isAdmin: z.boolean() });
-const adminSchema = z.discriminatedUnion('action', [
-  z.strictObject({ action: z.literal('set_intake'), sessionId: uuid, open: z.boolean() }),
-  z.strictObject({ action: z.literal('set_image_limits'), sessionId: uuid, limits: z.strictObject({ fileMegabytes: z.number(), count: z.number(), totalMegabytes: z.number() }) }),
-  z.strictObject({ action: z.literal('save_member'), sessionId: uuid, userId: uuid, member }),
-  z.strictObject({ action: z.literal('remove_member'), sessionId: uuid, userId: uuid }),
-  z.strictObject({ action: z.literal('edit_roster'), sessionId: uuid, command: z.unknown() }),
-]);
 const workflowSchema = z.strictObject({ sessionId: uuid, requestId: uuid, command: z.unknown() });
 const manageSchema = z.strictObject({ requestId: uuid, command: z.unknown() });
-const credentialsSchema = z.strictObject({ requestId: uuid, accountIds: z.unknown() });
+const credentialsSchema = z.strictObject({ requestId: uuid, eventId: uuid.nullable(), accountIds: z.unknown() });
 const imageSchema = z.discriminatedUnion('action', [
   z.strictObject({ action: z.literal('begin'), sessionId: uuid, requestId: uuid, issueId: uuid,
     visibility: z.enum(['public', 'internal']), name: z.string(), bytes: z.number() }),
@@ -42,8 +33,8 @@ const avatarCommandSchema = z.strictObject({ action: z.literal('remove') });
 const avatarPathSchema = z.tuple([uuid, uuid]);
 // Announcement text can use 10,000 characters of up to four bytes each.
 const announcementBodyLimit = 65_536;
-// A roster command can add 300 teams in one request.
-const adminBodyLimit = 131_072;
+// A management command can add 300 entrants with their usernames in one request.
+const manageBodyLimit = 131_072;
 
 export const privateHeaders = {
   ...baseSecurityHeaders,
@@ -58,9 +49,9 @@ export function privateJson(body: unknown, status = 200): Response {
 
 export interface ApplicationHttpServices {
   auth: Pick<AuthenticationService, 'current'>;
-  application: Pick<D1ApplicationService, 'sessions' | 'snapshot' | 'setIntake' | 'setImageLimits' | 'saveMember' | 'removeMember' | 'editRoster'>;
+  application: Pick<D1ApplicationService, 'contests' | 'snapshot'>;
   workflow: Pick<WorkflowService, 'execute'>;
-  manage: Pick<D1ManageService, 'site' | 'execute' | 'issueCredentials'>;
+  manage: Pick<D1ManageService, 'site' | 'event' | 'execute' | 'issueCredentials'>;
   images: Pick<R2ImageService, 'begin' | 'upload' | 'finish' | 'remove' | 'download'>;
   announcements: Pick<D1AnnouncementService, 'snapshot' | 'execute'>;
   announcementImages: Pick<R2AnnouncementImageService, 'begin' | 'upload' | 'finish' | 'remove' | 'download'>;
@@ -85,8 +76,12 @@ export function createApplicationHandler(services: ApplicationHttpServices, orig
       if (current.status.must_change || !current.status.session_valid) throw new AuthenticationError(403, 'Change your temporary password first.');
       const caller = current.caller;
       if (request.method === 'GET') {
-        if (url.pathname === '/api/sessions') return privateJson(await services.application.sessions(caller));
+        if (url.pathname === '/api/contests') {
+          const eventId = url.searchParams.get('eventId');
+          return privateJson(await services.application.contests(caller, eventId === null ? undefined : uuid.parse(eventId)));
+        }
         if (url.pathname === '/api/site') return privateJson(await services.manage.site(caller));
+        if (url.pathname === '/api/event') return privateJson(await services.manage.event(caller, uuid.parse(url.searchParams.get('eventId'))));
         if (url.pathname === '/api/snapshot' || url.pathname === '/api/updates') {
           const sessionId = uuid.parse(url.searchParams.get('sessionId'));
           if (url.pathname === '/api/snapshot') return privateJson(await services.application.snapshot(caller, sessionId));
@@ -145,7 +140,7 @@ export function createApplicationHandler(services: ApplicationHttpServices, orig
         throw new AuthenticationError(400, 'A JSON request body is required.');
       }
       const body = await readJsonBody(request, url.pathname === '/api/announcements' ? announcementBodyLimit
-        : url.pathname === '/api/admin' ? adminBodyLimit : undefined);
+        : url.pathname === '/api/manage' ? manageBodyLimit : undefined);
       if (url.pathname === '/api/workflow') {
         const parsed = workflowSchema.safeParse(body);
         if (!parsed.success) return privateJson({ outcome: 'rejected', reason: 'input' }, 400);
@@ -162,7 +157,7 @@ export function createApplicationHandler(services: ApplicationHttpServices, orig
       }
       if (url.pathname === '/api/credentials') {
         const parsed = credentialsSchema.parse(body);
-        return privateJson(await services.manage.issueCredentials(caller, parsed.requestId, parsed.accountIds));
+        return privateJson(await services.manage.issueCredentials(caller, parsed.requestId, { eventId: parsed.eventId, accountIds: parsed.accountIds }));
       }
       if (url.pathname === '/api/announcements') {
         const parsed = announcementSchema.safeParse(body);
@@ -190,17 +185,6 @@ export function createApplicationHandler(services: ApplicationHttpServices, orig
       if (url.pathname === '/api/avatars') {
         avatarCommandSchema.parse(body);
         await services.avatars.remove(caller);
-        return privateJson({});
-      }
-      if (url.pathname === '/api/admin') {
-        const command = adminSchema.parse(body);
-        switch (command.action) {
-          case 'set_intake': await services.application.setIntake(caller, command.sessionId, command.open); break;
-          case 'set_image_limits': await services.application.setImageLimits(caller, command.sessionId, command.limits); break;
-          case 'save_member': await services.application.saveMember(caller, command.sessionId, command.userId, command.member); break;
-          case 'remove_member': await services.application.removeMember(caller, command.sessionId, command.userId); break;
-          case 'edit_roster': await services.application.editRoster(caller, command.sessionId, command.command); break;
-        }
         return privateJson({});
       }
       if (url.pathname === '/api/images') {

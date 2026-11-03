@@ -3,16 +3,44 @@ import type { Announcements, Avatars, Backend, LiveUpdates } from '../contracts'
 import { AnnouncementRejectedError, ImageRequestError, WorkflowRejectedError, workflowRejectionMessage } from '../errors';
 import { announcementSnapshotSchema } from '../../connected/announcementModel';
 import { AVATAR_MAX_BYTES, imageKind } from '../../connected/imageFile';
-import { type Command, snapshotSchema, type Snapshot } from '../../connected/model';
+import { type Command, roleSchema, snapshotSchema, type Snapshot } from '../../connected/model';
 import { createCloudflareAuthentication } from './authentication';
 
-const sessionsSchema = z.array(z.object({ id: z.uuid(), name: z.string() }));
+const contestsSchema = z.array(z.object({
+  id: z.uuid(), name: z.string(), eventId: z.uuid(), manage: z.enum(['none', 'contest', 'event', 'site']),
+}));
 const siteSchema = z.object({
   webmasters: z.array(z.object({ id: z.uuid(), name: z.string(), handle: z.string(), ready: z.boolean() })),
   restrictWebmasterReads: z.boolean(),
+  events: z.array(z.object({
+    id: z.uuid(), name: z.string(), code: z.string(), timeZone: z.string(), archived: z.boolean(),
+    contests: z.number(), accounts: z.number(),
+  })),
   contestsToJoin: z.array(z.object({ id: z.uuid(), name: z.string(), eventName: z.string() })),
 });
-const receiptSchema = z.object({ accountIds: z.array(z.uuid()).exactOptional() });
+const receiptSchema = z.object({
+  eventId: z.uuid().exactOptional(), contestId: z.uuid().exactOptional(),
+  accountIds: z.array(z.uuid()).exactOptional(), entrantIds: z.array(z.uuid()).exactOptional(),
+});
+const consoleSchema = z.object({
+  event: z.object({ id: z.uuid(), name: z.string(), code: z.string(), timeZone: z.string(), archived: z.boolean() }),
+  manage: z.enum(['none', 'contest', 'event', 'site']),
+  admins: z.array(z.uuid()),
+  people: z.array(z.object({ id: z.uuid(), name: z.string(), handle: z.string().nullable(), ready: z.boolean() })),
+  entrants: z.array(z.object({
+    id: z.uuid(), kind: z.enum(['team', 'single']), name: z.string(), accountId: z.uuid().nullable(), handle: z.string().nullable(),
+  })),
+  contests: z.array(z.object({
+    id: z.uuid(), name: z.string(), contestType: z.enum(['singles', 'mixed', 'teams']), intakeOpen: z.boolean(),
+  })),
+  staffAssignments: z.array(z.object({
+    contestId: z.uuid(), accountId: z.uuid(), admin: z.boolean(), roles: z.array(roleSchema),
+  })),
+  entries: z.array(z.object({ contestId: z.uuid(), entrantId: z.uuid(), location: z.string() })),
+  audit: z.array(z.object({
+    id: z.string(), actorName: z.string(), at: z.string(), action: z.string(), target: z.string().nullable(),
+  })),
+});
 const issuedSchema = z.array(z.object({ accountId: z.uuid(), handle: z.string(), temporaryPassword: z.string().nullable() }));
 const startedSchema = z.object({ id: z.uuid(), original_path: z.string(), thumbnail_path: z.string() });
 const workflowSchema = z.discriminatedUnion('outcome', [
@@ -253,7 +281,10 @@ export function createCloudflareBackend(options: {
   return {
     auth,
     workflows: {
-      async sessions() { return sessionsSchema.parse(await readJson(await send('/api/sessions'))); },
+      async contests(query) {
+        const search = query?.eventId === undefined ? '' : `?eventId=${encodeURIComponent(query.eventId)}`;
+        return contestsSchema.parse(await readJson(await send(`/api/contests${search}`)));
+      },
       async snapshot(sessionId) {
         return snapshotSchema.parse(await readJson(await send(`/api/snapshot?sessionId=${encodeURIComponent(sessionId)}`)));
       },
@@ -262,21 +293,16 @@ export function createCloudflareBackend(options: {
       },
       executeAndRead: executeWorkflow,
     },
-    admin: {
-      account: auth.account,
-      async setIntake(sessionId, open) { await readJson(await post('/api/admin', { action: 'set_intake', sessionId, open })); },
-      async setImageLimits(sessionId, limits) { await readJson(await post('/api/admin', { action: 'set_image_limits', sessionId, limits })); },
-      async saveMember(sessionId, userId, member) { await readJson(await post('/api/admin', { action: 'save_member', sessionId, userId, member })); },
-      async removeMember(sessionId, userId) { await readJson(await post('/api/admin', { action: 'remove_member', sessionId, userId })); },
-      async editRoster(sessionId, command) { await readJson(await post('/api/admin', { action: 'edit_roster', sessionId, command })); },
-    },
     manage: {
       async site() { return siteSchema.nullable().parse(await readJson(await send('/api/site'))); },
+      async event(eventId) {
+        return consoleSchema.parse(await readJson(await send(`/api/event?eventId=${encodeURIComponent(eventId)}`)));
+      },
       async execute(requestId, command) {
         return receiptSchema.parse(await readJson(await post('/api/manage', { requestId, command })));
       },
-      async issueCredentials(requestId, accountIds) {
-        return issuedSchema.parse(await readJson(await post('/api/credentials', { requestId, accountIds })));
+      async issueCredentials(requestId, { eventId, accountIds }) {
+        return issuedSchema.parse(await readJson(await post('/api/credentials', { requestId, eventId, accountIds })));
       },
     },
     images: {

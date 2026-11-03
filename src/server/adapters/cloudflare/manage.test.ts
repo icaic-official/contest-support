@@ -9,7 +9,7 @@ import { D1ApplicationService } from './application';
 import { D1AuthenticationService } from './authentication';
 import { createBetterAuthIdentity } from './identity';
 import { loginKeyFor } from './credentials';
-import { D1ManageService } from './manage';
+import { D1ManageService, requirementOf } from './manage';
 import { passwordHasher, randomSecret, type PasswordHasher } from './password';
 
 const people = ['first', 'second', 'contestAdmin'] as const;
@@ -196,7 +196,7 @@ describe('site commands for webmasters', () => {
     const added = accountIds![0]!;
     const requestId = randomUUID();
     const issuing = new D1ManageService(db, passwordHasher);
-    const [issued] = await issuing.issueCredentials(caller('first'), requestId, [added]);
+    const [issued] = await issuing.issueCredentials(caller('first'), requestId, { eventId: null, accountIds: [added] });
     expect(issued).toMatchObject({ accountId: added, handle: 'newcomer' });
     expect(issued!.temporaryPassword).toMatch(/^.{12,}$/);
     expect((await siteOf('first')).webmasters).toContainEqual(expect.objectContaining({ id: added, ready: true }));
@@ -207,18 +207,18 @@ describe('site commands for webmasters', () => {
     const current = await authentication.current(new Headers({ cookie: signed.cookie.split(';')[0]! }));
     expect(current?.user.id).toBe(added);
     expect(current?.status.must_change).toBe(true);
-    expect(await issuing.issueCredentials(caller('first'), requestId, [added]))
+    expect(await issuing.issueCredentials(caller('first'), requestId, { eventId: null, accountIds: [added] }))
       .toEqual([{ accountId: added, handle: 'newcomer', temporaryPassword: null }]);
     expect(await rows("SELECT action, state, actor FROM account_operations WHERE account_id = ?", added))
       .toEqual([{ action: 'reset_password', state: 'completed', actor: caller('first').accountId }]);
     expect(await rows("SELECT json_extract(detail, '$.accountIds') AS accounts FROM authority_audit WHERE action = 'issue_passwords'"))
       .toEqual([{ accounts: JSON.stringify([added]) }]);
-    await expect(issuing.issueCredentials(caller('first'), requestId, [caller('second').accountId]))
+    await expect(issuing.issueCredentials(caller('first'), requestId, { eventId: null, accountIds: [caller('second').accountId] }))
       .rejects.toMatchObject({ status: 409, message: 'This request was already used for another change. Refresh and try again.' });
   });
 
   it('resets another webmaster and refuses the own account, other accounts, and other callers', async () => {
-    const issue = (person: Person, accountIds: unknown) => manage.issueCredentials(caller(person), randomUUID(), accountIds);
+    const issue = (person: Person, accountIds: unknown) => manage.issueCredentials(caller(person), randomUUID(), { eventId: null, accountIds });
     await expect(issue('first', [caller('first').accountId])).rejects.toMatchObject({ status: 400 });
     await expect(issue('first', [caller('contestAdmin').accountId])).rejects.toMatchObject({ status: 409 });
     await expect(issue('contestAdmin', [caller('first').accountId])).rejects.toMatchObject({ status: 403 });
@@ -226,7 +226,7 @@ describe('site commands for webmasters', () => {
     const second = caller('second').accountId;
     const failing = new D1ManageService({ prepare: (sql) => db.prepare(sql), batch: () => Promise.reject(new Error('private detail')) },
       fastPasswords);
-    await expect(failing.issueCredentials(caller('first'), randomUUID(), [second]))
+    await expect(failing.issueCredentials(caller('first'), randomUUID(), { eventId: null, accountIds: [second] }))
       .rejects.toMatchObject({ status: 409, message: 'The request outcome is unknown. Refresh before retrying.' });
     expect(await rows('SELECT credential_generation, must_change FROM accounts WHERE id = ?', second))
       .toEqual([{ credential_generation: 1, must_change: 0 }]);
@@ -428,16 +428,477 @@ describe('handle changes', () => {
       db.prepare('INSERT INTO memberships (session_id, account_id) VALUES (?, ?)').bind(ids.contest, legacy),
       db.prepare(`INSERT INTO membership_roles (session_id, account_id, role) VALUES (?, ?, 'volunteer')`).bind(ids.contest, legacy),
     ]);
-    const admin = await signIn('contestadmin');
-    await expect(authentication.account(admin, ids.contest, { action: 'reset_password', userId: legacy }))
-      .rejects.toMatchObject({ status: 409, message: 'Set a username before resetting this account.' });
+    const admin = (await authentication.current(await signIn('contestadmin')))!.caller;
+    const issuing = new D1ManageService(db, passwordHasher);
+    const issue = () => issuing.issueCredentials(admin, randomUUID(), { eventId: ids.event, accountIds: [legacy] });
+    await expect(issue()).rejects.toMatchObject({ status: 409, message: 'Set a username before issuing this account a password.' });
     expect(await rows('SELECT credential_state FROM accounts WHERE id = ?', legacy)).toEqual([{ credential_state: 'ready' }]);
     expect(await rename('contestAdmin', legacy, 'desk-legacy')).toEqual({});
-    const reset = await authentication.account(admin, ids.contest, { action: 'reset_password', userId: legacy });
-    expect(reset.signIn).toEqual({ kind: 'event', code: await eventCode() });
-    const signedIn = await authentication.current(await signIn('desk-legacy', reset.temporaryPassword));
+    const [reset] = await issue();
+    const signedIn = await authentication.current(await signIn('desk-legacy', reset!.temporaryPassword!));
     expect(signedIn).toMatchObject({ user: { id: legacy }, status: { handle: 'desk-legacy', must_change: true } });
     expect(await rows('SELECT a.username, b.username AS identity FROM accounts a JOIN ba_user b ON b.id = a.id WHERE a.id = ?', legacy))
       .toEqual([{ username: loginKeyFor(legacy), identity: loginKeyFor(legacy) }]);
+  });
+});
+
+describe('event, roster, and contest commands', () => {
+  const callerNames = ['webmaster', 'eventAdmin', 'contestAdmin', 'volunteer', 'otherAdmin'] as const;
+  type Name = typeof callerNames[number];
+  let db: D1Binding;
+  let dispose: (() => Promise<void>) | undefined;
+  let manage: D1ManageService;
+  const callers = new Map<Name, Caller>();
+  const caller = (name: Name) => callers.get(name)!;
+  const ids = { event: '', other: '', contest: '', otherContest: '' };
+
+  const run = (sql: string, ...values: D1Value[]) => db.prepare(sql).bind(...values).run();
+  const rows = async <T>(sql: string, ...values: D1Value[]) => (await db.prepare(sql).bind(...values).all<T>()).results;
+  const execute = (by: Name, command: ManageCommand, requestId: string = randomUUID()) =>
+    manage.execute(caller(by), requestId, command);
+  const entrants = async (by: Name, eventId: string, list: Array<[string, 'team' | 'single']>) =>
+    (await execute(by, {
+      type: 'create_entrants', eventId,
+      entrants: list.map(([name, kind]) => ({ kind, name, handle: name.toLowerCase().replaceAll(' ', '-') })),
+    })).entrantIds!;
+  const createContest = async (by: Name, eventId: string, name: string, contestType: 'singles' | 'mixed' | 'teams') =>
+    (await execute(by, { type: 'create_contest', eventId, name, contestType, categories: ['Devices', 'Other'] })).contestId!;
+  const seatsOf = (contestId: string) =>
+    rows<{ account_id: string; team_id: string | null }>('SELECT account_id, team_id FROM memberships WHERE session_id = ? ORDER BY account_id', contestId);
+  const addIssue = (contestId: string, entryId: string, category: string) => run(
+    `INSERT INTO issues (id, session_id, team_id, status, number, reporter, reporter_name, category, description, created_at)
+      VALUES (?, ?, ?, 'open', 1, ?, 'Fictional', ?, 'Fictional issue', strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`,
+    randomUUID(), contestId, entryId, caller('webmaster').accountId, category);
+
+  beforeEach(async () => {
+    const platform = await getPlatformProxy<{ DB: D1Binding }>({
+      configPath: 'wrangler.auth-ci.jsonc', persist: false, remoteBindings: false, envFiles: [],
+    });
+    db = platform.env.DB;
+    dispose = platform.dispose;
+    await applyMigrations(db);
+    manage = new D1ManageService(db, fastPasswords);
+    Object.assign(ids, { event: randomUUID(), other: randomUUID(), contest: randomUUID(), otherContest: randomUUID() });
+    await run('INSERT INTO events (id, name, code) VALUES (?, ?, ?), (?, ?, ?)',
+      ids.event, 'Fictional event', 'fictional-event', ids.other, 'Other event', 'other-event');
+    await run(`INSERT INTO sessions (id, event_id, name, contest_type) VALUES (?, ?, 'Live 1', 'teams'), (?, ?, 'Other live', 'teams')`,
+      ids.contest, ids.event, ids.otherContest, ids.other);
+    const now = "strftime('%Y-%m-%dT%H:%M:%fZ', 'now')";
+    for (const name of callerNames) {
+      const login = { accountId: randomUUID(), loginId: randomUUID() };
+      callers.set(name, login);
+      const event = name === 'webmaster' ? null : name === 'otherAdmin' ? ids.other : ids.event;
+      await db.batch([
+        db.prepare('INSERT INTO accounts (id, name, username, handle, event_id, must_change) VALUES (?, ?, ?, ?, ?, 0)')
+          .bind(login.accountId, `Fictional ${name}`, name.toLowerCase(), name.toLowerCase(), event),
+        db.prepare(`INSERT INTO ba_user (id, name, email, createdAt, updatedAt) VALUES (?, ?, ?, ${now}, ${now})`)
+          .bind(login.accountId, name, `${login.accountId}@roster.minsky.invalid`),
+        db.prepare(`INSERT INTO ba_session (id, userId, token, expiresAt, createdAt, updatedAt)
+          VALUES (?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '+1 hour'), ${now}, ${now})`)
+          .bind(login.loginId, login.accountId, randomUUID()),
+        db.prepare('INSERT INTO logins (id, account_id, expires_at, identity_session_id) VALUES (?, ?, unixepoch() + 3600, ?)')
+          .bind(login.loginId, login.accountId, login.loginId),
+      ]);
+    }
+    await db.batch([
+      db.prepare(`INSERT INTO grants (account_id, scope, granted_by) VALUES (?, 'site', 'fixture')`).bind(caller('webmaster').accountId),
+      db.prepare(`INSERT INTO grants (account_id, scope, event_id, granted_by) VALUES (?, 'event', ?, 'fixture'), (?, 'event', ?, 'fixture')`)
+        .bind(caller('eventAdmin').accountId, ids.event, caller('otherAdmin').accountId, ids.other),
+      db.prepare(`INSERT INTO memberships (session_id, account_id, is_admin) VALUES (?, ?, 1)`)
+        .bind(ids.contest, caller('contestAdmin').accountId),
+    ]);
+  }, 120_000);
+
+  afterEach(async () => { await dispose?.(); }, 120_000);
+
+  it('creates an event with its first admin, who waits for a password, and refuses a taken code', async () => {
+    const requestId = randomUUID();
+    const command: ManageCommand = {
+      type: 'create_event', name: 'Olympiad 2027', code: 'Olympiad-2027', timeZone: 'Asia/Singapore',
+      firstAdmin: { handle: 'Chief', name: 'Fictional chief' },
+    };
+    const receipt = await execute('webmaster', command, requestId);
+    expect(receipt.eventId).toBeDefined();
+    expect(await execute('webmaster', command, requestId)).toEqual(receipt);
+    const [adminId] = receipt.accountIds!;
+    expect(await rows('SELECT code, time_zone, name FROM events WHERE id = ?', receipt.eventId!))
+      .toEqual([{ code: 'olympiad-2027', time_zone: 'Asia/Singapore', name: 'Olympiad 2027' }]);
+    expect(await rows('SELECT handle, event_id, credential_state, must_change FROM accounts WHERE id = ?', adminId!))
+      .toEqual([{ handle: 'chief', event_id: receipt.eventId, credential_state: 'pending', must_change: 1 }]);
+    expect(await rows(`SELECT account_id FROM grants WHERE scope = 'event' AND event_id = ?`, receipt.eventId!))
+      .toEqual([{ account_id: adminId }]);
+    expect(await rows('SELECT action, event_id FROM authority_audit')).toEqual([{ action: 'create_event', event_id: null }]);
+    expect((await manage.site(caller('webmaster')))!.events.find((event) => event.id === receipt.eventId))
+      .toEqual({ id: receipt.eventId, name: 'Olympiad 2027', code: 'olympiad-2027', timeZone: 'Asia/Singapore', archived: false, contests: 0, accounts: 1 });
+    await expect(execute('webmaster', { ...command, firstAdmin: { handle: 'other', name: 'Other' } }))
+      .rejects.toMatchObject({ status: 409, message: 'That event code is taken. Choose another.' });
+    await expect(execute('webmaster', { ...command, code: 'bad code' })).rejects.toMatchObject({ status: 400 });
+    await expect(execute('webmaster', { ...command, code: 'zone-test', timeZone: 'Mars/Base' })).rejects.toMatchObject({ status: 400 });
+    // Only a webmaster creates an event.
+    await expect(execute('eventAdmin', { ...command, code: 'another-code' })).rejects.toMatchObject({ status: 403 });
+    expect(await rows('SELECT count(*) AS n FROM events')).toEqual([{ n: 3 }]);
+  });
+
+  it('lets an event admin update only its own event and name event admins from its own accounts', async () => {
+    await execute('eventAdmin', { type: 'update_event', eventId: ids.event, name: 'Renamed', code: 'renamed-event', timeZone: 'UTC' });
+    expect(await rows('SELECT name, code FROM events WHERE id = ?', ids.event)).toEqual([{ name: 'Renamed', code: 'renamed-event' }]);
+    await expect(execute('eventAdmin', { type: 'update_event', eventId: ids.event, name: 'Renamed', code: 'other-event', timeZone: 'UTC' }))
+      .rejects.toMatchObject({ status: 409, message: 'That event code is taken. Choose another.' });
+    await expect(execute('eventAdmin', { type: 'update_event', eventId: ids.other, name: 'Taken over', code: 'taken-over', timeZone: 'UTC' }))
+      .rejects.toMatchObject({ status: 403 });
+    await expect(execute('contestAdmin', { type: 'update_event', eventId: ids.event, name: 'Nope', code: 'nope-code', timeZone: 'UTC' }))
+      .rejects.toMatchObject({ status: 403 });
+    const { accountIds } = await execute('eventAdmin', { type: 'create_people', eventId: ids.event, people: [{ handle: 'newadmin', name: 'New admin' }] });
+    const [person] = accountIds!;
+    await execute('eventAdmin', { type: 'set_event_admin', eventId: ids.event, accountId: person!, admin: true });
+    expect(await rows(`SELECT count(*) AS n FROM grants WHERE scope = 'event' AND account_id = ?`, person!)).toEqual([{ n: 1 }]);
+    await execute('webmaster', { type: 'set_event_admin', eventId: ids.event, accountId: person!, admin: false });
+    expect(await rows(`SELECT count(*) AS n FROM grants WHERE scope = 'event' AND account_id = ?`, person!)).toEqual([{ n: 0 }]);
+    // An account of another event, and a webmaster, cannot be named.
+    await expect(execute('eventAdmin', { type: 'set_event_admin', eventId: ids.event, accountId: caller('otherAdmin').accountId, admin: true }))
+      .rejects.toMatchObject({ status: 409 });
+    await expect(execute('eventAdmin', { type: 'set_event_admin', eventId: ids.event, accountId: caller('webmaster').accountId, admin: true }))
+      .rejects.toMatchObject({ status: 409 });
+  });
+
+  it('creates people and entrants, each with one pending sign-in, and refuses duplicates and other events', async () => {
+    const people = await execute('eventAdmin', { type: 'create_people', eventId: ids.event, people: [
+      { handle: 'ada', name: 'Ada' }, { handle: 'grace', name: 'Grace' }] });
+    expect(people.accountIds).toHaveLength(2);
+    expect(await rows('SELECT handle, username, credential_state, must_change, entrant_id FROM accounts WHERE id = ?', people.accountIds![0]!))
+      .toEqual([{ handle: 'ada', username: people.accountIds![0]!.replaceAll('-', ''), credential_state: 'pending', must_change: 1, entrant_id: null }]);
+    await expect(execute('eventAdmin', { type: 'create_people', eventId: ids.event, people: [{ handle: 'ada', name: 'Again' }] }))
+      .rejects.toMatchObject({ status: 409, message: 'The username "ada" is taken. Choose another.' });
+    // The same handle in another event is a different name.
+    await execute('otherAdmin', { type: 'create_people', eventId: ids.other, people: [{ handle: 'ada', name: 'Ada elsewhere' }] });
+    await expect(execute('eventAdmin', { type: 'create_people', eventId: ids.other, people: [{ handle: 'eve', name: 'Eve' }] }))
+      .rejects.toMatchObject({ status: 403 });
+
+    const receipt = await execute('eventAdmin', { type: 'create_entrants', eventId: ids.event, entrants: [
+      { kind: 'team', name: 'Aurora', handle: 'aurora' }, { kind: 'single', name: 'Solo Sam', handle: 'sam' }] });
+    expect(receipt.entrantIds).toHaveLength(2);
+    expect(await rows('SELECT en.id, en.kind, en.name, a.entrant_id, a.handle, a.credential_state FROM entrants en JOIN accounts a ON a.entrant_id = en.id WHERE en.event_id = ? ORDER BY en.name', ids.event))
+      .toEqual([
+        { id: receipt.entrantIds![0], kind: 'team', name: 'Aurora', entrant_id: receipt.entrantIds![0], handle: 'aurora', credential_state: 'pending' },
+        { id: receipt.entrantIds![1], kind: 'single', name: 'Solo Sam', entrant_id: receipt.entrantIds![1], handle: 'sam', credential_state: 'pending' },
+      ]);
+    await expect(execute('eventAdmin', { type: 'create_entrants', eventId: ids.event, entrants: [{ kind: 'team', name: 'AURORA', handle: 'aurora-2' }] }))
+      .rejects.toMatchObject({ status: 409, message: 'An entrant named "AURORA" already exists.' });
+    await expect(execute('eventAdmin', { type: 'create_entrants', eventId: ids.event, entrants: [{ kind: 'team', name: 'Borealis', handle: 'sam' }] }))
+      .rejects.toMatchObject({ status: 409 });
+    await expect(execute('eventAdmin', { type: 'create_entrants', eventId: ids.event, entrants: [
+      { kind: 'team', name: 'Twin', handle: 'twin-1' }, { kind: 'team', name: 'TWIN', handle: 'twin-2' }] }))
+      .rejects.toMatchObject({ status: 400 });
+
+    await execute('eventAdmin', { type: 'rename_entrant', eventId: ids.event, entrantId: receipt.entrantIds![0]!, name: 'Aurora Prime' });
+    expect(await rows('SELECT name FROM entrants WHERE id = ?', receipt.entrantIds![0]!)).toEqual([{ name: 'Aurora Prime' }]);
+    await expect(execute('eventAdmin', { type: 'rename_entrant', eventId: ids.event, entrantId: receipt.entrantIds![0]!, name: 'solo sam' }))
+      .rejects.toMatchObject({ status: 409 });
+    // An entrant of the other event is not found by this event's admin.
+    const [foreign] = await entrants('otherAdmin', ids.other, [['Foreign', 'team']]);
+    await expect(execute('eventAdmin', { type: 'rename_entrant', eventId: ids.event, entrantId: foreign!, name: 'Mine now' }))
+      .rejects.toMatchObject({ status: 409 });
+    await expect(execute('eventAdmin', { type: 'rename_entrant', eventId: ids.other, entrantId: foreign!, name: 'Mine now' }))
+      .rejects.toMatchObject({ status: 403 });
+  });
+
+  it('assigns entrants to a contest, seats their sign-ins, and keeps the contest type', async () => {
+    const [team, single] = await entrants('eventAdmin', ids.event, [['Aurora', 'team'], ['Solo Sam', 'single']]);
+    const [foreign] = await entrants('otherAdmin', ids.other, [['Foreign', 'team']]);
+    const teamsContest = await createContest('eventAdmin', ids.event, 'Teams round', 'teams');
+    const singlesContest = await createContest('eventAdmin', ids.event, 'Singles round', 'singles');
+    const requestId = randomUUID();
+    const command: ManageCommand = { type: 'assign_entrants', contestId: teamsContest, entries: [{ entrantId: team!, location: ' Table 4 ' }] };
+    const receipt = await execute('eventAdmin', command, requestId);
+    expect(receipt).toEqual({ contestId: teamsContest, entrantIds: [team] });
+    expect(await execute('eventAdmin', command, requestId)).toEqual(receipt);
+    expect(await rows('SELECT name, location, entrant_id FROM teams WHERE session_id = ?', teamsContest))
+      .toEqual([{ name: 'Aurora', location: 'Table 4', entrant_id: team }]);
+    const account = (await rows<{ id: string }>('SELECT id FROM accounts WHERE entrant_id = ?', team!))[0]!.id;
+    expect((await seatsOf(teamsContest)).map((seat) => [seat.account_id, seat.team_id !== null])).toEqual([[account, true]]);
+    expect(await rows('SELECT action FROM admin_audit WHERE session_id = ?', teamsContest)).toEqual([{ action: 'assign_entrants' }]);
+    expect(await rows('SELECT action, event_id FROM authority_audit WHERE action = ?', 'assign_entrants'))
+      .toEqual([{ action: 'assign_entrants', event_id: ids.event }]);
+
+    // The type decides who may enter. A second entry of the same entrant is refused.
+    await expect(execute('eventAdmin', { type: 'assign_entrants', contestId: teamsContest, entries: [{ entrantId: single!, location: '' }] }))
+      .rejects.toMatchObject({ status: 409, message: 'Solo Sam does not fit this contest. It takes teams.' });
+    await expect(execute('eventAdmin', { type: 'assign_entrants', contestId: singlesContest, entries: [{ entrantId: team!, location: '' }] }))
+      .rejects.toMatchObject({ status: 409, message: 'Aurora does not fit this contest. It takes single contestants.' });
+    await expect(execute('eventAdmin', { type: 'assign_entrants', contestId: teamsContest, entries: [{ entrantId: team!, location: '' }] }))
+      .rejects.toMatchObject({ status: 409, message: 'Aurora is already in this contest.' });
+    // An entrant of another event, and a contest of another event.
+    await expect(execute('eventAdmin', { type: 'assign_entrants', contestId: teamsContest, entries: [{ entrantId: foreign!, location: '' }] }))
+      .rejects.toMatchObject({ status: 409 });
+    await expect(execute('eventAdmin', { type: 'assign_entrants', contestId: ids.otherContest, entries: [{ entrantId: team!, location: '' }] }))
+      .rejects.toMatchObject({ status: 403 });
+    await expect(execute('contestAdmin', command)).rejects.toMatchObject({ status: 403 });
+
+    // A mixed contest takes both. A contest type that would exclude an entry is refused.
+    await execute('eventAdmin', { type: 'update_contest', contestId: singlesContest, name: 'Mixed round', contestType: 'mixed' });
+    await execute('eventAdmin', { type: 'assign_entrants', contestId: singlesContest, entries: [{ entrantId: team!, location: 'A' }, { entrantId: single!, location: 'B' }] });
+    await expect(execute('eventAdmin', { type: 'update_contest', contestId: singlesContest, name: 'Singles round', contestType: 'singles' }))
+      .rejects.toMatchObject({ status: 409, message: 'Remove the entrants that this contest type excludes first.' });
+    await expect(run(`UPDATE sessions SET contest_type = 'singles' WHERE id = ?`, singlesContest))
+      .rejects.toThrow(/Remove the entrants that this contest type excludes first/);
+    await execute('eventAdmin', { type: 'unassign_entrant', contestId: singlesContest, entrantId: team! });
+    await execute('eventAdmin', { type: 'update_contest', contestId: singlesContest, name: 'Singles round', contestType: 'singles' });
+    expect(await rows('SELECT contest_type, name FROM sessions WHERE id = ?', singlesContest)).toEqual([{ contest_type: 'singles', name: 'Singles round' }]);
+  });
+
+  it('refuses to unassign an entrant that has an issue, and removes the seat of one that has none', async () => {
+    const [team, other] = await entrants('eventAdmin', ids.event, [['Aurora', 'team'], ['Borealis', 'team']]);
+    await execute('eventAdmin', { type: 'assign_entrants', contestId: ids.contest, entries: [{ entrantId: team!, location: '' }, { entrantId: other!, location: '' }] });
+    const [entry] = await rows<{ id: string }>('SELECT id FROM teams WHERE session_id = ? AND entrant_id = ?', ids.contest, team!);
+    await addIssue(ids.contest, entry!.id, 'Devices');
+    await expect(execute('eventAdmin', { type: 'unassign_entrant', contestId: ids.contest, entrantId: team! }))
+      .rejects.toMatchObject({ status: 409, message: 'Aurora has 1 issue and stays in the contest.' });
+    expect((await seatsOf(ids.contest)).filter((seat) => seat.team_id !== null)).toHaveLength(2);
+    await execute('eventAdmin', { type: 'unassign_entrant', contestId: ids.contest, entrantId: other! });
+    expect((await seatsOf(ids.contest)).filter((seat) => seat.team_id !== null)).toHaveLength(1);
+    expect(await rows('SELECT count(*) AS n FROM entrants WHERE id = ?', other!)).toEqual([{ n: 1 }]);
+    await expect(execute('eventAdmin', { type: 'unassign_entrant', contestId: ids.contest, entrantId: other! }))
+      .rejects.toMatchObject({ status: 409 });
+  });
+
+  it('lets only an event admin or a webmaster assign staff, and keeps entrants and other events out', async () => {
+    const [person] = (await execute('eventAdmin', { type: 'create_people', eventId: ids.event, people: [{ handle: 'pat', name: 'Pat' }] })).accountIds!;
+    const [team] = await entrants('eventAdmin', ids.event, [['Aurora', 'team']]);
+    const command: ManageCommand = { type: 'assign_staff', contestId: ids.contest, accountId: person!, roles: ['volunteer', 'jury'], admin: false };
+    // A contest admin runs its contest, but does not choose who staffs it.
+    await expect(execute('contestAdmin', command)).rejects.toMatchObject({ status: 403 });
+    await expect(execute('volunteer', command)).rejects.toMatchObject({ status: 403 });
+    const requestId = randomUUID();
+    const versionBefore = (await rows<{ version: number }>('SELECT version FROM sessions WHERE id = ?', ids.contest))[0]!.version;
+    const receipt = await execute('eventAdmin', command, requestId);
+    expect(await execute('eventAdmin', command, requestId)).toEqual(receipt);
+    expect(await rows('SELECT team_id, is_admin FROM memberships WHERE session_id = ? AND account_id = ?', ids.contest, person!))
+      .toEqual([{ team_id: null, is_admin: 0 }]);
+    expect(await rows('SELECT role FROM membership_roles WHERE session_id = ? AND account_id = ? ORDER BY role', ids.contest, person!))
+      .toEqual([{ role: 'jury' }, { role: 'volunteer' }]);
+    expect((await rows<{ version: number }>('SELECT version FROM sessions WHERE id = ?', ids.contest))[0]!.version).toBeGreaterThan(versionBefore);
+    expect(await rows('SELECT action, target FROM admin_audit WHERE session_id = ?', ids.contest))
+      .toEqual([{ action: 'assign_membership', target: person }]);
+    expect(await rows(`SELECT audience FROM audience_sequences WHERE session_id = ? ORDER BY audience`, ids.contest))
+      .toEqual([{ audience: `account:${person}` }, { audience: 'staff' }]);
+
+    // The last admin may leave. A new assignment replaces the roles.
+    await execute('webmaster', { type: 'assign_staff', contestId: ids.contest, accountId: person!, roles: [], admin: true });
+    expect(await rows('SELECT is_admin FROM memberships WHERE session_id = ? AND account_id = ?', ids.contest, person!)).toEqual([{ is_admin: 1 }]);
+    expect(await rows('SELECT count(*) AS n FROM membership_roles WHERE session_id = ? AND account_id = ?', ids.contest, person!)).toEqual([{ n: 0 }]);
+    await execute('eventAdmin', { type: 'unassign_staff', contestId: ids.contest, accountId: caller('contestAdmin').accountId });
+    await execute('eventAdmin', { type: 'unassign_staff', contestId: ids.contest, accountId: person! });
+    expect(await seatsOf(ids.contest)).toEqual([]);
+    await expect(execute('eventAdmin', { type: 'unassign_staff', contestId: ids.contest, accountId: person! }))
+      .rejects.toMatchObject({ status: 409 });
+
+    // An entrant's sign-in, an account of another event, and a webmaster cannot take a staff seat.
+    const entrantAccount = (await rows<{ id: string }>('SELECT id FROM accounts WHERE entrant_id = ?', team!))[0]!.id;
+    for (const accountId of [entrantAccount, caller('otherAdmin').accountId, caller('webmaster').accountId]) {
+      await expect(execute('eventAdmin', { ...command, accountId })).rejects.toMatchObject({ status: 409 });
+    }
+    expect(await rows('SELECT event_id FROM accounts WHERE id = ?', caller('webmaster').accountId)).toEqual([{ event_id: null }]);
+    await expect(execute('eventAdmin', { ...command, roles: [], admin: false })).rejects.toMatchObject({ status: 400 });
+  });
+
+  it('lets a contest admin run its own contest and no other, and refuses staff without admin', async () => {
+    const [team] = await entrants('eventAdmin', ids.event, [['Aurora', 'team']]);
+    await execute('eventAdmin', { type: 'assign_entrants', contestId: ids.contest, entries: [{ entrantId: team!, location: 'Desk' }] });
+    expect(await execute('contestAdmin', { type: 'set_intake', contestId: ids.contest, open: true })).toEqual({});
+    expect(await rows('SELECT intake_open FROM sessions WHERE id = ?', ids.contest)).toEqual([{ intake_open: 1 }]);
+    await execute('contestAdmin', { type: 'set_image_limits', contestId: ids.contest, fileMegabytes: 20, count: 8, totalMegabytes: 40 });
+    expect(await rows('SELECT max_image_bytes, max_images_per_issue, max_image_bytes_per_issue FROM sessions WHERE id = ?', ids.contest))
+      .toEqual([{ max_image_bytes: 20 * 1048576, max_images_per_issue: 8, max_image_bytes_per_issue: 40 * 1048576 }]);
+    await expect(execute('contestAdmin', { type: 'set_image_limits', contestId: ids.contest, fileMegabytes: 50, count: 8, totalMegabytes: 40 }))
+      .rejects.toMatchObject({ status: 400 });
+    await execute('contestAdmin', { type: 'set_categories', contestId: ids.contest, categories: ['Network', 'Other'] });
+    expect(await rows('SELECT categories FROM sessions WHERE id = ?', ids.contest)).toEqual([{ categories: '["Network","Other"]' }]);
+    await execute('contestAdmin', { type: 'set_location', contestId: ids.contest, entrantId: team!, location: 'Table 9' });
+    expect(await rows('SELECT location FROM teams WHERE session_id = ?', ids.contest)).toEqual([{ location: 'Table 9' }]);
+    expect((await rows<{ action: string }>('SELECT action FROM admin_audit WHERE session_id = ? ORDER BY at, rowid', ids.contest))
+      .map((row) => row.action).sort()).toEqual(['assign_entrants', 'set_categories', 'set_image_limits', 'set_intake', 'set_location']);
+    // The category list stays while an issue uses a category in it.
+    const [entry] = await rows<{ id: string }>('SELECT id FROM teams WHERE session_id = ?', ids.contest);
+    await addIssue(ids.contest, entry!.id, 'Network');
+    await expect(execute('contestAdmin', { type: 'set_categories', contestId: ids.contest, categories: ['Other'] }))
+      .rejects.toMatchObject({ status: 409, message: 'Network has 1 issue and stays in the list.' });
+
+    for (const command of [
+      { type: 'set_intake', contestId: ids.contest, open: false },
+      { type: 'set_location', contestId: ids.contest, entrantId: team!, location: 'x' },
+    ] satisfies ManageCommand[]) {
+      await expect(execute('volunteer', command)).rejects.toMatchObject({ status: 403 });
+    }
+    // The admin of one contest does not reach a contest of another event, and an event admin of one event does not reach another.
+    await expect(execute('contestAdmin', { type: 'set_intake', contestId: ids.otherContest, open: true })).rejects.toMatchObject({ status: 403 });
+    await expect(execute('eventAdmin', { type: 'set_intake', contestId: ids.otherContest, open: true })).rejects.toMatchObject({ status: 403 });
+    await expect(execute('webmaster', { type: 'set_intake', contestId: ids.otherContest, open: true })).resolves.toEqual({});
+  });
+
+  it('refuses every write in an archived event, and still shows its console', async () => {
+    await run('UPDATE events SET archived = 1 WHERE id = ?', ids.event);
+    for (const command of [
+      { type: 'create_people', eventId: ids.event, people: [{ handle: 'late', name: 'Late' }] },
+      { type: 'create_contest', eventId: ids.event, name: 'Late', contestType: 'teams', categories: ['Other'] },
+      { type: 'set_intake', contestId: ids.contest, open: true },
+    ] satisfies ManageCommand[]) {
+      await expect(execute('eventAdmin', command)).rejects.toMatchObject({ status: 403, message: 'This event is archived.' });
+    }
+    await expect(manage.issueCredentials(caller('eventAdmin'), randomUUID(), { eventId: ids.event, accountIds: [caller('volunteer').accountId] }))
+      .rejects.toMatchObject({ status: 403 });
+    expect((await manage.event(caller('eventAdmin'), ids.event)).event.archived).toBe(true);
+  });
+
+  it('issues passwords to accounts of an event under the account rule, and returns no password on a retry', async () => {
+    const [team] = await entrants('eventAdmin', ids.event, [['Aurora', 'team']]);
+    const [person] = (await execute('eventAdmin', { type: 'create_people', eventId: ids.event, people: [{ handle: 'pat', name: 'Pat' }] })).accountIds!;
+    await execute('eventAdmin', { type: 'assign_entrants', contestId: ids.contest, entries: [{ entrantId: team!, location: '' }] });
+    await execute('eventAdmin', { type: 'assign_staff', contestId: ids.contest, accountId: person!, roles: ['volunteer'], admin: false });
+    const entrantAccount = (await rows<{ id: string }>('SELECT id FROM accounts WHERE entrant_id = ?', team!))[0]!.id;
+    const issue = (by: Name, eventId: string | null, accountIds: string[], requestId: string = randomUUID()) =>
+      manage.issueCredentials(caller(by), requestId, { eventId, accountIds });
+
+    const requestId = randomUUID();
+    const issued = await issue('eventAdmin', ids.event, [person!, entrantAccount], requestId);
+    expect(issued.map(({ accountId, handle }) => ({ accountId, handle }))).toEqual([
+      { accountId: person, handle: 'pat' }, { accountId: entrantAccount, handle: 'aurora' }]);
+    expect(issued.every((row) => (row.temporaryPassword?.length ?? 0) >= 12)).toBe(true);
+    expect(await rows('SELECT credential_state, must_change, credential_generation FROM accounts WHERE id = ?', person!))
+      .toEqual([{ credential_state: 'ready', must_change: 1, credential_generation: 2 }]);
+    expect(await issue('eventAdmin', ids.event, [person!, entrantAccount], requestId)).toEqual([
+      { accountId: person, handle: 'pat', temporaryPassword: null }, { accountId: entrantAccount, handle: 'aurora', temporaryPassword: null }]);
+    expect(await rows('SELECT count(*) AS n FROM command_assertions')).toEqual([{ n: 0 }]);
+
+    // A contest admin may issue for accounts that sit only in contests it administers.
+    await expect(issue('contestAdmin', ids.event, [entrantAccount])).resolves.toHaveLength(1);
+    await expect(issue('contestAdmin', ids.event, [person!])).resolves.toHaveLength(1);
+    await expect(issue('contestAdmin', ids.event, [caller('eventAdmin').accountId])).rejects.toMatchObject({ status: 403 });
+    await expect(issue('volunteer', ids.event, [entrantAccount])).rejects.toMatchObject({ status: 403 });
+    // Another event's admin, an account of another event, and a webmaster by event ID are refused.
+    await expect(issue('otherAdmin', ids.event, [person!])).rejects.toMatchObject({ status: 403 });
+    await expect(issue('eventAdmin', ids.event, [caller('otherAdmin').accountId])).rejects.toMatchObject({ status: 403 });
+    await expect(issue('eventAdmin', ids.event, [caller('webmaster').accountId])).rejects.toMatchObject({ status: 403 });
+    await expect(issue('eventAdmin', ids.event, [caller('eventAdmin').accountId])).rejects.toMatchObject({ status: 400 });
+    await expect(issue('eventAdmin', null, [person!])).rejects.toMatchObject({ status: 403 });
+    // A webmaster issues for an event's accounts by naming the event.
+    await expect(issue('webmaster', ids.event, [caller('eventAdmin').accountId])).resolves.toHaveLength(1);
+    await expect(issue('webmaster', ids.other, [person!])).rejects.toMatchObject({ status: 403 });
+  });
+
+  it('refuses an issue when the caller loses its authority before the batch commits', async () => {
+    const racing = new D1ManageService({ prepare: (sql) => db.prepare(sql), batch: async (statements) => {
+      await run(`DELETE FROM grants WHERE scope = 'event' AND account_id = ?`, caller('eventAdmin').accountId);
+      return db.batch(statements);
+    } }, fastPasswords);
+    const target = caller('volunteer').accountId;
+    await expect(racing.issueCredentials(caller('eventAdmin'), randomUUID(), { eventId: ids.event, accountIds: [target] }))
+      .rejects.toMatchObject({ status: 409 });
+    expect(await rows('SELECT credential_generation FROM accounts WHERE id = ?', target)).toEqual([{ credential_generation: 1 }]);
+  });
+
+  it('shows an event admin and a webmaster the console, and nobody else', async () => {
+    const [team, single] = await entrants('eventAdmin', ids.event, [['Aurora', 'team'], ['Solo Sam', 'single']]);
+    const contest = await createContest('eventAdmin', ids.event, 'Mixed round', 'mixed');
+    await execute('eventAdmin', { type: 'assign_entrants', contestId: contest, entries: [{ entrantId: team!, location: 'T1' }, { entrantId: single!, location: 'T2' }] });
+    await execute('eventAdmin', { type: 'assign_staff', contestId: contest, accountId: caller('volunteer').accountId, roles: ['specialist'], admin: false });
+    const view = await manage.event(caller('eventAdmin'), ids.event);
+    expect(view.event).toEqual({ id: ids.event, name: 'Fictional event', code: 'fictional-event', timeZone: 'UTC', archived: false });
+    expect(view.manage).toBe('event');
+    expect(view.admins).toEqual([caller('eventAdmin').accountId]);
+    expect(view.people.map((person) => person.handle).sort()).toEqual(['contestadmin', 'eventadmin', 'volunteer']);
+    expect(view.entrants.map(({ name, kind, handle }) => ({ name, kind, handle }))).toEqual([
+      { name: 'Aurora', kind: 'team', handle: 'aurora' }, { name: 'Solo Sam', kind: 'single', handle: 'solo-sam' }]);
+    expect(view.contests.map(({ name, contestType, intakeOpen }) => ({ name, contestType, intakeOpen })))
+      .toEqual([{ name: 'Live 1', contestType: 'teams', intakeOpen: false }, { name: 'Mixed round', contestType: 'mixed', intakeOpen: false }]);
+    expect(view.staffAssignments).toEqual(expect.arrayContaining([
+      { contestId: contest, accountId: caller('volunteer').accountId, admin: false, roles: ['specialist'] },
+      { contestId: ids.contest, accountId: caller('contestAdmin').accountId, admin: true, roles: [] },
+    ]));
+    expect(view.entries.filter((entry) => entry.contestId === contest).map((entry) => entry.location).sort()).toEqual(['T1', 'T2']);
+    expect(view.audit.map((entry) => entry.action)).toContain('assign_entrants');
+    expect((await manage.event(caller('webmaster'), ids.event)).manage).toBe('site');
+    for (const by of ['contestAdmin', 'volunteer', 'otherAdmin'] as const) {
+      await expect(manage.event(caller(by), ids.event)).rejects.toMatchObject({ status: 403 });
+    }
+    await expect(manage.event(caller('eventAdmin'), 'not-an-event')).rejects.toMatchObject({ status: 400 });
+    await expect(manage.event(caller('eventAdmin'), randomUUID())).rejects.toMatchObject({ status: 403 });
+  });
+
+  /** One valid command of every type, so a new type fails to compile until it has a sample here. */
+  const samples = (): Record<ManageCommand['type'], ManageCommand> => {
+    const [event, contest, account, entrant] = [ids.event, ids.contest, randomUUID(), randomUUID()];
+    return {
+      create_event: { type: 'create_event', name: 'New', code: 'new-event', timeZone: 'UTC', firstAdmin: { handle: 'chief', name: 'Chief' } },
+      add_webmaster: { type: 'add_webmaster', person: { handle: 'newcomer', name: 'Newcomer' } },
+      remove_webmaster: { type: 'remove_webmaster', accountId: account },
+      set_webmaster_reads: { type: 'set_webmaster_reads', restricted: true },
+      update_event: { type: 'update_event', eventId: event, name: 'New', code: 'new-code', timeZone: 'UTC' },
+      set_event_admin: { type: 'set_event_admin', eventId: event, accountId: account, admin: true },
+      create_people: { type: 'create_people', eventId: event, people: [{ handle: 'person', name: 'Person' }] },
+      create_entrants: { type: 'create_entrants', eventId: event, entrants: [{ kind: 'team', name: 'Team', handle: 'team' }] },
+      rename_entrant: { type: 'rename_entrant', eventId: event, entrantId: entrant, name: 'Renamed' },
+      create_contest: { type: 'create_contest', eventId: event, name: 'New', contestType: 'teams', categories: ['Other'] },
+      update_contest: { type: 'update_contest', contestId: contest, name: 'New', contestType: 'teams' },
+      assign_entrants: { type: 'assign_entrants', contestId: contest, entries: [{ entrantId: entrant, location: '' }] },
+      unassign_entrant: { type: 'unassign_entrant', contestId: contest, entrantId: entrant },
+      assign_staff: { type: 'assign_staff', contestId: contest, accountId: account, roles: ['jury'], admin: false },
+      unassign_staff: { type: 'unassign_staff', contestId: contest, accountId: account },
+      set_intake: { type: 'set_intake', contestId: contest, open: true },
+      set_image_limits: { type: 'set_image_limits', contestId: contest, fileMegabytes: 10, count: 4, totalMegabytes: 40 },
+      set_categories: { type: 'set_categories', contestId: contest, categories: ['Other'] },
+      set_location: { type: 'set_location', contestId: contest, entrantId: entrant, location: 'Desk' },
+      join_contest: { type: 'join_contest', contestId: contest },
+      set_handle: { type: 'set_handle', eventId: event, accountId: account, handle: 'renamed' },
+    };
+  };
+
+  it('refuses every command to the account one level below its requirement, before it reads anything else', async () => {
+    const below: Record<'site' | 'event' | 'contest', Name> = { site: 'eventAdmin', event: 'contestAdmin', contest: 'volunteer' };
+    const commands = samples();
+    for (const type of Object.keys(commands) as Array<ManageCommand['type']>) {
+      const command = commands[type];
+      const requirement = requirementOf[type](command as never);
+      // An account command lets every account of the event in, and the plan refuses the one it may not manage.
+      if (!('level' in requirement)) continue;
+      const refused = below[requirement.level];
+      await expect(execute(refused, command), `${type} by ${refused}`).rejects.toMatchObject({ status: 403 });
+    }
+    expect(await rows('SELECT count(*) AS n FROM manage_receipts')).toEqual([{ n: 0 }]);
+    expect(await rows('SELECT count(*) AS n FROM events')).toEqual([{ n: 2 }]);
+  });
+});
+
+describe('the requirement of every command', () => {
+  const event = { scope: 'event', eventId: 'e' } as const;
+  const contest = { scope: 'contest', contestId: 'c' } as const;
+  const commands = {
+    create_event: [{ target: { scope: 'site' }, level: 'site' }],
+    add_webmaster: [{ target: { scope: 'site' }, level: 'site' }],
+    remove_webmaster: [{ target: { scope: 'site' }, level: 'site' }],
+    set_webmaster_reads: [{ target: { scope: 'site' }, level: 'site' }],
+    update_event: [{ target: event, level: 'event' }],
+    set_event_admin: [{ target: event, level: 'event' }],
+    create_people: [{ target: event, level: 'event' }],
+    create_entrants: [{ target: event, level: 'event' }],
+    rename_entrant: [{ target: event, level: 'event' }],
+    create_contest: [{ target: event, level: 'event' }],
+    update_contest: [{ target: contest, level: 'event' }],
+    assign_entrants: [{ target: contest, level: 'event' }],
+    unassign_entrant: [{ target: contest, level: 'event' }],
+    assign_staff: [{ target: contest, level: 'event' }],
+    unassign_staff: [{ target: contest, level: 'event' }],
+    set_intake: [{ target: contest, level: 'contest' }],
+    set_image_limits: [{ target: contest, level: 'contest' }],
+    set_categories: [{ target: contest, level: 'contest' }],
+    set_location: [{ target: contest, level: 'contest' }],
+    join_contest: [{ target: contest, level: 'site' }],
+    set_handle: [{ target: event, account: 'a' }],
+  } as const;
+
+  it.each(Object.entries(commands))('%s needs the authority that the design names', (type, [expected]) => {
+    // The fields that a requirement reads are the same for every command: e, c, and a.
+    const fields = { eventId: 'e', contestId: 'c', accountId: 'a' };
+    const read = requirementOf[type as ManageCommand['type']] as (command: object) => unknown;
+    expect(read({ type, ...fields })).toEqual(expected);
   });
 });

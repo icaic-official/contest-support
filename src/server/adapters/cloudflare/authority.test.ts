@@ -9,6 +9,7 @@ import { applyMigrations } from '../d1/testFixture';
 import { D1AnnouncementService } from './announcements';
 import { D1ApplicationService } from './application';
 import { authorityGuard, contestDataSql, resolveAuthority } from './authority';
+import { D1ManageService } from './manage';
 import { R2AvatarService } from './avatars';
 import { R2ImageService, type PrivateBucket } from './images';
 import { openStoreDatabase } from './tooling/store-database.mjs';
@@ -141,7 +142,7 @@ describe('one authority resolver for every reader', () => {
     const caller = callers[person];
     const contestId = contestIds[contest];
     const snapshot = await application().snapshot(caller, contestId).catch(() => undefined);
-    const listed = (await application().sessions(caller)).some((summary) => summary.id === contestId);
+    const listed = (await application().contests(caller)).some((summary) => summary.id === contestId);
     const announcements = await new D1AnnouncementService(db).snapshot(caller, contestId).then(() => true, () => false);
     const avatars = await new R2AvatarService(db, bucket).list(caller, contestId);
     const { issue, image } = issues.get(contest) ?? { issue: '', image: '' };
@@ -173,7 +174,8 @@ describe('one authority resolver for every reader', () => {
   }
 
   async function setsIntake(person: Person, contest: Contest): Promise<boolean> {
-    return application().setIntake(callers[person], contestIds[contest], true).then(() => true, () => false);
+    return new D1ManageService(db, { hash: async () => '', verify: async () => false })
+      .execute(callers[person], randomUUID(), { type: 'set_intake', contestId: contestIds[contest], open: true }).then(() => true, () => false);
   }
 
   it('gives every reader the same seat for every person in every contest', async () => {

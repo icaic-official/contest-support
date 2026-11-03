@@ -46,8 +46,18 @@ function cookieClient() {
     }
     return response;
   };
+  const auth = createCloudflareAuthentication({ origin, fetch: transport });
   return {
-    auth: createCloudflareAuthentication({ origin, fetch: transport }),
+    auth,
+    /** Issues a temporary password through the credential route, as an organizer's browser does. */
+    issue: async (accountId: string, eventId: string) => {
+      const response = await auth.withCsrf((token) => transport(new URL('/api/credentials', origin), {
+        method: 'POST', body: JSON.stringify({ requestId: randomUUID(), eventId, accountIds: [accountId] }),
+        headers: { 'Content-Type': 'application/json', 'X-Minsky-Request': '1', 'X-CSRF-Token': token },
+      }));
+      if (!response.ok) throw new Error('The credential request failed.');
+      return (await response.json() as Array<{ temporaryPassword: string | null }>)[0]!;
+    },
     metadata: () => metadata,
     status: (path: string) => statuses.get(path),
     // A saved request transport permits a revoked-cookie replay without putting
@@ -160,14 +170,14 @@ describe('isolated hosted Cloudflare authentication HTTP', () => {
 
     const admin = cookieClient();
     await admin.auth.signIn(event, adminUsername, password);
-    await admin.auth.account(fixture.sessionId, { action: 'reset_password', userId: fixture.contestant.accountId });
+    await admin.issue(fixture.contestant.accountId, fixture.eventId);
     // A fresh authorized reset replaces credentials from a lost reset response.
-    const recovered = await admin.auth.account(fixture.sessionId, { action: 'reset_password', userId: fixture.contestant.accountId });
+    const recovered = await admin.issue(fixture.contestant.accountId, fixture.eventId);
     if (!recovered.temporaryPassword) throw new Error('The authorized reset returned no temporary password.');
     await member.auth.signIn(event, username, recovered.temporaryPassword);
     expect((await member.auth.accountStatus()).must_change).toBe(true);
     const stale = member.capture();
-    const reset = await admin.auth.account(fixture.sessionId, { action: 'reset_password', userId: fixture.contestant.accountId });
+    const reset = await admin.issue(fixture.contestant.accountId, fixture.eventId);
     expect((await stale('/api/auth/session')).status).toBe(401);
     await expectFailure(member.auth.signIn(event, username, recovered.temporaryPassword)).toThrow();
     expect(member.status('/api/auth/sign-in')).toBe(401);
@@ -181,8 +191,8 @@ describe('isolated hosted Cloudflare authentication HTTP', () => {
       stmt('INSERT INTO memberships (session_id, account_id, team_id) VALUES (?, ?, ?)', fixture.secondSessionId, fixture.contestant.accountId, fixture.secondSessionTeamId),
       stmt('UPDATE memberships SET is_admin = 0 WHERE session_id = ? AND account_id = ?', fixture.secondSessionId, fixture.staff.accountId),
     ]);
-    await expectFailure(admin.auth.account(fixture.sessionId, { action: 'reset_password', userId: fixture.contestant.accountId })).toThrow();
-    expect(admin.status('/api/accounts')).toBe(403);
+    await expectFailure(admin.issue(fixture.contestant.accountId, fixture.eventId)).toThrow();
+    expect(admin.status('/api/credentials')).toBe(403);
     expect((await member.auth.accountStatus()).session_valid).toBe(true);
 
     const current = member.capture();

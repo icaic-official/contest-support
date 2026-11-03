@@ -341,3 +341,18 @@ export const contestsToJoinSql = `SELECT s.id, s.name, e.name AS event_name
  */
 export const manageWebmasterSql = `${manageAccountSql}
   AND EXISTS (SELECT 1 FROM grants g WHERE g.scope = 'site' AND g.account_id = t.id)`;
+
+/** The event admins of one event, by account. Binds eventId. */
+export const eventAdminsSql = `SELECT account_id FROM grants WHERE scope = 'event' AND event_id = ? ORDER BY account_id`;
+
+/**
+ * The staff seats that an assignment made in the contests of one event, with
+ * their roles. Event admins and webmasters hold none. Binds eventId.
+ */
+export const eventStaffSql = `SELECT m.session_id AS contest_id, m.account_id, m.is_admin,
+      (SELECT json_group_array(role) FROM (SELECT role FROM membership_roles mr
+        WHERE mr.session_id = m.session_id AND mr.account_id = m.account_id ORDER BY role)) AS roles
+    FROM sessions s JOIN memberships m ON m.session_id = s.id
+    WHERE s.event_id = ? AND m.team_id IS NULL AND (m.is_admin = 1 OR EXISTS (SELECT 1 FROM membership_roles mr
+      WHERE mr.session_id = m.session_id AND mr.account_id = m.account_id))
+    ORDER BY m.session_id, m.account_id`;

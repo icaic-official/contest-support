@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { Handle } from "@/backend/contracts";
 import type { Issue, Membership, Snapshot } from "@/connected/model";
 import {
   accountKind,
@@ -207,7 +208,7 @@ describe("account commands", () => {
   });
 
   it("changes a username and resets a password", () => {
-    expect(setHandleCommand("event", userId, " alex ")).toEqual({
+    expect(setHandleCommand("event", userId, "alex" as Handle)).toEqual({
       type: "set_handle",
       eventId: "event",
       accountId: userId,

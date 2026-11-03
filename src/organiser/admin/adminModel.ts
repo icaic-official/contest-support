@@ -1,4 +1,4 @@
-import type { AccountCommand, ManageCommand, MembershipInput } from "@/backend/contracts";
+import type { AccountCommand, Handle, ManageCommand, MembershipInput } from "@/backend/contracts";
 import { statusNames } from "@/connected/labels";
 import type { Issue, Membership, Role, Snapshot } from "@/connected/model";
 
@@ -143,9 +143,9 @@ export function createAccountCommand(account: NewAccount): AccountCommand {
 export function setHandleCommand(
   eventId: string,
   accountId: string,
-  username: string,
+  handle: Handle,
 ): ManageCommand {
-  return { type: "set_handle", eventId, accountId, handle: username.trim() };
+  return { type: "set_handle", eventId, accountId, handle };
 }
 
 /** The account command that issues a new temporary password. */

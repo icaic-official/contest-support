@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { backend } from "@/backend";
-import type { AccountCommand, RosterCommand, SignInTarget } from "@/backend/contracts";
+import { type AccountCommand, type Handle, parseHandle, type RosterCommand, type SignInTarget } from "@/backend/contracts";
 import { errorMessage } from "@/backend/errors";
 import type { Snapshot } from "@/connected/model";
 import {
@@ -39,7 +39,7 @@ export interface SessionAdmin {
   saveImageLimits: (limits: ImageLimits) => Promise<boolean>;
   createAccount: (account: NewAccount) => Promise<boolean>;
   /** Changes a username. The password and open sessions stay. */
-  setUsername: (userId: string, username: string) => Promise<boolean>;
+  setUsername: (userId: string, username: Handle) => Promise<boolean>;
   saveMembership: (userId: string, draft: MembershipDraft) => Promise<boolean>;
   resetPassword: (userId: string) => Promise<boolean>;
   revokeAccess: (userId: string) => Promise<boolean>;
@@ -131,17 +131,17 @@ export function useSessionAdmin(
         ),
       ),
     createAccount: (input) =>
-      run(() =>
-        account(
-          createAccountCommand(input),
-          input.username.trim().toLowerCase(),
-        ),
-      ),
+      run(async () => {
+        const username = parseHandle(input.username);
+        if (!username) throw new Error("Use 3 to 32 letters, digits, hyphens, or underscores.");
+        return account(createAccountCommand(input), username);
+      }),
     setUsername: (userId, username) =>
       run(async () => {
+        if (!state.event) throw new Error("Refresh the page, then change the username again.");
         await backend.manage.execute(
           crypto.randomUUID(),
-          setHandleCommand(state.event?.id ?? "", userId, username),
+          setHandleCommand(state.event.id, userId, username),
         );
       }, "Username changed."),
     saveMembership: (userId, draft) =>

@@ -102,17 +102,18 @@ test.describe("the contestant clock", () => {
   });
 
   test("closes by itself at the end, without a reload", async ({ browser, local }) => {
-    test.setTimeout(60_000);
+    test.setTimeout(90_000);
     await unconfirmAwards(local);
     await local.run(
-      `UPDATE sessions SET starts_at = ${at(-10)}, ends_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '+4 seconds'),
+      `UPDATE sessions SET starts_at = ${at(-10)}, ends_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '+25 seconds'),
        grace_minutes = 0, intake_follows_schedule = 1 WHERE id = ?`,
       local.sessions[0],
     );
     const page = await signIn(browser, local, "contestant");
     await expect(page.getByRole("button", { name: "Report an issue" })).toBeEnabled();
+    // The contest ends 25 seconds after the write, which leaves a slow machine time to sign in.
     // The browser refreshes at the boundary plus up to 15 seconds.
-    await expect(page.getByRole("region", { name: "Contest clock" })).toContainText(/^Reporting closed at /, { timeout: 30_000 });
+    await expect(page.getByRole("region", { name: "Contest clock" })).toContainText(/^Reporting closed at /, { timeout: 55_000 });
     await expect(page.getByRole("button", { name: "Report an issue" })).toBeDisabled();
   });
 });

@@ -35,6 +35,8 @@ const queries: Record<string, string> = {
 const materializedScans = new Map([
   [snapshotSql, /^SCAN (?:access|visible_issues|extra_minutes|a|i|c|x)(?: LEFT-JOIN)?$/],
   [announcementSnapshotSql, /^SCAN (?:access|c)$/],
+  // The webmaster row holds the account's site grant, if it has one. It is one row, and it gates the site branch.
+  [calendarSql, /^SCAN webmaster$/],
   // The site page lists every event, and the site has few.
   [siteEventsSql, /^SCAN e$/],
 ]);

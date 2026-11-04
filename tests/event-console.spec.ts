@@ -108,6 +108,38 @@ test("editing a contest with no schedule saves nothing until an edit, and a rena
   expect(row?.starts_at).not.toBeNull();
 });
 
+test("a rename from a stale Edit contest dialog keeps the schedule that another admin saved", async ({ page, local, browser }) => {
+  test.setTimeout(60_000);
+  await local.run(
+    `UPDATE sessions SET starts_at = '2031-03-03T10:00:00.000Z', ends_at = '2031-03-03T14:00:00.000Z', grace_minutes = 5 WHERE id = ?`,
+    local.sessions[0],
+  );
+  await page.setViewportSize(desktop);
+  await openConsole(page);
+  await tab(page, "Contests").click();
+  await page.getByRole("button", { name: "Edit Primary", exact: true }).click();
+  const first = page.getByRole("dialog", { name: "Edit contest" });
+  await expect(first.getByLabel("Grace after the end (minutes)", { exact: true })).toHaveValue("5");
+
+  const context = await browser.newContext({ viewport: desktop });
+  await local.attach(context);
+  const other = await context.newPage();
+  await openConsole(other);
+  await tab(other, "Contests").click();
+  await other.getByRole("button", { name: "Edit Primary", exact: true }).click();
+  const second = other.getByRole("dialog", { name: "Edit contest" });
+  await second.getByLabel("Grace after the end (minutes)", { exact: true }).fill("20");
+  await second.getByRole("button", { name: "Save contest", exact: true }).click();
+  await expect(second).toBeHidden();
+
+  await first.getByLabel("Name", { exact: true }).fill("Primary round");
+  await first.getByRole("button", { name: "Save contest", exact: true }).click();
+  await expect(first).toBeHidden();
+  expect(await local.rows("SELECT name, grace_minutes FROM sessions WHERE id = ?", local.sessions[0]))
+    .toEqual([{ name: "Primary round", grace_minutes: 20 }]);
+  await context.close();
+});
+
 test("an event admin adds a volunteer of the event to a contest", async ({ page, local, browser }) => {
   test.setTimeout(60_000);
   await page.setViewportSize(desktop);

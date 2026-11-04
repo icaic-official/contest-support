@@ -1,7 +1,7 @@
 import { useEffect, useId, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { backend } from "@/backend";
-import type { ContestSummary } from "@/backend/contracts";
+import type { ContestSummary, IntakeReason } from "@/backend/contracts";
 import { errorMessage } from "@/backend/errors";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -11,23 +11,33 @@ import { calendarWindow, groupCalendar } from "./calendarModel";
 import { intakeHeadline } from "./intakeText";
 import { formatInZone, viewerNote } from "./zonedTime";
 
+/** A calendar that nothing else changes still reads again this often, so a stale one corrects itself. */
+const calendarRefreshMs = 5 * 60_000;
+
 /** The contests of the person's own events for seven days, grouped by event and day in the event's zone. */
 export function Calendar({
   onOpen,
   currentId,
+  currentIntake,
   refreshKey = 0,
 }: {
   /** The contest that is open now. It shows "Current" in place of its button. */
   currentId?: string | undefined;
+  /**
+   * The open contest's intake for this person, from its snapshot. The calendar reads the contest-wide
+   * state, which hides a contestant's confirmed extra minutes, so the open contest shows this instead.
+   */
+  currentIntake?: IntakeReason | undefined;
   /** Opens a contest that the person holds a seat in. Omit it to list without links. */
   onOpen?: ((contest: ContestSummary) => void) | undefined;
-  /** Reads the calendar again when it changes. */
-  refreshKey?: number;
+  /** Reads the calendar again when it changes. It also reads again every five minutes. */
+  refreshKey?: number | string;
 }) {
   const id = useId();
   const [page, setPage] = useState(0);
   const [contests, setContests] = useState<ContestSummary[]>();
   const [error, setError] = useState("");
+  const [tick, setTick] = useState(0);
   useEffect(() => {
     let current = true;
     backend.workflows
@@ -43,7 +53,11 @@ export function Calendar({
     return () => {
       current = false;
     };
-  }, [page, refreshKey]);
+  }, [page, refreshKey, tick]);
+  useEffect(() => {
+    const timer = window.setInterval(() => setTick((count) => count + 1), calendarRefreshMs);
+    return () => window.clearInterval(timer);
+  }, []);
   const events = contests ? groupCalendar(contests) : [];
   const range = calendarWindow(page, Date.now());
   return (
@@ -101,7 +115,11 @@ export function Calendar({
                           </p>
                         )}
                       </div>
-                      <Badge variant="outline">{intakeHeadline(contest.intake.reason)}</Badge>
+                      {contest.id === currentId ? (
+                        currentIntake && <Badge variant="outline">{intakeHeadline(currentIntake)}</Badge>
+                      ) : (
+                        <Badge variant="outline">{intakeHeadline(contest.intake.reason)}</Badge>
+                      )}
                       {contest.id === currentId ? (
                         <Badge variant="secondary">Current</Badge>
                       ) : contest.canOpen ? (

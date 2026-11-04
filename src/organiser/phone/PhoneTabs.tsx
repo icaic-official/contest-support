@@ -28,6 +28,7 @@ import {
   type Snapshot,
 } from "@/connected/model";
 import { Calendar } from "@/connected/Calendar";
+import { calendarKey } from "@/connected/calendarModel";
 import { ContestAwardsPanel } from "@/connected/ContestAwards";
 import { ContestPicker } from "@/connected/ContestPicker";
 import { PictureEditor } from "@/connected/PictureEditor";
@@ -562,7 +563,8 @@ export function MeTab(props: PhoneTabProps & { onSessionChange: () => void }) {
       <div className="rounded-xl border bg-card p-3">
         <Calendar
           currentId={data.sessionId}
-          refreshKey={data.updates}
+          currentIntake={data.snapshot?.clock?.intake.reason}
+          refreshKey={calendarKey(data.snapshot)}
           onOpen={(contest) => {
             data.selectSession(contest.id);
             props.onSessionChange();

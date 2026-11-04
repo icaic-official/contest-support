@@ -195,3 +195,46 @@ test("jury on a phone see the calendar of the event, including a contest with no
   // The jury account holds a seat in the second contest too, so it is the only other contest that it can open.
   await expect(calendar.getByRole("button", { name: /^Open / })).toHaveCount(1);
 });
+
+test.describe("the calendar on the account page", () => {
+  test.describe.configure({ mode: "default" });
+
+  test("shows the contestant's personal intake for the open contest, not the contest-wide one", async ({ browser, local }) => {
+    await schedule(local, -120, -30, 5);
+    await local.run(
+      `INSERT INTO contest_awards (id, session_id, request_id, minutes, explanation, actor, actor_name, at, applied_at, applied_by, applied_name, applied_request)
+       SELECT ?, ?, 'req-5', 60, 'Power cut', id, name, ${at(0)}, ${at(0)}, id, name, 'req-6' FROM accounts WHERE id = ?`,
+      randomUUID(),
+      local.sessions[0],
+      local.users.jury,
+    );
+    const page = await signIn(browser, local, "contestant");
+    await expect(page.getByRole("button", { name: "Report an issue" })).toBeEnabled();
+    await page.goto("/account");
+    const row = page.getByRole("region", { name: "Calendar" }).getByRole("listitem").filter({ hasText: "Primary" });
+    await expect(row).toContainText("Current");
+    await expect(row).not.toContainText("Intake closed");
+    await expect(row).toContainText("Intake open");
+  });
+
+  test("reads again on a change of schedule, not on every live update", async ({ browser, local }) => {
+    await schedule(local, -30, 90);
+    const page = await signIn(browser, local, "contestant");
+    const reads: string[] = [];
+    page.on("request", (request) => {
+      if (request.url().includes("/api/contests?from=")) reads.push(request.url());
+    });
+    await page.goto("/account");
+    const calendar = page.getByRole("region", { name: "Calendar" });
+    await expect(calendar).toContainText("Primary");
+    await page.waitForTimeout(1000);
+    const first = reads.length;
+    expect(first).toBeGreaterThan(0);
+    for (const description of ["One", "Two"]) {
+      await local.act(local.users.contestant, { type: "submit", category: "Backend", description, team_id: local.teams[0] });
+    }
+    await expect(page.getByText("Live", { exact: true })).toBeVisible();
+    await page.waitForTimeout(1500);
+    expect(reads.length).toBe(first);
+  });
+});

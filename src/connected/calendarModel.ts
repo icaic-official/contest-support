@@ -1,4 +1,5 @@
 import type { ContestSummary } from "@/backend/contracts";
+import type { Snapshot } from "./model";
 import { zonedParts } from "./zonedTime";
 
 /** A contest that has a schedule. */
@@ -59,4 +60,20 @@ export function calendarWindow(page: number, now: number): { from: string; to: s
   start.setHours(0, 0, 0, 0);
   const from = start.getTime() + page * 7 * dayMs;
   return { from: new Date(from).toISOString(), to: new Date(from + 7 * dayMs).toISOString() };
+}
+
+/**
+ * What of the open contest the calendar shows: its name, schedule, and contest-wide intake. A live update
+ * that changes none of these leaves the key alone, so the calendar does not read again for it.
+ */
+export function calendarKey(snapshot: Snapshot | undefined): string {
+  const clock = snapshot?.clock;
+  return [
+    snapshot?.session?.id,
+    snapshot?.session?.name,
+    clock?.schedule?.starts_at,
+    clock?.schedule?.ends_at,
+    clock?.schedule?.grace_minutes,
+    clock?.follows_schedule,
+  ].join("|");
 }

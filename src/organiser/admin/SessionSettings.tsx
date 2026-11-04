@@ -69,6 +69,10 @@ export function IntakePanel({
   const id = useId();
   const mode = intakeMode(clock, open);
   const hasSchedule = !!clock?.schedule;
+  const unavailable = "h-11 aria-disabled:pointer-events-none aria-disabled:opacity-50";
+  const change = (next: IntakeMode) => {
+    if (!disabled && next !== mode) onChange(next);
+  };
   return (
     <section aria-labelledby={`${id}-title`} className="rounded-xl border bg-card p-4">
       <h3 id={`${id}-title`} className="text-[15px] font-medium">
@@ -88,14 +92,15 @@ export function IntakePanel({
         <p className="mt-1 text-xs text-muted-foreground">If it followed the schedule: {scheduleSummary(clock)}</p>
       )}
       <div className="mt-3 flex flex-wrap gap-2" role="group" aria-describedby={`${id}-state`}>
-        <Button type="button" variant="outline" className="h-11" disabled={disabled || mode === "open"} onClick={() => onChange("open")}>
+        {/* aria-disabled, not disabled, so the pressed button keeps keyboard focus while the request runs. */}
+        <Button type="button" variant="outline" className={unavailable} aria-disabled={disabled || mode === "open"} onClick={() => change("open")}>
           Open now
         </Button>
-        <Button type="button" variant="outline" className="h-11" disabled={disabled || mode === "closed"} onClick={() => onChange("closed")}>
+        <Button type="button" variant="outline" className={unavailable} aria-disabled={disabled || mode === "closed"} onClick={() => change("closed")}>
           Close now
         </Button>
         {hasSchedule && mode !== "schedule" && (
-          <Button type="button" variant="secondary" className="h-11" disabled={disabled} onClick={() => onChange("schedule")}>
+          <Button type="button" variant="secondary" className={unavailable} aria-disabled={disabled} onClick={() => change("schedule")}>
             Return to schedule
           </Button>
         )}

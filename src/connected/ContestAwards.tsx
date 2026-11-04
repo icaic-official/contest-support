@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { can } from "./capabilities";
+import { keepFocus } from "./hooks/useRefreshOnReturn";
 import { type ContestAwardRunner, useContestAwards } from "./hooks/useContestAwards";
 import { awardMinutesLabel } from "./labels";
 import type { Membership, Snapshot } from "./model";
@@ -47,7 +48,7 @@ function AwardForm({ runner, disabled }: { runner: ContestAwardRunner; disabled:
           id={`${id}-minutes`}
           inputMode="numeric"
           value={minutes}
-          disabled={disabled}
+          readOnly={disabled}
           className="h-11 text-base sm:max-w-40 md:text-sm"
           aria-invalid={minutes !== "" && parsed === undefined}
           onChange={(event) => setMinutes(event.target.value)}
@@ -60,12 +61,17 @@ function AwardForm({ runner, disabled }: { runner: ContestAwardRunner; disabled:
           id={`${id}-why`}
           value={explanation}
           maxLength={2000}
-          disabled={disabled}
+          readOnly={disabled}
           className="text-base md:text-sm"
           onChange={(event) => setExplanation(event.target.value)}
         />
       </div>
-      <Button type="submit" className="h-11 sm:w-fit" disabled={disabled || parsed === undefined || !text}>
+      {/* aria-disabled, not disabled, so the focused button keeps focus when the form clears. The submit handler checks the same condition. */}
+      <Button
+        type="submit"
+        className="h-11 aria-disabled:pointer-events-none aria-disabled:opacity-50 sm:w-fit"
+        aria-disabled={disabled || parsed === undefined || !text}
+      >
         Record the decision
       </Button>
     </form>
@@ -136,9 +142,9 @@ export function ContestAwardsPanel({
                   <Button
                     type="button"
                     variant="outline"
-                    className="mt-2 h-11 w-full sm:w-fit"
-                    disabled={runner.busy}
-                    onClick={() => void runner.run({ type: "apply", awardId: award.id })}
+                    className="mt-2 h-11 w-full aria-disabled:pointer-events-none aria-disabled:opacity-50 sm:w-fit"
+                    aria-disabled={runner.busy}
+                    onClick={() => void runner.run({ type: "apply", awardId: award.id }).then(() => keepFocus())}
                   >
                     <CheckCheck aria-hidden="true" />
                     Confirm applied externally

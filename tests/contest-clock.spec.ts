@@ -327,6 +327,24 @@ test.describe("keyboard focus on the organiser console", () => {
     expect(await focusedTag(jury)).not.toBe("BODY");
   });
 
+  test("confirming an award by keyboard moves focus to the page heading when the button goes", async ({ browser, local }) => {
+    await schedule(local, -30, 60);
+    await local.run(
+      `INSERT INTO contest_awards (id, session_id, request_id, minutes, explanation, actor, actor_name, at)
+       SELECT ?, ?, 'req-f', 10, 'Network outage', id, name, ${at(0)} FROM accounts WHERE id = ?`,
+      randomUUID(),
+      local.sessions[0],
+      local.users.jury,
+    );
+    const jury = await signIn(browser, local, "jury");
+    await pageLink(jury, /^Award review/).click();
+    const panel = jury.getByRole("region", { name: "Time awards for the whole contest" });
+    await panel.getByRole("button", { name: "Confirm applied externally" }).focus();
+    await jury.keyboard.press("Enter");
+    await expect(panel).toContainText("Applied · confirmed by");
+    await expect(jury.getByRole("heading", { level: 1 })).toBeFocused();
+  });
+
   test("changing intake by keyboard keeps focus on the page", async ({ browser, local }) => {
     await schedule(local, -30, 60);
     const admin = await signIn(browser, local, "admin");

@@ -1,5 +1,7 @@
 import { can, seatOf } from '../connected/capabilities.ts';
-import type { Command, IssueStatus, Role } from '../connected/model.ts';
+import { commandSchema, uuidPattern, workflowText, type Command, type IssueStatus, type Role } from '../connected/model.ts';
+
+export { workflowText };
 import type { Caller } from './authentication.ts';
 
 export type CommandResult =
@@ -52,37 +54,13 @@ export interface WorkflowPersistence {
 
 type Rejection = Extract<CommandResult, { outcome: 'rejected' }>;
 const reject = (reason: Rejection['reason']): Rejection => ({ outcome: 'rejected', reason });
-const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const uuid = uuidPattern;
 const object = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === 'object' && !Array.isArray(value);
 
-/** PostgreSQL btrim(text) removes spaces, and length(text) counts Unicode code points. */
-export function workflowText(value: string): string {
-  return value.replace(/^ +| +$/g, '');
-}
-/** SQLite length() stops at U+0000, so a database length CHECK would fail with an error the store cannot classify. */
-function validText(value: unknown): value is string {
-  if (typeof value !== 'string' || value.includes('\u0000')) return false;
-  const length = Array.from(workflowText(value)).length;
-  return length >= 1 && length <= 2000;
-}
-
-/** Keep original text and additional JSON fields for receipt equality. */
+/** Keeps original text and additional JSON fields for receipt equality. */
 export function isWorkflowCommand(value: unknown): value is Command {
-  if (!object(value)) return false;
-  if (value.type === 'submit') return validText(value.description) && typeof value.category === 'string' &&
-    (value.team_id === undefined || typeof value.team_id === 'string');
-  if (typeof value.issue_id !== 'string' || !uuid.test(value.issue_id) ||
-    typeof value.revision !== 'number' || !Number.isSafeInteger(value.revision) || value.revision < 0) return false;
-  switch (value.type) {
-    case 'claim': case 'accept': case 'escalate': case 'apply': return true;
-    case 'message': return validText(value.text) && (value.visibility === 'public' || value.visibility === 'internal');
-    case 'resolve': return validText(value.summary);
-    case 'reopen': return validText(value.reason);
-    case 'award': return validText(value.explanation) && typeof value.minutes === 'number' &&
-      Number.isInteger(value.minutes) && value.minutes >= 0 && value.minutes <= 2147483647;
-    default: return false;
-  }
+  return commandSchema.safeParse(value).success;
 }
 
 /** JSON object key order is irrelevant to the existing PostgreSQL receipt contract. */

@@ -28,7 +28,7 @@ export function WebmasterAccess({
       {state.error && (
         <Alert variant="destructive">
           <AlertDescription>
-            <p role="alert">{state.error}</p>
+            {state.error}
           </AlertDescription>
         </Alert>
       )}

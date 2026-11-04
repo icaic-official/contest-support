@@ -218,6 +218,11 @@ WHEN EXISTS (SELECT 1 FROM memberships WHERE session_id = NEW.session_id
 BEGIN
   SELECT RAISE(ABORT, 'A contestant holds no staff role');
 END;
+CREATE TRIGGER contestant_is_not_admin BEFORE UPDATE OF is_admin ON memberships
+WHEN NEW.is_admin = 1 AND NEW.team_id IS NOT NULL
+BEGIN
+  SELECT RAISE(ABORT, 'A contestant holds no admin seat');
+END;
 
 -- (6) An entrant's sign-in never holds an event grant. A site grant already
 -- needs an account without an event, and an entrant's sign-in always has one.

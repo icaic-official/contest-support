@@ -188,6 +188,7 @@ const refusals: ReadonlyArray<readonly [cause: string, message: string]> = [
   ['An entrant sign-in holds only its own entries', 'An entrant sign-in cannot take a staff seat.'],
   ['An entrant sign-in holds no grant', 'An entrant sign-in cannot be an event admin.'],
   ['A contestant holds no staff role', 'A contestant cannot take a staff role.'],
+  ['A contestant holds no admin seat', 'A contestant cannot be a contest admin.'],
   ['An account joins only contests of its own event', notInEvent],
 ];
 

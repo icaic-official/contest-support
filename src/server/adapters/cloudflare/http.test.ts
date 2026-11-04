@@ -19,7 +19,7 @@ function services() {
     auth: { current: vi.fn<ApplicationHttpServices['auth']['current']>().mockResolvedValue(identity) },
     application: {
       contests: vi.fn<ApplicationHttpServices['application']['contests']>()
-        .mockResolvedValue([{ id: sessionId, name: 'Fictional', eventId: requestId, manage: 'none' }]),
+        .mockResolvedValue([{ id: sessionId, name: 'Fictional', eventId: requestId, eventName: 'Fictional event', manage: 'none' }]),
       snapshot: vi.fn<ApplicationHttpServices['application']['snapshot']>(),
     },
     workflow: { execute: vi.fn<ApplicationHttpServices['workflow']['execute']>().mockResolvedValue({ outcome: 'committed', issueId: requestId }) },

@@ -32,13 +32,24 @@ export function Panel({
   );
 }
 
-/** The error of the last command, shown in an alert. */
+/** After a removal, moves focus to the same place in the list, or to the page heading when the list is empty. */
+export function focusAfterRemoval(button: HTMLElement) {
+  const list = button.closest("ul");
+  const buttons = list ? Array.from(list.querySelectorAll<HTMLElement>("button[data-removes]")) : [];
+  const index = buttons.indexOf(button);
+  requestAnimationFrame(() => {
+    const left = list?.isConnected ? Array.from(list.querySelectorAll<HTMLElement>("button[data-removes]")) : [];
+    (left[index] ?? left.at(-1) ?? document.querySelector<HTMLElement>("h1[tabindex]"))?.focus();
+  });
+}
+
+/** The error of the last command. `Alert` already announces it. */
 export function CommandError({ message }: { message: string }) {
   if (!message) return null;
   return (
     <Alert variant="destructive">
       <AlertDescription>
-        <p role="alert">{message}</p>
+        <p>{message}</p>
       </AlertDescription>
     </Alert>
   );

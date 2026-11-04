@@ -116,7 +116,7 @@ export function CredentialSheet({
         {sheet.error && (
           <Alert variant="destructive">
             <AlertDescription>
-              <p role="alert">{sheet.error}</p>
+              <p>{sheet.error}</p>
             </AlertDescription>
           </Alert>
         )}

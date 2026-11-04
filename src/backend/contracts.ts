@@ -88,6 +88,7 @@ export interface ContestSummary {
   id: string;
   name: string;
   eventId: string;
+  eventName: string;
   manage: ManageLevel;
 }
 

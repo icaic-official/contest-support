@@ -6,7 +6,7 @@ Phase 1 differs from this page and the sketches in these points:
 
 - The foreign key on `accounts.event_id` is `DEFERRABLE INITIALLY DEFERRED`. Test cleanups delete an event and then its accounts in one batch, and an immediate key refuses that order.
 - The resolver starts from the contest and its event, then joins the login tables, so the live form reads them once. Only a webmaster's stamp reads `site_settings`.
-- `/api/sessions` lists every contest that the caller can read. For a webmaster, that is every contest of the site.
+- `/api/sessions` (deleted in Phase 4, replaced by `/api/contests`) listed every contest that the caller can read. For a webmaster, that is every contest of the site.
 - `authorityCopies.test.ts` also refuses `FROM grants`. It exempts the two trusted terminal commands, `installation.ts` and `adminRecovery.ts`, which check an admin membership without a login.
 
 Phase 2 differs from this page and the sketches in these points:
@@ -14,7 +14,7 @@ Phase 2 differs from this page and the sketches in these points:
 - `PersonInput` has a `username`, not a `handle`, because handles arrive in Phase 3. `add_webmaster` stores the typed name as the username, and `0018` then copies it to the handle.
 - `issueCredentials` takes only the IDs of up to eight other webmasters. It has no `eventId` and no `contestId`, because no event console calls it yet. A retry of a committed request returns each account with `temporaryPassword: null`.
 - `Management.site()` returns only the webmasters, the read restriction, and the contests that the caller has not joined. For an account that is not a webmaster, it returns `null`, not 403. The browser then asks without logging an error.
-- `/api/sessions` and `snapshotSql` are unchanged, so the Phase 1 gate measures the same readers. A webmaster who must join a contest finds it on the **Site** page and on the no-access screen. The site read feeds both.
+- In Phase 1, `/api/sessions` (now `/api/contests`) and `snapshotSql` stayed unchanged, so the Phase 1 gate measures the same readers. A webmaster who must join a contest finds it on the **Site** page and on the no-access screen. The site read feeds both.
 - A webmaster can remove themselves while another enabled webmaster who holds a password remains. They keep their own login, because the batch checks the caller's login after its writes. A webmaster removed by another loses every open session.
 - A contest's activity shows a join as "Joined to read this contest" by "A webmaster" when the webmaster holds no membership there. `admin_audit` stores no actor name, and decision 12 keeps webmasters out of the member list. Showing the name needs a change to `snapshotSql`, which waits for the hosted rerun of the Phase 1 gate.
 - `recoverWebmaster` finds a webmaster by username, and `npm run cloudflare:recover-admin` calls it. `adminRecovery.ts` is deleted, so the command no longer recovers a contest admin who is not a webmaster. `recoverInstallationOwner` was deleted in Phase 4.

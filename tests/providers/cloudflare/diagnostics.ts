@@ -51,7 +51,7 @@ function endpoint(url: string): Endpoint | undefined {
     '/api/auth/session': 'auth_session', '/api/auth/sign-in': 'sign_in',
     '/api/auth/sign-out': 'sign_out', '/api/auth/change-password': 'change_password',
     '/api/credentials': 'accounts', '/api/contests': 'sessions',
-    '/api/snapshot': 'snapshot', '/api/workflow': 'workflow', '/api/admin': 'admin',
+    '/api/snapshot': 'snapshot', '/api/workflow': 'workflow', '/api/manage': 'admin',
     '/api/images': 'images', '/api/updates': 'updates',
   };
   return Object.hasOwn(paths, path) ? paths[path] : undefined;

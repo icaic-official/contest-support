@@ -7,7 +7,7 @@ import { type Command, roleSchema, snapshotSchema, type Snapshot } from '../../c
 import { createCloudflareAuthentication } from './authentication';
 
 const contestsSchema = z.array(z.object({
-  id: z.uuid(), name: z.string(), eventId: z.uuid(), manage: z.enum(['none', 'contest', 'event', 'site']),
+  id: z.uuid(), name: z.string(), eventId: z.uuid(), eventName: z.string(), manage: z.enum(['none', 'contest', 'event', 'site']),
 }));
 const siteSchema = z.object({
   webmasters: z.array(z.object({ id: z.uuid(), name: z.string(), handle: z.string(), ready: z.boolean() })),

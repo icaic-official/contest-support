@@ -106,7 +106,7 @@ export function notificationStatements(db: D1Connection, sessionId: string, audi
   ]);
 }
 
-const contestColumns = 'session_id AS id, session_name AS name, event_id, manage';
+const contestColumns = 'session_id AS id, session_name AS name, event_id, (SELECT name FROM events WHERE id = event_id) AS event_name, manage';
 
 /** Every contest that the caller can open. Bind with contestListBindings. */
 export const contestsListSql = `SELECT ${contestColumns} FROM (${contestDataSql('contests')}) ORDER BY name, id`;
@@ -114,7 +114,7 @@ export const contestsListSql = `SELECT ${contestColumns} FROM (${contestDataSql(
 /** The contests of one event that the caller can open. Bind with contestListBindings, then the event ID. */
 export const eventContestsSql = `SELECT ${contestColumns} FROM (${contestDataSql('contests')}) WHERE event_id = ? ORDER BY name, id`;
 
-interface ContestRow { id: string; name: string; event_id: string; manage: ManageLevel }
+interface ContestRow { id: string; name: string; event_id: string; event_name: string; manage: ManageLevel }
 
 /** D1 owns current access and consistent snapshots. */
 export class D1ApplicationService {
@@ -134,7 +134,7 @@ export class D1ApplicationService {
     const result = eventId === undefined
       ? await this.statement(contestsListSql, ...contestListBindings(caller)).all<ContestRow>()
       : await this.statement(eventContestsSql, ...contestListBindings(caller), eventId).all<ContestRow>();
-    return result.results.map((row) => ({ id: row.id, name: row.name, eventId: row.event_id, manage: row.manage }));
+    return result.results.map((row) => ({ id: row.id, name: row.name, eventId: row.event_id, eventName: row.event_name, manage: row.manage }));
   }
 
   async snapshot(caller: Caller, sessionId: string): Promise<Snapshot> {

@@ -315,7 +315,7 @@ export class FakeWorker extends FixtureWorker {
   protected readonly services: WorkerServices = {
     application: {
       contests: async () => this.snapshots().filter((item) => item.membership)
-        .map((item) => ({ id: item.session!.id, name: item.session!.name, eventId: item.event?.id ?? '', manage: 'none' as const })),
+        .map((item) => ({ id: item.session!.id, name: item.session!.name, eventId: item.event?.id ?? '', eventName: 'Fictional event', manage: 'none' as const })),
       snapshot: async (_caller, sessionId) => this.read(sessionId),
     },
     workflow: { execute: (_caller, _sessionId, requestId, command) => this.workflow(command as Command, requestId) },

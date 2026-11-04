@@ -76,12 +76,22 @@ export function SiteDashboard({
         {state.error && (
           <Alert variant="destructive">
             <AlertDescription>
-              <p role="alert">{state.error}</p>
+              <p>{state.error}</p>
+            </AlertDescription>
+          </Alert>
+        )}
+        {site && state.readError && (
+          <Alert variant="destructive">
+            <AlertDescription>
+              <p>This page may be out of date. {state.readError}</p>
+              <Button type="button" variant="outline" className="mt-2 h-11" onClick={() => void state.reload()}>
+                Retry
+              </Button>
             </AlertDescription>
           </Alert>
         )}
         {site ? (
-          <div className="grid items-start gap-5 lg:grid-cols-2">
+          <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-2">
             <div className="space-y-5">
               <Events site={site} state={state} />
               <Webmasters site={site} self={user.id} state={state} />
@@ -100,7 +110,10 @@ export function SiteDashboard({
         ) : state.loaded ? (
           <Alert variant="destructive">
             <AlertDescription>
-              <p role="alert">{state.readError}</p>
+              <p>{state.readError}</p>
+              <Button type="button" variant="outline" className="mt-2 h-11" onClick={() => void state.reload()}>
+                Retry
+              </Button>
             </AlertDescription>
           </Alert>
         ) : (
@@ -223,7 +236,10 @@ function Webmasters({
     <SiteCard
       title="Webmasters"
       action={
-        <Button type="button" variant="outline" size="sm" disabled={state.busy} onClick={() => setAdding(true)}>
+        <Button type="button" variant="outline" className="h-11" onClick={() => {
+          state.clearError();
+          setAdding(true);
+        }}>
           <UserPlus aria-hidden="true" />
           Add
         </Button>
@@ -249,14 +265,15 @@ function Webmasters({
                   type="button"
                   variant="ghost"
                   size="icon"
-                  disabled={state.busy}
+                  className="size-11"
+                 
                   aria-label={`Reset password for ${webmaster.name}`}
                   onClick={() => setConfirming({ kind: "reset", webmaster })}
                 >
                   <KeyRound aria-hidden="true" />
                 </Button>
               ) : (
-                <Button type="button" variant="outline" size="sm" disabled={state.busy} onClick={() => void issue(webmaster)}>
+                <Button type="button" variant="outline" className="h-11" onClick={() => void issue(webmaster)}>
                   Issue password
                 </Button>
               ))}
@@ -264,7 +281,7 @@ function Webmasters({
                 type="button"
                 variant="ghost"
                 size="icon"
-                disabled={state.busy}
+               
                 aria-label={`Remove ${webmaster.name}`}
                 onClick={() => setConfirming({ kind: "remove", webmaster })}
               >
@@ -408,7 +425,7 @@ function AddWebmasterForm({
         {submitted && !busy && error && (
           <Alert variant="destructive">
             <AlertDescription>
-              <p role="alert">{error}</p>
+              <p>{error}</p>
             </AlertDescription>
           </Alert>
         )}
@@ -441,13 +458,15 @@ function SiteSetting({ site, state }: { site: SiteOverview; state: SiteState }) 
               : "Off. Webmasters read every contest at once. Turn it on to make each webmaster join a contest first."}
           </p>
         </div>
+        <div className="flex min-h-11 items-center">
         <Switch
           id={id}
           checked={on}
-          disabled={state.busy}
+         
           aria-describedby={`${id}-state`}
           onCheckedChange={(restricted) => void state.execute({ type: "set_webmaster_reads", restricted })}
         />
+        </div>
       </div>
     </SiteCard>
   );
@@ -468,7 +487,10 @@ function Events({ site, state }: { site: SiteOverview; state: SiteState }) {
     <SiteCard
       title={`Events · ${site.events.length}`}
       action={
-        <Button type="button" variant="outline" size="sm" disabled={state.busy} onClick={() => setCreating(true)}>
+        <Button type="button" variant="outline" className="h-11" onClick={() => {
+          state.clearError();
+          setCreating(true);
+        }}>
           <CalendarPlus aria-hidden="true" />
           Create event
         </Button>
@@ -490,7 +512,7 @@ function Events({ site, state }: { site: SiteOverview; state: SiteState }) {
                   {item.accounts} {item.accounts === 1 ? "account" : "accounts"}
                 </p>
               </div>
-              <Button asChild variant="outline" size="sm" className="ml-auto">
+              <Button asChild variant="outline" className="ml-auto h-11">
                 <Link to={eventPath(item.id)} aria-label={`Open the console of ${item.name}`}>
                   Open console
                 </Link>
@@ -577,6 +599,15 @@ function CreateEvent({
   );
 }
 
+function validTimeZone(zone: string): boolean {
+  try {
+    new Intl.DateTimeFormat("en", { timeZone: zone });
+    return zone !== "";
+  } catch {
+    return false;
+  }
+}
+
 /** Mounted with the dialog, so each opening starts empty. */
 function CreateEventForm({
   busy,
@@ -599,6 +630,9 @@ function CreateEventForm({
     const code = parseEventCode(String(form.get("code") ?? ""));
     const handle = parseHandle(String(form.get("admin-username") ?? ""));
     if (!code) return setProblem("Use 3 to 40 lowercase letters, digits, or hyphens for the event code.");
+    if (!validTimeZone(String(form.get("time-zone") ?? "").trim())) {
+      return setProblem("Choose a time zone from the list, for example Europe/London.");
+    }
     if (!handle) return setProblem("Use 3 to 32 letters, digits, hyphens, or underscores for the admin username.");
     setProblem("");
     setSubmitted(true);
@@ -610,6 +644,7 @@ function CreateEventForm({
     });
   }
   const field = "h-11 text-base md:text-sm";
+  const zones = Intl.supportedValuesOf("timeZone");
   return (
     <>
       <form id={id} className="grid gap-4" onSubmit={submit}>
@@ -635,7 +670,12 @@ function CreateEventForm({
         </div>
         <div className="grid gap-2">
           <Label htmlFor={`${id}-zone`}>Time zone</Label>
-          <Input id={`${id}-zone`} name="time-zone" required defaultValue={zone} autoComplete="off" spellCheck={false} className={field} />
+          <Input id={`${id}-zone`} name="time-zone" required defaultValue={zone} list={`${id}-zones`} autoComplete="off" spellCheck={false} className={field} />
+          <datalist id={`${id}-zones`}>
+            {zones.map((item) => (
+              <option key={item} value={item} />
+            ))}
+          </datalist>
         </div>
         <div className="grid gap-2">
           <Label htmlFor={`${id}-admin-name`}>First event admin, name</Label>
@@ -657,14 +697,14 @@ function CreateEventForm({
         {problem && (
           <Alert variant="destructive">
             <AlertDescription>
-              <p role="alert">{problem}</p>
+              <p>{problem}</p>
             </AlertDescription>
           </Alert>
         )}
         {submitted && !busy && error && (
           <Alert variant="destructive">
             <AlertDescription>
-              <p role="alert">{error}</p>
+              <p>{error}</p>
             </AlertDescription>
           </Alert>
         )}

@@ -89,8 +89,18 @@ export function EventConsolePage({
             )}
           </div>
         </div>
+        {data && state.readError && (
+          <Alert variant="destructive">
+            <AlertDescription>
+              <p>This page may be out of date. {state.readError}</p>
+              <Button type="button" variant="outline" className="mt-2 h-11" onClick={() => void state.reload()}>
+                Retry
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
         {data ? (
-          <Tabs defaultValue="people" className="gap-4">
+          <Tabs defaultValue="people" className="gap-4" onValueChange={state.clearError}>
             <TabsList aria-label="Event console" id={tabsId} className="w-full sm:w-fit">
               {(
                 [
@@ -121,7 +131,10 @@ export function EventConsolePage({
         ) : state.loaded ? (
           <Alert variant="destructive">
             <AlertDescription>
-              <p role="alert">{state.readError}</p>
+              <p>{state.readError}</p>
+              <Button type="button" variant="outline" className="mt-2 h-11" onClick={() => void state.reload()}>
+                Retry
+              </Button>
             </AlertDescription>
           </Alert>
         ) : (

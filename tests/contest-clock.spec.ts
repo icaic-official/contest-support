@@ -175,7 +175,7 @@ test.describe("contest-wide time awards", () => {
     };
     const jury = await signIn(browser, local, "jury", desktop, loseFirstAward);
     let blocked = false;
-    await jury.route("**/api/snapshot**", (route) => (blocked ? route.abort("connectionreset") : route.fallback()));
+    await jury.route("**/api/snapshot**", (route) => (blocked ? route.fulfill({ status: 403, json: { error: "You have no access to this contest." } }) : route.fallback()));
     const open = async () => {
       await jury.getByRole("navigation", { name: "Console pages" }).getByRole("button", { name: /^Award review/ }).click();
       const panel = jury.getByRole("region", { name: "Time awards for the whole contest" });
@@ -187,16 +187,35 @@ test.describe("contest-wide time awards", () => {
     await panel.getByRole("button", { name: "Record the decision" }).click();
     await expect(panel.locator("p[role=alert]")).toBeVisible();
     expect(await local.rows("SELECT id FROM contest_awards WHERE session_id = ?", local.sessions[0])).toHaveLength(1);
-    // A refresh fails before the retry, which removes the console and its pending request ID.
+    // A refused refresh removes the console, and with it any state that holds the pending request ID.
     blocked = true;
     await jury.evaluate(() => window.dispatchEvent(new Event("focus")));
     await expect(jury.getByRole("button", { name: "Refresh access", exact: true })).toBeVisible();
     blocked = false;
-    await jury.getByRole("button", { name: "Refresh access", exact: true }).click();
+    await jury.evaluate(() => window.dispatchEvent(new Event("focus")));
+    await expect(jury.getByRole("navigation", { name: "Console pages" })).toBeVisible();
     const again = await open();
     await again.getByRole("button", { name: "Record the decision" }).click();
     await expect(again.getByRole("list", { name: "Contest-wide awards" })).toBeVisible();
     expect(await local.rows("SELECT id FROM contest_awards WHERE session_id = ?", local.sessions[0])).toHaveLength(1);
+  });
+
+  test("a network failure on refresh keeps the console, and a refusal removes it", async ({ browser, local }) => {
+    await schedule(local, -30, 60);
+    const jury = await signIn(browser, local, "jury");
+    let mode: "network" | "refused" = "network";
+    await jury.route("**/api/snapshot**", (route) =>
+      mode === "network"
+        ? route.abort("connectionreset")
+        : route.fulfill({ status: 403, json: { error: "You have no access to this contest." } }),
+    );
+    await jury.evaluate(() => window.dispatchEvent(new Event("focus")));
+    await expect(jury.getByRole("alert").filter({ hasText: "could not reach the server" }).first()).toBeVisible();
+    await expect(jury.getByRole("navigation", { name: "Console pages" })).toBeVisible();
+    mode = "refused";
+    await jury.evaluate(() => window.dispatchEvent(new Event("focus")));
+    await expect(jury.getByRole("button", { name: "Refresh access", exact: true })).toBeVisible();
+    await expect(jury.getByRole("navigation", { name: "Console pages" })).toHaveCount(0);
   });
 
   test("a contestant sees no award controls, and the Worker refuses a grant from a contestant", async ({ browser, local }) => {

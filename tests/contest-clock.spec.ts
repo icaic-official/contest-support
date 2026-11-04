@@ -306,3 +306,61 @@ test.describe("the calendar on the account page", () => {
     expect(reads.length).toBe(first);
   });
 });
+
+test.describe("keyboard focus on the organiser console", () => {
+  test.describe.configure({ mode: "default" });
+
+  const pageLink = (page: Page, name: RegExp) =>
+    page.getByRole("navigation", { name: "Console pages" }).getByRole("button", { name });
+  const focusedTag = (page: Page) => page.evaluate(() => document.activeElement?.tagName);
+
+  test("recording an award by keyboard keeps focus on the form", async ({ browser, local }) => {
+    await schedule(local, -30, 60);
+    const jury = await signIn(browser, local, "jury");
+    await pageLink(jury, /^Award review/).click();
+    const panel = jury.getByRole("region", { name: "Time awards for the whole contest" });
+    await panel.getByLabel("Minutes for every contestant").fill("15");
+    await panel.getByLabel("Why").fill("Network outage in the hall.");
+    await panel.getByRole("button", { name: "Record the decision" }).focus();
+    await jury.keyboard.press("Enter");
+    await expect(panel.getByRole("list", { name: "Contest-wide awards" })).toContainText("Network outage in the hall.");
+    expect(await focusedTag(jury)).not.toBe("BODY");
+  });
+
+  test("changing intake by keyboard keeps focus on the page", async ({ browser, local }) => {
+    await schedule(local, -30, 60);
+    const admin = await signIn(browser, local, "admin");
+    await pageLink(admin, /^Session settings/).click();
+    await expect(admin.getByRole("heading", { level: 1, name: "Session settings" })).toBeFocused();
+    const intake = admin.getByRole("region", { name: "Contestant intake", exact: true });
+    await intake.getByRole("button", { name: "Close now", exact: true }).focus();
+    await admin.keyboard.press("Enter");
+    await expect(intake).toContainText("set by staff");
+    expect(await focusedTag(admin)).not.toBe("BODY");
+  });
+
+  test("a quick Back and Forward still focuses the page heading", async ({ browser, local }) => {
+    await schedule(local, -30, 60);
+    const admin = await signIn(browser, local, "admin");
+    await pageLink(admin, /^Session settings/).click();
+    await expect(admin.getByRole("heading", { level: 1, name: "Session settings" })).toBeFocused();
+    await pageLink(admin, /^Overview/).click();
+    // Go forward again after the earlier page's effects ran and before the frame that focuses its heading.
+    await admin.evaluate(
+      () =>
+        new Promise<void>((resolve) => {
+          window.addEventListener(
+            "popstate",
+            () => {
+              window.addEventListener("popstate", () => resolve(), { once: true });
+              // After React ran its effects for the earlier page, and before the next frame.
+              window.setTimeout(() => window.history.forward(), 4);
+            },
+            { once: true },
+          );
+          window.history.back();
+        }),
+    );
+    await expect(admin.getByRole("heading", { level: 1, name: "Overview" })).toBeFocused();
+  });
+});

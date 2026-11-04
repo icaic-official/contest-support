@@ -10,7 +10,6 @@ interface WorkflowColumns {
   membership_team: string | null;
   is_admin: number;
   roles: string;
-  intake_open: number;
   categories: string;
   archived: number;
   teams: string;
@@ -37,10 +36,11 @@ type WorkflowRow = WorkflowColumns & ReceiptColumns;
 // version that access depends on. `teams` holds only the membership team and
 // the team that a submit names. Intake is derived from the schedule, the
 // override, and the contestant's confirmed extra time. The dependency carries
-// it, so a submit that crosses the close fails its batch and retries.
+// it, so a submit that crosses the close fails its batch and retries. The read
+// takes its intake from the dependency, so each evaluation computes it once.
 const intakeOpen = intakeOpenSql('s', extraMinutesSql('s', 'c.team_id'));
 const workflowSql = `SELECT c.account_name AS actor_name, c.team_id AS membership_team, c.is_admin, c.roles,
-    ${intakeOpen} AS intake_open, s.categories, c.archived,
+    s.categories, c.archived,
     (SELECT json_group_array(t.id) FROM (SELECT id FROM teams WHERE session_id = s.id AND id IN (c.team_id, ?) ORDER BY id) t) AS teams,
     i.id AS issue_id, i.team_id, i.status, i.owner, i.public_revision,
     (SELECT id FROM resolutions WHERE issue_id = i.id AND reopened_at IS NULL) AS resolution_id,
@@ -85,7 +85,7 @@ export class D1ApplicationStore implements WorkflowPersistence {
       state: {
         actor: { id: caller.accountId, name: row.actor_name },
         membership: { team_id: row.membership_team, is_admin: !!row.is_admin, roles: JSON.parse(row.roles) as Role[] },
-        session: { id: sessionId, intake_open: !!row.intake_open, categories: JSON.parse(row.categories) as string[] },
+        session: { id: sessionId, intake_open: (JSON.parse(row.dependency) as { intake: number }).intake === 1, categories: JSON.parse(row.categories) as string[] },
         archived: !!row.archived, teams: JSON.parse(row.teams) as string[],
         issue: row.issue_id && row.status && row.team_id && row.public_revision !== null
           ? { id: row.issue_id, team_id: row.team_id, status: row.status, owner: row.owner, revision: row.public_revision } : null,

@@ -40,11 +40,14 @@ const closeSql = (s: string, extra: string) =>
  * SQL boolean: is intake open now. While the contest follows its schedule,
  * intake runs from the start to the end plus the grace period. Otherwise
  * `intake_open` decides, which is the manual override and also today's switch.
- * The extra minutes are read only while the contest follows its schedule.
+ * Extra minutes only lengthen a contestant's time, so while the scheduled end
+ * lies ahead, the CASE answers without reading them. Only a contestant after
+ * the scheduled end pays for the read of the awards.
  */
 export function intakeOpenSql(s: string, extra = '0'): string {
   return `(CASE WHEN ${s}.intake_follows_schedule = 1
-    THEN ${nowSql} >= ${s}.starts_at AND ${nowSql} < ${closeSql(s, extra)}
+    THEN CASE WHEN ${nowSql} < ${s}.starts_at THEN 0 WHEN ${nowSql} < ${s}.ends_at THEN 1
+      ELSE ${nowSql} < ${closeSql(s, extra)} END
     ELSE ${s}.intake_open = 1 END)`;
 }
 

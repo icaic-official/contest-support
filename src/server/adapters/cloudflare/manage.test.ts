@@ -713,6 +713,46 @@ describe('event, roster, and contest commands', () => {
     await expect(execute('eventAdmin', { ...command, roles: [], admin: false })).rejects.toMatchObject({ status: 400 });
   });
 
+  it('creates a contest that follows its schedule, and keeps the schedule apart from the intake mode', async () => {
+    const created = await execute('eventAdmin', { type: 'create_contest', eventId: ids.event, name: 'Scheduled', contestType: 'teams',
+      schedule: { startsAt: '2030-03-01T01:00:00.000Z', endsAt: '2030-03-01T04:00:00.000Z', graceMinutes: 15 }, categories: ['Other'] });
+    const id = created.contestId!;
+    expect(await rows('SELECT starts_at, ends_at, grace_minutes, intake_follows_schedule FROM sessions WHERE id = ?', id))
+      .toEqual([{ starts_at: '2030-03-01T01:00:00.000Z', ends_at: '2030-03-01T04:00:00.000Z', grace_minutes: 15, intake_follows_schedule: 1 }]);
+    // Offsets and missing milliseconds become the one stored form.
+    await execute('eventAdmin', { type: 'update_contest', contestId: id, name: 'Scheduled', contestType: 'teams',
+      schedule: { startsAt: '2030-03-01T09:00:00+08:00', endsAt: '2030-03-01T12:30:00+08:00', graceMinutes: 0 } });
+    expect(await rows('SELECT starts_at, ends_at FROM sessions WHERE id = ?', id))
+      .toEqual([{ starts_at: '2030-03-01T01:00:00.000Z', ends_at: '2030-03-01T04:30:00.000Z' }]);
+    // Staff hold intake by hand. A new schedule leaves the mode alone.
+    await execute('contestAdmin', { type: 'set_intake', contestId: ids.contest, mode: 'closed' });
+    await execute('eventAdmin', { type: 'set_intake', contestId: id, mode: 'open' });
+    await execute('eventAdmin', { type: 'update_contest', contestId: id, name: 'Scheduled', contestType: 'teams',
+      schedule: { startsAt: '2030-03-01T02:00:00.000Z', endsAt: '2030-03-01T05:00:00.000Z', graceMinutes: 0 } });
+    expect(await rows('SELECT intake_follows_schedule, intake_open FROM sessions WHERE id = ?', id)).toEqual([{ intake_follows_schedule: 0, intake_open: 1 }]);
+    expect((await manage.event(caller('eventAdmin'), ids.event)).contests.find((contest) => contest.id === id))
+      .toMatchObject({ mode: 'open', intake: { open: true, reason: 'override_open', changesAt: null } });
+    await execute('eventAdmin', { type: 'set_intake', contestId: id, mode: 'schedule' });
+    expect((await manage.event(caller('eventAdmin'), ids.event)).contests.find((contest) => contest.id === id))
+      .toMatchObject({ mode: 'schedule', intake: { open: false, reason: 'before_start', changesAt: '2030-03-01T02:00:00.000Z' }, schedule: { graceMinutes: 0 } });
+  });
+
+  it('refuses a schedule that cannot run, and the schedule switch for a contest with no schedule', async () => {
+    const create = (schedule: object) => execute('eventAdmin', { type: 'create_contest', eventId: ids.event, name: 'Bad', contestType: 'teams',
+      schedule, categories: ['Other'] } as unknown as ManageCommand);
+    const times = { startsAt: '2030-03-01T01:00:00.000Z', endsAt: '2030-03-01T04:00:00.000Z' };
+    await expect(create({ ...times, endsAt: times.startsAt, graceMinutes: 0 })).rejects.toMatchObject({ status: 400 });
+    await expect(create({ startsAt: times.endsAt, endsAt: times.startsAt, graceMinutes: 0 })).rejects.toMatchObject({ status: 400 });
+    await expect(create({ ...times, graceMinutes: 241 })).rejects.toMatchObject({ status: 400 });
+    await expect(create({ ...times, graceMinutes: 1.5 })).rejects.toMatchObject({ status: 400 });
+    await expect(create({ startsAt: 'tomorrow', endsAt: times.endsAt, graceMinutes: 0 })).rejects.toMatchObject({ status: 400 });
+    expect(await rows('SELECT id FROM sessions WHERE name = ?', 'Bad')).toEqual([]);
+    // ids.contest has no schedule, so it cannot follow one.
+    await expect(execute('contestAdmin', { type: 'set_intake', contestId: ids.contest, mode: 'schedule' }))
+      .rejects.toMatchObject({ status: 409, message: 'This contest has no schedule. Set its start and end first.' });
+    expect(await rows('SELECT intake_follows_schedule FROM sessions WHERE id = ?', ids.contest)).toEqual([{ intake_follows_schedule: 0 }]);
+  });
+
   it('lets a contest admin run its own contest and no other, and refuses staff without admin', async () => {
     const [team] = await entrants('eventAdmin', ids.event, [['Aurora', 'team']]);
     await execute('eventAdmin', { type: 'assign_entrants', contestId: ids.contest, entries: [{ entrantId: team!, location: 'Desk' }] });

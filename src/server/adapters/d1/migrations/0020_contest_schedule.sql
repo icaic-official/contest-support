@@ -15,19 +15,21 @@ ALTER TABLE sessions ADD COLUMN intake_follows_schedule INTEGER NOT NULL DEFAULT
   CHECK (intake_follows_schedule IN (0, 1));
 
 CREATE TRIGGER session_schedule_inserted BEFORE INSERT ON sessions
-WHEN NOT ((NEW.starts_at IS NULL AND NEW.ends_at IS NULL AND NEW.intake_follows_schedule = 0)
+WHEN NOT COALESCE((NEW.starts_at IS NULL AND NEW.ends_at IS NULL AND NEW.intake_follows_schedule = 0)
   OR (NEW.starts_at = strftime('%Y-%m-%dT%H:%M:%fZ', NEW.starts_at)
-    AND NEW.ends_at = strftime('%Y-%m-%dT%H:%M:%fZ', NEW.ends_at) AND NEW.ends_at > NEW.starts_at))
+    AND NEW.ends_at = strftime('%Y-%m-%dT%H:%M:%fZ', NEW.ends_at) AND NEW.ends_at > NEW.starts_at), 0)
 BEGIN
   SELECT RAISE(ABORT, 'A schedule needs a start before its end');
 END;
 CREATE TRIGGER session_schedule_changed BEFORE UPDATE OF starts_at, ends_at, intake_follows_schedule ON sessions
-WHEN NOT ((NEW.starts_at IS NULL AND NEW.ends_at IS NULL AND NEW.intake_follows_schedule = 0)
+WHEN NOT COALESCE((NEW.starts_at IS NULL AND NEW.ends_at IS NULL AND NEW.intake_follows_schedule = 0)
   OR (NEW.starts_at = strftime('%Y-%m-%dT%H:%M:%fZ', NEW.starts_at)
-    AND NEW.ends_at = strftime('%Y-%m-%dT%H:%M:%fZ', NEW.ends_at) AND NEW.ends_at > NEW.starts_at))
+    AND NEW.ends_at = strftime('%Y-%m-%dT%H:%M:%fZ', NEW.ends_at) AND NEW.ends_at > NEW.starts_at), 0)
 BEGIN
   SELECT RAISE(ABORT, 'A schedule needs a start before its end');
 END;
+-- A comparison with NULL is NULL, and NOT NULL is NULL, so a trigger condition that
+-- reads a missing or malformed instant would pass. COALESCE turns that into a refusal.
 -- The calendar reads one event's contests in start order, or every contest that ends after a time.
 CREATE INDEX sessions_event_schedule ON sessions(event_id, starts_at);
 CREATE INDEX sessions_ends ON sessions(ends_at) WHERE ends_at IS NOT NULL;

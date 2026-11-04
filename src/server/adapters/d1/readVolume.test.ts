@@ -288,6 +288,21 @@ describe('rows read for a session with 1,200 accounts and 100 issues', () => {
     expect(rowsRead).toBeLessThan(130);
   });
 
+  // A contestant of a scheduled contest reads its own issues' awards for the personal end. Team 8 owns 4 issues,
+  // and the seed resolved issues 1 to 40, so issues 7 and 31 hold resolutions. Measured on 2026-11-04.
+  it('reads a bounded number of rows for a contestant of a scheduled contest with confirmed awards', async () => {
+    const now = "strftime('%Y-%m-%dT%H:%M:%fZ', 'now')";
+    await db.prepare(`UPDATE sessions SET starts_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-1 hour'),
+      ends_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '+1 hour'), intake_follows_schedule = 1 WHERE id = 'sess-1'`).run();
+    await db.prepare(`UPDATE awards SET applied_at = ${now}, applied_by = 'acc-2', applied_name = 'Person 2' WHERE id = 'award-7'`).run();
+    const { rowsRead, body } = await snapshot(db, callers.contestant);
+    expect(body!.clock).toMatchObject({ extra_minutes: 5, intake: { reason: 'running' } });
+    // Measured 132 on 2026-11-04, 20 rows more than the 112 of an unscheduled contest, because it reads the contestant's issue awards.
+    expect(rowsRead).toBeLessThan(150);
+    await db.prepare("UPDATE sessions SET intake_follows_schedule = 0, starts_at = NULL, ends_at = NULL WHERE id = 'sess-1'").run();
+    await db.prepare('UPDATE awards SET applied_at = NULL, applied_by = NULL, applied_name = NULL WHERE id = ?').bind('award-7').run();
+  });
+
   it('returns staff notes and only their own removals to a volunteer within a bounded read', async () => {
     const { rowsRead, body } = await snapshot(db, callers.volunteer);
     expect(body!.teams).toHaveLength(teams);
@@ -533,5 +548,39 @@ describe('rows read in a session of 480 teams', () => {
       expect(await store.commit(caller, 'sess-1', requestId, command, read, decision)).toMatchObject({ outcome: 'committed' });
       expect(usage.rowsRead, `${command.type} by account ${n}`).toBeLessThan(60);
     }
+  });
+
+  // A contest that follows its schedule reads the contestant's confirmed awards to find the personal end.
+  // The seed's contest has no schedule, so the two tests above read none. Here team 8's one issue carries
+  // a confirmed award, and the contest holds a confirmed contest-wide award.
+  it('reads a bounded number of rows for a scheduled contest with confirmed awards', async () => {
+    const now = "strftime('%Y-%m-%dT%H:%M:%fZ', 'now')";
+    const run = (sql: string) => db.prepare(sql).run();
+    // The contest ended 5 minutes ago. Only the confirmed 15 minutes keep this contestant open, so every read pays for them.
+    await run(`UPDATE sessions SET starts_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-2 hours'),
+      ends_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-5 minutes'), grace_minutes = 0, intake_follows_schedule = 1 WHERE id = 'sess-1'`);
+    // The seed resolved issues 1 to 40 and decided awards for 1 to 20. Team 8 owns issue 7, so its award gets confirmed.
+    await run(`UPDATE awards SET applied_at = ${now}, applied_by = 'acc-2', applied_name = 'Person 2' WHERE id = 'award-7'`);
+    await run(`INSERT INTO contest_awards (id, session_id, request_id, minutes, explanation, actor, actor_name, at, applied_at, applied_by, applied_name, applied_request)
+      VALUES ('wide-1', 'sess-1', 'req-wide', 10, 'Fictional outage', 'acc-3', 'Person 3', ${now}, ${now}, 'acc-2', 'Person 2', 'req-apply')`);
+    const { rowsRead, body } = await snapshot(db, callers.contestant);
+    expect(body!.clock).toMatchObject({ extra_minutes: 15, follows_schedule: true, intake: { open: true, reason: 'running' } });
+    expect(body!.contest_awards).toHaveLength(1);
+    // Measured 78 rows on 2026-11-04, after the commands above gave the team a second issue. The same contest without a schedule reads fewer.
+    expect(rowsRead).toBeLessThan(90);
+    const command: Command = { type: 'submit', category: 'Devices', description: 'Fictional report' };
+    const caller = { accountId: `acc-${callers.contestant}`, loginId: `login-${callers.contestant}` };
+    const requestId = randomUUID();
+    const { connection, usage } = metered(db);
+    const store = new D1ApplicationStore(connection);
+    const read = await store.read(caller, 'sess-1', requestId, command);
+    const decision = read && decideWorkflow(read.state, command);
+    if (!read || !decision || 'outcome' in decision) throw new Error('The scheduled submit was not accepted.');
+    expect(await store.commit(caller, 'sess-1', requestId, command, read, decision)).toMatchObject({ outcome: 'committed' });
+    // Measured 57 rows on 2026-11-04, the worst case: the contestant has three issues and holds only through confirmed extra time.
+    expect(usage.rowsRead, 'scheduled submit by a contestant with awards').toBeLessThan(60);
+    const volunteer = await snapshot(db, callers.volunteer);
+    expect(volunteer.body!.clock).toMatchObject({ extra_minutes: 0, personal_end_at: null });
+    expect(volunteer.body!.contest_awards).toHaveLength(1);
   });
 });

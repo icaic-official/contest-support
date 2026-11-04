@@ -275,11 +275,12 @@ export function manageAccountBindings(actor: string, target: string): D1Value[] 
 
 /**
  * Account `t` may change its own handle: it belongs to an event and holds no
- * contestant seat in any contest (owner decision 14, 2026-11-01). A
+ * contestant seat in any contest, and is not an entrant's sign-in even
+ * while no contest seats it (owner decision 14, 2026-11-01). A
  * contestant's handle is printed on the sheet that venue staff use. A
  * webmaster belongs to no event. The account page reads the same condition.
  */
-export const ownHandleSql = `t.event_id IS NOT NULL
+export const ownHandleSql = `t.event_id IS NOT NULL AND t.entrant_id IS NULL
   AND NOT EXISTS (SELECT 1 FROM memberships m WHERE m.account_id = t.id AND m.team_id IS NOT NULL)`;
 
 /**

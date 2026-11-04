@@ -363,7 +363,7 @@ export class D1ManageService {
     if (!authority.writable) throw new AuthenticationError(403, 'This event is archived.');
     const assertions = new Assertions(this.db);
     const plan = await this.plan(command, authority, assertions);
-    return this.commit(authority, requestId, record, plan, assertions);
+    return (await this.commit(authority, requestId, record, plan, assertions)).receipt;
   }
 
   /**
@@ -407,13 +407,14 @@ export class D1ManageService {
           { operationId: crypto.randomUUID(), actor: caller.accountId, temporary: true }),
       );
     }
-    await this.commit(authority, requestId, record, {
+    const { replayed: lost } = await this.commit(authority, requestId, record, {
       statements,
       audit: { action: 'issue_passwords', target: null, detail: { accountIds } },
       notify: [],
       receipt: { accountIds },
     }, assertions);
-    return this.issued(accountIds, passwords);
+    // A concurrent copy of this request committed first and stored other passwords. These were never stored.
+    return this.issued(accountIds, lost ? new Map() : passwords);
   }
 
   private async webmasterTargets(accountIds: readonly string[]): Promise<Array<CredentialRow & { stored: boolean }>> {
@@ -467,9 +468,9 @@ export class D1ManageService {
   /**
    * One batch: the authority guard, the plan, the audit, the receipt, the
    * notifications, and the login check. When the batch fails, a receipt that a
-   * concurrent copy of the request stored still answers it.
+   * concurrent copy of the request stored still answers it, and `replayed` says so.
    */
-  private async commit(authority: Authority, requestId: string, record: string, plan: Plan, assertions: Assertions): Promise<ManageReceipt> {
+  private async commit(authority: Authority, requestId: string, record: string, plan: Plan, assertions: Assertions): Promise<{ receipt: ManageReceipt; replayed: boolean }> {
     const { caller } = authority;
     const statements = [
       assertions.authority(authority),
@@ -491,10 +492,10 @@ export class D1ManageService {
       await this.db.batch(statements);
     } catch (error) {
       const replayed = await this.replay(caller, requestId, record);
-      if (replayed) return replayed;
+      if (replayed) return { receipt: replayed, replayed: true };
       throw refusal(error);
     }
-    return plan.receipt;
+    return { receipt: plan.receipt, replayed: false };
   }
 
   private async webmasters(): Promise<CredentialRow[]> {

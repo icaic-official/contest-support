@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
+  ReturningDialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
@@ -58,7 +59,10 @@ export function ConfirmDialog({
   description,
   confirmLabel,
   onConfirm,
+  returnFocus = false,
 }: {
+  /** Puts focus back on the opening control when no DialogTrigger does. */
+  returnFocus?: boolean;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   title: string;
@@ -66,9 +70,10 @@ export function ConfirmDialog({
   confirmLabel: string;
   onConfirm: () => void;
 }) {
+  const Content = returnFocus ? ReturningDialogContent : DialogContent;
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent showCloseButton={false} className="max-w-sm">
+      <Content showCloseButton={false} className="max-w-sm">
         <DialogHeader className="text-left">
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>{description}</DialogDescription>
@@ -94,7 +99,7 @@ export function ConfirmDialog({
             {confirmLabel}
           </Button>
         </DialogFooter>
-      </DialogContent>
+      </Content>
     </Dialog>
   );
 }

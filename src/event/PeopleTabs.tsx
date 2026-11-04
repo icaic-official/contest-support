@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
-  DialogContent,
+  ReturningDialogContent as DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
@@ -147,6 +147,7 @@ export function PeopleTab({ data, state }: TabProps) {
         </DialogContent>
       </Dialog>
       <ConfirmDialog
+        returnFocus
         open={!!resetting}
         onOpenChange={(open) => !open && setResetting(undefined)}
         title={`Reset the password of ${resetting?.name ?? "this person"}?`}
@@ -363,6 +364,7 @@ export function EntrantsTab({ data, state }: TabProps) {
         </DialogContent>
       </Dialog>
       <ConfirmDialog
+        returnFocus
         open={!!resetting}
         onOpenChange={(open) => !open && setResetting(undefined)}
         title={`Reset the password of ${resetting?.name ?? "this entrant"}?`}

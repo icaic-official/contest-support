@@ -4,7 +4,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
-  DialogContent,
+  ReturningDialogContent as DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,

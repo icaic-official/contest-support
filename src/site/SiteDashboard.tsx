@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
-  DialogContent,
+  ReturningDialogContent as DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
@@ -309,6 +309,7 @@ function Webmasters({
         }}
       />
       <ConfirmDialog
+        returnFocus
         open={!!confirming}
         onOpenChange={(open) => {
           if (!open) setConfirming(undefined);

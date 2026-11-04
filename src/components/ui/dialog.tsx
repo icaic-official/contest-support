@@ -66,13 +66,10 @@ function DialogContent({
   className,
   children,
   showCloseButton = true,
-  onOpenAutoFocus,
-  onCloseAutoFocus,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean
 }) {
-  const opener = React.useRef<Element | null>(null)
   return (
     <DialogPortal data-slot="dialog-portal">
       <DialogOverlay />
@@ -83,17 +80,6 @@ function DialogContent({
           className
         )}
         {...props}
-        onOpenAutoFocus={(event) => {
-          // Radix sends this before it moves focus, so the opener still holds it.
-          opener.current = document.activeElement
-          onOpenAutoFocus?.(event)
-        }}
-        onCloseAutoFocus={(event) => {
-          onCloseAutoFocus?.(event)
-          if (event.defaultPrevented) return
-          event.preventDefault()
-          restoreFocus(opener.current)
-        }}
       >
         {children}
         {showCloseButton && (
@@ -107,6 +93,27 @@ function DialogContent({
         )}
       </DialogPrimitive.Content>
     </DialogPortal>
+  )
+}
+
+/** A DialogContent for a dialog that state opens, with no DialogTrigger. */
+function ReturningDialogContent(props: React.ComponentProps<typeof DialogContent>) {
+  const opener = React.useRef<Element | null>(null)
+  return (
+    <DialogContent
+      {...props}
+      onOpenAutoFocus={(event) => {
+        // Radix sends this before it moves focus, so the opener still holds it.
+        opener.current = document.activeElement
+        props.onOpenAutoFocus?.(event)
+      }}
+      onCloseAutoFocus={(event) => {
+        props.onCloseAutoFocus?.(event)
+        if (event.defaultPrevented) return
+        event.preventDefault()
+        restoreFocus(opener.current)
+      }}
+    />
   )
 }
 
@@ -177,6 +184,7 @@ export {
   Dialog,
   DialogClose,
   DialogContent,
+  ReturningDialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,

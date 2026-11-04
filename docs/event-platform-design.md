@@ -809,6 +809,12 @@ The owner made these decisions on 2026-11-05, during the review of Phase 4:
 - **Last event admin.** Accepted. The last event admin can be removed, because a webmaster can appoint another.
 - **Picker start times.** A follow-up, not in Phase 4.
 
+Rehearsal of `0019` on 2026-11-05, on the separate fictional database `minsky-preview-rehearsal-0019`, deleted afterwards, through `wrangler d1 migrations apply --remote` as deploys run it. Wrangler sends each file to the `/query` endpoint.
+
+- **Atomicity.** Hosted D1 applied a file atomically in this one probe. A file whose third statement failed left no table and no `d1_migrations` row. This is an observation, not a provider promise, so `0019` stays safe statement by statement.
+- **Apply.** `0019` applied in 121 ms of D1 time on 406 teams and 404 accounts. The foreign key check returned no rows. The three-team chain formed one entrant. Unrelated same-named teams stayed apart. The staff account with a team seat stayed unlinked.
+- **Bulk assignment.** The `assign_entrants` insert of 300 entrants took 7 ms of D1 time, read 5,399 rows, wrote 3,000 rows, and seated 300 sign-ins. This measures that one statement through `wrangler d1 execute`, at 1,296 ms including Wrangler and the network. It does not measure the Worker request or the guards in its batch.
+
 ## Risks
 
 Each risk names its measurement.

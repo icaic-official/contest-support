@@ -61,6 +61,7 @@ const commandSchema = z.discriminatedUnion('type', [
       .refine((entrants) => new Set(entrants.map((entrant) => entrant.handle)).size === entrants.length, 'Usernames must be different.'),
   }),
   z.strictObject({ type: z.literal('rename_entrant'), eventId: uuid, entrantId: uuid, name: nameSchema }),
+  z.strictObject({ type: z.literal('add_entrant_sign_in'), eventId: uuid, entrantId: uuid, handle: handleSchema }),
   z.strictObject({
     type: z.literal('create_contest'), eventId: uuid, name: nameSchema, contestType: contestTypeSchema, categories: categoriesSchema,
   }),
@@ -124,6 +125,7 @@ export const requirementOf: {
   create_people: (command) => event(command.eventId),
   create_entrants: (command) => event(command.eventId),
   rename_entrant: (command) => event(command.eventId),
+  add_entrant_sign_in: (command) => event(command.eventId),
   create_contest: (command) => event(command.eventId),
   update_contest: (command) => contest(command.contestId, 'event'),
   assign_entrants: (command) => contest(command.contestId, 'event'),
@@ -405,6 +407,10 @@ export class D1ManageService {
         ...(target.stored ? [] : [this.statement('UPDATE accounts SET username = ? WHERE id = ? AND username IS NULL', target.loginKey, target.id)]),
         ...replaceCredentialStatements(this.db, target, await this.passwords.hash(password),
           { operationId: crypto.randomUUID(), actor: caller.accountId, temporary: true }),
+        // The activity list of each contest that seats the account shows the reset.
+        this.statement(`INSERT INTO admin_audit (id, session_id, actor, action, target)
+          SELECT lower(hex(randomblob(16))), session_id, ?, 'reset_password', ? FROM memberships WHERE account_id = ?`,
+        caller.accountId, target.id, target.id),
       );
     }
     const { replayed: lost } = await this.commit(authority, requestId, record, {
@@ -713,17 +719,41 @@ export class D1ManageService {
         if (others.some((row) => rosterKey(row.name) === rosterKey(command.name))) {
           throw new AuthenticationError(409, `An entrant named "${command.name}" already exists.`);
         }
+        const entries = (await this.statement('SELECT session_id, id FROM teams WHERE entrant_id = ?', command.entrantId)
+          .all<{ session_id: string; id: string }>()).results;
         return {
           statements: [
-            // D1 renames the entrant's entry in every contest.
+            // D1 renames the entrant's entry in every contest, and a shared sign-in that carries the old name.
             this.statement('UPDATE entrants SET name = ? WHERE id = ? AND event_id = ?', command.name, command.entrantId, command.eventId),
             assertions.check('SELECT 1 WHERE changes() = 1'),
             assertions.check(`SELECT 1 WHERE NOT EXISTS (SELECT 1 FROM entrants WHERE event_id = ? AND id <> ?
               AND lower(trim(name)) = lower(trim(?)))`, command.eventId, command.entrantId, command.name),
           ],
           audit: { action: 'rename_entrant', target: null, detail: { entrant: command.entrantId, from: current.name, to: command.name } },
-          notify: [],
+          notify: entries.map((entry) => ({ contestId: entry.session_id, audiences: ['staff', `team:${entry.id}`] })),
           receipt: {},
+        };
+      }
+      case 'add_entrant_sign_in': {
+        const { eventId: scopeEvent, entrantId, handle } = command;
+        const entrant = await this.statement('SELECT name FROM entrants WHERE id = ? AND event_id = ?', entrantId, scopeEvent)
+          .first<{ name: string }>();
+        if (!entrant) throw new AuthenticationError(409, staleEntrant);
+        if (await this.statement('SELECT 1 FROM accounts WHERE entrant_id = ?', entrantId).first()) {
+          throw new AuthenticationError(409, 'That entrant already has a sign-in. Refresh the page.');
+        }
+        if ((await this.takenHandles(scopeEvent, [handle])).length > 0) throw new AuthenticationError(409, usernameTaken);
+        const accountId = crypto.randomUUID();
+        return {
+          statements: [
+            assertions.check('SELECT 1 WHERE NOT EXISTS (SELECT 1 FROM accounts WHERE entrant_id = ?)', entrantId),
+            // D1 seats the new sign-in in each entry of the entrant. It has no password until issueCredentials.
+            this.statement(`INSERT INTO accounts (id, name, username, handle, event_id, entrant_id, must_change, credential_state)
+              VALUES (?, ?, ?, ?, ?, ?, 1, 'pending')`, accountId, entrant.name, loginKeyFor(accountId), handle, scopeEvent, entrantId),
+          ],
+          audit: { action: 'add_entrant_sign_in', target: accountId, detail: { entrant: entrantId, handle } },
+          notify: [],
+          receipt: { entrantIds: [entrantId], accountIds: [accountId] },
         };
       }
       case 'create_contest': {
@@ -777,14 +807,15 @@ export class D1ManageService {
         const misfit = found.results.find((row) => !fits(type.contest_type, row.kind));
         if (misfit) throw new AuthenticationError(409, `${misfit.name} does not fit this contest. It takes ${takes[type.contest_type]}.`);
         const entries = command.entries.map((entry) => ({
-          id: crypto.randomUUID(), entrantId: entry.entrantId, name: entrants.get(entry.entrantId)?.name ?? '', location: entry.location,
+          id: crypto.randomUUID(), entrantId: entry.entrantId, location: entry.location,
         }));
         return {
           statements: [
             // D1 seats each entrant's sign-in and checks the contest type.
             this.statement(`INSERT INTO teams (id, session_id, entrant_id, name, location)
               SELECT json_extract(value, '$.id'), ?, json_extract(value, '$.entrantId'),
-                json_extract(value, '$.name'), json_extract(value, '$.location') FROM json_each(?)`,
+                (SELECT name FROM entrants WHERE id = json_extract(value, '$.entrantId')), json_extract(value, '$.location')
+              FROM json_each(?)`,
             command.contestId, JSON.stringify(entries)),
             assertions.check('SELECT 1 WHERE changes() = ?', entries.length),
           ],

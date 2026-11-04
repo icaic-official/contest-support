@@ -72,28 +72,29 @@ test.describe("a webmaster", () => {
   });
 });
 
-test("an admin's credential sheet holds the event link, which fills in the code on a new device", async ({ browser, page, local }) => {
-  await page.setViewportSize({ width: 1280, height: 800 });
-  await page.goto("/sign-in");
-  await page.getByLabel("Username", { exact: true }).fill("admin");
-  await page.getByLabel("Password", { exact: true }).fill(crypto.randomUUID());
-  await page.getByRole("button", { name: "Sign in", exact: true }).click();
-  await page.getByRole("navigation", { name: "Console pages" }).getByRole("button", { name: /^Accounts/ }).click();
-  await page.getByRole("button", { name: "Create account" }).click();
-  const dialog = page.getByRole("dialog", { name: "Create account" });
-  await dialog.getByLabel("Display name", { exact: true }).fill("Fictional desk helper");
-  await dialog.getByLabel("Username", { exact: true }).fill("desk-helper");
-  await dialog.getByText("Volunteer", { exact: true }).click();
-  await dialog.getByRole("button", { name: "Create account", exact: true }).click();
-  const sheet = page.getByRole("dialog", { name: "Share these credentials securely" });
-  const link = `${new URL(page.url()).origin}/?event=${local.eventCode}`;
-  await expect(sheet.getByLabel("Sign-in link", { exact: true })).toHaveValue(link);
-  await expect(sheet.getByLabel("Username", { exact: true })).toHaveValue("desk-helper");
+test.describe("an event admin", () => {
+  test.use({ withEventAdmin: true });
 
-  const device = await browser.newContext({ viewport: { width: 390, height: 844 } });
-  await local.attach(device, { newDevice: true });
-  const opened = await device.newPage();
-  await opened.goto(link);
-  await expect(opened.getByLabel("Event code", { exact: true })).toHaveValue(local.eventCode);
-  await device.close();
+  test("gets a credential sheet with the event link, which fills in the code on a new device", async ({ browser, page, local }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await page.goto("/sign-in");
+    await page.getByLabel("Username", { exact: true }).fill("eventadmin");
+    await page.getByLabel("Password", { exact: true }).fill(crypto.randomUUID());
+    await page.getByRole("button", { name: "Sign in", exact: true }).click();
+    await expect(page.locator('[data-ui="organiser-desktop"]')).toBeVisible();
+    await page.goto("/event");
+    await page.getByLabel("People, one per line: name, username", { exact: true }).fill("Fictional desk helper, desk-helper");
+    await page.getByRole("button", { name: "Create people (1)", exact: true }).click();
+    const sheet = page.getByRole("dialog", { name: "Share these credentials securely" });
+    const link = `${new URL(page.url()).origin}/?event=${local.eventCode}`;
+    await expect(sheet.getByText(link, { exact: true })).toBeVisible();
+    await expect(sheet.getByText("desk-helper", { exact: true })).toBeVisible();
+
+    const device = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    await local.attach(device, { newDevice: true });
+    const opened = await device.newPage();
+    await opened.goto(link);
+    await expect(opened.getByLabel("Event code", { exact: true })).toHaveValue(local.eventCode);
+    await device.close();
+  });
 });

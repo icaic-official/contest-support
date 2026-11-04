@@ -154,7 +154,7 @@ for (const [layout, viewport] of [["laptop", desktop], ["phone", phone]] as cons
       const location = page.getByLabel("Cedar", { exact: true });
       await location.fill("Hall Z");
       roster.reject = "This contest has no such team.";
-      await page.getByRole("button", { name: "Save" }).nth(1).click();
+      await location.locator("xpath=ancestor::form").getByRole("button", { name: "Save", exact: true }).click();
       await expect(page.getByText("This contest has no such team.")).toBeVisible();
       await expect(location).toHaveValue("Hall Z");
     });

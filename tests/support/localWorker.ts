@@ -147,6 +147,12 @@ export class LocalWorker extends FixtureWorker {
     return account.id;
   }
 
+  /** Enters the contestant's entrant (Aurora) in the second session, which seats the contestant there too. */
+  async seatContestantInSecondSession(): Promise<void> {
+    await this.run('INSERT INTO teams (id, session_id, name, location, entrant_id) VALUES (?, ?, ?, ?, ?)',
+      randomUUID(), this.sessions[1], 'Aurora', 'A12', this.teams[0]);
+  }
+
   /** Runs one SQL statement against the fixture database. */
   async run(sql: string, ...values: Array<string | number | null>): Promise<void> {
     await this.db.prepare(sql).bind(...values).run();
@@ -223,6 +229,8 @@ export class LocalWorker extends FixtureWorker {
       write('INSERT INTO memberships (session_id, account_id) VALUES (?, ?)', this.sessions[1], this.users.jury),
       write(`INSERT INTO membership_roles (session_id, account_id, role) VALUES (?, ?, 'volunteer')`, this.sessions[1], this.users.jury),
     );
+    // The contestant's sign-in is the entrant of Aurora. Its seats follow the entries of that entrant.
+    statements.push(write('UPDATE accounts SET entrant_id = ? WHERE id = ?', this.teams[0], this.users.contestant));
     if (seedIssues) statements.push(...this.issueRows(write));
     await this.db.batch(statements);
     this.eventCode = (await this.db.prepare('SELECT code FROM events WHERE id = ?').bind(this.event).first<{ code: EventCode }>())!.code;

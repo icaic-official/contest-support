@@ -51,6 +51,7 @@ export function SignIn() {
         className="mt-8"
         onSubmit={(event) => {
           event.preventDefault();
+          if (busy) return;
           const data = new FormData(event.currentTarget);
           const eventCode = parseEventCode(code);
           if (!site && !eventCode) {
@@ -72,13 +73,16 @@ export function SignIn() {
               if (target.kind === "event") rememberEventCode(target.code);
             } catch (cause) {
               setError(errorMessage(cause));
+              document.getElementById("sign-in-password")?.focus();
             } finally {
               setBusy(false);
             }
           })();
         }}
       >
-        <fieldset disabled={busy} className="grid gap-5">
+        {/* Not disabled while busy: disabling the focused field drops focus to
+            the page body. The busy guard in onSubmit stops a double submit. */}
+        <fieldset className="grid gap-5">
           <legend className="sr-only">Account credentials</legend>
           {!site && (
             <div className="grid gap-2">

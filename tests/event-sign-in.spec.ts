@@ -44,6 +44,9 @@ test.describe("a webmaster", () => {
     await page.getByLabel("Password", { exact: true }).fill(password);
     await page.getByRole("button", { name: "Sign in", exact: true }).click();
     await expect(page.getByText("The event code, username, or password is incorrect.", { exact: true })).toBeVisible();
+    await expect(page.getByRole("alert")).toBeVisible();
+    // A keyboard user keeps their place: focus returns to the password field.
+    await expect(page.getByLabel("Password", { exact: true })).toBeFocused();
 
     await page.getByRole("button", { name: "Site sign-in", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Site sign-in", exact: true })).toBeVisible();

@@ -448,7 +448,7 @@ describe('rows read by management commands in a session with 1,200 accounts', ()
       [{ type: 'assign_staff', contestId: world.contest, accountId: world.account(1202), roles: ['jury'], admin: false }, 1201, 60],
       [{ type: 'unassign_staff', contestId: world.contest, accountId: world.account(1202) }, 1201, 50],
       [{ type: 'assign_entrants', contestId: world.contest, entries: [{ entrantId: fresh!, location: 'Hall 9' }] }, 1201, 150],
-      [{ type: 'update_contest', contestId: world.contest, name: 'Scale session', contestType: 'teams' }, 1201, 190],
+      [{ type: 'update_contest', contestId: world.contest, name: 'Scale session', contestType: 'teams' }, 1201, 135],
       [{ type: 'create_contest', eventId: world.event, name: 'Another', contestType: 'mixed', categories: ['Other'] }, 1201, 30],
       [{ type: 'create_people', eventId: world.event, people: [{ handle: 'fresh-person', name: 'Fresh person' }] }, 1201, 40],
     ];
@@ -458,7 +458,7 @@ describe('rows read by management commands in a session with 1,200 accounts', ()
   });
 
   // Removing an entry deletes its seats (the entry_seats_removed trigger), and the memberships
-  // foreign key finds the seats of the deleted team. Before migration 0020 each read scanned
+  // foreign key finds the seats of the deleted team. Before the index in migration 0019 each read scanned
   // the contest's memberships: 2,443 rows for 1,200 members, measured on 2026-11-04.
   // With memberships_team they read only the entry's seat: 43 rows.
   it('reads only the seats of the entry when an entry is removed', async () => {

@@ -103,10 +103,18 @@ export function useRouteFocus(headingId: string, ready: boolean): void {
       return;
     }
     // Menus restore trigger focus when they close. Focus the new page afterward.
+    let focused = false;
     const frame = window.requestAnimationFrame(() => {
+      focused = true;
       previous.current = pathname;
       document.getElementById(headingId)?.focus();
     });
-    return () => window.cancelAnimationFrame(frame);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      // A quick Back or Forward can return to the earlier address before this
+      // frame runs. Its heading was replaced since the last focus, so the
+      // earlier address needs focus again.
+      if (!focused) previous.current = undefined;
+    };
   }, [hash, headingId, pathname, ready]);
 }

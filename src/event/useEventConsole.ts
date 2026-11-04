@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { backend } from "@/backend";
 import type { EventConsole, ManageCommand, ManageReceipt } from "@/backend/contracts";
-import { errorMessage } from "@/backend/errors";
+import { errorMessage, RequestRefusedError } from "@/backend/errors";
+import { keepFocus, useRefreshOnReturn } from "@/connected/hooks/useRefreshOnReturn";
 import { issueBatches } from "./eventModel";
 
 /** One account on the credential sheet. */
@@ -20,15 +21,23 @@ export interface CredentialSheetState {
   error: string;
 }
 
+/** Why a command did not apply. "unknown" means that no server answer came, so the change may have applied. */
+export type CommandFailure = "refused" | "unknown";
+
+export const STILL_RUNNING = "Another change is still running. Try again.";
+
 export interface EventConsoleState {
-  /** Undefined while loading and after an error. */
+  /** Undefined until the first read succeeds. A later failed read keeps the last overview. */
   console: EventConsole | undefined;
   loaded: boolean;
   readError: string;
   /** Why the last command failed. */
   error: string;
+  clearError: () => void;
   busy: boolean;
   reload: () => Promise<void>;
+  /** Why the last command failed. Read it after `execute` resolves to undefined. */
+  failure: { readonly current: CommandFailure | undefined };
   /** Resolves to the receipt, or to undefined after an error. */
   execute: (command: ManageCommand) => Promise<ManageReceipt | undefined>;
   sheet: CredentialSheetState | undefined;
@@ -51,6 +60,9 @@ export function useEventConsole(eventId: string | undefined): EventConsoleState 
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [sheet, setSheet] = useState<CredentialSheetState>();
+  // Controls stay enabled while a command runs, so the focused one keeps focus. This stops a second send.
+  const running = useRef(false);
+  const failure = useRef<CommandFailure | undefined>(undefined);
   const pending = useRef(new Map<string, string>());
   const sheetRows = useRef<readonly CredentialRow[]>([]);
   // The event that the first read found. Commands and credential requests name it.
@@ -62,7 +74,6 @@ export function useEventConsole(eventId: string | undefined): EventConsoleState 
       setResolvedId(next.event.id);
       setReadError("");
     } catch (cause) {
-      setOverview(undefined);
       setReadError(errorMessage(cause));
     }
     setLoaded(true);
@@ -70,6 +81,7 @@ export function useEventConsole(eventId: string | undefined): EventConsoleState 
   useEffect(() => {
     void reload();
   }, [reload]);
+  useRefreshOnReturn(reload, running);
   const requestId = (key: string) => {
     const id = pending.current.get(key) ?? crypto.randomUUID();
     pending.current.set(key, id);
@@ -77,19 +89,30 @@ export function useEventConsole(eventId: string | undefined): EventConsoleState 
   };
   const execute = useCallback(
     async (command: ManageCommand) => {
+      if (running.current) {
+        failure.current = "refused";
+        setError(STILL_RUNNING);
+        return undefined;
+      }
+      running.current = true;
+      failure.current = undefined;
       const key = JSON.stringify(command);
       setBusy(true);
       setError("");
       try {
         const receipt = await backend.manage.execute(requestId(key), command);
-        pending.current.delete(key);
+        // A later change ended every earlier attempt, so none of their IDs may answer a new try.
+        pending.current.clear();
         return receipt;
       } catch (cause) {
+        failure.current = cause instanceof RequestRefusedError ? "refused" : "unknown";
         setError(errorMessage(cause));
         return undefined;
       } finally {
         await reload();
+        running.current = false;
         setBusy(false);
+        keepFocus();
       }
     },
     [reload],
@@ -97,6 +120,11 @@ export function useEventConsole(eventId: string | undefined): EventConsoleState 
   const issue = useCallback(
     async (accountIds: readonly string[]) => {
       if (!resolvedId || accountIds.length === 0) return;
+      if (running.current) {
+        setError(STILL_RUNNING);
+        return;
+      }
+      running.current = true;
       const fresh = (accountId: string): CredentialRow => ({ accountId, password: null, handle: null, state: "waiting" });
       // Earlier rows stay on the sheet, so an issue again keeps the passwords already shown.
       const known = new Set(sheetRows.current.map((row) => row.accountId));
@@ -139,6 +167,7 @@ export function useEventConsole(eventId: string | undefined): EventConsoleState 
       }
       setSheet((current) => (current ? { ...current, busy: false } : current));
       await reload();
+      running.current = false;
     },
     [reload, resolvedId],
   );
@@ -146,5 +175,6 @@ export function useEventConsole(eventId: string | undefined): EventConsoleState 
     sheetRows.current = [];
     setSheet(undefined);
   }, []);
-  return { console: overview, loaded, readError, error, busy, reload, execute, sheet, issue, dismissSheet };
+  const clearError = useCallback(() => setError(""), []);
+  return { console: overview, loaded, readError, error, clearError, busy, reload, failure, execute, sheet, issue, dismissSheet };
 }

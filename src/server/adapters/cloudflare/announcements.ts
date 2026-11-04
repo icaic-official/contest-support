@@ -7,7 +7,8 @@ import { can } from '../../../connected/capabilities';
 import type { Caller } from '../../authentication';
 import { AuthenticationError } from '../../authentication';
 import { equalWorkflowJson } from '../../workflow';
-import type { D1Connection, D1Statement, D1Value } from '../d1/connection';
+import { assertion, bound, deleteAssertions } from '../d1/assertions';
+import type { D1Connection, D1Statement } from '../d1/connection';
 import { currentReadyLoginBindings, currentReadyLoginSql, notificationStatements } from './application';
 import { type ContestAuthorityRow, contestDataBindings, contestDataSql, seatFromRow } from './authority';
 
@@ -42,11 +43,6 @@ export function announcementManager(row: string): string {
   return `(${row}.staff = 1 AND (${row}.is_admin = 1 OR EXISTS (SELECT 1 FROM json_each(${row}.roles) WHERE value = 'jury')))`;
 }
 
-export function announcementAssertion(db: D1Connection, id: string, sql: string, ...values: D1Value[]): D1Statement {
-  return db.prepare(`INSERT INTO command_assertions (id, valid) VALUES (?, CASE WHEN EXISTS (${sql}) THEN 1 ELSE 0 END)`)
-    .bind(id, ...values);
-}
-
 /**
  * Check first that the caller manages announcements in an active event.
  * Time can pass between batch statements, so recheck the credential after the writes.
@@ -55,17 +51,17 @@ export function announcementAssertion(db: D1Connection, id: string, sql: string,
 export function guardedAnnouncementBatch(db: D1Connection, guard: string, caller: Caller, sessionId: string,
   statements: D1Statement[]): D1Statement[] {
   return [
-    announcementAssertion(db, guard, `SELECT 1 FROM (${contestDataSql('caller')}) c WHERE c.archived = 0 AND ${announcementManager('c')}`,
+    assertion(db, guard, `SELECT 1 FROM (${contestDataSql('caller')}) c WHERE c.archived = 0 AND ${announcementManager('c')}`,
       ...contestDataBindings(caller, sessionId)),
     ...statements,
-    announcementAssertion(db, `${guard}:access`, currentReadyLoginSql, ...currentReadyLoginBindings(caller)),
-    db.prepare('DELETE FROM command_assertions WHERE id IN (?, ?, ?)').bind(guard, `${guard}:state`, `${guard}:access`),
+    assertion(db, `${guard}:access`, currentReadyLoginSql, ...currentReadyLoginBindings(caller)),
+    deleteAssertions(db, guard),
   ];
 }
 
 /** Every member reads announcements, so every live audience of the session changes. */
 export async function sessionAudiences(db: D1Connection, sessionId: string): Promise<string[]> {
-  const teams = await db.prepare('SELECT id FROM teams WHERE session_id = ?').bind(sessionId).all<{ id: string }>();
+  const teams = await bound(db, 'SELECT id FROM teams WHERE session_id = ?', sessionId).all<{ id: string }>();
   return ['staff', ...teams.results.map((team) => `team:${team.id}`)];
 }
 
@@ -103,22 +99,20 @@ FROM access`;
 export class D1AnnouncementService {
   constructor(private readonly db: D1Connection) {}
 
-  private statement(sql: string, ...values: D1Value[]): D1Statement { return this.db.prepare(sql).bind(...values); }
-
   /**
    * Readers see active records. Managers also see expired records. Nobody sees
    * removed records here. Their rows stay for the contest log.
    */
   async snapshot(caller: Caller, sessionId: string): Promise<AnnouncementSnapshot> {
     if (!uuid.safeParse(sessionId).success) throw new AuthenticationError(400, 'Invalid session.');
-    const row = await this.statement(snapshotSql, ...contestDataBindings(caller, sessionId), sessionId)
+    const row = await bound(this.db, snapshotSql, ...contestDataBindings(caller, sessionId), sessionId)
       .first<{ snapshot: string }>();
     if (!row) throw new AuthenticationError(403, 'Sign in again or change your temporary password.');
     return announcementSnapshotSchema.parse(JSON.parse(row.snapshot));
   }
 
   private async receipt(caller: Caller, requestId: string): Promise<ReceiptRow | null> {
-    return this.statement(`SELECT session_id, command, announcement_id FROM announcement_receipts
+    return bound(this.db, `SELECT session_id, command, announcement_id FROM announcement_receipts
       WHERE actor = ? AND request_id = ?`, caller.accountId, requestId).first<ReceiptRow>();
   }
 
@@ -137,7 +131,7 @@ export class D1AnnouncementService {
     }
     const command = parsed.data.type === 'remove' ? parsed.data
       : { ...parsed.data, expires_at: parsed.data.expires_at === null ? null : new Date(parsed.data.expires_at).toISOString() };
-    const current = await this.statement(contestDataSql('caller'), ...contestDataBindings(caller, sessionId)).first<ContestAuthorityRow>();
+    const current = await bound(this.db, contestDataSql('caller'), ...contestDataBindings(caller, sessionId)).first<ContestAuthorityRow>();
     if (!current || !can(seatFromRow(current), 'announce')) {
       throw new AnnouncementCommandError('access', 'Only session admins and jury can manage announcements.');
     }
@@ -153,24 +147,24 @@ export class D1AnnouncementService {
     const guardId = crypto.randomUUID();
     const statements: D1Statement[] = [];
     if (command.type === 'publish') {
-      statements.push(this.statement(`INSERT INTO announcements (id, session_id, title, details, author, author_name, expires_at)
+      statements.push(bound(this.db, `INSERT INTO announcements (id, session_id, title, details, author, author_name, expires_at)
         SELECT ?, ?, ?, ?, id, name, ? FROM accounts WHERE id = ?`,
       id, sessionId, command.title, command.details, command.expires_at, caller.accountId));
     } else {
-      statements.push(announcementAssertion(this.db, `${guardId}:state`, `SELECT 1 FROM announcements WHERE id = ? AND session_id = ?
+      statements.push(assertion(this.db, `${guardId}:state`, `SELECT 1 FROM announcements WHERE id = ? AND session_id = ?
         AND removed_at IS NULL AND revision = ?`, id, sessionId, command.revision));
       statements.push(command.type === 'edit'
-        ? this.statement(`UPDATE announcements SET title = ?, details = ?, expires_at = ?, edited_at = ${announcementNow},
+        ? bound(this.db, `UPDATE announcements SET title = ?, details = ?, expires_at = ?, edited_at = ${announcementNow},
             edited_by = ?, edited_name = (SELECT name FROM accounts WHERE id = ?), revision = revision + 1
             WHERE id = ? AND session_id = ? AND revision = ? AND removed_at IS NULL`,
         command.title, command.details, command.expires_at, caller.accountId, caller.accountId, id, sessionId, command.revision)
-        : this.statement(`UPDATE announcements SET removed_at = ${announcementNow}, removed_by = ?,
+        : bound(this.db, `UPDATE announcements SET removed_at = ${announcementNow}, removed_by = ?,
             removed_name = (SELECT name FROM accounts WHERE id = ?), revision = revision + 1
             WHERE id = ? AND session_id = ? AND revision = ? AND removed_at IS NULL`,
         caller.accountId, caller.accountId, id, sessionId, command.revision));
     }
     statements.push(
-      this.statement(`INSERT INTO announcement_receipts (actor, request_id, session_id, command, announcement_id)
+      bound(this.db, `INSERT INTO announcement_receipts (actor, request_id, session_id, command, announcement_id)
         VALUES (?, ?, ?, ?, ?)`, caller.accountId, requestId, sessionId, JSON.stringify(command), id),
       ...notificationStatements(this.db, sessionId, await sessionAudiences(this.db, sessionId)),
     );
@@ -182,7 +176,7 @@ export class D1AnnouncementService {
       if (committed) return this.replay(committed, sessionId, command);
       if (!isGuardFailure(error)) throw error;
       if (command.type !== 'publish') {
-        const latest = await this.statement('SELECT revision, removed_at FROM announcements WHERE id = ? AND session_id = ?',
+        const latest = await bound(this.db, 'SELECT revision, removed_at FROM announcements WHERE id = ? AND session_id = ?',
           id, sessionId).first<AnnouncementRow>();
         if (!latest || latest.removed_at !== null) throw new AnnouncementCommandError('state', 'Announcement unavailable.');
         if (latest.revision !== command.revision) {

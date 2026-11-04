@@ -4,7 +4,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
-  DialogContent,
+  ReturningDialogContent as DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
@@ -116,7 +116,7 @@ export function CredentialSheet({
         {sheet.error && (
           <Alert variant="destructive">
             <AlertDescription>
-              <p role="alert">{sheet.error}</p>
+              <p>{sheet.error}</p>
             </AlertDescription>
           </Alert>
         )}

@@ -6,7 +6,8 @@ import { AuthenticationError } from '../../authentication';
 import type { D1Connection, D1Statement, D1Value } from '../d1/connection';
 import { currentReadyLoginBindings, currentReadyLoginSql, notificationStatements } from './application';
 import { type ContestAuthorityRow, contestDataBindings, contestDataSql, seatFromRow } from './authority';
-import { announcementAssertion, sessionAudiences } from './announcements';
+import { assertion, deleteAssertions } from '../d1/assertions';
+import { sessionAudiences } from './announcements';
 
 const uuid = z.uuid();
 // SQLite length() stops at U+0000, so the length CHECK on stored text would fail with the wrong error.
@@ -73,12 +74,12 @@ export class D1ContestAwardService {
     const audit = (action: string, detail: object) => this.statement(
       'INSERT INTO admin_audit (id, session_id, actor, action, target, detail) VALUES (?, ?, ?, ?, NULL, ?)',
       crypto.randomUUID(), sessionId, caller.accountId, action, JSON.stringify(detail));
-    const guard = announcementAssertion(this.db, guardId,
+    const guard = assertion(this.db, guardId,
       `SELECT 1 FROM (${contestDataSql('caller')}) c WHERE c.archived = 0 AND ${guardSql[command.type]}`,
       ...contestDataBindings(caller, sessionId));
     const finish = [
-      announcementAssertion(this.db, `${guardId}:access`, currentReadyLoginSql, ...currentReadyLoginBindings(caller)),
-      this.statement('DELETE FROM command_assertions WHERE id IN (?, ?, ?)', guardId, `${guardId}:state`, `${guardId}:access`),
+      assertion(this.db, `${guardId}:access`, currentReadyLoginSql, ...currentReadyLoginBindings(caller)),
+      deleteAssertions(this.db, guardId),
     ];
 
     if (command.type === 'grant') {
@@ -128,7 +129,7 @@ export class D1ContestAwardService {
           applied_name = (SELECT name FROM accounts WHERE id = ?), applied_request = ?
           WHERE id = ? AND session_id = ? AND applied_at IS NULL`,
         caller.accountId, caller.accountId, requestId, award.id, sessionId),
-        announcementAssertion(this.db, `${guardId}:state`, 'SELECT 1 WHERE changes() = 1'),
+        assertion(this.db, `${guardId}:state`, 'SELECT 1 WHERE changes() = 1'),
         audit('contest_award_applied', { award: award.id, minutes: award.minutes }),
         ...notificationStatements(this.db, sessionId, audiences),
         ...finish,

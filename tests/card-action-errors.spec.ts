@@ -44,6 +44,16 @@ for (const viewport of viewports) {
       await expect(claim).toBeVisible();
       const number = (await claim.getAttribute("aria-label"))!.match(/\d+/)![0];
       // A direct write reaches no live client, so the page keeps the old revision.
+      // A window focus or a visible tab also refreshes the page, and under load
+      // that can land between the write and the click. Serve the snapshot that
+      // the page shows now, so that no refresh can see the write.
+      const stale = await page.evaluate(
+        (id) => fetch(`/api/snapshot?sessionId=${id}`).then((r) => r.text()),
+        local.sessions[0],
+      );
+      await page.route("**/api/snapshot*", (route) =>
+        route.fulfill({ contentType: "application/json", body: stale }),
+      );
       await local.run(
         `UPDATE issues SET write_version = write_version + 1, public_revision = public_revision + 1
          WHERE session_id = ? AND number = ?`,

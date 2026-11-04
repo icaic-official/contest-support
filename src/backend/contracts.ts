@@ -222,6 +222,7 @@ export type ManageCommand =
   | { readonly type: 'create_people'; readonly eventId: string; readonly people: readonly PersonInput[] }
   | { readonly type: 'create_entrants'; readonly eventId: string; readonly entrants: readonly EntrantInput[] }
   | { readonly type: 'rename_entrant'; readonly eventId: string; readonly entrantId: string; readonly name: string }
+  | { readonly type: 'add_entrant_sign_in'; readonly eventId: string; readonly entrantId: string; readonly handle: string }
   | { readonly type: 'create_contest'; readonly eventId: string; readonly name: string; readonly contestType: ContestType; readonly schedule: Schedule; readonly categories: readonly string[] }
   | { readonly type: 'update_contest'; readonly contestId: string; readonly name: string; readonly contestType: ContestType; readonly schedule?: Schedule | undefined }
   | { readonly type: 'assign_entrants'; readonly contestId: string; readonly entries: ReadonlyArray<{ readonly entrantId: string; readonly location: string }> }

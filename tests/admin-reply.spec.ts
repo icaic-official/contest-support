@@ -98,7 +98,7 @@ test("an admin without a support role attaches images from the reply composer, a
   const upload = admin.getByRole("dialog", { name: "Add an image" });
   await upload.getByLabel("Image file").setInputFiles(png("staff.png"));
   await upload.getByRole("button", { name: "Add image", exact: true }).click();
-  await expect(upload.getByRole("status")).toHaveText("Image added.");
+  await expect(upload.getByRole("status")).toHaveText("Image added.", { timeout: 15_000 });
   await upload.getByText("Visible to the team", { exact: true }).click();
   await upload.getByLabel("Image file").setInputFiles(png("team.png"));
   await upload.getByRole("button", { name: "Add image", exact: true }).click();

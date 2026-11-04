@@ -131,13 +131,13 @@ export function auditEntryText(
 
 /**
  * The name of an audit actor. A webmaster who joined is not a member of the
- * session, so the entry says "A webmaster". Another actor who left the
- * session shows as the account ID.
+ * session, so the entry says "A webmaster". An event admin, another webmaster,
+ * or a person who left the session shows as "An organizer". The ID never shows.
  */
 export function actorName(
   members: readonly SessionMember[],
   entry: Pick<Snapshot["audit"][number], "action" | "actor">,
 ): string {
   const name = members.find((item) => item.person.id === entry.actor)?.person.name;
-  return name ?? (entry.action === "webmaster_join" ? "A webmaster" : entry.actor);
+  return name ?? (entry.action === "webmaster_join" ? "A webmaster" : "An organizer");
 }

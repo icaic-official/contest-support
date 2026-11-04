@@ -19,6 +19,12 @@ interface PickerProps {
   disabled?: boolean | undefined;
 }
 
+/** A contest's name, with its event when another listed contest has the same name. */
+export function contestLabel(contests: readonly ContestSummary[], contest: ContestSummary): string {
+  const shared = contests.some((other) => other.id !== contest.id && other.name === contest.name);
+  return shared ? `${contest.name} · ${contest.eventName}` : contest.name;
+}
+
 /**
  * The one picker for the contests that a person may open, in three shapes:
  * a menu behind a trigger button, radio rows for a phone, and a select for the
@@ -58,7 +64,7 @@ export function ContestPicker(
           >
             {contests.map((item) => (
               <DropdownMenuRadioItem key={item.id} value={item.id}>
-                {item.name}
+                {contestLabel(contests, item)}
               </DropdownMenuRadioItem>
             ))}
           </DropdownMenuRadioGroup>
@@ -85,7 +91,7 @@ export function ContestPicker(
               onChange={() => onSelect(item.id)}
               className="size-4 accent-current"
             />
-            <span className="flex-1">{item.name}</span>
+            <span className="flex-1">{contestLabel(contests, item)}</span>
           </label>
         ))}
       </fieldset>
@@ -103,7 +109,7 @@ export function ContestPicker(
       >
         {contests.map((item) => (
           <option key={item.id} value={item.id}>
-            {item.name}
+            {contestLabel(contests, item)}
           </option>
         ))}
       </select>

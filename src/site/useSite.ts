@@ -7,17 +7,19 @@ import type {
   SiteOverview,
 } from "@/backend/contracts";
 import { errorMessage } from "@/backend/errors";
+import { keepFocus, useRefreshOnReturn } from "@/connected/hooks/useRefreshOnReturn";
 import type { SessionData } from "@/connected/hooks/useSessionSnapshot";
 
 /** The site read and its commands, for webmasters. */
 export interface SiteState {
-  /** Undefined while loading, after an error, and for a person who is not a webmaster. */
+  /** Undefined while loading and for a person who is not a webmaster. A later failed read keeps the last overview. */
   site: SiteOverview | undefined;
   loaded: boolean;
   /** Why the last read failed. */
   readError: string;
   /** Why the last command failed. */
   error: string;
+  clearError: () => void;
   /** True while a command runs. */
   busy: boolean;
   reload: () => Promise<void>;
@@ -42,13 +44,14 @@ export function useSite(): SiteState {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const pending = useRef(new Map<string, string>());
+  // Controls stay enabled while a command runs, so the focused one keeps focus. This stops a second send.
+  const running = useRef(false);
   const reload = useCallback(async () => {
     try {
       const next = await backend.manage.site();
       setSite(next ?? undefined);
       setReadError(next ? "" : "Only a webmaster can open the site page.");
     } catch (cause) {
-      setSite(undefined);
       setReadError(errorMessage(cause));
     }
     setLoaded(true);
@@ -56,25 +59,34 @@ export function useSite(): SiteState {
   useEffect(() => {
     void reload();
   }, [reload]);
+  useRefreshOnReturn(reload, running);
   const run = useCallback(
     async <T>(
       key: string,
       send: (requestId: string) => Promise<T>,
     ): Promise<T | undefined> => {
+      if (running.current) {
+        setError("Another change is still running. Try again.");
+        return undefined;
+      }
+      running.current = true;
       const requestId = pending.current.get(key) ?? crypto.randomUUID();
       pending.current.set(key, requestId);
       setBusy(true);
       setError("");
       try {
         const result = await send(requestId);
-        pending.current.delete(key);
+        // A later change ended every earlier attempt, so none of their IDs may answer a new try.
+        pending.current.clear();
         return result;
       } catch (cause) {
         setError(errorMessage(cause));
         return undefined;
       } finally {
         await reload();
+        running.current = false;
         setBusy(false);
+        keepFocus();
       }
     },
     [reload],
@@ -95,7 +107,8 @@ export function useSite(): SiteState {
       )?.[0],
     [run],
   );
-  return { site, loaded, readError, error, busy, reload, execute, issue };
+  const clearError = useCallback(() => setError(""), []);
+  return { site, loaded, readError, error, clearError, busy, reload, execute, issue };
 }
 
 /**

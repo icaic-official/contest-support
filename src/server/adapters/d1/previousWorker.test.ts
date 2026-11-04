@@ -444,6 +444,9 @@ describe('the previous Worker on the scoped authority schema', () => {
         .rejects.toThrow(/An entrant sign-in holds only its own entries/);
       await expect(db.batch([db.prepare(`INSERT INTO membership_roles (session_id, account_id, role) VALUES (?, ?, 'jury')`).bind(ids.first, ids.member)]))
         .rejects.toThrow(/A contestant holds no staff role/);
+      // The previous Worker never flags a contestant seat as admin, so the flag is refused.
+      await expect(db.prepare('UPDATE memberships SET is_admin = 1 WHERE account_id = ? AND team_id IS NOT NULL').bind(ids.member).run())
+        .rejects.toThrow(/A contestant holds no admin seat/);
       await db.batch([previousWorker.saveMember(db, ids.second, ids.staff)]);
       expect(await writer(db).all('SELECT team_id FROM memberships WHERE session_id = ? AND account_id = ?', ids.second, ids.staff)).toEqual([{ team_id: null }]);
     });

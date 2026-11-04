@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
-  DialogContent,
+  ReturningDialogContent as DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
@@ -16,6 +16,7 @@ import { Switch } from "@/components/ui/switch";
 import { rosterTextMax } from "@/connected/roster";
 import { UsernameForm } from "@/organiser/admin/AccountForms";
 import { PersonAvatar } from "@/organiser/components/issueDisplay";
+import { ConfirmDialog } from "@/organiser/admin/AccountAccess";
 import { entrantInputs, personInputs } from "./eventModel";
 import { CommandError, LinesForm, Panel, fieldClass } from "./forms";
 import type { EventConsoleState } from "./useEventConsole";
@@ -31,12 +32,13 @@ interface TabProps {
  * A new account has no password until the credential sheet issues one.
  */
 export function PeopleTab({ data, state }: TabProps) {
-  const locked = state.busy || data.event.archived;
+  const locked = data.event.archived;
   const [renaming, setRenaming] = useState<EventConsole["people"][number]>();
+  const [resetting, setResetting] = useState<EventConsole["people"][number]>();
   const admins = new Set(data.admins);
   return (
     <div className="space-y-5">
-      <CommandError message={state.error} />
+      {!renaming && <CommandError message={state.error} />}
       <Panel
         title="Add people"
         description="Staff and volunteers sign in with a username. Minsky shows each first password once."
@@ -60,9 +62,9 @@ export function PeopleTab({ data, state }: TabProps) {
               eventId: data.event.id,
               people: personInputs(lines),
             });
-            if (!receipt) return false;
+            if (!receipt) return state.failure.current === "unknown" ? "unknown" : "refused";
             void state.issue(receipt.accountIds ?? []);
-            return true;
+            return "done";
           }}
         />
       </Panel>
@@ -100,7 +102,10 @@ export function PeopleTab({ data, state }: TabProps) {
                     className="size-11"
                     disabled={locked}
                     aria-label={`Change username of ${person.name}`}
-                    onClick={() => setRenaming(person)}
+                    onClick={() => {
+                      state.clearError();
+                      setRenaming(person);
+                    }}
                   >
                     <Pencil aria-hidden="true" />
                   </Button>
@@ -109,7 +114,7 @@ export function PeopleTab({ data, state }: TabProps) {
                     variant="outline"
                     className="h-11"
                     disabled={locked}
-                    onClick={() => void state.issue([person.id])}
+                    onClick={() => (person.ready ? setResetting(person) : void state.issue([person.id]))}
                   >
                     <KeyRound aria-hidden="true" />
                     {person.ready ? "Reset password" : "Issue password"}
@@ -141,6 +146,17 @@ export function PeopleTab({ data, state }: TabProps) {
           <CommandError message={state.error} />
         </DialogContent>
       </Dialog>
+      <ConfirmDialog
+        returnFocus
+        open={!!resetting}
+        onOpenChange={(open) => !open && setResetting(undefined)}
+        title={`Reset the password of ${resetting?.name ?? "this person"}?`}
+        description="The current password stops working, and every open session ends. The new password is shown once."
+        confirmLabel="Reset password"
+        onConfirm={() => {
+          if (resetting) void state.issue([resetting.id]);
+        }}
+      />
     </div>
   );
 }
@@ -172,13 +188,15 @@ function AdminSwitch({
  * lines import many at once, and a rename changes the name in every contest.
  */
 export function EntrantsTab({ data, state }: TabProps) {
-  const locked = state.busy || data.event.archived;
+  const locked = data.event.archived;
   const [kind, setKind] = useState<EntrantKind>("team");
   const [renaming, setRenaming] = useState<EventConsole["entrants"][number]>();
+  const [resetting, setResetting] = useState<EventConsole["entrants"][number]>();
+  const [adding, setAdding] = useState<EventConsole["entrants"][number]>();
   const id = useId();
   return (
     <div className="space-y-5">
-      <CommandError message={state.error} />
+      {!renaming && !adding && <CommandError message={state.error} />}
       <Panel
         title="Import entrants"
         description="A team shares one sign-in. A single contestant has their own."
@@ -202,9 +220,9 @@ export function EntrantsTab({ data, state }: TabProps) {
               eventId: data.event.id,
               entrants: entrantInputs(lines, kind),
             });
-            if (!receipt) return false;
+            if (!receipt) return state.failure.current === "unknown" ? "unknown" : "refused";
             void state.issue(receipt.accountIds ?? []);
-            return true;
+            return "done";
           }}
         >
           <fieldset className="space-y-1.5">
@@ -257,21 +275,39 @@ export function EntrantsTab({ data, state }: TabProps) {
                     className="size-11"
                     disabled={locked}
                     aria-label={`Rename ${entrant.name}`}
-                    onClick={() => setRenaming(entrant)}
+                    onClick={() => {
+                      state.clearError();
+                      setRenaming(entrant);
+                    }}
                   >
                     <Pencil aria-hidden="true" />
                   </Button>
-                  {entrant.accountId && (
+                  {entrant.accountId ? (
                     <Button
                       type="button"
                       variant="outline"
                       className="h-11"
                       disabled={locked}
                       aria-label={`Reset password for ${entrant.name}`}
-                      onClick={() => void state.issue([entrant.accountId ?? ""])}
+                      onClick={() => setResetting(entrant)}
                     >
                       <KeyRound aria-hidden="true" />
                       Password
+                    </Button>
+                  ) : (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="h-11"
+                      disabled={locked}
+                      aria-label={`Add a sign-in for ${entrant.name}`}
+                      onClick={() => {
+                        state.clearError();
+                        setAdding(entrant);
+                      }}
+                    >
+                      <KeyRound aria-hidden="true" />
+                      Add sign-in
                     </Button>
                   )}
                 </div>
@@ -302,6 +338,42 @@ export function EntrantsTab({ data, state }: TabProps) {
           <CommandError message={state.error} />
         </DialogContent>
       </Dialog>
+      <Dialog open={!!adding} onOpenChange={(open) => !open && setAdding(undefined)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader className="text-left">
+            <DialogTitle>Add a sign-in for {adding?.name}</DialogTitle>
+            <DialogDescription>This entrant has no sign-in. Minsky shows the first password once.</DialogDescription>
+          </DialogHeader>
+          {adding && (
+            <UsernameForm
+              key={adding.id}
+              current={null}
+              disabled={locked}
+              onSubmit={(handle) => {
+                void state
+                  .execute({ type: "add_entrant_sign_in", eventId: data.event.id, entrantId: adding.id, handle })
+                  .then((receipt) => {
+                    if (!receipt) return;
+                    setAdding(undefined);
+                    void state.issue(receipt.accountIds ?? []);
+                  });
+              }}
+            />
+          )}
+          <CommandError message={state.error} />
+        </DialogContent>
+      </Dialog>
+      <ConfirmDialog
+        returnFocus
+        open={!!resetting}
+        onOpenChange={(open) => !open && setResetting(undefined)}
+        title={`Reset the password of ${resetting?.name ?? "this entrant"}?`}
+        description="The current password stops working for everyone who shares it, and every open session ends. The new password is shown once."
+        confirmLabel="Reset password"
+        onConfirm={() => {
+          if (resetting?.accountId) void state.issue([resetting.accountId]);
+        }}
+      />
     </div>
   );
 }

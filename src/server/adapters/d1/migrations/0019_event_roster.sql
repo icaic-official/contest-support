@@ -18,8 +18,9 @@ CREATE TABLE entrants (
 CREATE INDEX entrants_event ON entrants(event_id, name);
 
 -- The entry's entrant. Always set after this file (backfill plus entry_default_entrant).
--- Both entrant keys are deferred, like accounts.event_id in 0017. Test cleanups
--- delete an event, then its teams and accounts, in one batch.
+-- Both entrant keys are deferred, like accounts.event_id in 0017, because test
+-- cleanups delete an event, then its teams and accounts, in one batch. The
+-- backfill below does not rely on the deferral.
 ALTER TABLE teams ADD COLUMN entrant_id TEXT REFERENCES entrants(id) DEFERRABLE INITIALLY DEFERRED;
 CREATE INDEX teams_by_entrant ON teams(entrant_id);
 -- The entrant whose sign-in this account is. NULL for staff and webmasters.
@@ -31,37 +32,64 @@ CREATE INDEX accounts_entrant ON accounts(entrant_id) WHERE entrant_id IS NOT NU
 ALTER TABLE sessions ADD COLUMN contest_type TEXT NOT NULL DEFAULT 'teams'
   CHECK (contest_type IN ('singles', 'mixed', 'teams'));
 
--- Backfill. Every team becomes an entrant, except that a team joins the
--- oldest team of its event with the same name when the two share a contestant
--- account. Same-named teams that share no account are different groups, so
--- they keep their own entrants. A team also keeps its own entrant when its name
--- is empty, or when an older team of its contest has the same name, so that one
--- contest never holds an entrant twice. The oldest team lends its ID to the entrant.
-UPDATE teams SET entrant_id = (
-  SELECT o.id FROM teams o JOIN sessions so ON so.id = o.session_id
-  WHERE so.event_id = (SELECT event_id FROM sessions WHERE id = teams.session_id)
-    AND lower(trim(o.name)) = lower(trim(teams.name))
-  ORDER BY o.rowid LIMIT 1)
-WHERE trim(name) <> '';
-UPDATE teams SET entrant_id = NULL
-WHERE entrant_id IS NOT NULL AND (
-  entrant_id = id
-  OR EXISTS (SELECT 1 FROM teams p WHERE p.session_id = teams.session_id
-    AND lower(trim(p.name)) = lower(trim(teams.name)) AND p.rowid < teams.rowid)
-  OR NOT EXISTS (SELECT 1 FROM teams o WHERE o.id = teams.entrant_id AND o.session_id <> teams.session_id
-    AND EXISTS (SELECT 1 FROM memberships a JOIN memberships b ON b.account_id = a.account_id
-      WHERE a.team_id = teams.id AND b.team_id = o.id)));
+-- Backfill. Every team becomes an entrant, except that same-named teams of an
+-- event form one entrant when a chain of shared contestant accounts connects
+-- them. Same-named teams with no such chain are different groups, so they keep
+-- their own entrants. A team also keeps its own entrant when its name is empty,
+-- or when an older team of its contest has the same name, so that one contest
+-- never holds an entrant twice. The oldest team of a chain lends its ID and its
+-- spelling to the entrant.
+--
+-- Each statement stands alone: entrants exist before any key names them, so no
+-- step needs a deferred key at commit. The two statements repeat one query,
+-- because a staging table could not be dropped under assertAdditiveMigrations.
 INSERT INTO entrants (id, event_id, kind, name)
-SELECT t.id, s.event_id, 'team', t.name FROM teams t JOIN sessions s ON s.id = t.session_id WHERE t.entrant_id IS NULL;
-UPDATE teams SET entrant_id = id WHERE entrant_id IS NULL;
+WITH RECURSIVE mergeable AS (
+  SELECT t.id, s.event_id, lower(trim(t.name)) AS key FROM teams t JOIN sessions s ON s.id = t.session_id
+  WHERE trim(t.name) <> '' AND NOT EXISTS (SELECT 1 FROM teams p WHERE p.session_id = t.session_id
+    AND lower(trim(p.name)) = lower(trim(t.name)) AND p.rowid < t.rowid)
+), link AS (
+  SELECT DISTINCT x.id AS a, y.id AS b FROM mergeable x
+  JOIN mergeable y ON y.event_id = x.event_id AND y.key = x.key AND y.id <> x.id
+  JOIN memberships mx ON mx.team_id = x.id
+  JOIN memberships my ON my.team_id = y.id AND my.account_id = mx.account_id
+), reach (start, node) AS (
+  SELECT id, id FROM teams UNION SELECT r.start, l.b FROM reach r JOIN link l ON l.a = r.node
+), root AS (
+  SELECT r.start AS team_id, t.id AS root_id, min(t.rowid) FROM reach r JOIN teams t ON t.id = r.node GROUP BY r.start
+)
+SELECT t.id, s.event_id, 'team', t.name FROM root
+JOIN teams t ON t.id = root.team_id JOIN sessions s ON s.id = t.session_id
+WHERE root.root_id = root.team_id;
+WITH RECURSIVE mergeable AS (
+  SELECT t.id, s.event_id, lower(trim(t.name)) AS key FROM teams t JOIN sessions s ON s.id = t.session_id
+  WHERE trim(t.name) <> '' AND NOT EXISTS (SELECT 1 FROM teams p WHERE p.session_id = t.session_id
+    AND lower(trim(p.name)) = lower(trim(t.name)) AND p.rowid < t.rowid)
+), link AS (
+  SELECT DISTINCT x.id AS a, y.id AS b FROM mergeable x
+  JOIN mergeable y ON y.event_id = x.event_id AND y.key = x.key AND y.id <> x.id
+  JOIN memberships mx ON mx.team_id = x.id
+  JOIN memberships my ON my.team_id = y.id AND my.account_id = mx.account_id
+), reach (start, node) AS (
+  SELECT id, id FROM teams UNION SELECT r.start, l.b FROM reach r JOIN link l ON l.a = r.node
+), root AS (
+  SELECT r.start AS team_id, t.id AS root_id, min(t.rowid) FROM reach r JOIN teams t ON t.id = r.node GROUP BY r.start
+)
+UPDATE teams SET entrant_id = root.root_id FROM root WHERE root.team_id = teams.id;
 UPDATE teams SET name = (SELECT name FROM entrants WHERE id = teams.entrant_id)
 WHERE name IS NOT (SELECT name FROM entrants WHERE id = teams.entrant_id);
--- Each contestant account links to the entrant of its oldest team in its own event.
+-- Each contestant account links to the entrant of its oldest team in its own
+-- event. An account with any staff authority stays staff and is not linked,
+-- because an entrant's password button must never issue a login that holds staff
+-- authority. Its team seats stay. Its entrant has no sign-in until the console adds one.
 UPDATE accounts SET entrant_id = (
   SELECT t.entrant_id FROM memberships m JOIN teams t ON t.id = m.team_id
   JOIN sessions s ON s.id = m.session_id
   WHERE m.account_id = accounts.id AND s.event_id = accounts.event_id ORDER BY t.rowid LIMIT 1)
-WHERE EXISTS (SELECT 1 FROM memberships WHERE account_id = accounts.id AND team_id IS NOT NULL);
+WHERE EXISTS (SELECT 1 FROM memberships WHERE account_id = accounts.id AND team_id IS NOT NULL)
+  AND NOT EXISTS (SELECT 1 FROM memberships WHERE account_id = accounts.id AND (team_id IS NULL OR is_admin = 1))
+  AND NOT EXISTS (SELECT 1 FROM membership_roles WHERE account_id = accounts.id)
+  AND NOT EXISTS (SELECT 1 FROM grants WHERE account_id = accounts.id);
 CREATE UNIQUE INDEX teams_entrant ON teams(session_id, entrant_id);
 
 -- Removing an entry deletes the seats of its entrant (0019 entry_seats_removed),
@@ -81,6 +109,12 @@ WHEN NEW.entrant_id IS NOT NULL AND NOT EXISTS (
   SELECT 1 FROM entrants e JOIN sessions s ON s.id = NEW.session_id
   WHERE e.id = NEW.entrant_id AND e.event_id = s.event_id
     AND (s.contest_type = 'mixed' OR (s.contest_type = 'teams') = (e.kind = 'team')))
+BEGIN
+  SELECT RAISE(ABORT, 'This entrant cannot enter this contest');
+END;
+-- The previous Worker's add_teams sets no entrant, and entry_default_entrant makes a team.
+CREATE TRIGGER entry_default_fits BEFORE INSERT ON teams
+WHEN NEW.entrant_id IS NULL AND (SELECT contest_type FROM sessions WHERE id = NEW.session_id) = 'singles'
 BEGIN
   SELECT RAISE(ABORT, 'This entrant cannot enter this contest');
 END;
@@ -126,6 +160,10 @@ BEGIN
 END;
 CREATE TRIGGER account_entrant_fixed BEFORE UPDATE OF entrant_id ON accounts
 WHEN (OLD.entrant_id IS NOT NULL AND NEW.entrant_id IS NOT OLD.entrant_id)
+  OR (OLD.entrant_id IS NULL AND NEW.entrant_id IS NOT NULL AND (
+    EXISTS (SELECT 1 FROM memberships WHERE account_id = NEW.id AND (team_id IS NULL OR is_admin = 1))
+    OR EXISTS (SELECT 1 FROM membership_roles WHERE account_id = NEW.id)
+    OR EXISTS (SELECT 1 FROM grants WHERE account_id = NEW.id)))
   OR (NEW.entrant_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM entrants e
     WHERE e.id = NEW.entrant_id AND e.event_id IS NEW.event_id))
 BEGIN
@@ -145,7 +183,8 @@ BEGIN
 END;
 
 -- (4) Repair for the previous Worker's contestant membership. It links the
--- account to the entry's entrant. Then account_entrant_seats seats it in the
+-- account to the entry's entrant, unless the account holds staff authority: that
+-- account stays staff, and a webmaster stays outside every event. Then account_entrant_seats seats it in the
 -- entrant's other entries too. It also places the account, because SQLite
 -- does not promise the order in which this trigger and membership_adopts_event
 -- run, and account_entrant_fixed compares the two events.
@@ -154,7 +193,10 @@ BEGIN
   UPDATE accounts SET
     event_id = COALESCE(event_id, (SELECT event_id FROM sessions WHERE id = NEW.session_id)),
     entrant_id = (SELECT entrant_id FROM teams WHERE id = NEW.team_id)
-  WHERE id = NEW.account_id AND entrant_id IS NULL;
+  WHERE id = NEW.account_id AND entrant_id IS NULL
+    AND NOT EXISTS (SELECT 1 FROM memberships WHERE account_id = NEW.account_id AND (team_id IS NULL OR is_admin = 1))
+    AND NOT EXISTS (SELECT 1 FROM membership_roles WHERE account_id = NEW.account_id)
+    AND NOT EXISTS (SELECT 1 FROM grants WHERE account_id = NEW.account_id);
 END;
 
 -- (5) A seat matches its account's entrant, and an entrant's sign-in never holds staff authority.
@@ -176,6 +218,11 @@ WHEN EXISTS (SELECT 1 FROM memberships WHERE session_id = NEW.session_id
 BEGIN
   SELECT RAISE(ABORT, 'A contestant holds no staff role');
 END;
+CREATE TRIGGER contestant_is_not_admin BEFORE UPDATE OF is_admin ON memberships
+WHEN NEW.is_admin = 1 AND NEW.team_id IS NOT NULL
+BEGIN
+  SELECT RAISE(ABORT, 'A contestant holds no admin seat');
+END;
 
 -- (6) An entrant's sign-in never holds an event grant. A site grant already
 -- needs an account without an event, and an entrant's sign-in always has one.
@@ -191,6 +238,8 @@ END;
 CREATE TRIGGER entrant_renamed AFTER UPDATE OF name ON entrants WHEN NEW.name IS NOT OLD.name
 BEGIN
   UPDATE teams SET name = NEW.name WHERE entrant_id = NEW.id AND name IS NOT NEW.name;
+  -- A shared sign-in carries the entrant's name. A person's own name stays.
+  UPDATE accounts SET name = NEW.name WHERE entrant_id = NEW.id AND name IS OLD.name;
 END;
 CREATE TRIGGER entry_renamed AFTER UPDATE OF name ON teams
 WHEN NEW.name IS NOT OLD.name AND NEW.entrant_id IS NOT NULL

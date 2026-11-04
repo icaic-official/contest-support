@@ -379,6 +379,8 @@ describe('handle changes', () => {
   it('refuses an entrant sign-in its own handle while no contest seats it', async () => {
     const entrant = randomUUID();
     await run(`INSERT INTO entrants (id, event_id, kind, name) VALUES (?, ?, 'team', 'Unseated team')`, entrant, ids.event);
+    await run('DELETE FROM membership_roles WHERE account_id = ?', caller('volunteer').accountId);
+    await run('DELETE FROM memberships WHERE account_id = ?', caller('volunteer').accountId);
     await run('UPDATE accounts SET entrant_id = ? WHERE id = ?', entrant, caller('volunteer').accountId);
     expect(await rows('SELECT team_id FROM memberships WHERE account_id = ? AND team_id IS NOT NULL', caller('volunteer').accountId)).toEqual([]);
     await expect(renameAccount('volunteer', 'volunteer', 'unseated-team'))
@@ -873,6 +875,53 @@ describe('event, roster, and contest commands', () => {
     } }, fastPasswords);
   };
 
+  it('stores the current entrant name when a rename lands between the reads and the batch of an assignment', async () => {
+    const created = await execute('eventAdmin', { type: 'create_entrants', eventId: ids.event, entrants: [{ kind: 'team', name: 'Old name', handle: 'old-name' }] });
+    const entrantId = created.entrantIds![0]!;
+    const racing = racingService(() => execute('eventAdmin', { type: 'rename_entrant', eventId: ids.event, entrantId, name: 'New name' }));
+    await racing.execute(caller('eventAdmin'), randomUUID(), { type: 'assign_entrants', contestId: ids.contest, entries: [{ entrantId, location: '' }] });
+    expect(await rows('SELECT name FROM teams WHERE entrant_id = ?', entrantId)).toEqual([{ name: 'New name' }]);
+  });
+
+  it('renames a shared sign-in, refreshes each contest of the entrant, and keeps a personal name', async () => {
+    const created = await execute('eventAdmin', { type: 'create_entrants', eventId: ids.event, entrants: [{ kind: 'team', name: 'Old name', handle: 'old-name' }] });
+    const entrantId = created.entrantIds![0]!;
+    await execute('eventAdmin', { type: 'assign_entrants', contestId: ids.contest, entries: [{ entrantId, location: '' }] });
+    const [entry] = await rows<{ id: string }>('SELECT id FROM teams WHERE entrant_id = ?', entrantId);
+    const before = await rows('SELECT id FROM notifications WHERE session_id = ?', ids.contest);
+    await execute('eventAdmin', { type: 'rename_entrant', eventId: ids.event, entrantId, name: 'New name' });
+    expect(await rows('SELECT name FROM accounts WHERE entrant_id = ?', entrantId)).toEqual([{ name: 'New name' }]);
+    const added = await rows<{ audience: string }>('SELECT audience FROM notifications WHERE session_id = ?', ids.contest);
+    expect(added.length).toBe(before.length + 2);
+    expect(added.map((row) => row.audience)).toEqual(expect.arrayContaining(['staff', `team:${entry!.id}`]));
+    await run('UPDATE accounts SET name = ? WHERE entrant_id = ?', 'A person', entrantId);
+    await execute('eventAdmin', { type: 'rename_entrant', eventId: ids.event, entrantId, name: 'Third name' });
+    expect(await rows('SELECT name FROM accounts WHERE entrant_id = ?', entrantId)).toEqual([{ name: 'A person' }]);
+  });
+
+  it('records a password reset in the activity of each contest that seats the account', async () => {
+    const [person] = (await execute('eventAdmin', { type: 'create_people', eventId: ids.event, people: [{ handle: 'pat', name: 'Pat' }] })).accountIds!;
+    await execute('eventAdmin', { type: 'assign_staff', contestId: ids.contest, accountId: person!, roles: ['volunteer'], admin: false });
+    await manage.issueCredentials(caller('contestAdmin'), randomUUID(), { eventId: ids.event, accountIds: [person!] });
+    expect(await rows(`SELECT session_id, actor FROM admin_audit WHERE action = 'reset_password' AND target = ?`, person!))
+      .toEqual([{ session_id: ids.contest, actor: caller('contestAdmin').accountId }]);
+    const { audit } = await new D1ApplicationService(db).snapshot(caller('contestAdmin'), ids.contest);
+    expect(audit.some((entry) => entry.action === 'reset_password' && entry.target === person)).toBe(true);
+  });
+
+  it('gives an entrant with no sign-in one account, seated in each entry, and refuses a second', async () => {
+    const entrantId = randomUUID();
+    await run(`INSERT INTO entrants (id, event_id, kind, name) VALUES (?, ?, 'team', 'Legacy team')`, entrantId, ids.event);
+    await run('INSERT INTO teams (id, session_id, entrant_id, name) VALUES (?, ?, ?, ?)', randomUUID(), ids.contest, entrantId, 'Legacy team');
+    const command = { type: 'add_entrant_sign_in', eventId: ids.event, entrantId, handle: 'legacy-team' } as const;
+    await expect(execute('contestAdmin', command)).rejects.toMatchObject({ status: 403 });
+    const { accountIds } = await execute('eventAdmin', command);
+    expect(await rows('SELECT session_id FROM memberships WHERE account_id = ?', accountIds![0]!)).toEqual([{ session_id: ids.contest }]);
+    await expect(execute('eventAdmin', { ...command, handle: 'other-handle' })).rejects.toMatchObject({ status: 409 });
+    const [issued] = await manage.issueCredentials(caller('eventAdmin'), randomUUID(), { eventId: ids.event, accountIds: accountIds! });
+    expect(issued!.temporaryPassword).toBeTruthy();
+  });
+
   it('returns no password to the request that loses a race with a retry of itself', async () => {
     const target = caller('volunteer').accountId;
     const input = { eventId: ids.event, accountIds: [target] };
@@ -971,6 +1020,7 @@ describe('event, roster, and contest commands', () => {
       create_people: { type: 'create_people', eventId: event, people: [{ handle: 'person', name: 'Person' }] },
       create_entrants: { type: 'create_entrants', eventId: event, entrants: [{ kind: 'team', name: 'Team', handle: 'team' }] },
       rename_entrant: { type: 'rename_entrant', eventId: event, entrantId: entrant, name: 'Renamed' },
+      add_entrant_sign_in: { type: 'add_entrant_sign_in', eventId: event, entrantId: entrant, handle: 'late-team' },
       create_contest: { type: 'create_contest', eventId: event, name: 'New', contestType: 'teams', schedule: testSchedule, categories: ['Other'] },
       update_contest: { type: 'update_contest', contestId: contest, name: 'New', contestType: 'teams', schedule: testSchedule },
       assign_entrants: { type: 'assign_entrants', contestId: contest, entries: [{ entrantId: entrant, location: '' }] },
@@ -1015,6 +1065,7 @@ describe('the requirement of every command', () => {
     create_people: [{ target: event, level: 'event' }],
     create_entrants: [{ target: event, level: 'event' }],
     rename_entrant: [{ target: event, level: 'event' }],
+    add_entrant_sign_in: [{ target: event, level: 'event' }],
     create_contest: [{ target: event, level: 'event' }],
     update_contest: [{ target: contest, level: 'event' }],
     assign_entrants: [{ target: contest, level: 'event' }],

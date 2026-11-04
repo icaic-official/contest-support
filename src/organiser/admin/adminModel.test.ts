@@ -144,7 +144,7 @@ describe("display helpers", () => {
       { membership: member(), person: { id: userId, name: "Alex", username: null } },
     ];
     expect(actorName(members, { action: "set_intake", actor: userId })).toBe("Alex");
-    expect(actorName(members, { action: "set_intake", actor: "someone" })).toBe("someone");
+    expect(actorName(members, { action: "set_intake", actor: "someone" })).toBe("An organizer");
   });
 
   it("describes a webmaster's join without the webmaster's account ID", () => {

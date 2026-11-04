@@ -1,11 +1,11 @@
-import { useId, useMemo, useState } from "react";
+import { useId, useMemo, useRef, useState } from "react";
 import { Pencil } from "lucide-react";
 import type { ContestType, EventConsole, Schedule } from "@/backend/contracts";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
-  DialogContent,
+  ReturningDialogContent as DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
@@ -17,7 +17,7 @@ import { rosterTextMax, teamsPerCommandMax } from "@/connected/roster";
 import { viewerNote } from "@/connected/zonedTime";
 import { staffRoles } from "@/organiser/admin/adminModel";
 import { acceptsKind, contestTypeLabels, seatedEntrants } from "./eventModel";
-import { CommandError, Panel, fieldClass } from "./forms";
+import { CommandError, Panel, fieldClass, focusAfterRemoval } from "./forms";
 import { ScheduleFields } from "./ScheduleFields";
 import {
   type ScheduleDraft,
@@ -72,7 +72,7 @@ function TypeSelect({
 
 /** The contests of the event. A contest takes teams, single contestants, or both. */
 export function ContestsTab({ data, state }: TabProps) {
-  const locked = state.busy || data.event.archived;
+  const locked = data.event.archived;
   const id = useId();
   const [name, setName] = useState("");
   const [type, setType] = useState<ContestType>("teams");
@@ -83,7 +83,7 @@ export function ContestsTab({ data, state }: TabProps) {
   const parsed = scheduleOfDraft(draft, timeZone);
   return (
     <div className="space-y-5">
-      <CommandError message={state.error} />
+      {!editing && <CommandError message={state.error} />}
       <Panel
         title="Create a contest"
         description="Intake follows the schedule. A contest admin can open or close it by hand, and sets its limits and categories afterwards."
@@ -161,7 +161,10 @@ export function ContestsTab({ data, state }: TabProps) {
                     className="size-11"
                     disabled={locked}
                     aria-label={`Edit ${contest.name}`}
-                    onClick={() => setEditing(contest)}
+                    onClick={() => {
+                      state.clearError();
+                      setEditing(contest);
+                    }}
                   >
                     <Pencil aria-hidden="true" />
                   </Button>
@@ -272,8 +275,7 @@ function EditContest({
 /**
  * Who sits in one contest. Entrants of the contest's type are assigned in
  * bulk with a location, and unassigned one at a time. Staff are assigned with
- * roles and an admin flag. The contest admin sees both lists but changes
- * neither.
+ * roles and an admin flag. Only event admins and webmasters reach this tab.
  */
 export function AssignmentsTab({ data, state }: TabProps) {
   const id = useId();
@@ -318,14 +320,15 @@ function EntrantAssignments({
   contest,
 }: TabProps & { contest: EventConsole["contests"][number] }) {
   const id = useId();
-  const locked = state.busy || data.event.archived;
+  const locked = data.event.archived;
   const [picked, setPicked] = useState<ReadonlySet<string>>(new Set());
   const [location, setLocation] = useState("");
   const seated = useMemo(() => seatedEntrants(data, contest.id), [data, contest.id]);
   const entries = new Map(data.entries.filter((entry) => entry.contestId === contest.id).map((entry) => [entry.entrantId, entry]));
   const eligible = data.entrants.filter((entrant) => acceptsKind(contest.contestType, entrant.kind));
   const open = eligible.filter((entrant) => !seated.has(entrant.id));
-  const chosen = open.filter((entrant) => picked.has(entrant.id)).slice(0, teamsPerCommandMax);
+  const selected = open.filter((entrant) => picked.has(entrant.id));
+  const chosen = selected.slice(0, teamsPerCommandMax);
   const toggle = (entrantId: string, on: boolean) => {
     const next = new Set(picked);
     if (on) next.add(entrantId);
@@ -353,9 +356,9 @@ function EntrantAssignments({
                 .then((receipt) => receipt && setPicked(new Set()));
             }}
           >
-            <fieldset className="space-y-1">
+            <fieldset className="min-w-0 space-y-1">
               <legend className="text-sm font-medium">Not yet in this contest</legend>
-              <ul className="max-h-64 divide-y overflow-y-auto rounded-xl border">
+              <ul className="max-h-64 min-w-0 divide-y overflow-y-auto rounded-xl border">
                 {open.map((entrant) => (
                   <li key={entrant.id}>
                     <label className="flex min-h-11 cursor-pointer items-center gap-3 px-3 text-sm">
@@ -381,6 +384,12 @@ function EntrantAssignments({
               >
                 Select all
               </Button>
+              {open.length > teamsPerCommandMax && (
+                <p className="text-xs text-muted-foreground">
+                  One assignment takes up to {teamsPerCommandMax} entrants. Select all picks the first {teamsPerCommandMax}. Assign them, then select again.
+                  {selected.length > teamsPerCommandMax && ` ${selected.length - teamsPerCommandMax} selected entrants wait for the next assignment.`}
+                </p>
+              )}
             </fieldset>
             <div className="space-y-1.5">
               <Label htmlFor={`${id}-location`}>Location for the selected entrants</Label>
@@ -420,8 +429,14 @@ function EntrantAssignments({
                     variant="outline"
                     className="h-11"
                     disabled={locked}
+                    data-removes
                     aria-label={`Remove ${entrant.name} from ${contest.name}`}
-                    onClick={() => void state.execute({ type: "unassign_entrant", contestId: contest.id, entrantId: entrant.id })}
+                    onClick={(event) => {
+                      const button = event.currentTarget;
+                      void state
+                        .execute({ type: "unassign_entrant", contestId: contest.id, entrantId: entrant.id })
+                        .then((receipt) => receipt && focusAfterRemoval(button));
+                    }}
                   >
                     Remove
                   </Button>
@@ -439,7 +454,7 @@ function StaffAssignments({
   state,
   contest,
 }: TabProps & { contest: EventConsole["contests"][number] }) {
-  const locked = state.busy || data.event.archived;
+  const locked = data.event.archived;
   const held = new Map(
     data.staffAssignments.filter((item) => item.contestId === contest.id).map((item) => [item.accountId, item]),
   );
@@ -455,7 +470,7 @@ function StaffAssignments({
         <ul className="divide-y">
           {data.people.map((person) => (
             <StaffRow
-              key={`${person.id}:${JSON.stringify(held.get(person.id) ?? null)}`}
+              key={person.id}
               name={person.name}
               handle={person.handle}
               eventAdmin={admins.has(person.id)}
@@ -498,6 +513,15 @@ function StaffRow({
 }) {
   const [roles, setRoles] = useState<ReadonlySet<string>>(new Set(seat?.roles ?? ["volunteer"]));
   const [admin, setAdmin] = useState(seat?.admin ?? false);
+  // A changed seat resets the draft in place. A new key would remount the row and drop focus.
+  const seatKey = JSON.stringify(seat ?? null);
+  const [seenSeat, setSeenSeat] = useState(seatKey);
+  if (seenSeat !== seatKey) {
+    setSeenSeat(seatKey);
+    setRoles(new Set(seat?.roles ?? ["volunteer"]));
+    setAdmin(seat?.admin ?? false);
+  }
+  const assignRef = useRef<HTMLButtonElement>(null);
   const chosen = staffRoles.filter((role) => roles.has(role));
   const changed =
     !seat || admin !== seat.admin || chosen.join() !== staffRoles.filter((role) => seat.roles.includes(role)).join();
@@ -542,9 +566,13 @@ function StaffRow({
           type="button"
           variant="secondary"
           className="h-11"
-          disabled={disabled || !changed || (chosen.length === 0 && !admin)}
+          ref={assignRef}
+          aria-disabled={!changed || (chosen.length === 0 && !admin) ? true : undefined}
+          disabled={disabled}
           aria-label={`${seat ? "Update" : "Assign"} ${name}`}
-          onClick={() => onAssign(chosen, admin)}
+          onClick={() => {
+            if (changed && (chosen.length > 0 || admin)) onAssign(chosen, admin);
+          }}
         >
           {seat ? "Update" : "Assign"}
         </Button>
@@ -555,7 +583,10 @@ function StaffRow({
             className="h-11"
             disabled={disabled}
             aria-label={`Remove ${name} from this contest`}
-            onClick={onRemove}
+            onClick={() => {
+              assignRef.current?.focus();
+              onRemove();
+            }}
           >
             Remove
           </Button>

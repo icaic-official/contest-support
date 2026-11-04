@@ -168,8 +168,8 @@ test.describe("the site dashboard", () => {
       await page.getByRole("button", { name: "Sign in", exact: true }).click();
       await page.goto("/site");
       await expect(page.getByRole("heading", { level: 1, name: "Site" })).toBeVisible();
-      await expect(page.getByText("Jury verification", { exact: true })).toBeVisible();
-      await expect(page.getByRole("link", { name: "Open the console of Jury verification" })).toBeVisible();
+      // Parallel tests share the database, so several fixture events can hold this name.
+      await expect(page.getByRole("link", { name: "Open the console of Jury verification" }).first()).toBeVisible();
       if (shots) {
         mkdirSync(shots, { recursive: true });
         await page.screenshot({ path: `${shots}/site-${viewport.width}.png`, fullPage: true });

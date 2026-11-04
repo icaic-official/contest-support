@@ -75,4 +75,4 @@ Session admins and jury members post announcements to the whole session. See [Po
 ## Archived events
 
 Archived events stay readable. Changes, uploads, limit changes, and team and category edits stop. Nothing is deleted.
-An editor for events does not exist yet. The [installer](/operators/installation/#6-create-the-first-owner) creates the event and its session.
+A webmaster creates events on the **Site** page. The [installer](/operators/installation/#6-create-the-first-webmaster) creates only the first webmaster. An event admin then creates contests in the event console.

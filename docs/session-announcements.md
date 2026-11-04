@@ -1,6 +1,6 @@
 # Session announcements
 
-Ticket status and verification evidence are in the [T0006 ticket](history/tickets.md#t0006--session-announcements).
+Status and verification evidence are in the [session announcements record](history/tickets.md#t0006--session-announcements).
 
 An announcement is a short message for one contest session.
 Admins and jury publish it. Every current member of the session reads it.
@@ -42,7 +42,7 @@ This page is the reference for the behavior.
   Nobody can edit it, add images to it, or remove its images.
   A later export of the contest support log is future work.
 - An archived event stays readable and rejects every announcement and image write.
-- Outside this ticket: text history, read receipts, targeted audiences, scheduled publication, and push notifications.
+- Outside this feature: text history, read receipts, targeted audiences, scheduled publication, and push notifications.
 
 ### Competing edits
 

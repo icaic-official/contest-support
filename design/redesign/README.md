@@ -1,8 +1,8 @@
 # Minsky frontend redesign: concepts and directions
 
-Status: **direction chosen (2026-10-17) and implemented in T0015 (2026-10-18)**. [PR #44](https://github.com/GiftedNovaHD/minsky/pull/44) merged it on 2026-10-21. See [section 6](#6-chosen-direction-2026-10-17).
+Status: **direction chosen (2026-10-17) and implemented (2026-10-18)**. [PR #44](https://github.com/GiftedNovaHD/minsky/pull/44) merged it on 2026-10-21. See [section 6](#6-chosen-direction-2026-10-17).
 This file is the design record. [Frontend architecture](../../docs/frontend-architecture.md) describes the implemented code.
-Sections 1 to 5 describe the app before T0015 and the proposals at that time.
+Sections 1 to 5 describe the app before the redesign and the proposals at that time.
 The mockups use fictional sample data. They do not connect to a backend.
 
 ## 1. What the app does today
@@ -39,7 +39,7 @@ The main problems:
 | **Public replies vs internal notes** | Safety: never leak staff notes | A **two-mode composer** (segmented control). Internal mode recolors the whole composer amber with a lock icon. Internal notes in the thread look like **sticky notes**. A contestant view never contains them. |
 | **Resolution** (summary visible to the team, history kept) | Closure | A **resolve dialog** with radio cards for the preset summaries and a custom option. In the timeline, a green **milestone card**. Reopen events appear in the same timeline. |
 | **Award ledger** (decision, then separate confirmation of external application) | Fairness and audit | A **two-step receipt**: "Decided by X" ✓ then "Applied by Y" ✓ or pending. The jury gets **preset minute chips** (0/5/10/15/30, custom) instead of a drop-down. Leads get a **To decide → To apply → Applied** pipeline. |
-| **Team and location** | "Where do I walk?" | Show the **table number first**. Use **⌘K fuzzy search** for teams, tables and issue numbers (T0008 logic). Optional **floor map** with pins. |
+| **Team and location** | "Where do I walk?" | Show the **table number first**. Use **⌘K fuzzy search** for teams, tables and issue numbers (the existing fuzzy team search logic). Optional **floor map** with pins. |
 | **Session context** (event, session, intake open/closed, archived) | Global mode | A **session switcher** in the sidebar header, an **intake switch** with a one-line explanation, and an archived banner. |
 | **Roles** (volunteer, specialist, jury, admin; combined per person; contestant team accounts) | Different jobs | **Role-specific home screens**: contestants get a help page, support gets a queue/inbox, jury gets award review, admins get overview and accounts. People with several roles see the union of the navigation items. |
 | **Images** (fixed visibility chosen at upload, limits per session) | Evidence | A **thumbnail grid** with a visibility badge on each image, a drop zone that shows the limits, and a lightbox. |
@@ -107,11 +107,11 @@ Use a combination. Each direction solves a different problem, and the same compo
 - **Accessibility:** every drag or slide gesture (boards, slide to claim) needs a button alternative. Status always has an icon and a label, never color alone. Keep the focus management that exists today.
 - **Not in the current schema:** venue coordinates (floor map), helper zone ("Near me"), saved replies, configurable aging thresholds, and a team's display order. Treat these as separate follow-up decisions.
 - **Tests:** the Playwright journey test uses current labels and roles. A redesign needs selector updates in the same change.
-- **Size:** the full redesign is several tickets: foundation and shell, issue view, queue and search, contestant view, admin, mobile, and tests and docs. Plan to split it.
+- **Size:** the full redesign is several changes: foundation and shell, issue view, queue and search, contestant view, admin, mobile, and tests and docs. Plan to split it.
 
 ## 6. Chosen direction (2026-10-17)
 
-Implemented on 2026-10-18 in T0015, together with a separate organiser desktop console. See [frontend architecture](../../docs/frontend-architecture.md) and [How the open decisions were resolved](#how-the-open-decisions-were-resolved).
+Implemented on 2026-10-18, together with a separate organiser desktop console. See [frontend architecture](../../docs/frontend-architecture.md) and [How the open decisions were resolved](#how-the-open-decisions-were-resolved).
 
 The user chose **A (shadcn/ui console) combined with D (phone-first field mode)**:
 
@@ -138,7 +138,7 @@ The account type selects the UI after sign-in. A membership with `team_id` gets 
   - Report for a team, with fuzzy team search.
   - Decide award, with minute chips.
   - Create account, followed by a one-time credential screen.
-- **Find:** T0008 fuzzy search for teams, tables and issue numbers.
+- **Find:** fuzzy search for teams, tables and issue numbers.
 - On a phone the app fills the screen. The frame in the mockup is only for desktop review.
 
 ### Contestant app (`f-contestant-desktop.html`)
@@ -159,18 +159,18 @@ The account type selects the UI after sign-in. A membership with `team_id` gets 
 
 ### How the open decisions were resolved
 
-The user and the T0015 ticket settled the four open decisions on 2026-10-17:
+The user settled the four open decisions for the frontend redesign on 2026-10-17:
 
 1. **Organisers on a desktop or tablet** get a separate desktop console in the style of `a-console.html` at 1024 px and wider. The centred column was not built. Below 1024 px, organisers get the phone app.
 2. **Contestants on a phone** get no phone layout. The contestant app is a desktop layout and needs a window at least 1024 px wide. The single-column fallback was not built.
 3. **Category tiles** show the category name and one generic icon, with no description. The category data did not change.
 4. **Mockup items that need new data** stay out of scope: "Near me" or helper zones, quick replies, a floor map, configurable aging thresholds, and category icons or descriptions.
 
-The step 5 integration also moved the T0009 jury worklist into the phone **Awards** tab and the desktop **Award review** page. See [frontend architecture](../../docs/frontend-architecture.md#jury-award-lists).
+The step 5 integration also moved the jury worklist into the phone **Awards** tab and the desktop **Award review** page. See [frontend architecture](../../docs/frontend-architecture.md#jury-award-lists).
 
 ### Proposed implementation split
 
-The work is too large for one change. Proposed chats, all on one ticket branch. The work followed this split. The desktop console became an extra step 4 (step 2b), and integration became step 5. See [T0015](../../docs/history/tickets.md#t0015--organiser-and-contestant-frontend-redesign).
+The work is too large for one change. Proposed chats, all on one branch. The work followed this split. The desktop console became an extra step 4 (step 2b), and integration became step 5. See [the frontend redesign record](../../docs/history/tickets.md#t0015--organiser-and-contestant-frontend-redesign).
 
 1. **Foundation:** Tailwind v4, shadcn/ui setup, design tokens, split `ConnectedApp.tsx` into data hooks, sign-in and password screens, and selection of the UI by account type.
 2. **Organiser app:** tabs, queue, issue view, sheets, find, awards, session admin. This step can split further.

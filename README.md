@@ -17,7 +17,7 @@ See [frontend architecture](docs/frontend-architecture.md) for module responsibi
 
 [Read the user and operator guides](https://minsky-docs.icaic-minsky.workers.dev).
 Use [the installation guide](site/src/content/docs/operators/installation.mdx) for an isolated Cloudflare instance.
-The owner merged T0021 in [PR #43](https://github.com/GiftedNovaHD/minsky/pull/43) at `4e43739` on 2026-10-19.
+The owner merged the fresh Cloudflare development installation in [PR #43](https://github.com/GiftedNovaHD/minsky/pull/43) at `4e43739` on 2026-10-19.
 The owner separately approved the Cloudflare switch and a repeat automated deployment.
 It transferred no accounts, passwords, records, images, or IDs from the earlier backend.
 See [run log](docs/history/run-log.md#t0021-approved-activation-2026-10-19) for the deployment results and [activation](docs/activate-cloudflare-development.md) for the procedure.
@@ -28,13 +28,13 @@ These are development installations that require connectivity. Live-contest read
 A person signs in with an event code, a username, and a password. The sign-in link on a credential sheet, `/?event=<code>`, fills in the code, and the device remembers it. A webmaster belongs to no event and selects **Site sign-in** instead.
 A username is unique inside its event. Staff can change their own username on the account page. A team account cannot.
 
-T0015 ([PR #44](https://github.com/GiftedNovaHD/minsky/pull/44), merged at `a25f9f1` on 2026-10-21) gives three UIs. After sign-in, the membership selects one:
+The frontend redesign ([PR #44](https://github.com/GiftedNovaHD/minsky/pull/44), merged at `a25f9f1` on 2026-10-21) gives three UIs. After sign-in, the membership selects one:
 
 - **Contestant desktop app.** A membership with a team gets this app. It shows the team's reports, a live timer, a progress tracker, public messages, team-visible images and the report form. It has no phone layout and needs a window at least 1024 px wide.
 - **Organizer phone app.** Staff in a window narrower than 1024 px get bottom tabs by role: Queue, Mine, Find, Awards, Session and Me. Issues open in a full-screen view with an action bar and bottom sheets.
 - **Organizer desktop console.** Staff in a window 1024 px wide or wider get a sidebar, a queue table, an issue side sheet, a ⌘K command palette, Award review and the admin pages.
 
-The jury award lists from T0009 are in the phone **Awards** tab and the desktop **Award review** page.
+The jury award lists are in the phone **Awards** tab and the desktop **Award review** page.
 All UIs use shadcn/ui, Tailwind CSS and the same data hooks, with light and dark themes.
 See [frontend architecture](docs/frontend-architecture.md) and the [design record](design/redesign/README.md).
 
@@ -167,14 +167,13 @@ npm run docs:dev
 
 The deployment configuration is `wrangler.docs.jsonc`.
 See [the writing and deployment guide](site/src/content/docs/contributing/documentation.mdx).
-The initial docs deployment is explicitly authorized in T0011 before merge.
 Four Workers Builds triggers check and publish this repository. A branch push runs the checks. Branch previews on `minsky-preview` are switched off, because Workers Builds cannot limit their token to the preview resources. A merge into `main` publishes `minsky-dev` and the docs.
 [Build and publication flow](docs/cloudflare-builds.md#build-and-publication-flow) describes each trigger and what each push does.
 See [Workers Builds setup](docs/cloudflare-builds.md) for the dashboard steps and [CI settings](docs/cloudflare-build-settings.md) for on-demand browser and hosted commands.
 Automatic GitHub Actions publication is removed.
 The fresh Cloudflare development candidate and a separate empty installation pass the complete application checks.
 The approved activation and a later automated deployment passed their recorded application checks. Those runs used the retired Actions publisher.
-The [T0021 activation record](docs/history/run-log.md#t0021-approved-activation-2026-10-19) separates protected checks from stable URL verification.
+The [Cloudflare activation record](docs/history/run-log.md#t0021-approved-activation-2026-10-19) separates protected checks from stable URL verification.
 
 ### Repository records
 
@@ -183,7 +182,7 @@ Plans and rules:
 - [Contributor rules](AGENTS.md), the [planning record](PLAN.md), and the [roadmap](ROADMAP.md) for the technology stack.
   [AGENTS.md](AGENTS.md#api-tokens-for-agents) also states which Cloudflare tokens and resources agents can create.
 - [Product direction](docs/product-direction.md) — agreed requirements and open decisions.
-- [Development tickets](docs/history/tickets.md) — retired ticket records T0001 to T0025. Pull requests now record each change.
+- [Development tickets](docs/history/tickets.md) are the retired ticket records. Pull requests now record each change.
 - [Writing guide](docs/writing-guide.md) and [documentation release plan](docs/documentation-release-plan.md).
 - [Code quality](docs/code-quality.md) — CI summary, dependency policy, secret scanning, and review requirements.
 

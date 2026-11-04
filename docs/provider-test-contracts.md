@@ -148,10 +148,10 @@ No generic database API or infrastructure provisioning layer is part of this tes
 Terraform can later create resources. It cannot establish the behavior that these scenarios verify.
 
 
-## Earlier bounded authentication reuse (T0018 and T0020)
+## Earlier bounded authentication reuse
 
-T0018 extracts `verifyTemporaryAuthentication()` from the existing authentication scenario.
+The Cloudflare authentication work extracts `verifyTemporaryAuthentication()` from the existing authentication scenario.
 Cloudflare supplies its real authentication adapter and protected session-list hooks.
 That earlier bounded reuse did not establish complete Cloudflare `Backend` conformance.
-T0020's complete driver then passed all eight unchanged scenarios against the hosted Cloudflare application.
+The complete connector's driver then passed all eight unchanged scenarios against the hosted Cloudflare application.
 The former [protected connector job](history/run-log.md#final-protected-connector-verification) passed as a separate verification gate. GitHub Actions no longer runs it.

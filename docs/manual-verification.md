@@ -1,6 +1,6 @@
 # Connected manual verification
 
-## Documentation site (T0011)
+## Documentation site
 
 Run `npm run docs:build` and `npm run docs:test` after installing the separate `site/` dependencies.
 For the published site, run `MINSKY_DOCS_URL=https://minsky-docs.icaic-minsky.workers.dev npm run docs:test`.
@@ -26,7 +26,7 @@ Use `npm run cloudflare:recover-admin` when the development webmaster cannot sig
 Use a separate browser or profile for each account: contestant, volunteer, specialist, jury, and admin.
 Work only in a clearly identified development or test session.
 
-T0015 replaced the earlier workspace with three UIs. The membership and the window width select the UI:
+The frontend redesign replaced the earlier workspace with three UIs. The membership and the window width select the UI:
 
 - A contestant account gets the contestant desktop app. Use a window at least 1024 px wide, such as 1280 × 800.
 - A staff account below 1024 px gets the organizer phone app. Use 390 × 844, and 320 × 740 for the narrow check.
@@ -65,7 +65,7 @@ Section 7 lists the checks for each UI.
 
 Expected result: the app rejects removal of the last admin.
 
-Check the admin screens of T0015 in both organizer layouts:
+Check the admin screens in both organizer layouts:
 
 1. In the phone **Session** tab, check the status counts, the intake switch and the image limits with the − and + buttons.
 2. Select **New account**. Create a staff account. Check that the sheet shows the sign-in link, the username, and the temporary password once, with copy buttons and **Done**. Check that the link names the event code.
@@ -157,7 +157,7 @@ Expected result: Minsky records application status without changing an external 
 7. Refresh each browser.
 8. Compare the shared state.
 
-## 7. Interface and accessibility (T0015)
+## 7. Interface and accessibility
 
 Do these checks in the light theme and again in the dark theme.
 Change the theme with the theme menu. Check that the choice stays after a page reload.
@@ -453,15 +453,15 @@ Record observed results in [run log](history/run-log.md).
 Suggested manual checks are not completed checks.
 Browser automation does not establish results for real devices, assistive technology, or capacity.
 
-## 13. Jury worklist (T0009)
+## 13. Jury worklist
 
-Run these checks on the current T0009 revision after merging current `main`.
+Run these checks on the current revision after merging current `main`.
 For hosted acceptance, confirm your isolated test target before creating UUID-owned fictional accounts and records.
 Delete only that run's fixtures. Verify cleanup after the run. Use jury-only, combined jury/support, support-only,
 admin-only, and contestant accounts. Do not use real contest reports as fixtures.
 This is a checklist, not evidence that hosted or physical-device checks have passed.
 
-T0015 moved the worklist into the phone **Awards** tab and the desktop **Award review** page.
+The frontend redesign moved the worklist into the phone **Awards** tab and the desktop **Award review** page.
 The lists are **To decide**, **To apply** and **Applied**. There is no separate **Jury worklist** entry.
 See [frontend architecture](frontend-architecture.md#jury-award-lists).
 
@@ -523,7 +523,7 @@ The [frontend architecture](frontend-architecture.md#browser-routes) lists paths
 A full reload discards in-memory drafts, filters, and retry metadata.
 Record observed results separately from these instructions. Historical runs do not verify the combined frontend.
 
-## 15. Session announcements (T0006)
+## 15. Session announcements
 
 Use an active event with an admin, a jury member, a volunteer, and a contestant.
 Use two browser windows for the live checks. Run these checks after a reviewed deployment.

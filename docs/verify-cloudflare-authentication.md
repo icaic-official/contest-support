@@ -1,10 +1,10 @@
 # Verify Cloudflare authentication
 
-Use this guide for T0018's fictional authentication fixtures.
+Use this guide for the fictional authentication fixtures.
 These procedures test the separate authentication CI target. They do not migrate accounts or deploy the development application.
 Cloudflare serves the development application through its complete connector.
 See the [API reference](cloudflare-authentication.md) and [identity choice](cloudflare-authentication-choice.md) for behavior and resource limits.
-For T0020's complete connector, use the separate [direct store procedure](run-provider-tests.md#run-direct-cloudflare-store-checks).
+For the complete connector, use the separate [direct store procedure](run-provider-tests.md#run-direct-cloudflare-store-checks).
 That procedure requires the D1-only `minsky-connector-store-ci` target and all 82 hosted account cases.
 
 ## Run local checks
@@ -168,7 +168,7 @@ A credential-blocked run is not a pass.
 
 These earlier records remain:
 
-- The historical `cloud-test` allowlist included `main` and the exact T0018 branch. The T0019 branch remained outside it.
+- The historical `cloud-test` allowlist included `main` and the exact Cloudflare authentication branch. The shared server workflow branch remained outside it.
 - See [the run record](history/run-log.md#t0018-cloudflare-authentication-2026-10-18) for the initial rejection and later hosted resource limit.
 - The [PR #41 follow-up](history/run-log.md#pr-41-review-corrections-and-paid-authentication-2026-10-18) records the passing protected run on Workers Paid.
 
@@ -194,6 +194,6 @@ Do not reset the database or delete another run's records.
 
 For an interrupted account operation in an authorized fixture, use organizer-assisted reset after checking current permissions.
 The organizer must administer every assigned session. Archived memberships block recovery through the account API.
-T0020 adds trusted, provider-owned [installation-owner recovery](../site/src/content/docs/operators/installation.mdx#recover-the-owner).
+The complete connector adds trusted, provider-owned [installation-owner recovery](../site/src/content/docs/operators/installation.mdx#recover-the-owner).
 That procedure passed the recorded empty-installation checks. Confirm the exact installation and owner before recovery.
 Use `npm run cloudflare:recover-admin` to reset a webmaster password.

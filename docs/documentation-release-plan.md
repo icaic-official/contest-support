@@ -9,15 +9,15 @@ Treat documentation as part of each feature's acceptance criteria.
 The later [writing rules](writing-guide.md) apply the user's supplied `unslop` and `technical-writing` principles.
 Public pages each have one purpose: tutorial, how-to, reference, or explanation.
 
-This audit inspected T0011 revision `3c18cbb` and `main` at `de92d54` on 2026-10-17.
+This audit inspected the documentation site branch at `3c18cbb` and `main` at `de92d54` on 2026-10-17.
 GitHub reported a private repository, no selected license, and no published releases.
 The local checkout had no tags.
 PRs #20, #21, #23, and #29 remained open.
 The docs site's earlier build and browser checks passed. Those checks do not establish release-quality content.
 
-The entries below record the original T0011 audit and its T0007 dependency.
-T0020 now owns complete Cloudflare installation verification and the [PR #21 component review](history/pr21-installation-disposition.md).
-T0020 merged in PR #42. Its authorization and limits are in [its ticket](history/tickets.md#t0020-complete-cloudflare-connector).
+The entries below record the original documentation site audit and its dependency on the container packaging branch.
+The complete Cloudflare connector work now owns complete Cloudflare installation verification and the [PR #21 component review](history/pr21-installation-disposition.md).
+That work merged in PR #42. Its authorization and limits are in [the complete Cloudflare connector record](history/tickets.md#t0020-complete-cloudflare-connector).
 This audit does not authorize repository publication or license selection.
 Capacity validation and outage features retain their existing scope and remain separate work.
 
@@ -57,11 +57,11 @@ The npm `private: true` fields prevent package publication. They do not need rem
 **Observed:** [feature status](../site/src/content/docs/reference/status.md) mixes merged commits, open PRs, and a dated development deployment.
 There is no published release to which the guides can refer.
 The deployed app's exact revision was not established by the earlier HTTP check.
-**T0023 (2026-10-22):** the page now separates work in `main`, work not in `main`, environments, and unverified conditions. No release exists yet.
+**Documentation site redesign (2026-10-22):** the page now separates work in `main`, work not in `main`, environments, and unverified conditions. No release exists yet.
 
 **Complete when:** each published guide clearly belongs to a named release or a development revision.
 State supported installation paths and their verification limits for that revision.
-Keep unmerged features out of normal release task guides. Announcements (T0006) and the jury award lists (T0009 and T0015) are now in `main` and have task guides.
+Keep unmerged features out of normal release task guides. Announcements and the jury award lists are now in `main` and have task guides.
 Keep the distinction between merged, deployed, and verified.
 Do not add a version selector before there are distinct versions worth maintaining.
 
@@ -79,10 +79,10 @@ Keep isolated fixtures and preserve the decision to retire the local demo.
 
 ### 4. Verify one complete installation path
 
-**Observed:** [installation](../site/src/content/docs/operators/installation.mdx) requires the unmerged T0007 branch.
+**Observed:** [installation](../site/src/content/docs/operators/installation.mdx) requires the unmerged container packaging branch.
 The guide correctly labels container startup and a fresh independent backend as unverified.
 Its three hosting options do not have equivalent verification evidence.
-This was the 2026-10-17 observation. The current guide links to T0020's verified Cloudflare development procedure.
+This was the 2026-10-17 observation. The current guide links to the verified Cloudflare development procedure from the complete Cloudflare connector work.
 The review-fix hosted empty-installation trial passes on `2b6f6f0`, including the complete application and owner recovery.
 See its [evidence record](history/run-log.md#fresh-installation-after-review-fixes). Container packaging remains deferred.
 
@@ -90,7 +90,7 @@ See its [evidence record](history/run-log.md#fresh-installation-after-review-fix
 Record prerequisites, exact tool versions, account requirements, commands, expected results, and the tested revision.
 Complete the authenticated journey with fictional accounts and both image visibility modes.
 Keep other hosting paths labeled experimental until their own checks pass.
-T0020 owns the independent Cloudflare installation evidence. Container packaging is outside its scope.
+The complete Cloudflare connector work owns the independent Cloudflare installation evidence. Container packaging is outside its scope.
 
 ### 5. Make first-administrator setup reproducible
 
@@ -116,7 +116,7 @@ Include public frontend variables, function secrets, allowed origins, Auth setti
 For each value, state its location, purpose, format, default, required status, and whether it is secret.
 State whether a change needs a frontend rebuild, function deployment, or another explicit step.
 Explain the comma-separated `ALLOWED_ORIGINS` format with a local-development example.
-Document T0007 configuration only for a revision that contains those files.
+Document container packaging configuration only for a revision that contains those files.
 
 ### 7. State exact workflow permissions
 
@@ -189,7 +189,7 @@ Track reply retry behavior under its application work. Do not promise a fix from
 **Observed:** [docs contribution](../site/src/content/docs/contributing/documentation.mdx) mixes writing instructions with the project's account ID and deployment exception.
 [local development](../site/src/content/docs/contributing/development.md) refers to "the user" and agent-specific commit rules.
 The homepage links to the shared development app.
-**T0023 (2026-10-22):** both contribution pages now address an outside contributor. They contain no account ID, agent rules, or deployment exception. The homepage no longer links to the development app.
+**Documentation site redesign (2026-10-22):** both contribution pages now address an outside contributor. They contain no account ID, agent rules, or deployment exception. The homepage no longer links to the development app.
 
 **Complete when:** public contribution instructions address an outside contributor directly.
 Keep project deployment targets, historical exceptions, and agent rules in linked maintainer records.
@@ -200,7 +200,7 @@ Do not present it as the destination for an unrelated competition.
 ### 13. Add a concise explanation of the system
 
 **Observed:** public pages explain tasks but provide no architecture page, shared glossary, or lifecycle diagram.
-**T0023 (2026-10-22):** Excalidraw diagrams now show the issue lifecycle with timer behavior, the award flow, and the Cloudflare architecture. A glossary remains open.
+**Documentation site redesign (2026-10-22):** Excalidraw diagrams now show the issue lifecycle with timer behavior, the award flow, and the Cloudflare architecture. A glossary remains open.
 
 **Complete when:** show how the browser, static host, Auth, database, Realtime, Storage, and privileged functions relate.
 Explain event, session, team, issue, owner, handoff, resolution, award, and external application.
@@ -211,7 +211,7 @@ Document actual components. Do not imply a stable public integration API without
 ### 14. Reconcile current guidance with historical records
 
 **Observed:** `docs/product-direction.md` still says "beyond the demo" and refers to future demo feedback.
-Current-scope notes still discuss T0005 as active work, although its PR merged.
+Current-scope notes still discuss the issue images work as active, although its PR merged.
 The code-quality guide still says to apply settings after PR #2 checks appear.
 Older records also contain the former repository owner name.
 
@@ -286,7 +286,7 @@ Do not remove the custom error page solely to silence the warning.
 ### 20. Make documentation review part of release review
 
 **Observed:** the PR template checks documentation generally, but it has no explicit reader or command-reproduction criteria.
-The existing T0011 acceptance boxes describe the initial deployment, not open-source release readiness.
+The existing documentation site acceptance boxes describe the initial deployment, not open-source release readiness.
 
 **Complete when:** each behavior change updates its affected guides and reference material in the same PR.
 Review prerequisites, interface labels, limits, examples, and failure paths against code and observed behavior.
@@ -319,8 +319,8 @@ The broader permission table and account-guide work in findings 7 and 8 remain i
 
 ## Recommended order
 
-1. Complete factual corrections, audience separation, and the contributor path within T0011.
-2. Preserve T0020's verified independent Cloudflare development procedure and its recorded configuration, workflow, and owner-recovery evidence.
+1. Complete factual corrections, audience separation, and the contributor path within the documentation site work.
+2. Preserve the verified independent Cloudflare development procedure from the complete Cloudflare connector work, and its recorded configuration, workflow, and owner-recovery evidence.
 3. Resolve owner decisions about licensing, publication, support, and the canonical address before announcing a public release.
 4. Review the complete reader journey, run applicable checks, and publish through the selected deployment workflow.
 

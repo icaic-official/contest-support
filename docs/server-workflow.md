@@ -1,6 +1,6 @@
 # Server workflow reference
 
-T0019 extracted the existing issue decisions into [workflow.ts](../src/server/workflow.ts).
+PR #41 extracted the existing issue decisions into [workflow.ts](../src/server/workflow.ts).
 `WorkflowService` accepts all nine existing `Command` variants.
 Its rules contain no provider SDK, SQL, environment configuration, or provider selection.
 [Run log](history/run-log.md) records observed results.

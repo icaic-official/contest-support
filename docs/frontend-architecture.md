@@ -1,9 +1,9 @@
 # Frontend architecture
 
 This reference describes the shared frontend, its three layouts, and its browser routes.
-T0015 provides the contestant desktop app, organizer phone app, and organizer desktop console.
+The frontend redesign provides the contestant desktop app, organizer phone app, and organizer desktop console.
 PR #45 added browser routes and workflow retry protections to the redesigned shells.
-See [T0015](history/tickets.md#t0015--organiser-and-contestant-frontend-redesign) and [T0021](history/tickets.md#t0021-fresh-cloudflare-development-installation) for the recorded scope.
+See [the frontend redesign record](history/tickets.md#t0015--organiser-and-contestant-frontend-redesign) and [the fresh Cloudflare development installation record](history/tickets.md#t0021-fresh-cloudflare-development-installation) for the recorded scope.
 
 ## Stack
 
@@ -203,7 +203,7 @@ These rules apply:
 - The history table has no type column. `workflowEvent()` in `src/connected/historyEvents.ts` identifies workflow events by their fixed text, or by the timestamp of the related record when the text contains free input. `conversation()` shows all other entries as chat messages. The account page uses the same rule to count messages.
 - The timer uses `unresolvedTime()` from `model.ts`. It stops on resolution and continues on reopening. Resolved intervals are not counted.
 - **Report an issue** is disabled with a reason when contestant intake is closed or the event is archived. Reply and reopen are not available in an archived event.
-- The reply box sends with Enter and adds a line with Shift+Enter. The draft is cleared only when the server records the message, also after **Retry last request** (T0012).
+- The reply box sends with Enter and adds a line with Shift+Enter. The draft is cleared only when the server records the message, also after **Retry last request**.
 - `IssueImages` gets only the team-visible images, with `staff={false}`. It shows the image list and the preview dialog with Tailwind classes. It has no upload form. Staff upload through `OrganiserImages`.
 
 <a id="organiser-phone-app"></a>
@@ -224,7 +224,7 @@ Shared organizer parts are one level up, so the desktop console can use them:
 
 | File | Content |
 | --- | --- |
-| `organiserModel.ts` | Pure rules: tabs by role, jury-only visibility, the T0009 award lists (`awardLists`) and openable issues (`openableIssues`), queue chips, sort order, age tiers, hall and table from a location, issue number search, the allowed actions of an issue, its primary action and the hint for a missing action (`missingActionHint`). `organiserModel.test.ts` tests them. |
+| `organiserModel.ts` | Pure rules: tabs by role, jury-only visibility, the award lists (`awardLists`) and openable issues (`openableIssues`), queue chips, sort order, age tiers, hall and table from a location, issue number search, the allowed actions of an issue, its primary action and the hint for a missing action (`missingActionHint`). `organiserModel.test.ts` tests them. |
 | `components/issueDisplay.tsx` | Status badge (icon and label), place tile, unresolved timer, **Live** or **Reconnecting** badge, avatar and `AwardEvidence`. |
 | `components/IssueDetails.tsx` | Timers, lifecycle bar, owner, handoff banner, award receipt, resolution history and activity. |
 | `actions/IssueForms.tsx` | `ReplyForm`, `ResolveForm`, `EscalateForm`, `ReopenForm`, `AwardForm` and `ApplyForm`. Each form takes the issue, the `CommandRunner` and `onDone`. |
@@ -245,7 +245,7 @@ The admin parts take a `SessionAdmin` from `useSessionAdmin` or plain callbacks.
 
 These rules apply:
 
-- Tabs follow the combined roles. Volunteers and specialists get Queue, Mine, Find and Me. Jury members get Awards. A jury-only member sees resolved issues only, as before T0015. Admins also get Session.
+- Tabs follow the combined roles. Volunteers and specialists get Queue, Mine, Find and Me. Jury members get Awards. A jury-only member sees resolved issues only, as before the frontend redesign. Admins also get Session.
 - The Awards tab shows the lists from `awardLists()`. See [Jury award lists](#jury-award-lists).
 - The queue chips map to the shared status filter of `useWorkflowState`. Waiting is `open`, Handoffs is `escalated` and Resolved is `resolved`. Every other value, including `all` and `claimed` after a reopen, shows All active.
 - Cards are sorted by unresolved time, longest first. The timer is neutral below 10 minutes, amber below 20 minutes and rose after that. A resolved issue stays neutral.
@@ -256,7 +256,7 @@ These rules apply:
 - An open sheet closes when its action is no longer allowed, for example after the person loses the jury role (`sheetAllowed()`).
 - A staff member without a volunteer or specialist role sees one muted line under the buttons of the bottom bar. On an open issue it says why **Claim** is missing and that the person can still reply and add images. The bar then says that no one owns the issue. A jury member also sees one on a claimed or escalated issue, because only its owner or an admin can resolve it (`missingActionHint()`). A resolved issue and an archived event have no hint.
 - The Find tab keeps its query when the person goes back from a team.
-- The Session tab keeps the behavior of the `AdminPanel` from before T0015: status counts, the intake switch, image limits (1–50 MB, 1–24 images, 1–120 MB), accounts, a username for accounts without one, membership changes, password reset (not for your own account), removal of session access, assignment by user ID and recent administration activity.
+- The Session tab keeps the behavior of the `AdminPanel` from before the frontend redesign: status counts, the intake switch, image limits (1–50 MB, 1–24 images, 1–120 MB), accounts, a username for accounts without one, membership changes, password reset (not for your own account), removal of session access, assignment by user ID and recent administration activity.
 - A new account and a password reset show the credentials once, in the same sheet. If the admin closes the sheet while the request runs, the sheet opens again for the credentials. Closing the sheet discards them.
 - A password reset and a removal need confirmation in a dialog. The text keeps the meaning of the earlier `window.confirm` text.
 - A Team account needs a team. The form sends no staff roles and no Admin for it, as before.
@@ -277,7 +277,7 @@ It uses the same hooks, rules and forms as the phone app. It adds no workflow ru
 | --- | --- |
 | `OrganiserDesktopConsole.tsx` | The shell. It holds the page, the sidebar state, the sheet tab, the command palette, the report dialog, the report draft, the queue team filter and the reply drafts. These stay in memory while the snapshot is missing. It also handles ⌘K or Ctrl+K and the J and K keys. |
 | `ConsoleChrome.tsx` | `ConsoleSidebar` (session switcher, pages by role, intake switch for admins, and the person card that opens `/account`), `ConsoleTopBar` (sidebar button, breadcrumb, palette button, **Live** or **Reconnecting**, theme menu) and `CommandPalette`. |
-| `QueuePages.tsx` | `QueuePage` (status cards, status tabs with counts, T0008 team filter, issue table), `MinePage`, `HandoffsPage`, `TeamsPage` and the shared `PageHeader`. |
+| `QueuePages.tsx` | `QueuePage` (status cards, status tabs with counts, team filter, issue table), `MinePage`, `HandoffsPage`, `TeamsPage` and the shared `PageHeader`. |
 | `IssueTable.tsx` | `IssueTable` (number, status with icon and label, report and category, team and location, owner, aging timer, **Claim** or **Accept**) and `StatCards`. |
 | `IssueSheet.tsx` | The issue side sheet: timer cards, owner, lifecycle steps with times, handoff banner, actions, the Activity, Images and Outcome & award tabs and the reply composer. |
 | `AwardReviewPage.tsx` | The lists from `awardLists()`: To decide, To apply and Applied. Each card shows `AwardEvidence` and has the award form or the confirmation form. |
@@ -302,13 +302,13 @@ These rules apply:
 - **Claim** or **Accept** in a row stays on the page and does not open the sheet. When the person opens an issue while that command runs, the row action does not close it. **Claim** or **Accept handoff** in the sheet keeps the sheet open. A recorded report opens its issue in the sheet.
 - When the sheet closes, focus goes back to the control that opened it, then to the issue row, then to the page heading. Radix returns focus only to a `Dialog.Trigger`, so the console moves focus itself. The sheet keeps the last issue on screen while it slides out.
 - When the open issue leaves the person's lists, the sheet closes with the same status message as the phone app.
-- The queue team filter and the **Report for a team** dialog keep separate team choices. The UI before T0015 shared one choice.
+- The queue team filter and the **Report for a team** dialog keep separate team choices. The UI before the frontend redesign shared one choice.
 - The sheet shows one filled primary action from `primaryAction()`. Other allowed actions are outlined. **Decide award** and **Confirm applied** open the Outcome & award tab and move focus to the heading of the award or application section. Resolve, escalate and reopen open a dialog.
 - A refresh error or a command error stays pinned to the top of the scrolling page, so the error of a row far down the list stays in view.
 - The Images tab and the Outcome & award tab stay mounted while another tab is open. An upload continues, and a typed award explanation or an apply confirmation stays when the person opens another tab and comes back. Only the Activity tab unmounts, because it has no form.
 - A staff member without a volunteer or specialist role sees one muted line under the action buttons with the same rule and text as the phone app (`missingActionHint()`).
-- The composer has **Public reply** and **Internal note**. An internal note has the amber striped surface. The draft clears only when the server records the message, also after **Retry last request** (T0012).
-- The command palette finds issues by number (`31`, `#31`, `ISS-31`) or by report text from three characters, teams and tables with the T0008 search, pages and actions. A team opens the queue with that team filter. A jury-only member goes to Teams & tables instead.
+- The composer has **Public reply** and **Internal note**. An internal note has the amber striped surface. The draft clears only when the server records the message, also after **Retry last request**.
+- The command palette finds issues by number (`31`, `#31`, `ISS-31`) or by report text from three characters, teams and tables with the fuzzy team search, pages and actions. A team opens the queue with that team filter. A jury-only member goes to Teams & tables instead.
 - The intake switch in the sidebar and the admin pages share one `useSessionAdmin`, so one admin request runs at a time. Admin errors and notices show at the top of the page and in the open dialog.
 - The sidebar choice (expanded or collapsed) is kept in local storage under `minsky:console-sidebar`.
 
@@ -377,7 +377,7 @@ Controls are disabled while a step runs. After each step, focus returns to the c
 
 ## Jury award lists
 
-T0009 added a separate jury worklist on `main`. See [the worklist specification](history/t0009-jury-worklist.md).
+PR #23 added a separate jury worklist on `main`. See [the worklist specification](history/t0009-jury-worklist.md).
 The step 5 merge moved its rules into the phone Awards tab (`AwardsTab` in `PhoneTabs.tsx`) and the desktop `AwardReviewPage`.
 
 `awardLists(state)` in `organiserModel.ts` uses `juryWorklists()` from `src/connected/jury.ts`. It gives three lists:
@@ -393,7 +393,7 @@ These rules apply:
   When the award resolution was reopened, it also shows "This award relates to an earlier resolution."
 - `openableIssues(state, member)` adds reopened issues with a pending award for a jury-only member. Thus that member can open the issue and confirm the application.
   The ordinary queue of a jury-only member still shows resolved issues only.
-- The T0015 design differs from the T0009 specification in two ways.
+- The frontend redesign differs from the jury worklist specification in two ways.
   The desktop award and confirmation forms stay on the Award review cards.
   There is no separate **Jury worklist** sidebar entry and no **Back to jury worklist** button. The Award review page and the Awards tab are the worklist.
 

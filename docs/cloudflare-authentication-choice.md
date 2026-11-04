@@ -1,6 +1,6 @@
 # Cloudflare authentication choice
 
-This page explains the identity choice for T0018.
+This page explains the identity choice for Cloudflare authentication.
 Cloudflare serves the development application through the complete connector.
 The complete connector, fresh installations, and approved stable deployment have separate [verification records](history/run-log.md).
 The [activation procedure](activate-cloudflare-development.md) records the separate owner approval and recovery rules.
@@ -11,7 +11,7 @@ Cloudflare hosting has separate charges. The [resource and cost evidence](#resou
 
 ## Use Better Auth behind the identity adapter
 
-T0018 selected Better Auth `1.7.10`. `package.json` and `package-lock.json` pin the current exact version.
+The original Cloudflare authentication work selected Better Auth `1.7.10`. `package.json` and `package-lock.json` pin the current exact version.
 The package supplies username login, password verification, signed session cookies, database sessions, expiry, and logout.
 Its username plugin permits username login while its user schema retains an email field.
 Minsky uses a synthetic address under `accounts.minsky.invalid` for that required field.

@@ -1,7 +1,6 @@
 # Code quality and review
 
 On 2026-10-02, the user selected mandatory CI, a short PR review checklist, and scans for secrets and dependencies.
-These changes extend T0003.
 The user reviews and merges.
 Workers Builds publishes `main` to the `minsky-dev` development application after the checks pass in the same build.
 Branch previews on `minsky-preview` are switched off, because Workers Builds cannot limit their token to the preview resources.
@@ -123,7 +122,7 @@ The Google TypeScript style policy and manual interface checks in AGENTS.md stil
 ## Owner setup for mandatory merges
 
 On 2026-10-02, the user deferred remote merge enforcement and setup of vulnerability alerts.
-On 2026-10-03, the user moved these scope notes from T0004.
+On 2026-10-03, the user moved these scope notes out of the UI makeover.
 They stay deferred.
 The owner steps below remain incomplete.
 Hosted provider checks are on-demand commands. No protected GitHub environment runs them.

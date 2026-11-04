@@ -119,7 +119,7 @@ A review after the update from `main` found these defects. Each fix has a regres
 - Hosted Supabase and hosted Cloudflare behavior, including R2 transfers and Durable Object delivery.
 - Image upload in a browser. Service, database, function, and adapter tests cover its parts. No test runs the Cloudflare browser adapter, HTTP route, and image service together.
 - The shared provider test bridge. It reports that it does not cover announcements.
-- Other browsers, screen readers, 200% zoom, and physical devices. [Manual checks](../manual-verification.md#15-session-announcements-t0006) list them.
+- Other browsers, screen readers, 200% zoom, and physical devices. [Manual checks](../manual-verification.md#15-session-announcements) list them.
 
 ## Docs publication through Workers Builds, 2026-10-24
 
@@ -1453,7 +1453,7 @@ The simulated Realtime payload now includes PostgreSQL column metadata. Browser
 testing caught the return-focus case after a row moved sections; it was corrected
 before the passing run. None of those failed attempts count as passing checks.
 
-The [specification](t0009-jury-worklist.md) and [manual walkthrough](../manual-verification.md#13-jury-worklist-t0009)
+The [specification](t0009-jury-worklist.md) and [manual walkthrough](../manual-verification.md#13-jury-worklist)
 record remaining acceptance. Cloud results must not be inferred from local
 transport simulations. The hosted test includes zero-minute award, reopening,
 external confirmation, re-resolution, and rejection of a second award, but is unverified.

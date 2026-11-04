@@ -467,14 +467,14 @@ describe('rows read by management commands in a session with 1,200 accounts', ()
     expect((await measure(1201, { type: 'unassign_entrant', contestId: world.contest, entrantId: fresh! })).rowsRead).toBeLessThan(55);
   });
 
-  // Fifty entrants with their sign-ins enter one contest in one command. Measured 907 rows on 2026-11-04,
-  // about 18 for each entry: its seat, its triggers, and its sign-in lookup.
+  // Fifty entrants with their sign-ins enter one contest in one command. Measured 1,107 rows on 2026-11-05,
+  // about 22 for each entry: its seat, its triggers, its name, and its sign-in lookup.
   it('reads a bounded number of rows to assign 50 entrants at once', async () => {
     const entries = Array.from({ length: 50 }, (_, index) => ({ entrantId: `00000000-0000-4000-8006-${String(index + 1).padStart(12, '0')}`, location: `Table ${index + 1}` }));
     const { receipt, rowsRead } = await measure(1201, { type: 'assign_entrants', contestId: world.bulk, entries });
     expect(receipt.entrantIds).toHaveLength(50);
     expect((await db.prepare('SELECT count(*) AS n FROM memberships WHERE session_id = ?').bind(world.bulk).all<{ n: number }>()).results).toEqual([{ n: 50 }]);
-    expect(rowsRead).toBeLessThan(1_100);
+    expect(rowsRead).toBeLessThan(1_200);
   });
 });
 

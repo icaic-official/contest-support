@@ -33,7 +33,7 @@ const queries: Record<string, string> = {
 // readVolume.test.ts catches a scan of a real table behind an alias with the
 // same name, because it counts rows read on a large session.
 const materializedScans = new Map([
-  [snapshotSql, /^SCAN (?:access|visible_issues|extra_minutes|a|i|c)(?: LEFT-JOIN)?$/],
+  [snapshotSql, /^SCAN (?:access|visible_issues|extra_minutes|a|i|c|x)(?: LEFT-JOIN)?$/],
   [announcementSnapshotSql, /^SCAN (?:access|c)$/],
   // The site page lists every event, and the site has few.
   [siteEventsSql, /^SCAN e$/],

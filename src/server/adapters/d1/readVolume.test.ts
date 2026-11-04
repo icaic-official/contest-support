@@ -3,8 +3,9 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { Command, Snapshot } from '../../../connected/model';
 import { decideWorkflow } from '../../workflow';
 import { openStoreDatabase } from '../cloudflare/tooling/store-database.mjs';
-import { contestsListSql, currentReadyLoginSql, eventContestsSql, snapshotSql } from '../cloudflare/application';
+import { D1ApplicationService, contestsListSql, currentReadyLoginSql, eventContestsSql, snapshotSql } from '../cloudflare/application';
 import { currentAccountSql } from '../cloudflare/authentication';
+import { D1ContestAwardService } from '../cloudflare/contestAwards';
 import { D1ManageService } from '../cloudflare/manage';
 import { clockSql, extraMinutesSql, intakeOpenSql } from '../cloudflare/schedule';
 import type { ManageCommand } from '../../../backend/contracts';
@@ -297,8 +298,9 @@ describe('rows read for a session with 1,200 accounts and 100 issues', () => {
     await db.prepare(`UPDATE awards SET applied_at = ${now}, applied_by = 'acc-2', applied_name = 'Person 2' WHERE id = 'award-7'`).run();
     const { rowsRead, body } = await snapshot(db, callers.contestant);
     expect(body!.clock).toMatchObject({ extra_minutes: 5, intake: { reason: 'running' } });
-    // Measured 132 on 2026-11-04, 20 rows more than the 112 of an unscheduled contest, because it reads the contestant's issue awards.
-    expect(rowsRead).toBeLessThan(150);
+    // Measured 126 on 2026-11-04, 14 rows more than the 112 of an unscheduled contest, because it reads the
+    // contestant's issue awards. It stays under the ceiling of the unscheduled contestant snapshot.
+    expect(rowsRead).toBeLessThan(130);
     await db.prepare("UPDATE sessions SET intake_follows_schedule = 0, starts_at = NULL, ends_at = NULL WHERE id = 'sess-1'").run();
     await db.prepare('UPDATE awards SET applied_at = NULL, applied_by = NULL, applied_name = NULL WHERE id = ?').bind('award-7').run();
   });
@@ -502,6 +504,44 @@ describe('rows read by management commands in a session with 1,200 accounts', ()
     expect(receipt.entrantIds).toHaveLength(50);
     expect((await db.prepare('SELECT count(*) AS n FROM memberships WHERE session_id = ?').bind(world.bulk).all<{ n: number }>()).results).toEqual([{ n: 50 }]);
     expect(rowsRead).toBeLessThan(1_100);
+  });
+
+  // A contest-wide award tells the staff and every team of the contest, like set_intake. The contest has 24 teams,
+  // so each command reads the team list once and writes two audience rows for each. Measured on 2026-11-04:
+  // 101 rows to grant and 105 to confirm after the tests above (72 and 101 when run alone), all above the
+  // 60-row target of the workflow commands. A contest of 800 teams reads about 800 more rows for the list.
+  it('reads a bounded number of rows to grant and to confirm a contest-wide award', async () => {
+    await db.prepare("INSERT INTO membership_roles (session_id, account_id, role) VALUES (?, ?, 'jury')").bind(world.contest, world.account(1)).run();
+    const read = async (command: Parameters<D1ContestAwardService['execute']>[3]) => {
+      const { connection, usage } = metered(db);
+      const id = await new D1ContestAwardService(connection).execute(as(1), world.contest, randomUUID(), command);
+      return { id, rowsRead: usage.rowsRead };
+    };
+    const granted = await read({ type: 'grant', minutes: 15, explanation: 'Fictional outage' });
+    expect(granted.rowsRead, 'grant').toBeLessThan(125);
+    expect((await read({ type: 'apply', awardId: granted.id })).rowsRead, 'apply').toBeLessThan(130);
+  });
+
+  // The calendar of a member reads the member's own event through sessions_event_schedule. Other events add no rows.
+  // Measured on 2026-11-04: 29 rows for a contestant with 3 scheduled contests of its event and 60 of another event.
+  // Before the webmaster branch read its grant once, the grant check ran for each of the 60 and the read took 152 rows.
+  it('reads only the member\'s own event for a calendar window', async () => {
+    const other = '00000000-0000-4000-8000-00000000e002';
+    const series = (count: number) => `WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < ${count})`;
+    await db.prepare(`UPDATE sessions SET starts_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-1 hour'), ends_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '+1 hour'),
+      intake_follows_schedule = 1 WHERE event_id = ?`).bind(world.event).run();
+    await db.prepare("INSERT INTO events (id, name) VALUES (?, 'Other event')").bind(other).run();
+    await db.prepare(`${series(60)} INSERT INTO sessions (id, event_id, name, starts_at, ends_at, intake_follows_schedule)
+      SELECT ${uuid(9, 'i')}, '${other}', 'Elsewhere ' || i, strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-1 hour'),
+        strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '+' || i || ' hours'), 1 FROM n`).run();
+    const window = { from: new Date(Date.now() - 3_600_000).toISOString(), to: new Date(Date.now() + 86_400_000).toISOString() };
+    for (const [name, n, ceiling] of [['a contestant', 7, 40], ['a contest admin', 1, 40]] as const) {
+      const { connection, usage } = metered(db);
+      const contests = await new D1ApplicationService(connection).contests(as(n), { window });
+      expect(contests.map((contest) => contest.eventId), name).toEqual(Array(contests.length).fill(world.event));
+      expect(contests.length, name).toBeGreaterThanOrEqual(2);
+      expect(usage.rowsRead, name).toBeLessThan(ceiling);
+    }
   });
 });
 

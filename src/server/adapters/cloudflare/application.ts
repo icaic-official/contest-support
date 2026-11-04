@@ -4,7 +4,7 @@ import { snapshotSchema, type Snapshot } from '../../../connected/model';
 import type { Caller } from '../../authentication';
 import { AuthenticationError } from '../../authentication';
 import type { D1Connection, D1Statement, D1Value } from '../d1/connection';
-import { calendarScopeSql, contestDataBindings, contestDataSql, contestListBindings, contestSeatsSql } from './authority';
+import { calendarEventSql, calendarWebmasterSql, contestDataBindings, contestDataSql, contestListBindings, contestSeatsSql } from './authority';
 import { clockSql, extraMinutesSql, intakeOpenSql, intakeStateSql, parseIntake, scheduleOf, type ScheduleColumns } from './schedule';
 
 /** Bind accountId, loginId. This check also works after an authorized self-removal. */
@@ -30,7 +30,7 @@ export function currentReadyLoginBindings(caller: Caller): D1Value[] {
 // extra_minutes is the contestant's confirmed extra time. It is read once, and
 // only for a contest with a schedule, because the clock and the intake state
 // both use it. The contest keeps today's reads without a schedule.
-const extra = '(SELECT minutes FROM extra_minutes)';
+const extra = 'x.minutes';
 export const snapshotSql = `WITH login AS (${currentReadyLoginSql}), access AS MATERIALIZED (${contestDataSql('caller')}),
   extra_minutes AS MATERIALIZED (SELECT CASE WHEN s.ends_at IS NULL THEN 0 ELSE ${extraMinutesSql('s', 'a.team_id')} END AS minutes
     FROM access a JOIN sessions s ON s.id = a.session_id),
@@ -107,7 +107,7 @@ SELECT json_object(
     FROM admin_audit d WHERE d.session_id = (SELECT ? WHERE c.is_admin = 1)
     ORDER BY d.at DESC, d.id DESC LIMIT 50)), '[]')),
   'server_time', strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
-) AS snapshot FROM login LEFT JOIN access c ON true`;
+) AS snapshot FROM login LEFT JOIN access c ON true LEFT JOIN extra_minutes x ON true`;
 
 /** Appends opaque invalidations to the same transaction as the changed data. */
 export function notificationStatements(db: D1Connection, sessionId: string, audiences: readonly string[]): D1Statement[] {
@@ -139,18 +139,20 @@ export const CALENDAR_LIMIT = 500;
 /**
  * The scheduled contests that overlap a window: every contest of the caller's
  * own event, and every contest of the site for a webmaster. A contest that the
- * caller holds no seat in is listed with `can_open` 0. Bind accountId, loginId,
- * then contestListBindings, then the window start and end.
+ * caller holds no seat in is listed with `can_open` 0. A member reads the event
+ * index and a webmaster the end-time index, so a member's read does not grow
+ * with the other events of the site. Bind accountId, loginId, then
+ * contestListBindings, then the window start and end for each of the two scopes.
  */
-export const calendarSql = `WITH login AS (${currentReadyLoginSql}),
+const calendarRow = (from: string, scope: string) => `SELECT s.id, s.name, s.event_id, COALESCE(r.manage, 'none') AS manage,
+    e.name AS event_name, e.time_zone, s.contest_type, s.starts_at, s.ends_at, s.grace_minutes, s.intake_follows_schedule,
+    s.intake_open, ${intakeStateSql('s')} AS intake, r.session_id IS NOT NULL AS can_open
+  FROM ${from} CROSS JOIN sessions s JOIN events e ON e.id = s.event_id LEFT JOIN reach r ON r.session_id = s.id
+  WHERE ${scope} AND s.ends_at > ? AND s.starts_at < ?`;
+export const calendarSql = `WITH login AS (${currentReadyLoginSql}), webmaster AS MATERIALIZED (${calendarWebmasterSql}),
   reach AS MATERIALIZED (SELECT c.session_id, c.manage FROM (${contestDataSql('contests')}) c)
-SELECT s.id, s.name, s.event_id, COALESCE(r.manage, 'none') AS manage, e.name AS event_name, e.time_zone,
-  s.contest_type, s.starts_at, s.ends_at, s.grace_minutes, s.intake_follows_schedule, s.intake_open,
-  ${intakeStateSql('s')} AS intake, r.session_id IS NOT NULL AS can_open
-FROM login CROSS JOIN sessions s JOIN events e ON e.id = s.event_id LEFT JOIN reach r ON r.session_id = s.id
-WHERE s.ends_at > ? AND s.starts_at < ?
-  AND ${calendarScopeSql}
-ORDER BY s.starts_at, s.id LIMIT ${CALENDAR_LIMIT}`;
+SELECT * FROM (${calendarRow('login', calendarEventSql)} UNION ALL ${calendarRow('webmaster CROSS JOIN login', '1')})
+ORDER BY starts_at, id LIMIT ${CALENDAR_LIMIT}`;
 
 interface ContestRow extends ScheduleColumns {
   id: string; name: string; event_id: string; manage: ManageLevel; event_name: string; time_zone: string;
@@ -175,7 +177,7 @@ export class D1ApplicationService {
     const { eventId, window } = query;
     if (eventId !== undefined && !z.uuid().safeParse(eventId).success) throw new AuthenticationError(400, 'Choose an event.');
     const result = window !== undefined
-      ? await this.statement(calendarSql, ...currentReadyLoginBindings(caller), ...contestListBindings(caller), window.from, window.to)
+      ? await this.statement(calendarSql, ...currentReadyLoginBindings(caller), ...contestListBindings(caller), window.from, window.to, window.from, window.to)
         .all<ContestRow>()
       : eventId === undefined
         ? await this.statement(contestsListSql, ...contestListBindings(caller)).all<ContestRow>()

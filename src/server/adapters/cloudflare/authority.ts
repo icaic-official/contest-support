@@ -117,13 +117,15 @@ export function contestDataSql(selection: ContestSelection): string {
 }
 
 /**
- * The contests that a calendar lists for the account `login.id`: every contest
- * of the account's own event, and every contest of the site for a webmaster.
- * The calendar lists a contest without opening it, so it needs no seat. It
- * reads schedules only. `s` names the contest row.
+ * The two scopes of a calendar read for the account `login.id`, in two
+ * statements so that each reads its own index. The webmaster row is read once,
+ * so a member's webmaster branch stops before it reads a contest. A member lists the contests of
+ * the account's own event. A webmaster lists the contests of every event. The
+ * calendar lists a contest without opening it, so it needs no seat and reads
+ * schedules only. `s` names the contest row.
  */
-export const calendarScopeSql = `(s.event_id = (SELECT event_id FROM accounts WHERE id = login.id)
-  OR EXISTS (SELECT 1 FROM grants WHERE scope = 'site' AND account_id = login.id))`;
+export const calendarEventSql = 's.event_id = (SELECT event_id FROM accounts WHERE id = login.id)';
+export const calendarWebmasterSql = "SELECT 1 FROM login JOIN grants g ON g.scope = 'site' AND g.account_id = login.id";
 
 /** Callers must come from the trusted authentication service. */
 export function contestDataBindings(caller: Caller, contestId: string): D1Value[] {

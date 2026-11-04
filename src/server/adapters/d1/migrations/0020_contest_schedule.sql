@@ -63,8 +63,6 @@ WHEN OLD.applied_at IS NOT NULL OR NEW.id IS NOT OLD.id OR NEW.session_id IS NOT
 BEGIN
   SELECT RAISE(ABORT, 'A contest award is final, and its confirmation is written once');
 END;
--- The console sums applied issue awards per contest.
-CREATE INDEX awards_session ON awards(session_id);
 
 DROP TRIGGER session_changes;
 CREATE TRIGGER session_changes AFTER UPDATE OF intake_open, event_id, categories, contest_type,

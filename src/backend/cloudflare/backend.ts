@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { Announcements, Avatars, Backend, LiveUpdates } from '../contracts';
-import { AnnouncementRejectedError, ImageRequestError, WorkflowRejectedError, workflowRejectionMessage } from '../errors';
+import { AnnouncementRejectedError, ImageRequestError, RequestRefusedError, WorkflowRejectedError, workflowRejectionMessage } from '../errors';
 import { announcementSnapshotSchema } from '../../connected/announcementModel';
 import { AVATAR_MAX_BYTES, imageKind } from '../../connected/imageFile';
 import { type Command, roleSchema, snapshotSchema, type Snapshot } from '../../connected/model';
@@ -95,7 +95,8 @@ export function createCloudflareBackend(options: {
     const body: unknown = await response.json().catch(() => undefined);
     if (!response.ok) {
       const error = failureSchema.safeParse(body);
-      throw new Error(error.success ? error.data.error : 'The request could not be completed.');
+      const message = error.success ? error.data.error : 'The request could not be completed.';
+      throw response.status < 500 ? new RequestRefusedError(message) : new Error(message);
     }
     return body;
   }

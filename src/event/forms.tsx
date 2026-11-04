@@ -58,7 +58,7 @@ export function CommandError({ message }: { message: string }) {
 /**
  * A box of pasted "name, username" lines with a live check of every line. The
  * box keeps its text until the command succeeds, so a failed request loses
- * nothing. `onSubmit` resolves to true when the server recorded the lines.
+ * nothing. `onSubmit` resolves to "done" when the server recorded the lines, "refused" when it answered with a refusal, and "unknown" when no answer came.
  */
 export function LinesForm({
   label,
@@ -74,7 +74,7 @@ export function LinesForm({
   submitLabel: string;
   rules: LineRules;
   disabled: boolean;
-  onSubmit: (lines: PersonLine[]) => Promise<boolean>;
+  onSubmit: (lines: PersonLine[]) => Promise<"done" | "refused" | "unknown">;
   children?: ReactNode;
 }) {
   const id = useId();
@@ -97,9 +97,10 @@ export function LinesForm({
         // The submit button goes disabled when the box empties, so focus waits in the box for the next lines.
         document.getElementById(id)?.focus();
         const sent = text;
-        void onSubmit(lines).then((done) => {
-          if (done) setText("");
-          else setLost(sent);
+        void onSubmit(lines).then((outcome) => {
+          if (outcome === "done") setText("");
+          // A refusal changed nothing, so the typed lines stay and nothing is waiting for a later read.
+          setLost(outcome === "unknown" ? sent : "");
         });
       }}
     >

@@ -62,9 +62,9 @@ export function PeopleTab({ data, state }: TabProps) {
               eventId: data.event.id,
               people: personInputs(lines),
             });
-            if (!receipt) return false;
+            if (!receipt) return state.failure.current === "unknown" ? "unknown" : "refused";
             void state.issue(receipt.accountIds ?? []);
-            return true;
+            return "done";
           }}
         />
       </Panel>
@@ -220,9 +220,9 @@ export function EntrantsTab({ data, state }: TabProps) {
               eventId: data.event.id,
               entrants: entrantInputs(lines, kind),
             });
-            if (!receipt) return false;
+            if (!receipt) return state.failure.current === "unknown" ? "unknown" : "refused";
             void state.issue(receipt.accountIds ?? []);
-            return true;
+            return "done";
           }}
         >
           <fieldset className="space-y-1.5">

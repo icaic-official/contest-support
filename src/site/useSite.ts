@@ -65,7 +65,10 @@ export function useSite(): SiteState {
       key: string,
       send: (requestId: string) => Promise<T>,
     ): Promise<T | undefined> => {
-      if (running.current) return undefined;
+      if (running.current) {
+        setError("Another change is still running. Try again.");
+        return undefined;
+      }
       running.current = true;
       const requestId = pending.current.get(key) ?? crypto.randomUUID();
       pending.current.set(key, requestId);

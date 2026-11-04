@@ -79,7 +79,13 @@ export function LinesForm({
 }) {
   const id = useId();
   const [text, setText] = useState("");
+  const [lost, setLost] = useState("");
   const lines = parsePersonLines(text, rules);
+  // The answer to these lines was lost, and the next read shows that the server recorded them.
+  if (lost && lost === text && lines.length > 0 && lines.every((line) => rules.takenHandles.includes(line.handle))) {
+    setText("");
+    setLost("");
+  }
   const problem = linesError(lines);
   const flagged = lines.filter((line) => line.problem);
   return (
@@ -88,8 +94,12 @@ export function LinesForm({
       onSubmit={(event) => {
         event.preventDefault();
         if (disabled || problem) return;
+        // The submit button goes disabled when the box empties, so focus waits in the box for the next lines.
+        document.getElementById(id)?.focus();
+        const sent = text;
         void onSubmit(lines).then((done) => {
           if (done) setText("");
+          else setLost(sent);
         });
       }}
     >

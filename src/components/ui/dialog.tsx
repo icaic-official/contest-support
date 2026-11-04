@@ -66,13 +66,13 @@ function DialogContent({
   className,
   children,
   showCloseButton = true,
+  onOpenAutoFocus,
   onCloseAutoFocus,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean
 }) {
-  // The first render runs before Radix moves focus into the dialog.
-  const [opener] = React.useState(() => document.activeElement)
+  const opener = React.useRef<Element | null>(null)
   return (
     <DialogPortal data-slot="dialog-portal">
       <DialogOverlay />
@@ -83,11 +83,16 @@ function DialogContent({
           className
         )}
         {...props}
+        onOpenAutoFocus={(event) => {
+          // Radix sends this before it moves focus, so the opener still holds it.
+          opener.current = document.activeElement
+          onOpenAutoFocus?.(event)
+        }}
         onCloseAutoFocus={(event) => {
           onCloseAutoFocus?.(event)
           if (event.defaultPrevented) return
           event.preventDefault()
-          restoreFocus(opener)
+          restoreFocus(opener.current)
         }}
       >
         {children}

@@ -203,16 +203,6 @@ test.describe("the console's roster editor", () => {
   };
   const closeSheet = (page: Page) =>
     page.getByRole("dialog", { name: "Share these credentials securely" }).getByRole("button", { name: "Done", exact: true }).click();
-  /** The next request to `path` fails. "request" stops it before the server, and "response" after. */
-  const loseNext = async (page: Page, path: string, part: "request" | "response") => {
-    let lost = false;
-    await page.route(`**${path}`, async (route) => {
-      if (lost || route.request().method() !== "POST") return route.fallback();
-      lost = true;
-      if (part === "response") await route.fetch();
-      await route.abort();
-    });
-  };
 
   test("adds entrants with the keyboard alone", async ({ page, local }) => {
     expect(local.eventCode).not.toBe("");
@@ -224,10 +214,11 @@ test.describe("the console's roster editor", () => {
     await page.keyboard.press("Tab");
     await page.keyboard.press("Enter");
     const sheet = page.getByRole("dialog", { name: "Share these credentials securely" });
-    await expect(sheet).toBeVisible();
+    await expect(sheet.getByLabel("Password for Team Zeta", { exact: true })).toBeVisible();
+    await expect(sheet.getByRole("button", { name: "Done", exact: true })).toBeEnabled();
     await page.keyboard.press("Escape");
     await expect(sheet).toHaveCount(0);
-    await expect(page.getByRole("button", { name: "Import entrants", exact: true })).toBeFocused();
+    await expect(box(page)).toBeFocused();
     await expect(box(page)).toHaveValue("");
   });
 
@@ -258,7 +249,7 @@ test.describe("the console's roster editor", () => {
       sent.push(route.request().postData());
       return route.fallback();
     });
-    await loseNext(page, "/api/manage", "request");
+    local.loseNext("/api/manage", "request");
     await box(page).fill("Team Zeta, team-zeta");
     await page.getByRole("button", { name: "Import entrants (1)", exact: true }).click();
     await expect(page.getByRole("alert")).toBeVisible();
@@ -272,12 +263,13 @@ test.describe("the console's roster editor", () => {
 
   test("when the answer was lost, a retry clears the box without a second entrant", async ({ page, local }) => {
     await openEntrants(page);
-    await loseNext(page, "/api/manage", "response");
+    local.loseNext("/api/manage", "response");
     await box(page).fill("Team Zeta, team-zeta");
     await page.getByRole("button", { name: "Import entrants (1)", exact: true }).click();
     await expect(page.getByRole("alert")).toBeVisible();
-    // The read after the lost answer already shows the entrant, so its line is now a problem.
+    // The read after the lost answer shows the entrant, so the box clears itself.
     await expect(page.getByText("Entrants · 4")).toBeVisible();
+    await expect(box(page)).toHaveValue("");
     expect(await local.rows("SELECT id FROM entrants WHERE name = 'Team Zeta' AND event_id = (SELECT id FROM events WHERE code = ?)", local.eventCode)).toHaveLength(1);
   });
 
@@ -347,7 +339,7 @@ test.describe("the console's roster editor", () => {
     await page.getByRole("button", { name: "Create people (1)", exact: true }).click();
     await closeSheet(page);
     const toggle = page.getByRole("switch", { name: "Sam Lee: Event admin" });
-    await loseNext(page, "/api/manage", "response");
+    local.loseNext("/api/manage", "response");
     await toggle.click();
     await expect(page.getByRole("alert")).toHaveCount(1);
     await expect(toggle).toBeChecked();
@@ -382,6 +374,7 @@ test.describe("the console's roster editor", () => {
     await page.getByRole("button", { name: "Select all", exact: true }).click();
     await page.getByRole("button", { name: /^Assign selected entrants/ }).click();
     const list = page.getByRole("list", { name: /^Entrants in Primary/ });
+    await expect(list.getByText("Team Eta", { exact: true })).toBeVisible();
     const removes = list.getByRole("button", { name: /^Remove / });
     const before = await removes.count();
     await removes.first().focus();

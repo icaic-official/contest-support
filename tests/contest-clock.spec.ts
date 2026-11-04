@@ -169,3 +169,29 @@ test.describe("contest-wide time awards", () => {
     expect(await local.rows("SELECT id FROM contest_awards WHERE session_id = ?", local.sessions[0])).toEqual([]);
   });
 });
+
+test("jury on a phone see the calendar of the event, including a contest with no seat", async ({ browser, local }) => {
+  await schedule(local, -30, 90);
+  await local.run(
+    `UPDATE sessions SET starts_at = ${at(30)}, ends_at = ${at(120)}, intake_follows_schedule = 1 WHERE id = ?`,
+    local.sessions[1],
+  );
+  const hidden = randomUUID();
+  await local.run(
+    `INSERT INTO sessions (id, event_id, name, starts_at, ends_at, intake_follows_schedule) VALUES (?, ?, 'Closed room', ${at(60)}, ${at(180)}, 1)`,
+    hidden,
+    local.event,
+  );
+  const page = await signIn(browser, local, "jury", phone);
+  await page.getByRole("navigation", { name: "Organizer sections" }).getByRole("button", { name: /^Me/ }).click();
+  const calendar = page.getByRole("region", { name: "Calendar" });
+  await expect(calendar).toContainText("Primary");
+  await expect(calendar.getByRole("listitem").filter({ hasText: "Primary" })).toContainText("Current");
+  await expect(calendar.getByRole("button", { name: "Open Secondary" })).toBeVisible();
+  const row = calendar.getByRole("listitem").filter({ hasText: "Closed room" });
+  await expect(row).toContainText("You have no seat here");
+  await expect(row.getByRole("button")).toHaveCount(0);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
+  // The jury account holds a seat in the second contest too, so it is the only other contest that it can open.
+  await expect(calendar.getByRole("button", { name: /^Open / })).toHaveCount(1);
+});

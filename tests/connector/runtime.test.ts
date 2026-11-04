@@ -307,8 +307,8 @@ it('runs the complete application through isolated HTTPS, D1, R2, and Durable Ob
       contestType: 'teams', schedule: null, intake: { open: true, reason: 'override_open', changesAt: null }, canOpen: true, manage: 'none',
     }]);
     // The calendar lists scheduled contests only, and refuses a window that is open-ended or too long.
-    const window = `from=${encodeURIComponent(new Date(Date.now() - 3_600_000).toISOString())}&to=${encodeURIComponent(new Date(Date.now() + 3_600_000).toISOString())}`;
-    expect(await json(contestant, `/api/contests?${window}`)).toEqual([]);
+    const calendar = `from=${encodeURIComponent(new Date(Date.now() - 3_600_000).toISOString())}&to=${encodeURIComponent(new Date(Date.now() + 3_600_000).toISOString())}`;
+    expect(await json(contestant, `/api/contests?${calendar}`)).toEqual([]);
     await json(contestant, `/api/contests?from=${encodeURIComponent(new Date().toISOString())}`, undefined, 400);
     expect((await json<Array<{ manage: string }>>(eventAdmin, '/api/contests')).map((item) => item.manage)).toEqual(['event']);
     await json(contestant, '/api/sessions', undefined, 404);

@@ -27,7 +27,7 @@ export function ScheduleFields({
       <legend className="text-sm font-medium">
         Schedule <span className="font-normal text-muted-foreground">in {timeZone} ({zoneLabel(timeZone)})</span>
       </legend>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 gap-3 min-[380px]:grid-cols-2">
         <div className="space-y-1.5">
           <Label htmlFor={`${id}-start-date`}>Start date</Label>
           <Input id={`${id}-start-date`} type="date" value={draft.startDate} className={fieldClass}

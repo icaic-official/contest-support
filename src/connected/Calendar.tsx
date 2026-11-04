@@ -14,8 +14,11 @@ import { formatInZone, viewerNote } from "./zonedTime";
 /** The contests of the person's own events for seven days, grouped by event and day in the event's zone. */
 export function Calendar({
   onOpen,
+  currentId,
   refreshKey = 0,
 }: {
+  /** The contest that is open now. It shows "Current" in place of its button. */
+  currentId?: string | undefined;
   /** Opens a contest that the person holds a seat in. Omit it to list without links. */
   onOpen?: ((contest: ContestSummary) => void) | undefined;
   /** Reads the calendar again when it changes. */
@@ -99,7 +102,9 @@ export function Calendar({
                         )}
                       </div>
                       <Badge variant="outline">{intakeHeadline(contest.intake.reason)}</Badge>
-                      {contest.canOpen ? (
+                      {contest.id === currentId ? (
+                        <Badge variant="secondary">Current</Badge>
+                      ) : contest.canOpen ? (
                         onOpen && (
                           <Button type="button" variant="outline" className="h-11"
                             aria-label={`Open ${contest.name}`} onClick={() => onOpen(contest)}>

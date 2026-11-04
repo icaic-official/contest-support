@@ -27,6 +27,7 @@ import {
   type Membership,
   type Snapshot,
 } from "@/connected/model";
+import { Calendar } from "@/connected/Calendar";
 import { ContestAwardsPanel } from "@/connected/ContestAwards";
 import { ContestPicker } from "@/connected/ContestPicker";
 import { PictureEditor } from "@/connected/PictureEditor";
@@ -558,6 +559,16 @@ export function MeTab(props: PhoneTabProps & { onSessionChange: () => void }) {
           </p>
         )}
       </section>
+      <div className="rounded-xl border bg-card p-3">
+        <Calendar
+          currentId={data.sessionId}
+          refreshKey={data.updates}
+          onOpen={(contest) => {
+            data.selectSession(contest.id);
+            props.onSessionChange();
+          }}
+        />
+      </div>
       <div className="divide-y rounded-xl border bg-card">
         <button
           id={changePictureButtonId}

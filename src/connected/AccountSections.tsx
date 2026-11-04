@@ -400,9 +400,9 @@ export function SessionsSection({
       </ul>
       <div className="mt-6">
         <Calendar
+          currentId={data.sessionId}
           refreshKey={data.updates}
           onOpen={(contest) => {
-            if (contest.id === data.sessionId) return;
             data.selectSession(contest.id);
             onSessionChange();
           }}

@@ -72,7 +72,9 @@ const commandSchema = z.discriminatedUnion('type', [
     schedule: scheduleSchema, categories: categoriesSchema,
   }),
   z.strictObject({
-    type: z.literal('update_contest'), contestId: uuid, name: nameSchema, contestType: contestTypeSchema, schedule: scheduleSchema,
+    type: z.literal('update_contest'), contestId: uuid, name: nameSchema, contestType: contestTypeSchema,
+    // Omitted keeps the current schedule, including none.
+    schedule: scheduleSchema.optional(),
   }),
   z.strictObject({
     type: z.literal('assign_entrants'), contestId: uuid,
@@ -764,21 +766,27 @@ export class D1ManageService {
         if (current.contest_type !== command.contestType && await this.entriesExcludedBy(command.contestId, command.contestType)) {
           throw new AuthenticationError(409, typeExcludes);
         }
+        const before = scheduleOf(current);
+        const schedule = command.schedule ?? before;
         return {
           // D1 refuses a contest type that excludes an entry, and it counts the change in the contest version.
           statements: [
             // The schedule never changes the intake mode. Staff choose that with set_intake.
-            this.statement(`UPDATE sessions SET name = ?, contest_type = ?, starts_at = ?, ends_at = ?, grace_minutes = ?
-              WHERE id = ?`, command.name, command.contestType, command.schedule.startsAt, command.schedule.endsAt,
-            command.schedule.graceMinutes, command.contestId),
+            // A command without a schedule leaves the three schedule columns as they are.
+            command.schedule
+              ? this.statement(`UPDATE sessions SET name = ?, contest_type = ?, starts_at = ?, ends_at = ?, grace_minutes = ?
+                WHERE id = ?`, command.name, command.contestType, command.schedule.startsAt, command.schedule.endsAt,
+              command.schedule.graceMinutes, command.contestId)
+              : this.statement(`UPDATE sessions SET name = ?, contest_type = ? WHERE id = ?`,
+                command.name, command.contestType, command.contestId),
             assertions.check('SELECT 1 WHERE changes() = 1'),
           ],
           audit: { action: 'update_contest', target: null,
-            detail: { contest: command.contestId, from: { name: current.name, contestType: current.contest_type, schedule: scheduleOf(current) },
-              to: { name: command.name, contestType: command.contestType, schedule: command.schedule } } },
+            detail: { contest: command.contestId, from: { name: current.name, contestType: current.contest_type, schedule: before },
+              to: { name: command.name, contestType: command.contestType, schedule } } },
           contestAudit: { action: 'update_contest', target: null,
-            detail: { from: { name: current.name, contestType: current.contest_type, schedule: scheduleOf(current) },
-              to: { name: command.name, contestType: command.contestType, schedule: command.schedule } } },
+            detail: { from: { name: current.name, contestType: current.contest_type, schedule: before },
+              to: { name: command.name, contestType: command.contestType, schedule } } },
           notify: [{ contestId: command.contestId, audiences: await this.contestAudiences(command.contestId) }],
           receipt: {},
         };

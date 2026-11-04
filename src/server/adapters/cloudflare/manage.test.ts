@@ -737,6 +737,19 @@ describe('event, roster, and contest commands', () => {
       .toMatchObject({ mode: 'schedule', intake: { open: false, reason: 'before_start', changesAt: '2030-03-01T02:00:00.000Z' }, schedule: { graceMinutes: 0 } });
   });
 
+  it('renames a contest with no schedule and leaves its schedule empty when the command omits one', async () => {
+    expect(await rows('SELECT starts_at, ends_at FROM sessions WHERE id = ?', ids.contest)).toEqual([{ starts_at: null, ends_at: null }]);
+    await execute('eventAdmin', { type: 'update_contest', contestId: ids.contest, name: 'Renamed only', contestType: 'teams' });
+    expect(await rows('SELECT name, starts_at, ends_at FROM sessions WHERE id = ?', ids.contest))
+      .toEqual([{ name: 'Renamed only', starts_at: null, ends_at: null }]);
+    // A scheduled contest keeps its schedule the same way.
+    const created = await execute('eventAdmin', { type: 'create_contest', eventId: ids.event, name: 'Keeps', contestType: 'teams',
+      schedule: { startsAt: '2030-03-01T01:00:00.000Z', endsAt: '2030-03-01T04:00:00.000Z', graceMinutes: 15 }, categories: ['Other'] });
+    await execute('eventAdmin', { type: 'update_contest', contestId: created.contestId!, name: 'Kept', contestType: 'teams' });
+    expect(await rows('SELECT name, starts_at, ends_at, grace_minutes FROM sessions WHERE id = ?', created.contestId!))
+      .toEqual([{ name: 'Kept', starts_at: '2030-03-01T01:00:00.000Z', ends_at: '2030-03-01T04:00:00.000Z', grace_minutes: 15 }]);
+  });
+
   it('refuses a schedule that cannot run, and the schedule switch for a contest with no schedule', async () => {
     const create = (schedule: object) => execute('eventAdmin', { type: 'create_contest', eventId: ids.event, name: 'Bad', contestType: 'teams',
       schedule, categories: ['Other'] } as unknown as ManageCommand);

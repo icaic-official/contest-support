@@ -190,7 +190,7 @@ export function ContestsTab({ data, state }: TabProps) {
                     contestId: editing.id,
                     name: next.name,
                     contestType: next.type,
-                    schedule: next.schedule,
+                    ...(next.schedule && { schedule: next.schedule }),
                   })
                   .then((receipt) => receipt && setEditing(undefined))
               }
@@ -212,26 +212,29 @@ function EditContest({
   contest: EventConsole["contests"][number];
   timeZone: string;
   disabled: boolean;
-  onSubmit: (next: { name: string; type: ContestType; schedule: Schedule }) => void;
+  /** `schedule` is absent when the contest has none and the person added none. */
+  onSubmit: (next: { name: string; type: ContestType; schedule?: Schedule }) => void;
 }) {
   const id = useId();
   const [name, setName] = useState(contest.name);
   const [type, setType] = useState(contest.contestType);
-  const [draft, setDraft] = useState<ScheduleDraft>(() =>
-    contest.schedule ? draftOf(contest.schedule, timeZone) : emptyDraft(timeZone),
+  // A contest with no schedule shows no fields until the person adds one.
+  const [draft, setDraft] = useState<ScheduleDraft | undefined>(() =>
+    contest.schedule ? draftOf(contest.schedule, timeZone) : undefined,
   );
   const trimmed = name.trim();
-  const parsed = scheduleOfDraft(draft, timeZone);
+  const parsed = draft ? scheduleOfDraft(draft, timeZone) : undefined;
   const changed =
     trimmed !== contest.name ||
     type !== contest.contestType ||
-    ("schedule" in parsed && !sameSchedule(contest.schedule, parsed.schedule));
+    (!!parsed && "schedule" in parsed && !sameSchedule(contest.schedule, parsed.schedule));
   return (
     <form
       className="space-y-3"
       onSubmit={(event) => {
         event.preventDefault();
-        if (trimmed && changed && "schedule" in parsed) onSubmit({ name: trimmed, type, schedule: parsed.schedule });
+        if (!trimmed || !changed || (parsed && "problem" in parsed)) return;
+        onSubmit({ name: trimmed, type, ...(parsed && "schedule" in parsed && { schedule: parsed.schedule }) });
       }}
     >
       <div className="space-y-1.5">
@@ -250,9 +253,16 @@ function EditContest({
         <Label htmlFor={`${id}-type`}>Type</Label>
         <TypeSelect id={`${id}-type`} value={type} disabled={disabled} onChange={setType} />
       </div>
-      <ScheduleFields draft={draft} timeZone={timeZone} disabled={disabled} onChange={setDraft} />
-      {"problem" in parsed && <p className="text-sm text-muted-foreground">{parsed.problem}</p>}
-      <Button type="submit" className="h-11 w-full" disabled={disabled || !trimmed || !changed || "problem" in parsed}>
+      {draft ? (
+        <ScheduleFields draft={draft} timeZone={timeZone} disabled={disabled} onChange={setDraft} />
+      ) : (
+        <Button type="button" variant="outline" className="h-11 w-full" disabled={disabled}
+          onClick={() => setDraft(emptyDraft(timeZone))}>
+          Add a schedule
+        </Button>
+      )}
+      {parsed && "problem" in parsed && <p className="text-sm text-muted-foreground">{parsed.problem}</p>}
+      <Button type="submit" className="h-11 w-full" disabled={disabled || !trimmed || !changed || (!!parsed && "problem" in parsed)}>
         Save contest
       </Button>
     </form>

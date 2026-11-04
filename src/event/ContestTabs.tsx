@@ -237,7 +237,10 @@ function EditContest({
       onSubmit={(event) => {
         event.preventDefault();
         if (!trimmed || !changed || (parsed && "problem" in parsed)) return;
-        onSubmit({ name: trimmed, type, ...(parsed && "schedule" in parsed && { schedule: parsed.schedule }) });
+        // Send the schedule only when this person changed it, so a rename cannot undo another admin's save.
+        const schedule =
+          parsed && "schedule" in parsed && !sameSchedule(contest.schedule, parsed.schedule) ? parsed.schedule : undefined;
+        onSubmit({ name: trimmed, type, ...(schedule && { schedule }) });
       }}
     >
       <div className="space-y-1.5">

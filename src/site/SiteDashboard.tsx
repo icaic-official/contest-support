@@ -20,6 +20,7 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import type { SessionData } from "@/connected/hooks/useSessionSnapshot";
+import { Calendar } from "@/connected/Calendar";
 import { useNow } from "@/connected/hooks/useNow";
 import { eventPath, useRouteFocus, workspacePaths } from "@/connected/navigation";
 import { ConfirmDialog } from "@/organiser/admin/AccountAccess";
@@ -79,6 +80,17 @@ export function SiteDashboard({
               <p role="alert">{state.error}</p>
             </AlertDescription>
           </Alert>
+        )}
+        {site && (
+          <section aria-label="Calendar of every event" className="rounded-xl border bg-card p-4 sm:p-5">
+            <Calendar
+              refreshKey={site.events.reduce((total, event) => total + event.contests, 0)}
+              onOpen={(contest) => {
+                data.selectSession(contest.id);
+                void navigate(workspacePaths.queue);
+              }}
+            />
+          </section>
         )}
         {site ? (
           <div className="grid items-start gap-5 lg:grid-cols-2">

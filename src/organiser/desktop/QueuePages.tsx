@@ -7,6 +7,7 @@ import {
   pillIndicator,
   SlidingIndicator,
 } from "@/components/ui/sliding-indicator";
+import { ContestAwardsPanel } from "@/connected/ContestAwards";
 import { TeamSearch } from "@/connected/TeamSearch";
 import {
   initialTeamSelection,
@@ -157,6 +158,7 @@ export function QueuePage({
           )
         }
       />
+      <ContestAwardsPanel state={state} member={member} refresh={props.shell.data.refresh} pendingOnly />
       <StatCards issues={issues} state={state} now={now} />
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div

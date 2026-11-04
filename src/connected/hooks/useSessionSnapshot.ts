@@ -9,7 +9,7 @@ import { backend } from "@/backend";
 import type { ContestSummary } from "@/backend/contracts";
 import { errorMessage } from "@/backend/errors";
 import type { Snapshot } from "../model";
-import { startRefreshSchedule } from "./refreshSchedule";
+import { boundaryDelay, startRefreshSchedule } from "./refreshSchedule";
 
 /** A contest that the person may open. */
 export type SessionSummary = ContestSummary;
@@ -168,6 +168,15 @@ export function useSessionSnapshot(userId: string): SessionData {
       }),
     [connected],
   );
+  // Refresh when the schedule changes the contest's intake or end. Time sends
+  // no live hint, so the browser waits for the boundary and adds a random delay.
+  const changesAt = state?.clock?.intake.changes_at;
+  useEffect(() => {
+    const delay = boundaryDelay(changesAt, Date.now(), clockOffset.current);
+    if (delay === undefined) return undefined;
+    const timer = window.setTimeout(() => tick.current?.(), delay);
+    return () => window.clearTimeout(timer);
+  }, [changesAt]);
   const selectSession = useCallback((next: string) => {
     generation.current++;
     setState(undefined);

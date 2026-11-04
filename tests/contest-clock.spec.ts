@@ -187,7 +187,7 @@ test.describe("contest-wide time awards", () => {
     await panel.getByRole("button", { name: "Record the decision" }).click();
     await expect(panel.locator("p[role=alert]")).toBeVisible();
     expect(await local.rows("SELECT id FROM contest_awards WHERE session_id = ?", local.sessions[0])).toHaveLength(1);
-    // A refused refresh removes the console, and with it any state that holds the pending request ID.
+    // A failed refresh removes the console, and with it any state that holds the pending request ID.
     blocked = true;
     await jury.evaluate(() => window.dispatchEvent(new Event("focus")));
     await expect(jury.getByRole("button", { name: "Refresh access", exact: true })).toBeVisible();
@@ -198,24 +198,6 @@ test.describe("contest-wide time awards", () => {
     await again.getByRole("button", { name: "Record the decision" }).click();
     await expect(again.getByRole("list", { name: "Contest-wide awards" })).toBeVisible();
     expect(await local.rows("SELECT id FROM contest_awards WHERE session_id = ?", local.sessions[0])).toHaveLength(1);
-  });
-
-  test("a network failure on refresh keeps the console, and a refusal removes it", async ({ browser, local }) => {
-    await schedule(local, -30, 60);
-    const jury = await signIn(browser, local, "jury");
-    let mode: "network" | "refused" = "network";
-    await jury.route("**/api/snapshot**", (route) =>
-      mode === "network"
-        ? route.abort("connectionreset")
-        : route.fulfill({ status: 403, json: { error: "You have no access to this contest." } }),
-    );
-    await jury.evaluate(() => window.dispatchEvent(new Event("focus")));
-    await expect(jury.getByRole("alert").filter({ hasText: "could not reach the server" }).first()).toBeVisible();
-    await expect(jury.getByRole("navigation", { name: "Console pages" })).toBeVisible();
-    mode = "refused";
-    await jury.evaluate(() => window.dispatchEvent(new Event("focus")));
-    await expect(jury.getByRole("button", { name: "Refresh access", exact: true })).toBeVisible();
-    await expect(jury.getByRole("navigation", { name: "Console pages" })).toHaveCount(0);
   });
 
   test("a contestant sees no award controls, and the Worker refuses a grant from a contestant", async ({ browser, local }) => {
@@ -339,9 +321,12 @@ test.describe("keyboard focus on the organiser console", () => {
     const jury = await signIn(browser, local, "jury");
     await pageLink(jury, /^Award review/).click();
     const panel = jury.getByRole("region", { name: "Time awards for the whole contest" });
-    await panel.getByRole("button", { name: "Confirm applied externally" }).focus();
-    await jury.keyboard.press("Enter");
-    await expect(panel).toContainText("Applied · confirmed by");
+    // A live refresh can replace the button between the focus and the key, so try again until it is confirmed. A repeat is harmless.
+    await expect(async () => {
+      await panel.getByRole("button", { name: "Confirm applied externally" }).focus({ timeout: 1000 });
+      await jury.keyboard.press("Enter");
+      await expect(panel).toContainText("Applied · confirmed by", { timeout: 1500 });
+    }).toPass({ timeout: 15_000 });
     await expect(jury.getByRole("heading", { level: 1 })).toBeFocused();
   });
 

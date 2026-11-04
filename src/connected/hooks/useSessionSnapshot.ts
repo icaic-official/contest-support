@@ -7,7 +7,7 @@ import {
 } from "react";
 import { backend } from "@/backend";
 import type { ContestSummary } from "@/backend/contracts";
-import { errorMessage, RequestRefusedError } from "@/backend/errors";
+import { errorMessage } from "@/backend/errors";
 import type { Snapshot } from "../model";
 import { boundaryDelay, startRefreshSchedule } from "./refreshSchedule";
 
@@ -89,9 +89,8 @@ export function useSessionSnapshot(userId: string): SessionData {
         setRefreshError("");
       } catch (cause) {
         if (run !== generation.current) return;
-        // A refusal can mean that access ended, so it clears the data. A network or server failure
-        // keeps the last snapshot, as the event console does, and the refresh error shows beside it.
-        if (cause instanceof RequestRefusedError) setState(undefined);
+        // Clear cached data on access/network failure; never display stale permissions.
+        setState(undefined);
         setRefreshError(errorMessage(cause));
       }
       setLoaded(true);

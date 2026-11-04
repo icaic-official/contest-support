@@ -374,6 +374,16 @@ describe('handle changes', () => {
     await expect(renameAccount('volunteer', 'volunteer', 'two-seats')).rejects.toMatchObject({ status: 403 });
   });
 
+  it('refuses an entrant sign-in its own handle while no contest seats it', async () => {
+    const entrant = randomUUID();
+    await run(`INSERT INTO entrants (id, event_id, kind, name) VALUES (?, ?, 'team', 'Unseated team')`, entrant, ids.event);
+    await run('UPDATE accounts SET entrant_id = ? WHERE id = ?', entrant, caller('volunteer').accountId);
+    expect(await rows('SELECT team_id FROM memberships WHERE account_id = ? AND team_id IS NOT NULL', caller('volunteer').accountId)).toEqual([]);
+    await expect(renameAccount('volunteer', 'volunteer', 'unseated-team'))
+      .rejects.toMatchObject({ status: 403, message: 'You cannot change this account.' });
+    expect(await handleOf('volunteer')).toBe('volunteer');
+  });
+
   it('refuses a contestant its own handle, because venue staff read it from the sheet', async () => {
     await expect(renameAccount('contestant', 'contestant', 'renamed-team'))
       .rejects.toMatchObject({ status: 403, message: 'You cannot change this account.' });
@@ -794,6 +804,71 @@ describe('event, roster, and contest commands', () => {
     await expect(racing.issueCredentials(caller('eventAdmin'), randomUUID(), { eventId: ids.event, accountIds: [target] }))
       .rejects.toMatchObject({ status: 409 });
     expect(await rows('SELECT credential_generation FROM accounts WHERE id = ?', target)).toEqual([{ credential_generation: 1 }]);
+  });
+
+  /** A service whose first batch runs `before` first, so that a change lands between the reads and the batch. */
+  const racingService = (before: () => Promise<unknown>) => {
+    let fired = false;
+    return new D1ManageService({ prepare: (sql) => db.prepare(sql), batch: async (statements) => {
+      if (!fired) {
+        fired = true;
+        await before();
+      }
+      return db.batch(statements);
+    } }, fastPasswords);
+  };
+
+  it('returns no password to the request that loses a race with a retry of itself', async () => {
+    const target = caller('volunteer').accountId;
+    const input = { eventId: ids.event, accountIds: [target] };
+    const requestId = randomUUID();
+    const racing = racingService(async () => {
+      // The retry commits first and returns the passwords. The racing request must not return its own.
+      expect((await manage.issueCredentials(caller('eventAdmin'), requestId, input))[0]!.temporaryPassword).toBeTruthy();
+    });
+    expect(await racing.issueCredentials(caller('eventAdmin'), requestId, input))
+      .toEqual([{ accountId: target, handle: 'volunteer', temporaryPassword: null }]);
+    expect(await rows('SELECT credential_generation FROM accounts WHERE id = ?', target)).toEqual([{ credential_generation: 2 }]);
+  });
+
+  it('refuses a contest admin an account that also sits in a contest it does not administer, or in an archived event', async () => {
+    const second = await createContest('eventAdmin', ids.event, 'Second', 'teams');
+    const [person] = (await execute('eventAdmin', { type: 'create_people', eventId: ids.event, people: [{ handle: 'pat', name: 'Pat' }] })).accountIds!;
+    const issue = () => manage.issueCredentials(caller('contestAdmin'), randomUUID(), { eventId: ids.event, accountIds: [person!] });
+    await execute('eventAdmin', { type: 'assign_staff', contestId: ids.contest, accountId: person!, roles: ['volunteer'], admin: false });
+    await expect(issue()).resolves.toHaveLength(1);
+    await execute('eventAdmin', { type: 'assign_staff', contestId: second, accountId: person!, roles: ['volunteer'], admin: false });
+    await expect(issue()).rejects.toMatchObject({ status: 403 });
+    await execute('eventAdmin', { type: 'unassign_staff', contestId: second, accountId: person! });
+    await expect(issue()).resolves.toHaveLength(1);
+    await run('UPDATE events SET archived = 1 WHERE id = ?', ids.event);
+    await expect(issue()).rejects.toMatchObject({ status: 403 });
+  });
+
+  it.each([
+    ['its credential generation changes', 'UPDATE accounts SET credential_generation = credential_generation + 1 WHERE id = ?', 2],
+    ['it is disabled', 'UPDATE accounts SET disabled = 1 WHERE id = ?', 1],
+  ])('refuses an issue when the target changes before the batch commits: %s', async (_name, change, generation) => {
+    const target = caller('volunteer').accountId;
+    const racing = racingService(() => run(change, target));
+    await expect(racing.issueCredentials(caller('eventAdmin'), randomUUID(), { eventId: ids.event, accountIds: [target] }))
+      .rejects.toMatchObject({ status: 409 });
+    expect(await rows('SELECT credential_generation, must_change FROM accounts WHERE id = ?', target))
+      .toEqual([{ credential_generation: generation, must_change: 0 }]);
+  });
+
+  it.each([
+    ['expired', 'UPDATE logins SET expires_at = unixepoch() - 1 WHERE account_id = ?'],
+    ['revoked', 'UPDATE logins SET revoked = 1 WHERE account_id = ?'],
+    ['must change its password', 'UPDATE accounts SET must_change = 1 WHERE id = ?'],
+    ['pending', `UPDATE accounts SET credential_state = 'pending' WHERE id = ?`],
+  ])('refuses an issue when the caller login is %s at the final check', async (_name, change) => {
+    const target = caller('volunteer').accountId;
+    const racing = racingService(() => run(change, caller('eventAdmin').accountId));
+    await expect(racing.issueCredentials(caller('eventAdmin'), randomUUID(), { eventId: ids.event, accountIds: [target] }))
+      .rejects.toMatchObject({ status: 409 });
+    expect(await rows('SELECT credential_generation, must_change FROM accounts WHERE id = ?', target))
+      .toEqual([{ credential_generation: 1, must_change: 0 }]);
   });
 
   it('shows an event admin and a webmaster the console, and nobody else', async () => {

@@ -31,31 +31,36 @@ CREATE INDEX accounts_entrant ON accounts(entrant_id) WHERE entrant_id IS NOT NU
 ALTER TABLE sessions ADD COLUMN contest_type TEXT NOT NULL DEFAULT 'teams'
   CHECK (contest_type IN ('singles', 'mixed', 'teams'));
 
--- Backfill. One entrant per event and normalized team name, so a team that
--- appears in two contests of one event becomes one entrant. A team keeps its
--- own entrant when its name is empty, or when an older team of the same
--- contest has the same name, so that one contest never holds an entrant twice.
--- The representative teams row lends its ID to the entrant.
+-- Backfill. Every team becomes an entrant, except that a team joins the
+-- oldest team of its event with the same name when the two share a contestant
+-- account. Same-named teams that share no account are different groups, so
+-- they keep their own entrants. A team also keeps its own entrant when its name
+-- is empty, or when an older team of its contest has the same name, so that one
+-- contest never holds an entrant twice. The oldest team lends its ID to the entrant.
+UPDATE teams SET entrant_id = (
+  SELECT o.id FROM teams o JOIN sessions so ON so.id = o.session_id
+  WHERE so.event_id = (SELECT event_id FROM sessions WHERE id = teams.session_id)
+    AND lower(trim(o.name)) = lower(trim(teams.name))
+  ORDER BY o.rowid LIMIT 1)
+WHERE trim(name) <> '';
+UPDATE teams SET entrant_id = NULL
+WHERE entrant_id IS NOT NULL AND (
+  entrant_id = id
+  OR EXISTS (SELECT 1 FROM teams p WHERE p.session_id = teams.session_id
+    AND lower(trim(p.name)) = lower(trim(teams.name)) AND p.rowid < teams.rowid)
+  OR NOT EXISTS (SELECT 1 FROM teams o WHERE o.id = teams.entrant_id AND o.session_id <> teams.session_id
+    AND EXISTS (SELECT 1 FROM memberships a JOIN memberships b ON b.account_id = a.account_id
+      WHERE a.team_id = teams.id AND b.team_id = o.id)));
 INSERT INTO entrants (id, event_id, kind, name)
-SELECT t.id, s.event_id, 'team', t.name FROM teams t JOIN sessions s ON s.id = t.session_id
-WHERE trim(t.name) = ''
-  OR EXISTS (SELECT 1 FROM teams t2 WHERE t2.session_id = t.session_id
-    AND lower(trim(t2.name)) = lower(trim(t.name)) AND t2.rowid < t.rowid)
-  OR NOT EXISTS (SELECT 1 FROM teams t2 JOIN sessions s2 ON s2.id = t2.session_id
-    WHERE s2.event_id = s.event_id AND lower(trim(t2.name)) = lower(trim(t.name)) AND t2.rowid < t.rowid);
--- A team that is not a representative joins the oldest team of its event with
--- its name. That team is a representative in another contest.
-UPDATE teams SET entrant_id = CASE WHEN EXISTS (SELECT 1 FROM entrants WHERE id = teams.id) THEN teams.id ELSE (
-  SELECT t2.id FROM teams t2 JOIN sessions s2 ON s2.id = t2.session_id
-  WHERE s2.event_id = (SELECT event_id FROM sessions WHERE id = teams.session_id)
-    AND lower(trim(t2.name)) = lower(trim(teams.name))
-  ORDER BY t2.rowid LIMIT 1) END;
+SELECT t.id, s.event_id, 'team', t.name FROM teams t JOIN sessions s ON s.id = t.session_id WHERE t.entrant_id IS NULL;
+UPDATE teams SET entrant_id = id WHERE entrant_id IS NULL;
 UPDATE teams SET name = (SELECT name FROM entrants WHERE id = teams.entrant_id)
 WHERE name IS NOT (SELECT name FROM entrants WHERE id = teams.entrant_id);
--- Each contestant account links to the entrant of its oldest team.
+-- Each contestant account links to the entrant of its oldest team in its own event.
 UPDATE accounts SET entrant_id = (
   SELECT t.entrant_id FROM memberships m JOIN teams t ON t.id = m.team_id
-  WHERE m.account_id = accounts.id ORDER BY t.rowid LIMIT 1)
+  JOIN sessions s ON s.id = m.session_id
+  WHERE m.account_id = accounts.id AND s.event_id = accounts.event_id ORDER BY t.rowid LIMIT 1)
 WHERE EXISTS (SELECT 1 FROM memberships WHERE account_id = accounts.id AND team_id IS NOT NULL);
 CREATE UNIQUE INDEX teams_entrant ON teams(session_id, entrant_id);
 
@@ -85,7 +90,7 @@ BEGIN
   SELECT RAISE(ABORT, 'An entry keeps its entrant');
 END;
 CREATE TRIGGER contest_type_fits_entries BEFORE UPDATE OF contest_type ON sessions
-WHEN EXISTS (SELECT 1 FROM teams t JOIN entrants e ON e.id = t.entrant_id
+WHEN NEW.contest_type IS NOT OLD.contest_type AND EXISTS (SELECT 1 FROM teams t JOIN entrants e ON e.id = t.entrant_id
   WHERE t.session_id = NEW.id AND NOT (NEW.contest_type = 'mixed' OR (NEW.contest_type = 'teams') = (e.kind = 'team')))
 BEGIN
   SELECT RAISE(ABORT, 'Remove the entrants that this contest type excludes first');

@@ -175,7 +175,7 @@ describe('one authority resolver for every reader', () => {
 
   async function setsIntake(person: Person, contest: Contest): Promise<boolean> {
     return new D1ManageService(db, { hash: async () => '', verify: async () => false })
-      .execute(callers[person], randomUUID(), { type: 'set_intake', contestId: contestIds[contest], open: true }).then(() => true, () => false);
+      .execute(callers[person], randomUUID(), { type: 'set_intake', contestId: contestIds[contest], mode: 'open' }).then(() => true, () => false);
   }
 
   it('gives every reader the same seat for every person in every contest', async () => {

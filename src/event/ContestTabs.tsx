@@ -1,6 +1,6 @@
 import { useId, useMemo, useState } from "react";
 import { Pencil } from "lucide-react";
-import type { ContestType, EventConsole } from "@/backend/contracts";
+import type { ContestType, EventConsole, Schedule } from "@/backend/contracts";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -12,10 +12,21 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { intakeHeadline } from "@/connected/intakeText";
 import { rosterTextMax, teamsPerCommandMax } from "@/connected/roster";
+import { viewerNote } from "@/connected/zonedTime";
 import { staffRoles } from "@/organiser/admin/adminModel";
 import { acceptsKind, contestTypeLabels, seatedEntrants } from "./eventModel";
 import { CommandError, Panel, fieldClass } from "./forms";
+import { ScheduleFields } from "./ScheduleFields";
+import {
+  type ScheduleDraft,
+  describeSchedule,
+  draftOf,
+  emptyDraft,
+  sameSchedule,
+  scheduleOfDraft,
+} from "./scheduleForm";
 import type { EventConsoleState } from "./useEventConsole";
 
 interface TabProps {
@@ -65,23 +76,30 @@ export function ContestsTab({ data, state }: TabProps) {
   const id = useId();
   const [name, setName] = useState("");
   const [type, setType] = useState<ContestType>("teams");
+  const timeZone = data.event.timeZone;
+  const [draft, setDraft] = useState<ScheduleDraft>(() => emptyDraft(timeZone));
   const [editing, setEditing] = useState<EventConsole["contests"][number]>();
   const trimmed = name.trim();
+  const parsed = scheduleOfDraft(draft, timeZone);
   return (
     <div className="space-y-5">
       <CommandError message={state.error} />
-      <Panel title="Create a contest" description="A contest admin sets its intake, limits, and categories afterwards.">
+      <Panel
+        title="Create a contest"
+        description="Intake follows the schedule. A contest admin can open or close it by hand, and sets its limits and categories afterwards."
+      >
         <form
-          className="grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end"
+          className="grid gap-4 sm:grid-cols-2"
           onSubmit={(event) => {
             event.preventDefault();
-            if (locked || !trimmed) return;
+            if (locked || !trimmed || "problem" in parsed) return;
             void state
               .execute({
                 type: "create_contest",
                 eventId: data.event.id,
                 name: trimmed,
                 contestType: type,
+                schedule: parsed.schedule,
                 categories: defaultCategories,
               })
               .then((receipt) => receipt && setName(""));
@@ -103,7 +121,16 @@ export function ContestsTab({ data, state }: TabProps) {
             <Label htmlFor={`${id}-type`}>Contest type</Label>
             <TypeSelect id={`${id}-type`} value={type} disabled={locked} onChange={setType} />
           </div>
-          <Button type="submit" variant="secondary" className="h-11" disabled={locked || !trimmed}>
+          <div className="sm:col-span-2">
+            <ScheduleFields draft={draft} timeZone={timeZone} disabled={locked} onChange={setDraft} />
+            {"problem" in parsed && <p className="mt-2 text-sm text-muted-foreground">{parsed.problem}</p>}
+          </div>
+          <Button
+            type="submit"
+            variant="secondary"
+            className="h-11 sm:col-span-2 sm:w-fit"
+            disabled={locked || !trimmed || "problem" in parsed}
+          >
             Create contest
           </Button>
         </form>
@@ -118,9 +145,15 @@ export function ContestsTab({ data, state }: TabProps) {
                 <div className="min-w-0 flex-1 basis-36 leading-tight">
                   <p className="truncate text-sm font-medium">{contest.name}</p>
                   <p className="text-xs text-muted-foreground">{contestTypeLabels[contest.contestType]}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {contest.schedule ? describeSchedule(contest.schedule, timeZone) : "No schedule"}
+                    {contest.schedule && viewerNote(contest.schedule.startsAt, timeZone, "datetime") && (
+                      <span> · {viewerNote(contest.schedule.startsAt, timeZone, "datetime")}</span>
+                    )}
+                  </p>
                 </div>
                 <div className="ml-auto flex items-center gap-2">
-                  <Badge variant="outline">{contest.intakeOpen ? "Intake open" : "Intake closed"}</Badge>
+                  <Badge variant="outline">{intakeHeadline(contest.intake.reason)}</Badge>
                   <Button
                     type="button"
                     variant="outline"
@@ -139,7 +172,7 @@ export function ContestsTab({ data, state }: TabProps) {
         )}
       </Panel>
       <Dialog open={!!editing} onOpenChange={(open) => !open && setEditing(undefined)}>
-        <DialogContent className="max-w-sm">
+        <DialogContent className="max-h-[90dvh] max-w-sm overflow-y-auto">
           <DialogHeader className="text-left">
             <DialogTitle>Edit contest</DialogTitle>
             <DialogDescription>A contest keeps its entrants when its name changes.</DialogDescription>
@@ -148,10 +181,17 @@ export function ContestsTab({ data, state }: TabProps) {
             <EditContest
               key={editing.id}
               contest={editing}
+              timeZone={timeZone}
               disabled={locked}
               onSubmit={(next) =>
                 void state
-                  .execute({ type: "update_contest", contestId: editing.id, name: next.name, contestType: next.type })
+                  .execute({
+                    type: "update_contest",
+                    contestId: editing.id,
+                    name: next.name,
+                    contestType: next.type,
+                    schedule: next.schedule,
+                  })
                   .then((receipt) => receipt && setEditing(undefined))
               }
             />
@@ -165,24 +205,33 @@ export function ContestsTab({ data, state }: TabProps) {
 
 function EditContest({
   contest,
+  timeZone,
   disabled,
   onSubmit,
 }: {
   contest: EventConsole["contests"][number];
+  timeZone: string;
   disabled: boolean;
-  onSubmit: (next: { name: string; type: ContestType }) => void;
+  onSubmit: (next: { name: string; type: ContestType; schedule: Schedule }) => void;
 }) {
   const id = useId();
   const [name, setName] = useState(contest.name);
   const [type, setType] = useState(contest.contestType);
+  const [draft, setDraft] = useState<ScheduleDraft>(() =>
+    contest.schedule ? draftOf(contest.schedule, timeZone) : emptyDraft(timeZone),
+  );
   const trimmed = name.trim();
-  const changed = trimmed !== contest.name || type !== contest.contestType;
+  const parsed = scheduleOfDraft(draft, timeZone);
+  const changed =
+    trimmed !== contest.name ||
+    type !== contest.contestType ||
+    ("schedule" in parsed && !sameSchedule(contest.schedule, parsed.schedule));
   return (
     <form
       className="space-y-3"
       onSubmit={(event) => {
         event.preventDefault();
-        if (trimmed && changed) onSubmit({ name: trimmed, type });
+        if (trimmed && changed && "schedule" in parsed) onSubmit({ name: trimmed, type, schedule: parsed.schedule });
       }}
     >
       <div className="space-y-1.5">
@@ -201,7 +250,9 @@ function EditContest({
         <Label htmlFor={`${id}-type`}>Type</Label>
         <TypeSelect id={`${id}-type`} value={type} disabled={disabled} onChange={setType} />
       </div>
-      <Button type="submit" className="h-11 w-full" disabled={disabled || !trimmed || !changed}>
+      <ScheduleFields draft={draft} timeZone={timeZone} disabled={disabled} onChange={setDraft} />
+      {"problem" in parsed && <p className="text-sm text-muted-foreground">{parsed.problem}</p>}
+      <Button type="submit" className="h-11 w-full" disabled={disabled || !trimmed || !changed || "problem" in parsed}>
         Save contest
       </Button>
     </form>

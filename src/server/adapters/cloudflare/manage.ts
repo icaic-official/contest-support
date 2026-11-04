@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import {
-  ISSUE_BATCH, parseEventCode, type ContestType, type EntrantKind, type EventConsole, type IssuedCredential,
+  GRACE_MINUTES_MAX, ISSUE_BATCH, parseEventCode, type ContestType, type EntrantKind, type EventConsole, type IssuedCredential,
   type LoginKey, type ManageCommand, type ManageLevel, type ManageReceipt, type SiteOverview,
 } from '../../../backend/contracts';
 import { categoriesMax, hasControlCharacter, rosterKey, rosterTextMax, teamsPerCommandMax } from '../../../connected/roster';
@@ -14,6 +14,7 @@ import {
 } from './authority';
 import { handleSchema, loginKeyFor, replaceCredentialStatements } from './credentials';
 import { randomSecret, type PasswordHasher } from './password';
+import { intakeModeOf, intakeStateSql, parseIntake, scheduleOf, type ScheduleColumns } from './schedule';
 
 const noControl = (value: string) => !hasControlCharacter(value);
 const nameSchema = z.string().trim().min(1).max(rosterTextMax).refine(noControl, 'Remove control characters.');
@@ -34,6 +35,11 @@ const timeZoneSchema = z.string().trim().min(1).max(64).refine((zone) => {
   }
 }, 'Use an IANA time zone name.');
 const contestTypeSchema = z.enum(['singles', 'mixed', 'teams']);
+// D1 stores instants as UTC text with milliseconds. Parsing and printing again gives that one form.
+const instantSchema = z.iso.datetime({ offset: true }).transform((text) => new Date(text).toISOString());
+const scheduleSchema = z.strictObject({
+  startsAt: instantSchema, endsAt: instantSchema, graceMinutes: z.number().int().min(0).max(GRACE_MINUTES_MAX),
+}).refine((schedule) => schedule.startsAt < schedule.endsAt, 'The contest must end after it starts.');
 const categoriesSchema = z.array(nameSchema).min(1).max(categoriesMax).refine(distinct, 'Category names must be different.');
 const uuid = z.uuid();
 
@@ -62,9 +68,12 @@ const commandSchema = z.discriminatedUnion('type', [
   }),
   z.strictObject({ type: z.literal('rename_entrant'), eventId: uuid, entrantId: uuid, name: nameSchema }),
   z.strictObject({
-    type: z.literal('create_contest'), eventId: uuid, name: nameSchema, contestType: contestTypeSchema, categories: categoriesSchema,
+    type: z.literal('create_contest'), eventId: uuid, name: nameSchema, contestType: contestTypeSchema,
+    schedule: scheduleSchema, categories: categoriesSchema,
   }),
-  z.strictObject({ type: z.literal('update_contest'), contestId: uuid, name: nameSchema, contestType: contestTypeSchema }),
+  z.strictObject({
+    type: z.literal('update_contest'), contestId: uuid, name: nameSchema, contestType: contestTypeSchema, schedule: scheduleSchema,
+  }),
   z.strictObject({
     type: z.literal('assign_entrants'), contestId: uuid,
     entries: z.array(z.strictObject({ entrantId: uuid, location: locationSchema })).min(1).max(teamsPerCommandMax)
@@ -76,7 +85,7 @@ const commandSchema = z.discriminatedUnion('type', [
     roles: z.array(roleSchema).max(3).refine((roles) => new Set(roles).size === roles.length),
   }).refine((command) => command.admin || command.roles.length > 0),
   z.strictObject({ type: z.literal('unassign_staff'), contestId: uuid, accountId: uuid }),
-  z.strictObject({ type: z.literal('set_intake'), contestId: uuid, open: z.boolean() }),
+  z.strictObject({ type: z.literal('set_intake'), contestId: uuid, mode: z.enum(['schedule', 'open', 'closed']) }),
   z.strictObject({
     type: z.literal('set_image_limits'), contestId: uuid,
     fileMegabytes: z.number().int().min(1).max(50),
@@ -170,6 +179,7 @@ const cannotChangeAccount = 'You cannot change this account.';
 const codeTaken = 'That event code is taken. Choose another.';
 const notInEvent = 'That account is not in this event. Refresh the page.';
 const staleEntrant = 'That entrant is not in this event. Refresh the page.';
+const noSchedule = 'This contest has no schedule. Set its start and end first.';
 const typeExcludes = 'Remove the entrants that this contest type excludes first.';
 const entrantDoesNotFit = 'This entrant does not fit this contest. Check the contest type.';
 
@@ -257,7 +267,8 @@ export const eventConsoleSql = {
   entrants: `SELECT en.id, en.kind, en.name, a.id AS account_id, a.handle FROM entrants en
     LEFT JOIN accounts a ON a.id = (SELECT id FROM accounts WHERE entrant_id = en.id ORDER BY rowid LIMIT 1)
     WHERE en.event_id = ? ORDER BY en.name, en.id`,
-  contests: 'SELECT id, name, contest_type, intake_open FROM sessions WHERE event_id = ? ORDER BY name, id',
+  contests: `SELECT s.id, s.name, s.contest_type, s.starts_at, s.ends_at, s.grace_minutes, s.intake_follows_schedule,
+      s.intake_open, ${intakeStateSql('s')} AS intake FROM sessions s WHERE s.event_id = ? ORDER BY s.name, s.id`,
   staffAssignments: eventStaffSql,
   entries: `SELECT t.session_id AS contest_id, t.entrant_id, t.location FROM sessions s
     JOIN teams t ON t.session_id = s.id WHERE s.event_id = ? ORDER BY t.session_id, t.entrant_id`,
@@ -322,7 +333,10 @@ export class D1ManageService {
       read<{ account_id: string }>(eventConsoleSql.admins),
       read<{ id: string; name: string; handle: string | null; ready: number }>(eventConsoleSql.people),
       read<{ id: string; kind: EntrantKind; name: string; account_id: string | null; handle: string | null }>(eventConsoleSql.entrants),
-      read<{ id: string; name: string; contest_type: ContestType; intake_open: number }>(eventConsoleSql.contests),
+      read<{
+        id: string; name: string; contest_type: ContestType; starts_at: string | null; ends_at: string | null;
+        grace_minutes: number; intake_follows_schedule: number; intake_open: number; intake: string;
+      }>(eventConsoleSql.contests),
       read<{ contest_id: string; account_id: string; is_admin: number; roles: string }>(eventConsoleSql.staffAssignments),
       read<{ contest_id: string; entrant_id: string; location: string }>(eventConsoleSql.entries),
       read<{ id: string; actor_name: string; at: string; action: string; target: string | null }>(eventConsoleSql.audit),
@@ -338,7 +352,8 @@ export class D1ManageService {
         id: entrant.id, kind: entrant.kind, name: entrant.name, accountId: entrant.account_id, handle: entrant.handle,
       })),
       contests: contests.map((item) => ({
-        id: item.id, name: item.name, contestType: item.contest_type, intakeOpen: item.intake_open === 1,
+        id: item.id, name: item.name, contestType: item.contest_type,
+        schedule: scheduleOf(item), mode: intakeModeOf(item), intake: parseIntake(item.intake),
       })),
       staffAssignments: assignments.map((item) => ({
         contestId: item.contest_id, accountId: item.account_id, admin: item.is_admin === 1, roles: JSON.parse(item.roles) as Role[],
@@ -730,17 +745,21 @@ export class D1ManageService {
         const newContest = crypto.randomUUID();
         return {
           statements: [
-            this.statement('INSERT INTO sessions (id, event_id, name, contest_type, categories) VALUES (?, ?, ?, ?, ?)',
-              newContest, command.eventId, command.name, command.contestType, JSON.stringify(command.categories)),
+            // The new contest follows its schedule. Only a contest without one is manual.
+            this.statement(`INSERT INTO sessions (id, event_id, name, contest_type, categories, starts_at, ends_at, grace_minutes,
+              intake_follows_schedule) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)`,
+            newContest, command.eventId, command.name, command.contestType, JSON.stringify(command.categories),
+            command.schedule.startsAt, command.schedule.endsAt, command.schedule.graceMinutes),
           ],
-          audit: { action: 'create_contest', target: null, detail: { contest: newContest, name: command.name, contestType: command.contestType } },
+          audit: { action: 'create_contest', target: null,
+            detail: { contest: newContest, name: command.name, contestType: command.contestType, schedule: command.schedule } },
           notify: [],
           receipt: { contestId: newContest },
         };
       }
       case 'update_contest': {
-        const current = await this.statement('SELECT name, contest_type FROM sessions WHERE id = ?', command.contestId)
-          .first<{ name: string; contest_type: ContestType }>();
+        const current = await this.statement(`SELECT name, contest_type, starts_at, ends_at, grace_minutes FROM sessions WHERE id = ?`,
+          command.contestId).first<{ name: string; contest_type: ContestType } & ScheduleColumns>();
         if (!current) throw new AuthenticationError(409, 'That contest no longer exists. Refresh the page.');
         if (current.contest_type !== command.contestType && await this.entriesExcludedBy(command.contestId, command.contestType)) {
           throw new AuthenticationError(409, typeExcludes);
@@ -748,14 +767,18 @@ export class D1ManageService {
         return {
           // D1 refuses a contest type that excludes an entry, and it counts the change in the contest version.
           statements: [
-            this.statement('UPDATE sessions SET name = ?, contest_type = ? WHERE id = ?', command.name, command.contestType, command.contestId),
+            // The schedule never changes the intake mode. Staff choose that with set_intake.
+            this.statement(`UPDATE sessions SET name = ?, contest_type = ?, starts_at = ?, ends_at = ?, grace_minutes = ?
+              WHERE id = ?`, command.name, command.contestType, command.schedule.startsAt, command.schedule.endsAt,
+            command.schedule.graceMinutes, command.contestId),
             assertions.check('SELECT 1 WHERE changes() = 1'),
           ],
           audit: { action: 'update_contest', target: null,
-            detail: { contest: command.contestId, from: { name: current.name, contestType: current.contest_type },
-              to: { name: command.name, contestType: command.contestType } } },
+            detail: { contest: command.contestId, from: { name: current.name, contestType: current.contest_type, schedule: scheduleOf(current) },
+              to: { name: command.name, contestType: command.contestType, schedule: command.schedule } } },
           contestAudit: { action: 'update_contest', target: null,
-            detail: { from: { name: current.name, contestType: current.contest_type }, to: { name: command.name, contestType: command.contestType } } },
+            detail: { from: { name: current.name, contestType: current.contest_type, schedule: scheduleOf(current) },
+              to: { name: command.name, contestType: command.contestType, schedule: command.schedule } } },
           notify: [{ contestId: command.contestId, audiences: await this.contestAudiences(command.contestId) }],
           receipt: {},
         };
@@ -855,14 +878,22 @@ export class D1ManageService {
           receipt: { contestId: command.contestId },
         };
       }
-      case 'set_intake':
+      case 'set_intake': {
+        // The follow switch needs a schedule. D1 refuses it without one as well.
+        if (command.mode === 'schedule' && !(await this.statement('SELECT 1 FROM sessions WHERE id = ? AND starts_at IS NOT NULL', command.contestId).first())) {
+          throw new AuthenticationError(409, noSchedule);
+        }
         return {
-          statements: [this.statement('UPDATE sessions SET intake_open = ? WHERE id = ?', Number(command.open), command.contestId)],
+          statements: [command.mode === 'schedule'
+            ? this.statement('UPDATE sessions SET intake_follows_schedule = 1 WHERE id = ?', command.contestId)
+            : this.statement('UPDATE sessions SET intake_follows_schedule = 0, intake_open = ? WHERE id = ?',
+              Number(command.mode === 'open'), command.contestId)],
           audit: null,
-          contestAudit: { action: 'set_intake', target: null, detail: { open: command.open } },
+          contestAudit: { action: 'set_intake', target: null, detail: { mode: command.mode } },
           notify: [{ contestId: command.contestId, audiences: await this.contestAudiences(command.contestId) }],
           receipt: {},
         };
+      }
       case 'set_image_limits':
         return {
           statements: [this.statement(`UPDATE sessions SET max_image_bytes = ?, max_images_per_issue = ?,

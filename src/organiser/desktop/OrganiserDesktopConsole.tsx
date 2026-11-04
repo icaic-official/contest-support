@@ -357,7 +357,7 @@ export function OrganiserDesktopConsole({
                       open: session.intake_open,
                       disabled: admin.busy || admin.archived,
                       onChange: (open) => {
-                        void admin.setIntake(open);
+                        void admin.setIntake(open ? 'open' : 'closed');
                       },
                     }
                   : undefined

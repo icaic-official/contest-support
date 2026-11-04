@@ -291,7 +291,7 @@ it('runs the complete application through isolated HTTPS, D1, R2, and Durable Ob
     expect(eventAdmin.id).toBe(fixture.eventAdmin);
     const organizer = await createStaff(eventAdmin, 'organizer', { roles: ['volunteer', 'jury'], admin: true });
     // A contest admin sets the contest's own settings.
-    await manage(organizer, { type: 'set_intake', contestId: fixture.session, open: true });
+    await manage(organizer, { type: 'set_intake', contestId: fixture.session, mode: 'open' });
     await manage(organizer, { type: 'set_image_limits', contestId: fixture.session, fileMegabytes: 1, count: 3, totalMegabytes: 3 });
     const specialist = await createStaff(eventAdmin, 'specialist', { roles: ['specialist'], admin: false });
     const leaver = await createStaff(eventAdmin, 'leaver', { roles: ['volunteer'], admin: false });
@@ -306,7 +306,7 @@ it('runs the complete application through isolated HTTPS, D1, R2, and Durable Ob
     expect((await json<Array<{ manage: string }>>(eventAdmin, '/api/contests')).map((item) => item.manage)).toEqual(['event']);
     await json(contestant, '/api/sessions', undefined, 404);
     await json(organizer, '/api/admin', {}, 404);
-    await json(contestant, '/api/manage', { requestId: randomUUID(), command: { type: 'set_intake', contestId: fixture.session, open: false } }, 403);
+    await json(contestant, '/api/manage', { requestId: randomUUID(), command: { type: 'set_intake', contestId: fixture.session, mode: 'closed' } }, 403);
     expect((await json<{ event: { id: string } }>(eventAdmin, '/api/event')).event.id).toBe(fixture.event);
     await json(organizer, '/api/event', undefined, 403);
     const issueId = await workflow(contestant, { type: 'submit', category: 'Devices', description: 'Fictional device failure' });
@@ -389,10 +389,10 @@ it('runs the complete application through isolated HTTPS, D1, R2, and Durable Ob
     await json(specialist, '/api/avatars', { action: 'remove' });
     await json(organizer, '/api/avatars', { action: 'remove' });
     expect(await avatars(specialist)).toEqual([]);
-    await manage(organizer, { type: 'set_intake', contestId: fixture.session, open: false });
+    await manage(organizer, { type: 'set_intake', contestId: fixture.session, mode: 'closed' });
     await json(contestant, '/api/workflow', { sessionId: fixture.session, requestId: randomUUID(),
       command: { type: 'submit', category: 'Devices', description: 'Closed fictional intake' } }, 409);
-    await manage(organizer, { type: 'set_intake', contestId: fixture.session, open: true });
+    await manage(organizer, { type: 'set_intake', contestId: fixture.session, mode: 'open' });
     await organizer.page.evaluate(() => (window as RuntimeWindow).fixtureSockets!.staff!.socket.close());
     await connect(organizer, 'reconnected');
     expect((await snapshot(organizer)).issues).toHaveLength(2);

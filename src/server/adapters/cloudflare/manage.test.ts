@@ -12,6 +12,8 @@ import { loginKeyFor } from './credentials';
 import { D1ManageService, requirementOf } from './manage';
 import { passwordHasher, randomSecret, type PasswordHasher } from './password';
 
+const testSchedule = { startsAt: '2030-01-01T09:00:00.000Z', endsAt: '2030-01-01T11:00:00.000Z', graceMinutes: 0 };
+
 const people = ['first', 'second', 'contestAdmin'] as const;
 const fastPasswords: PasswordHasher = { hash: async () => 'fictional-test-hash', verify: async () => false };
 type Person = typeof people[number];
@@ -472,7 +474,7 @@ describe('event, roster, and contest commands', () => {
       entrants: list.map(([name, kind]) => ({ kind, name, handle: name.toLowerCase().replaceAll(' ', '-') })),
     })).entrantIds!;
   const createContest = async (by: Name, eventId: string, name: string, contestType: 'singles' | 'mixed' | 'teams') =>
-    (await execute(by, { type: 'create_contest', eventId, name, contestType, categories: ['Devices', 'Other'] })).contestId!;
+    (await execute(by, { type: 'create_contest', eventId, name, contestType, schedule: testSchedule, categories: ['Devices', 'Other'] })).contestId!;
   const seatsOf = (contestId: string) =>
     rows<{ account_id: string; team_id: string | null }>('SELECT account_id, team_id FROM memberships WHERE session_id = ? ORDER BY account_id', contestId);
   const addIssue = (contestId: string, entryId: string, category: string) => run(
@@ -645,14 +647,14 @@ describe('event, roster, and contest commands', () => {
     await expect(execute('contestAdmin', command)).rejects.toMatchObject({ status: 403 });
 
     // A mixed contest takes both. A contest type that would exclude an entry is refused.
-    await execute('eventAdmin', { type: 'update_contest', contestId: singlesContest, name: 'Mixed round', contestType: 'mixed' });
+    await execute('eventAdmin', { type: 'update_contest', contestId: singlesContest, name: 'Mixed round', contestType: 'mixed', schedule: testSchedule });
     await execute('eventAdmin', { type: 'assign_entrants', contestId: singlesContest, entries: [{ entrantId: team!, location: 'A' }, { entrantId: single!, location: 'B' }] });
-    await expect(execute('eventAdmin', { type: 'update_contest', contestId: singlesContest, name: 'Singles round', contestType: 'singles' }))
+    await expect(execute('eventAdmin', { type: 'update_contest', contestId: singlesContest, name: 'Singles round', contestType: 'singles', schedule: testSchedule }))
       .rejects.toMatchObject({ status: 409, message: 'Remove the entrants that this contest type excludes first.' });
     await expect(run(`UPDATE sessions SET contest_type = 'singles' WHERE id = ?`, singlesContest))
       .rejects.toThrow(/Remove the entrants that this contest type excludes first/);
     await execute('eventAdmin', { type: 'unassign_entrant', contestId: singlesContest, entrantId: team! });
-    await execute('eventAdmin', { type: 'update_contest', contestId: singlesContest, name: 'Singles round', contestType: 'singles' });
+    await execute('eventAdmin', { type: 'update_contest', contestId: singlesContest, name: 'Singles round', contestType: 'singles', schedule: testSchedule });
     expect(await rows('SELECT contest_type, name FROM sessions WHERE id = ?', singlesContest)).toEqual([{ contest_type: 'singles', name: 'Singles round' }]);
   });
 
@@ -714,7 +716,7 @@ describe('event, roster, and contest commands', () => {
   it('lets a contest admin run its own contest and no other, and refuses staff without admin', async () => {
     const [team] = await entrants('eventAdmin', ids.event, [['Aurora', 'team']]);
     await execute('eventAdmin', { type: 'assign_entrants', contestId: ids.contest, entries: [{ entrantId: team!, location: 'Desk' }] });
-    expect(await execute('contestAdmin', { type: 'set_intake', contestId: ids.contest, open: true })).toEqual({});
+    expect(await execute('contestAdmin', { type: 'set_intake', contestId: ids.contest, mode: 'open' })).toEqual({});
     expect(await rows('SELECT intake_open FROM sessions WHERE id = ?', ids.contest)).toEqual([{ intake_open: 1 }]);
     await execute('contestAdmin', { type: 'set_image_limits', contestId: ids.contest, fileMegabytes: 20, count: 8, totalMegabytes: 40 });
     expect(await rows('SELECT max_image_bytes, max_images_per_issue, max_image_bytes_per_issue FROM sessions WHERE id = ?', ids.contest))
@@ -734,23 +736,23 @@ describe('event, roster, and contest commands', () => {
       .rejects.toMatchObject({ status: 409, message: 'Network has 1 issue and stays in the list.' });
 
     for (const command of [
-      { type: 'set_intake', contestId: ids.contest, open: false },
+      { type: 'set_intake', contestId: ids.contest, mode: 'closed' },
       { type: 'set_location', contestId: ids.contest, entrantId: team!, location: 'x' },
     ] satisfies ManageCommand[]) {
       await expect(execute('volunteer', command)).rejects.toMatchObject({ status: 403 });
     }
     // The admin of one contest does not reach a contest of another event, and an event admin of one event does not reach another.
-    await expect(execute('contestAdmin', { type: 'set_intake', contestId: ids.otherContest, open: true })).rejects.toMatchObject({ status: 403 });
-    await expect(execute('eventAdmin', { type: 'set_intake', contestId: ids.otherContest, open: true })).rejects.toMatchObject({ status: 403 });
-    await expect(execute('webmaster', { type: 'set_intake', contestId: ids.otherContest, open: true })).resolves.toEqual({});
+    await expect(execute('contestAdmin', { type: 'set_intake', contestId: ids.otherContest, mode: 'open' })).rejects.toMatchObject({ status: 403 });
+    await expect(execute('eventAdmin', { type: 'set_intake', contestId: ids.otherContest, mode: 'open' })).rejects.toMatchObject({ status: 403 });
+    await expect(execute('webmaster', { type: 'set_intake', contestId: ids.otherContest, mode: 'open' })).resolves.toEqual({});
   });
 
   it('refuses every write in an archived event, and still shows its console', async () => {
     await run('UPDATE events SET archived = 1 WHERE id = ?', ids.event);
     for (const command of [
       { type: 'create_people', eventId: ids.event, people: [{ handle: 'late', name: 'Late' }] },
-      { type: 'create_contest', eventId: ids.event, name: 'Late', contestType: 'teams', categories: ['Other'] },
-      { type: 'set_intake', contestId: ids.contest, open: true },
+      { type: 'create_contest', eventId: ids.event, name: 'Late', contestType: 'teams', schedule: testSchedule, categories: ['Other'] },
+      { type: 'set_intake', contestId: ids.contest, mode: 'open' },
     ] satisfies ManageCommand[]) {
       await expect(execute('eventAdmin', command)).rejects.toMatchObject({ status: 403, message: 'This event is archived.' });
     }
@@ -883,8 +885,8 @@ describe('event, roster, and contest commands', () => {
     expect(view.people.map((person) => person.handle).sort()).toEqual(['contestadmin', 'eventadmin', 'volunteer']);
     expect(view.entrants.map(({ name, kind, handle }) => ({ name, kind, handle }))).toEqual([
       { name: 'Aurora', kind: 'team', handle: 'aurora' }, { name: 'Solo Sam', kind: 'single', handle: 'solo-sam' }]);
-    expect(view.contests.map(({ name, contestType, intakeOpen }) => ({ name, contestType, intakeOpen })))
-      .toEqual([{ name: 'Live 1', contestType: 'teams', intakeOpen: false }, { name: 'Mixed round', contestType: 'mixed', intakeOpen: false }]);
+    expect(view.contests.map(({ name, contestType, mode }) => ({ name, contestType, mode })))
+      .toEqual([{ name: 'Live 1', contestType: 'teams', mode: 'closed' }, { name: 'Mixed round', contestType: 'mixed', mode: 'schedule' }]);
     expect(view.staffAssignments).toEqual(expect.arrayContaining([
       { contestId: contest, accountId: caller('volunteer').accountId, admin: false, roles: ['specialist'] },
       { contestId: ids.contest, accountId: caller('contestAdmin').accountId, admin: true, roles: [] },
@@ -916,13 +918,13 @@ describe('event, roster, and contest commands', () => {
       create_people: { type: 'create_people', eventId: event, people: [{ handle: 'person', name: 'Person' }] },
       create_entrants: { type: 'create_entrants', eventId: event, entrants: [{ kind: 'team', name: 'Team', handle: 'team' }] },
       rename_entrant: { type: 'rename_entrant', eventId: event, entrantId: entrant, name: 'Renamed' },
-      create_contest: { type: 'create_contest', eventId: event, name: 'New', contestType: 'teams', categories: ['Other'] },
-      update_contest: { type: 'update_contest', contestId: contest, name: 'New', contestType: 'teams' },
+      create_contest: { type: 'create_contest', eventId: event, name: 'New', contestType: 'teams', schedule: testSchedule, categories: ['Other'] },
+      update_contest: { type: 'update_contest', contestId: contest, name: 'New', contestType: 'teams', schedule: testSchedule },
       assign_entrants: { type: 'assign_entrants', contestId: contest, entries: [{ entrantId: entrant, location: '' }] },
       unassign_entrant: { type: 'unassign_entrant', contestId: contest, entrantId: entrant },
       assign_staff: { type: 'assign_staff', contestId: contest, accountId: account, roles: ['jury'], admin: false },
       unassign_staff: { type: 'unassign_staff', contestId: contest, accountId: account },
-      set_intake: { type: 'set_intake', contestId: contest, open: true },
+      set_intake: { type: 'set_intake', contestId: contest, mode: 'open' },
       set_image_limits: { type: 'set_image_limits', contestId: contest, fileMegabytes: 10, count: 4, totalMegabytes: 40 },
       set_categories: { type: 'set_categories', contestId: contest, categories: ['Other'] },
       set_location: { type: 'set_location', contestId: contest, entrantId: entrant, location: 'Desk' },

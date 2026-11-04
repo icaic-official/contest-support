@@ -40,7 +40,7 @@ describe('Cloudflare Backend transport', () => {
     ['workflow', (backend: Backend) =>
       backend.workflows.execute(sessionId, requestId, command)],
     ['manage', (backend: Backend) =>
-      backend.manage.execute(requestId, { type: 'set_intake', contestId: sessionId, open: true })],
+      backend.manage.execute(requestId, { type: 'set_intake', contestId: sessionId, mode: 'open' })],
     ['image finish', (backend: Backend) =>
       backend.images.finish(sessionId, issueId)],
     ['image upload', (backend: Backend) => backend.images.upload(

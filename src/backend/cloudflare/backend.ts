@@ -6,8 +6,17 @@ import { AVATAR_MAX_BYTES, imageKind } from '../../connected/imageFile';
 import { type Command, roleSchema, snapshotSchema, type Snapshot } from '../../connected/model';
 import { createCloudflareAuthentication } from './authentication';
 
+const instantSchema = z.string();
+const scheduleSchema = z.object({ startsAt: instantSchema, endsAt: instantSchema, graceMinutes: z.number().int() });
+const intakeSchema = z.object({
+  open: z.boolean(),
+  reason: z.enum(['before_start', 'running', 'grace', 'ended', 'override_open', 'override_closed']),
+  changesAt: instantSchema.nullable(),
+});
 const contestsSchema = z.array(z.object({
-  id: z.uuid(), name: z.string(), eventId: z.uuid(), manage: z.enum(['none', 'contest', 'event', 'site']),
+  id: z.uuid(), name: z.string(), eventId: z.uuid(), eventName: z.string(), timeZone: z.string(),
+  contestType: z.enum(['singles', 'mixed', 'teams']), schedule: scheduleSchema.nullable(), intake: intakeSchema,
+  canOpen: z.boolean(), manage: z.enum(['none', 'contest', 'event', 'site']),
 }));
 const siteSchema = z.object({
   webmasters: z.array(z.object({ id: z.uuid(), name: z.string(), handle: z.string(), ready: z.boolean() })),
@@ -31,7 +40,8 @@ const consoleSchema = z.object({
     id: z.uuid(), kind: z.enum(['team', 'single']), name: z.string(), accountId: z.uuid().nullable(), handle: z.string().nullable(),
   })),
   contests: z.array(z.object({
-    id: z.uuid(), name: z.string(), contestType: z.enum(['singles', 'mixed', 'teams']), intakeOpen: z.boolean(),
+    id: z.uuid(), name: z.string(), contestType: z.enum(['singles', 'mixed', 'teams']),
+    schedule: scheduleSchema.nullable(), mode: z.enum(['schedule', 'open', 'closed']), intake: intakeSchema,
   })),
   staffAssignments: z.array(z.object({
     contestId: z.uuid(), accountId: z.uuid(), admin: z.boolean(), roles: z.array(roleSchema),
@@ -282,7 +292,9 @@ export function createCloudflareBackend(options: {
     auth,
     workflows: {
       async contests(query) {
-        const search = query?.eventId === undefined ? '' : `?eventId=${encodeURIComponent(query.eventId)}`;
+        const search = query?.window !== undefined
+          ? `?from=${encodeURIComponent(query.window.from)}&to=${encodeURIComponent(query.window.to)}`
+          : query?.eventId === undefined ? '' : `?eventId=${encodeURIComponent(query.eventId)}`;
         return contestsSchema.parse(await readJson(await send(`/api/contests${search}`)));
       },
       async snapshot(sessionId) {
@@ -303,6 +315,12 @@ export function createCloudflareBackend(options: {
       },
       async issueCredentials(requestId, { eventId, accountIds }) {
         return issuedSchema.parse(await readJson(await post('/api/credentials', { requestId, eventId, accountIds })));
+      },
+    },
+    contestAwards: {
+      async execute(sessionId, requestId, command) {
+        const body = await readJson(await post('/api/contest-awards', { sessionId, requestId, command }));
+        return z.object({ id: z.uuid() }).parse(body).id;
       },
     },
     images: {

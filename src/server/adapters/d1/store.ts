@@ -2,6 +2,7 @@ import type { Caller } from '../../authentication';
 import type { WorkflowPersistence, WorkflowRead, WorkflowDecision, WorkflowCommitResult } from '../../workflow.ts';
 import type { Command, IssueStatus, Role } from '../../../connected/model.ts';
 import { contestDataBindings, contestDataSql } from '../cloudflare/authority';
+import { extraMinutesSql, intakeOpenSql } from '../cloudflare/schedule';
 import type { D1Connection, D1Statement, D1Value } from './connection';
 
 interface WorkflowColumns {
@@ -34,15 +35,19 @@ type WorkflowRow = WorkflowColumns & ReceiptColumns;
 // Each read uses one primary SQLite snapshot. The contest resolver checks the
 // login, the identity session, and the caller's seat. Its stamp covers every
 // version that access depends on. `teams` holds only the membership team and
-// the team that a submit names.
+// the team that a submit names. Intake is derived from the schedule, the
+// override, and the contestant's confirmed extra time. The dependency carries
+// it, so a submit that crosses the close fails its batch and retries.
+const intakeOpen = intakeOpenSql('s', extraMinutesSql('s', 'c.team_id'));
 const workflowSql = `SELECT c.account_name AS actor_name, c.team_id AS membership_team, c.is_admin, c.roles,
-    s.intake_open, s.categories, c.archived,
+    ${intakeOpen} AS intake_open, s.categories, c.archived,
     (SELECT json_group_array(t.id) FROM (SELECT id FROM teams WHERE session_id = s.id AND id IN (c.team_id, ?) ORDER BY id) t) AS teams,
     i.id AS issue_id, i.team_id, i.status, i.owner, i.public_revision,
     (SELECT id FROM resolutions WHERE issue_id = i.id AND reopened_at IS NULL) AS resolution_id,
     aw.id AS award_id, aw.applied_at,
     json_object('authority', json(c.stamp), 'name', c.account_name, 'expires', c.identity_expires_at,
       'teams', (SELECT json_group_array(t.id) FROM (SELECT id FROM teams WHERE session_id = s.id AND id IN (c.team_id, ?) ORDER BY id) t),
+      'intake', ${intakeOpen},
       'issue', i.write_version,
       'resolutions', (SELECT json_group_array(json_object('id', r.id, 'at', r.at, 'reopened_at', r.reopened_at,
         'reopened_by', r.reopened_by, 'summary', r.summary, 'reason', r.reason))

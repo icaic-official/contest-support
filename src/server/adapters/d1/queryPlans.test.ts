@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { openStoreDatabase } from '../cloudflare/tooling/store-database.mjs';
 import { snapshotSql as announcementSnapshotSql } from '../cloudflare/announcements';
-import { contestsListSql, eventContestsSql, snapshotSql } from '../cloudflare/application';
+import { calendarSql, contestsListSql, eventContestsSql, snapshotSql } from '../cloudflare/application';
 import { contestDataSql, signInAccountSql } from '../cloudflare/authority';
 import { claimSql } from '../cloudflare/live';
 import { eventConsoleSql, siteEventsSql } from '../cloudflare/manage';
@@ -20,6 +20,7 @@ const queries: Record<string, string> = {
   'current access for live logins': contestDataSql('logins'),
   'contests list': contestsListSql,
   'event contests list': eventContestsSql,
+  'calendar': calendarSql,
   ...Object.fromEntries(Object.entries(eventConsoleSql).map(([name, sql]) => [`event console ${name}`, sql])),
   'site events': siteEventsSql,
   'event sign-in': signInAccountSql.event,
@@ -32,7 +33,7 @@ const queries: Record<string, string> = {
 // readVolume.test.ts catches a scan of a real table behind an alias with the
 // same name, because it counts rows read on a large session.
 const materializedScans = new Map([
-  [snapshotSql, /^SCAN (?:access|visible_issues|a|i|c)(?: LEFT-JOIN)?$/],
+  [snapshotSql, /^SCAN (?:access|visible_issues|extra_minutes|a|i|c)(?: LEFT-JOIN)?$/],
   [announcementSnapshotSql, /^SCAN (?:access|c)$/],
   // The site page lists every event, and the site has few.
   [siteEventsSql, /^SCAN e$/],
@@ -63,7 +64,7 @@ describe('D1 query plans', () => {
     return plan.results.map((row) => row.detail)
       .filter((detail) => detail.startsWith('SCAN ') && !/^SCAN (?:CONSTANT ROW|\(subquery-\d+\)|json_each)/.test(detail))
       .filter((detail) => !materializedScans.get(sql)?.test(detail))
-      .filter((detail) => ![contestsListSql, eventContestsSql].includes(sql) || !webmasterContests.test(detail));
+      .filter((detail) => ![contestsListSql, eventContestsSql, calendarSql].includes(sql) || !webmasterContests.test(detail));
   }
 
   async function plan(sql: string): Promise<string> {

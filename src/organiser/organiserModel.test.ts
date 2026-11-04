@@ -459,6 +459,7 @@ describe("jury award lists (T0009)", () => {
   }
   function state(overrides: Partial<Snapshot>): Snapshot {
     return {
+      contest_awards: [],
       session: {
         id: "session",
         event_id: "event",

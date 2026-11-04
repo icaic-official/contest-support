@@ -9,13 +9,19 @@ import type { R2ImageService } from './images';
 import { AnnouncementCommandError, type D1AnnouncementService } from './announcements';
 import type { R2AnnouncementImageService } from './announcementImages';
 import type { R2AvatarService } from './avatars';
+import type { D1ContestAwardService } from './contestAwards';
 import type { D1ManageService } from './manage';
 import { logEvent, requestFields } from './log';
 import { baseSecurityHeaders } from './securityHeaders';
 
 const uuid = z.uuid();
 const workflowSchema = z.strictObject({ sessionId: uuid, requestId: uuid, command: z.unknown() });
+const contestAwardSchema = z.strictObject({ sessionId: uuid, requestId: uuid, command: z.unknown() });
 const manageSchema = z.strictObject({ requestId: uuid, command: z.unknown() });
+// A calendar window is at most 92 days, which bounds one read.
+const instant = z.iso.datetime({ offset: true }).transform((text) => new Date(text).toISOString());
+const windowSchema = z.strictObject({ from: instant, to: instant })
+  .refine(({ from, to }) => from < to && Date.parse(to) - Date.parse(from) <= 92 * 86_400_000);
 const credentialsSchema = z.strictObject({ requestId: uuid, eventId: uuid.nullable(), accountIds: z.unknown() });
 const imageSchema = z.discriminatedUnion('action', [
   z.strictObject({ action: z.literal('begin'), sessionId: uuid, requestId: uuid, issueId: uuid,
@@ -52,6 +58,7 @@ export interface ApplicationHttpServices {
   application: Pick<D1ApplicationService, 'contests' | 'snapshot'>;
   workflow: Pick<WorkflowService, 'execute'>;
   manage: Pick<D1ManageService, 'site' | 'event' | 'execute' | 'issueCredentials'>;
+  contestAwards: Pick<D1ContestAwardService, 'execute'>;
   images: Pick<R2ImageService, 'begin' | 'upload' | 'finish' | 'remove' | 'download'>;
   announcements: Pick<D1AnnouncementService, 'snapshot' | 'execute'>;
   announcementImages: Pick<R2AnnouncementImageService, 'begin' | 'upload' | 'finish' | 'remove' | 'download'>;
@@ -78,7 +85,11 @@ export function createApplicationHandler(services: ApplicationHttpServices, orig
       if (request.method === 'GET') {
         if (url.pathname === '/api/contests') {
           const eventId = url.searchParams.get('eventId');
-          return privateJson(await services.application.contests(caller, eventId === null ? undefined : uuid.parse(eventId)));
+          if (url.searchParams.has('from') || url.searchParams.has('to')) {
+            return privateJson(await services.application.contests(caller, { window: windowSchema.parse({
+              from: url.searchParams.get('from'), to: url.searchParams.get('to') }) }));
+          }
+          return privateJson(await services.application.contests(caller, eventId === null ? {} : { eventId: uuid.parse(eventId) }));
         }
         if (url.pathname === '/api/site') return privateJson(await services.manage.site(caller));
         if (url.pathname === '/api/event') return privateJson(await services.manage.event(caller, url.searchParams.has('eventId') ? uuid.parse(url.searchParams.get('eventId')) : undefined));
@@ -154,6 +165,10 @@ export function createApplicationHandler(services: ApplicationHttpServices, orig
       if (url.pathname === '/api/manage') {
         const parsed = manageSchema.parse(body);
         return privateJson(await services.manage.execute(caller, parsed.requestId, parsed.command));
+      }
+      if (url.pathname === '/api/contest-awards') {
+        const parsed = contestAwardSchema.parse(body);
+        return privateJson({ id: await services.contestAwards.execute(caller, parsed.sessionId, parsed.requestId, parsed.command) });
       }
       if (url.pathname === '/api/credentials') {
         const parsed = credentialsSchema.parse(body);

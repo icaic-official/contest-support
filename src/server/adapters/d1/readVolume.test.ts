@@ -6,6 +6,7 @@ import { openStoreDatabase } from '../cloudflare/tooling/store-database.mjs';
 import { contestsListSql, currentReadyLoginSql, eventContestsSql, snapshotSql } from '../cloudflare/application';
 import { currentAccountSql } from '../cloudflare/authentication';
 import { D1ManageService } from '../cloudflare/manage';
+import { clockSql, extraMinutesSql, intakeOpenSql } from '../cloudflare/schedule';
 import type { ManageCommand } from '../../../backend/contracts';
 import { contestDataBindings, contestDataSql, contestListBindings } from '../cloudflare/authority';
 import { R2AvatarService } from '../cloudflare/avatars';
@@ -14,6 +15,7 @@ import type { D1Connection, D1Statement } from './connection';
 import { D1ApplicationStore } from './store';
 import { applyMigrations } from './testFixture';
 
+const testSchedule = { startsAt: '2030-01-01T09:00:00.000Z', endsAt: '2030-01-01T11:00:00.000Z', graceMinutes: 0 };
 const configPath = 'src/server/adapters/cloudflare/deploy/connector-store-ci.wrangler.jsonc';
 const accounts = 1200;
 const teams = 24;
@@ -98,19 +100,29 @@ async function seed(db: D1Connection, teamCount: number): Promise<void> {
  * once for every row. It is the reference for the permission filters.
  * Replace it when the snapshot gains or loses a field.
  */
+// The reference computes the contestant's extra minutes where it uses them, as
+// the snapshot did before extra_minutes was read once.
+const referenceExtra = `(CASE WHEN s.ends_at IS NULL THEN 0 ELSE ${extraMinutesSql('s', '(SELECT team_id FROM access)')} END)`;
 const referenceSnapshotSql = `WITH login AS (${currentReadyLoginSql}), access AS MATERIALIZED (${contestDataSql('caller')}),
   visible_issues AS MATERIALIZED (
     SELECT i.* FROM access a CROSS JOIN issues i WHERE i.session_id = ? AND i.team_id = a.team_id
     UNION ALL SELECT i.* FROM access a CROSS JOIN issues i WHERE a.staff = 1 AND i.session_id = ?)
 SELECT json_object(
   'session', (SELECT json_object('id', s.id, 'event_id', s.event_id, 'name', s.name,
-    'intake_open', json(CASE WHEN s.intake_open THEN 'true' ELSE 'false' END),
+    'intake_open', json(CASE WHEN ${intakeOpenSql('s', referenceExtra)} THEN 'true' ELSE 'false' END),
     'categories', json(s.categories), 'revision', s.version,
     'max_image_bytes', s.max_image_bytes, 'max_images_per_issue', s.max_images_per_issue,
     'max_image_bytes_per_issue', s.max_image_bytes_per_issue) FROM sessions s WHERE s.id = ? AND EXISTS (SELECT 1 FROM access)),
   'event', (SELECT json_object('id', e.id, 'name', e.name,
     'archived', json(CASE WHEN e.archived THEN 'true' ELSE 'false' END))
     FROM events e JOIN sessions s ON s.event_id = e.id WHERE s.id = ? AND EXISTS (SELECT 1 FROM access)),
+  'clock', (SELECT ${clockSql('s', { timeZone: 'e.time_zone', entry: '(SELECT team_id FROM access)', extra: referenceExtra })}
+    FROM sessions s JOIN events e ON e.id = s.event_id WHERE s.id = (SELECT session_id FROM access)),
+  'contest_awards', json(COALESCE((SELECT json_group_array(json(row)) FROM (
+    SELECT json_object('id', k.id, 'minutes', k.minutes, 'explanation', k.explanation, 'actor_name', k.actor_name,
+      'at', k.at, 'applied_at', k.applied_at, 'applied_name', k.applied_name) AS row
+    FROM contest_awards k CROSS JOIN access a WHERE k.session_id = a.session_id
+      AND (a.staff = 1 OR (a.team_id IS NOT NULL AND k.applied_at IS NOT NULL)) ORDER BY k.at, k.id)), '[]')),
   'membership', (SELECT json_object('session_id', ?, 'user_id', account_id,
     'team_id', team_id, 'roles', json(roles), 'is_admin', json(CASE WHEN is_admin THEN 'true' ELSE 'false' END)) FROM access),
   'teams', json(COALESCE((SELECT json_group_array(json(row)) FROM (
@@ -442,14 +454,14 @@ describe('rows read by management commands in a session with 1,200 accounts', ()
   it('reads a bounded number of rows for each command that changes one thing', async () => {
     const [fresh] = (await measure(1201, { type: 'create_entrants', eventId: world.event, entrants: [{ kind: 'team', name: 'Fresh team', handle: 'fresh-team' }] })).receipt.entrantIds!;
     const commands: Array<[ManageCommand, number, number]> = [
-      [{ type: 'set_intake', contestId: world.contest, open: true }, 1, 90],
+      [{ type: 'set_intake', contestId: world.contest, mode: 'open' }, 1, 90],
       [{ type: 'set_image_limits', contestId: world.contest, fileMegabytes: 10, count: 12, totalMegabytes: 100 }, 1, 120],
       [{ type: 'set_location', contestId: world.contest, entrantId: world.team(3), location: 'Hall 2' }, 1, 40],
       [{ type: 'assign_staff', contestId: world.contest, accountId: world.account(1202), roles: ['jury'], admin: false }, 1201, 60],
       [{ type: 'unassign_staff', contestId: world.contest, accountId: world.account(1202) }, 1201, 50],
       [{ type: 'assign_entrants', contestId: world.contest, entries: [{ entrantId: fresh!, location: 'Hall 9' }] }, 1201, 150],
-      [{ type: 'update_contest', contestId: world.contest, name: 'Scale session', contestType: 'teams' }, 1201, 135],
-      [{ type: 'create_contest', eventId: world.event, name: 'Another', contestType: 'mixed', categories: ['Other'] }, 1201, 30],
+      [{ type: 'update_contest', contestId: world.contest, name: 'Scale session', contestType: 'teams', schedule: testSchedule }, 1201, 135],
+      [{ type: 'create_contest', eventId: world.event, name: 'Another', contestType: 'mixed', schedule: testSchedule, categories: ['Other'] }, 1201, 30],
       [{ type: 'create_people', eventId: world.event, people: [{ handle: 'fresh-person', name: 'Fresh person' }] }, 1201, 40],
     ];
     for (const [command, n, ceiling] of commands) {

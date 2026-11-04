@@ -351,6 +351,8 @@ describe('the previous Worker on the scoped authority schema', () => {
     const ids = {
       event: randomUUID(), first: randomUUID(), second: randomUUID(), third: randomUUID(),
       aurora: randomUUID(), auroraAgain: randomUUID(), borealis: randomUUID(), staff: randomUUID(), member: randomUUID(),
+      dubhe: randomUUID(), dubheAgain: randomUUID(), shared: randomUUID(),
+      elsewhere: randomUUID(), elsewhereSession: randomUUID(), elsewhereTeam: randomUUID(), traveler: randomUUID(),
     };
     const rosterMigration = '0019_event_roster.sql';
     /** The previous Worker's roster statements, as they were before entrants. */
@@ -361,28 +363,50 @@ describe('the previous Worker on the scoped authority schema', () => {
 
     beforeAll(async () => {
       ({ db, dispose } = await open());
-      await applyMigrations(db, (name) => name < rosterMigration);
+      // The fixture is written before 0017, which allowed a seat in any event and then placed each account by its majority.
+      await applyMigrations(db, (name) => name < '0017');
       const { run } = writer(db);
       await run('INSERT INTO events (id, name) VALUES (?, ?)', ids.event, 'Roster event');
       await run('INSERT INTO sessions (id, event_id, name) VALUES (?, ?, ?), (?, ?, ?), (?, ?, ?)',
         ids.first, ids.event, 'First', ids.second, ids.event, 'Second', ids.third, ids.event, 'Third');
+      // A legacy anomaly: an older team in another event, where one account also holds a seat.
+      await run('INSERT INTO events (id, name) VALUES (?, ?)', ids.elsewhere, 'Other roster event');
+      await run('INSERT INTO sessions (id, event_id, name) VALUES (?, ?, ?)', ids.elsewhereSession, ids.elsewhere, 'Elsewhere');
+      await run('INSERT INTO teams (id, session_id, name, location) VALUES (?, ?, ?, ?)', ids.elsewhereTeam, ids.elsewhereSession, 'Aldebaran', 'F');
       await run('INSERT INTO teams (id, session_id, name, location) VALUES (?, ?, ?, ?), (?, ?, ?, ?), (?, ?, ?, ?)',
         ids.aurora, ids.first, 'Aurora', 'A', ids.auroraAgain, ids.second, ' aurora ', 'B', ids.borealis, ids.first, 'Borealis', 'C');
+      await run('INSERT INTO teams (id, session_id, name, location) VALUES (?, ?, ?, ?), (?, ?, ?, ?)',
+        ids.dubhe, ids.first, 'Dubhe', 'D', ids.dubheAgain, ids.second, 'dubhe', 'E');
+      await addAccount(db, ids.shared, 'shared');
+      await run('INSERT INTO memberships (session_id, account_id, team_id) VALUES (?, ?, ?), (?, ?, ?)',
+        ids.first, ids.shared, ids.aurora, ids.second, ids.shared, ids.auroraAgain);
+      await addAccount(db, ids.traveler, 'traveler');
+      await run('INSERT INTO memberships (session_id, account_id, team_id) VALUES (?, ?, ?), (?, ?, ?), (?, ?, ?)',
+        ids.elsewhereSession, ids.traveler, ids.elsewhereTeam, ids.first, ids.traveler, ids.borealis, ids.second, ids.traveler, ids.dubheAgain);
       await addAccount(db, ids.staff, 'staff');
       await run('INSERT INTO memberships (session_id, account_id, is_admin) VALUES (?, ?, 1)', ids.first, ids.staff);
+      await applyMigrations(db, (name) => name >= '0017' && name < rosterMigration);
       await applyMigrations(db, (name) => name >= rosterMigration);
     });
     afterAll(async () => { await dispose?.(); });
 
-    it('gives each team an entrant, and one entrant to a name that two contests of an event share', async () => {
+    it('gives each team an entrant, and one entrant to same-named teams that share a contestant account', async () => {
       const { all } = writer(db);
       const teams = await all<{ id: string; entrant_id: string; name: string }>('SELECT id, entrant_id, name FROM teams');
       const byId = Object.fromEntries(teams.map((team) => [team.id, team]));
       expect(byId[ids.aurora]!.entrant_id).toBe(byId[ids.auroraAgain]!.entrant_id);
       expect(byId[ids.borealis]!.entrant_id).not.toBe(byId[ids.aurora]!.entrant_id);
       expect(byId[ids.auroraAgain]!.name).toBe('Aurora');
-      expect(await all('SELECT kind FROM entrants WHERE event_id = ?', ids.event)).toEqual([{ kind: 'team' }, { kind: 'team' }]);
+      expect(byId[ids.dubhe]!.entrant_id).not.toBe(byId[ids.dubheAgain]!.entrant_id);
+      expect(byId[ids.dubheAgain]!.name).toBe('dubhe');
+      expect(await all('SELECT kind FROM entrants WHERE event_id = ?', ids.event)).toHaveLength(4);
       expect(await all('SELECT contest_type FROM sessions WHERE event_id = ? GROUP BY contest_type', ids.event)).toEqual([{ contest_type: 'teams' }]);
+    });
+
+    it('links an account to the entrant of its oldest team in its own event', async () => {
+      const { first } = writer(db);
+      expect(await first('SELECT entrant_id FROM accounts WHERE id = ?', ids.traveler))
+        .toEqual({ entrant_id: (await first<{ entrant_id: string }>('SELECT entrant_id FROM teams WHERE id = ?', ids.borealis))!.entrant_id });
     });
 
     it('gives a team that the previous Worker adds an entrant of the same event', async () => {

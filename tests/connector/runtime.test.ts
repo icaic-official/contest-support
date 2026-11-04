@@ -302,7 +302,7 @@ it('runs the complete application through isolated HTTPS, D1, R2, and Durable Ob
     await manage(eventAdmin, { type: 'set_handle', eventId: fixture.event, accountId: legacyId, handle: assignedUsername });
     expect((await snapshot(organizer)).members.find((member) => member.person.id === legacyId)?.person.username).toBe(assignedUsername);
     const contests = await json<Array<{ id: string; name: string; eventId: string; manage: string }>>(contestant, '/api/contests');
-    expect(contests).toEqual([{ id: fixture.session, name: 'Fictional contest', eventId: fixture.event, manage: 'none' }]);
+    expect(contests).toEqual([{ id: fixture.session, name: 'Fictional contest', eventId: fixture.event, eventName: expect.any(String), manage: 'none' }]);
     expect((await json<Array<{ manage: string }>>(eventAdmin, '/api/contests')).map((item) => item.manage)).toEqual(['event']);
     await json(contestant, '/api/sessions', undefined, 404);
     await json(organizer, '/api/admin', {}, 404);

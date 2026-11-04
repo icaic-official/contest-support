@@ -396,6 +396,8 @@ export class D1ManageService {
     for (const target of targets) {
       const password = randomSecret() + 'A9!';
       passwords.set(target.id, password);
+      const seats = await this.statement('SELECT session_id FROM memberships WHERE account_id = ?', target.id)
+        .all<{ session_id: string }>();
       // A reset or a change of authority since the read fails the batch.
       const allowed = scope === null
         ? `${manageWebmasterSql} AND t.disabled = 0 AND t.credential_generation = ?`
@@ -408,9 +410,8 @@ export class D1ManageService {
         ...replaceCredentialStatements(this.db, target, await this.passwords.hash(password),
           { operationId: crypto.randomUUID(), actor: caller.accountId, temporary: true }),
         // The activity list of each contest that seats the account shows the reset.
-        this.statement(`INSERT INTO admin_audit (id, session_id, actor, action, target)
-          SELECT lower(hex(randomblob(16))), session_id, ?, 'reset_password', ? FROM memberships WHERE account_id = ?`,
-        caller.accountId, target.id, target.id),
+        ...seats.results.map((seat) => this.statement(`INSERT INTO admin_audit (id, session_id, actor, action, target)
+          VALUES (?, ?, ?, 'reset_password', ?)`, crypto.randomUUID(), seat.session_id, caller.accountId, target.id)),
       );
     }
     const { replayed: lost } = await this.commit(authority, requestId, record, {

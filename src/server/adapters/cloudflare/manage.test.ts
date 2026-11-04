@@ -850,6 +850,8 @@ describe('event, roster, and contest commands', () => {
     await manage.issueCredentials(caller('contestAdmin'), randomUUID(), { eventId: ids.event, accountIds: [person!] });
     expect(await rows(`SELECT session_id, actor FROM admin_audit WHERE action = 'reset_password' AND target = ?`, person!))
       .toEqual([{ session_id: ids.contest, actor: caller('contestAdmin').accountId }]);
+    const { audit } = await new D1ApplicationService(db).snapshot(caller('contestAdmin'), ids.contest);
+    expect(audit.some((entry) => entry.action === 'reset_password' && entry.target === person)).toBe(true);
   });
 
   it('gives an entrant with no sign-in one account, seated in each entry, and refuses a second', async () => {

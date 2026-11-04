@@ -1,5 +1,6 @@
 import { LogOut, RefreshCw } from "lucide-react";
 import { useState } from "react";
+import { ContestPicker } from "@/connected/ContestPicker";
 import { BrandMark } from "@/components/brand";
 import { BuildId } from "@/components/build-id";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -13,7 +14,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import type { SessionData } from "@/connected/hooks/useSessionSnapshot";
@@ -69,24 +69,14 @@ export function NoSessionAccess({
             </Alert>
           )}
           {sessions.length > 1 && (
-            <div className="grid gap-2">
-              <Label htmlFor="access-session">Contest session</Label>
-              <select
-                id="access-session"
-                value={sessionId}
-                disabled={!!onRetry}
-                onChange={(event) =>
-                  data.selectSession(event.target.value)
-                }
-                className="h-11 rounded-md border border-input bg-transparent px-3 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:bg-input/30"
-              >
-                {sessions.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.name}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <ContestPicker
+              variant="select"
+              label="Contest session"
+              contests={sessions}
+              value={sessionId}
+              disabled={!!onRetry}
+              onSelect={data.selectSession}
+            />
           )}
         </CardContent>
       )}

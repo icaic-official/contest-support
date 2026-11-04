@@ -143,7 +143,7 @@ class VirtualUser {
   async load(hintAt) {
     if (!this.active) return;
     try {
-      await this.get('sessions', '/api/sessions');
+      await this.get('contests', '/api/contests');
       const snapshot = (await this.get('snapshot', `/api/snapshot?sessionId=${sessionId}`)).body;
       this.observe(snapshot, now(), hintAt);
       this.snapshot = snapshot;

@@ -6,12 +6,13 @@ import {
   useState,
 } from "react";
 import { backend } from "@/backend";
-import type { SessionSummary } from "@/backend/contracts";
+import type { ContestSummary } from "@/backend/contracts";
 import { errorMessage } from "@/backend/errors";
 import type { Snapshot } from "../model";
 import { startRefreshSchedule } from "./refreshSchedule";
 
-export type { SessionSummary };
+/** A contest that the person may open. */
+export type SessionSummary = ContestSummary;
 
 /** Shared session data for every UI. Read it; do not copy it into state. */
 export interface SessionData {
@@ -70,7 +71,7 @@ export function useSessionSnapshot(userId: string): SessionData {
     // revision. A write waits for its own refresh before enabling controls.
     const task = refreshQueue.current.then(async () => {
       try {
-        const list = await backend.workflows.sessions(userId);
+        const list = await backend.workflows.contests();
         const nextSession = list.some((s) => s.id === sessionId)
           ? sessionId
           : (list[0]?.id ?? "");
@@ -96,7 +97,7 @@ export function useSessionSnapshot(userId: string): SessionData {
     });
     refreshQueue.current = task;
     return task;
-  }, [sessionId, userId]);
+  }, [sessionId]);
   const applySnapshot = useCallback(
     (forSession: string, next: Snapshot) => {
       const run = generation.current;

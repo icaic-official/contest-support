@@ -110,7 +110,7 @@ test("the sidebar account card opens the account page and focuses its heading", 
 for (const [path, heading, membership] of [
   ["/administration", "Overview", { ...staff, is_admin: true }],
   ["/administration/accounts", "Accounts", { ...staff, is_admin: true }],
-  ["/administration/roster", "Roster", { ...staff, is_admin: true }],
+  ["/administration/roster", "Team locations", { ...staff, is_admin: true }],
   [
     "/administration/settings",
     "Session settings",
@@ -135,16 +135,6 @@ for (const [path, heading, membership] of [
     await expect(page).toHaveURL(path);
   });
 }
-
-test("the assign-by-ID form names the field Account ID, as the account page does", async ({
-  page,
-  api,
-}) => {
-  await signIn(page, api, { ...staff, is_admin: true }, "/administration/accounts");
-  await page.getByText("Assign an existing account by ID", { exact: true }).click();
-  await expect(page.getByLabel("Account ID", { exact: true })).toBeVisible();
-  await expect(page.getByLabel("Auth user UUID")).toHaveCount(0);
-});
 
 test("browser history restores the section and heading focus", async ({
   page,

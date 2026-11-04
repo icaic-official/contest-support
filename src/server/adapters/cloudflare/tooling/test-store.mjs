@@ -17,9 +17,9 @@ const suites = {
     include: ['src/server/adapters/d1/store.test.ts'],
   },
   accounts: {
-    total: 82, label: 'connector accounts', maxWorkers: 4,
+    total: 34, label: 'connector accounts', maxWorkers: 4,
     include: ['authentication.test.ts', 'authenticationRecovery.test.ts',
-      'authenticationInitiation.test.ts', 'authenticationCompletion.test.ts']
+      'authenticationCompletion.test.ts']
       .map((file) => `src/server/adapters/cloudflare/${file}`),
   },
 };

@@ -135,22 +135,20 @@ export async function runTrustedCommand(options, dependencies = {}) {
     }
     return;
   }
-  if (!['bootstrap', 'recover'].includes(options.command)) throw new Error('Select a trusted installation operation.');
+  if (options.command !== 'bootstrap') throw new Error('Select a trusted installation operation.');
   const prepared = await (dependencies.loadLibrary ?? loadInstallationLibrary)();
   let handle;
   let platform;
   let cleanupFailed = false;
   try {
-    const input = options.command === 'bootstrap' ? await readPublicJson(options.competition) : undefined;
-    if (input !== undefined) prepared.library.validateCompetitionConfiguration(input);
+    const input = await readPublicJson(options.site);
+    prepared.library.validateSiteConfiguration(input);
     handle = await reserveCredentialOutput(options.credentials);
     const metadata = { command: options.command, accountId: settings.accountId, databaseId: settings.databaseId };
     await writePrivateResult(handle, { status: 'prepared', ...metadata });
     platform = await (dependencies.openPlatform ?? openRemotePlatform)(options.config);
     await writePrivateResult(handle, { status: 'operation_started', ...metadata });
-    const result = options.command === 'bootstrap'
-      ? await prepared.library.bootstrapInstallation(platform.env.DB, input)
-      : await prepared.library.recoverInstallationOwner(platform.env.DB, { installationId: options.installation, accountId: options.owner });
+    const result = await prepared.library.bootstrapSite(platform.env.DB, input);
     await writePrivateResult(handle, { status: 'completed', provider: metadata, ...result });
   } catch {
     // Keep the exclusive 0600 file, including any completed or partial result.

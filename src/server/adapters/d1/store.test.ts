@@ -196,7 +196,8 @@ describe("D1 workflow persistence", () => {
       expired: fixture.statement("UPDATE logins SET expires_at = unixepoch() - 1 WHERE id = ?", fixture.staff.loginId),
       revoked: fixture.statement("UPDATE logins SET revoked = 1 WHERE id = ?", fixture.staff.loginId),
       roles: fixture.statement("DELETE FROM membership_roles WHERE session_id = ? AND account_id = ?", fixture.sessionId, fixture.staff.accountId),
-      team: fixture.statement("UPDATE memberships SET team_id = ? WHERE session_id = ? AND account_id = ?", fixture.otherTeamId, fixture.sessionId, fixture.contestant.accountId),
+      // 0019 refuses moving an entrant's seat to another team. Unassigning the entry removes the seat.
+      team: fixture.statement("DELETE FROM memberships WHERE session_id = ? AND account_id = ?", fixture.sessionId, fixture.contestant.accountId),
     };
     await mutations[change].run();
   }

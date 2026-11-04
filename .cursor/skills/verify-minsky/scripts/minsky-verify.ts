@@ -84,8 +84,11 @@ interface Result {
 
 interface Installation {
   sessionId: string;
-  teamIds: string[];
-  adminUsername: string;
+  eventId: string;
+  eventCode: string;
+  /** The event admin that fixture SQL created. The webmaster issues its first password. */
+  eventAdminId: string;
+  webmasterHandle: string;
   temporaryPassword: string;
 }
 
@@ -105,8 +108,9 @@ class LocalApi {
     this.sessionId = sessionId;
   }
 
-  async adopt(username: string, temporaryPassword: string): Promise<void> {
-    await this.signIn(username, temporaryPassword);
+  /** `event` is the event code, or null for the site sign-in of a webmaster. */
+  async adopt(username: string, temporaryPassword: string, event: string | null): Promise<void> {
+    await this.signIn(username, temporaryPassword, event);
     await this.post(username, '/api/auth/change-password', {
       currentPassword: temporaryPassword,
       newPassword: PASSWORD,
@@ -125,9 +129,9 @@ class LocalApi {
     return result && typeof result === 'object' ? result as Record<string, unknown> : {};
   }
 
-  private async signIn(username: string, password: string): Promise<void> {
+  private async signIn(username: string, password: string, event: string | null): Promise<void> {
     const jar = new Map<string, string>();
-    const body = await this.request('POST', '/api/auth/sign-in', jar, { username, password });
+    const body = await this.request('POST', '/api/auth/sign-in', jar, { event, handle: username, password });
     if (body.status !== 200) throw new Error(failure('/api/auth/sign-in', body));
     this.jars.set(username, jar);
   }
@@ -741,7 +745,8 @@ function bootstrapIsolated(root: string, env: NodeJS.ProcessEnv, secret: string)
 async function bootstrapLocal(root: string): Promise<void> {
   register(pathToFileURL(path.join(root, '.cursor/skills/verify-minsky/scripts/resolve-typescript.mjs')));
   const { getPlatformProxy } = await import('wrangler');
-  const { bootstrapInstallation } = await import('../../../../src/server/adapters/cloudflare/installation.ts');
+  const { bootstrapSite } = await import('../../../../src/server/adapters/cloudflare/installation.ts');
+  const { loginKeyFor } = await import('../../../../src/server/adapters/cloudflare/credentials.ts');
   const proxy = await getPlatformProxy<{ DB: D1Connection }>({
     configPath: path.join(stateDir(root), 'wrangler.json'),
     persist: { path: path.join(stateDir(root), 'persist', 'v3') },
@@ -749,49 +754,80 @@ async function bootstrapLocal(root: string): Promise<void> {
     envFiles: [],
   });
   try {
-    const installation = await bootstrapInstallation(proxy.env.DB, {
-      adminUsername: 'admin',
-      adminName: 'Test admin',
-      eventName: EVENT_NAME,
-      sessionName: SESSION_NAME,
-      categories: ['Problem statement', 'Devices', 'Backend', 'Other'],
-      teams: [
-        { name: 'Aurora', location: 'A12' },
-        { name: 'Cedar', location: 'A18' },
-      ],
-    });
+    // Bootstrap makes the one webmaster. Fixture SQL makes what create_event would: the event, its first admin, and a contest.
+    const webmaster = await bootstrapSite(proxy.env.DB, { webmasterHandle: 'webmaster', webmasterName: 'Test webmaster' });
+    const [eventId, sessionId, eventAdminId] = [crypto.randomUUID(), crypto.randomUUID(), crypto.randomUUID()];
+    await proxy.env.DB.batch([
+      proxy.env.DB.prepare('INSERT INTO events (id, name) VALUES (?, ?)').bind(eventId, EVENT_NAME),
+      proxy.env.DB.prepare('INSERT INTO sessions (id, event_id, name, categories, intake_open) VALUES (?, ?, ?, ?, 0)')
+        .bind(sessionId, eventId, SESSION_NAME, JSON.stringify(['Problem statement', 'Devices', 'Backend', 'Other'])),
+      proxy.env.DB.prepare(`INSERT INTO accounts (id, name, username, handle, event_id, must_change, credential_state)
+        VALUES (?, 'Test admin', ?, 'admin', ?, 1, 'pending')`).bind(eventAdminId, loginKeyFor(eventAdminId), eventId),
+      proxy.env.DB.prepare(`INSERT INTO grants (account_id, scope, event_id, granted_by) VALUES (?, 'event', ?, 'fixture')`)
+        .bind(eventAdminId, eventId),
+    ]);
+    const code = await proxy.env.DB.prepare('SELECT code FROM events WHERE id = ?').bind(eventId).first<{ code: string }>();
+    if (!code) throw new Error('The local event has no code.');
+    const installation: Installation = {
+      sessionId, eventId, eventCode: code.code, eventAdminId,
+      webmasterHandle: webmaster.handle, temporaryPassword: webmaster.temporaryPassword,
+    };
     writeFileSync(installationFile(root), JSON.stringify(installation), { mode: 0o600 });
   } finally {
     await proxy.dispose();
   }
 }
 
+/** The temporary passwords of up to eight accounts, issued by `caller` for the event. */
+async function issue(api: LocalApi, caller: string, installation: Installation, accountIds: string[]): Promise<string[]> {
+  const issued = await api.post(caller, '/api/credentials', {
+    requestId: crypto.randomUUID(), eventId: installation.eventId, accountIds,
+  }) as unknown as Array<{ temporaryPassword?: unknown }>;
+  return issued.map((item) => {
+    if (typeof item.temporaryPassword !== 'string') throw new Error('A credential request did not return a temporary password.');
+    return item.temporaryPassword;
+  });
+}
+
 async function seedAccounts(api: LocalApi, installation: Installation, seed: Seed): Promise<void> {
-  await api.adopt(installation.adminUsername, installation.temporaryPassword);
-  await api.post('admin', '/api/admin', { action: 'set_intake', sessionId: installation.sessionId, open: true });
-  const aurora = installation.teamIds[0];
-  if (!aurora) throw new Error('Bootstrap did not create the Aurora team.');
-  const accounts: Array<{ username: string; name: string; teamId: string | null; roles: StaffRole[] }> = [
-    { username: 'contestant', name: 'Test contestant', teamId: aurora, roles: [] },
-    { username: 'volunteer', name: 'Test volunteer', teamId: null, roles: ['volunteer'] },
-    { username: 'specialist', name: 'Test specialist', teamId: null, roles: ['specialist'] },
-    { username: 'jury', name: 'Test jury', teamId: null, roles: ['jury'] },
-    { username: 'combined', name: 'Test combined', teamId: null, roles: ['volunteer', 'specialist', 'jury'] },
+  // The webmaster gives the event admin a first password, as the site page does after create_event.
+  await api.adopt(installation.webmasterHandle, installation.temporaryPassword, null);
+  const [adminPassword] = await issue(api, installation.webmasterHandle, installation, [installation.eventAdminId]);
+  await api.adopt('admin', adminPassword!, installation.eventCode);
+  const manage = (command: Record<string, unknown>) =>
+    api.post('admin', '/api/manage', { requestId: crypto.randomUUID(), command });
+  await manage({ type: 'set_intake', contestId: installation.sessionId, open: true });
+  const teams = await manage({
+    type: 'create_entrants', eventId: installation.eventId,
+    entrants: [
+      { kind: 'team', name: 'Aurora', handle: 'contestant' },
+      { kind: 'team', name: 'Cedar', handle: 'cedar' },
+    ],
+  });
+  const entrantIds = teams.entrantIds as string[];
+  await manage({
+    type: 'assign_entrants', contestId: installation.sessionId,
+    entries: [{ entrantId: entrantIds[0], location: 'A12' }, { entrantId: entrantIds[1], location: 'A18' }],
+  });
+  const staff: Array<{ username: string; name: string; roles: StaffRole[] }> = [
+    { username: 'volunteer', name: 'Test volunteer', roles: ['volunteer'] },
+    { username: 'specialist', name: 'Test specialist', roles: ['specialist'] },
+    { username: 'jury', name: 'Test jury', roles: ['jury'] },
+    { username: 'combined', name: 'Test combined', roles: ['volunteer', 'specialist', 'jury'] },
   ];
-  for (const account of accounts) {
-    const created = await api.post('admin', '/api/accounts', {
-      sessionId: installation.sessionId,
-      command: {
-        action: 'create_account',
-        username: account.username,
-        name: account.name,
-        teamId: account.teamId,
-        roles: account.roles,
-        isAdmin: false,
-      },
+  const people = await manage({
+    type: 'create_people', eventId: installation.eventId,
+    people: staff.map(({ username, name }) => ({ handle: username, name })),
+  });
+  const staffIds = people.accountIds as string[];
+  for (const [index, account] of staff.entries()) {
+    await manage({
+      type: 'assign_staff', contestId: installation.sessionId, accountId: staffIds[index], roles: account.roles, admin: false,
     });
-    if (typeof created.temporaryPassword !== 'string') throw new Error(`Account ${account.username} did not return a temporary password.`);
-    await api.adopt(account.username, created.temporaryPassword);
+  }
+  const passwords = await issue(api, 'admin', installation, [(teams.accountIds as string[])[0]!, ...staffIds]);
+  for (const [index, username] of ['contestant', ...staff.map((account) => account.username)].entries()) {
+    await api.adopt(username, passwords[index]!, installation.eventCode);
   }
   if (seed === 'jury') await seedJuryIssues(api, installation.sessionId);
 }

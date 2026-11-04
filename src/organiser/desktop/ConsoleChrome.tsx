@@ -36,14 +36,7 @@ import {
   DialogDescription,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuLabel,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { ContestPicker } from "@/connected/ContestPicker";
 import { Switch } from "@/components/ui/switch";
 import {
   Tooltip,
@@ -56,6 +49,7 @@ import type { Issue, Membership, Snapshot } from "@/connected/model";
 import { searchTeams, unresolvedLabel } from "@/connected/teamSearch";
 import { type ThemePreference, useTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
+import { EventLink } from "@/event/EventLink";
 import { SiteLink } from "@/site/SiteLink";
 import {
   ConnectionBadge,
@@ -129,39 +123,33 @@ function SessionSwitcher({
     );
   }
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger
-        disabled={locked}
-        className={cn(rowClass, "hover:bg-sidebar-accent disabled:opacity-50")}
-        aria-label={`Contest session: ${sessionName}. Change session`}
-      >
-        {mark}
-        {label}
-        {!collapsed && (
-          <ChevronsUpDown
-            aria-hidden="true"
-            className="size-4 text-muted-foreground"
-          />
-        )}
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="w-64">
-        <DropdownMenuLabel>Contest session</DropdownMenuLabel>
-        <DropdownMenuRadioGroup
-          value={data.sessionId}
-          onValueChange={(sessionId) => {
-            if (sessionId === data.sessionId) return;
-            data.selectSession(sessionId);
-            onSessionChange();
-          }}
+    <ContestPicker
+      variant="menu"
+      contests={data.sessions}
+      value={data.sessionId}
+      disabled={locked}
+      className="w-64"
+      onSelect={(sessionId) => {
+        data.selectSession(sessionId);
+        onSessionChange();
+      }}
+      trigger={
+        <button
+          type="button"
+          className={cn(rowClass, "hover:bg-sidebar-accent disabled:opacity-50")}
+          aria-label={`Contest session: ${sessionName}. Change session`}
         >
-          {data.sessions.map((session) => (
-            <DropdownMenuRadioItem key={session.id} value={session.id}>
-              {session.name}
-            </DropdownMenuRadioItem>
-          ))}
-        </DropdownMenuRadioGroup>
-      </DropdownMenuContent>
-    </DropdownMenu>
+          {mark}
+          {label}
+          {!collapsed && (
+            <ChevronsUpDown
+              aria-hidden="true"
+              className="size-4 text-muted-foreground"
+            />
+          )}
+        </button>
+      }
+    />
   );
 }
 
@@ -326,6 +314,14 @@ export function ConsoleSidebar({
       </nav>
       {member.is_admin && (
         <div className="px-2 pb-2">
+          <EventLink
+            data={data}
+            collapsed={collapsed}
+            className={cn(
+              "text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+              collapsed && "justify-center",
+            )}
+          />
           <SiteLink
             collapsed={collapsed}
             className={cn(

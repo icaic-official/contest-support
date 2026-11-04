@@ -1,7 +1,8 @@
 import { test as base, expect, type BrowserContext, type Page, type WebSocketRoute } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
-import type { AccountResult, EventCode, PersonAvatar, RosterCommand, SignInTarget } from '../../src/backend/contracts';
-import { rosterCommandSchema } from '../../src/connected/roster';
+import type {
+  CredentialIssue, EventCode, EventConsole, IssuedCredential, ManageCommand, ManageReceipt, PersonAvatar, SignInTarget,
+} from '../../src/backend/contracts';
 import type { AnnouncementSnapshot } from '../../src/connected/announcementModel';
 import type { Command, Membership, Snapshot } from '../../src/connected/model';
 import {
@@ -45,7 +46,6 @@ const loginCookie = 'minsky_fixture_login';
 class FixtureIdentity implements AuthenticationService {
   constructor(
     private readonly accounts: () => readonly FixtureAccount[],
-    private readonly eventCode: () => EventCode,
     private readonly canChangeHandle: (accountId: string) => Promise<boolean>,
   ) {}
 
@@ -77,16 +77,11 @@ class FixtureIdentity implements AuthenticationService {
     if (!session) throw new AuthenticationError(401, 'Sign in to continue.');
     return { cookie: `${loginCookie}=${session.caller.loginId}; Path=/; HttpOnly; SameSite=Strict` };
   }
-
-  /** A fictional credential of the fixture's event. No account changes. */
-  async account(): Promise<AccountResult> {
-    return { temporaryPassword: 'fictional-temporary-password', signIn: { kind: 'event', code: this.eventCode() } };
-  }
 }
 
 /** The request paths that the deployed Worker sends to its authentication handler. */
 function authenticationPath(path: string): boolean {
-  return path === '/api/accounts' || path.startsWith('/api/auth/');
+  return path.startsWith('/api/auth/');
 }
 
 /**
@@ -147,7 +142,7 @@ export abstract class FixtureWorker {
         }
       }, { key: eventCodeStorageKey, code: this.eventCodeOfDevice() });
     }
-    const identity = new FixtureIdentity(() => this.accounts(), () => this.eventCodeOfDevice(), (id) => this.canChangeHandle(id));
+    const identity = new FixtureIdentity(() => this.accounts(), (id) => this.canChangeHandle(id));
     const authentication = createAuthenticationHandler(identity, { origins: [this.origin] });
     const application = createApplicationHandler({
       ...this.services,
@@ -289,8 +284,18 @@ export class FakeWorker extends FixtureWorker {
   workflow: (command: Command, requestId: string) => Promise<CommandResult> = async (command) =>
     ({ outcome: 'committed', issueId: 'issue_id' in command ? command.issue_id : randomUUID() });
 
-  /** Receives each roster command, parsed as the Worker parses it. Throw an AuthenticationError to reject. */
-  roster: (sessionId: string, command: RosterCommand) => Promise<void> = async () => {};
+  /** Receives each management command. Throw an AuthenticationError to reject. */
+  manage: (command: ManageCommand) => Promise<ManageReceipt> = async () => {
+    throw new AuthenticationError(403, 'Only a webmaster can change the site.');
+  };
+
+  /** The event console that the signed-in account reads. Undefined refuses the read. */
+  eventConsole: EventConsole | undefined;
+
+  /** Receives each credential request. Throw an AuthenticationError to reject. */
+  issue: (input: CredentialIssue) => Promise<IssuedCredential[]> = async () => {
+    throw new AuthenticationError(403, 'Only a webmaster can issue webmaster passwords.');
+  };
 
   protected accounts(): readonly FixtureAccount[] {
     return this.account ? [this.account] : [];
@@ -309,20 +314,19 @@ export class FakeWorker extends FixtureWorker {
 
   protected readonly services: WorkerServices = {
     application: {
-      sessions: async () => this.snapshots().filter((item) => item.membership)
-        .map((item) => ({ id: item.session!.id, name: item.session!.name })),
+      contests: async () => this.snapshots().filter((item) => item.membership)
+        .map((item) => ({ id: item.session!.id, name: item.session!.name, eventId: item.event?.id ?? '', eventName: 'Fictional event', manage: 'none' as const })),
       snapshot: async (_caller, sessionId) => this.read(sessionId),
-      setIntake: async () => {},
-      setImageLimits: async () => {},
-      saveMember: async () => {},
-      removeMember: async () => {},
-      editRoster: async (_caller, sessionId, command) => this.roster(sessionId, rosterCommandSchema.parse(command)),
     },
     workflow: { execute: (_caller, _sessionId, requestId, command) => this.workflow(command as Command, requestId) },
     manage: {
       site: async () => null,
-      execute: async () => { throw new AuthenticationError(403, 'Only a webmaster can change the site.'); },
-      issueCredentials: async () => { throw new AuthenticationError(403, 'Only a webmaster can issue webmaster passwords.'); },
+      event: async () => {
+        if (!this.eventConsole) throw new AuthenticationError(403, 'Only an event admin or a webmaster can change this event.');
+        return this.eventConsole;
+      },
+      execute: async (_caller, _requestId, command) => this.manage(command as ManageCommand),
+      issueCredentials: async (_caller, _requestId, input) => this.issue(input as CredentialIssue),
     },
     announcements: {
       snapshot: async () => this.announcements,

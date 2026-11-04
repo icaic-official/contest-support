@@ -1,7 +1,6 @@
 import { z } from 'zod';
 import type {
-  AccountCommand, AccountIdentity, AccountResult, Authentication, EventCode,
-  Unsubscribe,
+  AccountIdentity, Authentication, Unsubscribe,
 } from '../contracts';
 
 const identitySchema = z.object({ id: z.uuid(), name: z.string().exactOptional(), email: z.string().exactOptional() });
@@ -14,15 +13,9 @@ const sessionSchema = z.object({
   }),
   csrf: z.string().min(1),
 });
-const signInSchema = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal('event'), code: z.string().transform((code) => code as EventCode) }),
-  z.object({ kind: z.literal('site') }),
-]);
-const resultSchema = z.object({ temporaryPassword: z.string(), signIn: signInSchema });
 const errorSchema = z.object({ error: z.string() });
 
 export interface CloudflareAuthentication extends Authentication {
-  account(sessionId: string, command: AccountCommand): Promise<AccountResult>;
   /**
    * Sends a request with the login's CSRF token. The token comes from the
    * last session read and is reused until the login changes. A 403 reply
@@ -196,9 +189,6 @@ export function createCloudflareAuthentication(options: {
       if (!current || current.status.must_change || !current.status.session_valid) {
         throw new Error('Sign in again to confirm the password change.');
       }
-    },
-    async account(sessionId, command) {
-      return resultSchema.parse(await (await mutate('/api/accounts', { sessionId, command })).json());
     },
   };
 }

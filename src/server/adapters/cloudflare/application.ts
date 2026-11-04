@@ -1,26 +1,10 @@
 import { z } from 'zod';
-import type { MembershipInput, RosterCommand, SessionSummary } from '../../../backend/contracts';
-import { rosterCommandSchema, rosterKey } from '../../../connected/roster';
+import type { ContestSummary, ManageLevel } from '../../../backend/contracts';
 import { snapshotSchema, type Snapshot } from '../../../connected/model';
 import type { Caller } from '../../authentication';
 import { AuthenticationError } from '../../authentication';
 import type { D1Connection, D1Statement, D1Value } from '../d1/connection';
-import {
-  authorityGuard, contestDataBindings, contestDataSql, contestListBindings, contestSeatsSql, reaches, resolveAuthority,
-} from './authority';
-
-const memberSchema = z.object({
-  teamId: z.string().uuid().nullable(),
-  roles: z.array(z.enum(['volunteer', 'specialist', 'jury'])).max(3),
-  isAdmin: z.boolean(),
-}).strict().refine((member) => member.teamId
-  ? member.roles.length === 0 && !member.isAdmin
-  : member.roles.length > 0 || member.isAdmin);
-const limitsSchema = z.object({
-  fileMegabytes: z.number().int().min(1).max(50),
-  count: z.number().int().min(1).max(24),
-  totalMegabytes: z.number().int().min(1).max(120),
-}).strict().refine((limits) => limits.fileMegabytes <= limits.totalMegabytes);
+import { contestDataBindings, contestDataSql, contestListBindings, contestSeatsSql } from './authority';
 
 /** Bind accountId, loginId. This check also works after an authorized self-removal. */
 export const currentReadyLoginSql = `SELECT a.id FROM accounts a JOIN logins l ON l.account_id = a.id
@@ -33,8 +17,6 @@ export const currentReadyLoginSql = `SELECT a.id FROM accounts a JOIN logins l O
 export function currentReadyLoginBindings(caller: Caller): D1Value[] {
   return [caller.accountId, caller.loginId];
 }
-
-interface AdminGate { id: string; caller: Caller; statements: D1Statement[] }
 
 // D1 compiles every statement on every call, and SQLite compiles a CTE again at
 // each place that names it. So the resolver is named twice: once as `c` in the
@@ -60,7 +42,7 @@ SELECT json_object(
     'team_id', c.team_id, 'roles', json(c.roles), 'is_admin', json(CASE WHEN c.is_admin THEN 'true' ELSE 'false' END))
     WHERE c.account_id IS NOT NULL),
   'teams', json(COALESCE((SELECT json_group_array(json(row)) FROM (
-    SELECT json_object('id', id, 'session_id', session_id, 'name', name, 'location', location) AS row FROM (
+    SELECT json_object('id', id, 'session_id', session_id, 'name', name, 'location', location, 'entrant_id', entrant_id) AS row FROM (
       SELECT t.* FROM teams t WHERE c.staff = 1 AND t.session_id = ?
       UNION ALL SELECT t.* FROM teams t WHERE t.id = c.team_id) ORDER BY name, id)), '[]')),
   'issues', json(COALESCE((SELECT json_group_array(json(row)) FROM (
@@ -124,11 +106,17 @@ export function notificationStatements(db: D1Connection, sessionId: string, audi
   ]);
 }
 
-/** Every contest that the caller can open. Bind with contestListBindings. */
-export const sessionsListSql = `SELECT session_id AS id, session_name AS name FROM (${contestDataSql('contests')})
-  ORDER BY name, id`;
+const contestColumns = 'session_id AS id, session_name AS name, event_id, (SELECT name FROM events WHERE id = event_id) AS event_name, manage';
 
-/** D1 owns current access, consistent snapshots, and atomic administration. */
+/** Every contest that the caller can open. Bind with contestListBindings. */
+export const contestsListSql = `SELECT ${contestColumns} FROM (${contestDataSql('contests')}) ORDER BY name, id`;
+
+/** The contests of one event that the caller can open. Bind with contestListBindings, then the event ID. */
+export const eventContestsSql = `SELECT ${contestColumns} FROM (${contestDataSql('contests')}) WHERE event_id = ? ORDER BY name, id`;
+
+interface ContestRow { id: string; name: string; event_id: string; event_name: string; manage: ManageLevel }
+
+/** D1 owns current access and consistent snapshots. */
 export class D1ApplicationService {
   constructor(private readonly db: D1Connection) {}
 
@@ -136,260 +124,24 @@ export class D1ApplicationService {
     return this.db.prepare(sql).bind(...values);
   }
 
-  private validIds(sessionId: string, userId?: string): void {
-    if (!z.string().uuid().safeParse(sessionId).success ||
-        (userId !== undefined && !z.string().uuid().safeParse(userId).success)) {
-      throw new AuthenticationError(400, 'Invalid session or account.');
-    }
-  }
-
-  async sessions(caller: Caller): Promise<SessionSummary[]> {
-    const result = await this.statement(sessionsListSql, ...contestListBindings(caller)).all<SessionSummary>();
-    return result.results;
+  /**
+   * The contests that the caller can open. The resolver already limits an
+   * account of an event to that event, and lets a webmaster reach every
+   * contest, so an event ID only narrows the answer.
+   */
+  async contests(caller: Caller, eventId?: string): Promise<ContestSummary[]> {
+    if (eventId !== undefined && !z.uuid().safeParse(eventId).success) throw new AuthenticationError(400, 'Choose an event.');
+    const result = eventId === undefined
+      ? await this.statement(contestsListSql, ...contestListBindings(caller)).all<ContestRow>()
+      : await this.statement(eventContestsSql, ...contestListBindings(caller), eventId).all<ContestRow>();
+    return result.results.map((row) => ({ id: row.id, name: row.name, eventId: row.event_id, eventName: row.event_name, manage: row.manage }));
   }
 
   async snapshot(caller: Caller, sessionId: string): Promise<Snapshot> {
-    this.validIds(sessionId);
+    if (!z.uuid().safeParse(sessionId).success) throw new AuthenticationError(400, 'Invalid session or account.');
     const row = await this.statement(snapshotSql, caller.accountId, caller.loginId, ...contestDataBindings(caller, sessionId),
       ...Array<string>(9).fill(sessionId)).first<{ snapshot: string }>();
     if (!row) throw new AuthenticationError(403, 'Sign in again or change your temporary password.');
     return snapshotSchema.parse(JSON.parse(row.snapshot));
-  }
-
-  private assertion(id: string, sql: string, ...values: D1Value[]): D1Statement {
-    return this.statement(`INSERT INTO command_assertions (id, valid)
-      VALUES (?, CASE WHEN EXISTS (${sql}) THEN 1 ELSE 0 END)`, id, ...values);
-  }
-
-  private async adminGate(caller: Caller, sessionId: string): Promise<AdminGate> {
-    const authority = await resolveAuthority(this.db, caller, { scope: 'contest', contestId: sessionId });
-    if (!authority || !reaches(authority, 'contest') || !authority.writable) {
-      throw new AuthenticationError(403, 'Admin membership in an active event is required.');
-    }
-    const id = crypto.randomUUID();
-    return { id, caller, statements: [authorityGuard(this.db, id, authority)] };
-  }
-
-  private async commit(gate: AdminGate, statements: D1Statement[]): Promise<void> {
-    try {
-      await this.db.batch([...gate.statements, ...statements,
-        // Time can advance between D1 batch statements. Recheck credentials
-        // after the writes, without requiring a membership just removed by its owner.
-        this.assertion(`${gate.id}:access`, currentReadyLoginSql, ...currentReadyLoginBindings(gate.caller)),
-        this.statement('DELETE FROM command_assertions WHERE id IN (?, ?)', gate.id, `${gate.id}:access`)]);
-    } catch (error) {
-      const rejected = error instanceof Error && /(?:CHECK|UNIQUE|FOREIGN KEY|NOT NULL) constraint failed/.test(error.message);
-      throw new AuthenticationError(409, rejected
-        ? 'The session or account changed. Refresh before retrying.'
-        : 'The request outcome is unknown. Refresh before retrying.');
-    }
-  }
-
-  private audit(sessionId: string, actor: string, action: string, target: string | null, detail: object): D1Statement {
-    return this.statement('INSERT INTO admin_audit (id, session_id, actor, action, target, detail) VALUES (?, ?, ?, ?, ?, ?)',
-      crypto.randomUUID(), sessionId, actor, action, target, JSON.stringify(detail));
-  }
-
-  private async sessionAudiences(sessionId: string): Promise<string[]> {
-    const teams = await this.statement('SELECT id FROM teams WHERE session_id = ?', sessionId).all<{ id: string }>();
-    return ['staff', ...teams.results.map((team) => `team:${team.id}`)];
-  }
-
-  async setIntake(caller: Caller, sessionId: string, open: boolean): Promise<void> {
-    this.validIds(sessionId);
-    if (typeof open !== 'boolean') throw new AuthenticationError(400, 'Choose intake state.');
-    const gate = await this.adminGate(caller, sessionId);
-    await this.commit(gate, [
-      this.statement('UPDATE sessions SET intake_open = ? WHERE id = ?', Number(open), sessionId),
-      this.audit(sessionId, caller.accountId, 'set_intake', null, { open }),
-      ...notificationStatements(this.db, sessionId, await this.sessionAudiences(sessionId)),
-    ]);
-  }
-
-  async setImageLimits(caller: Caller, sessionId: string, input: {
-    fileMegabytes: number; count: number; totalMegabytes: number;
-  }): Promise<void> {
-    this.validIds(sessionId);
-    const parsed = limitsSchema.safeParse(input);
-    if (!parsed.success) throw new AuthenticationError(400, 'Choose valid image limits: 1 to 50 MB per image, 1 to 24 images, and 1 to 120 MB per issue. An image cannot be larger than the issue total.');
-    const limits = parsed.data;
-    const gate = await this.adminGate(caller, sessionId);
-    await this.commit(gate, [
-      this.statement(`UPDATE sessions SET max_image_bytes = ?, max_images_per_issue = ?,
-        max_image_bytes_per_issue = ? WHERE id = ?`, limits.fileMegabytes * 1048576,
-      limits.count, limits.totalMegabytes * 1048576, sessionId),
-      this.audit(sessionId, caller.accountId, 'set_image_limits', null,
-        { file_mb: limits.fileMegabytes, count: limits.count, total_mb: limits.totalMegabytes }),
-      ...notificationStatements(this.db, sessionId, await this.sessionAudiences(sessionId)),
-    ]);
-  }
-
-  /**
-   * Edits the teams and categories of a session. Every rule is checked twice.
-   * A read first gives a clear message. A guard inside the same batch then
-   * covers a write that lands between the read and the commit.
-   */
-  async editRoster(caller: Caller, sessionId: string, input: unknown): Promise<void> {
-    this.validIds(sessionId);
-    const parsed = rosterCommandSchema.safeParse(input);
-    if (!parsed.success) {
-      throw new AuthenticationError(400, 'Use different names of 1 to 200 characters. A team location can be empty.');
-    }
-    const command = parsed.data;
-    const gate = await this.adminGate(caller, sessionId);
-    const guardIds: string[] = [];
-    const guards = (...checks: Array<[string, ...D1Value[]]>) => checks.map(([sql, ...values]) => {
-      const id = crypto.randomUUID();
-      guardIds.push(id);
-      return this.assertion(id, sql, ...values);
-    });
-    const changes = await this.rosterChanges(sessionId, command, guards);
-    await this.commit(gate, [
-      ...changes.statements,
-      this.statement('DELETE FROM command_assertions WHERE id IN (SELECT value FROM json_each(?))', JSON.stringify(guardIds)),
-      this.audit(sessionId, caller.accountId, command.type, null, changes.detail),
-      ...notificationStatements(this.db, sessionId, changes.audiences ?? await this.sessionAudiences(sessionId)),
-    ]);
-  }
-
-  private async rosterChanges(
-    sessionId: string,
-    command: RosterCommand,
-    guards: (...checks: Array<[string, ...D1Value[]]>) => D1Statement[],
-  ): Promise<{ statements: D1Statement[]; detail: object; audiences?: string[] }> {
-    const teams = (await this.statement('SELECT id, name FROM teams WHERE session_id = ?', sessionId)
-      .all<{ id: string; name: string }>()).results;
-    const sameName = (name: string, exceptIds: ReadonlySet<string>) =>
-      teams.find((team) => !exceptIds.has(team.id) && rosterKey(team.name) === rosterKey(name));
-    const noClash = `SELECT 1 WHERE NOT EXISTS (SELECT 1 FROM teams a JOIN teams b ON b.session_id = a.session_id
-      AND b.id <> a.id AND lower(trim(b.name)) = lower(trim(a.name)) WHERE a.session_id = ? AND a.id IN (SELECT value FROM json_each(?)))`;
-    switch (command.type) {
-      case 'add_teams': {
-        const ids = new Set(command.teams.map((team) => team.id));
-        const clash = command.teams.find((team) => sameName(team.name, ids));
-        if (clash) throw new AuthenticationError(409, `A team named "${clash.name}" already exists.`);
-        const idList = JSON.stringify([...ids]);
-        return {
-          detail: { count: command.teams.length },
-          audiences: ['staff'],
-          statements: [
-            // A repeated request keeps its first rows. The guards below fail when an ID belongs to another session.
-            this.statement(`INSERT INTO teams (id, session_id, name, location)
-              SELECT json_extract(value, '$.id'), ?, json_extract(value, '$.name'), json_extract(value, '$.location')
-              FROM json_each(?) WHERE true ON CONFLICT(id) DO NOTHING`, sessionId, JSON.stringify(command.teams)),
-            ...guards(
-              ['SELECT 1 WHERE (SELECT count(*) FROM teams WHERE session_id = ? AND id IN (SELECT value FROM json_each(?))) = ?',
-                sessionId, idList, ids.size],
-              [noClash, sessionId, idList],
-            ),
-          ],
-        };
-      }
-      case 'update_team': {
-        const current = teams.find((team) => team.id === command.teamId);
-        if (!current) throw new AuthenticationError(409, 'That team no longer exists. Refresh the page.');
-        if (sameName(command.name, new Set([command.teamId]))) {
-          throw new AuthenticationError(409, `A team named "${command.name}" already exists.`);
-        }
-        return {
-          detail: { team: command.teamId, from: current.name, name: command.name, location: command.location },
-          audiences: ['staff', `team:${command.teamId}`],
-          statements: [
-            this.statement('UPDATE teams SET name = ?, location = ? WHERE id = ? AND session_id = ?',
-              command.name, command.location, command.teamId, sessionId),
-            ...guards(['SELECT 1 WHERE changes() = 1'], [noClash, sessionId, JSON.stringify([command.teamId])]),
-          ],
-        };
-      }
-      case 'delete_team': {
-        const current = teams.find((team) => team.id === command.teamId);
-        if (!current) throw new AuthenticationError(409, 'That team no longer exists. Refresh the page.');
-        const used = await this.statement(`SELECT
-          (SELECT count(*) FROM issues WHERE session_id = ?1 AND team_id = ?2) AS issues,
-          (SELECT count(*) FROM memberships WHERE session_id = ?1 AND team_id = ?2) AS accounts`, sessionId, command.teamId)
-          .first<{ issues: number; accounts: number }>();
-        if (used?.issues) {
-          throw new AuthenticationError(409, `${current.name} has ${used.issues} ${used.issues === 1 ? 'issue' : 'issues'} and stays in the roster.`);
-        }
-        if (used?.accounts) {
-          throw new AuthenticationError(409, `${used.accounts} ${used.accounts === 1 ? 'account belongs' : 'accounts belong'} to ${current.name}. Move or remove ${used.accounts === 1 ? 'it' : 'them'} first.`);
-        }
-        return {
-          detail: { team: command.teamId, name: current.name },
-          audiences: ['staff'],
-          statements: [
-            ...guards(['SELECT 1 WHERE NOT EXISTS (SELECT 1 FROM issues WHERE session_id = ? AND team_id = ?) AND NOT EXISTS (SELECT 1 FROM memberships WHERE session_id = ? AND team_id = ?)',
-              sessionId, command.teamId, sessionId, command.teamId]),
-            this.statement('DELETE FROM teams WHERE id = ? AND session_id = ?', command.teamId, sessionId),
-            ...guards(['SELECT 1 WHERE changes() = 1']),
-          ],
-        };
-      }
-      case 'set_categories': {
-        const kept = new Set(command.categories);
-        const used = (await this.statement(`SELECT category, count(*) AS issues FROM issues
-          WHERE session_id = ? AND category <> '' GROUP BY category ORDER BY category`, sessionId)
-          .all<{ category: string; issues: number }>()).results;
-        const stuck = used.filter((row) => !kept.has(row.category));
-        const [first] = stuck;
-        if (first) {
-          throw new AuthenticationError(409, `${first.category} has ${first.issues} ${first.issues === 1 ? 'issue' : 'issues'} and stays in the list.${
-            stuck.length > 1 ? ` ${stuck.length - 1} more ${stuck.length === 2 ? 'category stays' : 'categories stay'} too.` : ''}`);
-        }
-        return {
-          detail: { categories: command.categories },
-          statements: [
-            this.statement('UPDATE sessions SET categories = ? WHERE id = ?', JSON.stringify(command.categories), sessionId),
-            ...guards(['SELECT 1 WHERE NOT EXISTS (SELECT 1 FROM issues WHERE session_id = ? AND category <> \'\' AND category NOT IN (SELECT value FROM json_each(?)))',
-              sessionId, JSON.stringify(command.categories)]),
-          ],
-        };
-      }
-    }
-  }
-
-  async saveMember(caller: Caller, sessionId: string, userId: string, input: MembershipInput): Promise<void> {
-    const parsed = memberSchema.safeParse(input);
-    if (!parsed.success) throw new AuthenticationError(400, 'Choose a contestant team or staff roles or admin membership.');
-    await this.manageMember(caller, sessionId, userId, parsed.data);
-  }
-
-  async removeMember(caller: Caller, sessionId: string, userId: string): Promise<void> {
-    await this.manageMember(caller, sessionId, userId, undefined);
-  }
-
-  private async manageMember(caller: Caller, sessionId: string, userId: string, input: MembershipInput | undefined): Promise<void> {
-    this.validIds(sessionId, userId);
-    const gate = await this.adminGate(caller, sessionId);
-    const prior = await this.statement('SELECT team_id FROM memberships WHERE session_id = ? AND account_id = ?', sessionId, userId)
-      .first<{ team_id: string | null }>();
-    const guardId = crypto.randomUUID();
-    const changes: D1Statement[] = [this.assertion(guardId, `SELECT 1 FROM accounts WHERE id = ? AND
-      (? = 1 OR NOT EXISTS (SELECT 1 FROM memberships WHERE session_id = ? AND account_id = ? AND is_admin = 1)
-      OR EXISTS (SELECT 1 FROM memberships WHERE session_id = ? AND account_id <> ? AND is_admin = 1))`,
-    userId, Number(input?.isAdmin ?? false), sessionId, userId, sessionId, userId)];
-    if (input) {
-      changes.push(
-        this.statement(`INSERT INTO memberships (session_id, account_id, team_id, is_admin) VALUES (?, ?, ?, ?)
-          ON CONFLICT(session_id, account_id) DO UPDATE SET team_id = excluded.team_id, is_admin = excluded.is_admin`,
-        sessionId, userId, input.teamId, Number(input.isAdmin)),
-        this.statement('DELETE FROM membership_roles WHERE session_id = ? AND account_id = ?', sessionId, userId),
-        ...[...new Set(input.roles)].map((role) => this.statement(
-          'INSERT INTO membership_roles (session_id, account_id, role) VALUES (?, ?, ?)', sessionId, userId, role)),
-      );
-    } else {
-      changes.push(this.statement('DELETE FROM memberships WHERE session_id = ? AND account_id = ?', sessionId, userId));
-    }
-    const audiences = ['staff', `account:${userId}`];
-    if (prior?.team_id) audiences.push(`team:${prior.team_id}`);
-    if (input?.teamId) audiences.push(`team:${input.teamId}`);
-    changes.push(
-      this.statement('UPDATE sessions SET version = version + 1 WHERE id = ?', sessionId),
-      this.audit(sessionId, caller.accountId, input ? 'assign_membership' : 'revoke_membership', userId,
-        { team: input?.teamId ?? null, roles: input?.roles ?? [], admin: input?.isAdmin ?? false }),
-      ...notificationStatements(this.db, sessionId, audiences),
-      this.statement('DELETE FROM command_assertions WHERE id = ?', guardId),
-    );
-    await this.commit(gate, changes);
   }
 }

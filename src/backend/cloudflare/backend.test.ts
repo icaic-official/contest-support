@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createCloudflareBackend } from './backend';
 import type { Backend } from '../contracts';
-import { AnnouncementRejectedError, ImageRequestError, WorkflowRejectedError } from '../errors';
+import { AnnouncementRejectedError, ImageRequestError, RequestRefusedError, WorkflowRejectedError } from '../errors';
 import { AVATAR_MAX_BYTES } from '../../connected/imageFile';
 
 const origin = 'https://connector.example';
@@ -39,8 +39,8 @@ describe('Cloudflare Backend transport', () => {
   describe.each([
     ['workflow', (backend: Backend) =>
       backend.workflows.execute(sessionId, requestId, command)],
-    ['admin', (backend: Backend) =>
-      backend.admin.setIntake(sessionId, true)],
+    ['manage', (backend: Backend) =>
+      backend.manage.execute(requestId, { type: 'set_intake', contestId: sessionId, open: true })],
     ['image finish', (backend: Backend) =>
       backend.images.finish(sessionId, issueId)],
     ['image upload', (backend: Backend) => backend.images.upload(
@@ -178,6 +178,17 @@ describe('Cloudflare Backend transport', () => {
       const backend = createCloudflareBackend({ origin, fetch: transport(response) });
       await expect(backend.workflows.execute(sessionId, requestId, command)).rejects.not.toBeInstanceOf(WorkflowRejectedError);
     }
+  });
+
+  it('marks a management command refused only when the server answered with a 4xx', async () => {
+    const send = (response: () => Response) => createCloudflareBackend({ origin, fetch: transport(response) })
+      .manage.execute(requestId, { type: 'set_intake', contestId: sessionId, open: true });
+    await expect(send(() => Response.json({ error: 'That username is taken.' }, { status: 409 })))
+      .rejects.toBeInstanceOf(RequestRefusedError);
+    for (const response of [
+      () => Response.json({ error: 'Database failed.' }, { status: 503 }),
+      () => { throw new TypeError('Lost response.'); },
+    ]) await expect(send(response)).rejects.not.toBeInstanceOf(RequestRefusedError);
   });
 
   it('retains image retry classification and requires authorized uncached downloads', async () => {

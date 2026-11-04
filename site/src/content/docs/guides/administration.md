@@ -5,18 +5,16 @@ description: Create accounts, reset passwords, edit teams and categories, contro
 
 Use the **Session** tab (phone) or the **Accounts**, **Roster**, and **Session settings** pages (console).
 
-## Create an account
+## Create accounts and assign people
 
-1. Select **New account** (phone) or **Create account** (console).
-2. Create a team account for contestants or a personal account for each staff member.
-3. Copy the sign-in link, the username, and the temporary password before you select **Done**. Minsky shows the password once.
-4. Send them through a private channel.
+An event admin or a webmaster creates accounts and assigns people. A contest admin does not. Open the **event console** from the sidebar link **Event console**, or at `/event`.
 
-The sign-in link names your event, for example `https://minsky.example/?event=xxxx-2026`. It fills in the event code on the sign-in form.
-A username is unique inside your event. Another event can use the same username.
+- **People.** Paste lines of `name, username` and choose **Create people**. Switch **Event admin** on for a person who should run the event.
+- **Entrants.** Choose **Team** or **Single contestant**, paste lines of `name, username`, and choose **Import entrants**. Each entrant has one sign-in.
+- **Contests.** Create a contest with a type: teams, single contestants, or both.
+- **Assignments.** Choose a contest. Select entrants, give them a location, and assign them. Give each person roles, or make them a contest admin, and choose **Assign**.
 
-Choose the team for a contestant. Give staff any of **Volunteer**, **Specialist**, **Jury**, and **Admin**. Roles combine.
-App access is separate from access to GitHub and to the hosting provider, such as Cloudflare.
+After each creation, a credential sheet shows each temporary password once, in batches of eight. If a password did not arrive, choose **Issue again**.
 
 ## Reset a password
 
@@ -25,7 +23,7 @@ App access is separate from access to GitHub and to the hosting provider, such a
 3. Give the new temporary password privately.
 
 The reset signs the account out everywhere. History stays. The account keeps its username.
-Resets and username changes affect the whole account, so you need admin access to all its sessions.
+Resets and username changes affect the whole account. A contest admin can use them only for an account that sits in no other contest. An event admin can use them for every account of the event.
 
 ## Change a username
 
@@ -37,24 +35,12 @@ The password stays, and open sessions stay signed in. An older account without a
 
 ## Remove access
 
-Removing a membership removes access to that session. History still names the person.
-Minsky keeps at least one admin.
+An event admin removes a person from a contest in the event console, on the **Assignments** tab. History still names the person. An entrant leaves a contest the same way, unless it has an issue there.
 
-## Teams
+## Team locations
 
-Only session admins edit teams. On the phone, open **Teams** in the **Session** tab. In the console, open **Roster**.
-
-To add teams:
-
-1. Select the **Add teams** box.
-2. Type one team on each line. Write the name, then a comma or a tab, then the table or location. For example: `Aurora, Hall A desk 12`.
-3. Press Ctrl+Enter (Cmd+Enter on a Mac), or select **Add teams**. The box clears and keeps focus, so you can type the next lines.
-
-You can paste lines from a spreadsheet. One request adds up to 300 teams. Minsky checks the lines before it sends them. It names each line that has a problem. A name must be 1 to 200 characters. Two teams cannot have the same name. Minsky ignores differences in capital letters.
-
-To change a team, select **Edit** in its row. Change the name or the location. Press Enter to save or Escape to cancel. A new name shows to the team's contestants and to staff at once.
-
-To delete a team, select **Delete** and confirm. A team that has an issue or an account stays in the roster. Minsky shows why. To remove a team that has accounts, move or remove its accounts first. A team with an issue always stays, because the issue history names it.
+A contest admin changes where a team sits. On the phone, open **Team locations** in the **Session** tab. In the console, open **Team locations**. Change the text in a team's row and select **Save**.
+A contest admin does not add, rename, or delete teams. An event admin does that in the event console, on the **Entrants** tab, and assigns them on the **Assignments** tab.
 
 ## Categories
 
@@ -89,4 +75,4 @@ Session admins and jury members post announcements to the whole session. See [Po
 ## Archived events
 
 Archived events stay readable. Changes, uploads, limit changes, and team and category edits stop. Nothing is deleted.
-An editor for events does not exist yet. The [installer](/operators/installation/#6-create-the-first-owner) creates the event and its session.
+A webmaster creates events on the **Site** page. The [installer](/operators/installation/#6-create-the-first-webmaster) creates only the first webmaster. An event admin then creates contests in the event console.

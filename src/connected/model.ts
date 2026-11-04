@@ -84,6 +84,8 @@ export const snapshotSchema = z.object({
       session_id: uuid,
       name: z.string(),
       location: z.string(),
+      /** The entrant that this entry belongs to. Commands name the entrant, not the entry. */
+      entrant_id: uuid.nullable().optional(),
     }),
   ),
   issues: z.array(issueSchema),

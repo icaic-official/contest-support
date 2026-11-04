@@ -1,7 +1,7 @@
 import { type FormEvent, type ReactNode, useId, useState } from "react";
 import { Link, useNavigate } from "react-router";
-import { Clock, KeyRound, LogOut, ShieldCheck, UserMinus, UserPlus } from "lucide-react";
-import type { AccountIdentity, PersonInput, SiteOverview } from "@/backend/contracts";
+import { CalendarPlus, Clock, KeyRound, LogOut, ShieldCheck, UserMinus, UserPlus } from "lucide-react";
+import { type AccountIdentity, type EventCode, type PersonInput, type SiteOverview, parseEventCode, parseHandle } from "@/backend/contracts";
 import { BrandMark } from "@/components/brand";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
-  DialogContent,
+  ReturningDialogContent as DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
@@ -21,7 +21,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import type { SessionData } from "@/connected/hooks/useSessionSnapshot";
 import { useNow } from "@/connected/hooks/useNow";
-import { useRouteFocus, workspacePaths } from "@/connected/navigation";
+import { eventPath, useRouteFocus, workspacePaths } from "@/connected/navigation";
 import { ConfirmDialog } from "@/organiser/admin/AccountAccess";
 import { CredentialReveal } from "@/organiser/admin/CredentialReveal";
 import { usernamePattern } from "@/organiser/admin/adminModel";
@@ -66,7 +66,7 @@ export function SiteDashboard({
               Site
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              The webmasters and the site setting.
+              The events, the webmasters, and the site setting.
             </p>
           </div>
           <Button asChild variant="outline">
@@ -76,13 +76,26 @@ export function SiteDashboard({
         {state.error && (
           <Alert variant="destructive">
             <AlertDescription>
-              <p role="alert">{state.error}</p>
+              <p>{state.error}</p>
+            </AlertDescription>
+          </Alert>
+        )}
+        {site && state.readError && (
+          <Alert variant="destructive">
+            <AlertDescription>
+              <p>This page may be out of date. {state.readError}</p>
+              <Button type="button" variant="outline" className="mt-2 h-11" onClick={() => void state.reload()}>
+                Retry
+              </Button>
             </AlertDescription>
           </Alert>
         )}
         {site ? (
-          <div className="grid items-start gap-5 lg:grid-cols-2">
-            <Webmasters site={site} self={user.id} state={state} />
+          <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-2">
+            <div className="space-y-5">
+              <Events site={site} state={state} />
+              <Webmasters site={site} self={user.id} state={state} />
+            </div>
             <div className="space-y-5">
               <SiteSetting site={site} state={state} />
               {site.restrictWebmasterReads && (
@@ -97,7 +110,10 @@ export function SiteDashboard({
         ) : state.loaded ? (
           <Alert variant="destructive">
             <AlertDescription>
-              <p role="alert">{state.readError}</p>
+              <p>{state.readError}</p>
+              <Button type="button" variant="outline" className="mt-2 h-11" onClick={() => void state.reload()}>
+                Retry
+              </Button>
             </AlertDescription>
           </Alert>
         ) : (
@@ -220,7 +236,10 @@ function Webmasters({
     <SiteCard
       title="Webmasters"
       action={
-        <Button type="button" variant="outline" size="sm" disabled={state.busy} onClick={() => setAdding(true)}>
+        <Button type="button" variant="outline" className="h-11" onClick={() => {
+          state.clearError();
+          setAdding(true);
+        }}>
           <UserPlus aria-hidden="true" />
           Add
         </Button>
@@ -246,14 +265,15 @@ function Webmasters({
                   type="button"
                   variant="ghost"
                   size="icon"
-                  disabled={state.busy}
+                  className="size-11"
+                 
                   aria-label={`Reset password for ${webmaster.name}`}
                   onClick={() => setConfirming({ kind: "reset", webmaster })}
                 >
                   <KeyRound aria-hidden="true" />
                 </Button>
               ) : (
-                <Button type="button" variant="outline" size="sm" disabled={state.busy} onClick={() => void issue(webmaster)}>
+                <Button type="button" variant="outline" className="h-11" onClick={() => void issue(webmaster)}>
                   Issue password
                 </Button>
               ))}
@@ -261,7 +281,7 @@ function Webmasters({
                 type="button"
                 variant="ghost"
                 size="icon"
-                disabled={state.busy}
+               
                 aria-label={`Remove ${webmaster.name}`}
                 onClick={() => setConfirming({ kind: "remove", webmaster })}
               >
@@ -289,6 +309,7 @@ function Webmasters({
         }}
       />
       <ConfirmDialog
+        returnFocus
         open={!!confirming}
         onOpenChange={(open) => {
           if (!open) setConfirming(undefined);
@@ -405,7 +426,7 @@ function AddWebmasterForm({
         {submitted && !busy && error && (
           <Alert variant="destructive">
             <AlertDescription>
-              <p role="alert">{error}</p>
+              <p>{error}</p>
             </AlertDescription>
           </Alert>
         )}
@@ -438,14 +459,265 @@ function SiteSetting({ site, state }: { site: SiteOverview; state: SiteState }) 
               : "Off. Webmasters read every contest at once. Turn it on to make each webmaster join a contest first."}
           </p>
         </div>
+        <div className="flex min-h-11 items-center">
         <Switch
           id={id}
           checked={on}
-          disabled={state.busy}
+         
           aria-describedby={`${id}-state`}
           onCheckedChange={(restricted) => void state.execute({ type: "set_webmaster_reads", restricted })}
         />
+        </div>
       </div>
     </SiteCard>
+  );
+}
+
+type SiteEvent = SiteOverview["events"][number];
+
+/**
+ * The events of the site. A webmaster creates an event with its first event
+ * admin, then shares that admin's password once. The event admin runs the rest
+ * in the event console.
+ */
+function Events({ site, state }: { site: SiteOverview; state: SiteState }) {
+  const [creating, setCreating] = useState(false);
+  const [credentials, setCredentials] = useState<(Credentials & { eventName: string }) | undefined>();
+  const [notice, setNotice] = useState("");
+  return (
+    <SiteCard
+      title={`Events · ${site.events.length}`}
+      action={
+        <Button type="button" variant="outline" className="h-11" onClick={() => {
+          state.clearError();
+          setCreating(true);
+        }}>
+          <CalendarPlus aria-hidden="true" />
+          Create event
+        </Button>
+      }
+    >
+      {site.events.length === 0 ? (
+        <p className="text-sm text-muted-foreground">No events yet. Create one and name its first event admin.</p>
+      ) : (
+        <ul className="divide-y">
+          {site.events.map((item: SiteEvent) => (
+            <li key={item.id} className="flex flex-wrap items-center gap-x-3 gap-y-2 py-2.5">
+              <div className="min-w-0 flex-1 basis-36 leading-tight">
+                <p className="truncate text-sm font-medium">
+                  {item.name}
+                  {item.archived && <span className="ml-1 text-xs font-normal text-muted-foreground">(archived)</span>}
+                </p>
+                <p className="truncate text-xs text-muted-foreground">
+                  <span className="font-mono">{item.code}</span> · {item.contests} {item.contests === 1 ? "contest" : "contests"} ·{" "}
+                  {item.accounts} {item.accounts === 1 ? "account" : "accounts"}
+                </p>
+              </div>
+              <Button asChild variant="outline" className="ml-auto h-11">
+                <Link to={eventPath(item.id)} aria-label={`Open the console of ${item.name}`}>
+                  Open console
+                </Link>
+              </Button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <p role="status" className="mt-2 text-xs text-muted-foreground empty:hidden">
+        {notice}
+      </p>
+      <CreateEvent
+        open={creating}
+        busy={state.busy}
+        error={state.error}
+        onOpenChange={setCreating}
+        onCreate={async (input) => {
+          const receipt = await state.execute({
+            type: "create_event",
+            name: input.name,
+            code: input.code,
+            timeZone: input.timeZone,
+            firstAdmin: input.firstAdmin,
+          });
+          const adminId = receipt?.accountIds?.[0];
+          if (!receipt?.eventId || !adminId) return;
+          setCreating(false);
+          const issued = await state.issue(adminId, receipt.eventId);
+          if (issued?.temporaryPassword) {
+            setCredentials({
+              eventName: input.name,
+              username: issued.handle,
+              password: issued.temporaryPassword,
+              signIn: { kind: "event", code: input.code as EventCode },
+            });
+          } else {
+            setNotice(`${input.name} exists, but its first admin has no password yet. Open the console and choose Issue password.`);
+          }
+        }}
+      />
+      <Dialog
+        open={!!credentials}
+        onOpenChange={(open) => {
+          if (!open) setCredentials(undefined);
+        }}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader className="text-left">
+            <DialogTitle>First event admin of {credentials?.eventName}</DialogTitle>
+            <DialogDescription>Give these to the event admin in person.</DialogDescription>
+          </DialogHeader>
+          {credentials && <CredentialReveal credentials={credentials} onDone={() => setCredentials(undefined)} />}
+        </DialogContent>
+      </Dialog>
+    </SiteCard>
+  );
+}
+
+function CreateEvent({
+  open,
+  busy,
+  error,
+  onOpenChange,
+  onCreate,
+}: {
+  open: boolean;
+  busy: boolean;
+  error: string;
+  onOpenChange: (open: boolean) => void;
+  onCreate: (input: { name: string; code: string; timeZone: string; firstAdmin: PersonInput }) => Promise<void>;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[90dvh] max-w-sm overflow-y-auto">
+        <DialogHeader className="text-left">
+          <DialogTitle>Create an event</DialogTitle>
+          <DialogDescription>
+            The first event admin runs the event. Minsky shows that admin's first password once.
+          </DialogDescription>
+        </DialogHeader>
+        <CreateEventForm busy={busy} error={error} onCancel={() => onOpenChange(false)} onCreate={onCreate} />
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function validTimeZone(zone: string): boolean {
+  try {
+    new Intl.DateTimeFormat("en", { timeZone: zone });
+    return zone !== "";
+  } catch {
+    return false;
+  }
+}
+
+/** Mounted with the dialog, so each opening starts empty. */
+function CreateEventForm({
+  busy,
+  error,
+  onCancel,
+  onCreate,
+}: {
+  busy: boolean;
+  error: string;
+  onCancel: () => void;
+  onCreate: (input: { name: string; code: string; timeZone: string; firstAdmin: PersonInput }) => Promise<void>;
+}) {
+  const id = useId();
+  const [submitted, setSubmitted] = useState(false);
+  const [problem, setProblem] = useState("");
+  const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const code = parseEventCode(String(form.get("code") ?? ""));
+    const handle = parseHandle(String(form.get("admin-username") ?? ""));
+    if (!code) return setProblem("Use 3 to 40 lowercase letters, digits, or hyphens for the event code.");
+    if (!validTimeZone(String(form.get("time-zone") ?? "").trim())) {
+      return setProblem("Choose a time zone from the list, for example Europe/London.");
+    }
+    if (!handle) return setProblem("Use 3 to 32 letters, digits, hyphens, or underscores for the admin username.");
+    setProblem("");
+    setSubmitted(true);
+    void onCreate({
+      name: String(form.get("name") ?? "").trim(),
+      code,
+      timeZone: String(form.get("time-zone") ?? "").trim(),
+      firstAdmin: { name: String(form.get("admin-name") ?? "").trim(), handle },
+    });
+  }
+  const field = "h-11 text-base md:text-sm";
+  const zones = Intl.supportedValuesOf("timeZone");
+  return (
+    <>
+      <form id={id} className="grid gap-4" onSubmit={submit}>
+        <div className="grid gap-2">
+          <Label htmlFor={`${id}-name`}>Event name</Label>
+          <Input id={`${id}-name`} name="name" required maxLength={200} autoComplete="off" className={field} />
+        </div>
+        <div className="grid gap-2">
+          <Label htmlFor={`${id}-code`}>Event code</Label>
+          <Input
+            id={`${id}-code`}
+            name="code"
+            required
+            autoComplete="off"
+            spellCheck={false}
+            autoCapitalize="none"
+            aria-describedby={`${id}-code-rule`}
+            className={`${field} font-mono`}
+          />
+          <p id={`${id}-code-rule`} className="text-xs text-muted-foreground">
+            3 to 40 lowercase letters, digits, or hyphens, for example xxxx-olympiad-2026. People type it to sign in.
+          </p>
+        </div>
+        <div className="grid gap-2">
+          <Label htmlFor={`${id}-zone`}>Time zone</Label>
+          <Input id={`${id}-zone`} name="time-zone" required defaultValue={zone} list={`${id}-zones`} autoComplete="off" spellCheck={false} className={field} />
+          <datalist id={`${id}-zones`}>
+            {zones.map((item) => (
+              <option key={item} value={item} />
+            ))}
+          </datalist>
+        </div>
+        <div className="grid gap-2">
+          <Label htmlFor={`${id}-admin-name`}>First event admin, name</Label>
+          <Input id={`${id}-admin-name`} name="admin-name" required maxLength={200} autoComplete="off" className={field} />
+        </div>
+        <div className="grid gap-2">
+          <Label htmlFor={`${id}-admin-username`}>First event admin, username</Label>
+          <Input
+            id={`${id}-admin-username`}
+            name="admin-username"
+            required
+            pattern={usernamePattern}
+            autoComplete="off"
+            spellCheck={false}
+            autoCapitalize="none"
+            className={`${field} font-mono`}
+          />
+        </div>
+        {problem && (
+          <Alert variant="destructive">
+            <AlertDescription>
+              <p>{problem}</p>
+            </AlertDescription>
+          </Alert>
+        )}
+        {submitted && !busy && error && (
+          <Alert variant="destructive">
+            <AlertDescription>
+              <p>{error}</p>
+            </AlertDescription>
+          </Alert>
+        )}
+      </form>
+      <DialogFooter className="gap-2">
+        <Button type="button" variant="outline" className="h-11" onClick={onCancel}>
+          Cancel
+        </Button>
+        <Button type="submit" form={id} className="h-11" disabled={busy} loading={busy}>
+          Create event
+        </Button>
+      </DialogFooter>
+    </>
   );
 }

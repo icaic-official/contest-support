@@ -5,7 +5,7 @@ These procedures test the separate authentication CI target. They do not migrate
 Cloudflare serves the development application through its complete connector.
 See the [API reference](cloudflare-authentication.md) and [identity choice](cloudflare-authentication-choice.md) for behavior and resource limits.
 For T0020's complete connector, use the separate [direct store procedure](run-provider-tests.md#run-direct-cloudflare-store-checks).
-That procedure requires the D1-only `minsky-connector-store-ci` target and all 82 hosted account cases.
+That procedure requires the D1-only `minsky-connector-store-ci` target and all 34 hosted account cases.
 
 ## Run local checks
 
@@ -25,7 +25,6 @@ The suite uses four fixed files under `src/server/adapters/cloudflare/`:
 | --- | --- |
 | `authentication.test.ts` | Login, sessions, and password changes. |
 | `authenticationRecovery.test.ts` | Organizer account operations, interrupted operations, and recovery. |
-| `authenticationInitiation.test.ts` | Current-access races when account operations start. |
 | `authenticationCompletion.test.ts` | Current-access races when credential operations complete. |
 
 Cases run serially within each file. Up to four files run concurrently.
@@ -122,7 +121,7 @@ The runners reject missing or different targets before fixture writes.
 For a focused D1 rerun, append `--test-name-pattern=PATTERN` using a test-name expression.
 The target arguments remain mandatory. Record focused results separately from a complete run.
 This filter applies only to the historical `test:auth:hosted` runner.
-The complete connector account runner rejects filters and overrides. It requires all 82 hosted cases without failures or skips.
+The complete connector account runner rejects filters and overrides. It requires all 34 hosted cases without failures or skips.
 Its numeric progress reports appear at least every 15 seconds while the test process runs.
 Reports include completed and total cases, active cases, elapsed time, and the age of the oldest active case.
 They also include database call counts, statement counts, accumulated call time, partial provider-reported SQL time, and calls in progress.

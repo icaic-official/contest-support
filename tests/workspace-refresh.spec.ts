@@ -399,7 +399,7 @@ for (const [layout, viewport] of viewports) {
       }
     });
 
-    test('refreshed roles and team assignments are the values saved by the membership form', async ({
+    test('a refresh updates the open account dialog and keeps an unsaved username', async ({
       page,
       api,
     }) => {
@@ -415,71 +415,21 @@ for (const [layout, viewport] of viewports) {
           .getByRole('button', { name: 'Session', exact: true })
           .click();
       }
-      const openAccount = async (name: string) => {
-        await (isDesktop(page)
-          ? page.getByRole('button', { name: `Manage ${name}`, exact: true })
-          : page.getByRole('button', { name: new RegExp(`^${name}`) })
-        ).click();
-        const sheet = page.getByRole('dialog', { name, exact: true });
-        await expect(sheet).toBeVisible();
-        return sheet;
-      };
-      const role = (sheet: Locator, name: string) =>
-        sheet.getByRole('checkbox', { name, exact: true });
-
-      let sheet = await openAccount('Review helper');
-      await sheet.getByText('Jury', { exact: true }).click();
-      await expect(role(sheet, 'Jury')).toBeChecked();
+      await (isDesktop(page)
+        ? page.getByRole('button', { name: 'Manage Review helper', exact: true })
+        : page.getByRole('button', { name: /^Review helper/ })
+      ).click();
+      let sheet = page.getByRole('dialog', { name: 'Review helper', exact: true });
+      await expect(sheet).toBeVisible();
+      // The contest panel changes a username and reissues a password. Roles and teams belong to the event console.
+      await expect(sheet.getByRole('checkbox')).toHaveCount(0);
+      await expect(sheet.getByRole('button', { name: 'Save membership' })).toHaveCount(0);
+      await sheet.getByLabel('Change username', { exact: true }).fill('helper-two');
       state.members[0]!.person.name = 'Updated helper';
       await refresh(page);
-      // The account name updates and the unsaved choice stays.
       sheet = page.getByRole('dialog', { name: 'Updated helper', exact: true });
       await expect(sheet).toBeVisible();
-      await expect(role(sheet, 'Jury')).toBeChecked();
-
-      state.members[0]!.membership.roles = ['volunteer', 'specialist'];
-      state.members[0]!.membership.is_admin = true;
-      await refresh(page);
-      await expect(role(sheet, 'Specialist')).toBeChecked();
-      await expect(role(sheet, 'Admin')).toBeChecked();
-      await expect(role(sheet, 'Volunteer')).toBeChecked();
-      await expect(role(sheet, 'Jury')).not.toBeChecked();
-      await sheet.getByRole('button', { name: 'Save membership', exact: true }).click();
-      await expect
-        .poll(() => api.bodies('/api/admin'))
-        .toEqual([
-          {
-            action: 'save_member',
-            sessionId: SESSION_ID,
-            userId: MEMBER_ID,
-            member: { teamId: null, roles: ['volunteer', 'specialist'], isAdmin: true },
-          },
-        ]);
-      await expect(sheet).toBeHidden();
-
-      state.members[0]!.membership = {
-        ...state.members[0]!.membership,
-        team_id: TEAM_ID,
-        roles: [],
-        is_admin: false,
-      };
-      await refresh(page);
-      const account = isDesktop(page)
-        ? page.getByRole('row', { name: /Updated helper/ })
-        : page.getByRole('button', { name: /^Updated helper/ });
-      await expect(account).toContainText('Aurora');
-      sheet = await openAccount('Updated helper');
-      await expect(sheet.getByRole('radio', { name: /^Team/ })).toBeChecked();
-      await expect(sheet.getByLabel('Contestant team')).toHaveValue(TEAM_ID);
-      await sheet.getByRole('button', { name: 'Save membership', exact: true }).click();
-      await expect
-        .poll(() => api.bodies('/api/admin')[1])
-        .toEqual({
-          action: 'save_member',
-          sessionId: SESSION_ID,
-          userId: MEMBER_ID,
-          member: { teamId: TEAM_ID, roles: [], isAdmin: false },
-        });
+      await expect(sheet.getByLabel('Change username', { exact: true })).toHaveValue('helper-two');
     });
 
     /** Records the open issue as claimed when the held workflow call returns. */

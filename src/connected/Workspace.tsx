@@ -12,7 +12,9 @@ import { useCommand } from "./hooks/useCommand";
 import { useSessionSnapshot } from "./hooks/useSessionSnapshot";
 import { type UiKind, uiKindFor } from "./model";
 import type { ShellProps } from "./shell";
-import { canOpenPage, isEntryPath, pageForPath, sitePath } from "./navigation";
+import { canOpenPage, eventPath, eventRouteOf, isEntryPath, pageForPath, sitePath } from "./navigation";
+import { EventConsolePage } from "@/event/EventConsole";
+import { useOwnEvent } from "@/event/useOwnEvent";
 import { SiteDashboard } from "@/site/SiteDashboard";
 
 /**
@@ -42,6 +44,22 @@ export function Workspace({
   const [kind, setKind] = useState<UiKind>();
   if (current && current !== kind) setKind(current);
   const page = pageForPath(pathname);
+  // An event admin whose event has no contest yet has nothing else to open.
+  const noContest = data.loaded && !data.snapshot && data.sessions.length === 0 && !data.refreshError;
+  const ownEvent = useOwnEvent(noContest);
+  const eventRoute = eventRouteOf(pathname);
+  if (eventRoute) {
+    return (
+      <EventConsolePage
+        key={eventRoute.eventId ?? ""}
+        eventId={eventRoute.eventId}
+        user={props.user}
+        signOut={props.signOut}
+        hasContests={data.sessions.length > 0}
+      />
+    );
+  }
+  if (noContest && ownEvent === "yes") return <Navigate to={eventPath()} replace />;
   // The site page needs no readable contest, so a webmaster who must join
   // first can still reach the setting that asks for the join.
   if (pathname.replace(/\/+$/u, "") === sitePath) {

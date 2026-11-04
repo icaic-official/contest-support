@@ -3,7 +3,10 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { Command, Snapshot } from '../../../connected/model';
 import { decideWorkflow } from '../../workflow';
 import { openStoreDatabase } from '../cloudflare/tooling/store-database.mjs';
-import { currentReadyLoginSql, sessionsListSql, snapshotSql } from '../cloudflare/application';
+import { contestsListSql, currentReadyLoginSql, eventContestsSql, snapshotSql } from '../cloudflare/application';
+import { currentAccountSql } from '../cloudflare/authentication';
+import { D1ManageService } from '../cloudflare/manage';
+import type { ManageCommand } from '../../../backend/contracts';
 import { contestDataBindings, contestDataSql, contestListBindings } from '../cloudflare/authority';
 import { R2AvatarService } from '../cloudflare/avatars';
 import type { PrivateBucket } from '../cloudflare/images';
@@ -111,7 +114,7 @@ SELECT json_object(
   'membership', (SELECT json_object('session_id', ?, 'user_id', account_id,
     'team_id', team_id, 'roles', json(roles), 'is_admin', json(CASE WHEN is_admin THEN 'true' ELSE 'false' END)) FROM access),
   'teams', json(COALESCE((SELECT json_group_array(json(row)) FROM (
-    SELECT json_object('id', t.id, 'session_id', t.session_id, 'name', t.name, 'location', t.location) AS row
+    SELECT json_object('id', t.id, 'session_id', t.session_id, 'name', t.name, 'location', t.location, 'entrant_id', t.entrant_id) AS row
     FROM teams t CROSS JOIN access a WHERE t.session_id = ? AND (a.staff = 1 OR t.id = a.team_id) ORDER BY t.name, t.id)), '[]')),
   'issues', json(COALESCE((SELECT json_group_array(json(row)) FROM (
     SELECT json_object('id', i.id, 'number', i.number, 'session_id', i.session_id,
@@ -336,15 +339,142 @@ describe('rows read for a session with 1,200 accounts and 100 issues', () => {
     expect(usage.rowsRead).toBeLessThan(36);
   });
 
-  it('reads a handful of rows for the sessions list', async () => {
-    const list = async (n: number) => db.prepare(sessionsListSql)
-      .bind(...contestListBindings({ accountId: `acc-${n}`, loginId: `login-${n}` })).all<{ id: string }>();
+  it('reads a handful of rows for the contests list', async () => {
+    const list = async (n: number, eventId?: string) => {
+      const caller = { accountId: `acc-${n}`, loginId: `login-${n}` };
+      return eventId === undefined
+        ? db.prepare(contestsListSql).bind(...contestListBindings(caller)).all<{ id: string }>()
+        : db.prepare(eventContestsSql).bind(...contestListBindings(caller), eventId).all<{ id: string }>();
+    };
     const result = await list(callers.contestant);
-    expect(result.results).toEqual([{ id: 'sess-1', name: 'Scale session' }]);
+    expect(result.results).toEqual([expect.objectContaining({ id: 'sess-1', name: 'Scale session', event_id: 'ev-1', manage: 'none' })]);
     expect(result.meta?.rows_read ?? Infinity).toBeLessThan(30);
     for (const n of [callers.eventAdmin, callers.webmaster]) {
       expect((await list(n)).results.map((row) => row.id), `account ${n}`).toEqual(['sess-2', 'sess-1']);
     }
+    const narrowed = await list(callers.contestant, 'ev-1');
+    expect(narrowed.results.map((row) => row.id)).toEqual(['sess-1']);
+    expect(narrowed.meta?.rows_read ?? Infinity).toBeLessThan(30);
+    expect((await list(callers.contestant, 'ev-2')).results).toEqual([]);
+  });
+
+  // Every request reads the signed-in account before it does anything else.
+  // Measured on 2026-11-04 it reads 4 to 5 rows, because ownHandleSql looks for a contestant
+  // seat of the account through the memberships index and not through every member.
+  it('reads a handful of rows for the account status of every request', async () => {
+    for (const n of [callers.admin, callers.contestant, callers.eventAdmin, callers.webmaster]) {
+      const result = await db.prepare(currentAccountSql).bind(`ids-${n}`, `acc-${n}`).all<{ id: string }>();
+      expect(result.results.map((row) => row.id), `account ${n}`).toEqual([`acc-${n}`]);
+      expect(result.meta?.rows_read ?? Infinity, `account ${n}`).toBeLessThan(10);
+    }
+  });
+});
+
+/**
+ * The management commands refuse an ID that is not a UUID, so this world has UUID IDs:
+ * one event and one contest with 24 teams, 1,200 accounts with logins, and 100 issues.
+ * Account 1 is a contest admin, 1201 an event admin, and 1202 a staff member with no role.
+ * Accounts 1203 to 1252 are 50 entrants of the event that no contest holds yet.
+ */
+const uuid = (group: number, index: string) => `printf('00000000-0000-4000-80${String(group).padStart(2, '0')}-%012d', ${index})`;
+const world = {
+  event: '00000000-0000-4000-8000-00000000e001', contest: '00000000-0000-4000-8000-00000000c001',
+  bulk: '00000000-0000-4000-8000-00000000c002', account: (n: number) => `00000000-0000-4000-8001-${String(n).padStart(12, '0')}`,
+  team: (n: number) => `00000000-0000-4000-8002-${String(n).padStart(12, '0')}`,
+};
+
+async function seedWorld(db: D1Connection): Promise<void> {
+  const series = (count: number) => `WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < ${count})`;
+  const now = "strftime('%Y-%m-%dT%H:%M:%fZ', 'now')";
+  const later = "strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '+1 day')";
+  const run = (sql: string) => db.prepare(sql).run();
+  const people = accounts + 3;
+  await run(`INSERT INTO events (id, name) VALUES ('${world.event}', 'Scale event')`);
+  await run(`INSERT INTO sessions (id, event_id, name) VALUES ('${world.contest}', '${world.event}', 'Scale session'), ('${world.bulk}', '${world.event}', 'Bulk session')`);
+  await run(`${series(teams)} INSERT INTO teams (id, session_id, name, location)
+    SELECT ${uuid(2, 'i')}, '${world.contest}', 'Team ' || i, 'Table ' || i FROM n`);
+  await run(`${series(people)} INSERT INTO accounts (id, name, username, handle, must_change)
+    SELECT ${uuid(1, 'i')}, 'Person ' || i, 'user' || i, 'user' || i, 0 FROM n`);
+  await run(`${series(people)} INSERT INTO ba_user (id, name, email, emailVerified, createdAt, updatedAt, username)
+    SELECT ${uuid(1, 'i')}, 'Person ' || i, 'user' || i || '@x.invalid', 1, ${now}, ${now}, 'user' || i FROM n`);
+  await run(`${series(people)} INSERT INTO ba_session (id, expiresAt, token, createdAt, updatedAt, userId)
+    SELECT ${uuid(3, 'i')}, ${later}, 'tok-' || i, ${now}, ${now}, ${uuid(1, 'i')} FROM n`);
+  await run(`${series(people)} INSERT INTO logins (id, account_id, expires_at, identity_session_id)
+    SELECT ${uuid(4, 'i')}, ${uuid(1, 'i')}, unixepoch() + 86400, ${uuid(3, 'i')} FROM n`);
+  await run(`${series(accounts)} INSERT INTO memberships (session_id, account_id, team_id, is_admin)
+    SELECT '${world.contest}', ${uuid(1, 'i')}, CASE WHEN i = 1 THEN NULL ELSE ${uuid(2, `(1 + i % ${teams})`)} END, i = 1 FROM n`);
+  await run(`INSERT INTO memberships (session_id, account_id, team_id) VALUES ('${world.contest}', '${world.account(1202)}', NULL)`);
+  await run(`UPDATE accounts SET event_id = '${world.event}' WHERE id = '${world.account(1201)}'`);
+  await run(`INSERT INTO grants (account_id, scope, event_id, granted_by) VALUES ('${world.account(1201)}', 'event', '${world.event}', 'fixture')`);
+  await run(`${series(issues)} INSERT INTO issues (id, session_id, team_id, status, number, reporter, reporter_name, category, description, created_at)
+    SELECT ${uuid(5, 'i')}, '${world.contest}', ${uuid(2, `(1 + i % ${teams})`)}, 'open', i, ${uuid(1, '2')}, 'Person', 'Devices', 'Fictional issue ' || i, ${now} FROM n`);
+  // 50 entrants of the event that no contest holds, each with its own sign-in.
+  await run(`${series(50)} INSERT INTO entrants (id, event_id, kind, name)
+    SELECT ${uuid(6, 'i')}, '${world.event}', 'team', 'Waiting team ' || i FROM n`);
+  await run(`${series(50)} INSERT INTO accounts (id, name, username, handle, event_id, entrant_id, must_change)
+    SELECT ${uuid(7, 'i')}, 'Waiting team ' || i, 'waiting' || i, 'waiting' || i, '${world.event}', ${uuid(6, 'i')}, 0 FROM n`);
+}
+
+describe('rows read by management commands in a session with 1,200 accounts', () => {
+  let db: D1Connection;
+  let dispose: () => Promise<void>;
+  const hasher = { hash: async () => 'fictional-hash', verify: async () => false };
+  const as = (n: number) => ({ accountId: world.account(n), loginId: `00000000-0000-4000-8004-${String(n).padStart(12, '0')}` });
+
+  beforeAll(async () => {
+    const platform = await openStoreDatabase({ configPath, remoteBindings: false });
+    await applyMigrations(platform.db);
+    await seedWorld(platform.db);
+    ({ db, dispose } = platform);
+  });
+  afterAll(async () => { await dispose?.(); });
+
+  async function measure(n: number, command: ManageCommand) {
+    const { connection, usage } = metered(db);
+    const receipt = await new D1ManageService(connection, hasher).execute(as(n), randomUUID(), command);
+    return { receipt, rowsRead: usage.rowsRead };
+  }
+
+  // Each command is its parse, reads, authority check, and one batch. Measured on 2026-11-04.
+  // A command that tells the whole contest (the first two below, and update_contest) reads
+  // the contest's 24 teams once for its audiences, then writes two audience rows for each.
+  // The others read 23 to 47 rows. Each ceiling sits about 20% above the measure.
+  it('reads a bounded number of rows for each command that changes one thing', async () => {
+    const [fresh] = (await measure(1201, { type: 'create_entrants', eventId: world.event, entrants: [{ kind: 'team', name: 'Fresh team', handle: 'fresh-team' }] })).receipt.entrantIds!;
+    const commands: Array<[ManageCommand, number, number]> = [
+      [{ type: 'set_intake', contestId: world.contest, open: true }, 1, 90],
+      [{ type: 'set_image_limits', contestId: world.contest, fileMegabytes: 10, count: 12, totalMegabytes: 100 }, 1, 120],
+      [{ type: 'set_location', contestId: world.contest, entrantId: world.team(3), location: 'Hall 2' }, 1, 40],
+      [{ type: 'assign_staff', contestId: world.contest, accountId: world.account(1202), roles: ['jury'], admin: false }, 1201, 60],
+      [{ type: 'unassign_staff', contestId: world.contest, accountId: world.account(1202) }, 1201, 50],
+      [{ type: 'assign_entrants', contestId: world.contest, entries: [{ entrantId: fresh!, location: 'Hall 9' }] }, 1201, 150],
+      [{ type: 'update_contest', contestId: world.contest, name: 'Scale session', contestType: 'teams' }, 1201, 135],
+      [{ type: 'create_contest', eventId: world.event, name: 'Another', contestType: 'mixed', categories: ['Other'] }, 1201, 30],
+      [{ type: 'create_people', eventId: world.event, people: [{ handle: 'fresh-person', name: 'Fresh person' }] }, 1201, 40],
+    ];
+    for (const [command, n, ceiling] of commands) {
+      expect((await measure(n, command)).rowsRead, command.type).toBeLessThan(ceiling);
+    }
+  });
+
+  // Removing an entry deletes its seats (the entry_seats_removed trigger), and the memberships
+  // foreign key finds the seats of the deleted team. Before the index in migration 0019 each read scanned
+  // the contest's memberships: 2,443 rows for 1,200 members, measured on 2026-11-04.
+  // With memberships_team they read only the entry's seat: 43 rows.
+  it('reads only the seats of the entry when an entry is removed', async () => {
+    const [fresh] = (await measure(1201, { type: 'create_entrants', eventId: world.event, entrants: [{ kind: 'team', name: 'Leaving team', handle: 'leaving-team' }] })).receipt.entrantIds!;
+    await measure(1201, { type: 'assign_entrants', contestId: world.contest, entries: [{ entrantId: fresh!, location: '' }] });
+    expect((await measure(1201, { type: 'unassign_entrant', contestId: world.contest, entrantId: fresh! })).rowsRead).toBeLessThan(55);
+  });
+
+  // Fifty entrants with their sign-ins enter one contest in one command. Measured 1,107 rows on 2026-11-05,
+  // about 22 for each entry: its seat, its triggers, its name, and its sign-in lookup.
+  it('reads a bounded number of rows to assign 50 entrants at once', async () => {
+    const entries = Array.from({ length: 50 }, (_, index) => ({ entrantId: `00000000-0000-4000-8006-${String(index + 1).padStart(12, '0')}`, location: `Table ${index + 1}` }));
+    const { receipt, rowsRead } = await measure(1201, { type: 'assign_entrants', contestId: world.bulk, entries });
+    expect(receipt.entrantIds).toHaveLength(50);
+    expect((await db.prepare('SELECT count(*) AS n FROM memberships WHERE session_id = ?').bind(world.bulk).all<{ n: number }>()).results).toEqual([{ n: 50 }]);
+    expect(rowsRead).toBeLessThan(1_200);
   });
 });
 

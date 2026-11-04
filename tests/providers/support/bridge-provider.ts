@@ -65,7 +65,7 @@ export function createBrowserProvider(configuration: unknown): BrowserProvider {
       },
     },
     workflows: {
-      sessions: async () => [],
+      contests: async () => [],
       snapshot: async () => unsupported(),
       async execute(_sessionId, _requestId, command) {
         if (command.type === 'submit' && command.description === 'reject') {
@@ -78,14 +78,6 @@ export function createBrowserProvider(configuration: unknown): BrowserProvider {
         }
         return '00000000-0000-4000-8000-000000000001';
       },
-    },
-    admin: {
-      account: async () => unsupported(),
-      setIntake: async () => unsupported(),
-      setImageLimits: async () => unsupported(),
-      saveMember: async () => unsupported(),
-      removeMember: async () => unsupported(),
-      editRoster: async () => unsupported(),
     },
     images: {
       begin: async () => unsupported(),
@@ -111,6 +103,7 @@ export function createBrowserProvider(configuration: unknown): BrowserProvider {
     },
     manage: {
       site: async () => unsupported(),
+      event: async () => unsupported(),
       execute: async () => unsupported(),
       issueCredentials: async () => unsupported(),
     },

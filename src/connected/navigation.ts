@@ -25,6 +25,19 @@ export const signInPath = "/sign-in";
 /** The webmasters' site page. It belongs to no contest. */
 export const sitePath = "/site";
 
+/** The event console. `/event` opens the caller's own event, `/event/<id>` a named one. */
+export const eventBase = "/event";
+
+export function eventPath(eventId?: string): string {
+  return eventId === undefined ? eventBase : `${eventBase}/${eventId}`;
+}
+
+/** The event console that an address names, or undefined for any other address. */
+export function eventRouteOf(pathname: string): { eventId: string | undefined } | undefined {
+  const match = /^\/event(?:\/([0-9a-f-]{36}))?\/?$/u.exec(pathname);
+  return match ? { eventId: match[1] } : undefined;
+}
+
 /** True for the signed-out entry addresses, which a signed-in person leaves for the queue. */
 export function isEntryPath(pathname: string): boolean {
   const path = pathname.replace(/\/+$/u, "");

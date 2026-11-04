@@ -116,7 +116,7 @@ describe('Better Auth work per request with real local D1', () => {
     const cookie = signed.headers.getSetCookie().find((value) => value.startsWith('__Host-minsky-session='))!.split(';')[0]!;
 
     sql.length = 0;
-    const response = await request('/api/sessions', { headers: { Cookie: cookie } });
+    const response = await request('/api/contests', { headers: { Cookie: cookie } });
     expect(response.status).toBe(200);
     const statements = [...sql];
     expect(statements.filter((text) => /sqlite_master|table_info|pragma/i.test(text))).toEqual([]);

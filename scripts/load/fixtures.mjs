@@ -12,14 +12,20 @@ export function derivePassword(secret, username) {
   return createHmac('sha256', secret).update(username).digest('hex').slice(0, 32) + 'A9!';
 }
 
-/** `owner` is the private result of `cloudflare:install bootstrap` or `recover`. */
+/**
+ * `owner` is the private result of `cloudflare:install bootstrap` or the
+ * webmaster recovery: the site webmaster's handle and temporary password. Setup
+ * creates the run's event, its event admin, and its contest with that webmaster.
+ */
 export function newFixtures({ origin, owner }) {
   return {
-    version: 1,
+    version: 2,
     runId: randomBytes(4).toString('hex'),
     secret: randomBytes(32).toString('hex'),
-    origin, sessionId: owner.sessionId,
-    admin: { username: owner.adminUsername, temporary: owner.temporaryPassword, changed: false },
+    origin,
+    eventId: undefined, eventCode: undefined, sessionId: undefined,
+    webmaster: { username: owner.handle, temporary: owner.temporaryPassword, changed: false },
+    admin: undefined,
     accounts: [],
   };
 }
@@ -30,7 +36,7 @@ export function accountPrefix(fixtures) {
 
 export async function readFixtures(path) {
   const fixtures = JSON.parse(await readFile(path, 'utf8'));
-  if (fixtures.version !== 1 || !/^[0-9a-f]{8}$/.test(fixtures.runId)) throw new Error('The fixture file has an unknown format.');
+  if (fixtures.version !== 2 || !/^[0-9a-f]{8}$/.test(fixtures.runId)) throw new Error('The fixture file has an unknown format.');
   return fixtures;
 }
 

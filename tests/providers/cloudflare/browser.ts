@@ -8,7 +8,7 @@ const configurationSchema = z.strictObject({ origin: z.url() });
 /** Exercise the actual browser connector with same-origin hosted cookies. */
 export function createBrowserProvider(configuration: unknown): BrowserProvider {
   const { origin } = configurationSchema.parse(configuration);
-  const faults = createResponseFaults({ workflow: '/api/workflow', account: '/api/accounts' });
+  const faults = createResponseFaults({ workflow: '/api/workflow', account: '/api/credentials' });
   const backend = createCloudflareBackend({
     origin,
     fetch: faults.fetch,

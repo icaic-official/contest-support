@@ -216,7 +216,7 @@ export async function runUiJourney(browser: Browser, fixture: UiFixture, options
   }
 
   async function adminAction(page: Page, button: Locator) {
-    await adminRequest(page, button, '/api/admin');
+    await adminRequest(page, button, '/api/manage');
     await expect(page.getByRole('status').filter({ hasText: 'Administration action completed.' })).toBeVisible();
   }
 
@@ -229,8 +229,28 @@ export async function runUiJourney(browser: Browser, fixture: UiFixture, options
     return dialog;
   }
 
-  function accountRow(page: Page, actor: Actor): Locator {
-    return page.getByRole('row').filter({ hasText: fixture.accounts[actor].username });
+  /** The event console of the event admin, opened from the sidebar link. */
+  async function openEventConsole(page: Page) {
+    await page.getByRole('link', { name: 'Event console', exact: true }).click();
+    await expect(page).toHaveURL(new RegExp('/event/[0-9a-f-]{36}$'));
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+    await page.getByRole('tab', { name: 'Assignments', exact: true }).click();
+    await page.getByLabel('Contest', { exact: true }).selectOption({ label: sessionName });
+  }
+
+  /** The row of one person in the staff panel of the Assignments tab. */
+  function staffRow(page: Page, actor: Actor): Locator {
+    return page.getByRole('listitem').filter({ hasText: fixture.accounts[actor].username });
+  }
+
+  /** Sets one role of a person and saves the seat. */
+  async function setRole(page: Page, actor: Actor, role: string, on: boolean) {
+    const row = staffRow(page, actor);
+    await choose(row.getByRole('checkbox', { name: new RegExp(`: ${role}$`) }), on);
+    const saved = page.waitForResponse((response) => response.url() === `${fixture.origin}/api/manage`
+      && response.request().method() === 'POST');
+    await row.getByRole('button', { name: /^Update / }).click();
+    expect((await saved).status()).toBe(200);
   }
 
   try {
@@ -309,46 +329,29 @@ export async function runUiJourney(browser: Browser, fixture: UiFixture, options
     await newCategory.focus();
     await admin.page.keyboard.type(category);
     await admin.page.keyboard.press('Enter');
-    await adminRequest(admin.page, admin.page.getByRole('button', { name: 'Save categories', exact: true }), '/api/admin');
+    await adminRequest(admin.page, admin.page.getByRole('button', { name: 'Save categories', exact: true }), '/api/manage');
     await expect(admin.page.getByRole('status').filter({ hasText: 'Categories saved.' })).toBeVisible();
-    // Teams: add one from the keyboard, rename it, and see that a team with an account stays.
-    await consolePage(admin.page, 'Roster');
+    // Team locations: a contest admin changes a location and cannot add, rename, or delete a team.
+    await consolePage(admin.page, 'Team locations');
     await expect(admin.page).toHaveURL(new URL('/administration/roster', fixture.origin).href);
-    const extraTeam = `Roster ${crypto.randomUUID().slice(0, 8)}`;
-    await admin.page.getByLabel('Add teams', { exact: true }).focus();
-    await admin.page.keyboard.type(`${extraTeam}, Hall Z`);
-    const added = admin.page.waitForResponse((response) => response.url() === `${fixture.origin}/api/admin`
-      && response.request().method() === 'POST');
-    await admin.page.keyboard.press('Control+Enter');
-    expect((await added).status()).toBe(200);
-    await expect(admin.page.getByRole('status').filter({ hasText: 'Added 1 team.' })).toBeVisible();
-    await expect(admin.page.getByLabel('Add teams', { exact: true })).toBeFocused();
-    await expect(admin.page.getByRole('button', { name: `Edit ${extraTeam}`, exact: true })).toBeVisible();
-    await expect(admin.page.getByText(/^In use: 1 account\. This team stays\.$/).first()).toBeVisible();
-    await expect(admin.page.getByRole('button', { name: /^Delete /, disabled: true }).first()).toBeVisible();
-    const renamed = `${extraTeam} B`;
-    await admin.page.getByRole('button', { name: `Edit ${extraTeam}`, exact: true }).click();
-    await admin.page.getByLabel('Team name', { exact: true }).fill(renamed);
-    await adminRequest(admin.page, admin.page.getByRole('button', { name: 'Save', exact: true }), '/api/admin');
-    await expect(admin.page.getByRole('button', { name: `Edit ${renamed}`, exact: true })).toBeVisible();
-    await admin.page.getByRole('button', { name: `Delete ${renamed}`, exact: true }).click();
-    await adminRequest(admin.page, admin.page.getByRole('button', { name: 'Delete team', exact: true }), '/api/admin');
-    await expect(admin.page.getByRole('button', { name: `Edit ${renamed}`, exact: true })).toHaveCount(0);
+    await expect(admin.page.getByLabel('Add teams', { exact: true })).toHaveCount(0);
+    await expect(admin.page.getByRole('button', { name: /^(?:Edit|Delete) / })).toHaveCount(0);
+    const location = admin.page.getByLabel('Provider team 0', { exact: true });
+    await location.fill('Hall Z');
+    await adminRequest(admin.page, location.locator('xpath=ancestor::form').getByRole('button', { name: 'Save', exact: true }), '/api/manage');
+    await expect(admin.page.getByRole('status').filter({ hasText: 'Location saved.' })).toBeVisible();
     await consolePage(admin.page, 'Accounts');
     await expect(admin.page).toHaveURL(new URL('/administration/accounts', fixture.origin).href);
-    let member = await manage(admin.page, 'volunteer');
-    await choose(member.getByRole('checkbox', { name: 'Jury', exact: true }));
-    await adminAction(admin.page, member.getByRole('button', { name: 'Save membership', exact: true }));
-    await expect(member).toBeHidden();
-    await expect(accountRow(admin.page, 'volunteer').getByText('Jury', { exact: true })).toBeVisible();
-    await expect(accountRow(admin.page, 'volunteer').getByText('Volunteer', { exact: true })).toBeVisible();
+    phase = 'event console assignments';
+    // Only an event admin assigns people. A contest admin sees no controls for it.
+    await expect(admin.page.getByRole('link', { name: 'Event console', exact: true })).toHaveCount(0);
+    await expect(admin.page.getByRole('button', { name: /^Create account|^New account/ })).toHaveCount(0);
+    const eventAdmin = await login('eventAdmin');
+    await openEventConsole(eventAdmin.page);
+    await setRole(eventAdmin.page, 'volunteer', 'Jury', true);
     // Combined roles reach the member's open phone app.
     await expect(phoneTabs(volunteer.page).getByRole('button', { name: 'Awards', exact: true })).toBeVisible();
-    member = await manage(admin.page, 'volunteer');
-    await choose(member.getByRole('checkbox', { name: 'Jury', exact: true }), false);
-    await adminAction(admin.page, member.getByRole('button', { name: 'Save membership', exact: true }));
-    await expect(member).toBeHidden();
-    await expect(accountRow(admin.page, 'volunteer').getByText('Jury', { exact: true })).toHaveCount(0);
+    await setRole(eventAdmin.page, 'volunteer', 'Jury', false);
     await expect(phoneTabs(volunteer.page).getByRole('button', { name: 'Awards', exact: true })).toHaveCount(0);
     phase = 'phone and keyboard navigation';
     await volunteer.page.setViewportSize({ width: 320, height: 740 });
@@ -543,30 +546,27 @@ export async function runUiJourney(browser: Browser, fixture: UiFixture, options
     await specialist.page.getByRole('button', { name: `Open ${issueReference}`, exact: true }).click();
     await expect(owner(sheet)).toHaveText(`You (${specialistName})`);
     await expect(firstAssignment(sheet)).toHaveText(firstAssigned);
-    phase = 'membership revocation and restoration';
-    member = await manage(admin.page, 'otherTeam');
-    await member.getByRole('button', { name: 'Revoke session access', exact: true }).click();
-    await adminAction(admin.page, admin.page.getByRole('dialog', { name: /^Revoke .* access to this session\?$/ })
-      .getByRole('button', { name: 'Revoke access', exact: true }));
+    phase = 'assignment removal and restoration';
+    const removed = eventAdmin.page.waitForResponse((response) => response.url() === `${fixture.origin}/api/manage`
+      && response.request().method() === 'POST');
+    await eventAdmin.page.getByRole('button', { name: `Remove Provider team 1 from ${sessionName}`, exact: true }).click();
+    expect((await removed).status()).toBe(200);
     await expect.poll(() => other.probe.closed).toBeGreaterThan(0);
     await expect(other.page.getByRole('heading', { name: 'Session access', exact: true })).toBeVisible({ timeout: 30_000 });
-    await expect(accountRow(admin.page, 'otherTeam')).toHaveCount(0);
-    await admin.page.getByText('Assign an existing account by ID', { exact: true }).click();
-    const assign = admin.page.locator('form').filter({ has: admin.page.getByLabel('Account ID', { exact: true }) });
-    await assign.getByLabel('Account ID', { exact: true }).fill(fixture.accounts.otherTeam.id);
-    await choose(assign.getByRole('radio', { name: /^Team/ }));
-    await assign.getByLabel('Contestant team', { exact: true }).selectOption({ label: 'Provider team 1 · Fixture desk 1' });
-    await adminAction(admin.page, assign.getByRole('button', { name: 'Assign membership', exact: true }));
-    await expect(accountRow(admin.page, 'otherTeam')).toContainText('Provider team 1');
+    await choose(eventAdmin.page.getByRole('checkbox', { name: /^Provider team 1/ }));
+    const restored = eventAdmin.page.waitForResponse((response) => response.url() === `${fixture.origin}/api/manage`
+      && response.request().method() === 'POST');
+    await eventAdmin.page.getByRole('button', { name: /^Assign selected entrants/ }).click();
+    expect((await restored).status()).toBe(200);
     await other.page.reload();
     await expect(uiRoot(other.page, 'contestant')).toBeVisible({ timeout: 30_000 });
     await expect(other.page.getByText(description)).toHaveCount(0);
     phase = 'organizer assisted account recovery';
-    member = await manage(admin.page, 'temporary');
+    const member = await manage(admin.page, 'temporary');
     await member.getByRole('button', { name: 'Reset password', exact: true }).click();
     // The one-time credentials replace the page notice in the account dialog.
     await adminRequest(admin.page, admin.page.getByRole('dialog', { name: /^Reset .*'s password\?$/ })
-      .getByRole('button', { name: 'Reset password', exact: true }), '/api/accounts');
+      .getByRole('button', { name: 'Reset password', exact: true }), '/api/credentials');
     const credentials = admin.page.getByRole('region', { name: 'Temporary account credentials', exact: true });
     await expect(credentials).toBeVisible({ timeout: 45_000 });
     const recoveredPassword = await privateValue(credentials.getByLabel('Temporary password', { exact: true }));
@@ -581,8 +581,8 @@ export async function runUiJourney(browser: Browser, fixture: UiFixture, options
     phase = 'final provider and notification assertions';
     expect(requests.has('POST /api/auth/sign-in')).toBe(true);
     expect(requests.has('POST /api/workflow')).toBe(true);
-    expect(requests.has('POST /api/admin')).toBe(true);
-    expect(requests.has('POST /api/accounts')).toBe(true);
+    expect(requests.has('POST /api/manage')).toBe(true);
+    expect(requests.has('POST /api/credentials')).toBe(true);
     expect([...requests].some((request) => request.startsWith('PUT /api/image/'))).toBe(true);
     expect(workspaces.every(({ probe }) => !probe.invalid)).toBe(true);
     // The Worker sends a Content-Security-Policy. The whole journey must not break it.

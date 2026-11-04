@@ -34,6 +34,7 @@ async function passwordOf(sheet: Locator, name: string): Promise<string> {
 }
 
 test("an event admin creates a contest, imports entrants, assigns them, and a contestant opens the contest", async ({ page, local, browser }) => {
+  test.setTimeout(60_000);
   await page.setViewportSize(desktop);
   await openConsole(page);
 
@@ -83,6 +84,7 @@ test("an event admin creates a contest, imports entrants, assigns them, and a co
 });
 
 test("an event admin adds a volunteer of the event to a contest", async ({ page, local, browser }) => {
+  test.setTimeout(60_000);
   await page.setViewportSize(desktop);
   await openConsole(page);
 

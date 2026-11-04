@@ -28,9 +28,16 @@ async function schedule(local: LocalWorker, start: number, end: number, grace = 
   );
 }
 
-async function signIn(browser: Browser, local: LocalWorker, name: string, viewport = desktop): Promise<Page> {
+async function signIn(
+  browser: Browser,
+  local: LocalWorker,
+  name: string,
+  viewport = desktop,
+  beforeLoad?: () => void,
+): Promise<Page> {
   const context = await browser.newContext({ viewport });
   await local.attach(context);
+  if (beforeLoad) await context.addInitScript(beforeLoad);
   const page = await context.newPage();
   await page.goto("/sign-in");
   await page.getByLabel("Username", { exact: true }).fill(name);
@@ -148,6 +155,48 @@ test.describe("contest-wide time awards", () => {
     await jury.reload();
     await jury.getByRole("navigation", { name: "Console pages" }).getByRole("button", { name: /^Award review/ }).click();
     await expect(jury.getByRole("region", { name: "Time awards for the whole contest" })).toContainText("Applied · confirmed by Test volunteer");
+  });
+
+  test("a retry after a lost response and a failed refresh records one award", async ({ browser, local }) => {
+    test.setTimeout(90_000);
+    await schedule(local, -30, 60);
+    // The Worker records the first award, and the browser never sees the response.
+    const loseFirstAward = () => {
+      const send = window.fetch.bind(window);
+      let lost = true;
+      window.fetch = async (input, init) => {
+        const response = await send(input, init);
+        if (lost && String(input instanceof Request ? input.url : input).includes("/api/contest-awards")) {
+          lost = false;
+          throw new TypeError("Failed to fetch");
+        }
+        return response;
+      };
+    };
+    const jury = await signIn(browser, local, "jury", desktop, loseFirstAward);
+    let blocked = false;
+    await jury.route("**/api/snapshot**", (route) => (blocked ? route.abort("connectionreset") : route.fallback()));
+    const open = async () => {
+      await jury.getByRole("navigation", { name: "Console pages" }).getByRole("button", { name: /^Award review/ }).click();
+      const panel = jury.getByRole("region", { name: "Time awards for the whole contest" });
+      await panel.getByLabel("Minutes for every contestant").fill("15");
+      await panel.getByLabel("Why").fill("Network outage in the hall.");
+      return panel;
+    };
+    const panel = await open();
+    await panel.getByRole("button", { name: "Record the decision" }).click();
+    await expect(panel.locator("p[role=alert]")).toBeVisible();
+    expect(await local.rows("SELECT id FROM contest_awards WHERE session_id = ?", local.sessions[0])).toHaveLength(1);
+    // A refresh fails before the retry, which removes the console and its pending request ID.
+    blocked = true;
+    await jury.evaluate(() => window.dispatchEvent(new Event("focus")));
+    await expect(jury.getByRole("button", { name: "Refresh access", exact: true })).toBeVisible();
+    blocked = false;
+    await jury.getByRole("button", { name: "Refresh access", exact: true }).click();
+    const again = await open();
+    await again.getByRole("button", { name: "Record the decision" }).click();
+    await expect(again.getByRole("list", { name: "Contest-wide awards" })).toBeVisible();
+    expect(await local.rows("SELECT id FROM contest_awards WHERE session_id = ?", local.sessions[0])).toHaveLength(1);
   });
 
   test("a contestant sees no award controls, and the Worker refuses a grant from a contestant", async ({ browser, local }) => {

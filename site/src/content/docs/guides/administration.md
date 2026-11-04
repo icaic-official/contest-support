@@ -1,6 +1,6 @@
 ---
 title: Manage a session
-description: Create accounts, reset passwords, edit teams and categories, control intake, set image limits, and post announcements.
+description: Create accounts, reset passwords, edit teams and categories, schedule contests, control intake, set image limits, and post announcements.
 ---
 
 Use the **Session** tab (phone) or the **Accounts**, **Roster**, and **Session settings** pages (console).
@@ -54,8 +54,36 @@ Minsky saves the whole list at once. Keep at least one category. A category must
 
 ## Intake
 
-Open intake to let contestants submit reports. Close it to stop new reports.
-Staff can still report for a team, and existing issues can still be reopened.
+Intake follows the contest's schedule. An event admin sets the start, the end, and the grace period in the event's time zone, on the **Contests** tab of the event console. See [Schedule a contest](#schedule-a-contest).
+
+Intake opens at the start and closes at the end plus the grace period. A contestant's own end time is the contest's end plus the minutes that staff confirmed as applied. That contestant can report until the personal end time plus the grace period.
+
+The **Contestant intake** panel in **Session settings** (console) or the **Session** tab (phone) shows the state:
+
+- **Following the schedule.** The panel says when intake opens and closes.
+- **Open now** holds intake open until you close it or return it to the schedule.
+- **Close now** holds intake closed in the same way.
+- **Return to schedule** ends the hold. It shows only while you hold intake by hand and the contest has a schedule.
+
+A contest that existed before schedules has none. Its intake stays a switch that staff set by hand until an event admin gives it a schedule and you select **Return to schedule**.
+
+Closed intake stops new contestant reports. Staff can still report for a team, and existing issues can still be reopened.
+
+## Schedule a contest
+
+Event admins and webmasters set the schedule. A contest admin cannot.
+
+1. Open the event console and select **Contests**.
+2. Enter the start date and time, the end date and time, and the grace period in minutes. The form shows the event's time zone. Enter the time as it reads on a clock in the event's zone.
+3. Select **Create contest**, or use the pencil on a contest to change its schedule.
+
+A schedule change leaves the intake mode alone. A contest that you hold open by hand stays open until you select **Return to schedule**.
+
+If a time does not exist in the event's zone, because clocks move forward, Minsky uses the first minute after the gap. If it occurs twice, Minsky uses the earlier one.
+
+## Time awards for the whole contest
+
+The jury can give minutes to every contestant of a contest, for example after a network outage. Open **Award review** (console) or **Awards** (phone), enter the minutes and the reason, and select **Record the decision**. Staff apply the minutes in the external contest system, then support or jury select **Confirm applied externally**. Only confirmed minutes extend contestants' end times. See [Jury](/guides/jury/).
 
 ## Image limits
 

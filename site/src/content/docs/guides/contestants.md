@@ -12,7 +12,23 @@ Sign in from the link on your team's sign-in sheet. The link fills in your event
 3. Submit.
 
 Minsky fills in your team and location. The timer starts when you submit.
-If you cannot submit, intake is closed. Contact staff through the channel your organizer gives you.
+If you cannot submit, intake is closed. The clock above the button says why. Contact staff through the channel your organizer gives you.
+
+## Read the contest clock
+
+Reporting follows the contest's schedule. The clock shows times in the event's time zone. If your device uses another zone, it adds "Your time" with your own time.
+
+| The clock says | Meaning |
+| --- | --- |
+| Reporting opens at 13:00. | The contest has not started. You can report from that time. |
+| Ends in 1:42:10. | The contest runs. The countdown shows the time left. |
+| Reporting closes in 8:00. | The contest ended, and the grace period runs. You can still report. |
+| Reporting closed at 18:25. | You can no longer report. Ask staff. |
+| Reporting is closed by the organizers. | Staff closed reporting by hand. |
+
+Your end time is the contest's end plus the minutes that staff confirmed as applied. They can come from a time award on one of your issues, or from an award that the jury gave to the whole contest. The clock then says "Your end time is 18:10. It includes 10 minutes that staff confirmed as applied." Minsky does not change the external contest clock. An award counts here only after staff confirm that they applied it there.
+
+The page updates itself at each of these times. It can take up to 15 seconds. The server decides whether it accepts your report, so a report that you send after the end can be refused even if the page has not yet updated.
 
 ## Follow progress
 

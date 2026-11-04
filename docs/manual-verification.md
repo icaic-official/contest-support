@@ -67,7 +67,7 @@ Expected result: the app rejects removal of the last admin.
 
 Check the admin screens of T0015 in both organizer layouts:
 
-1. In the phone **Session** tab, check the status counts, the intake switch and the image limits with the − and + buttons.
+1. In the phone **Session** tab, check the status counts, the intake panel (**Open now**, **Close now**, and **Return to schedule**) and the image limits with the − and + buttons.
 2. Select **New account**. Create a staff account. Check that the sheet shows the sign-in link, the username, and the temporary password once, with copy buttons and **Done**. Check that the link names the event code.
 3. Select **Done**. Open the account again. Check that the credentials do not show again.
 4. Reset the password of another account. Check that a confirmation dialog shows first. Check that the new credentials show once.
@@ -80,13 +80,26 @@ Check the admin screens of T0015 in both organizer layouts:
 
 ## 3. Contestant intake
 
-1. Close contestant intake as admin.
+1. Close contestant intake as admin with **Close now**.
 2. Attempt a new contestant submission.
 3. Check that the submission fails.
 4. Submit an issue as staff on behalf of a roster team.
 5. Reopen an existing resolved issue.
 6. Check that staff submission and reopening still work.
-7. Open contestant intake again.
+7. Open contestant intake again with **Open now**, then select **Return to schedule** if the contest has a schedule.
+
+## 3a. Contest schedule, clock, and time awards
+
+Use a phone width of 390 px and of 320 px for the volunteer screens.
+
+1. As an event admin, create a contest that starts in two minutes and ends in six, with two minutes of grace. Check that the form names the event's time zone, and that **Contests** shows the schedule in that zone. If your device uses another zone, check that **Your time** shows your own time.
+2. As a contestant, check that the clock says "Reporting opens at ..." with "Opens in ...", and that **Report an issue** is disabled with the same reason.
+3. Wait for the start. Check that the clock changes to "Ends in ..." without a reload, within 15 seconds, and that **Report an issue** is enabled.
+4. As jury, record a contest-wide award of 10 minutes. As a volunteer on a phone, check that **Time awards to confirm** shows above the queue, fits the screen with no sideways scroll, and has a 44 px **Confirm applied externally** button. Before you confirm, check that the contestant clock shows no extra time.
+5. Confirm the award as the volunteer. Check that the contestant clock says "Your end time is ... It includes 10 minutes that staff confirmed as applied."
+6. Wait for the end. Check that the contestant keeps reporting through the extra minutes and the grace period, then sees "Reporting closed at ...".
+7. As a contest admin, select **Close now**, then **Return to schedule**. Check that the clock follows each change.
+8. Open **Account**. Check that the calendar lists the contests of your event for seven days, marks a contest where you have no seat, and has no horizontal scroll at 320 px.
 
 ## 4. Submission, replies, and handoff
 

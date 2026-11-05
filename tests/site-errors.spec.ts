@@ -4,7 +4,6 @@ import { expect, test } from "./support/localWorker";
 test.use({ seedIssues: false, webmaster: "admin", withEventAdmin: false });
 
 test("a site change that starts while another runs says so", async ({ page, local }) => {
-  void local;
   test.setTimeout(60_000);
   await page.goto("/sign-in");
   await page.getByRole("button", { name: "Site sign-in", exact: true }).click();
@@ -24,5 +23,9 @@ test("a site change that starts while another runs says so", async ({ page, loca
   await setting.click();
   await setting.click();
   await expect(page.getByText("Another change is still running. Try again.")).toBeVisible();
+  const finished = page.waitForResponse("**/api/manage");
   release();
+  await finished;
+  // The setting is one row for the whole shared database.
+  await local.run("UPDATE site_settings SET restrict_webmaster_reads = 0 WHERE singleton = 1");
 });

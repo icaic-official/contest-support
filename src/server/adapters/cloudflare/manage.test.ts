@@ -123,6 +123,13 @@ describe('site commands for webmasters', () => {
     expect(await rows('SELECT * FROM manage_receipts')).toEqual([]);
   });
 
+  it('tells a webmaster that a contest to join no longer exists, and tells nobody else', async () => {
+    const gone = { type: 'join_contest', contestId: randomUUID() } satisfies ManageCommand;
+    await expect(execute('first', gone)).rejects.toMatchObject({ status: 409, message: 'That contest no longer exists. Refresh the page.' });
+    await expect(execute('contestAdmin', gone)).rejects.toMatchObject({ status: 403, message: 'Only a webmaster can change the site.' });
+    expect(await rows('SELECT * FROM manage_receipts')).toEqual([]);
+  });
+
   it('refuses a join while webmasters read every contest, and D1 writes both audit rows once they must join', async () => {
     const joinNeedsRestriction = 'Turn on "Webmasters read contest data only after joining" before you join a contest.';
     await expect(execute('first', { type: 'join_contest', contestId: ids.contest }))

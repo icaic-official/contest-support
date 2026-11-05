@@ -360,6 +360,10 @@ export class D1ManageService {
     if (replayed) return replayed;
     const requirement = requirementFor(command);
     const authority = await resolveAuthority(this.db, caller, requirement.target);
+    // A contest that is gone resolves to no authority. A webmaster sees that as a missing contest, not a denial.
+    if (!authority && command.type === 'join_contest' && (await resolveAuthority(this.db, caller, { scope: 'site' }))) {
+      throw new AuthenticationError(409, 'That contest no longer exists. Refresh the page.');
+    }
     if (!authority || ('level' in requirement && !reaches(authority, requirement.level))) {
       throw new AuthenticationError(403, 'level' in requirement ? deniedMessage[requirement.level] : cannotChangeAccount);
     }

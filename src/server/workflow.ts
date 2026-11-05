@@ -1,8 +1,9 @@
 import { can, seatOf } from '../connected/capabilities.ts';
 import { commandSchema, uuidPattern, workflowText, type Command, type IssueStatus, type Role } from '../connected/model.ts';
 
-export { workflowText };
 import type { Caller } from './authentication.ts';
+
+export { workflowText };
 
 export type CommandResult =
   | { outcome: 'committed'; issueId: string }
@@ -54,7 +55,6 @@ export interface WorkflowPersistence {
 
 type Rejection = Extract<CommandResult, { outcome: 'rejected' }>;
 const reject = (reason: Rejection['reason']): Rejection => ({ outcome: 'rejected', reason });
-const uuid = uuidPattern;
 const object = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === 'object' && !Array.isArray(value);
 
@@ -192,7 +192,7 @@ export class WorkflowService {
   constructor(private readonly store: WorkflowPersistence) {}
 
   async execute(caller: Caller, sessionId: string, requestId: string, input: unknown): Promise<CommandResult> {
-    if (!uuid.test(sessionId) || !uuid.test(requestId) || !isWorkflowCommand(input)) return reject('input');
+    if (!uuidPattern.test(sessionId) || !uuidPattern.test(requestId) || !isWorkflowCommand(input)) return reject('input');
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
         const read = await this.store.read(caller, sessionId, requestId, input);

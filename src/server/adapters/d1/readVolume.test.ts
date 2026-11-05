@@ -3,9 +3,11 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { Command, Snapshot } from '../../../connected/model';
 import { decideWorkflow } from '../../workflow';
 import { openStoreDatabase } from '../cloudflare/tooling/store-database.mjs';
-import { contestsListSql, currentReadyLoginSql, eventContestsSql, snapshotSql } from '../cloudflare/application';
+import { D1ApplicationService, contestsListSql, currentReadyLoginSql, eventContestsSql, snapshotSql } from '../cloudflare/application';
 import { currentAccountSql } from '../cloudflare/authentication';
+import { D1ContestAwardService } from '../cloudflare/contestAwards';
 import { D1ManageService } from '../cloudflare/manage';
+import { clockSql, extraMinutesSql, intakeOpenSql } from '../cloudflare/schedule';
 import type { ManageCommand } from '../../../backend/contracts';
 import { contestDataBindings, contestDataSql, contestListBindings } from '../cloudflare/authority';
 import { R2AvatarService } from '../cloudflare/avatars';
@@ -14,6 +16,7 @@ import type { D1Connection, D1Statement } from './connection';
 import { D1ApplicationStore } from './store';
 import { applyMigrations } from './testFixture';
 
+const testSchedule = { startsAt: '2030-01-01T09:00:00.000Z', endsAt: '2030-01-01T11:00:00.000Z', graceMinutes: 0 };
 const configPath = 'src/server/adapters/cloudflare/deploy/connector-store-ci.wrangler.jsonc';
 const accounts = 1200;
 const teams = 24;
@@ -98,19 +101,29 @@ async function seed(db: D1Connection, teamCount: number): Promise<void> {
  * once for every row. It is the reference for the permission filters.
  * Replace it when the snapshot gains or loses a field.
  */
+// The reference computes the contestant's extra minutes where it uses them, as
+// the snapshot did before extra_minutes was read once.
+const referenceExtra = `(CASE WHEN s.ends_at IS NULL THEN 0 ELSE ${extraMinutesSql('s', '(SELECT team_id FROM access)')} END)`;
 const referenceSnapshotSql = `WITH login AS (${currentReadyLoginSql}), access AS MATERIALIZED (${contestDataSql('caller')}),
   visible_issues AS MATERIALIZED (
     SELECT i.* FROM access a CROSS JOIN issues i WHERE i.session_id = ? AND i.team_id = a.team_id
     UNION ALL SELECT i.* FROM access a CROSS JOIN issues i WHERE a.staff = 1 AND i.session_id = ?)
 SELECT json_object(
   'session', (SELECT json_object('id', s.id, 'event_id', s.event_id, 'name', s.name,
-    'intake_open', json(CASE WHEN s.intake_open THEN 'true' ELSE 'false' END),
+    'intake_open', json(CASE WHEN ${intakeOpenSql('s', referenceExtra)} THEN 'true' ELSE 'false' END),
     'categories', json(s.categories), 'revision', s.version,
     'max_image_bytes', s.max_image_bytes, 'max_images_per_issue', s.max_images_per_issue,
     'max_image_bytes_per_issue', s.max_image_bytes_per_issue) FROM sessions s WHERE s.id = ? AND EXISTS (SELECT 1 FROM access)),
   'event', (SELECT json_object('id', e.id, 'name', e.name,
     'archived', json(CASE WHEN e.archived THEN 'true' ELSE 'false' END))
     FROM events e JOIN sessions s ON s.event_id = e.id WHERE s.id = ? AND EXISTS (SELECT 1 FROM access)),
+  'clock', (SELECT ${clockSql('s', { timeZone: 'e.time_zone', entry: '(SELECT team_id FROM access)', extra: referenceExtra })}
+    FROM sessions s JOIN events e ON e.id = s.event_id WHERE s.id = (SELECT session_id FROM access)),
+  'contest_awards', json(COALESCE((SELECT json_group_array(json(row)) FROM (
+    SELECT json_object('id', k.id, 'minutes', k.minutes, 'explanation', k.explanation, 'actor_name', k.actor_name,
+      'at', k.at, 'applied_at', k.applied_at, 'applied_name', k.applied_name) AS row
+    FROM contest_awards k CROSS JOIN access a WHERE k.session_id = a.session_id
+      AND (a.staff = 1 OR (a.team_id IS NOT NULL AND k.applied_at IS NOT NULL)) ORDER BY k.at, k.id)), '[]')),
   'membership', (SELECT json_object('session_id', ?, 'user_id', account_id,
     'team_id', team_id, 'roles', json(roles), 'is_admin', json(CASE WHEN is_admin THEN 'true' ELSE 'false' END)) FROM access),
   'teams', json(COALESCE((SELECT json_group_array(json(row)) FROM (
@@ -274,6 +287,22 @@ describe('rows read for a session with 1,200 accounts and 100 issues', () => {
     expect(body!.members).toEqual([]);
     expect(body!.audit).toEqual([]);
     expect(rowsRead).toBeLessThan(130);
+  });
+
+  // A contestant of a scheduled contest reads its own issues' awards for the personal end. Team 8 owns 4 issues,
+  // and the seed resolved issues 1 to 40, so issues 7 and 31 hold resolutions. Measured on 2026-11-04.
+  it('reads a bounded number of rows for a contestant of a scheduled contest with confirmed awards', async () => {
+    const now = "strftime('%Y-%m-%dT%H:%M:%fZ', 'now')";
+    await db.prepare(`UPDATE sessions SET starts_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-1 hour'),
+      ends_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '+1 hour'), intake_follows_schedule = 1 WHERE id = 'sess-1'`).run();
+    await db.prepare(`UPDATE awards SET applied_at = ${now}, applied_by = 'acc-2', applied_name = 'Person 2' WHERE id = 'award-7'`).run();
+    const { rowsRead, body } = await snapshot(db, callers.contestant);
+    expect(body!.clock).toMatchObject({ extra_minutes: 5, intake: { reason: 'running' } });
+    // Measured 126 on 2026-11-04, 14 rows more than the 112 of an unscheduled contest, because it reads the
+    // contestant's issue awards. It stays under the ceiling of the unscheduled contestant snapshot.
+    expect(rowsRead).toBeLessThan(130);
+    await db.prepare("UPDATE sessions SET intake_follows_schedule = 0, starts_at = NULL, ends_at = NULL WHERE id = 'sess-1'").run();
+    await db.prepare('UPDATE awards SET applied_at = NULL, applied_by = NULL, applied_name = NULL WHERE id = ?').bind('award-7').run();
   });
 
   it('returns staff notes and only their own removals to a volunteer within a bounded read', async () => {
@@ -442,14 +471,14 @@ describe('rows read by management commands in a session with 1,200 accounts', ()
   it('reads a bounded number of rows for each command that changes one thing', async () => {
     const [fresh] = (await measure(1201, { type: 'create_entrants', eventId: world.event, entrants: [{ kind: 'team', name: 'Fresh team', handle: 'fresh-team' }] })).receipt.entrantIds!;
     const commands: Array<[ManageCommand, number, number]> = [
-      [{ type: 'set_intake', contestId: world.contest, open: true }, 1, 90],
+      [{ type: 'set_intake', contestId: world.contest, mode: 'open' }, 1, 90],
       [{ type: 'set_image_limits', contestId: world.contest, fileMegabytes: 10, count: 12, totalMegabytes: 100 }, 1, 120],
       [{ type: 'set_location', contestId: world.contest, entrantId: world.team(3), location: 'Hall 2' }, 1, 40],
       [{ type: 'assign_staff', contestId: world.contest, accountId: world.account(1202), roles: ['jury'], admin: false }, 1201, 60],
       [{ type: 'unassign_staff', contestId: world.contest, accountId: world.account(1202) }, 1201, 50],
       [{ type: 'assign_entrants', contestId: world.contest, entries: [{ entrantId: fresh!, location: 'Hall 9' }] }, 1201, 150],
-      [{ type: 'update_contest', contestId: world.contest, name: 'Scale session', contestType: 'teams' }, 1201, 135],
-      [{ type: 'create_contest', eventId: world.event, name: 'Another', contestType: 'mixed', categories: ['Other'] }, 1201, 30],
+      [{ type: 'update_contest', contestId: world.contest, name: 'Scale session', contestType: 'teams', schedule: testSchedule }, 1201, 135],
+      [{ type: 'create_contest', eventId: world.event, name: 'Another', contestType: 'mixed', schedule: testSchedule, categories: ['Other'] }, 1201, 30],
       [{ type: 'create_people', eventId: world.event, people: [{ handle: 'fresh-person', name: 'Fresh person' }] }, 1201, 40],
     ];
     for (const [command, n, ceiling] of commands) {
@@ -475,6 +504,44 @@ describe('rows read by management commands in a session with 1,200 accounts', ()
     expect(receipt.entrantIds).toHaveLength(50);
     expect((await db.prepare('SELECT count(*) AS n FROM memberships WHERE session_id = ?').bind(world.bulk).all<{ n: number }>()).results).toEqual([{ n: 50 }]);
     expect(rowsRead).toBeLessThan(1_200);
+  });
+
+  // A contest-wide award tells the staff and every team of the contest, like set_intake. The contest has 24 teams,
+  // so each command reads the team list once and writes two audience rows for each. Measured on 2026-11-04:
+  // 101 rows to grant and 105 to confirm after the tests above (72 and 101 when run alone), all above the
+  // 60-row target of the workflow commands. A contest of 800 teams reads about 800 more rows for the list.
+  it('reads a bounded number of rows to grant and to confirm a contest-wide award', async () => {
+    await db.prepare("INSERT INTO membership_roles (session_id, account_id, role) VALUES (?, ?, 'jury')").bind(world.contest, world.account(1)).run();
+    const read = async (command: Parameters<D1ContestAwardService['execute']>[3]) => {
+      const { connection, usage } = metered(db);
+      const id = await new D1ContestAwardService(connection).execute(as(1), world.contest, randomUUID(), command);
+      return { id, rowsRead: usage.rowsRead };
+    };
+    const granted = await read({ type: 'grant', minutes: 15, explanation: 'Fictional outage' });
+    expect(granted.rowsRead, 'grant').toBeLessThan(125);
+    expect((await read({ type: 'apply', awardId: granted.id })).rowsRead, 'apply').toBeLessThan(130);
+  });
+
+  // The calendar of a member reads the member's own event through sessions_event_schedule. Other events add no rows.
+  // Measured on 2026-11-04: 29 rows for a contestant with 3 scheduled contests of its event and 60 of another event.
+  // Before the webmaster branch read its grant once, the grant check ran for each of the 60 and the read took 152 rows.
+  it('reads only the member\'s own event for a calendar window', async () => {
+    const other = '00000000-0000-4000-8000-00000000e002';
+    const series = (count: number) => `WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < ${count})`;
+    await db.prepare(`UPDATE sessions SET starts_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-1 hour'), ends_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '+1 hour'),
+      intake_follows_schedule = 1 WHERE event_id = ?`).bind(world.event).run();
+    await db.prepare("INSERT INTO events (id, name) VALUES (?, 'Other event')").bind(other).run();
+    await db.prepare(`${series(60)} INSERT INTO sessions (id, event_id, name, starts_at, ends_at, intake_follows_schedule)
+      SELECT ${uuid(9, 'i')}, '${other}', 'Elsewhere ' || i, strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-1 hour'),
+        strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '+' || i || ' hours'), 1 FROM n`).run();
+    const window = { from: new Date(Date.now() - 3_600_000).toISOString(), to: new Date(Date.now() + 86_400_000).toISOString() };
+    for (const [name, n, ceiling] of [['a contestant', 7, 40], ['a contest admin', 1, 40]] as const) {
+      const { connection, usage } = metered(db);
+      const contests = await new D1ApplicationService(connection).contests(as(n), { window });
+      expect(contests.map((contest) => contest.eventId), name).toEqual(Array(contests.length).fill(world.event));
+      expect(contests.length, name).toBeGreaterThanOrEqual(2);
+      expect(usage.rowsRead, name).toBeLessThan(ceiling);
+    }
   });
 });
 
@@ -521,5 +588,39 @@ describe('rows read in a session of 480 teams', () => {
       expect(await store.commit(caller, 'sess-1', requestId, command, read, decision)).toMatchObject({ outcome: 'committed' });
       expect(usage.rowsRead, `${command.type} by account ${n}`).toBeLessThan(60);
     }
+  });
+
+  // A contest that follows its schedule reads the contestant's confirmed awards to find the personal end.
+  // The seed's contest has no schedule, so the two tests above read none. Here team 8's one issue carries
+  // a confirmed award, and the contest holds a confirmed contest-wide award.
+  it('reads a bounded number of rows for a scheduled contest with confirmed awards', async () => {
+    const now = "strftime('%Y-%m-%dT%H:%M:%fZ', 'now')";
+    const run = (sql: string) => db.prepare(sql).run();
+    // The contest ended 5 minutes ago. Only the confirmed 15 minutes keep this contestant open, so every read pays for them.
+    await run(`UPDATE sessions SET starts_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-2 hours'),
+      ends_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-5 minutes'), grace_minutes = 0, intake_follows_schedule = 1 WHERE id = 'sess-1'`);
+    // The seed resolved issues 1 to 40 and decided awards for 1 to 20. Team 8 owns issue 7, so its award gets confirmed.
+    await run(`UPDATE awards SET applied_at = ${now}, applied_by = 'acc-2', applied_name = 'Person 2' WHERE id = 'award-7'`);
+    await run(`INSERT INTO contest_awards (id, session_id, request_id, minutes, explanation, actor, actor_name, at, applied_at, applied_by, applied_name, applied_request)
+      VALUES ('wide-1', 'sess-1', 'req-wide', 10, 'Fictional outage', 'acc-3', 'Person 3', ${now}, ${now}, 'acc-2', 'Person 2', 'req-apply')`);
+    const { rowsRead, body } = await snapshot(db, callers.contestant);
+    expect(body!.clock).toMatchObject({ extra_minutes: 15, follows_schedule: true, intake: { open: true, reason: 'running' } });
+    expect(body!.contest_awards).toHaveLength(1);
+    // Measured 78 rows on 2026-11-04, after the commands above gave the team a second issue. The same contest without a schedule reads fewer.
+    expect(rowsRead).toBeLessThan(90);
+    const command: Command = { type: 'submit', category: 'Devices', description: 'Fictional report' };
+    const caller = { accountId: `acc-${callers.contestant}`, loginId: `login-${callers.contestant}` };
+    const requestId = randomUUID();
+    const { connection, usage } = metered(db);
+    const store = new D1ApplicationStore(connection);
+    const read = await store.read(caller, 'sess-1', requestId, command);
+    const decision = read && decideWorkflow(read.state, command);
+    if (!read || !decision || 'outcome' in decision) throw new Error('The scheduled submit was not accepted.');
+    expect(await store.commit(caller, 'sess-1', requestId, command, read, decision)).toMatchObject({ outcome: 'committed' });
+    // Measured 57 rows on 2026-11-04, the worst case: the contestant has three issues and holds only through confirmed extra time.
+    expect(usage.rowsRead, 'scheduled submit by a contestant with awards').toBeLessThan(60);
+    const volunteer = await snapshot(db, callers.volunteer);
+    expect(volunteer.body!.clock).toMatchObject({ extra_minutes: 0, personal_end_at: null });
+    expect(volunteer.body!.contest_awards).toHaveLength(1);
   });
 });

@@ -40,7 +40,7 @@ describe('Cloudflare Backend transport', () => {
     ['workflow', (backend: Backend) =>
       backend.workflows.execute(sessionId, requestId, command)],
     ['manage', (backend: Backend) =>
-      backend.manage.execute(requestId, { type: 'set_intake', contestId: sessionId, open: true })],
+      backend.manage.execute(requestId, { type: 'set_intake', contestId: sessionId, mode: 'open' })],
     ['image finish', (backend: Backend) =>
       backend.images.finish(sessionId, issueId)],
     ['image upload', (backend: Backend) => backend.images.upload(
@@ -182,7 +182,7 @@ describe('Cloudflare Backend transport', () => {
 
   it('marks a management command refused only when the server answered with a 4xx', async () => {
     const send = (response: () => Response) => createCloudflareBackend({ origin, fetch: transport(response) })
-      .manage.execute(requestId, { type: 'set_intake', contestId: sessionId, open: true });
+      .manage.execute(requestId, { type: 'set_intake', contestId: sessionId, mode: 'open' });
     await expect(send(() => Response.json({ error: 'That username is taken.' }, { status: 409 })))
       .rejects.toBeInstanceOf(RequestRefusedError);
     for (const response of [

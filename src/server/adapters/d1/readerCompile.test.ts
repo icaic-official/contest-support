@@ -59,12 +59,14 @@ describe('reader compile cost', () => {
   const stub = resolverStub(db);
 
   for (const [name, [sql, bound]] of Object.entries(bounds)) {
-    it(`the ${name} compiles the resolver at most ${bound} times over`, () => {
+    // Contention on a busy machine has measured 7.07 once in six runs against a 3.3 to 4.0 norm. A reader that
+    // names the resolver per section measures 7.2 or more every time, so a retry cannot hide it.
+    it(`the ${name} compiles the resolver at most ${bound} times over`, { retry: 2 }, () => {
       const stubbed = sql.split(resolver).join(stub);
       expect(stubbed).not.toContain(resolver);
-      const shares = Array.from({ length: 5 }, () =>
+      const shares = Array.from({ length: 9 }, () =>
         (compileMs(db, sql) - compileMs(db, stubbed)) / compileMs(db, resolver));
-      const median = shares.sort((left, right) => left - right)[2];
+      const median = shares.sort((left, right) => left - right)[4];
       expect(median).toBeLessThan(bound);
     });
   }

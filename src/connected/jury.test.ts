@@ -50,6 +50,7 @@ const award: Snapshot["awards"][number] = {
 };
 function snapshot(overrides: Partial<Snapshot> = {}): Snapshot {
   return {
+    contest_awards: [],
     session: {
       id: "session",
       event_id: "event",

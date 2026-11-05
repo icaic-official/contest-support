@@ -15,6 +15,7 @@ import { D1AnnouncementService } from '../../src/server/adapters/cloudflare/anno
 import { R2AnnouncementImageService } from '../../src/server/adapters/cloudflare/announcementImages';
 import { R2AvatarService } from '../../src/server/adapters/cloudflare/avatars';
 import { ownHandleSql } from '../../src/server/adapters/cloudflare/authority';
+import { D1ContestAwardService } from '../../src/server/adapters/cloudflare/contestAwards';
 import { D1ManageService } from '../../src/server/adapters/cloudflare/manage';
 import { passwordHasher } from '../../src/server/adapters/cloudflare/password';
 import { R2ImageService, type PrivateBucket } from '../../src/server/adapters/cloudflare/images';
@@ -85,6 +86,7 @@ export class LocalWorker extends FixtureWorker {
       application: new D1ApplicationService(db),
       workflow: this.workflow,
       manage: new D1ManageService(db, passwordHasher),
+      contestAwards: new D1ContestAwardService(db),
       announcements: new D1AnnouncementService(db),
       announcementImages: new R2AnnouncementImageService(db, knownLength(bucket)),
       images: new R2ImageService(db, knownLength(bucket)),

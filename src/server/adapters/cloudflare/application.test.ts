@@ -155,11 +155,11 @@ describe('Cloudflare authorized application and administration', () => {
     expect((await service.contests(fixture.contestant)).map((session) => session.id)).toEqual([fixture.sessionId]);
     expect((await service.contests(fixture.staff)).map((session) => session.id).sort())
       .toEqual([fixture.sessionId, fixture.secondSessionId].sort());
-    expect(await service.contests(fixture.staff, fixture.eventId)).toEqual(
+    expect(await service.contests(fixture.staff, { eventId: fixture.eventId })).toEqual(
       (await service.contests(fixture.staff)).filter((summary) => summary.eventId === fixture.eventId));
-    expect(await service.contests(fixture.staff, randomUUID())).toEqual([]);
+    expect(await service.contests(fixture.staff, { eventId: randomUUID() })).toEqual([]);
     expect((await service.contests(fixture.contestant))[0]).toMatchObject({ eventId: fixture.eventId, manage: 'none' });
-    await expect(service.contests(fixture.staff, 'not-an-event')).rejects.toMatchObject({ status: 400 });
+    await expect(service.contests(fixture.staff, { eventId: 'not-an-event' })).rejects.toMatchObject({ status: 400 });
     expect(await service.snapshot(fixture.contestant, fixture.secondSessionId)).toMatchObject({
       session: null, event: null, membership: null, teams: [], issues: [], resolutions: [],
       history: [], awards: [], attachments: [], pending_removals: [], members: [], audit: [],

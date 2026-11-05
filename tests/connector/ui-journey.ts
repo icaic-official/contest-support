@@ -308,15 +308,15 @@ export async function runUiJourney(browser: Browser, fixture: UiFixture, options
       .getByRole('button', { name: 'Report an issue', exact: true });
     await consolePage(admin.page, 'Session settings');
     await expect(admin.page).toHaveURL(new URL('/administration/settings', fixture.origin).href);
-    // The settings page switch. The console header has a second, shorter one.
-    const intake = admin.page.getByRole('switch', { name: /^Contestant intake (?:Open|Closed)\./ });
-    await expect(intake).toBeChecked();
-    await adminAction(admin.page, intake);
-    await expect(intake).not.toBeChecked();
+    // The settings page panel. The console header has a shorter switch for the same override.
+    const intake = admin.page.getByRole('region', { name: 'Contestant intake', exact: true });
+    await expect(intake).toContainText('Intake open (set by staff)');
+    await adminAction(admin.page, intake.getByRole('button', { name: 'Close now', exact: true }));
+    await expect(intake).toContainText('Intake closed (set by staff)');
     await expect(reportButton).toBeDisabled();
     await expect(volunteer.page.getByText('Contestant intake closed', { exact: true })).toBeVisible();
-    await adminAction(admin.page, intake);
-    await expect(intake).toBeChecked();
+    await adminAction(admin.page, intake.getByRole('button', { name: 'Open now', exact: true }));
+    await expect(intake).toContainText('Intake open (set by staff)');
     await expect(reportButton).toBeEnabled();
     await admin.page.getByLabel('Largest image (MB)', { exact: true }).fill('1');
     await admin.page.getByLabel('Images per issue', { exact: true }).fill('3');

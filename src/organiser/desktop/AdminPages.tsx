@@ -23,7 +23,7 @@ import {
 } from "../admin/AccountAccess";
 import { CredentialReveal } from "../admin/CredentialReveal";
 import { CategoryEditor, TeamLocationEditor } from "../admin/RosterEditors";
-import { ImageLimitsForm, IntakeSwitch } from "../admin/SessionSettings";
+import { ImageLimitsForm, IntakePanel } from "../admin/SessionSettings";
 import {
   accountKind,
   limitsOfSession,
@@ -406,7 +406,8 @@ export function SettingsPage({
         title="Session settings"
         description={`These settings apply to ${session.name}.`}
       />
-      <IntakeSwitch
+      <IntakePanel
+        clock={props.state.clock}
         open={session.intake_open}
         disabled={disabled}
         onChange={(next) => {

@@ -83,6 +83,63 @@ test("an event admin creates a contest, imports entrants, assigns them, and a co
   await device.close();
 });
 
+test("editing a contest with no schedule saves nothing until an edit, and a rename keeps it unscheduled", async ({ page, local }) => {
+  await page.setViewportSize(desktop);
+  await openConsole(page);
+  await tab(page, "Contests").click();
+  await page.getByRole("button", { name: "Edit Primary", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Edit contest" });
+  await expect(dialog.getByRole("button", { name: "Save contest", exact: true })).toBeDisabled();
+  await expect(dialog.getByLabel("Start date", { exact: true })).toHaveCount(0);
+  await dialog.getByLabel("Name", { exact: true }).fill("Primary round");
+  await expect(dialog.getByRole("button", { name: "Save contest", exact: true })).toBeEnabled();
+  await dialog.getByRole("button", { name: "Save contest", exact: true }).click();
+  await expect(dialog).toBeHidden();
+  expect(await local.rows("SELECT name, starts_at, ends_at FROM sessions WHERE id = ?", local.sessions[0]))
+    .toEqual([{ name: "Primary round", starts_at: null, ends_at: null }]);
+  // "Add a schedule" shows the fields, and Save stays off until they hold a valid schedule that differs.
+  await page.getByRole("button", { name: "Edit Primary round", exact: true }).click();
+  await dialog.getByRole("button", { name: "Add a schedule", exact: true }).click();
+  await expect(dialog.getByLabel("Start date", { exact: true })).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "Save contest", exact: true })).toBeEnabled();
+  await dialog.getByRole("button", { name: "Save contest", exact: true }).click();
+  await expect(dialog).toBeHidden();
+  const [row] = await local.rows<{ starts_at: string | null }>("SELECT starts_at FROM sessions WHERE id = ?", local.sessions[0]);
+  expect(row?.starts_at).not.toBeNull();
+});
+
+test("a rename from a stale Edit contest dialog keeps the schedule that another admin saved", async ({ page, local, browser }) => {
+  test.setTimeout(60_000);
+  await local.run(
+    `UPDATE sessions SET starts_at = '2031-03-03T10:00:00.000Z', ends_at = '2031-03-03T14:00:00.000Z', grace_minutes = 5 WHERE id = ?`,
+    local.sessions[0],
+  );
+  await page.setViewportSize(desktop);
+  await openConsole(page);
+  await tab(page, "Contests").click();
+  await page.getByRole("button", { name: "Edit Primary", exact: true }).click();
+  const first = page.getByRole("dialog", { name: "Edit contest" });
+  await expect(first.getByLabel("Grace after the end (minutes)", { exact: true })).toHaveValue("5");
+
+  const context = await browser.newContext({ viewport: desktop });
+  await local.attach(context);
+  const other = await context.newPage();
+  await openConsole(other);
+  await tab(other, "Contests").click();
+  await other.getByRole("button", { name: "Edit Primary", exact: true }).click();
+  const second = other.getByRole("dialog", { name: "Edit contest" });
+  await second.getByLabel("Grace after the end (minutes)", { exact: true }).fill("20");
+  await second.getByRole("button", { name: "Save contest", exact: true }).click();
+  await expect(second).toBeHidden();
+
+  await first.getByLabel("Name", { exact: true }).fill("Primary round");
+  await first.getByRole("button", { name: "Save contest", exact: true }).click();
+  await expect(first).toBeHidden();
+  expect(await local.rows("SELECT name, grace_minutes FROM sessions WHERE id = ?", local.sessions[0]))
+    .toEqual([{ name: "Primary round", grace_minutes: 20 }]);
+  await context.close();
+});
+
 test("an event admin adds a volunteer of the event to a contest", async ({ page, local, browser }) => {
   test.setTimeout(60_000);
   await page.setViewportSize(desktop);

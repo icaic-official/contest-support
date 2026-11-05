@@ -49,3 +49,9 @@ Rejected files exceed the [session limits](/guides/administration/#image-limits)
 
 Volunteers and specialists can select **Report for a team**, even when intake is closed.
 Select the team from the suggestions first.
+
+## See the calendar and confirm contest-wide awards
+
+Select **Account** and look under **Sessions** for the calendar. It lists the scheduled contests of your event for seven days, grouped by day in the event's time zone. A contest where you hold no seat shows "You have no seat here". Use **Open** to switch to a contest that you can open. Webmasters see every event.
+
+When the jury gives minutes to the whole contest, the card **Time awards to confirm** shows above the queue. Apply the minutes in the external contest system first. Then select **Confirm applied externally**. Contestants' end times grow only by confirmed minutes.

@@ -173,7 +173,7 @@ The result contains `temporaryPassword` when the action creates replacement cred
 
 `saveMember()` assigns the team, roles, and admin flag.
 `removeMember()` revokes membership in one session.
-`setIntake()` changes contestant intake.
+The management command `set_intake` takes a mode: `schedule` follows the contest's schedule, and `open` or `closed` hold intake by hand. `contestAwards.execute()` records and confirms contest-wide time awards.
 `setImageLimits()` sets the file size, image count, and combined size.
 The size inputs use the existing UI convention of 1,048,576 bytes per MB.
 `editRoster(sessionId, command)` takes a `RosterCommand`:

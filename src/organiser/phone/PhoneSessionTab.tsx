@@ -13,7 +13,7 @@ import { CredentialReveal } from "../admin/CredentialReveal";
 import { CategoryEditor, TeamLocationEditor } from "../admin/RosterEditors";
 import {
   ImageLimitsForm,
-  IntakeSwitch,
+  IntakePanel,
   StatusCounts,
 } from "../admin/SessionSettings";
 import { type SessionMember, limitsOfSession } from "../admin/adminModel";
@@ -87,7 +87,8 @@ export function SessionTab({ state, shell }: PhoneTabProps) {
       )}
       <AdminFeedback error="" notice={admin.notice} className="empty:hidden" />
       <StatusCounts issues={state.issues} />
-      <IntakeSwitch
+      <IntakePanel
+        clock={state.clock}
         open={session.intake_open}
         disabled={disabled}
         onChange={(next) => {

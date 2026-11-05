@@ -17,6 +17,7 @@ const sessionSchema = z.object({
   id: uuid,
   event_id: uuid,
   name: z.string(),
+  /** Derived: whether this viewer may report now. A contestant's end is the personal end. */
   intake_open: z.boolean(),
   categories: z.array(z.string()),
   revision: z.number(),
@@ -72,8 +73,40 @@ const resolutionSchema = z.object({
   reopened_name: z.string().nullable(),
   reason: z.string().nullable(),
 });
+const intakeSchema = z.object({
+  open: z.boolean(),
+  reason: z.enum(["before_start", "running", "grace", "ended", "override_open", "override_closed"]),
+  /** The next instant at which the reason changes by time alone. The browser refreshes then. */
+  changes_at: time.nullable(),
+});
+/** What the schedule, the override, and confirmed awards make of one contest, derived by D1. */
+const clockSchema = z.object({
+  time_zone: z.string(),
+  schedule: z
+    .object({ starts_at: time, ends_at: time, grace_minutes: z.number().int().nonnegative() })
+    .nullable(),
+  follows_schedule: z.boolean(),
+  intake: intakeSchema,
+  /** Contestants only: the scheduled end plus the extra minutes that staff confirmed as applied. */
+  personal_end_at: time.nullable(),
+  extra_minutes: z.number().int().nonnegative(),
+});
+export type ContestClock = z.infer<typeof clockSchema>;
+const contestAwardSchema = z.object({
+  id: uuid,
+  minutes: z.number().int().nonnegative(),
+  explanation: z.string(),
+  actor_name: z.string(),
+  at: time,
+  applied_at: time.nullable(),
+  applied_name: z.string().nullable(),
+});
+export type ContestAward = z.infer<typeof contestAwardSchema>;
 export const snapshotSchema = z.object({
   session: sessionSchema.nullable(),
+  clock: clockSchema.nullish(),
+  /** Staff read every contest-wide award. A contestant reads those that staff confirmed. */
+  contest_awards: z.array(contestAwardSchema).default([]),
   event: z
     .object({ id: uuid, name: z.string(), archived: z.boolean() })
     .nullable(),

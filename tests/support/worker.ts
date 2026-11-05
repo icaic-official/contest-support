@@ -244,6 +244,7 @@ export function sessionSnapshot(
     attachments: [],
     pending_removals: [],
     awards: [],
+    contest_awards: [],
     audit: [],
     members: [],
     server_time: '2026-10-17T00:00:00Z',
@@ -315,7 +316,12 @@ export class FakeWorker extends FixtureWorker {
   protected readonly services: WorkerServices = {
     application: {
       contests: async () => this.snapshots().filter((item) => item.membership)
-        .map((item) => ({ id: item.session!.id, name: item.session!.name, eventId: item.event?.id ?? '', eventName: 'Fictional event', manage: 'none' as const })),
+        .map((item) => ({
+          id: item.session!.id, name: item.session!.name, eventId: item.event?.id ?? '', eventName: item.event?.name ?? '',
+          timeZone: 'UTC', contestType: 'teams' as const, schedule: null,
+          intake: { open: item.session!.intake_open, reason: item.session!.intake_open ? 'override_open' as const : 'override_closed' as const, changesAt: null },
+          canOpen: true, manage: 'none' as const,
+        })),
       snapshot: async (_caller, sessionId) => this.read(sessionId),
     },
     workflow: { execute: (_caller, _sessionId, requestId, command) => this.workflow(command as Command, requestId) },
@@ -328,6 +334,7 @@ export class FakeWorker extends FixtureWorker {
       execute: async (_caller, _requestId, command) => this.manage(command as ManageCommand),
       issueCredentials: async (_caller, _requestId, input) => this.issue(input as CredentialIssue),
     },
+    contestAwards: { execute: async () => randomUUID() },
     announcements: {
       snapshot: async () => this.announcements,
       execute: async () => randomUUID(),

@@ -74,6 +74,7 @@ function entry(
 
 function snapshot(overrides: Partial<Snapshot> = {}): Snapshot {
   return {
+    contest_awards: [],
     session: null,
     event: null,
     membership: null,

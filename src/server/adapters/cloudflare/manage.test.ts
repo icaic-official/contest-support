@@ -12,6 +12,8 @@ import { loginKeyFor } from './credentials';
 import { D1ManageService, requirementOf } from './manage';
 import { passwordHasher, randomSecret, type PasswordHasher } from './password';
 
+const testSchedule = { startsAt: '2030-01-01T09:00:00.000Z', endsAt: '2030-01-01T11:00:00.000Z', graceMinutes: 0 };
+
 const people = ['first', 'second', 'contestAdmin'] as const;
 const fastPasswords: PasswordHasher = { hash: async () => 'fictional-test-hash', verify: async () => false };
 type Person = typeof people[number];
@@ -474,7 +476,7 @@ describe('event, roster, and contest commands', () => {
       entrants: list.map(([name, kind]) => ({ kind, name, handle: name.toLowerCase().replaceAll(' ', '-') })),
     })).entrantIds!;
   const createContest = async (by: Name, eventId: string, name: string, contestType: 'singles' | 'mixed' | 'teams') =>
-    (await execute(by, { type: 'create_contest', eventId, name, contestType, categories: ['Devices', 'Other'] })).contestId!;
+    (await execute(by, { type: 'create_contest', eventId, name, contestType, schedule: testSchedule, categories: ['Devices', 'Other'] })).contestId!;
   const seatsOf = (contestId: string) =>
     rows<{ account_id: string; team_id: string | null }>('SELECT account_id, team_id FROM memberships WHERE session_id = ? ORDER BY account_id', contestId);
   const addIssue = (contestId: string, entryId: string, category: string) => run(
@@ -647,14 +649,14 @@ describe('event, roster, and contest commands', () => {
     await expect(execute('contestAdmin', command)).rejects.toMatchObject({ status: 403 });
 
     // A mixed contest takes both. A contest type that would exclude an entry is refused.
-    await execute('eventAdmin', { type: 'update_contest', contestId: singlesContest, name: 'Mixed round', contestType: 'mixed' });
+    await execute('eventAdmin', { type: 'update_contest', contestId: singlesContest, name: 'Mixed round', contestType: 'mixed', schedule: testSchedule });
     await execute('eventAdmin', { type: 'assign_entrants', contestId: singlesContest, entries: [{ entrantId: team!, location: 'A' }, { entrantId: single!, location: 'B' }] });
-    await expect(execute('eventAdmin', { type: 'update_contest', contestId: singlesContest, name: 'Singles round', contestType: 'singles' }))
+    await expect(execute('eventAdmin', { type: 'update_contest', contestId: singlesContest, name: 'Singles round', contestType: 'singles', schedule: testSchedule }))
       .rejects.toMatchObject({ status: 409, message: 'Remove the entrants that this contest type excludes first.' });
     await expect(run(`UPDATE sessions SET contest_type = 'singles' WHERE id = ?`, singlesContest))
       .rejects.toThrow(/Remove the entrants that this contest type excludes first/);
     await execute('eventAdmin', { type: 'unassign_entrant', contestId: singlesContest, entrantId: team! });
-    await execute('eventAdmin', { type: 'update_contest', contestId: singlesContest, name: 'Singles round', contestType: 'singles' });
+    await execute('eventAdmin', { type: 'update_contest', contestId: singlesContest, name: 'Singles round', contestType: 'singles', schedule: testSchedule });
     expect(await rows('SELECT contest_type, name FROM sessions WHERE id = ?', singlesContest)).toEqual([{ contest_type: 'singles', name: 'Singles round' }]);
   });
 
@@ -713,10 +715,63 @@ describe('event, roster, and contest commands', () => {
     await expect(execute('eventAdmin', { ...command, roles: [], admin: false })).rejects.toMatchObject({ status: 400 });
   });
 
+  it('creates a contest that follows its schedule, and keeps the schedule apart from the intake mode', async () => {
+    const created = await execute('eventAdmin', { type: 'create_contest', eventId: ids.event, name: 'Scheduled', contestType: 'teams',
+      schedule: { startsAt: '2030-03-01T01:00:00.000Z', endsAt: '2030-03-01T04:00:00.000Z', graceMinutes: 15 }, categories: ['Other'] });
+    const id = created.contestId!;
+    expect(await rows('SELECT starts_at, ends_at, grace_minutes, intake_follows_schedule FROM sessions WHERE id = ?', id))
+      .toEqual([{ starts_at: '2030-03-01T01:00:00.000Z', ends_at: '2030-03-01T04:00:00.000Z', grace_minutes: 15, intake_follows_schedule: 1 }]);
+    // Offsets and missing milliseconds become the one stored form.
+    await execute('eventAdmin', { type: 'update_contest', contestId: id, name: 'Scheduled', contestType: 'teams',
+      schedule: { startsAt: '2030-03-01T09:00:00+08:00', endsAt: '2030-03-01T12:30:00+08:00', graceMinutes: 0 } });
+    expect(await rows('SELECT starts_at, ends_at FROM sessions WHERE id = ?', id))
+      .toEqual([{ starts_at: '2030-03-01T01:00:00.000Z', ends_at: '2030-03-01T04:30:00.000Z' }]);
+    // Staff hold intake by hand. A new schedule leaves the mode alone.
+    await execute('contestAdmin', { type: 'set_intake', contestId: ids.contest, mode: 'closed' });
+    await execute('eventAdmin', { type: 'set_intake', contestId: id, mode: 'open' });
+    await execute('eventAdmin', { type: 'update_contest', contestId: id, name: 'Scheduled', contestType: 'teams',
+      schedule: { startsAt: '2030-03-01T02:00:00.000Z', endsAt: '2030-03-01T05:00:00.000Z', graceMinutes: 0 } });
+    expect(await rows('SELECT intake_follows_schedule, intake_open FROM sessions WHERE id = ?', id)).toEqual([{ intake_follows_schedule: 0, intake_open: 1 }]);
+    expect((await manage.event(caller('eventAdmin'), ids.event)).contests.find((contest) => contest.id === id))
+      .toMatchObject({ mode: 'open', intake: { open: true, reason: 'override_open', changesAt: null } });
+    await execute('eventAdmin', { type: 'set_intake', contestId: id, mode: 'schedule' });
+    expect((await manage.event(caller('eventAdmin'), ids.event)).contests.find((contest) => contest.id === id))
+      .toMatchObject({ mode: 'schedule', intake: { open: false, reason: 'before_start', changesAt: '2030-03-01T02:00:00.000Z' }, schedule: { graceMinutes: 0 } });
+  });
+
+  it('renames a contest with no schedule and leaves its schedule empty when the command omits one', async () => {
+    expect(await rows('SELECT starts_at, ends_at FROM sessions WHERE id = ?', ids.contest)).toEqual([{ starts_at: null, ends_at: null }]);
+    await execute('eventAdmin', { type: 'update_contest', contestId: ids.contest, name: 'Renamed only', contestType: 'teams' });
+    expect(await rows('SELECT name, starts_at, ends_at FROM sessions WHERE id = ?', ids.contest))
+      .toEqual([{ name: 'Renamed only', starts_at: null, ends_at: null }]);
+    // A scheduled contest keeps its schedule the same way.
+    const created = await execute('eventAdmin', { type: 'create_contest', eventId: ids.event, name: 'Keeps', contestType: 'teams',
+      schedule: { startsAt: '2030-03-01T01:00:00.000Z', endsAt: '2030-03-01T04:00:00.000Z', graceMinutes: 15 }, categories: ['Other'] });
+    await execute('eventAdmin', { type: 'update_contest', contestId: created.contestId!, name: 'Kept', contestType: 'teams' });
+    expect(await rows('SELECT name, starts_at, ends_at, grace_minutes FROM sessions WHERE id = ?', created.contestId!))
+      .toEqual([{ name: 'Kept', starts_at: '2030-03-01T01:00:00.000Z', ends_at: '2030-03-01T04:00:00.000Z', grace_minutes: 15 }]);
+  });
+
+  it('refuses a schedule that cannot run, and the schedule switch for a contest with no schedule', async () => {
+    const create = (schedule: object) => execute('eventAdmin', { type: 'create_contest', eventId: ids.event, name: 'Bad', contestType: 'teams',
+      schedule, categories: ['Other'] } as unknown as ManageCommand);
+    const times = { startsAt: '2030-03-01T01:00:00.000Z', endsAt: '2030-03-01T04:00:00.000Z' };
+    await expect(create({ ...times, endsAt: times.startsAt, graceMinutes: 0 })).rejects.toMatchObject({ status: 400 });
+    await expect(create({ startsAt: times.endsAt, endsAt: times.startsAt, graceMinutes: 0 })).rejects.toMatchObject({ status: 400 });
+    await expect(create({ ...times, graceMinutes: 241 })).rejects.toMatchObject({ status: 400 });
+    await expect(create({ ...times, graceMinutes: 1.5 })).rejects.toMatchObject({ status: 400 });
+    await expect(create({ startsAt: 'tomorrow', endsAt: times.endsAt, graceMinutes: 0 })).rejects.toMatchObject({ status: 400 });
+    expect(await rows('SELECT id FROM sessions WHERE name = ?', 'Bad')).toEqual([]);
+    // ids.contest has no schedule, so it cannot follow one.
+    await expect(execute('contestAdmin', { type: 'set_intake', contestId: ids.contest, mode: 'schedule' }))
+      .rejects.toMatchObject({ status: 409, message: 'This contest has no schedule. Set its start and end first.' });
+    expect(await rows('SELECT intake_follows_schedule FROM sessions WHERE id = ?', ids.contest)).toEqual([{ intake_follows_schedule: 0 }]);
+  });
+
   it('lets a contest admin run its own contest and no other, and refuses staff without admin', async () => {
     const [team] = await entrants('eventAdmin', ids.event, [['Aurora', 'team']]);
     await execute('eventAdmin', { type: 'assign_entrants', contestId: ids.contest, entries: [{ entrantId: team!, location: 'Desk' }] });
-    expect(await execute('contestAdmin', { type: 'set_intake', contestId: ids.contest, open: true })).toEqual({});
+    expect(await execute('contestAdmin', { type: 'set_intake', contestId: ids.contest, mode: 'open' })).toEqual({});
     expect(await rows('SELECT intake_open FROM sessions WHERE id = ?', ids.contest)).toEqual([{ intake_open: 1 }]);
     await execute('contestAdmin', { type: 'set_image_limits', contestId: ids.contest, fileMegabytes: 20, count: 8, totalMegabytes: 40 });
     expect(await rows('SELECT max_image_bytes, max_images_per_issue, max_image_bytes_per_issue FROM sessions WHERE id = ?', ids.contest))
@@ -736,23 +791,23 @@ describe('event, roster, and contest commands', () => {
       .rejects.toMatchObject({ status: 409, message: 'Network has 1 issue and stays in the list.' });
 
     for (const command of [
-      { type: 'set_intake', contestId: ids.contest, open: false },
+      { type: 'set_intake', contestId: ids.contest, mode: 'closed' },
       { type: 'set_location', contestId: ids.contest, entrantId: team!, location: 'x' },
     ] satisfies ManageCommand[]) {
       await expect(execute('volunteer', command)).rejects.toMatchObject({ status: 403 });
     }
     // The admin of one contest does not reach a contest of another event, and an event admin of one event does not reach another.
-    await expect(execute('contestAdmin', { type: 'set_intake', contestId: ids.otherContest, open: true })).rejects.toMatchObject({ status: 403 });
-    await expect(execute('eventAdmin', { type: 'set_intake', contestId: ids.otherContest, open: true })).rejects.toMatchObject({ status: 403 });
-    await expect(execute('webmaster', { type: 'set_intake', contestId: ids.otherContest, open: true })).resolves.toEqual({});
+    await expect(execute('contestAdmin', { type: 'set_intake', contestId: ids.otherContest, mode: 'open' })).rejects.toMatchObject({ status: 403 });
+    await expect(execute('eventAdmin', { type: 'set_intake', contestId: ids.otherContest, mode: 'open' })).rejects.toMatchObject({ status: 403 });
+    await expect(execute('webmaster', { type: 'set_intake', contestId: ids.otherContest, mode: 'open' })).resolves.toEqual({});
   });
 
   it('refuses every write in an archived event, and still shows its console', async () => {
     await run('UPDATE events SET archived = 1 WHERE id = ?', ids.event);
     for (const command of [
       { type: 'create_people', eventId: ids.event, people: [{ handle: 'late', name: 'Late' }] },
-      { type: 'create_contest', eventId: ids.event, name: 'Late', contestType: 'teams', categories: ['Other'] },
-      { type: 'set_intake', contestId: ids.contest, open: true },
+      { type: 'create_contest', eventId: ids.event, name: 'Late', contestType: 'teams', schedule: testSchedule, categories: ['Other'] },
+      { type: 'set_intake', contestId: ids.contest, mode: 'open' },
     ] satisfies ManageCommand[]) {
       await expect(execute('eventAdmin', command)).rejects.toMatchObject({ status: 403, message: 'This event is archived.' });
     }
@@ -932,8 +987,8 @@ describe('event, roster, and contest commands', () => {
     expect(view.people.map((person) => person.handle).sort()).toEqual(['contestadmin', 'eventadmin', 'volunteer']);
     expect(view.entrants.map(({ name, kind, handle }) => ({ name, kind, handle }))).toEqual([
       { name: 'Aurora', kind: 'team', handle: 'aurora' }, { name: 'Solo Sam', kind: 'single', handle: 'solo-sam' }]);
-    expect(view.contests.map(({ name, contestType, intakeOpen }) => ({ name, contestType, intakeOpen })))
-      .toEqual([{ name: 'Live 1', contestType: 'teams', intakeOpen: false }, { name: 'Mixed round', contestType: 'mixed', intakeOpen: false }]);
+    expect(view.contests.map(({ name, contestType, mode }) => ({ name, contestType, mode })))
+      .toEqual([{ name: 'Live 1', contestType: 'teams', mode: 'closed' }, { name: 'Mixed round', contestType: 'mixed', mode: 'schedule' }]);
     expect(view.staffAssignments).toEqual(expect.arrayContaining([
       { contestId: contest, accountId: caller('volunteer').accountId, admin: false, roles: ['specialist'] },
       { contestId: ids.contest, accountId: caller('contestAdmin').accountId, admin: true, roles: [] },
@@ -966,13 +1021,13 @@ describe('event, roster, and contest commands', () => {
       create_entrants: { type: 'create_entrants', eventId: event, entrants: [{ kind: 'team', name: 'Team', handle: 'team' }] },
       rename_entrant: { type: 'rename_entrant', eventId: event, entrantId: entrant, name: 'Renamed' },
       add_entrant_sign_in: { type: 'add_entrant_sign_in', eventId: event, entrantId: entrant, handle: 'late-team' },
-      create_contest: { type: 'create_contest', eventId: event, name: 'New', contestType: 'teams', categories: ['Other'] },
-      update_contest: { type: 'update_contest', contestId: contest, name: 'New', contestType: 'teams' },
+      create_contest: { type: 'create_contest', eventId: event, name: 'New', contestType: 'teams', schedule: testSchedule, categories: ['Other'] },
+      update_contest: { type: 'update_contest', contestId: contest, name: 'New', contestType: 'teams', schedule: testSchedule },
       assign_entrants: { type: 'assign_entrants', contestId: contest, entries: [{ entrantId: entrant, location: '' }] },
       unassign_entrant: { type: 'unassign_entrant', contestId: contest, entrantId: entrant },
       assign_staff: { type: 'assign_staff', contestId: contest, accountId: account, roles: ['jury'], admin: false },
       unassign_staff: { type: 'unassign_staff', contestId: contest, accountId: account },
-      set_intake: { type: 'set_intake', contestId: contest, open: true },
+      set_intake: { type: 'set_intake', contestId: contest, mode: 'open' },
       set_image_limits: { type: 'set_image_limits', contestId: contest, fileMegabytes: 10, count: 4, totalMegabytes: 40 },
       set_categories: { type: 'set_categories', contestId: contest, categories: ['Other'] },
       set_location: { type: 'set_location', contestId: contest, entrantId: entrant, location: 'Desk' },

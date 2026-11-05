@@ -27,6 +27,9 @@ import {
   type Membership,
   type Snapshot,
 } from "@/connected/model";
+import { Calendar } from "@/connected/Calendar";
+import { calendarKey } from "@/connected/calendarModel";
+import { ContestAwardsPanel } from "@/connected/ContestAwards";
 import { ContestPicker } from "@/connected/ContestPicker";
 import { PictureEditor } from "@/connected/PictureEditor";
 import type { ShellProps } from "@/connected/shell";
@@ -117,6 +120,7 @@ export function QueueTab(props: PhoneTabProps) {
   const canClaim = oldest ? props.cardAction(oldest) === "claim" : false;
   return (
     <div className="space-y-4">
+      <ContestAwardsPanel state={state} member={member} refresh={props.shell.data.refresh} pendingOnly />
       {oldest && canClaim && (
         <section
           aria-label="Oldest waiting issue"
@@ -393,6 +397,7 @@ export function AwardsTab(props: PhoneTabProps) {
   const archived = Boolean(state.event?.archived);
   return (
     <div className="space-y-4">
+      <ContestAwardsPanel state={state} member={props.member} refresh={props.shell.data.refresh} />
       <div
         role="group"
         aria-label="Award lists"
@@ -555,6 +560,17 @@ export function MeTab(props: PhoneTabProps & { onSessionChange: () => void }) {
           </p>
         )}
       </section>
+      <div className="rounded-xl border bg-card p-3">
+        <Calendar
+          currentId={data.sessionId}
+          currentIntake={data.snapshot?.clock?.intake.reason}
+          refreshKey={calendarKey(data.snapshot)}
+          onOpen={(contest) => {
+            data.selectSession(contest.id);
+            props.onSessionChange();
+          }}
+        />
+      </div>
       <div className="divide-y rounded-xl border bg-card">
         <button
           id={changePictureButtonId}

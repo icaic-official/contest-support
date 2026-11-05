@@ -1,10 +1,11 @@
 import { z } from 'zod';
-import type { ContestSummary, ManageLevel } from '../../../backend/contracts';
+import type { ContestQuery, ContestSummary, ContestType, ManageLevel } from '../../../backend/contracts';
 import { snapshotSchema, type Snapshot } from '../../../connected/model';
 import type { Caller } from '../../authentication';
 import { AuthenticationError } from '../../authentication';
 import type { D1Connection, D1Statement, D1Value } from '../d1/connection';
-import { contestDataBindings, contestDataSql, contestListBindings, contestSeatsSql } from './authority';
+import { calendarEventSql, calendarWebmasterSql, contestDataBindings, contestDataSql, contestListBindings, contestSeatsSql } from './authority';
+import { clockSql, extraMinutesSql, intakeOpenSql, intakeStateSql, parseIntake, scheduleOf, type ScheduleColumns } from './schedule';
 
 /** Bind accountId, loginId. This check also works after an authorized self-removal. */
 export const currentReadyLoginSql = `SELECT a.id FROM accounts a JOIN logins l ON l.account_id = a.id
@@ -26,18 +27,31 @@ export function currentReadyLoginBindings(caller: Caller): D1Value[] {
 // The audit section takes its key from `c`, so a caller who is not an admin
 // reads no audit row. A team member reads the own team by key. The memberships
 // foreign key keeps that team in the same session.
+// extra_minutes is the contestant's confirmed extra time. It is read once, and
+// only for a contest with a schedule, because the clock and the intake state
+// both use it. The contest keeps today's reads without a schedule.
+const extra = 'x.minutes';
 export const snapshotSql = `WITH login AS (${currentReadyLoginSql}), access AS MATERIALIZED (${contestDataSql('caller')}),
+  extra_minutes AS MATERIALIZED (SELECT CASE WHEN s.ends_at IS NULL THEN 0 ELSE ${extraMinutesSql('s', 'a.team_id')} END AS minutes
+    FROM access a JOIN sessions s ON s.id = a.session_id),
   visible_issues AS MATERIALIZED (SELECT i.* FROM access a CROSS JOIN issues i
     WHERE (i.session_id = ? AND i.team_id = a.team_id) OR (a.staff = 1 AND i.session_id = ?))
 SELECT json_object(
   'session', (SELECT json_object('id', s.id, 'event_id', s.event_id, 'name', s.name,
-    'intake_open', json(CASE WHEN s.intake_open THEN 'true' ELSE 'false' END),
+    'intake_open', json(CASE WHEN ${intakeOpenSql('s', extra)} THEN 'true' ELSE 'false' END),
     'categories', json(s.categories), 'revision', s.version,
     'max_image_bytes', s.max_image_bytes, 'max_images_per_issue', s.max_images_per_issue,
     'max_image_bytes_per_issue', s.max_image_bytes_per_issue) FROM sessions s WHERE s.id = ? AND c.account_id IS NOT NULL),
   'event', (SELECT json_object('id', e.id, 'name', e.name,
     'archived', json(CASE WHEN e.archived THEN 'true' ELSE 'false' END))
     FROM events e JOIN sessions s ON s.event_id = e.id WHERE s.id = ? AND c.account_id IS NOT NULL),
+  'clock', (SELECT ${clockSql('s', { timeZone: 'e.time_zone', entry: 'c.team_id', extra })}
+    FROM sessions s JOIN events e ON e.id = s.event_id WHERE s.id = c.session_id),
+  'contest_awards', json(COALESCE((SELECT json_group_array(json(row)) FROM (
+    SELECT json_object('id', k.id, 'minutes', k.minutes, 'explanation', k.explanation, 'actor_name', k.actor_name,
+      'at', k.at, 'applied_at', k.applied_at, 'applied_name', k.applied_name) AS row
+    FROM contest_awards k WHERE k.session_id = c.session_id
+      AND (c.staff = 1 OR (c.team_id IS NOT NULL AND k.applied_at IS NOT NULL)) ORDER BY k.at, k.id)), '[]')),
   'membership', (SELECT json_object('session_id', ?, 'user_id', c.account_id,
     'team_id', c.team_id, 'roles', json(c.roles), 'is_admin', json(CASE WHEN c.is_admin THEN 'true' ELSE 'false' END))
     WHERE c.account_id IS NOT NULL),
@@ -93,7 +107,7 @@ SELECT json_object(
     FROM admin_audit d WHERE d.session_id = (SELECT ? WHERE c.is_admin = 1)
     ORDER BY d.at DESC, d.id DESC LIMIT 50)), '[]')),
   'server_time', strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
-) AS snapshot FROM login LEFT JOIN access c ON true`;
+) AS snapshot FROM login LEFT JOIN access c ON true LEFT JOIN extra_minutes x ON true`;
 
 /** Appends opaque invalidations to the same transaction as the changed data. */
 export function notificationStatements(db: D1Connection, sessionId: string, audiences: readonly string[]): D1Statement[] {
@@ -106,15 +120,44 @@ export function notificationStatements(db: D1Connection, sessionId: string, audi
   ]);
 }
 
-const contestColumns = 'session_id AS id, session_name AS name, event_id, (SELECT name FROM events WHERE id = event_id) AS event_name, manage';
+const contestColumns = `c.session_id AS id, c.session_name AS name, c.event_id, c.manage, e.name AS event_name, e.time_zone,
+  s.contest_type, s.starts_at, s.ends_at, s.grace_minutes, s.intake_follows_schedule, s.intake_open,
+  ${intakeStateSql('s')} AS intake`;
 
 /** Every contest that the caller can open. Bind with contestListBindings. */
-export const contestsListSql = `SELECT ${contestColumns} FROM (${contestDataSql('contests')}) ORDER BY name, id`;
+export const contestsListSql = `SELECT ${contestColumns}, 1 AS can_open FROM (${contestDataSql('contests')}) c
+  JOIN sessions s ON s.id = c.session_id JOIN events e ON e.id = s.event_id ORDER BY c.session_name, c.session_id`;
 
 /** The contests of one event that the caller can open. Bind with contestListBindings, then the event ID. */
-export const eventContestsSql = `SELECT ${contestColumns} FROM (${contestDataSql('contests')}) WHERE event_id = ? ORDER BY name, id`;
+export const eventContestsSql = `SELECT ${contestColumns}, 1 AS can_open FROM (${contestDataSql('contests')}) c
+  JOIN sessions s ON s.id = c.session_id JOIN events e ON e.id = s.event_id WHERE c.event_id = ?
+  ORDER BY c.session_name, c.session_id`;
 
-interface ContestRow { id: string; name: string; event_id: string; event_name: string; manage: ManageLevel }
+/** The most contests that one calendar read returns. */
+export const CALENDAR_LIMIT = 500;
+
+/**
+ * The scheduled contests that overlap a window: every contest of the caller's
+ * own event, and every contest of the site for a webmaster. A contest that the
+ * caller holds no seat in is listed with `can_open` 0. A member reads the event
+ * index and a webmaster the end-time index, so a member's read does not grow
+ * with the other events of the site. Bind accountId, loginId, then
+ * contestListBindings, then the window start and end for each of the two scopes.
+ */
+const calendarRow = (from: string, scope: string) => `SELECT s.id, s.name, s.event_id, COALESCE(r.manage, 'none') AS manage,
+    e.name AS event_name, e.time_zone, s.contest_type, s.starts_at, s.ends_at, s.grace_minutes, s.intake_follows_schedule,
+    s.intake_open, ${intakeStateSql('s')} AS intake, r.session_id IS NOT NULL AS can_open
+  FROM ${from} CROSS JOIN sessions s JOIN events e ON e.id = s.event_id LEFT JOIN reach r ON r.session_id = s.id
+  WHERE ${scope} AND s.ends_at > ? AND s.starts_at < ?`;
+export const calendarSql = `WITH login AS (${currentReadyLoginSql}), webmaster AS MATERIALIZED (${calendarWebmasterSql}),
+  reach AS MATERIALIZED (SELECT c.session_id, c.manage FROM (${contestDataSql('contests')}) c)
+SELECT * FROM (${calendarRow('login', calendarEventSql)} UNION ALL ${calendarRow('webmaster CROSS JOIN login', '1')})
+ORDER BY starts_at, id LIMIT ${CALENDAR_LIMIT}`;
+
+interface ContestRow extends ScheduleColumns {
+  id: string; name: string; event_id: string; manage: ManageLevel; event_name: string; time_zone: string;
+  contest_type: ContestType; intake_follows_schedule: number; intake_open: number; intake: string; can_open: number;
+}
 
 /** D1 owns current access and consistent snapshots. */
 export class D1ApplicationService {
@@ -125,16 +168,25 @@ export class D1ApplicationService {
   }
 
   /**
-   * The contests that the caller can open. The resolver already limits an
-   * account of an event to that event, and lets a webmaster reach every
-   * contest, so an event ID only narrows the answer.
+   * The contests that the caller can open, or with a window, the calendar of
+   * the caller's event. The resolver already limits an account of an event to
+   * that event, and lets a webmaster reach every contest, so an event ID only
+   * narrows the answer.
    */
-  async contests(caller: Caller, eventId?: string): Promise<ContestSummary[]> {
+  async contests(caller: Caller, query: ContestQuery = {}): Promise<ContestSummary[]> {
+    const { eventId, window } = query;
     if (eventId !== undefined && !z.uuid().safeParse(eventId).success) throw new AuthenticationError(400, 'Choose an event.');
-    const result = eventId === undefined
-      ? await this.statement(contestsListSql, ...contestListBindings(caller)).all<ContestRow>()
-      : await this.statement(eventContestsSql, ...contestListBindings(caller), eventId).all<ContestRow>();
-    return result.results.map((row) => ({ id: row.id, name: row.name, eventId: row.event_id, eventName: row.event_name, manage: row.manage }));
+    const result = window !== undefined
+      ? await this.statement(calendarSql, ...currentReadyLoginBindings(caller), ...contestListBindings(caller), window.from, window.to, window.from, window.to)
+        .all<ContestRow>()
+      : eventId === undefined
+        ? await this.statement(contestsListSql, ...contestListBindings(caller)).all<ContestRow>()
+        : await this.statement(eventContestsSql, ...contestListBindings(caller), eventId).all<ContestRow>();
+    return result.results.map((row) => ({
+      id: row.id, name: row.name, eventId: row.event_id, eventName: row.event_name, timeZone: row.time_zone,
+      contestType: row.contest_type, schedule: scheduleOf(row), intake: parseIntake(row.intake),
+      canOpen: row.can_open === 1, manage: row.manage,
+    }));
   }
 
   async snapshot(caller: Caller, sessionId: string): Promise<Snapshot> {

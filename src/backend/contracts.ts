@@ -83,13 +83,78 @@ export interface Authentication {
   changePassword(currentPassword: string, newPassword: string): Promise<void>;
 }
 
-/** A contest that the caller may open. `manage` is the caller's authority over its structure. */
+/**
+ * When a contest runs. Instants are UTC strings. The event's time zone
+ * decides how the browser shows them. Contests run continuously and may overlap.
+ */
+export interface Schedule {
+  readonly startsAt: string;
+  readonly endsAt: string;
+  /** Minutes after the end during which intake stays open. */
+  readonly graceMinutes: number;
+}
+
+/** The longest grace period, in minutes. D1 enforces the same bound. */
+export const GRACE_MINUTES_MAX = 240;
+
+/** Why intake is open or closed. The override reasons mean that staff hold intake open or closed. */
+export type IntakeReason = 'before_start' | 'running' | 'grace' | 'ended' | 'override_open' | 'override_closed';
+
+/** Derived by D1 at read time from the schedule and the override. Never stored. */
+export interface IntakeState {
+  readonly open: boolean;
+  readonly reason: IntakeReason;
+  /** The next instant at which the reason changes by time alone. Null while an override holds. */
+  readonly changesAt: string | null;
+}
+
+/** `schedule`: intake follows the schedule. `open`, `closed`: staff override it. */
+export type IntakeMode = 'schedule' | 'open' | 'closed';
+
+/**
+ * A contest that the caller may list. `canOpen` is false for a contest of the
+ * caller's event that the caller holds no seat in. `manage` is the caller's
+ * authority over its structure.
+ */
 export interface ContestSummary {
   id: string;
   name: string;
   eventId: string;
   eventName: string;
+  timeZone: string;
+  contestType: ContestType;
+  /** Null for a contest created before schedules existed. */
+  schedule: Schedule | null;
+  /** The contest-wide state. A contestant's own state can last longer by confirmed extra time. */
+  intake: IntakeState;
+  canOpen: boolean;
   manage: ManageLevel;
+}
+
+/**
+ * `eventId`: every contest of that event that the caller may list.
+ * `window`: every scheduled contest of the caller's event that overlaps the
+ * window. A webmaster gets the contests of every event.
+ */
+export type ContestQuery =
+  | { readonly eventId?: string; readonly window?: undefined }
+  | { readonly eventId?: undefined; readonly window: { readonly from: string; readonly to: string } };
+
+export type ContestAwardCommand =
+  | { readonly type: 'grant'; readonly minutes: number; readonly explanation: string }
+  | { readonly type: 'apply'; readonly awardId: string };
+
+/**
+ * Contest-wide time awards give minutes to every contestant of one contest.
+ * Jury grant them. Support or jury confirm that the minutes were applied outside Minsky.
+ * Minsky changes no external contest clock.
+ */
+export interface ContestAwards {
+  /**
+   * Reusing a request ID with the same command must not repeat a write.
+   * Resolves to the award ID. A rejection carries the reason.
+   */
+  execute(sessionId: string, requestId: string, command: ContestAwardCommand): Promise<string>;
 }
 
 export interface Workflows {
@@ -98,7 +163,7 @@ export interface Workflows {
    * contests of that event. Without one, the caller's own event, or every
    * contest for a webmaster.
    */
-  contests(query?: { eventId?: string }): Promise<ContestSummary[]>;
+  contests(query?: ContestQuery): Promise<ContestSummary[]>;
   snapshot(sessionId: string): Promise<Snapshot>;
   /**
    * Reusing a request ID with the same command must not repeat a write.
@@ -158,14 +223,14 @@ export type ManageCommand =
   | { readonly type: 'create_entrants'; readonly eventId: string; readonly entrants: readonly EntrantInput[] }
   | { readonly type: 'rename_entrant'; readonly eventId: string; readonly entrantId: string; readonly name: string }
   | { readonly type: 'add_entrant_sign_in'; readonly eventId: string; readonly entrantId: string; readonly handle: string }
-  | { readonly type: 'create_contest'; readonly eventId: string; readonly name: string; readonly contestType: ContestType; readonly categories: readonly string[] }
-  | { readonly type: 'update_contest'; readonly contestId: string; readonly name: string; readonly contestType: ContestType }
+  | { readonly type: 'create_contest'; readonly eventId: string; readonly name: string; readonly contestType: ContestType; readonly schedule: Schedule; readonly categories: readonly string[] }
+  | { readonly type: 'update_contest'; readonly contestId: string; readonly name: string; readonly contestType: ContestType; readonly schedule?: Schedule | undefined }
   | { readonly type: 'assign_entrants'; readonly contestId: string; readonly entries: ReadonlyArray<{ readonly entrantId: string; readonly location: string }> }
   | { readonly type: 'unassign_entrant'; readonly contestId: string; readonly entrantId: string }
   | { readonly type: 'assign_staff'; readonly contestId: string; readonly accountId: string; readonly roles: readonly Role[]; readonly admin: boolean }
   | { readonly type: 'unassign_staff'; readonly contestId: string; readonly accountId: string }
   // Contest. Requires a contest admin of that contest, or higher.
-  | { readonly type: 'set_intake'; readonly contestId: string; readonly open: boolean }
+  | { readonly type: 'set_intake'; readonly contestId: string; readonly mode: IntakeMode }
   | { readonly type: 'set_image_limits'; readonly contestId: string; readonly fileMegabytes: number; readonly count: number; readonly totalMegabytes: number }
   | { readonly type: 'set_categories'; readonly contestId: string; readonly categories: readonly string[] }
   | { readonly type: 'set_location'; readonly contestId: string; readonly entrantId: string; readonly location: string }
@@ -257,7 +322,9 @@ export interface EventConsole {
     readonly id: string;
     readonly name: string;
     readonly contestType: ContestType;
-    readonly intakeOpen: boolean;
+    readonly schedule: Schedule | null;
+    readonly mode: IntakeMode;
+    readonly intake: IntakeState;
   }>;
   /** Staff seats that an assignment made. Event admins and webmasters hold none. */
   readonly staffAssignments: ReadonlyArray<{
@@ -392,6 +459,7 @@ export interface Backend {
   auth: Authentication;
   workflows: Workflows;
   manage: Management;
+  contestAwards: ContestAwards;
   images: ImageTransport;
   announcements: Announcements;
   avatars: Avatars;

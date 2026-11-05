@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { backend } from "@/backend";
-import { type Handle, type ManageCommand, type SignInTarget } from "@/backend/contracts";
+import { type Handle, type IntakeMode, type ManageCommand, type SignInTarget } from "@/backend/contracts";
 import { errorMessage } from "@/backend/errors";
 import type { Snapshot } from "@/connected/model";
 import { type ImageLimits, imageLimitsInput, setHandleCommand } from "./adminModel";
@@ -25,7 +25,7 @@ export interface SessionAdmin {
   credentials: Credentials | undefined;
   dismissCredentials: () => void;
   /** Each request resolves to true when the server records it. */
-  setIntake: (open: boolean) => Promise<boolean>;
+  setIntake: (mode: IntakeMode) => Promise<boolean>;
   saveImageLimits: (limits: ImageLimits) => Promise<boolean>;
   /** Changes a username. The password and open sessions stay. */
   setUsername: (userId: string, username: Handle) => Promise<boolean>;
@@ -107,8 +107,8 @@ export function useSessionAdmin(
     notice,
     credentials,
     dismissCredentials: () => setCredentials(undefined),
-    setIntake: (open) =>
-      run(() => contest({ type: "set_intake", contestId: sessionId, open })),
+    setIntake: (mode) =>
+      run(() => contest({ type: "set_intake", contestId: sessionId, mode })),
     saveImageLimits: (limits) =>
       run(() => contest({ type: "set_image_limits", contestId: sessionId, ...imageLimitsInput(limits) })),
     setUsername: (userId, username) =>

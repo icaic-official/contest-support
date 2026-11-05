@@ -253,6 +253,7 @@ export async function createBrowserBackend(
       execute: (requestId, command) => call({ type: 'manage', requestId, command }),
       issueCredentials: (requestId, input) => call({ type: 'issue', requestId, input }),
     },
+    contestAwards: { execute: unsupported },
     announcements: {
       snapshot: unsupported,
       execute: unsupported,

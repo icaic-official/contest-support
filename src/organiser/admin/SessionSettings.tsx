@@ -2,8 +2,10 @@ import { useId, useState } from "react";
 import { Minus, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Switch } from "@/components/ui/switch";
-import type { Issue } from "@/connected/model";
+import type { IntakeMode } from "@/backend/contracts";
+import { intakeHeadline } from "@/connected/intakeText";
+import type { ContestClock, Issue } from "@/connected/model";
+import { formatInZone, viewerNote } from "@/connected/zonedTime";
 import { StatusIcon } from "../components/issueDisplay";
 import {
   type ImageLimits,
@@ -33,54 +35,80 @@ export function StatusCounts({ issues }: { issues: readonly Issue[] }) {
   );
 }
 
+/** The clock of a contest in words, for example "Opens 13:00, closes 18:15 (15 minutes grace)". */
+export function scheduleSummary(clock: ContestClock): string {
+  const schedule = clock.schedule;
+  if (!schedule) return "This contest has no schedule.";
+  const zone = clock.time_zone;
+  const closes = new Date(Date.parse(schedule.ends_at) + schedule.grace_minutes * 60_000).toISOString();
+  const grace = schedule.grace_minutes > 0 ? ` (${schedule.grace_minutes} minutes grace)` : "";
+  const note = viewerNote(schedule.starts_at, zone, "datetime");
+  return `Opens ${formatInZone(schedule.starts_at, zone, "datetime")}, closes ${formatInZone(closes, zone, "datetime")}${grace}.${note ? ` ${note}.` : ""}`;
+}
+
+/** How staff hold intake: with the schedule, or by hand. */
+export function intakeMode(clock: ContestClock | null | undefined, open: boolean): IntakeMode {
+  return clock ? (clock.follows_schedule ? "schedule" : open ? "open" : "closed") : open ? "open" : "closed";
+}
+
 /**
- * Opens or closes contestant intake. The whole row is the label of the
- * switch, so the touch target is the full row.
+ * Shows when contestant intake opens and closes. Staff can open or close it
+ * by hand, and return it to the schedule.
  */
-export function IntakeSwitch({
+export function IntakePanel({
+  clock,
   open,
   disabled,
   onChange,
 }: {
+  clock: ContestClock | null | undefined;
   open: boolean;
   disabled: boolean;
-  onChange: (open: boolean) => void;
+  onChange: (mode: IntakeMode) => void;
 }) {
   const id = useId();
+  const mode = intakeMode(clock, open);
+  const hasSchedule = !!clock?.schedule;
+  const unavailable = "h-11 aria-disabled:pointer-events-none aria-disabled:opacity-50";
+  const change = (next: IntakeMode) => {
+    if (!disabled && next !== mode) onChange(next);
+  };
   return (
-    <div className="rounded-xl border bg-card">
-      <label
-        htmlFor={`${id}-intake`}
-        className="flex min-h-14 cursor-pointer items-center gap-3 p-4 has-[:disabled]:cursor-not-allowed"
-      >
-        <span className="flex-1">
-          <span className="block text-[15px] font-medium">
-            Contestant intake
-          </span>
-          <span
-            id={`${id}-state`}
-            className="block text-xs text-muted-foreground"
-          >
-            {open
-              ? "Open. Teams can submit new reports."
-              : "Closed. Teams cannot submit new reports."}
-          </span>
-        </span>
-        <Switch
-          id={`${id}-intake`}
-          checked={open}
-          disabled={disabled}
-          onCheckedChange={onChange}
-          aria-describedby={`${id}-state ${id}-help`}
-          // The switch is small. The pseudo-element makes a 44 px target.
-          className="relative after:absolute after:-inset-x-2 after:-inset-y-3.5"
-        />
-      </label>
-      <p id={`${id}-help`} className="px-4 pb-4 text-xs text-muted-foreground">
-        Closing intake stops new contestant reports. Staff work and reopening
-        remain available.
+    <section aria-labelledby={`${id}-title`} className="rounded-xl border bg-card p-4">
+      <h3 id={`${id}-title`} className="text-[15px] font-medium">
+        Contestant intake
+      </h3>
+      <p id={`${id}-state`} className="mt-1 text-sm">
+        {clock ? intakeHeadline(clock.intake.reason) : open ? "Intake open" : "Intake closed"}
       </p>
-    </div>
+      <p className="mt-1 text-xs text-muted-foreground">
+        {mode === "schedule" && clock
+          ? `Following the schedule. ${scheduleSummary(clock)}`
+          : mode === "open"
+            ? "Staff opened intake by hand. It stays open until staff close it or return it to the schedule."
+            : "Staff closed intake by hand. It stays closed until staff open it or return it to the schedule."}
+      </p>
+      {mode !== "schedule" && clock?.schedule && (
+        <p className="mt-1 text-xs text-muted-foreground">If it followed the schedule: {scheduleSummary(clock)}</p>
+      )}
+      <div className="mt-3 flex flex-wrap gap-2" role="group" aria-describedby={`${id}-state`}>
+        {/* aria-disabled, not disabled, so the pressed button keeps keyboard focus while the request runs. */}
+        <Button type="button" variant="outline" className={unavailable} aria-disabled={disabled || mode === "open"} onClick={() => change("open")}>
+          Open now
+        </Button>
+        <Button type="button" variant="outline" className={unavailable} aria-disabled={disabled || mode === "closed"} onClick={() => change("closed")}>
+          Close now
+        </Button>
+        {hasSchedule && mode !== "schedule" && (
+          <Button type="button" variant="secondary" className={unavailable} aria-disabled={disabled} onClick={() => change("schedule")}>
+            Return to schedule
+          </Button>
+        )}
+      </div>
+      <p className="mt-3 text-xs text-muted-foreground">
+        Closing intake stops new contestant reports. Staff work and reopening remain available.
+      </p>
+    </section>
   );
 }
 

@@ -451,4 +451,56 @@ describe('the previous Worker on the scoped authority schema', () => {
       expect(await writer(db).all('SELECT team_id FROM memberships WHERE session_id = ? AND account_id = ?', ids.second, ids.staff)).toEqual([{ team_id: null }]);
     });
   });
+
+  describe('on the contest schedule schema', () => {
+    let db: D1Connection;
+    let dispose: () => Promise<void>;
+    const ids = { event: randomUUID(), scheduled: randomUUID(), plain: randomUUID() };
+    // The previous Worker reads and writes only `intake_open`. These are its statements for intake.
+    const readIntake = (id: string) => db.prepare('SELECT intake_open, version FROM sessions WHERE id = ?').bind(id).first<{ intake_open: number; version: number }>();
+    const setIntake = (id: string, open: number) => db.prepare('UPDATE sessions SET intake_open = ? WHERE id = ?').bind(open, id).run();
+
+    beforeAll(async () => {
+      ({ db, dispose } = await open());
+      await applyMigrations(db);
+      const { run } = writer(db);
+      await run('INSERT INTO events (id, name) VALUES (?, ?)', ids.event, 'Schedule event');
+      // A contest that the new Worker created: it follows its schedule, and its manual switch is still closed.
+      await run(`INSERT INTO sessions (id, event_id, name, starts_at, ends_at, grace_minutes, intake_follows_schedule)
+        VALUES (?, ?, 'Scheduled', strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-1 hour'), strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '+1 hour'), 10, 1)`,
+      ids.scheduled, ids.event);
+    });
+    afterAll(async () => { await dispose?.(); });
+
+    it('reads a scheduled contest as a manual contest, closed until its switch changes', async () => {
+      expect(await readIntake(ids.scheduled)).toMatchObject({ intake_open: 0 });
+    });
+
+    it('opens and closes a scheduled contest with its old switch, and counts each change in the version', async () => {
+      const before = (await readIntake(ids.scheduled))!;
+      await setIntake(ids.scheduled, 1);
+      const after = (await readIntake(ids.scheduled))!;
+      expect(after.intake_open).toBe(1);
+      expect(after.version).toBe(before.version + 1);
+      // The schedule still holds, so the new Worker reads it as following the schedule again.
+      expect(await writer(db).first('SELECT intake_follows_schedule, starts_at IS NOT NULL AS scheduled FROM sessions WHERE id = ?', ids.scheduled))
+        .toEqual({ intake_follows_schedule: 1, scheduled: 1 });
+    });
+
+    it('never trips a schedule trigger with its own contest inserts and updates', async () => {
+      const { run, first } = writer(db);
+      // Its create_session names no schedule column. The defaults are a valid manual contest.
+      await run('INSERT INTO sessions (id, event_id, name) VALUES (?, ?, ?)', ids.plain, ids.event, 'Plain');
+      expect(await first('SELECT starts_at, ends_at, grace_minutes, intake_follows_schedule FROM sessions WHERE id = ?', ids.plain))
+        .toEqual({ starts_at: null, ends_at: null, grace_minutes: 0, intake_follows_schedule: 0 });
+      await setIntake(ids.plain, 1);
+      await run('UPDATE sessions SET name = ?, categories = ? WHERE id = ?', 'Renamed', '["Other"]', ids.plain);
+      await run('UPDATE sessions SET name = ? WHERE id = ?', 'Renamed too', ids.scheduled);
+      expect(await first('SELECT name FROM sessions WHERE id = ?', ids.scheduled)).toEqual({ name: 'Renamed too' });
+    });
+
+    it('leaves the schedule triggers to refuse only a schedule that cannot run', async () => {
+      await expect(writer(db).run('UPDATE sessions SET ends_at = starts_at WHERE id = ?', ids.scheduled)).rejects.toThrow(/start before its end/);
+    });
+  });
 });

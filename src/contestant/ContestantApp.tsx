@@ -5,6 +5,7 @@ import { AccountPage, useOpenPasswordChange } from "@/connected/AccountPage";
 import { useRouteFocus } from "@/connected/navigation";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { ContestClock } from "@/connected/ContestClock";
 import { useNow } from "@/connected/hooks/useNow";
 import { useWorkflowState } from "@/connected/hooks/useWorkflowState";
 import { isRunning } from "@/connected/model";
@@ -79,7 +80,7 @@ export function ContestantApp(props: ShellProps) {
   const team = state.teams.find((item) => item.id === teamId);
   const issues = teamIssues(state.issues, teamId);
   const issue = issues.find((item) => item.id === selectedIssueId) ?? issues[0];
-  const blocker = reportBlocker(state);
+  const blocker = reportBlocker(state, now);
 
   /** Clears the open report and the report form after the session changes. */
   function resetForSession() {
@@ -161,6 +162,7 @@ export function ContestantApp(props: ShellProps) {
           className="flex min-h-0 flex-col border-r bg-sidebar"
         >
           <div className="p-4">
+            <ContestClock clock={state.clock} now={now} />
             <Button
               ref={reportButton}
               className="h-10 w-full"

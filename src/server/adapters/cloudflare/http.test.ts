@@ -19,7 +19,8 @@ function services() {
     auth: { current: vi.fn<ApplicationHttpServices['auth']['current']>().mockResolvedValue(identity) },
     application: {
       contests: vi.fn<ApplicationHttpServices['application']['contests']>()
-        .mockResolvedValue([{ id: sessionId, name: 'Fictional', eventId: requestId, eventName: 'Fictional event', manage: 'none' }]),
+        .mockResolvedValue([{ id: sessionId, name: 'Fictional', eventId: requestId, eventName: 'Fictional event', timeZone: 'UTC', contestType: 'teams',
+          schedule: null, intake: { open: true, reason: 'override_open', changesAt: null }, canOpen: true, manage: 'none' }]),
       snapshot: vi.fn<ApplicationHttpServices['application']['snapshot']>(),
     },
     workflow: { execute: vi.fn<ApplicationHttpServices['workflow']['execute']>().mockResolvedValue({ outcome: 'committed', issueId: requestId }) },
@@ -29,6 +30,7 @@ function services() {
       execute: vi.fn<ApplicationHttpServices['manage']['execute']>().mockResolvedValue({}),
       issueCredentials: vi.fn<ApplicationHttpServices['manage']['issueCredentials']>().mockResolvedValue([]),
     },
+    contestAwards: { execute: vi.fn<ApplicationHttpServices['contestAwards']['execute']>().mockResolvedValue(requestId) },
     images: {
       begin: vi.fn<ApplicationHttpServices['images']['begin']>(),
       upload: vi.fn<ApplicationHttpServices['images']['upload']>(),
@@ -81,7 +83,7 @@ describe('Cloudflare application HTTP boundary', () => {
   it('checks login, temporary-password state, origin, token, and fetch metadata before mutation', async () => {
     const deps = services();
     const handle = createApplicationHandler(deps, origin);
-    const body = { requestId, command: { type: 'set_intake', contestId: sessionId, open: true } };
+    const body = { requestId, command: { type: 'set_intake', contestId: sessionId, mode: 'open' } };
     const rejectedHeaders: Array<Record<string, string>> = [
       { Origin: 'https://attacker.example' }, { 'X-CSRF-Token': 'stale' },
       { 'X-Minsky-Request': '' }, { 'Sec-Fetch-Site': 'cross-site' },
@@ -108,15 +110,33 @@ describe('Cloudflare application HTTP boundary', () => {
     expect(deps.manage.issueCredentials).not.toHaveBeenCalled();
   });
 
+  it('runs a contest-wide award through the trusted caller', async () => {
+    const deps = services();
+    const handle = createApplicationHandler(deps, origin);
+    const command = { type: 'grant', minutes: 10, explanation: 'Network outage.' };
+    const response = await handle(post('/api/contest-awards', { sessionId, requestId, command }));
+    expect(await response.json()).toEqual({ id: requestId });
+    expect(deps.contestAwards.execute).toHaveBeenCalledWith(identity.caller, sessionId, requestId, command);
+    expect((await handle(post('/api/contest-awards', { sessionId, command }))).status).toBe(400);
+  });
+
   it('reads contests and the event console with the trusted caller', async () => {
     const deps = services();
     const handle = createApplicationHandler(deps, origin);
     const get = (path: string) => handle(new Request(`${origin}${path}`, { headers: { Origin: origin } }));
     expect((await get('/api/contests')).status).toBe(200);
-    expect(deps.application.contests).toHaveBeenLastCalledWith(identity.caller, undefined);
+    expect(deps.application.contests).toHaveBeenLastCalledWith(identity.caller, {});
     expect((await get(`/api/contests?eventId=${requestId}`)).status).toBe(200);
-    expect(deps.application.contests).toHaveBeenLastCalledWith(identity.caller, requestId);
+    expect(deps.application.contests).toHaveBeenLastCalledWith(identity.caller, { eventId: requestId });
     expect((await get('/api/contests?eventId=nope')).status).toBe(400);
+    const from = encodeURIComponent('2026-11-03T00:00:00+08:00');
+    expect((await get(`/api/contests?from=${from}&to=2026-11-05T00:00:00Z`)).status).toBe(200);
+    expect(deps.application.contests).toHaveBeenLastCalledWith(identity.caller,
+      { window: { from: '2026-11-02T16:00:00.000Z', to: '2026-11-05T00:00:00.000Z' } });
+    // A window is at most 92 days, runs forward, and names both ends.
+    expect((await get(`/api/contests?from=${from}&to=2027-11-05T00:00:00Z`)).status).toBe(400);
+    expect((await get(`/api/contests?from=2026-11-05T00:00:00Z&to=2026-11-03T00:00:00Z`)).status).toBe(400);
+    expect((await get(`/api/contests?from=${from}`)).status).toBe(400);
     expect((await get('/api/sessions')).status).toBe(404);
     deps.manage.event.mockRejectedValueOnce(new AuthenticationError(403, 'Only an event admin or a webmaster can change this event.'));
     expect((await get(`/api/event?eventId=${requestId}`)).status).toBe(403);
@@ -169,7 +189,7 @@ describe('Cloudflare application HTTP boundary', () => {
   describe('workflow response snapshot', () => {
     const snapshot: Snapshot = {
       session: null, event: null, membership: null, teams: [], issues: [], resolutions: [], history: [], attachments: [],
-      pending_removals: [], awards: [], members: [], audit: [], server_time: '2026-10-25T00:00:00Z',
+      pending_removals: [], awards: [], contest_awards: [], members: [], audit: [], server_time: '2026-10-25T00:00:00Z',
     };
     const body = { sessionId, requestId, command: {} };
 

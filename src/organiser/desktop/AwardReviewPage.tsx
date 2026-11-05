@@ -4,6 +4,7 @@ import {
   SlidingIndicator,
 } from "@/components/ui/sliding-indicator";
 import { cn } from "@/lib/utils";
+import { ContestAwardsPanel } from "@/connected/ContestAwards";
 import { clockDuration } from "@/connected/ui";
 import { ApplyForm, AwardForm } from "../actions/IssueForms";
 import { AwardReceipt } from "../components/IssueDetails";
@@ -35,6 +36,7 @@ export function AwardReviewPage({ props }: { props: ConsolePageProps }) {
         title="Award review"
         description="Decide on resolved issues. Recording an award does not change the contest clock. Staff confirm external application separately."
       />
+      <ContestAwardsPanel state={state} member={member} refresh={props.shell.data.refresh} />
       <div
         role="group"
         aria-label="Award lists"

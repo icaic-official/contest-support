@@ -97,5 +97,5 @@ export function setImageLimits(
 }
 
 export function setIntake(backend: Backend, contestId: string, open: boolean): Promise<ManageReceipt> {
-  return manage(backend, { type: 'set_intake', contestId, open });
+  return manage(backend, { type: 'set_intake', contestId, mode: open ? 'open' : 'closed' });
 }

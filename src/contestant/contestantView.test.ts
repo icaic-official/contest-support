@@ -297,4 +297,20 @@ describe("reportBlocker", () => {
       reportBlocker({ session, event: { ...event, archived: true } }),
     ).toBe("This event is archived. Records are read only.");
   });
+
+  it("names the time that reporting opens or closed when the schedule decides", () => {
+    const closed = { ...session, intake_open: false };
+    const clock = (reason: "before_start" | "ended") => ({
+      time_zone: "Asia/Singapore",
+      schedule: { starts_at: "2026-11-03T05:00:00.000Z", ends_at: "2026-11-03T10:00:00.000Z", grace_minutes: 25 },
+      follows_schedule: true,
+      intake: { open: false, reason, changes_at: null },
+      personal_end_at: "2026-11-03T10:00:00.000Z",
+      extra_minutes: 0,
+    });
+    const now = Date.parse("2026-11-03T04:00:00.000Z");
+    expect(reportBlocker({ session: closed, event, clock: clock("before_start") }, now)).toMatch(/^Reporting opens at .*13:00\.$/);
+    expect(reportBlocker({ session: closed, event, clock: clock("ended") }, now)).toMatch(/^Reporting closed at .*18:25\.$/);
+    expect(reportBlocker({ session, event, clock: clock("ended") }, now)).toBeUndefined();
+  });
 });

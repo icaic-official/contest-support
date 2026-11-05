@@ -161,7 +161,7 @@ test("an event admin adds a volunteer of the event to a contest", async ({ page,
   await expect(row.getByText("Assigned", { exact: true })).toBeVisible();
   const [seat] = await local.rows<{ roles: string }>(
     `SELECT json_group_array(role) AS roles FROM membership_roles WHERE session_id = ? AND account_id =
-      (SELECT id FROM accounts WHERE handle = 'sam-lee')`, local.sessions[0]);
+      (SELECT id FROM accounts WHERE handle = 'sam-lee' AND event_id = (SELECT event_id FROM sessions WHERE id = ?))`, local.sessions[0], local.sessions[0]);
   expect(JSON.parse(seat!.roles)).toEqual(["volunteer"]);
 
   // Sam signs in and opens the contest on a phone.

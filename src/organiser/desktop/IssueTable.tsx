@@ -24,14 +24,13 @@ import {
   type Snapshot,
   type Team,
 } from "@/connected/model";
-import { useTick } from "@/connected/hooks/useNow";
 import { clockDuration } from "@/connected/ui";
 import { useChangedIssues } from "../useChangedIssues";
 import {
   PersonAvatar,
   StatusBadge,
   StatusIcon,
-  UnresolvedTimer,
+  LiveUnresolvedTimer,
 } from "../components/issueDisplay";
 import type { ConsolePageProps, RowAction } from "./consoleProps";
 import { type QueueStats, queueStats } from "./consoleModel";
@@ -211,27 +210,6 @@ export function IssueTable({
   );
 }
 
-/** The unresolved time of a row. It keeps its own clock, so the row does not render every second. */
-function RowTimer({
-  issue,
-  resolutions,
-  clockOffset,
-}: {
-  issue: Issue;
-  resolutions: readonly Resolution[];
-  clockOffset: { readonly current: number };
-}) {
-  const tick = useTick();
-  return (
-    <UnresolvedTimer
-      issue={issue}
-      resolutions={resolutions}
-      now={tick + clockOffset.current}
-      className="text-sm"
-    />
-  );
-}
-
 const IssueRow = memo(function IssueRow({
   issue,
   team,
@@ -320,10 +298,11 @@ const IssueRow = memo(function IssueRow({
         </div>
       </TableCell>
       <TableCell className="text-right">
-        <RowTimer
+        <LiveUnresolvedTimer
           issue={issue}
           resolutions={resolutions}
           clockOffset={clockOffset}
+          className="text-sm"
         />
       </TableCell>
       <TableCell className="pr-4 text-right">

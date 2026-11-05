@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { type ComponentProps, useState } from "react";
 import {
   ArrowUpRight,
   CircleCheck,
@@ -8,6 +8,7 @@ import {
   WifiOff,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { useTick } from "@/connected/hooks/useNow";
 import { useAvatarUrl } from "@/connected/Avatars";
 import type { JuryRow } from "@/connected/jury";
 import { formatDate, statusNames } from "@/connected/labels";
@@ -139,6 +140,20 @@ export function UnresolvedTimer({
       {clockDuration(ms)}
     </span>
   );
+}
+
+/**
+ * An unresolved timer with its own clock. A list of rows renders once for a
+ * change of data, and only these small timers render each second.
+ */
+export function LiveUnresolvedTimer({
+  clockOffset,
+  ...props
+}: Omit<ComponentProps<typeof UnresolvedTimer>, "now"> & {
+  clockOffset: { readonly current: number };
+}) {
+  const tick = useTick();
+  return <UnresolvedTimer {...props} now={tick + clockOffset.current} />;
 }
 
 /** The Realtime state: Live, or Reconnecting while the channel is down. */

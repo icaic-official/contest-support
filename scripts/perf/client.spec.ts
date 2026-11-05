@@ -74,7 +74,9 @@ async function signIn(page: Page, role: (typeof roles)[number]): Promise<void> {
   await page.getByLabel("Username", { exact: true }).fill(role);
   await page.getByLabel("Password", { exact: true }).fill(randomUUID());
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
-  await expect(page.locator(`[data-ui="${surface[role]}"]`)).toBeVisible();
+  const narrow = (page.viewportSize()?.width ?? 1280) < 1024;
+  const ui = role !== "contestant" && narrow ? "organiser-phone" : surface[role];
+  await expect(page.locator(`[data-ui="${ui}"]`)).toBeVisible();
   await expect(page.getByText("Live", { exact: true })).toBeVisible();
 }
 
@@ -259,9 +261,10 @@ test.describe("profile", () => {
   });
 });
 
-test.describe("render", () => {
-  test.use({ baseURL: dev });
-  test("component renders per live hint, volunteer with a large queue", async ({ local, page, context }) => {
+for (const [label, viewport] of [["desktop", { width: 1280, height: 800 }], ["phone", { width: 390, height: 844 }]] as const) {
+test.describe(`render ${label}`, () => {
+  test.use({ baseURL: dev, viewport });
+  test(`component renders per live hint, volunteer with a large queue, ${label}`, async ({ local, page, context }) => {
     test.setTimeout(600_000);
     await seedQueue(local, issueCount);
     await context.addInitScript(() => {
@@ -309,17 +312,18 @@ test.describe("render", () => {
     await snapshot();
     // Three idle seconds: only the clocks tick.
     await page.waitForTimeout(3100);
-    results["render:idle3s"] = await snapshot();
+    results[`render:idle3s:${label}`] = await snapshot();
     // A hint that changes nothing, the common case: other people's activity elsewhere.
     local.notify();
     await counter.settle(1500);
-    results["render:unchangedHint"] = await snapshot();
+    results[`render:unchangedHint:${label}`] = await snapshot();
     // A change to one issue.
     const row = await local.rows<{ id: string }>("SELECT id FROM issues WHERE session_id = ? AND status = 'open' LIMIT 1", local.sessions[0]);
     await local.run("UPDATE issues SET public_revision = public_revision + 1, write_version = write_version + 1, status = 'claimed', owner = ?, owner_name = 'Test volunteer', first_assigned_at = ? WHERE id = ?",
       local.users.volunteer, new Date().toISOString(), row[0]!.id);
     local.notify();
     await counter.settle(1500);
-    results["render:oneIssueChanged"] = await snapshot();
+    results[`render:oneIssueChanged:${label}`] = await snapshot();
   });
 });
+}

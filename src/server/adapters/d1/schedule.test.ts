@@ -253,6 +253,129 @@ describe('contest schedule, clock, time awards, and intake', () => {
       await expect(run('UPDATE contest_awards SET minutes = 1 WHERE id = ?', id)).rejects.toThrow(/final/);
     });
 
+    describe('withdrawing an unconfirmed award', () => {
+      const withdraw = (id: string) => ({ type: 'withdraw', awardId: id }) as const;
+      const stateOf = async (id: string) => (await fixture.rows(
+        'SELECT applied_at, withdrawn_at, withdrawn_by, withdrawn_request FROM contest_awards WHERE id = ?', id))[0]!;
+
+      it('keeps the row, frees the size, hides it from contestants, and gives no time', async () => {
+        await follow(-60, -5);
+        const id = await awards.execute(fixture.staff, fixture.sessionId, randomUUID(), grant);
+        const requestId = randomUUID();
+        expect(await awards.execute(fixture.staff, fixture.sessionId, requestId, withdraw(id))).toBe(id);
+        expect(await stateOf(id)).toMatchObject({ applied_at: null, withdrawn_by: fixture.staff.accountId, withdrawn_request: requestId });
+        expect((await stateOf(id)).withdrawn_at).toBeTruthy();
+        const staffView = (await application.snapshot(fixture.staff, fixture.sessionId)).contest_awards;
+        expect(staffView).toMatchObject([{ id, withdrawn_at: expect.any(String) as string, withdrawn_name: expect.any(String) as string }]);
+        expect((await application.snapshot(fixture.contestant, fixture.sessionId)).contest_awards).toEqual([]);
+        expect(await clockOf(fixture.contestant)).toMatchObject({ open: false, clock: { extra_minutes: 0 } });
+        // The same size can be granted again, and the withdrawn row stays.
+        const again = await awards.execute(fixture.staff, fixture.sessionId, randomUUID(), grant);
+        expect(again).not.toBe(id);
+        expect(await fixture.rows('SELECT id FROM contest_awards WHERE session_id = ?', fixture.sessionId)).toHaveLength(2);
+        expect(await fixture.rows('SELECT action FROM admin_audit WHERE action = ?', 'contest_award_withdrawn')).toHaveLength(1);
+      });
+
+      it('replays its own receipt without a second write, and refuses another request', async () => {
+        const id = await awards.execute(fixture.staff, fixture.sessionId, randomUUID(), grant);
+        const requestId = randomUUID();
+        const results = await Promise.all([
+          awards.execute(fixture.staff, fixture.sessionId, requestId, withdraw(id)),
+          awards.execute(fixture.staff, fixture.sessionId, requestId, withdraw(id)),
+        ]);
+        expect(results).toEqual([id, id]);
+        expect(await awards.execute(fixture.staff, fixture.sessionId, requestId, withdraw(id))).toBe(id);
+        expect(await fixture.rows('SELECT id FROM admin_audit WHERE action = ?', 'contest_award_withdrawn')).toHaveLength(1);
+        await expect(awards.execute(fixture.staff, fixture.sessionId, randomUUID(), withdraw(id))).rejects.toMatchObject({ status: 409 });
+      });
+
+      it('lets only jury withdraw, and only in the contest of the award', async () => {
+        const id = await awards.execute(fixture.staff, fixture.sessionId, randomUUID(), grant);
+        for (const caller of [fixture.specialist, fixture.contestant, fixture.otherContestant]) {
+          await expect(awards.execute(caller, fixture.sessionId, randomUUID(), withdraw(id))).rejects.toMatchObject({ status: 403 });
+        }
+        await run("INSERT INTO membership_roles (session_id, account_id, role) VALUES (?, ?, 'jury')", fixture.secondSessionId, fixture.staff.accountId);
+        await expect(awards.execute(fixture.staff, fixture.secondSessionId, randomUUID(), withdraw(id))).rejects.toMatchObject({ status: 409 });
+        expect((await stateOf(id)).withdrawn_at).toBeNull();
+      });
+
+      it('never withdraws a confirmed award and never confirms a withdrawn one', async () => {
+        const confirmed = await awards.execute(fixture.staff, fixture.sessionId, randomUUID(), grant);
+        await awards.execute(fixture.specialist, fixture.sessionId, randomUUID(), { type: 'apply', awardId: confirmed });
+        await expect(awards.execute(fixture.staff, fixture.sessionId, randomUUID(), withdraw(confirmed))).rejects.toMatchObject({ status: 409 });
+        await expect(run("UPDATE contest_awards SET withdrawn_at = 'x', withdrawn_by = ?, withdrawn_name = 'x', withdrawn_request = 'x' WHERE id = ?",
+          fixture.staff.accountId, confirmed)).rejects.toThrow(/final|not both/);
+
+        const withdrawn = await awards.execute(fixture.staff, fixture.sessionId, randomUUID(), { ...grant, minutes: 30 });
+        await awards.execute(fixture.staff, fixture.sessionId, randomUUID(), withdraw(withdrawn));
+        await expect(awards.execute(fixture.specialist, fixture.sessionId, randomUUID(), { type: 'apply', awardId: withdrawn }))
+          .rejects.toMatchObject({ status: 409 });
+        await expect(run("UPDATE contest_awards SET applied_at = 'x', applied_by = ?, applied_name = 'x', applied_request = 'x' WHERE id = ?",
+          fixture.staff.accountId, withdrawn)).rejects.toThrow(/final|not both/);
+        expect((await stateOf(withdrawn)).applied_at).toBeNull();
+      });
+
+      it('refuses a half-written or doubled outcome in the table itself', async () => {
+        const id = await awards.execute(fixture.staff, fixture.sessionId, randomUUID(), grant);
+        await expect(run("UPDATE contest_awards SET withdrawn_at = 'x' WHERE id = ?", id)).rejects.toThrow(/not both/);
+        await expect(run(`UPDATE contest_awards SET withdrawn_at = 'x', withdrawn_by = ?, withdrawn_name = 'x', withdrawn_request = 'x',
+          applied_at = 'x', applied_by = ?, applied_name = 'x', applied_request = 'x' WHERE id = ?`, fixture.staff.accountId, fixture.staff.accountId, id))
+          .rejects.toThrow(/not both/);
+        expect((await stateOf(id)).withdrawn_at).toBeNull();
+      });
+
+      it('lets exactly one of a concurrent confirm and withdraw win', async () => {
+        for (let round = 0; round < 5; round += 1) {
+          const id = await awards.execute(fixture.staff, fixture.sessionId, randomUUID(), { ...grant, minutes: 40 + round });
+          const results = await Promise.allSettled([
+            awards.execute(fixture.specialist, fixture.sessionId, randomUUID(), { type: 'apply', awardId: id }),
+            awards.execute(fixture.staff, fixture.sessionId, randomUUID(), withdraw(id)),
+          ]);
+          expect(results.map((result) => result.status).sort()).toEqual(['fulfilled', 'rejected']);
+          const state = await stateOf(id);
+          expect([state.applied_at !== null, state.withdrawn_at !== null].sort()).toEqual([false, true]);
+        }
+      });
+
+      it('refuses a withdrawal in an archived event', async () => {
+        const id = await awards.execute(fixture.staff, fixture.sessionId, randomUUID(), grant);
+        await run('UPDATE events SET archived = 1 WHERE id = ?', fixture.eventId);
+        await expect(awards.execute(fixture.staff, fixture.sessionId, randomUUID(), withdraw(id))).rejects.toMatchObject({ status: 409 });
+      });
+
+      it('notifies the staff and every team', async () => {
+        const id = await awards.execute(fixture.staff, fixture.sessionId, randomUUID(), grant);
+        await run('DELETE FROM notifications WHERE session_id = ?', fixture.sessionId);
+        await awards.execute(fixture.staff, fixture.sessionId, randomUUID(), withdraw(id));
+        const audiences = (await fixture.rows('SELECT audience FROM notifications WHERE session_id = ? AND audience NOT LIKE ?', fixture.sessionId, 'account:%'))
+          .map((row) => row.audience).sort();
+        expect(audiences).toEqual(['staff', `team:${fixture.teamId}`, `team:${fixture.otherTeamId}`].sort());
+      });
+
+      // The previous Worker's statements, copied from the release before migration 0021. They stay fixed.
+      describe('the previous Worker on the same database', () => {
+        const previousConfirm = (id: string) => run(`UPDATE contest_awards SET applied_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), applied_by = ?,
+          applied_name = 'Previous', applied_request = ? WHERE id = ? AND session_id = ? AND applied_at IS NULL`,
+        fixture.specialist.accountId, randomUUID(), id, fixture.sessionId);
+        const previousGrant = (minutes: number) => run(`INSERT INTO contest_awards (id, session_id, request_id, minutes, explanation, actor, actor_name, at)
+          SELECT ?, ?, ?, ?, 'Previous grant', id, name, strftime('%Y-%m-%dT%H:%M:%fZ', 'now') FROM accounts WHERE id = ?`,
+        randomUUID(), fixture.sessionId, randomUUID(), minutes, fixture.staff.accountId);
+
+        it('cannot confirm a withdrawn award, and can grant the size that the withdrawal freed', async () => {
+          const id = await awards.execute(fixture.staff, fixture.sessionId, randomUUID(), grant);
+          await awards.execute(fixture.staff, fixture.sessionId, randomUUID(), withdraw(id));
+          await expect(previousConfirm(id)).rejects.toThrow(/final|not both/);
+          await previousGrant(15);
+          expect(await fixture.rows('SELECT id FROM contest_awards WHERE session_id = ? AND minutes = 15', fixture.sessionId)).toHaveLength(2);
+        });
+
+        it('still holds one waiting award of each size', async () => {
+          await previousGrant(25);
+          await expect(previousGrant(25)).rejects.toThrow(/UNIQUE constraint failed: contest_awards.session_id, contest_awards.minutes/);
+        });
+      });
+    });
+
     it('refuses minutes and text that the record cannot hold', async () => {
       for (const bad of [{ minutes: 0 }, { minutes: 1441 }, { minutes: 1.5 }, { explanation: '   ' }, { explanation: 'x'.repeat(2001) }]) {
         await expect(awards.execute(fixture.staff, fixture.sessionId, randomUUID(), { ...grant, ...bad }))

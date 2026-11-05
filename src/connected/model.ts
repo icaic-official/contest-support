@@ -100,6 +100,9 @@ const contestAwardSchema = z.object({
   at: time,
   applied_at: time.nullable(),
   applied_name: z.string().nullable(),
+  /** Staff read withdrawn awards in the history. A withdrawn award gives no time, and a contestant never reads one. */
+  withdrawn_at: time.nullable().default(null),
+  withdrawn_name: z.string().nullable().default(null),
 });
 export type ContestAward = z.infer<typeof contestAwardSchema>;
 export const snapshotSchema = z.object({

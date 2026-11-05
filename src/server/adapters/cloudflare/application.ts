@@ -49,7 +49,8 @@ SELECT json_object(
     FROM sessions s JOIN events e ON e.id = s.event_id WHERE s.id = c.session_id),
   'contest_awards', json(COALESCE((SELECT json_group_array(json(row)) FROM (
     SELECT json_object('id', k.id, 'minutes', k.minutes, 'explanation', k.explanation, 'actor_name', k.actor_name,
-      'at', k.at, 'applied_at', k.applied_at, 'applied_name', k.applied_name) AS row
+      'at', k.at, 'applied_at', k.applied_at, 'applied_name', k.applied_name,
+      'withdrawn_at', k.withdrawn_at, 'withdrawn_name', k.withdrawn_name) AS row
     FROM contest_awards k WHERE k.session_id = c.session_id
       AND (c.staff = 1 OR (c.team_id IS NOT NULL AND k.applied_at IS NOT NULL)) ORDER BY k.at, k.id)), '[]')),
   'membership', (SELECT json_object('session_id', ?, 'user_id', c.account_id,

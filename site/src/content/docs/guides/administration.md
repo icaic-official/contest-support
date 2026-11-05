@@ -117,3 +117,13 @@ Session admins and jury members post announcements to the whole session. See [Po
 
 Archived events stay readable. Changes, uploads, limit changes, and team and category edits stop. Nothing is deleted.
 A webmaster creates events on the **Site** page. The [installer](/operators/installation/#6-create-the-first-webmaster) creates only the first webmaster. An event admin then creates contests in the event console.
+
+## Changes that affect live passwords
+
+A live contest stays closed until every contestant seat has a password issued for it. These changes affect that state:
+
+- **Assign an entrant, or add a sign-in, while reporting is open.** Minsky asks first and names the number of teams. If you confirm, reporting closes for every team, and Minsky opens the password sheet. Reporting opens again when the last password is issued.
+- **Move a contest.** If the new time no longer overlaps the time that the passwords were issued for, those passwords no longer count, and the contest waits for new ones. An end extension, or a shift that still overlaps, keeps them. If the move would stop a contest that should still be running, Minsky refuses it. Close reporting first.
+- **Issue a password for a later contest.** If the person holds a password for a live contest that has not ended, the preview says "These passwords stop working for" and names the contest. Reissue for that contest later.
+- **Two open contests block a reset.** Close one contest, then issue the password.
+- **Roll back the Worker.** After a rollback, live contests open without this check. Close live contests before a rollback.

@@ -17,7 +17,7 @@ Phase 6 differs from this page and the sketches in these points:
 - An account with no password yet is exempt from that refusal, because it has no sign-in to lose. This keeps the first issue after an assignment working.
 - A request that names a contest in which the account has no seat gets 409. This is the closed choice for a case that the design does not state.
 - The event console shows the count as "Waiting for live passwords: 3" and lists sign-ins, because one entrant can hold several sign-ins. The preview of other contests applies the window rule to contests that share an entrant. `forContestsSql` still decides per account on the server.
-- Assigning an entrant to a ready live contest closes it for every team until that seat is issued. A disabled seat keeps its contest closed until an organizer removes the seat. Both are the closed behavior.
+- Assigning an entrant with a sign-in to a ready, open live contest closes it for every team until that seat is issued, so the command needs `closeReporting: true` and the console asks first. `0022` also records each scope's issued window, and a move off that window ends the scope. A disabled seat keeps its contest closed until an organizer removes the seat. Both are the closed behavior.
 - `forContestsSql` and the seat reads live in `authority.ts`, because `authorityCopies.test.ts` keeps every membership join there.
 
 Phase 2 differs from this page and the sketches in these points:
@@ -441,8 +441,13 @@ The rule has these consequences:
 
 - One issue serves overlapping live contests that share a sign-in. A local behavior check shows that an issue for "Live 1" covers the overlapping "Live 2" and both become ready.
 - An issue never opens a later live contest that does not overlap. An issue on day 1 for "Live 1" does not open "Live 3" on day 3, so "Live 3" gets its own fresh password. A "not ended" rule would break that. A contest that starts exactly at the end plus grace does not overlap.
-- An issue is refused when it would sign a contestant out of a contest outside the set whose intake is open now. That is the earlier Rule 3, restated for automatic intake.
+- An issue is refused when it would sign a contestant out of a contest outside the set whose intake is open now. That is the earlier Rule 3, restated for automatic intake. When two open contests block each other, the refusal tells the organizer to close one contest and then issue.
 - A contestant's own forced change keeps the scope. A reset by either Worker ends it, and the contest closes until reissue.
+- Each scope records the target contest's window at the issue. A schedule move that no longer overlaps that fixed window ends the scope and recounts `unready_seats`, in a D1 trigger. So a postponed contest does not open with old passwords, and small repeated shifts cannot walk away from an issue. An end extension or a shift that still overlaps keeps the scope.
+- A move that would end scopes while the new window still holds the current time, on a contest that is open, gets 409. The organizer closes reporting first. A move that ends the running period is allowed, because the organizer can see that it stops the contest.
+- `assign_entrants` and `add_entrant_sign_in` get 409 when they would close an open live contest, unless the request carries `closeReporting: true`. The batch repeats the check. The console asks first, names the number of teams, tells every team when the contest closes or opens, and then opens the issue sheet for the new sign-ins. An entrant without a sign-in adds no seat, so that assignment does not ask.
+- An issue gets 409 when the account holds a scope for a live contest that has not ended and that lies outside `forContests`, unless the request carries `voidLivePasswords: true`. The console preview says "These passwords stop working for: ...", and only then sends the flag. A stale preview therefore gets the refusal. `recoveryContest` names an open contest, then the entrant's next live contest.
+- `memberships.account_id` is fixed by a trigger, because the count keys on it. No Worker writes it.
 - The hash runs before one batch that holds every write, so an interrupted issue leaves the old password valid. Readiness never shows a gap.
 - `unready_seats` is not in `session_changes`. A credential issue therefore does not fail in-flight staff commands. The submit batch re-checks intake through its dependency value.
 
@@ -763,7 +768,7 @@ The [type sketch](event-platform-sketches.md#type-sketch) shows the final shape.
      - A lost response replays without passwords.
      - `npm run test:auth:hash` for the per-batch CPU.
    - **Browser test.** Issue live passwords and watch the readiness count reach zero.
-   - **Revert.** Readiness columns stay. The previous Worker ignores them.
+   - **Revert.** Readiness columns stay. The previous Worker ignores them, so after a Worker rollback a live contest opens without the password gate. D1 does not enforce the gate. Organizers must close live contests before a rollback.
 7. **`feature/event-deletion` (`0023`).**
    - **Scope.**
      - `delete_event`, `advanceDeletions` with the lease and the cron task, the `event_deletions` fence in the resolvers and in sign-in, `/erase`, `PrivateBucket.list`, and the dashboard progress.

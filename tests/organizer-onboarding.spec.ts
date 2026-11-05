@@ -143,16 +143,17 @@ test.describe("assigning staff", () => {
   test.use({ seedIssues: false, withEventAdmin: true });
 
   test("ticks no role, names the roles on the button, and explains a disabled button", async ({ page, local }) => {
+    const handle = `sam-${randomUUID().slice(0, 8)}`;
     await page.setViewportSize(desktop);
     await signInPage(page, "eventadmin");
     await page.goto("/event");
     await page.getByRole("tab", { name: "People", exact: true }).click();
-    await page.getByLabel("People, one per line: name, username", { exact: true }).fill("Sam Lee, sam-lee");
+    await page.getByLabel("People, one per line: name, username", { exact: true }).fill(`Sam Lee, ${handle}`);
     await page.getByRole("button", { name: "Create people (1)", exact: true }).click();
     await page.getByRole("dialog", { name: "Share these credentials securely" }).getByRole("button", { name: "Done", exact: true }).click();
     await page.getByRole("tab", { name: "Assignments", exact: true }).click();
     await page.getByLabel("Contest", { exact: true }).selectOption({ label: "Primary" });
-    const row = page.getByRole("listitem").filter({ hasText: "sam-lee" });
+    const row = page.getByRole("listitem").filter({ hasText: handle });
     await expect(row.getByRole("checkbox", { name: /Volunteer$/ })).not.toBeChecked();
     const assign = row.getByRole("button", { name: "Assign Sam Lee", exact: true });
     await expect(assign).toHaveAttribute("aria-disabled", "true");
@@ -165,8 +166,10 @@ test.describe("assigning staff", () => {
     await expect(row.getByText("Assigned", { exact: true })).toBeVisible();
     const [seat] = await local.rows<{ roles: string }>(
       `SELECT json_group_array(role) AS roles FROM membership_roles WHERE session_id = ? AND account_id =
-        (SELECT id FROM accounts WHERE handle = 'sam-lee')`,
+        (SELECT id FROM accounts WHERE handle = ? AND event_id = ?)`,
       local.sessions[0],
+      handle,
+      local.event,
     );
     expect((JSON.parse(seat!.roles) as string[]).sort()).toEqual(["jury", "volunteer"]);
     for (const width of [390, 320]) {

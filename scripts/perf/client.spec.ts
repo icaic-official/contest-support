@@ -307,6 +307,9 @@ test.describe("render", () => {
       return { total, commits, top: entries.slice(0, 12) };
     });
     await snapshot();
+    // Three idle seconds: only the clocks tick.
+    await page.waitForTimeout(3100);
+    results["render:idle3s"] = await snapshot();
     // A hint that changes nothing, the common case: other people's activity elsewhere.
     local.notify();
     await counter.settle(1500);

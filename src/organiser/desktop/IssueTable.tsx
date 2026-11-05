@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { memo, type ReactNode, useCallback, useLayoutEffect, useMemo, useRef } from "react";
 import {
   ArrowDown,
   ArrowUp,
@@ -17,7 +17,14 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { isRunning, type Issue, type Snapshot } from "@/connected/model";
+import {
+  isRunning,
+  type Issue,
+  type Resolution,
+  type Snapshot,
+  type Team,
+} from "@/connected/model";
+import { useTick } from "@/connected/hooks/useNow";
 import { clockDuration } from "@/connected/ui";
 import { useChangedIssues } from "../useChangedIssues";
 import {
@@ -26,7 +33,7 @@ import {
   StatusIcon,
   UnresolvedTimer,
 } from "../components/issueDisplay";
-import type { ConsolePageProps } from "./consoleProps";
+import type { ConsolePageProps, RowAction } from "./consoleProps";
 import { type QueueStats, queueStats } from "./consoleModel";
 import type { QueueSort, QueueSortKey } from "./queueSort";
 
@@ -105,16 +112,6 @@ export function issueRowId(issueId: string): string {
   return `issue-row-${issueId}`;
 }
 
-/** Whether an active issue was resolved before and then reopened. */
-function wasReopened(issue: Issue, state: Snapshot): boolean {
-  return (
-    issue.status !== "resolved" &&
-    state.resolutions.some(
-      (record) => record.issue_id === issue.id && record.reopened_at,
-    )
-  );
-}
-
 /**
  * Issues in a data table. The issue number is a button that opens the side
  * sheet, so every row is reachable with Tab and Enter. A click anywhere on
@@ -138,6 +135,31 @@ export function IssueTable({
 }) {
   const { state, now, workflow } = props;
   const changed = useChangedIssues(state.issues, state.session?.id, now);
+  // The console builds new callbacks on every render, and it renders every
+  // second. The rows call the latest ones through these stable wrappers, so a
+  // row that did not change does not render again.
+  const latest = useRef(props);
+  useLayoutEffect(() => {
+    latest.current = props;
+  });
+  const open = useCallback((id: string) => latest.current.openIssue(id), []);
+  const run = useCallback(
+    (issue: Issue, action: RowAction) => latest.current.runRowAction(issue, action),
+    [],
+  );
+  const teams = useMemo(
+    () => new Map(state.teams.map((team) => [team.id, team])),
+    [state.teams],
+  );
+  const reopened = useMemo(
+    () =>
+      new Set(
+        state.resolutions
+          .filter((record) => record.reopened_at)
+          .map((record) => record.issue_id),
+      ),
+    [state.resolutions],
+  );
   if (!issues.length) {
     return (
       <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed p-10 text-center text-sm text-muted-foreground">
@@ -161,113 +183,26 @@ export function IssueTable({
         </TableHeader>
         <TableBody>
           {issues.map((issue) => {
-            const team = state.teams.find((item) => item.id === issue.team_id);
             const action = props.rowAction(issue);
-            const selected = workflow.selectedIssueId === issue.id;
             return (
-              <TableRow
+              <IssueRow
                 key={issue.id}
-                data-state={selected ? "selected" : undefined}
-                data-changed={changed.has(issue.id) ? "" : undefined}
-                className="cursor-pointer data-[changed]:animate-row-flash"
-                onClick={() => props.openIssue(issue.id)}
-              >
-                <TableCell className="pl-4">
-                  <button
-                    id={issueRowId(issue.id)}
-                    data-issue-row=""
-                    type="button"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      props.openIssue(issue.id);
-                    }}
-                    className="rounded-sm font-mono text-xs text-muted-foreground outline-none hover:text-foreground hover:underline focus-visible:ring-[3px] focus-visible:ring-ring/50"
-                  >
-                    <span className="sr-only">Open </span>ISS-{issue.number}
-                  </button>
-                </TableCell>
-                <TableCell>
-                  <div className="flex flex-col items-start gap-1">
-                    <StatusBadge status={issue.status} />
-                    {wasReopened(issue, state) && (
-                      <Badge
-                        variant="outline"
-                        className="text-muted-foreground"
-                      >
-                        <RotateCcw aria-hidden="true" />
-                        Reopened
-                      </Badge>
-                    )}
-                  </div>
-                </TableCell>
-                <TableCell className="w-full max-w-0">
-                  <div className="truncate font-medium">
-                    {issue.description}
-                  </div>
-                  <div className="truncate text-xs text-muted-foreground">
-                    {issue.category}
-                  </div>
-                </TableCell>
-                <TableCell className="max-w-48">
-                  <div className="truncate font-medium">{team?.name}</div>
-                  <div className="truncate text-xs text-muted-foreground">
-                    {team?.location}
-                  </div>
-                </TableCell>
-                <TableCell className="max-w-44">
-                  <div className="flex items-center gap-2">
-                    <PersonAvatar
-                      name={issue.owner_name}
-                      personId={issue.owner}
-                      className="size-7 text-[10px]"
-                    />
-                    <span
-                      className={
-                        issue.owner_name
-                          ? "truncate"
-                          : "truncate text-muted-foreground"
-                      }
-                    >
-                      {issue.owner_name ?? "Unassigned"}
-                    </span>
-                  </div>
-                </TableCell>
-                <TableCell className="text-right">
-                  <UnresolvedTimer
-                    issue={issue}
-                    resolutions={state.resolutions}
-                    now={now}
-                    className="text-sm"
-                  />
-                </TableCell>
-                <TableCell className="pr-4 text-right">
-                  {action && (
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      disabled={workflow.command.locked}
-                      loading={isRunning(
-                        workflow.command.running,
-                        action,
-                        issue.id,
-                      )}
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        props.runRowAction(issue, action);
-                      }}
-                      aria-label={`${action === "claim" ? "Claim" : "Accept handoff for"} ISS-${issue.number}`}
-                    >
-                      {action === "claim" ? (
-                        <Hand aria-hidden="true" />
-                      ) : (
-                        <Handshake aria-hidden="true" />
-                      )}
-                      {action === "claim" ? "Claim" : "Accept"}
-                    </Button>
-                  )}
-                </TableCell>
-              </TableRow>
+                issue={issue}
+                team={teams.get(issue.team_id)}
+                resolutions={state.resolutions}
+                clockOffset={props.shell.data.clockOffset}
+                selected={workflow.selectedIssueId === issue.id}
+                changed={changed.has(issue.id)}
+                reopened={issue.status !== "resolved" && reopened.has(issue.id)}
+                action={action}
+                locked={workflow.command.locked}
+                running={
+                  action !== undefined &&
+                  isRunning(workflow.command.running, action, issue.id)
+                }
+                onOpen={open}
+                onRun={run}
+              />
             );
           })}
         </TableBody>
@@ -275,6 +210,148 @@ export function IssueTable({
     </div>
   );
 }
+
+/** The unresolved time of a row. It keeps its own clock, so the row does not render every second. */
+function RowTimer({
+  issue,
+  resolutions,
+  clockOffset,
+}: {
+  issue: Issue;
+  resolutions: readonly Resolution[];
+  clockOffset: { readonly current: number };
+}) {
+  const tick = useTick();
+  return (
+    <UnresolvedTimer
+      issue={issue}
+      resolutions={resolutions}
+      now={tick + clockOffset.current}
+      className="text-sm"
+    />
+  );
+}
+
+const IssueRow = memo(function IssueRow({
+  issue,
+  team,
+  resolutions,
+  clockOffset,
+  selected,
+  changed,
+  reopened,
+  action,
+  locked,
+  running,
+  onOpen,
+  onRun,
+}: {
+  issue: Issue;
+  team: Team | undefined;
+  resolutions: readonly Resolution[];
+  clockOffset: { readonly current: number };
+  selected: boolean;
+  changed: boolean;
+  reopened: boolean;
+  action: RowAction | undefined;
+  locked: boolean;
+  running: boolean;
+  onOpen: (issueId: string) => void;
+  onRun: (issue: Issue, action: RowAction) => void;
+}) {
+  return (
+    <TableRow
+      data-state={selected ? "selected" : undefined}
+      data-changed={changed ? "" : undefined}
+      className="cursor-pointer data-[changed]:animate-row-flash"
+      onClick={() => onOpen(issue.id)}
+    >
+      <TableCell className="pl-4">
+        <button
+          id={issueRowId(issue.id)}
+          data-issue-row=""
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            onOpen(issue.id);
+          }}
+          className="rounded-sm font-mono text-xs text-muted-foreground outline-none hover:text-foreground hover:underline focus-visible:ring-[3px] focus-visible:ring-ring/50"
+        >
+          <span className="sr-only">Open </span>ISS-{issue.number}
+        </button>
+      </TableCell>
+      <TableCell>
+        <div className="flex flex-col items-start gap-1">
+          <StatusBadge status={issue.status} />
+          {reopened && (
+            <Badge variant="outline" className="text-muted-foreground">
+              <RotateCcw aria-hidden="true" />
+              Reopened
+            </Badge>
+          )}
+        </div>
+      </TableCell>
+      <TableCell className="w-full max-w-0">
+        <div className="truncate font-medium">{issue.description}</div>
+        <div className="truncate text-xs text-muted-foreground">
+          {issue.category}
+        </div>
+      </TableCell>
+      <TableCell className="max-w-48">
+        <div className="truncate font-medium">{team?.name}</div>
+        <div className="truncate text-xs text-muted-foreground">
+          {team?.location}
+        </div>
+      </TableCell>
+      <TableCell className="max-w-44">
+        <div className="flex items-center gap-2">
+          <PersonAvatar
+            name={issue.owner_name}
+            personId={issue.owner}
+            className="size-7 text-[10px]"
+          />
+          <span
+            className={
+              issue.owner_name ? "truncate" : "truncate text-muted-foreground"
+            }
+          >
+            {issue.owner_name ?? "Unassigned"}
+          </span>
+        </div>
+      </TableCell>
+      <TableCell className="text-right">
+        <RowTimer
+          issue={issue}
+          resolutions={resolutions}
+          clockOffset={clockOffset}
+        />
+      </TableCell>
+      <TableCell className="pr-4 text-right">
+        {action && (
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            disabled={locked}
+            loading={running}
+            onClick={(event) => {
+              event.stopPropagation();
+              onRun(issue, action);
+            }}
+            aria-label={`${action === "claim" ? "Claim" : "Accept handoff for"} ISS-${issue.number}`}
+          >
+            {action === "claim" ? (
+              <Hand aria-hidden="true" />
+            ) : (
+              <Handshake aria-hidden="true" />
+            )}
+            {action === "claim" ? "Claim" : "Accept"}
+          </Button>
+        )}
+      </TableCell>
+    </TableRow>
+  );
+});
 
 function statCards(stats: QueueStats) {
   const plural = (count: number, word: string) =>

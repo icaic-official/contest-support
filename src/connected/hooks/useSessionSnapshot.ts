@@ -8,6 +8,7 @@ import {
 import { backend } from "@/backend";
 import type { ContestSummary } from "@/backend/contracts";
 import { errorMessage } from "@/backend/errors";
+import { keepUnchanged } from "../keepUnchanged";
 import type { Snapshot } from "../model";
 import { createRefreshQueue } from "./refreshQueue";
 import { boundaryDelay, startRefreshSchedule } from "./refreshSchedule";
@@ -85,9 +86,9 @@ export function useSessionSnapshot(userId: string): SessionData {
           : undefined;
         if (run !== generation.current) return;
         readFor.current = nextSession;
-        setSessions(list);
+        setSessions((shown) => keepUnchanged(shown, list));
         setSessionId(nextSession);
-        setState(next?.membership ? next : undefined);
+        setState((shown) => (next?.membership ? keepUnchanged(shown, next) : undefined));
         if (next) {
           clockOffset.current = Date.parse(next.server_time) - Date.now();
           shownAt.current = Date.parse(next.server_time);
@@ -113,7 +114,7 @@ export function useSessionSnapshot(userId: string): SessionData {
         if (at < shownAt.current) return true;
         shownAt.current = at;
         clockOffset.current = at - Date.now();
-        setState(next);
+        setState((shown) => keepUnchanged(shown, next));
         setRefreshError("");
         setLoaded(true);
         return true;

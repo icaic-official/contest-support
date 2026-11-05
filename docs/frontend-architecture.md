@@ -436,7 +436,20 @@ export PLAYWRIGHT_BROWSERS_PATH="$HOME/.cache/ms-playwright"
 npx playwright install chromium
 ```
 
-`npm run build` reports a warning: the main JavaScript chunk is about 511 kB, above the 500 kB warning limit. The build still passes. Code splitting is a follow-up.
+## Client weight
+
+The app loads each role's screens on demand. `src/connected/lazyScreens.tsx` holds the lazy imports for the contestant app, the organizer app, the event console and the site page. `src/organiser/layouts.ts` does the same for the organizer desktop console and the phone app. A contestant does not download the staff console, and a phone does not download the desktop console.
+`Workspace` remembers the last role in `localStorage` (`minsky-screen`), and `src/main.tsx` starts that download while the session check runs.
+
+Every module that builds a zod schema imports `src/lib/zodConfig.ts` before it imports `zod`. The Content-Security-Policy forbids `eval`, and zod probes for it when it builds its first schema. With several chunks, the import order of `main.tsx` alone does not decide which chunk runs first. `npm run test:connector:ui:local` fails on a policy violation.
+
+Long lists keep their cost low in three ways:
+
+- `useSessionSnapshot` keeps the identity of every object that did not change between two snapshots (`keepUnchanged`).
+- Queue rows and phone cards are memoized. Each timer subscribes to one shared clock (`useTick`), so a clock tick renders the timers and not the rows.
+- Reads run one at a time. A read that has not started yet serves every caller that arrives before it starts (`refreshQueue.ts`). A page in the background skips live hints and timer reads, and reads once when it becomes visible.
+
+`npm run perf:client` measures this. It builds the app, serves it with Brotli, and runs `scripts/perf/client.spec.ts` against the local fixture with Chromium at 4x CPU slowdown and slow 4G. Set `PERF_RUNS` for the number of loads and `PERF_OUT` for a JSON file. `npm run perf:size` prints the size of each built script and stylesheet. The first number to read is the median of several runs. The machine must be quiet, because the timings share its CPU.
 
 ## Motion
 

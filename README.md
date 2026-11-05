@@ -98,6 +98,8 @@ Anyone who can read that log can sign in as that admin. Use only fictional data 
 | `npm run test:auth:hash` | Measure password cost in a temporary local Worker. |
 | `npm run load -- <command>` | Run a load test against an isolated installation: `site`, `setup`, `run`, `analytics`, and `cleanup`. See [Run a load test](docs/run-load-tests.md). |
 | `npm run perf:reads` | Count the D1 calls, statements, rows read and rows written of each API request at several data sizes. It uses a temporary local database with fictional data and no Cloudflare credentials. Add `-- --plan=base` for the 1,200-account shape only, `-- --explain` for query plans, and `-- --out=<file.json>` for the raw records. Compare saved records with `node scripts/compare-read-volume.mjs --base=<files> --head=<files>`. |
+| `npm run perf:client` | Build the app and measure first load at 4x CPU slowdown on slow 4G, heap, component renders, and snapshot reads, with a 500-issue queue on the local fixture. Set `PERF_RUNS` and `PERF_OUT=<file.json>`. See [Client weight](docs/frontend-architecture.md#client-weight). |
+| `npm run perf:size` | Print the raw, gzip and Brotli size of each script and stylesheet in `dist/assets`. |
 | `npm run test:e2e:smoke` | Run the critical-path browser files `tests/landing.spec.ts` and `tests/journey.spec.ts`. |
 | `npm run test:e2e` | Run every mocked browser test, including the smoke files. The specs use the Cloudflare client. They serve the real Worker routes from the test process. See [the browser suite](#the-mocked-browser-suite). |
 | `npm run test:providers:list` | List the shared provider scenarios without hosted credentials. |

@@ -174,8 +174,10 @@ test.describe("assigning staff", () => {
     expect((JSON.parse(seat!.roles) as string[]).sort()).toEqual(["jury", "volunteer"]);
     for (const width of [390, 320]) {
       await page.setViewportSize({ width, height: 800 });
-      const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
-      expect(overflow, `${width}px`).toBeLessThanOrEqual(0);
+      // The layout switches after the resize event, so wait for it to settle.
+      await expect
+        .poll(() => page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth), { message: `${width}px` })
+        .toBeLessThanOrEqual(0);
       if (shots) await page.screenshot({ path: `${shots}/assign-${width}.png`, fullPage: true });
     }
   });

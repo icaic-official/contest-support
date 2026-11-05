@@ -16,6 +16,8 @@ export interface CredentialRow {
 }
 
 export interface CredentialSheetState {
+  /** The contest this sheet issues for, so "Issue again" opens the same live contests. */
+  contestId: string | null;
   rows: readonly CredentialRow[];
   busy: boolean;
   error: string;
@@ -42,7 +44,7 @@ export interface EventConsoleState {
   execute: (command: ManageCommand) => Promise<ManageReceipt | undefined>;
   sheet: CredentialSheetState | undefined;
   /** Issues passwords in batches of ISSUE_BATCH and opens the credential sheet. */
-  issue: (accountIds: readonly string[]) => Promise<void>;
+  issue: (accountIds: readonly string[], contestId?: string | null) => Promise<void>;
   dismissSheet: () => void;
 }
 
@@ -118,7 +120,7 @@ export function useEventConsole(eventId: string | undefined): EventConsoleState 
     [reload],
   );
   const issue = useCallback(
-    async (accountIds: readonly string[]) => {
+    async (accountIds: readonly string[], contestId: string | null = null) => {
       if (!resolvedId || accountIds.length === 0) return;
       if (running.current) {
         setError(STILL_RUNNING);
@@ -135,13 +137,13 @@ export function useEventConsole(eventId: string | undefined): EventConsoleState 
       const show = (nextRows: CredentialRow[], busyNow: boolean, message = "") => {
         rows = nextRows;
         sheetRows.current = nextRows;
-        setSheet({ rows, busy: busyNow, error: message });
+        setSheet({ rows, busy: busyNow, error: message, contestId });
       };
       show(rows, true);
       for (const batch of issueBatches(accountIds)) {
-        const key = `issue:${batch.join(",")}`;
+        const key = `issue:${contestId ?? ""}:${batch.join(",")}`;
         try {
-          const issued = await backend.manage.issueCredentials(requestId(key), { eventId: resolvedId, accountIds: batch });
+          const issued = await backend.manage.issueCredentials(requestId(key), { eventId: resolvedId, accountIds: batch, contestId });
           pending.current.delete(key);
           show(
             rows.map((row) => {

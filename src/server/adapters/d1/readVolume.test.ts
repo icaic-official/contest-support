@@ -479,7 +479,7 @@ describe('rows read by management commands in a session with 1,200 accounts', ()
       [{ type: 'unassign_staff', contestId: world.contest, accountId: world.account(1202) }, 1201, 50],
       [{ type: 'assign_entrants', contestId: world.contest, entries: [{ entrantId: fresh!, location: 'Hall 9' }] }, 1201, 150],
       [{ type: 'update_contest', contestId: world.contest, name: 'Scale session', contestType: 'teams', schedule: testSchedule }, 1201, 135],
-      [{ type: 'create_contest', eventId: world.event, name: 'Another', contestType: 'mixed', schedule: testSchedule, categories: ['Other'] }, 1201, 30],
+      [{ type: 'create_contest', kind: 'practice', eventId: world.event, name: 'Another', contestType: 'mixed', schedule: testSchedule, categories: ['Other'] }, 1201, 30],
       [{ type: 'create_people', eventId: world.event, people: [{ handle: 'fresh-person', name: 'Fresh person' }] }, 1201, 40],
     ];
     for (const [command, n, ceiling] of commands) {

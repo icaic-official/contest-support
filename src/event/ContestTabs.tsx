@@ -1,6 +1,6 @@
 import { useId, useMemo, useRef, useState } from "react";
 import { Pencil } from "lucide-react";
-import type { ContestType, EventConsole, Schedule } from "@/backend/contracts";
+import type { ContestKind, ContestType, EventConsole, Schedule } from "@/backend/contracts";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -16,7 +16,7 @@ import { intakeHeadline } from "@/connected/intakeText";
 import { rosterTextMax, teamsPerCommandMax } from "@/connected/roster";
 import { viewerNote } from "@/connected/zonedTime";
 import { staffRoles } from "@/organiser/admin/adminModel";
-import { acceptsKind, contestTypeLabels, seatedEntrants } from "./eventModel";
+import { acceptsKind, alsoOpens, contestTypeLabels, seatedEntrants } from "./eventModel";
 import { CommandError, Panel, fieldClass, focusAfterRemoval } from "./forms";
 import { ScheduleFields } from "./ScheduleFields";
 import {
@@ -76,6 +76,7 @@ export function ContestsTab({ data, state }: TabProps) {
   const id = useId();
   const [name, setName] = useState("");
   const [type, setType] = useState<ContestType>("teams");
+  const [kind, setKind] = useState<ContestKind>("practice");
   const timeZone = data.event.timeZone;
   const [draft, setDraft] = useState<ScheduleDraft>(() => emptyDraft(timeZone));
   const [editing, setEditing] = useState<EventConsole["contests"][number]>();
@@ -98,6 +99,7 @@ export function ContestsTab({ data, state }: TabProps) {
                 type: "create_contest",
                 eventId: data.event.id,
                 name: trimmed,
+                kind,
                 contestType: type,
                 schedule: parsed.schedule,
                 categories: defaultCategories,
@@ -120,6 +122,19 @@ export function ContestsTab({ data, state }: TabProps) {
           <div className="space-y-1.5">
             <Label htmlFor={`${id}-type`}>Contest type</Label>
             <TypeSelect id={`${id}-type`} value={type} disabled={locked} onChange={setType} />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor={`${id}-kind`}>Contest kind</Label>
+            <select
+              id={`${id}-kind`}
+              value={kind}
+              disabled={locked}
+              onChange={(event) => setKind(event.target.value as ContestKind)}
+              className={selectClass}
+            >
+              <option value="practice">Practice</option>
+              <option value="live">Live: closed until every sign-in has a live password</option>
+            </select>
           </div>
           <div className="sm:col-span-2">
             <ScheduleFields draft={draft} timeZone={timeZone} disabled={locked} onChange={setDraft} />
@@ -144,7 +159,9 @@ export function ContestsTab({ data, state }: TabProps) {
               <li key={contest.id} className="flex flex-wrap items-center gap-x-3 gap-y-2 py-3">
                 <div className="min-w-0 flex-1 basis-36 leading-tight">
                   <p className="truncate text-sm font-medium">{contest.name}</p>
-                  <p className="text-xs text-muted-foreground">{contestTypeLabels[contest.contestType]}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {contest.kind === "live" ? "Live" : "Practice"} · {contestTypeLabels[contest.contestType]}
+                  </p>
                   <p className="text-xs text-muted-foreground">
                     {contest.schedule ? describeSchedule(contest.schedule, timeZone) : "No schedule"}
                     {contest.schedule && viewerNote(contest.schedule.startsAt, timeZone, "datetime") && (
@@ -169,6 +186,14 @@ export function ContestsTab({ data, state }: TabProps) {
                     <Pencil aria-hidden="true" />
                   </Button>
                 </div>
+                {contest.waiting.length > 0 && (
+                  <LivePasswords
+                    contest={contest}
+                    data={data}
+                    disabled={locked}
+                    onIssue={() => void state.issue(contest.waiting.map((seat) => seat.accountId), contest.id)}
+                  />
+                )}
               </li>
             ))}
           </ul>
@@ -202,6 +227,33 @@ export function ContestsTab({ data, state }: TabProps) {
           <CommandError message={state.error} />
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+/** Who still waits for a live password, and which contests the new passwords also open. */
+function LivePasswords({
+  contest,
+  data,
+  disabled,
+  onIssue,
+}: {
+  contest: EventConsole["contests"][number];
+  data: EventConsole;
+  disabled: boolean;
+  onIssue: () => void;
+}) {
+  const others = alsoOpens(data, contest);
+  return (
+    <div className="basis-full space-y-2 rounded-xl border p-3">
+      <p className="text-sm font-medium">Waiting for live passwords: {contest.waiting.length}</p>
+      <p className="text-xs break-words text-muted-foreground">{contest.waiting.map((seat) => seat.name).join(", ")}</p>
+      {others.length > 0 && (
+        <p className="text-xs text-muted-foreground">These passwords also open: {others.map((other) => other.name).join(", ")}.</p>
+      )}
+      <Button type="button" variant="secondary" className="h-auto min-h-11 whitespace-normal" disabled={disabled} onClick={onIssue}>
+        Issue live passwords for {contest.name}
+      </Button>
     </div>
   );
 }

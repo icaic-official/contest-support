@@ -36,8 +36,14 @@ export function personalEndSql(s: string, extra: string): string {
 const closeSql = (s: string, extra: string) =>
   `strftime('%Y-%m-%dT%H:%M:%fZ', ${personalEndSql(s, extra)}, '+' || ${s}.grace_minutes || ' minutes')`;
 
+/** SQL instant: the end of the contest's window, which is the scheduled end plus grace. */
+export function windowEndSql(s: string): string {
+  return `strftime('%Y-%m-%dT%H:%M:%fZ', ${s}.ends_at, '+' || ${s}.grace_minutes || ' minutes')`;
+}
+
 /**
- * SQL boolean: is intake open now. While the contest follows its schedule,
+ * SQL boolean: is intake open now. The live gate comes first, so no override
+ * opens a live contest with a seat that waits for a password. While the contest follows its schedule,
  * intake runs from the start to the end plus the grace period. Otherwise
  * `intake_open` decides, which is the manual override and also today's switch.
  * Extra minutes only lengthen a contestant's time, so while the scheduled end
@@ -45,7 +51,8 @@ const closeSql = (s: string, extra: string) =>
  * the scheduled end pays for the read of the awards.
  */
 export function intakeOpenSql(s: string, extra = '0'): string {
-  return `(CASE WHEN ${s}.intake_follows_schedule = 1
+  return `(CASE WHEN ${s}.kind = 'live' AND ${s}.unready_seats > 0 THEN 0
+    WHEN ${s}.intake_follows_schedule = 1
     THEN CASE WHEN ${nowSql} < ${s}.starts_at THEN 0 WHEN ${nowSql} < ${s}.ends_at THEN 1
       ELSE ${nowSql} < ${closeSql(s, extra)} END
     ELSE ${s}.intake_open = 1 END)`;
@@ -61,13 +68,15 @@ export function intakeStateSql(s: string, extra = '0'): string {
   const end = personalEndSql(s, extra);
   const close = closeSql(s, extra);
   return `json_object('open', json(CASE WHEN ${intakeOpenSql(s, extra)} THEN 'true' ELSE 'false' END),
-    'reason', CASE WHEN ${s}.intake_follows_schedule = 0 THEN
+    'reason', CASE WHEN ${s}.kind = 'live' AND ${s}.unready_seats > 0 THEN 'awaiting_live_passwords'
+      WHEN ${s}.intake_follows_schedule = 0 THEN
         CASE WHEN ${s}.intake_open = 1 THEN 'override_open' ELSE 'override_closed' END
       WHEN ${nowSql} < ${s}.starts_at THEN 'before_start'
       WHEN ${nowSql} < ${end} THEN 'running'
       WHEN ${nowSql} < ${close} THEN 'grace'
       ELSE 'ended' END,
-    'changes_at', CASE WHEN ${s}.intake_follows_schedule = 0 THEN NULL
+    'changes_at', CASE WHEN ${s}.kind = 'live' AND ${s}.unready_seats > 0 THEN NULL
+      WHEN ${s}.intake_follows_schedule = 0 THEN NULL
       WHEN ${nowSql} < ${s}.starts_at THEN ${s}.starts_at
       WHEN ${nowSql} < ${end} THEN ${end}
       WHEN ${nowSql} < ${close} THEN ${close} END)`;

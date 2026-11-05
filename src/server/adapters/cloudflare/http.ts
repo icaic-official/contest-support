@@ -22,7 +22,7 @@ const manageSchema = z.strictObject({ requestId: uuid, command: z.unknown() });
 const instant = z.iso.datetime({ offset: true }).transform((text) => new Date(text).toISOString());
 const windowSchema = z.strictObject({ from: instant, to: instant })
   .refine(({ from, to }) => from < to && Date.parse(to) - Date.parse(from) <= 92 * 86_400_000);
-const credentialsSchema = z.strictObject({ requestId: uuid, eventId: uuid.nullable(), accountIds: z.unknown() });
+const credentialsSchema = z.strictObject({ requestId: uuid, eventId: uuid.nullable(), accountIds: z.unknown(), contestId: uuid.nullable().default(null) });
 const imageSchema = z.discriminatedUnion('action', [
   z.strictObject({ action: z.literal('begin'), sessionId: uuid, requestId: uuid, issueId: uuid,
     visibility: z.enum(['public', 'internal']), name: z.string(), bytes: z.number() }),
@@ -172,7 +172,7 @@ export function createApplicationHandler(services: ApplicationHttpServices, orig
       }
       if (url.pathname === '/api/credentials') {
         const parsed = credentialsSchema.parse(body);
-        return privateJson(await services.manage.issueCredentials(caller, parsed.requestId, { eventId: parsed.eventId, accountIds: parsed.accountIds }));
+        return privateJson(await services.manage.issueCredentials(caller, parsed.requestId, { eventId: parsed.eventId, accountIds: parsed.accountIds, contestId: parsed.contestId }));
       }
       if (url.pathname === '/api/announcements') {
         const parsed = announcementSchema.safeParse(body);

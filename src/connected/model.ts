@@ -75,7 +75,7 @@ const resolutionSchema = z.object({
 });
 const intakeSchema = z.object({
   open: z.boolean(),
-  reason: z.enum(["before_start", "running", "grace", "ended", "override_open", "override_closed"]),
+  reason: z.enum(["before_start", "running", "grace", "ended", "override_open", "override_closed", "awaiting_live_passwords"]),
   /** The next instant at which the reason changes by time alone. The browser refreshes then. */
   changes_at: time.nullable(),
 });

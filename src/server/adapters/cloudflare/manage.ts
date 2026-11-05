@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import {
-  GRACE_MINUTES_MAX, ISSUE_BATCH, parseEventCode, type ContestType, type EntrantKind, type EventConsole, type IssuedCredential,
+  GRACE_MINUTES_MAX, ISSUE_BATCH, parseEventCode, type ContestKind, type ContestType, type EntrantKind, type EventConsole, type IssuedCredential,
   type LoginKey, type ManageCommand, type ManageLevel, type ManageReceipt, type SiteOverview,
 } from '../../../backend/contracts';
 import { categoriesMax, hasControlCharacter, rosterKey, rosterTextMax, teamsPerCommandMax } from '../../../connected/roster';
@@ -11,6 +11,10 @@ import { currentReadyLoginBindings, currentReadyLoginSql, notificationStatements
 import {
   authorityGuard, contestsToJoinSql, eventAdminsSql, eventStaffSql, manageAccountBindings, manageAccountSql, manageHandleBindings, manageHandleSql,
   manageWebmasterSql, reaches, resolveAuthority, webmastersSql, type Authority, type Target,
+  accountSeatsSql,
+  openConflictBindings,
+  openConflictSql,
+  waitingSeatsSql,
 } from './authority';
 import { handleSchema, loginKeyFor, replaceCredentialStatements } from './credentials';
 import { readablePassword, type PasswordHasher } from './password';
@@ -69,7 +73,7 @@ const commandSchema = z.discriminatedUnion('type', [
   z.strictObject({ type: z.literal('rename_entrant'), eventId: uuid, entrantId: uuid, name: nameSchema }),
   z.strictObject({ type: z.literal('add_entrant_sign_in'), eventId: uuid, entrantId: uuid, handle: handleSchema }),
   z.strictObject({
-    type: z.literal('create_contest'), eventId: uuid, name: nameSchema, contestType: contestTypeSchema,
+    type: z.literal('create_contest'), kind: z.enum(['practice', 'live']).default('practice'), eventId: uuid, name: nameSchema, contestType: contestTypeSchema,
     schedule: scheduleSchema, categories: categoriesSchema,
   }),
   z.strictObject({
@@ -104,6 +108,8 @@ const issueSchema = z.strictObject({
   eventId: z.uuid().nullable(),
   accountIds: z.array(z.uuid()).min(1).max(ISSUE_BATCH)
     .refine((accountIds) => new Set(accountIds).size === accountIds.length),
+  // A tab from before this field names no contest.
+  contestId: z.uuid().nullable().default(null),
 });
 
 /**
@@ -273,7 +279,8 @@ export const eventConsoleSql = {
     LEFT JOIN accounts a ON a.id = (SELECT id FROM accounts WHERE entrant_id = en.id ORDER BY rowid LIMIT 1)
     WHERE en.event_id = ? ORDER BY en.name, en.id`,
   contests: `SELECT s.id, s.name, s.contest_type, s.starts_at, s.ends_at, s.grace_minutes, s.intake_follows_schedule,
-      s.intake_open, ${intakeStateSql('s')} AS intake FROM sessions s WHERE s.event_id = ? ORDER BY s.name, s.id`,
+      s.intake_open, s.kind, ${intakeStateSql('s')} AS intake FROM sessions s WHERE s.event_id = ? ORDER BY s.name, s.id`,
+  waitingSeats: waitingSeatsSql,
   staffAssignments: eventStaffSql,
   entries: `SELECT t.session_id AS contest_id, t.entrant_id, t.location FROM sessions s
     JOIN teams t ON t.session_id = s.id WHERE s.event_id = ? ORDER BY t.session_id, t.entrant_id`,
@@ -333,15 +340,16 @@ export class D1ManageService {
     const authority = await resolveAuthority(this.db, caller, { scope: 'event', eventId: id });
     if (!authority || !reaches(authority, 'event')) throw new AuthenticationError(403, deniedMessage.event);
     const read = <T>(sql: string) => this.statement(sql, id).all<T>().then((result) => result.results);
-    const [events, admins, people, entrants, contests, assignments, entries, audit] = await Promise.all([
+    const [events, admins, people, entrants, contests, waiting, assignments, entries, audit] = await Promise.all([
       read<{ id: string; name: string; code: string; time_zone: string; archived: number }>(eventConsoleSql.event),
       read<{ account_id: string }>(eventConsoleSql.admins),
       read<{ id: string; name: string; handle: string | null; ready: number }>(eventConsoleSql.people),
       read<{ id: string; kind: EntrantKind; name: string; account_id: string | null; handle: string | null }>(eventConsoleSql.entrants),
       read<{
         id: string; name: string; contest_type: ContestType; starts_at: string | null; ends_at: string | null;
-        grace_minutes: number; intake_follows_schedule: number; intake_open: number; intake: string;
+        grace_minutes: number; intake_follows_schedule: number; intake_open: number; intake: string; kind: ContestKind;
       }>(eventConsoleSql.contests),
+      read<{ contest_id: string; account_id: string; name: string; handle: string }>(eventConsoleSql.waitingSeats),
       read<{ contest_id: string; account_id: string; is_admin: number; roles: string }>(eventConsoleSql.staffAssignments),
       read<{ contest_id: string; entrant_id: string; location: string }>(eventConsoleSql.entries),
       read<{ id: string; actor_name: string; at: string; action: string; target: string | null }>(eventConsoleSql.audit),
@@ -358,7 +366,9 @@ export class D1ManageService {
       })),
       contests: contests.map((item) => ({
         id: item.id, name: item.name, contestType: item.contest_type,
-        schedule: scheduleOf(item), mode: intakeModeOf(item), intake: parseIntake(item.intake),
+        kind: item.kind, schedule: scheduleOf(item), mode: intakeModeOf(item), intake: parseIntake(item.intake),
+        waiting: waiting.filter((seat) => seat.contest_id === item.id)
+          .map((seat) => ({ accountId: seat.account_id, name: seat.name, handle: seat.handle })),
       })),
       staffAssignments: assignments.map((item) => ({
         contestId: item.contest_id, accountId: item.account_id, admin: item.is_admin === 1, roles: JSON.parse(item.roles) as Role[],
@@ -401,8 +411,8 @@ export class D1ManageService {
   async issueCredentials(caller: Caller, requestId: string, input: unknown): Promise<IssuedCredential[]> {
     const parsed = issueSchema.safeParse(input);
     if (!parsed.success) throw new AuthenticationError(400, `Choose 1 to ${ISSUE_BATCH} different accounts.`);
-    const { eventId: scope, accountIds } = parsed.data;
-    const record = JSON.stringify({ type: 'issue_credentials', eventId: scope, accountIds });
+    const { eventId: scope, accountIds, contestId } = parsed.data;
+    const record = JSON.stringify({ type: 'issue_credentials', eventId: scope, accountIds, contestId });
     const replayed = await this.replay(caller, requestId, record);
     if (replayed) return this.issued(accountIds, new Map());
     if (accountIds.includes(caller.accountId)) throw new AuthenticationError(400, 'Use Change password for your own account.');
@@ -412,14 +422,26 @@ export class D1ManageService {
     }
     if (!authority.writable) throw new AuthenticationError(403, 'This event is archived.');
     const targets = scope === null ? await this.webmasterTargets(accountIds) : await this.eventTargets(caller, scope, accountIds);
+    if (contestId !== null && !(await this.statement('SELECT 1 FROM sessions WHERE id = ? AND event_id = ?', contestId, scope).first())) {
+      throw new AuthenticationError(409, 'That contest no longer exists. Refresh the page.');
+    }
     const assertions = new Assertions(this.db);
     const passwords = new Map<string, string>();
     const statements: D1Statement[] = [];
+    const liveSeats = new Map<string, number>();
     for (const target of targets) {
       const password = readablePassword();
       passwords.set(target.id, password);
-      const seats = await this.statement('SELECT session_id FROM memberships WHERE account_id = ?', target.id)
-        .all<{ session_id: string }>();
+      const seats = await this.statement(accountSeatsSql, target.id)
+        .all<{ session_id: string; kind: ContestKind; unready_seats: number }>();
+      if (contestId !== null && !seats.results.some((seat) => seat.session_id === contestId)) {
+        throw new AuthenticationError(409, `${target.name} has no seat in that contest. Refresh the page.`);
+      }
+      const conflict = await this.statement(openConflictSql, ...openConflictBindings(target.id, contestId)).first<{ name: string }>();
+      if (conflict) {
+        throw new AuthenticationError(409, `Reporting is open in ${conflict.name}. A new password would sign ${target.name} out of it. Issue it from ${conflict.name}, or close that contest first.`);
+      }
+      for (const seat of seats.results) if (seat.kind === 'live') liveSeats.set(seat.session_id, seat.unready_seats);
       // A reset or a change of authority since the read fails the batch.
       const allowed = scope === null
         ? `${manageWebmasterSql} AND t.disabled = 0 AND t.credential_generation = ?`
@@ -427,10 +449,12 @@ export class D1ManageService {
       statements.push(
         assertions.check(allowed, ...manageAccountBindings(caller.accountId, target.id),
           ...(scope === null ? [] : [scope]), target.credential_generation),
+        // Intake can open between the read and the batch. This runs before the writes that change readiness.
+        assertions.check(`SELECT 1 WHERE NOT EXISTS (${openConflictSql})`, ...openConflictBindings(target.id, contestId)),
         // An account from before login keys gets its key with its first password.
         ...(target.stored ? [] : [this.statement('UPDATE accounts SET username = ? WHERE id = ? AND username IS NULL', target.loginKey, target.id)]),
         ...replaceCredentialStatements(this.db, target, await this.passwords.hash(password),
-          { operationId: crypto.randomUUID(), actor: caller.accountId, temporary: true }),
+          { operationId: crypto.randomUUID(), actor: caller.accountId, temporary: true, contestId }),
         // The activity list of each contest that seats the account shows the reset.
         ...seats.results.map((seat) => this.statement(`INSERT INTO admin_audit (id, session_id, actor, action, target)
           VALUES (?, ?, ?, 'reset_password', ?)`, crypto.randomUUID(), seat.session_id, caller.accountId, target.id)),
@@ -438,8 +462,11 @@ export class D1ManageService {
     }
     const { replayed: lost } = await this.commit(authority, requestId, record, {
       statements,
-      audit: { action: 'issue_passwords', target: null, detail: { accountIds } },
-      notify: [],
+      audit: { action: 'issue_passwords', target: null, detail: { accountIds, contestId } },
+      // Staff follow the count. Contestants hear only when this batch can open or close the contest.
+      notify: await Promise.all([...liveSeats].map(async ([id, unready]) => ({
+        contestId: id, audiences: unready <= accountIds.length ? await this.contestAudiences(id) : ['staff'],
+      }))),
       receipt: { accountIds },
     }, assertions);
     // A concurrent copy of this request committed first and stored other passwords. These were never stored.
@@ -784,13 +811,13 @@ export class D1ManageService {
         return {
           statements: [
             // The new contest follows its schedule. Only a contest without one is manual.
-            this.statement(`INSERT INTO sessions (id, event_id, name, contest_type, categories, starts_at, ends_at, grace_minutes,
-              intake_follows_schedule) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)`,
-            newContest, command.eventId, command.name, command.contestType, JSON.stringify(command.categories),
+            this.statement(`INSERT INTO sessions (id, event_id, name, kind, contest_type, categories, starts_at, ends_at, grace_minutes,
+              intake_follows_schedule) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
+            newContest, command.eventId, command.name, command.kind, command.contestType, JSON.stringify(command.categories),
             command.schedule.startsAt, command.schedule.endsAt, command.schedule.graceMinutes),
           ],
           audit: { action: 'create_contest', target: null,
-            detail: { contest: newContest, name: command.name, contestType: command.contestType, schedule: command.schedule } },
+            detail: { contest: newContest, name: command.name, kind: command.kind, contestType: command.contestType, schedule: command.schedule } },
           notify: [],
           receipt: { contestId: newContest },
         };

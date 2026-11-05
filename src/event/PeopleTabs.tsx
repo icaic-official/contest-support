@@ -17,7 +17,7 @@ import { rosterTextMax } from "@/connected/roster";
 import { UsernameForm } from "@/organiser/admin/AccountForms";
 import { PersonAvatar } from "@/organiser/components/issueDisplay";
 import { ConfirmDialog } from "@/organiser/admin/AccountAccess";
-import { entrantInputs, personInputs } from "./eventModel";
+import { entrantInputs, personInputs, recoveryContest } from "./eventModel";
 import { CommandError, LinesForm, Panel, fieldClass } from "./forms";
 import type { EventConsoleState } from "./useEventConsole";
 
@@ -371,7 +371,7 @@ export function EntrantsTab({ data, state }: TabProps) {
         description="The current password stops working for everyone who shares it, and every open session ends. The new password is shown once."
         confirmLabel="Reset password"
         onConfirm={() => {
-          if (resetting?.accountId) void state.issue([resetting.accountId]);
+          if (resetting?.accountId) void state.issue([resetting.accountId], recoveryContest(data, resetting.id));
         }}
       />
     </div>

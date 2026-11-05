@@ -98,7 +98,10 @@ export interface Schedule {
 export const GRACE_MINUTES_MAX = 240;
 
 /** Why intake is open or closed. The override reasons mean that staff hold intake open or closed. */
-export type IntakeReason = 'before_start' | 'running' | 'grace' | 'ended' | 'override_open' | 'override_closed';
+/** A live contest stays closed until every contestant seat has a password issued for it. Fixed at creation. */
+export type ContestKind = 'practice' | 'live';
+
+export type IntakeReason = 'before_start' | 'running' | 'grace' | 'ended' | 'override_open' | 'override_closed' | 'awaiting_live_passwords';
 
 /** Derived by D1 at read time from the schedule and the override. Never stored. */
 export interface IntakeState {
@@ -225,7 +228,7 @@ export type ManageCommand =
   | { readonly type: 'create_entrants'; readonly eventId: string; readonly entrants: readonly EntrantInput[] }
   | { readonly type: 'rename_entrant'; readonly eventId: string; readonly entrantId: string; readonly name: string }
   | { readonly type: 'add_entrant_sign_in'; readonly eventId: string; readonly entrantId: string; readonly handle: string }
-  | { readonly type: 'create_contest'; readonly eventId: string; readonly name: string; readonly contestType: ContestType; readonly schedule: Schedule; readonly categories: readonly string[] }
+  | { readonly type: 'create_contest'; readonly eventId: string; readonly name: string; readonly kind: ContestKind; readonly contestType: ContestType; readonly schedule: Schedule; readonly categories: readonly string[] }
   | { readonly type: 'update_contest'; readonly contestId: string; readonly name: string; readonly contestType: ContestType; readonly schedule?: Schedule | undefined }
   | { readonly type: 'assign_entrants'; readonly contestId: string; readonly entries: ReadonlyArray<{ readonly entrantId: string; readonly location: string }> }
   | { readonly type: 'unassign_entrant'; readonly contestId: string; readonly entrantId: string }
@@ -324,9 +327,12 @@ export interface EventConsole {
     readonly id: string;
     readonly name: string;
     readonly contestType: ContestType;
+    readonly kind: ContestKind;
     readonly schedule: Schedule | null;
     readonly mode: IntakeMode;
     readonly intake: IntakeState;
+    /** Contestant seats without a password issued for this contest. Empty for a practice contest. */
+    readonly waiting: ReadonlyArray<{ readonly accountId: string; readonly name: string; readonly handle: string }>;
   }>;
   /** Staff seats that an assignment made. Event admins and webmasters hold none. */
   readonly staffAssignments: ReadonlyArray<{
@@ -346,6 +352,8 @@ export interface EventConsole {
 export interface CredentialIssue {
   readonly eventId: string | null;
   readonly accountIds: readonly string[];
+  /** The contest the organizer issues for. A live target opens the overlapping live contests. */
+  readonly contestId: string | null;
 }
 
 /** Site and event administration, and handle changes for the accounts that a caller may manage. */

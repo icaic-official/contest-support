@@ -2,6 +2,7 @@ import type { EntrantKind, ManageLevel, Seat, SignInTarget } from '../../../back
 import type { Role } from '../../../connected/model';
 import type { Caller } from '../../authentication';
 import type { D1Connection, D1Statement, D1Value } from '../d1/connection';
+import { extraMinutesSql, intakeOpenSql, windowEndSql } from './schedule';
 
 const nowSql = "strftime('%Y-%m-%dT%H:%M:%fZ', 'now')";
 
@@ -368,3 +369,41 @@ export const eventStaffSql = `SELECT m.session_id AS contest_id, m.account_id, m
     WHERE s.event_id = ? AND m.team_id IS NULL AND (m.is_admin = 1 OR EXISTS (SELECT 1 FROM membership_roles mr
       WHERE mr.session_id = m.session_id AND mr.account_id = m.account_id))
     ORDER BY m.session_id, m.account_id`;
+
+/**
+ * The only definition of `forContests`: the live contests of the account's
+ * entries whose window overlaps the target contest's window. A window runs from
+ * the scheduled start to the scheduled end plus grace, and every live contest
+ * has a schedule. So an issue on day 1 never opens a contest on day 3. A
+ * practice target, or none, gives the empty set. Bind the account, then the target.
+ */
+export const forContestsSql = `SELECT s.id FROM sessions t
+  JOIN memberships m ON m.account_id = ? AND m.team_id IS NOT NULL
+  JOIN sessions s ON s.id = m.session_id
+  WHERE t.id = ? AND t.kind = 'live' AND s.kind = 'live' AND s.event_id = t.event_id
+    AND s.starts_at < ${windowEndSql('t')} AND t.starts_at < ${windowEndSql('s')}`;
+
+/**
+ * The open contests that a new password would sign this account out of: its
+ * contestant seats outside `forContests` and other than the target itself.
+ * Bind with `openConflictBindings`.
+ */
+export const openConflictSql = `SELECT s.name FROM memberships m JOIN sessions s ON s.id = m.session_id
+  WHERE m.account_id = ? AND m.team_id IS NOT NULL AND s.id IS NOT ? AND s.id NOT IN (${forContestsSql})
+    AND ${intakeOpenSql('s', extraMinutesSql('s', 'm.team_id'))}`;
+
+export function openConflictBindings(accountId: string, contestId: string | null): D1Value[] {
+  return [accountId, contestId, accountId, contestId];
+}
+
+/** The contests that seat an account, with their readiness. */
+export const accountSeatsSql = `SELECT m.session_id, s.kind, s.unready_seats FROM memberships m
+  JOIN sessions s ON s.id = m.session_id WHERE m.account_id = ?`;
+
+/** The contestant seats of an event's live contests without a password issued for them. */
+export const waitingSeatsSql = `SELECT m.session_id AS contest_id, a.id AS account_id, a.name, COALESCE(a.handle, '') AS handle
+  FROM sessions s JOIN memberships m ON m.session_id = s.id AND m.team_id IS NOT NULL
+  JOIN accounts a ON a.id = m.account_id
+  WHERE s.event_id = ? AND s.kind = 'live' AND NOT EXISTS (SELECT 1 FROM credential_scopes c
+    WHERE c.account_id = m.account_id AND c.session_id = m.session_id)
+  ORDER BY a.name, a.id`;

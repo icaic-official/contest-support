@@ -163,7 +163,7 @@ describe('Cloudflare application HTTP boundary', () => {
     expect(await refused.json()).toEqual({ error: 'The last webmaster cannot be removed.' });
     expect(deps.manage.execute).toHaveBeenCalledTimes(2);
     expect((await handle(post('/api/credentials', { requestId, eventId: requestId, accountIds: [sessionId] }))).status).toBe(200);
-    expect(deps.manage.issueCredentials).toHaveBeenCalledWith(identity.caller, requestId, { eventId: requestId, accountIds: [sessionId] });
+    expect(deps.manage.issueCredentials).toHaveBeenCalledWith(identity.caller, requestId, { eventId: requestId, accountIds: [sessionId], contestId: null });
     expect((await handle(post('/api/credentials', { requestId, accountIds: [sessionId] }))).status).toBe(400);
   });
 

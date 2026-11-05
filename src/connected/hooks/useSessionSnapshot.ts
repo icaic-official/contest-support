@@ -9,6 +9,7 @@ import { backend } from "@/backend";
 import type { ContestSummary } from "@/backend/contracts";
 import { errorMessage } from "@/backend/errors";
 import type { Snapshot } from "../model";
+import { createRefreshQueue } from "./refreshQueue";
 import { boundaryDelay, startRefreshSchedule } from "./refreshSchedule";
 
 /** A contest that the person may open. */
@@ -64,12 +65,16 @@ export function useSessionSnapshot(userId: string): SessionData {
   // Server time of the newest snapshot shown. An older snapshot never replaces it.
   const shownAt = useRef(0);
   const generation = useRef(0);
-  const refreshQueue = useRef<Promise<void>>(Promise.resolve());
+  // The session that the last successful read showed, so the subscribe effect
+  // does not read it again straight after the read that selected it.
+  const readFor = useRef<string>(undefined);
+  const [queue] = useState(createRefreshQueue);
   const refresh = useCallback(() => {
     const run = generation.current;
     // Serialize reads so an older Realtime response cannot overwrite a newer
     // revision. A write waits for its own refresh before enabling controls.
-    const task = refreshQueue.current.then(async () => {
+    // A read that has not started yet serves every caller that arrives before it starts.
+    return queue.read(run, async () => {
       try {
         const list = await backend.workflows.contests();
         const nextSession = list.some((s) => s.id === sessionId)
@@ -79,6 +84,7 @@ export function useSessionSnapshot(userId: string): SessionData {
           ? await backend.workflows.snapshot(nextSession)
           : undefined;
         if (run !== generation.current) return;
+        readFor.current = nextSession;
         setSessions(list);
         setSessionId(nextSession);
         setState(next?.membership ? next : undefined);
@@ -95,13 +101,11 @@ export function useSessionSnapshot(userId: string): SessionData {
       }
       setLoaded(true);
     });
-    refreshQueue.current = task;
-    return task;
-  }, [sessionId]);
+  }, [queue, sessionId]);
   const applySnapshot = useCallback(
     (forSession: string, next: Snapshot) => {
       const run = generation.current;
-      const task = refreshQueue.current.then(() => {
+      return queue.after(() => {
         if (run !== generation.current || forSession !== sessionId) return false;
         if (!next.membership) return false;
         const at = Date.parse(next.server_time);
@@ -114,16 +118,11 @@ export function useSessionSnapshot(userId: string): SessionData {
         setLoaded(true);
         return true;
       });
-      refreshQueue.current = task.then(
-        () => undefined,
-        () => undefined,
-      );
-      return task;
     },
-    [sessionId],
+    [queue, sessionId],
   );
   useEffect(() => {
-    void refresh();
+    if (readFor.current !== sessionId) void refresh();
     setConnected(false);
     // The first refresh selects a session. Empty IDs produce invalid live filters.
     const unsubscribe = sessionId
@@ -179,6 +178,7 @@ export function useSessionSnapshot(userId: string): SessionData {
   }, [changesAt]);
   const selectSession = useCallback((next: string) => {
     generation.current++;
+    readFor.current = undefined;
     setState(undefined);
     setLoaded(false);
     setSessionId(next);

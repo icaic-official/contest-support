@@ -99,14 +99,15 @@ test("a late entrant in a running live contest asks first, and the sheet reopens
   const name = `Running ${crypto.randomUUID().slice(0, 8)}`;
   await createLive(page, name);
   await local.run("UPDATE sessions SET starts_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-1 minute'), ends_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '+2 hours') WHERE name = ?", name);
+  // An empty running contest is open, so the console needs the new schedule before the first seat.
+  await page.reload();
   await tab(page, "Assignments").click();
   await page.getByLabel("Contest", { exact: true }).selectOption({ label: name });
   await page.getByRole("checkbox", { name: /^Team Orion/ }).check();
   await page.getByRole("button", { name: "Assign selected entrants (1)", exact: true }).click();
-  await tab(page, "Contests").click();
-  await page.getByRole("button", { name: `Issue live passwords for ${name}`, exact: true }).click();
+  await page.getByRole("button", { name: "Assign and close reporting", exact: true }).click();
+  await expect(sheet.getByLabel("Password for Team Orion", { exact: true })).toBeVisible();
   await sheet.getByRole("button", { name: "Done", exact: true }).click();
-  await expect(page.getByRole("button", { name: `Issue live passwords for ${name}`, exact: true })).toHaveCount(0);
 
   await tab(page, "Assignments").click();
   await page.getByLabel("Contest", { exact: true }).selectOption({ label: name });

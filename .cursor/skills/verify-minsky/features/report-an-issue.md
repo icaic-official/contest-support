@@ -14,7 +14,7 @@ A contestant describes a problem for their own team. Sending the report closes t
 
 - Sign in as `contestant` and choose **Report an issue** in **Your reports**.
 - When the team has no report yet, **Report details** also has a **Report an issue** button.
-- There is no phone layout for contestants. The window must be at least 1024 px wide.
+- Contestants have one responsive layout. At 1024 px and wider the list sits beside the report. Below that width one screen shows at a time. Check both 1280 x 800 and 390 x 844.
 
 ## Driving it with minsky-verify
 

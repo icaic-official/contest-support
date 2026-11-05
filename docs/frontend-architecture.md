@@ -1,7 +1,7 @@
 # Frontend architecture
 
 This reference describes the shared frontend, its three layouts, and its browser routes.
-T0015 provides the contestant desktop app, organizer phone app, and organizer desktop console.
+T0015 provides the contestant app, organizer phone app, and organizer desktop console. The contestant app is one responsive app (2026-11-05).
 PR #45 added browser routes and workflow retry protections to the redesigned shells.
 See [T0015](history/tickets.md#t0015--organiser-and-contestant-frontend-redesign) and [T0021](history/tickets.md#t0021-fresh-cloudflare-development-installation) for the recorded scope.
 
@@ -186,7 +186,7 @@ The server also closes a socket when access is revoked, and the drop starts a re
 
 ## Contestant app
 
-`ContestantApp` (`src/contestant/`) is the UI for team accounts. It is a desktop layout and has no phone layout. It needs a window that is at least 1024 px wide.
+`ContestantApp` (`src/contestant/`) is the UI for team accounts. It is one responsive app. At 1024 px and wider it shows the report list (`ReportsPane`) beside the report. Below 1024 px it shows one screen at a time: the home (`ReportsPane` with the clock, the report button and the list), one report with a **Your reports** back button, or the report form. `useMediaQuery(desktopQuery)` selects the layout, and both layouts share the same components, state and drafts. The reply box and the form buttons stick to the bottom of the scroll area on a phone. `index.html` sets `interactive-widget=resizes-content`, so an on-screen keyboard shrinks the page and keeps them in view. While a contestant types on a short phone screen, the announcement strip hides (`src/index.css`).
 
 | File | Content |
 | --- | --- |

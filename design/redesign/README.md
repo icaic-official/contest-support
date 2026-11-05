@@ -162,7 +162,7 @@ The account type selects the UI after sign-in. A membership with `team_id` gets 
 The user and the T0015 ticket settled the four open decisions on 2026-10-17:
 
 1. **Organisers on a desktop or tablet** get a separate desktop console in the style of `a-console.html` at 1024 px and wider. The centred column was not built. Below 1024 px, organisers get the phone app.
-2. **Contestants on a phone** get no phone layout. The contestant app is a desktop layout and needs a window at least 1024 px wide. The single-column fallback was not built.
+2. **Contestants on a phone** get the same app in a single column (2026-11-05). The home shows the clock, the report button and the list. A report and the report form each fill the screen.
 3. **Category tiles** show the category name and one generic icon, with no description. The category data did not change.
 4. **Mockup items that need new data** stay out of scope: "Near me" or helper zones, quick replies, a floor map, configurable aging thresholds, and category icons or descriptions.
 

@@ -11,7 +11,7 @@ export interface RefreshQueue {
   /**
    * Resolves when a read that starts after this call has finished. `scope`
    * names the session generation. Callers of another scope never share a read.
-   * `read` must not reject.
+   * If `read` rejects, its callers get the rejection. Later reads still run.
    */
   read(scope: number, read: () => Promise<void>): Promise<void>;
   /** Runs `work` after everything queued so far. It is never shared. */
@@ -33,7 +33,8 @@ export function createRefreshQueue(): RefreshQueue {
         }),
       };
       waiting = entry;
-      tail = entry.done;
+      // A rejected read reaches only its own callers. Reads queued after it still run.
+      tail = entry.done.catch(() => undefined);
       return entry.done;
     },
     after<T>(work: () => T): Promise<T> {

@@ -100,4 +100,18 @@ describe("refresh queue", () => {
     });
     expect(ran).toBe(true);
   });
+
+  it("keeps running later reads after one read rejects", async () => {
+    const queue = createRefreshQueue();
+    await expect(
+      queue.read(1, async () => {
+        throw new Error("boom");
+      }),
+    ).rejects.toThrow("boom");
+    let ran = false;
+    await queue.read(1, async () => {
+      ran = true;
+    });
+    expect(ran).toBe(true);
+  });
 });

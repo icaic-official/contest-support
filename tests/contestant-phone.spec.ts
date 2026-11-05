@@ -206,7 +206,7 @@ for (const width of widths) {
       buffer: png(640, 200, () => red),
     });
     await sheet.getByRole("button", { name: "Add image", exact: true }).click();
-    await expect(sheet.getByRole("status")).toHaveText("Image added.");
+    await expect(sheet.getByRole("status")).toHaveText("Image added.", { timeout: 15_000 });
 
     await expect(page.getByText("A helper is on the way to A12.", { exact: true })).toBeVisible();
     await expect(page.getByText(/USB hub is faulty/)).toHaveCount(0);

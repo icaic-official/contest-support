@@ -182,29 +182,57 @@ export type Resolution = z.infer<typeof resolutionSchema>;
 export type Team = Snapshot["teams"][number];
 export type Award = Snapshot["awards"][number];
 export type HistoryEntry = Snapshot["history"][number];
-export type Command =
-  | { type: "submit"; category: string; description: string; team_id?: string }
-  | {
-      type: "claim" | "accept" | "escalate" | "apply";
-      issue_id: string;
-      revision: number;
-    }
-  | {
-      type: "message";
-      issue_id: string;
-      revision: number;
-      text: string;
-      visibility: "public" | "internal";
-    }
-  | { type: "resolve"; issue_id: string; revision: number; summary: string }
-  | { type: "reopen"; issue_id: string; revision: number; reason: string }
-  | {
-      type: "award";
-      issue_id: string;
-      revision: number;
-      minutes: number;
-      explanation: string;
-    };
+/** PostgreSQL btrim(text) removes spaces, and length(text) counts Unicode code points. */
+export function workflowText(value: string): string {
+  return value.replace(/^ +| +$/g, "");
+}
+/**
+ * Text that a command stores. SQLite length() stops at U+0000, so a database
+ * length CHECK would fail with an error the store cannot classify.
+ */
+const commandText = z.string().refine((value) => {
+  if (value.includes("\u0000")) return false;
+  const length = Array.from(workflowText(value)).length;
+  return length >= 1 && length <= 2000;
+});
+/** Matches a UUID of version 1 to 8, as the server checks it. */
+export const uuidPattern =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const target = {
+  issue_id: z.string().regex(uuidPattern),
+  revision: z.number().int().nonnegative(),
+};
+/**
+ * The one definition of a command. The server validates with it and keeps the
+ * original value, not the parsed copy, so extra JSON fields survive for receipt replay.
+ */
+export const commandSchema = z.discriminatedUnion("type", [
+  z.object({
+    type: z.literal("submit"),
+    category: z.string(),
+    description: commandText,
+    team_id: z.string().optional(),
+  }),
+  z.object({
+    type: z.enum(["claim", "accept", "escalate", "apply"]),
+    ...target,
+  }),
+  z.object({
+    type: z.literal("message"),
+    ...target,
+    text: commandText,
+    visibility: z.enum(["public", "internal"]),
+  }),
+  z.object({ type: z.literal("resolve"), ...target, summary: commandText }),
+  z.object({ type: z.literal("reopen"), ...target, reason: commandText }),
+  z.object({
+    type: z.literal("award"),
+    ...target,
+    minutes: z.number().int().min(0).max(2147483647),
+    explanation: commandText,
+  }),
+]);
+export type Command = z.infer<typeof commandSchema>;
 
 /**
  * True when `running` is a command of this type, and for this issue when

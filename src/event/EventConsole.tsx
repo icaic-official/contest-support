@@ -100,7 +100,8 @@ export function EventConsolePage({
           </Alert>
         )}
         {data ? (
-          <Tabs defaultValue="people" className="gap-4" onValueChange={state.clearError}>
+          // An event with no contest opens on the form that creates one.
+          <Tabs defaultValue={data.contests.length === 0 ? "contests" : "people"} className="gap-4" onValueChange={state.clearError}>
             <TabsList aria-label="Event console" id={tabsId} className="w-full sm:w-fit">
               {(
                 [

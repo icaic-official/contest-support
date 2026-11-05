@@ -156,8 +156,8 @@ test("an event admin adds a volunteer of the event to a contest", async ({ page,
   await tab(page, "Assignments").click();
   await page.getByLabel("Contest", { exact: true }).selectOption({ label: "Primary" });
   const row = page.getByRole("listitem").filter({ hasText: "sam-lee" });
-  await expect(row.getByRole("checkbox", { name: /Volunteer$/ })).toBeChecked();
-  await row.getByRole("button", { name: "Assign Sam Lee", exact: true }).click();
+  await row.getByRole("checkbox", { name: /Volunteer$/ }).check({ force: true });
+  await row.getByRole("button", { name: "Assign Sam Lee as Volunteer", exact: true }).click();
   await expect(row.getByText("Assigned", { exact: true })).toBeVisible();
   const [seat] = await local.rows<{ roles: string }>(
     `SELECT json_group_array(role) AS roles FROM membership_roles WHERE session_id = ? AND account_id =

@@ -169,7 +169,7 @@ describe('trusted Cloudflare site bootstrap and webmaster recovery', () => {
     await expectFailure(bootstrap()).toThrow('The database is not empty.');
     const result = await recoverWebmaster(db, { handle: site.webmasterHandle }, { passwords: fastPasswords });
     expect(result.handle).toBe(site.webmasterHandle);
-    expect(Boolean(result.temporaryPassword)).toBe(true);
+    expect(result.temporaryPassword).toMatch(/^[2-9A-HJ-NP-Za-km-np-z]{16}$/);
   });
 
   it('recovers a webmaster in one batch, and the old password and sessions stop working', async () => {

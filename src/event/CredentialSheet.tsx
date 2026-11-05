@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Copy } from "lucide-react";
+import { createPortal } from "react-dom";
+import { Copy, Printer } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -15,7 +16,9 @@ import type { CredentialSheetState } from "./useEventConsole";
 /**
  * The temporary passwords of a batch, shown once. A row whose password did not
  * come back (a lost response, or a failed batch) has an "Issue again" button.
- * The dialog cannot close by accident while a batch runs.
+ * The dialog cannot close by accident while a batch runs. "Print sheets" prints
+ * one card per person from a hidden copy of the same rows. The copy lives only
+ * as long as the dialog, and nothing writes a password to storage or a log.
  */
 export function CredentialSheet({
   sheet,
@@ -51,7 +54,30 @@ export function CredentialSheet({
       setCopied("Copy is not available. Select the text and copy it.");
     }
   }
+  const printable = sheet.rows.filter((row) => row.password);
   return (
+    <>
+    {printable.length > 0 && createPortal(
+      <div data-print-sheets="">
+        {printable.map((row) => (
+          <section key={row.accountId} data-print-card="">
+            <h2>{names.get(row.accountId) ?? "Account"}</h2>
+            <dl>
+              <dt>Sign-in link</dt>
+              <dd>{link}</dd>
+              <dt>Event code</dt>
+              <dd>{code}</dd>
+              <dt>Username</dt>
+              <dd>{row.handle ?? handles.get(row.accountId) ?? ""}</dd>
+              <dt>Password</dt>
+              <dd>{row.password}</dd>
+            </dl>
+            <p>Change this password when you first sign in.</p>
+          </section>
+        ))}
+      </div>,
+      document.body,
+    )}
     <Dialog open onOpenChange={(open) => !open && !sheet.busy && onClose()}>
       <DialogContent className="max-h-[90dvh] max-w-lg overflow-y-auto">
         <DialogHeader className="text-left">
@@ -133,6 +159,16 @@ export function CredentialSheet({
           >
             Copy all
           </Button>
+          <Button
+            type="button"
+            variant="outline"
+            className="h-11"
+            disabled={printable.length === 0}
+            onClick={() => window.print()}
+          >
+            <Printer aria-hidden="true" />
+            Print sheets
+          </Button>
           {missing.length > 0 && (
             <Button
               type="button"
@@ -150,5 +186,6 @@ export function CredentialSheet({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+    </>
   );
 }

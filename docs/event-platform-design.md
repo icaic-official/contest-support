@@ -125,17 +125,17 @@ This design replaces these sections of the [earlier design](history/multi-compet
 
 ## How each person uses the platform
 
-This section describes the target behavior from each person's view. None of it is built.
+This section describes the target behavior from each person's view. Phases 1 to 5 are built. A step that this page marks **Designed, not built** waits for Phase 6. Practice and live contests, and **Issue live passwords**, are the Phase 6 steps. Today every contest has a type and a schedule, and no kind.
 
 ### Quickstart for an organizer
 
 These steps take a new installation to a working event:
 
-1. A maintainer runs `npm run cloudflare:install -- bootstrap --site=site.json` on an empty database. Minsky creates one webmaster and prints a temporary password once.
+1. A maintainer runs `npm run cloudflare:install -- bootstrap` on an empty hosted database, with the flags that the [installation guide](../site/src/content/docs/operators/installation.mdx) lists. The command reaches the hosted database only. It has no local mode. Minsky creates one webmaster and writes a temporary password once, to a private file.
 2. The webmaster opens `https://minsky.example/`, chooses **Site sign-in**, signs in, and changes the temporary password.
-3. The webmaster selects **New event**. The form takes the name "XXXX Olympiad 2026", the event code `xxxx-2026`, the time zone `Asia/Singapore`, and the first event admin, with handle `chen` and name "Chen Li". Minsky shows Chen's credential sheet once. The sheet holds the link `https://minsky.example/?event=xxxx-2026`, the handle, and the temporary password.
+3. The webmaster selects **Create event**. The form takes the name "XXXX Olympiad 2026", the event code `xxxx-2026`, the time zone `Asia/Singapore`, and the first event admin, with handle `chen` and name "Chen Li". Minsky shows Chen's credential sheet once. The sheet holds the link `https://minsky.example/?event=xxxx-2026`, the handle, and the temporary password.
 4. Chen signs in from that link and builds the event. That work covers contests, staff, teams, single contestants, and assignments.
-5. Each staff member and contestant gets a sheet with the same event link. Nobody types an event code that they could mistake.
+5. Each staff member and contestant gets a sheet with the same event link. The link fills in the event code. A person types the code only when they open the plain sign-in page, so keep the code short and easy to read aloud.
 
 The sign-in form labels the handle field **Username**, because people know that word. In code and on this page, the typed name is the **handle**. The stored name that Better Auth knows is the **login key**. Nobody sees or types a login key.
 
@@ -145,7 +145,7 @@ A webmaster works in this order:
 
 1. The webmaster signs in with **Site sign-in**. Webmasters belong to no event, so this form has no event code.
 2. The webmaster lands on the **Site** dashboard. It lists each event with its derived span ("3 to 5 Nov, Asia/Singapore") and its contest and account counts. It also shows a calendar of every event's contests, the webmasters, the setting **Webmasters read contest data only after joining**, and the progress of deletions.
-3. The webmaster selects **New event** (step 3 of the quickstart). One batch creates the event, the admin's account, and the event grant. Then the browser asks for that one account's credentials.
+3. The webmaster selects **Create event** (step 3 of the quickstart). One batch creates the event, the admin's account, and the event grant. Then the browser asks for that one account's credentials.
 4. The webmaster opens any event console and does anything that an event admin can do. For example, the webmaster resets the password of a locked-out event admin.
 5. The webmaster opens a contest. By default, the contest opens at once. While the restriction is on, Minsky first says "Join this contest to read its issues and notes. The contest's admins see your join in their audit." **Join** writes a contest-scope grant. D1 then writes the audit rows itself.
 6. The webmaster adds or removes webmasters. Removing the last enabled webmaster fails with "The last webmaster cannot be removed".
@@ -156,11 +156,11 @@ A webmaster works in this order:
 An event admin builds the event in this order:
 
 1. The event admin signs in at `?event=xxxx-2026` and lands on the **Event** console.
-2. **Contests.** The event admin creates "Practice 1" (practice, teams, 3 Nov 09:00 to 11:00), "Live 1" (live, teams, 3 Nov 13:00 to 18:00, 15 minutes grace), and "Live Singles" (live, singles, 4 Nov 09:00 to 12:00). The console takes and shows times in the event's time zone.
+2. **Contests.** The event admin creates contests with a name, a type (teams, singles, or mixed), and a schedule with a grace period. The console takes and shows times in the event's time zone. **Designed, not built (Phase 6):** a contest kind, so that the event admin can create "Practice 1" as practice and "Live 1" and "Live Singles" as live.
 3. **Entrants.** The event admin imports a list of teams and single contestants. Each row gives a kind, a name, and a handle. Minsky creates the entrant and its one sign-in.
 4. **People.** The event admin imports staff, each with a handle and a name.
 5. **Assignments.** The event admin uses a grid of contests by entrants, and a grid of contests by staff with roles (contest admin, jury, volunteer, and specialist). One entrant can enter several contests. One staff member can serve in several.
-6. **Credentials.** The event admin issues practice passwords and prints sheets. Before "Live 1", the event admin selects **Issue live passwords for Live 1**. Minsky lists the teams and the live contests that each new password will also open. Those are the team's live contests whose window overlaps "Live 1". Minsky issues eight accounts per request with a progress bar. "Live 1" shows "Waiting for live passwords: 3 teams" until the last team is done.
+6. **Credentials.** The event admin issues passwords and prints sheets. **Designed, not built (Phase 6):** before "Live 1", the event admin selects **Issue live passwords for Live 1**. Minsky lists the teams and the live contests that each new password will also open. Those are the team's live contests whose window overlaps "Live 1". Minsky issues eight accounts per request with a progress bar. "Live 1" shows "Waiting for live passwords: 3 teams" until the last team is done.
 7. The event admin adds a second event admin with **Make event admin**.
 
 ### Contest admin
@@ -168,7 +168,7 @@ An event admin builds the event in this order:
 A contest admin manages one contest:
 
 1. The contest admin signs in with the event link. The picker lists the contests of the event with start times in the event's time zone. It opens the contest that runs now, or the next one. The choice stays in the address (`?contest=...`), so a refresh keeps it.
-2. The intake panel says "Following schedule. Opens 13:00, closes 18:15 (15 minutes grace)". **Open now** and **Close now** override the schedule. **Return to schedule** ends the override. A live contest that waits for passwords says so, and no override can open it.
+2. The intake panel says "Following schedule. Opens 13:00, closes 18:15 (15 minutes grace)". **Open now** and **Close now** override the schedule. **Return to schedule** ends the override. **Designed, not built (Phase 6):** a live contest that waits for passwords says so, and no override can open it.
 3. The contest admin edits categories, image limits, and team locations, and publishes announcements, as today.
 4. **Staff.** The contest admin sees the contest's staff and their roles. To add or remove a staff member, the contest admin asks an event admin. An event that wants no contest admins assigns none.
 5. The contest admin reissues a password or changes the handle of an account at the desk. The contest admin can do this only for an account that holds no grant and whose every assignment is one of the admin's contests.

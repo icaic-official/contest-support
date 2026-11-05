@@ -47,6 +47,11 @@ export interface SessionData {
   selectSession: (sessionId: string) => void;
 }
 
+/** True while the tab is in the background. The refresh schedule reads again when it returns. */
+function inBackground(): boolean {
+  return document.visibilityState === "hidden";
+}
+
 /**
  * Loads the person's sessions and the selected session snapshot. It refreshes
  * on live changes, on focus, when the tab becomes visible and when the browser
@@ -130,13 +135,16 @@ export function useSessionSnapshot(userId: string): SessionData {
       ? backend.updates.subscribe({
           sessionId,
           userId,
+          // A hidden page shows nothing. It reads once when the person returns.
           onChange: () => {
+            if (inBackground()) return;
             setUpdates((count) => count + 1);
             void refresh();
           },
           // A drop can mean that the server revoked access, so read at once.
           onConnection: (isConnected) => {
             setConnected(isConnected);
+            if (inBackground()) return;
             setUpdates((count) => count + 1);
             void refresh();
           },
@@ -154,6 +162,7 @@ export function useSessionSnapshot(userId: string): SessionData {
   const tick = useRef<() => void>(undefined);
   useEffect(() => {
     tick.current = () => {
+      if (inBackground()) return;
       setUpdates((count) => count + 1);
       void refresh();
     };

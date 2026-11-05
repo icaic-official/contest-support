@@ -236,6 +236,7 @@ export function Announcements({ data }: { data: SessionData }) {
   return (
     <section
       aria-labelledby={headingId}
+      data-announcements=""
       // Reading keeps the queue in view. An open form needs room for all its controls.
       // Below the desktop breakpoint every button is 44 px high, so a thumb can hit it.
       className={`${composing || edit ? "max-h-[80dvh]" : "max-h-[40dvh]"} shrink-0 overflow-y-auto border-b bg-muted/40 max-lg:**:data-[slot=button]:h-11`}

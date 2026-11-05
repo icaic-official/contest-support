@@ -1,11 +1,8 @@
-import { useMediaQuery } from "@/connected/hooks/useMediaQuery";
+import { desktopQuery, useMediaQuery } from "@/connected/hooks/useMediaQuery";
 import { useWorkflowState } from "@/connected/hooks/useWorkflowState";
 import type { ShellProps } from "@/connected/shell";
 import { OrganiserDesktopConsole } from "./desktop/OrganiserDesktopConsole";
 import { OrganiserPhoneApp } from "./phone/OrganiserPhoneApp";
-
-/** Viewports at least this wide get the desktop console. */
-export const organiserDesktopQuery = "(min-width: 1024px)";
 
 /**
  * The organiser UI for volunteers, specialists, jury members and session
@@ -15,7 +12,7 @@ export const organiserDesktopQuery = "(min-width: 1024px)";
  */
 export function OrganiserApp(props: ShellProps) {
   const workflow = useWorkflowState(props.data);
-  const desktop = useMediaQuery(organiserDesktopQuery);
+  const desktop = useMediaQuery(desktopQuery);
   return desktop ? (
     <OrganiserDesktopConsole shell={props} workflow={workflow} />
   ) : (

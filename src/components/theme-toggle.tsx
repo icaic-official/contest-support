@@ -8,6 +8,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { type ThemePreference, useTheme } from "@/lib/theme";
+import { cn } from "@/lib/utils";
 
 /** The theme choices in display order. Every theme picker uses this table. */
 export const themeOptions: readonly {
@@ -21,13 +22,13 @@ export const themeOptions: readonly {
 ];
 
 /** A menu button that sets the light or dark theme. */
-export function ThemeToggle() {
+export function ThemeToggle({ className }: { className?: string }) {
   const { preference, theme, setPreference } = useTheme();
   const Current = theme === "dark" ? Moon : Sun;
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" aria-label="Color theme">
+        <Button variant="ghost" size="icon" className={cn("max-lg:size-11", className)} aria-label="Color theme">
           <Current />
         </Button>
       </DropdownMenuTrigger>

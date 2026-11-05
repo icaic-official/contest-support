@@ -211,3 +211,14 @@
     scroll-behavior: auto !important;
   }
 }
+
+/*
+ * A phone with its keyboard open has little height. While a contestant types,
+ * the announcement strip steps aside so the field and its send button stay in
+ * view. The strip returns when the field loses focus.
+ */
+@media (max-width: 1023px) and (max-height: 520px) {
+  body:has([data-ui="contestant"] :is(textarea, input):focus) [data-announcements] {
+    display: none;
+  }
+}

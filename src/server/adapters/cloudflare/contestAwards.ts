@@ -110,6 +110,10 @@ export class D1ContestAwardService {
           WHERE actor = ? AND request_id = ?`, caller.accountId, requestId)
           .first<Pick<AwardRow, 'id' | 'session_id' | 'minutes' | 'explanation'>>();
         if (committed) return replay(committed);
+        // The unique index lets one award of each size wait for confirmation in one contest, whoever granted it.
+        const waiting = await this.statement(`SELECT 1 AS found FROM contest_awards
+          WHERE session_id = ? AND minutes = ? AND applied_at IS NULL`, sessionId, command.minutes).first();
+        if (waiting && error instanceof Error && /UNIQUE constraint failed/.test(error.message)) throw new AuthenticationError(409, 'An award of this length is waiting for confirmation.');
         throw refusal(error);
       }
       return id;

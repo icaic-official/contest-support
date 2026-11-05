@@ -200,6 +200,51 @@ test.describe("contest-wide time awards", () => {
     expect(await local.rows("SELECT id FROM contest_awards WHERE session_id = ?", local.sessions[0])).toHaveLength(1);
   });
 
+  // The Worker records the first award and the browser never sees the response. The browser then loses
+  // the request ID, by a reload or by an edit, so the retry is a new request. The Worker must refuse it.
+  for (const [name, loseId] of [
+    ["a reload", async (jury: Page) => jury.reload()],
+    ["an edited explanation", async () => undefined],
+  ] as const) {
+    test(`a retry after a lost response and ${name} records one award`, async ({ browser, local }) => {
+      test.setTimeout(90_000);
+      await schedule(local, -30, 60);
+      const loseFirstAward = () => {
+        const send = window.fetch.bind(window);
+        window.fetch = async (input, init) => {
+          const response = await send(input, init);
+          if (!sessionStorage.getItem("lost") && String(input instanceof Request ? input.url : input).includes("/api/contest-awards")) {
+            sessionStorage.setItem("lost", "1");
+            throw new TypeError("Failed to fetch");
+          }
+          return response;
+        };
+      };
+      const jury = await signIn(browser, local, "jury", desktop, loseFirstAward);
+      const open = async () => {
+        await jury.getByRole("navigation", { name: "Console pages" }).getByRole("button", { name: /^Award review/ }).click();
+        const panel = jury.getByRole("region", { name: "Time awards for the whole contest" });
+        await panel.getByLabel("Minutes for every contestant").fill("15");
+        await panel.getByLabel("Why").fill("Network outage in the hall.");
+        return panel;
+      };
+      const panel = await open();
+      await panel.getByRole("button", { name: "Record the decision" }).click();
+      await expect(panel.locator("p[role=alert]")).toBeVisible();
+      expect(await local.rows("SELECT id FROM contest_awards WHERE session_id = ?", local.sessions[0])).toHaveLength(1);
+      await loseId(jury);
+      const retry = await open();
+      if (name === "an edited explanation") await retry.getByLabel("Why").fill("Network outage in the hall, 20 minutes.");
+      await retry.getByRole("button", { name: "Record the decision" }).click();
+      await expect(retry.locator("p[role=alert]")).toHaveText("An award of this length is waiting for confirmation.");
+      // The refusal keeps the typed text and shows the recorded award.
+      await expect(retry.getByLabel("Minutes for every contestant")).toHaveValue("15");
+      await expect(retry.getByLabel("Why")).toHaveValue(name === "a reload" ? "Network outage in the hall." : "Network outage in the hall, 20 minutes.");
+      await expect(retry.getByRole("list", { name: "Contest-wide awards" })).toContainText("Network outage in the hall.");
+      expect(await local.rows("SELECT id FROM contest_awards WHERE session_id = ?", local.sessions[0])).toHaveLength(1);
+    });
+  }
+
   test("a contestant sees no award controls, and the Worker refuses a grant from a contestant", async ({ browser, local }) => {
     await schedule(local, -30, 60);
     const contestant = await signIn(browser, local, "contestant");

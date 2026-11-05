@@ -56,6 +56,9 @@ CREATE TABLE contest_awards (
     OR (applied_at IS NOT NULL AND applied_by IS NOT NULL AND applied_name IS NOT NULL AND applied_request IS NOT NULL))
 ) STRICT;
 CREATE INDEX contest_awards_session ON contest_awards(session_id, at);
+-- A new request ID cannot repeat an award whose confirmation is pending: a reload or an edited
+-- explanation after a lost response would otherwise record a second award of the same size.
+CREATE UNIQUE INDEX contest_awards_unconfirmed ON contest_awards(session_id, minutes) WHERE applied_at IS NULL;
 CREATE TRIGGER contest_award_fixed BEFORE UPDATE ON contest_awards
 WHEN OLD.applied_at IS NOT NULL OR NEW.id IS NOT OLD.id OR NEW.session_id IS NOT OLD.session_id
   OR NEW.minutes IS NOT OLD.minutes OR NEW.explanation IS NOT OLD.explanation OR NEW.actor IS NOT OLD.actor

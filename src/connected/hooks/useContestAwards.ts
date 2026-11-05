@@ -12,7 +12,9 @@ export interface ContestAwardRunner {
 }
 
 // Outside the component, because a refused read removes the console and its hooks. The ID of a command
-// whose response was lost must outlive that, or the retry records a second award. A page reload still loses it.
+// whose response was lost must outlive that, so the retry gets the first receipt and the form clears.
+// A page reload or an edited explanation loses the ID. The server then refuses the retry, because one
+// award of each size can wait for confirmation (`contest_awards_unconfirmed`). A confirmation keeps its ID for the same reason.
 const pending = new Map<string, string>();
 
 /**
@@ -40,6 +42,8 @@ export function useContestAwards(sessionId: string, refresh: () => Promise<void>
         return true;
       } catch (cause) {
         setError(errorMessage(cause));
+        // The refusal may mean that the list is stale, so show the award that was recorded. The form keeps its text.
+        await refresh().catch(() => undefined);
         return false;
       } finally {
         setBusy(false);

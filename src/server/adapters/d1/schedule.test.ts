@@ -176,6 +176,52 @@ describe('contest schedule, clock, time awards, and intake', () => {
       expect(await fixture.rows('SELECT applied_at FROM contest_awards WHERE id = ?', id)).toEqual([{ applied_at: null }]);
     });
 
+    describe('one unconfirmed award of each size', () => {
+      const waiting = { status: 409, message: 'An award of this length is waiting for confirmation.' };
+      const count = async () => (await fixture.rows('SELECT id FROM contest_awards WHERE session_id = ?', fixture.sessionId)).length;
+
+      it('refuses a new request ID with the same minutes, even with another explanation, and replays the first receipt first', async () => {
+        const requestId = randomUUID();
+        const first = await awards.execute(fixture.staff, fixture.sessionId, requestId, grant);
+        await expect(awards.execute(fixture.staff, fixture.sessionId, randomUUID(), grant)).rejects.toMatchObject(waiting);
+        await expect(awards.execute(fixture.staff, fixture.sessionId, randomUUID(), { ...grant, explanation: 'Edited text.' }))
+          .rejects.toMatchObject(waiting);
+        expect(await awards.execute(fixture.staff, fixture.sessionId, requestId, grant)).toBe(first);
+        expect(await count()).toBe(1);
+        expect(await fixture.rows('SELECT id FROM admin_audit WHERE action = ?', 'contest_award')).toHaveLength(1);
+      });
+
+      it('refuses the same minutes from another actor', async () => {
+        await run("INSERT INTO membership_roles (session_id, account_id, role) VALUES (?, ?, 'jury')", fixture.sessionId, fixture.specialist.accountId);
+        await awards.execute(fixture.staff, fixture.sessionId, randomUUID(), grant);
+        await expect(awards.execute(fixture.specialist, fixture.sessionId, randomUUID(), grant)).rejects.toMatchObject(waiting);
+        expect(await count()).toBe(1);
+      });
+
+      it('allows other minutes, another contest, and the same minutes once the first is confirmed', async () => {
+        const first = await awards.execute(fixture.staff, fixture.sessionId, randomUUID(), grant);
+        await awards.execute(fixture.staff, fixture.sessionId, randomUUID(), { ...grant, minutes: 20 });
+        await run("INSERT INTO membership_roles (session_id, account_id, role) VALUES (?, ?, 'jury')", fixture.secondSessionId, fixture.staff.accountId);
+        await awards.execute(fixture.staff, fixture.secondSessionId, randomUUID(), grant);
+        await awards.execute(fixture.specialist, fixture.sessionId, randomUUID(), { type: 'apply', awardId: first });
+        await awards.execute(fixture.staff, fixture.sessionId, randomUUID(), grant);
+        expect(await fixture.rows('SELECT id FROM contest_awards WHERE session_id = ? AND minutes = 15', fixture.sessionId)).toHaveLength(2);
+        expect(await count()).toBe(3);
+      });
+
+      it('records one of two concurrent grants with new request IDs and refuses the other', async () => {
+        const results = await Promise.allSettled([
+          awards.execute(fixture.staff, fixture.sessionId, randomUUID(), grant),
+          awards.execute(fixture.staff, fixture.sessionId, randomUUID(), grant),
+        ]);
+        expect(results.map((result) => result.status).sort()).toEqual(['fulfilled', 'rejected']);
+        const refused = results.find((result): result is PromiseRejectedResult => result.status === 'rejected');
+        expect(refused?.reason).toMatchObject(waiting);
+        expect(await count()).toBe(1);
+        expect(await fixture.rows('SELECT id FROM admin_audit WHERE action = ?', 'contest_award')).toHaveLength(1);
+      });
+    });
+
     it('writes a repeated grant once, and refuses a request ID that names another award', async () => {
       const requestId = randomUUID();
       const first = await awards.execute(fixture.staff, fixture.sessionId, requestId, grant);

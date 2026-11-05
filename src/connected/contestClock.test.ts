@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { boundaryDelay } from "./hooks/refreshSchedule";
 import { clockText, closedMessage, closesAt } from "./contestClock";
 import type { ContestClock } from "./model";
@@ -24,6 +24,16 @@ function clock(overrides: Partial<ContestClock> & { reason: ContestClock["intake
 
 const at = (iso: string) => Date.parse(iso);
 
+/** Pins the zone that the viewer's device reports, so no test depends on the host zone. */
+function viewerIn(zone: string) {
+  const resolved = Intl.DateTimeFormat.prototype.resolvedOptions;
+  vi.spyOn(Intl.DateTimeFormat.prototype, "resolvedOptions").mockImplementation(function (this: Intl.DateTimeFormat) {
+    return { ...resolved.call(this), timeZone: zone };
+  });
+}
+
+afterEach(() => vi.restoreAllMocks());
+
 describe("clockText", () => {
   it("names the opening time in the event zone before the start", () => {
     const text = clockText(
@@ -35,15 +45,27 @@ describe("clockText", () => {
     expect(text.countdown).toBe("1:00:00");
   });
 
-  it("counts down to the end while the contest runs", () => {
-    const text = clockText(
-      clock({ reason: "running", intake: { open: true, reason: "running", changes_at: schedule.ends_at } }),
-      at("2026-11-03T08:17:50.000Z"),
-    );
+  const running = () => clock({ reason: "running", intake: { open: true, reason: "running", changes_at: schedule.ends_at } });
+
+  it("counts down to the end while the contest runs, with no extra line for a viewer in the event zone", () => {
+    viewerIn("Asia/Singapore");
+    const text = clockText(running(), at("2026-11-03T08:17:50.000Z"));
     expect(text.headline).toBe("Ends in 1:42:10");
     expect(text.details).toEqual([
       expect.stringMatching(/^The contest ends at .*18:00\.$/),
       "Reporting stays open 15 minutes after that.",
+    ]);
+  });
+
+  it("adds the viewer's own time for a viewer in another zone", () => {
+    viewerIn("America/New_York");
+    const text = clockText(running(), at("2026-11-03T08:17:50.000Z"));
+    expect(text.headline).toBe("Ends in 1:42:10");
+    // 10:00Z is 05:00 in New York.
+    expect(text.details).toEqual([
+      expect.stringMatching(/^The contest ends at .*18:00\.$/),
+      "Reporting stays open 15 minutes after that.",
+      expect.stringMatching(/^Your time: .*05:00\.$/),
     ]);
   });
 

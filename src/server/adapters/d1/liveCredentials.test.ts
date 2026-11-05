@@ -148,6 +148,12 @@ describe('live password rule', () => {
     expect((await issue(fixture.sessionId, [fixture.contestant.accountId]))[0]!.temporaryPassword).toBeTruthy();
   });
 
+  it('lets an account with no password take its first one while its contest is open', async () => {
+    await run(`UPDATE accounts SET credential_state = 'pending' WHERE id = ?`, fixture.contestant.accountId);
+    await run('UPDATE sessions SET intake_open = 1 WHERE id = ?', fixture.sessionId);
+    expect((await issue(null, [fixture.contestant.accountId]))[0]!.temporaryPassword).toBeTruthy();
+  });
+
   it('refuses a target that does not seat the account', async () => {
     await closeFixtureContests();
     const live = await liveContest(-10, 60);

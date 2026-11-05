@@ -437,7 +437,9 @@ export class D1ManageService {
       if (contestId !== null && !seats.results.some((seat) => seat.session_id === contestId)) {
         throw new AuthenticationError(409, `${target.name} has no seat in that contest. Refresh the page.`);
       }
-      const conflict = await this.statement(openConflictSql, ...openConflictBindings(target.id, contestId)).first<{ name: string }>();
+      // An account that has no password yet has no sign-in to lose.
+      const conflict = target.ready === 0 ? null
+        : await this.statement(openConflictSql, ...openConflictBindings(target.id, contestId)).first<{ name: string }>();
       if (conflict) {
         throw new AuthenticationError(409, `Reporting is open in ${conflict.name}. A new password would sign ${target.name} out of it. Issue it from ${conflict.name}, or close that contest first.`);
       }
@@ -450,7 +452,7 @@ export class D1ManageService {
         assertions.check(allowed, ...manageAccountBindings(caller.accountId, target.id),
           ...(scope === null ? [] : [scope]), target.credential_generation),
         // Intake can open between the read and the batch. This runs before the writes that change readiness.
-        assertions.check(`SELECT 1 WHERE NOT EXISTS (${openConflictSql})`, ...openConflictBindings(target.id, contestId)),
+        ...(target.ready === 0 ? [] : [assertions.check(`SELECT 1 WHERE NOT EXISTS (${openConflictSql})`, ...openConflictBindings(target.id, contestId))]),
         // An account from before login keys gets its key with its first password.
         ...(target.stored ? [] : [this.statement('UPDATE accounts SET username = ? WHERE id = ? AND username IS NULL', target.loginKey, target.id)]),
         ...replaceCredentialStatements(this.db, target, await this.passwords.hash(password),

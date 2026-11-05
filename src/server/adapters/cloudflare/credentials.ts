@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { parseHandle, type LoginKey } from '../../../backend/contracts';
 import type { D1Connection, D1Statement, D1Value } from '../d1/connection';
 import { forContestsSql } from './authority';
+import { windowEndSql } from './schedule';
 
 /** Typed text to a handle, through `parseHandle`. */
 export const handleSchema = z.string().transform((text, context) => {
@@ -90,7 +91,8 @@ export function replaceCredentialStatements(
     statement(db, `INSERT INTO account_operations (id, account_id, actor, action, state) VALUES (?, ?, ?, 'reset_password', 'pending')`,
       options.operationId, account.id, options.actor),
     ...completeCredentialReset(db, account, options.operationId, hash, options.temporary),
-    statement(db, `INSERT INTO credential_scopes (account_id, session_id, operation_id)
-        SELECT ?, id, ? FROM (${forContestsSql})`, account.id, options.operationId, account.id, options.contestId),
+    statement(db, `INSERT INTO credential_scopes (account_id, session_id, operation_id, issued_from, issued_until)
+        SELECT ?, f.id, ?, t.starts_at, ${windowEndSql('t')} FROM (${forContestsSql}) f JOIN sessions t ON t.id = ?`,
+    account.id, options.operationId, account.id, options.contestId, options.contestId),
   ];
 }

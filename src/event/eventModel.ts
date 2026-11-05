@@ -122,11 +122,35 @@ export function alsoOpens(console: EventConsole, contest: ConsoleContest): Conso
 
 /**
  * The contest to name when an organizer resets one entrant's password: an open
- * contest of that entrant, live first. The server refuses a reset that would sign
- * the contestant out of an open contest that the request does not name.
+ * contest of that entrant, live first, then the entrant's next live contest. The
+ * server refuses a reset that would sign the contestant out of an open contest that
+ * the request does not name.
  */
 export function recoveryContest(console: EventConsole, entrantId: string): string | null {
   const open = console.contests.filter((contest) => contest.intake.open
     && console.entries.some((entry) => entry.contestId === contest.id && entry.entrantId === entrantId));
-  return (open.find((contest) => contest.kind === "live") ?? open[0])?.id ?? null;
+  const next = console.contests
+    .filter((contest) => contest.kind === "live" && notEnded(contest) && isEntered(console, contest.id, entrantId))
+    .sort((a, b) => Date.parse(a.schedule?.startsAt ?? "") - Date.parse(b.schedule?.startsAt ?? ""))[0];
+  return (open.find((contest) => contest.kind === "live") ?? next ?? open[0])?.id ?? null;
+}
+
+function notEnded(contest: ConsoleContest): boolean {
+  return !!contest.schedule && Date.now() < windowOf(contest.schedule).end;
+}
+
+function isEntered(console: EventConsole, contestId: string, entrantId: string): boolean {
+  return console.entries.some((entry) => entry.contestId === contestId && entry.entrantId === entrantId);
+}
+
+/**
+ * The live contests, not yet ended, where these accounts hold a password that an
+ * issue for `target` would stop. `voidedScopesSql` decides on the server.
+ */
+export function voidedBy(console: EventConsole, target: ConsoleContest | undefined, accountIds: readonly string[]): ConsoleContest[] {
+  const kept = new Set(target ? [target.id, ...alsoOpens(console, target).map((other) => other.id)] : []);
+  const entrants = console.entrants.filter((entrant) => entrant.accountId && accountIds.includes(entrant.accountId));
+  return console.contests.filter((contest) => contest.kind === "live" && !kept.has(contest.id) && notEnded(contest)
+    && entrants.some((entrant) => isEntered(console, contest.id, entrant.id)
+      && !contest.waiting.some((seat) => seat.accountId === entrant.accountId)));
 }

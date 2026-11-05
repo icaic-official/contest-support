@@ -82,3 +82,41 @@ test("an organizer issues live passwords from one sheet, and the readiness count
   await expect(page.getByText(/^Waiting for live passwords: /)).toHaveCount(0);
   await expect(page.getByRole("button", { name: /^Issue live passwords/ })).toHaveCount(0);
 });
+
+test("a late entrant in a running live contest asks first, and the sheet reopens reporting", async ({ page, local }) => {
+  test.setTimeout(90_000);
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await signIn(page, "eventadmin");
+  await expect(page.locator('[data-ui="organiser-desktop"], [data-ui="organiser-phone"]')).toBeVisible();
+  await page.goto("/event");
+  await tab(page, "Entrants").click();
+  await page.getByLabel("Entrants, one per line: name, username", { exact: true })
+    .fill("Team Orion, team-orion\nTeam Vega, team-vega");
+  await page.getByRole("button", { name: "Import entrants (2)", exact: true }).click();
+  const sheet = page.getByRole("dialog", { name: "Share these credentials securely" });
+  await sheet.getByRole("button", { name: "Done", exact: true }).click();
+  await tab(page, "Contests").click();
+  const name = `Running ${crypto.randomUUID().slice(0, 8)}`;
+  await createLive(page, name);
+  await local.run("UPDATE sessions SET starts_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-1 minute'), ends_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '+2 hours') WHERE name = ?", name);
+  await tab(page, "Assignments").click();
+  await page.getByLabel("Contest", { exact: true }).selectOption({ label: name });
+  await page.getByRole("checkbox", { name: /^Team Orion/ }).check();
+  await page.getByRole("button", { name: "Assign selected entrants (1)", exact: true }).click();
+  await tab(page, "Contests").click();
+  await page.getByRole("button", { name: `Issue live passwords for ${name}`, exact: true }).click();
+  await sheet.getByRole("button", { name: "Done", exact: true }).click();
+  await expect(page.getByRole("button", { name: `Issue live passwords for ${name}`, exact: true })).toHaveCount(0);
+
+  await tab(page, "Assignments").click();
+  await page.getByLabel("Contest", { exact: true }).selectOption({ label: name });
+  await page.getByRole("checkbox", { name: /^Team Vega/ }).check();
+  await page.getByRole("button", { name: "Assign selected entrants (1)", exact: true }).click();
+  const confirm = page.getByRole("alertdialog").or(page.getByRole("dialog", { name: `Close reporting in ${name}?` }));
+  await expect(confirm.getByText("Reporting closes for 1 team until the new sign-ins have passwords.", { exact: false })).toBeVisible();
+  await confirm.getByRole("button", { name: "Assign and close reporting", exact: true }).click();
+  await expect(sheet.getByLabel("Password for Team Vega", { exact: true })).toBeVisible();
+  await sheet.getByRole("button", { name: "Done", exact: true }).click();
+  await tab(page, "Contests").click();
+  await expect(page.getByRole("button", { name: `Issue live passwords for ${name}`, exact: true })).toHaveCount(0);
+});

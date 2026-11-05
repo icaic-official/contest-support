@@ -16,7 +16,8 @@ import { intakeHeadline } from "@/connected/intakeText";
 import { rosterTextMax, teamsPerCommandMax } from "@/connected/roster";
 import { viewerNote } from "@/connected/zonedTime";
 import { staffRoles } from "@/organiser/admin/adminModel";
-import { acceptsKind, alsoOpens, contestTypeLabels, seatedEntrants } from "./eventModel";
+import { ConfirmDialog } from "@/organiser/admin/AccountAccess";
+import { acceptsKind, alsoOpens, contestTypeLabels, seatedEntrants, voidedBy } from "./eventModel";
 import { CommandError, Panel, fieldClass, focusAfterRemoval } from "./forms";
 import { ScheduleFields } from "./ScheduleFields";
 import {
@@ -191,7 +192,7 @@ export function ContestsTab({ data, state }: TabProps) {
                     contest={contest}
                     data={data}
                     disabled={locked}
-                    onIssue={() => void state.issue(contest.waiting.map((seat) => seat.accountId), contest.id)}
+                    onIssue={(voids) => void state.issue(contest.waiting.map((seat) => seat.accountId), contest.id, voids)}
                   />
                 )}
               </li>
@@ -241,9 +242,10 @@ function LivePasswords({
   contest: EventConsole["contests"][number];
   data: EventConsole;
   disabled: boolean;
-  onIssue: () => void;
+  onIssue: (voidLivePasswords: boolean) => void;
 }) {
   const others = alsoOpens(data, contest);
+  const voided = voidedBy(data, contest, contest.waiting.map((seat) => seat.accountId));
   return (
     <div className="basis-full space-y-2 rounded-xl border p-3">
       <p className="text-sm font-medium">Waiting for live passwords: {contest.waiting.length}</p>
@@ -251,7 +253,10 @@ function LivePasswords({
       {others.length > 0 && (
         <p className="text-xs text-muted-foreground">These passwords also open: {others.map((other) => other.name).join(", ")}.</p>
       )}
-      <Button type="button" variant="secondary" className="h-auto min-h-11 whitespace-normal" disabled={disabled} onClick={onIssue}>
+      {voided.length > 0 && (
+        <p className="text-sm font-medium">These passwords stop working for: {voided.map((other) => other.name).join(", ")}.</p>
+      )}
+      <Button type="button" variant="secondary" className="h-auto min-h-11 whitespace-normal" disabled={disabled} onClick={() => onIssue(voided.length > 0)}>
         Issue live passwords for {contest.name}
       </Button>
     </div>
@@ -378,6 +383,7 @@ function EntrantAssignments({
   const locked = data.event.archived;
   const [picked, setPicked] = useState<ReadonlySet<string>>(new Set());
   const [location, setLocation] = useState("");
+  const [confirming, setConfirming] = useState(false);
   const seated = useMemo(() => seatedEntrants(data, contest.id), [data, contest.id]);
   const entries = new Map(data.entries.filter((entry) => entry.contestId === contest.id).map((entry) => [entry.entrantId, entry]));
   const eligible = data.entrants.filter((entrant) => acceptsKind(contest.contestType, entrant.kind));
@@ -390,25 +396,45 @@ function EntrantAssignments({
     else next.delete(entrantId);
     setPicked(next);
   };
+  const closes = contest.kind === "live" && contest.intake.open && chosen.some((entrant) => entrant.accountId);
+  const assign = () => {
+    void state
+      .execute({
+        type: "assign_entrants",
+        contestId: contest.id,
+        entries: chosen.map((entrant) => ({ entrantId: entrant.id, location: location.trim() })),
+        ...(closes ? { closeReporting: true } : {}),
+      })
+      .then((receipt) => {
+        if (!receipt) return;
+        setPicked(new Set());
+        const accountIds = receipt.accountIds ?? [];
+        if (closes && accountIds.length > 0) void state.issue(accountIds, contest.id, voidedBy(data, contest, accountIds).length > 0);
+      });
+  };
   return (
     <Panel
       title={`Entrants in ${contest.name} · ${seated.size}`}
       description={`This contest takes: ${contestTypeLabels[contest.contestType].toLowerCase()}. Assigning gives each entrant's sign-in a seat.`}
     >
       <div className="space-y-4">
+        <ConfirmDialog
+          returnFocus
+          open={confirming}
+          onOpenChange={setConfirming}
+          title={`Close reporting in ${contest.name}?`}
+          description={`Reporting closes for ${entries.size} ${entries.size === 1 ? "team" : "teams"} until the new sign-ins have passwords. Minsky issues them next.`}
+          confirmLabel="Assign and close reporting"
+          onConfirm={assign}
+        />
         {open.length > 0 ? (
           <form
             className="space-y-3"
             onSubmit={(event) => {
               event.preventDefault();
               if (locked || chosen.length === 0) return;
-              void state
-                .execute({
-                  type: "assign_entrants",
-                  contestId: contest.id,
-                  entries: chosen.map((entrant) => ({ entrantId: entrant.id, location: location.trim() })),
-                })
-                .then((receipt) => receipt && setPicked(new Set()));
+              if (closes) setConfirming(true);
+              else assign();
             }}
           >
             <fieldset className="min-w-0 space-y-1">

@@ -18,6 +18,7 @@ export interface CredentialRow {
 export interface CredentialSheetState {
   /** The contest this sheet issues for, so "Issue again" opens the same live contests. */
   contestId: string | null;
+  voidLivePasswords: boolean;
   rows: readonly CredentialRow[];
   busy: boolean;
   error: string;
@@ -44,7 +45,7 @@ export interface EventConsoleState {
   execute: (command: ManageCommand) => Promise<ManageReceipt | undefined>;
   sheet: CredentialSheetState | undefined;
   /** Issues passwords in batches of ISSUE_BATCH and opens the credential sheet. */
-  issue: (accountIds: readonly string[], contestId?: string | null) => Promise<void>;
+  issue: (accountIds: readonly string[], contestId?: string | null, voidLivePasswords?: boolean) => Promise<void>;
   dismissSheet: () => void;
 }
 
@@ -120,7 +121,7 @@ export function useEventConsole(eventId: string | undefined): EventConsoleState 
     [reload],
   );
   const issue = useCallback(
-    async (accountIds: readonly string[], contestId: string | null = null) => {
+    async (accountIds: readonly string[], contestId: string | null = null, voidLivePasswords = false) => {
       if (!resolvedId || accountIds.length === 0) return;
       if (running.current) {
         setError(STILL_RUNNING);
@@ -137,13 +138,13 @@ export function useEventConsole(eventId: string | undefined): EventConsoleState 
       const show = (nextRows: CredentialRow[], busyNow: boolean, message = "") => {
         rows = nextRows;
         sheetRows.current = nextRows;
-        setSheet({ rows, busy: busyNow, error: message, contestId });
+        setSheet({ rows, busy: busyNow, error: message, contestId, voidLivePasswords });
       };
       show(rows, true);
       for (const batch of issueBatches(accountIds)) {
-        const key = `issue:${contestId ?? ""}:${batch.join(",")}`;
+        const key = `issue:${contestId ?? ""}:${voidLivePasswords}:${batch.join(",")}`;
         try {
-          const issued = await backend.manage.issueCredentials(requestId(key), { eventId: resolvedId, accountIds: batch, contestId });
+          const issued = await backend.manage.issueCredentials(requestId(key), { eventId: resolvedId, accountIds: batch, contestId, voidLivePasswords });
           pending.current.delete(key);
           show(
             rows.map((row) => {

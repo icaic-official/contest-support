@@ -21,6 +21,7 @@ describe('live password rule', () => {
   let dispose: () => Promise<void>;
   let fixture: D1Fixture;
   let created = false;
+  const lateEntrants: string[] = [];
   let manage: D1ManageService;
   let organizer: Caller;
 
@@ -49,6 +50,11 @@ describe('live password rule', () => {
   afterEach(async () => {
     if (!created) return;
     await run('DELETE FROM sessions WHERE event_id = ? AND id NOT IN (?, ?)', fixture.eventId, fixture.sessionId, fixture.secondSessionId);
+    for (const entrant of lateEntrants.splice(0)) {
+      await run('DELETE FROM teams WHERE entrant_id = ?', entrant);
+      await run('DELETE FROM accounts WHERE entrant_id = ?', entrant);
+      await run('DELETE FROM entrants WHERE id = ?', entrant);
+    }
     await fixture.cleanup();
   });
 
@@ -109,7 +115,7 @@ describe('live password rule', () => {
     expect((await intake(live)).open).toBe(true);
     await expect(issue(null, [fixture.contestant.accountId])).rejects.toMatchObject({ status: 409 });
     await run('UPDATE sessions SET intake_follows_schedule = 0, intake_open = 0 WHERE id = ?', live);
-    await issue(null, [fixture.contestant.accountId]);
+    await manage.issueCredentials(organizer, randomUUID(), { eventId: fixture.eventId, accountIds: [fixture.contestant.accountId], contestId: null, voidLivePasswords: true });
     expect(await unready(live)).toBe(1);
   });
 
@@ -203,7 +209,8 @@ describe('live password rule', () => {
         WHERE t.session_id = ? AND a.id = ?`, live, account))!.id;
       switch (pick(4)) {
         case 0:
-          await run('INSERT OR IGNORE INTO credential_scopes (account_id, session_id, operation_id) VALUES (?, ?, ?)', account, live, randomUUID());
+          await run(`INSERT OR IGNORE INTO credential_scopes (account_id, session_id, operation_id, issued_from, issued_until)
+            VALUES (?, ?, ?, ${at(10)}, ${at(60)})`, account, live, randomUUID());
           break;
         case 1:
           await run('DELETE FROM credential_scopes WHERE account_id = ? AND session_id = ?', account, live);
@@ -221,11 +228,196 @@ describe('live password rule', () => {
   it('removes a live contest and an account with seats and scopes without a count error', async () => {
     await closeFixtureContests();
     const live = await liveContest(-10, 60);
-    await issue(live, [fixture.contestant.accountId]);
-    await run('DELETE FROM memberships WHERE session_id = ? AND account_id = ?', live, fixture.otherContestant.accountId);
+    const gone = await liveContest(-10, 60);
+    await issue(live, both());
+    const account = randomUUID();
+    await run(`INSERT INTO accounts (id, name, username, handle, event_id, must_change) VALUES (?, 'Fictional', ?, ?, ?, 0)`,
+      account, `u-${account.slice(0, 12)}`, `u-${account.slice(0, 12)}`, fixture.eventId);
+    const team = (await one<{ id: string }>('SELECT id FROM teams WHERE session_id = ? LIMIT 1', live))!.id;
+    await run('INSERT INTO memberships (session_id, account_id, team_id) VALUES (?, ?, ?)', live, account, team);
+    await run(`INSERT INTO credential_scopes (account_id, session_id, operation_id, issued_from, issued_until)
+      VALUES (?, ?, ?, ${at(-10)}, ${at(60)})`, account, live, randomUUID());
     expect(await unready(live)).toBe(0);
-    await run('DELETE FROM credential_scopes WHERE session_id = ?', live);
-    expect(await unready(live)).toBe(1);
+
+    await run('DELETE FROM accounts WHERE id = ?', account);
+    expect(await unready(live)).toBe(0);
+    await run('DELETE FROM sessions WHERE id = ?', gone);
+    expect(await one('SELECT 1 FROM credential_scopes WHERE session_id = ?', gone)).toBeNull();
+    expect(await unready(live)).toBe(await recount(live));
+  });
+
+  it('refuses to move a seat to another account, so the count cannot drift', async () => {
+    const live = await liveContest(10, 60);
+    await expect(run('UPDATE memberships SET account_id = ? WHERE session_id = ? AND account_id = ?',
+      organizer.accountId, live, fixture.contestant.accountId)).rejects.toThrow();
+  });
+
+  describe('a schedule move', () => {
+    const iso = (minutes: number) => new Date(Date.now() + minutes * 60_000).toISOString();
+    const move = (id: string, start: number, end: number, graceMinutes = 0) =>
+      manage.execute(organizer, randomUUID(), {
+        type: 'update_contest', contestId: id, name: `Live ${id.slice(0, 8)}`, contestType: 'teams',
+        schedule: { startsAt: iso(start), endsAt: iso(end), graceMinutes },
+      });
+
+    it('voids the passwords when a contest moves off the window they were issued for', async () => {
+      await closeFixtureContests();
+      const live = await liveContest(60, 120);
+      await issue(live, both());
+      expect(await unready(live)).toBe(0);
+      await move(live, 3 * 1440, 3 * 1440 + 60);
+      expect(await unready(live)).toBe(2);
+      expect(await recount(live)).toBe(2);
+    });
+
+    it('keeps a running contest open through an end extension and a shift that still overlaps', async () => {
+      await closeFixtureContests();
+      const live = await liveContest(-10, 60);
+      await issue(live, both());
+      await move(live, -10, 300, 15);
+      expect((await intake(live)).open).toBe(true);
+      await move(live, -5, 400);
+      expect(await intake(live)).toMatchObject({ open: true, reason: 'running' });
+    });
+
+    it('does not let small repeated shifts walk away from an issue', async () => {
+      await closeFixtureContests();
+      const live = await liveContest(60, 120);
+      await issue(live, both());
+      for (const shift of [30, 50]) {
+        await move(live, 60 + shift, 120 + shift);
+        expect(await unready(live)).toBe(0);
+      }
+      await move(live, 121, 181);
+      expect(await unready(live)).toBe(2);
+    });
+
+    it('voids only the moved contest of an overlapping issue, against the window issued for', async () => {
+      await closeFixtureContests();
+      const first = await liveContest(60, 120);
+      const second = await liveContest(90, 150);
+      await issue(first, both());
+      await move(second, 125, 180);
+      expect(await unready(second)).toBe(2);
+      expect(await unready(first)).toBe(0);
+    });
+
+    it('refuses a move that voids passwords while its new window keeps the contest running', async () => {
+      await closeFixtureContests();
+      const walking = await liveContest(-10, 60);
+      await issue(walking, both());
+      await run('UPDATE credential_scopes SET issued_until = ? WHERE session_id = ?', iso(-5), walking);
+      await expect(move(walking, -4, 60)).rejects.toMatchObject({ status: 409 });
+      expect((await intake(walking)).open).toBe(true);
+      // A move that ends the running period is the organizer's visible choice.
+      await move(walking, 70, 130);
+      expect(await unready(walking)).toBe(2);
+    });
+  });
+
+  describe('a late seat in a running live contest', () => {
+    async function bareEntrant() {
+      const entrant = randomUUID();
+      lateEntrants.push(entrant);
+      await run(`INSERT INTO entrants (id, event_id, kind, name) VALUES (?, ?, 'team', ?)`, entrant, fixture.eventId, `Late ${entrant.slice(0, 8)}`);
+      return entrant;
+    }
+    async function freshEntrant() {
+      const entrant = await bareEntrant();
+      const account = randomUUID();
+      await run(`INSERT INTO accounts (id, name, username, handle, event_id, entrant_id, must_change) VALUES (?, 'Late', ?, ?, ?, ?, 0)`,
+        account, `u-${account.slice(0, 12)}`, `u-${account.slice(0, 12)}`, fixture.eventId, entrant);
+      return { entrant, account };
+    }
+    const teamNotices = async (id: string) => (await db.prepare(`SELECT audience FROM notifications WHERE session_id = ? AND audience LIKE 'team:%'`).bind(id).all<{ audience: string }>()).results.length;
+    const clearNotices = (id: string) => run('DELETE FROM notifications WHERE session_id = ?', id);
+
+    async function openContest() {
+      await closeFixtureContests();
+      const live = await liveContest(-10, 60);
+      await issue(live, both());
+      return live;
+    }
+
+    it('refuses assign_entrants without closeReporting, and with it closes, notifies, and names the accounts', async () => {
+      const live = await openContest();
+      await clearNotices(live);
+      const { entrant, account } = await freshEntrant();
+      const assign = (extra: object) => manage.execute(organizer, randomUUID(), {
+        type: 'assign_entrants', contestId: live, entries: [{ entrantId: entrant, location: '' }], ...extra,
+      });
+      await expect(assign({})).rejects.toMatchObject({ status: 409 });
+      expect((await intake(live)).open).toBe(true);
+      const receipt = await assign({ closeReporting: true });
+      expect(receipt.accountIds).toEqual([account]);
+      expect(await intake(live)).toMatchObject({ open: false, reason: 'awaiting_live_passwords' });
+      expect(await teamNotices(live)).toBeGreaterThanOrEqual(3);
+    });
+
+    it('does not ask when the assigned entrant has no sign-in, or the contest is practice', async () => {
+      const live = await openContest();
+      const entrant = await bareEntrant();
+      await manage.execute(organizer, randomUUID(), { type: 'assign_entrants', contestId: live, entries: [{ entrantId: entrant, location: '' }] });
+      expect((await intake(live)).open).toBe(true);
+      await run('UPDATE sessions SET intake_open = 1 WHERE id = ?', fixture.sessionId);
+      const late = await freshEntrant();
+      await manage.execute(organizer, randomUUID(), { type: 'assign_entrants', contestId: fixture.sessionId, entries: [{ entrantId: late.entrant, location: '' }] });
+    });
+
+    it('refuses add_entrant_sign_in without closeReporting, and with it closes and notifies', async () => {
+      const live = await openContest();
+      const entrant = await bareEntrant();
+      await manage.execute(organizer, randomUUID(), { type: 'assign_entrants', contestId: live, entries: [{ entrantId: entrant, location: '' }] });
+      await clearNotices(live);
+      const handle = `late-${entrant.slice(0, 6)}`;
+      const add = (extra: object) => manage.execute(organizer, randomUUID(), { type: 'add_entrant_sign_in', eventId: fixture.eventId, entrantId: entrant, handle, ...extra });
+      await expect(add({})).rejects.toMatchObject({ status: 409 });
+      await add({ closeReporting: true });
+      expect((await intake(live)).open).toBe(false);
+      expect(await teamNotices(live)).toBeGreaterThanOrEqual(3);
+    });
+
+    it('tells every team when removing the last waiting seat opens the contest', async () => {
+      const live = await openContest();
+      const { entrant } = await freshEntrant();
+      await manage.execute(organizer, randomUUID(), { type: 'assign_entrants', contestId: live, entries: [{ entrantId: entrant, location: '' }], closeReporting: true });
+      await clearNotices(live);
+      await manage.execute(organizer, randomUUID(), { type: 'unassign_entrant', contestId: live, entrantId: entrant });
+      expect((await intake(live)).open).toBe(true);
+      expect(await teamNotices(live)).toBeGreaterThanOrEqual(2);
+    });
+  });
+
+  describe('a password for a later contest', () => {
+    it('refuses to void a scope of a contest that has not ended, unless the request says so', async () => {
+      await closeFixtureContests();
+      const dayOne = await liveContest(60, 120);
+      const dayThree = await liveContest(3 * 1440, 3 * 1440 + 60);
+      await issue(dayOne, both());
+      const sheet = () => issue(dayThree, [fixture.contestant.accountId]);
+      await expect(sheet()).rejects.toMatchObject({ status: 409 });
+      await expect(sheet()).rejects.toThrow(/stop working in Live /);
+      expect(await unready(dayOne)).toBe(0);
+      await manage.issueCredentials(organizer, randomUUID(), { eventId: fixture.eventId, accountIds: [fixture.contestant.accountId], contestId: dayThree, voidLivePasswords: true });
+      expect(await unready(dayOne)).toBe(1);
+      expect(await unready(dayThree)).toBe(1);
+    });
+
+    it('does not ask about a contest that has ended', async () => {
+      await closeFixtureContests();
+      const over = await liveContest(-300, -200);
+      const next = await liveContest(60, 120);
+      await issue(over, both());
+      await expect(issue(next, both())).resolves.toHaveLength(2);
+    });
+
+    it('tells the organizer to close one contest when two open contests block each other', async () => {
+      await closeFixtureContests();
+      const live = await liveContest(-10, 60);
+      await issue(live, both());
+      await run('UPDATE sessions SET intake_open = 1 WHERE id = ?', fixture.sessionId);
+      await expect(issue(live, [fixture.contestant.accountId])).rejects.toThrow(/Close one contest, then issue/);
+    });
   });
 });
 
@@ -262,6 +454,7 @@ describe('0022 applied one statement at a time', () => {
         const gone = seats.shift()!;
         await run(`INSERT INTO account_operations (id, account_id, actor, action, state) VALUES (?, ?, ?, 'reset_password', 'completed')`, randomUUID(), fresh, fresh);
         await run('DELETE FROM memberships WHERE session_id = ? AND account_id = ?', contest, gone);
+        await run('UPDATE sessions SET grace_minutes = grace_minutes + 1 WHERE id = ?', contest);
         seats.push(fresh);
       }
       const final = await db.prepare(`SELECT unready_seats AS stored, (SELECT count(*) FROM memberships m WHERE m.session_id = s.id AND m.team_id IS NOT NULL) AS counted

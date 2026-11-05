@@ -227,10 +227,10 @@ export type ManageCommand =
   | { readonly type: 'create_people'; readonly eventId: string; readonly people: readonly PersonInput[] }
   | { readonly type: 'create_entrants'; readonly eventId: string; readonly entrants: readonly EntrantInput[] }
   | { readonly type: 'rename_entrant'; readonly eventId: string; readonly entrantId: string; readonly name: string }
-  | { readonly type: 'add_entrant_sign_in'; readonly eventId: string; readonly entrantId: string; readonly handle: string }
+  | { readonly type: 'add_entrant_sign_in'; readonly eventId: string; readonly entrantId: string; readonly handle: string; readonly closeReporting?: boolean | undefined }
   | { readonly type: 'create_contest'; readonly eventId: string; readonly name: string; readonly kind: ContestKind; readonly contestType: ContestType; readonly schedule: Schedule; readonly categories: readonly string[] }
   | { readonly type: 'update_contest'; readonly contestId: string; readonly name: string; readonly contestType: ContestType; readonly schedule?: Schedule | undefined }
-  | { readonly type: 'assign_entrants'; readonly contestId: string; readonly entries: ReadonlyArray<{ readonly entrantId: string; readonly location: string }> }
+  | { readonly type: 'assign_entrants'; readonly contestId: string; readonly entries: ReadonlyArray<{ readonly entrantId: string; readonly location: string }>; readonly closeReporting?: boolean | undefined }
   | { readonly type: 'unassign_entrant'; readonly contestId: string; readonly entrantId: string }
   | { readonly type: 'assign_staff'; readonly contestId: string; readonly accountId: string; readonly roles: readonly Role[]; readonly admin: boolean }
   | { readonly type: 'unassign_staff'; readonly contestId: string; readonly accountId: string }
@@ -354,6 +354,8 @@ export interface CredentialIssue {
   readonly accountIds: readonly string[];
   /** The contest the organizer issues for. A live target opens the overlapping live contests. */
   readonly contestId: string | null;
+  /** The organizer saw that this stops the passwords of live contests that have not ended. */
+  readonly voidLivePasswords?: boolean;
 }
 
 /** Site and event administration, and handle changes for the accounts that a caller may manage. */

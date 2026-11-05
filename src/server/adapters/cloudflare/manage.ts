@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import {
-  GRACE_MINUTES_MAX, ISSUE_BATCH, parseEventCode, type ContestKind, type ContestType, type EntrantKind, type EventConsole, type IssuedCredential,
+  GRACE_MINUTES_MAX, ISSUE_BATCH, parseEventCode, type ContestKind, type ContestType, type Schedule, type EntrantKind, type EventConsole, type IssuedCredential,
   type LoginKey, type ManageCommand, type ManageLevel, type ManageReceipt, type SiteOverview,
 } from '../../../backend/contracts';
 import { categoriesMax, hasControlCharacter, rosterKey, rosterTextMax, teamsPerCommandMax } from '../../../connected/roster';
@@ -15,10 +15,12 @@ import {
   openConflictBindings,
   openConflictSql,
   waitingSeatsSql,
+  moveStopsContestSql,
+  voidedScopesSql,
 } from './authority';
 import { handleSchema, loginKeyFor, replaceCredentialStatements } from './credentials';
 import { readablePassword, type PasswordHasher } from './password';
-import { intakeModeOf, intakeStateSql, parseIntake, scheduleOf, type ScheduleColumns } from './schedule';
+import { intakeModeOf, intakeOpenSql, intakeStateSql, parseIntake, scheduleOf, type ScheduleColumns } from './schedule';
 
 const noControl = (value: string) => !hasControlCharacter(value);
 const nameSchema = z.string().trim().min(1).max(rosterTextMax).refine(noControl, 'Remove control characters.');
@@ -71,7 +73,7 @@ const commandSchema = z.discriminatedUnion('type', [
       .refine((entrants) => new Set(entrants.map((entrant) => entrant.handle)).size === entrants.length, 'Usernames must be different.'),
   }),
   z.strictObject({ type: z.literal('rename_entrant'), eventId: uuid, entrantId: uuid, name: nameSchema }),
-  z.strictObject({ type: z.literal('add_entrant_sign_in'), eventId: uuid, entrantId: uuid, handle: handleSchema }),
+  z.strictObject({ type: z.literal('add_entrant_sign_in'), eventId: uuid, entrantId: uuid, handle: handleSchema, closeReporting: z.boolean().optional() }),
   z.strictObject({
     type: z.literal('create_contest'), kind: z.enum(['practice', 'live']).default('practice'), eventId: uuid, name: nameSchema, contestType: contestTypeSchema,
     schedule: scheduleSchema, categories: categoriesSchema,
@@ -82,7 +84,7 @@ const commandSchema = z.discriminatedUnion('type', [
     schedule: scheduleSchema.optional(),
   }),
   z.strictObject({
-    type: z.literal('assign_entrants'), contestId: uuid,
+    type: z.literal('assign_entrants'), contestId: uuid, closeReporting: z.boolean().optional(),
     entries: z.array(z.strictObject({ entrantId: uuid, location: locationSchema })).min(1).max(teamsPerCommandMax)
       .refine((entries) => new Set(entries.map((entry) => entry.entrantId)).size === entries.length),
   }),
@@ -110,6 +112,7 @@ const issueSchema = z.strictObject({
     .refine((accountIds) => new Set(accountIds).size === accountIds.length),
   // A tab from before this field names no contest.
   contestId: z.uuid().nullable().default(null),
+  voidLivePasswords: z.boolean().default(false),
 });
 
 /**
@@ -211,6 +214,15 @@ const refusals: ReadonlyArray<readonly [cause: string, message: string]> = [
 ];
 
 /** Maps a failed batch to a message without SQL or provider detail. */
+function closesReporting(contest: string): string {
+  return `Reporting is open in ${contest}. This change closes it for every team until the new sign-in has a password. Confirm to continue.`;
+}
+
+function moveStopsBindings(contestId: string, schedule: Schedule): D1Value[] {
+  const end = new Date(Date.parse(schedule.endsAt) + schedule.graceMinutes * 60_000).toISOString();
+  return [contestId, schedule.startsAt, end, end, schedule.startsAt];
+}
+
 function refusal(error: unknown): AuthenticationError {
   const message = error instanceof Error ? error.message : '';
   const known = refusals.find(([cause]) => message.includes(cause));
@@ -411,8 +423,8 @@ export class D1ManageService {
   async issueCredentials(caller: Caller, requestId: string, input: unknown): Promise<IssuedCredential[]> {
     const parsed = issueSchema.safeParse(input);
     if (!parsed.success) throw new AuthenticationError(400, `Choose 1 to ${ISSUE_BATCH} different accounts.`);
-    const { eventId: scope, accountIds, contestId } = parsed.data;
-    const record = JSON.stringify({ type: 'issue_credentials', eventId: scope, accountIds, contestId });
+    const { eventId: scope, accountIds, contestId, voidLivePasswords } = parsed.data;
+    const record = JSON.stringify({ type: 'issue_credentials', eventId: scope, accountIds, contestId, voidLivePasswords });
     const replayed = await this.replay(caller, requestId, record);
     if (replayed) return this.issued(accountIds, new Map());
     if (accountIds.includes(caller.accountId)) throw new AuthenticationError(400, 'Use Change password for your own account.');
@@ -441,7 +453,12 @@ export class D1ManageService {
       const conflict = target.ready === 0 ? null
         : await this.statement(openConflictSql, ...openConflictBindings(target.id, contestId)).first<{ name: string }>();
       if (conflict) {
-        throw new AuthenticationError(409, `Reporting is open in ${conflict.name}. A new password would sign ${target.name} out of it. Issue it from ${conflict.name}, or close that contest first.`);
+        throw new AuthenticationError(409, `Reporting is open in ${conflict.name}. A new password would sign ${target.name} out of it. Close one contest, then issue the password.`);
+      }
+      const voided = target.ready === 0 || voidLivePasswords ? null
+        : await this.statement(voidedScopesSql, ...openConflictBindings(target.id, contestId)).first<{ name: string }>();
+      if (voided) {
+        throw new AuthenticationError(409, `The password of ${target.name} would stop working in ${voided.name}, which has not ended. Confirm the new password, or issue it after ${voided.name} ends.`);
       }
       for (const seat of seats.results) if (seat.kind === 'live') liveSeats.set(seat.session_id, seat.unready_seats);
       // A reset or a change of authority since the read fails the batch.
@@ -453,6 +470,7 @@ export class D1ManageService {
           ...(scope === null ? [] : [scope]), target.credential_generation),
         // Intake can open between the read and the batch. This runs before the writes that change readiness.
         ...(target.ready === 0 ? [] : [assertions.check(`SELECT 1 WHERE NOT EXISTS (${openConflictSql})`, ...openConflictBindings(target.id, contestId))]),
+        ...(target.ready === 0 || voidLivePasswords ? [] : [assertions.check(`SELECT 1 WHERE NOT EXISTS (${voidedScopesSql})`, ...openConflictBindings(target.id, contestId))]),
         // An account from before login keys gets its key with its first password.
         ...(target.stored ? [] : [this.statement('UPDATE accounts SET username = ? WHERE id = ? AND username IS NULL', target.loginKey, target.id)]),
         ...replaceCredentialStatements(this.db, target, await this.passwords.hash(password),
@@ -796,15 +814,24 @@ export class D1ManageService {
         }
         if ((await this.takenHandles(scopeEvent, [handle])).length > 0) throw new AuthenticationError(409, usernameTaken);
         const accountId = crypto.randomUUID();
+        const liveEntries = await this.statement(`SELECT s.id, s.name, ${intakeOpenSql('s')} AS open FROM teams t
+          JOIN sessions s ON s.id = t.session_id WHERE t.entrant_id = ? AND s.kind = 'live'`, entrantId)
+          .all<{ id: string; name: string; open: number }>();
+        const closes = liveEntries.results.find((entry) => entry.open === 1);
+        if (closes && !command.closeReporting) throw new AuthenticationError(409, closesReporting(closes.name));
         return {
           statements: [
             assertions.check('SELECT 1 WHERE NOT EXISTS (SELECT 1 FROM accounts WHERE entrant_id = ?)', entrantId),
+            ...(command.closeReporting ? [] : [assertions.check(`SELECT 1 WHERE NOT EXISTS (SELECT 1 FROM teams t
+              JOIN sessions s ON s.id = t.session_id WHERE t.entrant_id = ? AND s.kind = 'live' AND ${intakeOpenSql('s')})`, entrantId)]),
             // D1 seats the new sign-in in each entry of the entrant. It has no password until issueCredentials.
             this.statement(`INSERT INTO accounts (id, name, username, handle, event_id, entrant_id, must_change, credential_state)
               VALUES (?, ?, ?, ?, ?, ?, 1, 'pending')`, accountId, entrant.name, loginKeyFor(accountId), handle, scopeEvent, entrantId),
           ],
           audit: { action: 'add_entrant_sign_in', target: accountId, detail: { entrant: entrantId, handle } },
-          notify: [],
+          notify: await Promise.all(liveEntries.results.map(async (entry) => ({
+            contestId: entry.id, audiences: entry.open === 1 ? await this.contestAudiences(entry.id) : ['staff'],
+          }))),
           receipt: { entrantIds: [entrantId], accountIds: [accountId] },
         };
       }
@@ -833,9 +860,14 @@ export class D1ManageService {
         }
         const before = scheduleOf(current);
         const schedule = command.schedule ?? before;
+        const moveBindings = command.schedule ? moveStopsBindings(command.contestId, command.schedule) : [];
+        if (command.schedule && await this.statement(moveStopsContestSql, ...moveBindings).first()) {
+          throw new AuthenticationError(409, 'This move leaves the window that the passwords were issued for, and the contest would stop while it should run. Close reporting first, then move it and issue new passwords.');
+        }
         return {
           // D1 refuses a contest type that excludes an entry, and it counts the change in the contest version.
           statements: [
+            ...(command.schedule ? [assertions.check(`SELECT 1 WHERE NOT EXISTS (${moveStopsContestSql})`, ...moveBindings)] : []),
             // The schedule never changes the intake mode. Staff choose that with set_intake.
             // A command without a schedule leaves the three schedule columns as they are.
             command.schedule
@@ -864,7 +896,8 @@ export class D1ManageService {
             .all<{ id: string; kind: EntrantKind; name: string }>(),
           this.statement('SELECT entrant_id FROM teams WHERE session_id = ? AND entrant_id IN (SELECT value FROM json_each(?))',
             command.contestId, listed).all<{ entrant_id: string }>(),
-          this.statement('SELECT contest_type FROM sessions WHERE id = ?', command.contestId).first<{ contest_type: ContestType }>(),
+          this.statement(`SELECT s.name, s.contest_type, s.kind, ${intakeOpenSql('s')} AS open FROM sessions s WHERE s.id = ?`, command.contestId)
+            .first<{ name: string; contest_type: ContestType; kind: ContestKind; open: number }>(),
         ]);
         const entrants = new Map(found.results.map((row) => [row.id, row]));
         if (!type || entrants.size !== ids.length) throw new AuthenticationError(409, staleEntrant);
@@ -875,8 +908,17 @@ export class D1ManageService {
         const entries = command.entries.map((entry) => ({
           id: crypto.randomUUID(), entrantId: entry.entrantId, location: entry.location,
         }));
+        const unscoped = type.kind !== 'live' ? [] : (await this.statement(`SELECT a.id FROM accounts a
+          WHERE a.entrant_id IN (SELECT value FROM json_each(?)) AND NOT EXISTS (SELECT 1 FROM credential_scopes c
+            WHERE c.account_id = a.id AND c.session_id = ?)`, listed, command.contestId).all<{ id: string }>()).results.map((row) => row.id);
+        const closes = type.open === 1 && unscoped.length > 0;
+        if (closes && !command.closeReporting) throw new AuthenticationError(409, closesReporting(type.name));
         return {
           statements: [
+            ...(command.closeReporting ? [] : [assertions.check(`SELECT 1 WHERE NOT EXISTS (SELECT 1 FROM sessions s
+              JOIN accounts a ON a.entrant_id IN (SELECT value FROM json_each(?))
+              WHERE s.id = ? AND s.kind = 'live' AND ${intakeOpenSql('s')} AND NOT EXISTS (SELECT 1 FROM credential_scopes c
+                WHERE c.account_id = a.id AND c.session_id = s.id))`, listed, command.contestId)]),
             // D1 seats each entrant's sign-in and checks the contest type.
             this.statement(`INSERT INTO teams (id, session_id, entrant_id, name, location)
               SELECT json_extract(value, '$.id'), ?, json_extract(value, '$.entrantId'),
@@ -887,8 +929,10 @@ export class D1ManageService {
           ],
           audit: { action: 'assign_entrants', target: null, detail: { contest: command.contestId, count: entries.length } },
           contestAudit: { action: 'assign_entrants', target: null, detail: { count: entries.length } },
-          notify: [{ contestId: command.contestId, audiences: ['staff'] }],
-          receipt: { contestId: command.contestId, entrantIds: ids },
+          notify: [{ contestId: command.contestId, audiences: closes
+            ? [...await this.contestAudiences(command.contestId), ...entries.map((entry) => `team:${entry.id}`)]
+            : ['staff'] }],
+          receipt: { contestId: command.contestId, entrantIds: ids, ...(type.kind === 'live' ? { accountIds: unscoped } : {}) },
         };
       }
       case 'unassign_entrant': {
@@ -899,7 +943,13 @@ export class D1ManageService {
         if (entry.issues > 0) {
           throw new AuthenticationError(409, `${entry.name} has ${entry.issues} ${entry.issues === 1 ? 'issue' : 'issues'} and stays in the contest.`);
         }
-        const account = await this.statement('SELECT id FROM accounts WHERE entrant_id = ?', command.entrantId).all<{ id: string }>();
+        const account = await this.statement(`SELECT id, EXISTS (SELECT 1 FROM credential_scopes c
+            WHERE c.account_id = accounts.id AND c.session_id = ?) AS scoped FROM accounts WHERE entrant_id = ?`, command.contestId, command.entrantId)
+          .all<{ id: string; scoped: number }>();
+        const live = await this.statement(`SELECT unready_seats FROM sessions WHERE id = ? AND kind = 'live'`, command.contestId)
+          .first<{ unready_seats: number }>();
+        const waitingHere = account.results.filter((row) => row.scoped === 0).length;
+        const opens = !!live && waitingHere > 0 && live.unready_seats <= waitingHere;
         return {
           statements: [
             assertions.check('SELECT 1 WHERE NOT EXISTS (SELECT 1 FROM issues WHERE session_id = ? AND team_id = ?)', command.contestId, entry.id),
@@ -909,7 +959,7 @@ export class D1ManageService {
           ],
           audit: { action: 'unassign_entrant', target: null, detail: { contest: command.contestId, entrant: command.entrantId } },
           contestAudit: { action: 'unassign_entrant', target: null, detail: { entrant: command.entrantId, name: entry.name } },
-          notify: [{ contestId: command.contestId, audiences: ['staff', `team:${entry.id}`, ...account.results.map((row) => `account:${row.id}`)] }],
+          notify: [{ contestId: command.contestId, audiences: [...(opens ? await this.contestAudiences(command.contestId) : ['staff', `team:${entry.id}`]), ...account.results.map((row) => `account:${row.id}`)] }],
           receipt: { contestId: command.contestId, entrantIds: [command.entrantId] },
         };
       }

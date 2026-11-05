@@ -8,7 +8,7 @@ import {
   linesError,
   parsePersonLines,
   personInputs,
-  recoveryContest,
+  recoveryContest, voidedBy,
 } from "./eventModel";
 
 const rules = { uniqueNames: true, takenNames: ["Aurora"], takenHandles: ["aurora"] };
@@ -102,5 +102,19 @@ describe("live contest helpers", () => {
   it("names the entrant's open contest for a reset, live first", () => {
     expect(recoveryContest(data, "e")).toBe("open");
     expect(recoveryContest(data, "nobody")).toBeNull();
+  });
+
+  it("falls back to the entrant's next live contest that has not ended", () => {
+    const year = new Date().getUTCFullYear() + 1;
+    const future = (id: string, day: number) => contest(id, "live", `${year}-01-0${day}T09:00:00.000Z`, `${year}-01-0${day}T10:00:00.000Z`);
+    const later = {
+      contests: [future("third", 3), future("first", 1), contest("past", "live", "2020-01-01T09:00:00.000Z", "2020-01-01T10:00:00.000Z")],
+      entries: ["third", "first", "past"].map((contestId) => ({ contestId, entrantId: "e", location: "" })),
+      entrants: [{ id: "e", accountId: "acct" }],
+    } as unknown as EventConsole;
+    expect(recoveryContest(later, "e")).toBe("first");
+    expect(voidedBy(later, later.contests[0], ["acct"]).map((item) => item.id)).toEqual(["first"]);
+    expect(voidedBy(later, later.contests[1], ["acct"]).map((item) => item.id)).toEqual(["third"]);
+    expect(voidedBy({ ...later, contests: [later.contests[0]!, { ...later.contests[1]!, waiting: [{ accountId: "acct", name: "e", handle: "e" }] }] }, later.contests[0], ["acct"])).toEqual([]);
   });
 });

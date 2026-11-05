@@ -315,8 +315,8 @@ export function createCloudflareBackend(options: {
       async execute(requestId, command) {
         return receiptSchema.parse(await readJson(await post('/api/manage', { requestId, command })));
       },
-      async issueCredentials(requestId, { eventId, accountIds, contestId }) {
-        return issuedSchema.parse(await readJson(await post('/api/credentials', { requestId, eventId, accountIds, contestId })));
+      async issueCredentials(requestId, { eventId, accountIds, contestId, voidLivePasswords }) {
+        return issuedSchema.parse(await readJson(await post('/api/credentials', { requestId, eventId, accountIds, contestId, voidLivePasswords })));
       },
     },
     contestAwards: {

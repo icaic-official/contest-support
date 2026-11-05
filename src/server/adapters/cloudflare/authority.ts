@@ -396,6 +396,27 @@ export function openConflictBindings(accountId: string, contestId: string | null
   return [accountId, contestId, accountId, contestId];
 }
 
+/**
+ * The live contests, not yet ended, whose password a new issue would void: the
+ * account's scopes outside `forContests` and other than the target. Bind with
+ * `openConflictBindings`.
+ */
+export const voidedScopesSql = `SELECT s.name FROM credential_scopes c JOIN sessions s ON s.id = c.session_id
+  JOIN memberships m ON m.session_id = s.id AND m.account_id = c.account_id AND m.team_id IS NOT NULL
+  WHERE c.account_id = ? AND s.kind = 'live' AND ${nowSql} < ${windowEndSql('s')} AND s.id IS NOT ?
+    AND s.id NOT IN (${forContestsSql})`;
+
+/**
+ * A row when a move would void a seat's password and the contest stays due to run.
+ * Bind the contest, the new start, the new end with grace, that end, and that start.
+ */
+export const moveStopsContestSql = `SELECT 1 FROM sessions s
+  JOIN memberships m ON m.session_id = s.id AND m.team_id IS NOT NULL
+  JOIN credential_scopes c ON c.account_id = m.account_id AND c.session_id = s.id
+  WHERE s.id = ? AND s.kind = 'live' AND ${intakeOpenSql('s')}
+    AND (s.intake_follows_schedule = 0 OR (? <= ${nowSql} AND ${nowSql} < ?))
+    AND NOT (c.issued_from < ? AND ? < c.issued_until)`;
+
 /** The contests that seat an account, with their readiness. */
 export const accountSeatsSql = `SELECT m.session_id, s.kind, s.unready_seats FROM memberships m
   JOIN sessions s ON s.id = m.session_id WHERE m.account_id = ?`;

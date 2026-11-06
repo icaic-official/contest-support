@@ -159,21 +159,20 @@ npm run test:connector:accounts:hosted -- \
   --database=341350ba-7c74-4c46-8b21-edfdcda475f5
 ```
 
-The expected result is `Hosted connector accounts: 82 passed, 0 failed, 0 skipped.`
+The expected result is `Hosted connector accounts: 34 passed, 0 failed, 0 skipped.`
 This command checks current permissions, identity expiry, credential generation, revocation, and rollback inside account batches.
 It uses maintained password hashing and the same reviewed D1-only configuration.
 The runner includes four fixed authentication files:
 
 - `src/server/adapters/cloudflare/authentication.test.ts`
 - `src/server/adapters/cloudflare/authenticationRecovery.test.ts`
-- `src/server/adapters/cloudflare/authenticationInitiation.test.ts`
 - `src/server/adapters/cloudflare/authenticationCompletion.test.ts`
 
 Cases run serially within each file. Up to four files run concurrently.
 Each case creates its own UUID-scoped fixture. Each file owns its identity service and database proxy.
 Fixture setup, credential snapshots, and cleanup checks use D1 batches with the same row assertions.
 The local `npm run test:auth` suite includes one additional expiry-clock probe and must pass all 83 cases.
-Record that local result separately from the 82 hosted cases.
+Record that local result separately from the 34 hosted cases.
 Both connector runners reject test filters, count overrides, and configuration overrides beyond the documented target and transport options.
 Both direct D1 runners retain their own fixture journals if cleanup fails. They use the original reviewed repository configuration.
 
@@ -220,7 +219,7 @@ npm run test:connector:accounts:hosted -- \
   --database=341350ba-7c74-4c46-8b21-edfdcda475f5
 ```
 
-The expected result is `Hosted connector accounts: 82 passed, 0 failed, 0 skipped.`
+The expected result is `Hosted connector accounts: 34 passed, 0 failed, 0 skipped.`
 The API option uses the same files, assertions, case counts, and timeouts as the binding transport.
 The API transport runs files in sequence with one worker. Native account checks retain four workers.
 Tests can still run concurrent operations inside each case. The runner adds no retries or case filters.

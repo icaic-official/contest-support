@@ -32,7 +32,7 @@ export function SignIn() {
     >
       <Link
         to="/"
-        className="mb-10 flex w-fit rounded-md text-lg outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+        className="mb-10 flex min-h-11 w-fit items-center rounded-md text-lg outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
       >
         <BrandMark />
       </Link>

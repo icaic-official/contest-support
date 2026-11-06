@@ -5,8 +5,9 @@ import type { D1Binding, D1Connection, D1Statement, D1Value } from '../d1/connec
 import { D1Fixture, applyMigrations } from '../d1/testFixture';
 import { measureD1 } from '../d1/testMetrics';
 import { parseHandle, type EventCode, type Handle, type SignInTarget } from '../../../backend/contracts';
-import { D1ApplicationService, notificationStatements } from './application';
+import { D1ApplicationService } from './application';
 import { D1AuthenticationService, signInFailureLimits } from './authentication';
+import { D1ManageService } from './manage';
 import { loginKeyFor } from './credentials';
 import { createBetterAuthIdentity, type IdentityProvider } from './identity';
 import { passwordHasher, randomSecret, type PasswordHasher } from './password';
@@ -44,7 +45,7 @@ function expectFailure(operation: Promise<unknown>) {
   return expect(operation.then(() => undefined)).rejects;
 }
 
-export type AuthenticationCases = 'sessions' | 'recovery' | 'initiation' | 'completion';
+export type AuthenticationCases = 'sessions' | 'recovery' | 'completion';
 
 /** Each file owns its fixtures. Hosted files can run concurrently. */
 export function registerAuthenticationCases(group: AuthenticationCases) {
@@ -403,91 +404,9 @@ export function registerAuthenticationCases(group: AuthenticationCases) {
         expect(await service.current(headers)).toBeUndefined();
         expect((await service.current(await signIn(username, replacement)))?.status.must_change).toBe(false);
       });
-
-      it('leaves an interrupted D1 identity completion restricted and allows organizer recovery', async () => {
-        let batches = 0;
-        const interruptedDb: D1Connection = {
-          prepare: (sql) => db.prepare(sql),
-          batch: async (statements) => {
-            if (++batches === 2) throw new Error('Interrupted identity commit');
-            return db.batch(statements);
-          },
-        };
-        const interrupted = new D1AuthenticationService(interruptedDb, identity, hasher);
-        await expectFailure(interrupted.account(adminHeaders, fixture.sessionId, { action: 'reset_password', userId: fixture.contestant.accountId })).toMatchObject({ status: 409 });
-        await expectFailure(signIn()).toMatchObject({ status: 401 });
-        expect((await stmt('SELECT credential_state FROM accounts WHERE id = ?', fixture.contestant.accountId).first<{credential_state: string}>())?.credential_state).toBe('pending');
-        const recovered = await service.account(adminHeaders, fixture.sessionId, { action: 'reset_password', userId: fixture.contestant.accountId });
-        expect((await service.current(await signIn(username, recovered.temporaryPassword)))?.status.must_change).toBe(true);
-      });
-
-      it('rolls back reset initiation when current admin access changes before commit', async () => {
-        let called = false;
-        const competingDb: D1Connection = { prepare: (sql) => db.prepare(sql), batch: async (statements) => {
-          if (!called) {
-            called = true;
-            await stmt('UPDATE memberships SET is_admin = 0 WHERE account_id = ?', fixture.staff.accountId).run();
-          }
-          return db.batch(statements);
-        } };
-        await expectFailure(new D1AuthenticationService(competingDb, identity, hasher).account(adminHeaders, fixture.sessionId, { action: 'reset_password', userId: fixture.contestant.accountId })).toMatchObject({ status: 409 });
-        expect((await service.current(await signIn()))?.status.must_change).toBe(false);
-        expect((await stmt('SELECT count(*) n FROM account_operations WHERE account_id = ?', fixture.contestant.accountId).first<{n: number}>())?.n).toBe(0);
-      });
-    }
-
-    const restrictions = ['expired_login', 'expired_identity', 'revoked', 'generation', 'must_change', 'disabled', 'pending', 'permission'];
-
-    if (group === 'initiation') {
-      for (const action of ['create_account', 'reset_password'] as const) {
-        it.each(restrictions)(`rolls back ${action} initiation when %s changes at the final check`, async (restriction) => {
-          await signIn();
-          const accountUsername = `late_${randomSecret().slice(0, 20)}`;
-          const before = await credentialEffects();
-          const racing = changeAtFinalGuard(await actorRestriction(restriction));
-          const command = action === 'create_account'
-            ? { action, username: accountUsername, name: `auth-fixture:${fixture.eventId}`, teamId: fixture.teamId, roles: [], isAdmin: false }
-            : { action, userId: fixture.contestant.accountId };
-          await expectFailure(racing.account(adminHeaders, fixture.sessionId, command)).toMatchObject({ status: 409 });
-          expect(await credentialEffects()).toBe(before);
-          expect((await service.current(adminHeaders))?.status.must_change).toBe(false);
-        });
-      }
     }
 
     if (group === 'completion') {
-      for (const action of ['create_account', 'reset_password'] as const) {
-        it.each(restrictions)(`rolls back ${action} credential completion when %s changes at the final check`, async (restriction) => {
-          await signIn();
-          let pending: string | undefined;
-          const racing = changeAtFinalGuard(await actorRestriction(restriction), 2, async () => { pending = await credentialEffects(); });
-          const accountUsername = `late_${randomSecret().slice(0, 20)}`;
-          const command = action === 'create_account'
-            ? { action, username: accountUsername, name: `auth-fixture:${fixture.eventId}`, teamId: fixture.teamId, roles: [], isAdmin: false }
-            : { action, userId: fixture.contestant.accountId };
-          await expectFailure(racing.account(adminHeaders, fixture.sessionId, command)).toMatchObject({ status: 409 });
-          expect(pending).toBeDefined();
-          expect(await credentialEffects()).toBe(pending);
-          const account = await stmt('SELECT credential_state, must_change FROM accounts WHERE handle = ?',
-            action === 'create_account' ? accountUsername : username).first<{ credential_state: string; must_change: number }>();
-          expect(account).toMatchObject({ credential_state: 'pending', must_change: 1 });
-          expect((await service.current(adminHeaders))?.status.must_change).toBe(false);
-        });
-
-        it(`rolls back ${action} completion when the target credential generation changes at the final check`, async () => {
-          const accountUsername = action === 'create_account' ? `late_${randomSecret().slice(0, 20)}` : username;
-          let pending: string | undefined;
-          const racing = changeAtFinalGuard(stmt('UPDATE accounts SET credential_generation = credential_generation + 1 WHERE handle = ?', accountUsername),
-            2, async () => { pending = await credentialEffects(); });
-          const command = action === 'create_account'
-            ? { action, username: accountUsername, name: `auth-fixture:${fixture.eventId}`, teamId: fixture.teamId, roles: [], isAdmin: false }
-            : { action, userId: fixture.contestant.accountId };
-          await expectFailure(racing.account(adminHeaders, fixture.sessionId, command)).toMatchObject({ status: 409 });
-          expect(pending).toBeDefined();
-          expect(await credentialEffects()).toBe(pending);
-        });
-      }
-
       it.each(['expired_login', 'generation', 'disabled', 'pending'])(
         'rolls back a self password change when %s changes after old sessions are revoked', async (restriction) => {
           const before = await credentialEffects();
@@ -556,47 +475,6 @@ export function registerAuthenticationCases(group: AuthenticationCases) {
       }
     }
 
-    if (group === 'recovery') {
-      it('keeps reset restricted if the organizer loses permission during hashing', async () => {
-        const interrupted = new D1AuthenticationService(db, identity, { ...hasher, hash: async (value) => {
-          await stmt('UPDATE memberships SET is_admin = 0 WHERE account_id = ?', fixture.staff.accountId).run();
-          return hasher.hash(value);
-        } });
-        await expectFailure(interrupted.account(adminHeaders, fixture.sessionId, { action: 'reset_password', userId: fixture.contestant.accountId })).toMatchObject({ status: 403 });
-        await expectFailure(signIn()).toMatchObject({ status: 401 });
-        await stmt('UPDATE memberships SET is_admin = 1 WHERE account_id = ?', fixture.staff.accountId).run();
-        const reset = await service.account(adminHeaders, fixture.sessionId, { action: 'reset_password', userId: fixture.contestant.accountId });
-        expect((await service.current(await signIn(username, reset.temporaryPassword)))?.status.must_change).toBe(true);
-      });
-
-      it('recovers an interrupted account creation without replacing its account ID', async () => {
-        const accountUsername = `create_${randomSecret().slice(0, 20)}`;
-        usernames.push(accountUsername);
-        const interrupted = new D1AuthenticationService(db, identity, { ...hasher, hash: async () => { throw new Error('Interrupted creation'); } });
-        await expectFailure(interrupted.account(adminHeaders, fixture.sessionId, { action: 'create_account', username: accountUsername, name: `auth-fixture:${fixture.eventId}`, teamId: fixture.teamId, roles: [], isAdmin: false })).toThrow('Interrupted creation');
-        const row = await stmt('SELECT id, credential_state FROM accounts WHERE handle = ?', accountUsername).first<{id: string; credential_state: string}>();
-        extraIds.push(row!.id);
-        expect(row?.credential_state).toBe('pending');
-        const recovered = await service.account(adminHeaders, fixture.sessionId, { action: 'reset_password', userId: row!.id });
-        expect((await service.current(await signIn(accountUsername, recovered.temporaryPassword)))?.user.id).toBe(row?.id);
-      });
-
-      it('blocks reset when a different assigned session is archived', async () => {
-        const archivedEvent = randomUUID();
-        // D1 refuses a membership in another event, so the membership comes before the move.
-        await db.batch([
-          stmt('INSERT INTO events (id, archived) VALUES (?, 1)', archivedEvent),
-          stmt('INSERT INTO memberships (session_id, account_id) VALUES (?, ?)', fixture.secondSessionId, fixture.contestant.accountId),
-          stmt('UPDATE sessions SET event_id = ? WHERE id = ?', archivedEvent, fixture.secondSessionId),
-        ]);
-        try {
-          await expectFailure(service.account(adminHeaders, fixture.sessionId, { action: 'reset_password', userId: fixture.contestant.accountId })).toMatchObject({ status: 403 });
-        } finally {
-          await db.batch([stmt('UPDATE sessions SET event_id = ? WHERE id = ?', fixture.eventId, fixture.secondSessionId), stmt('DELETE FROM events WHERE id = ?', archivedEvent)]);
-        }
-      });
-    }
-
     if (group === 'sessions') {
       it('bounds password attempts and releases an expired rate window', async () => {
         const key = limitKey(username);
@@ -622,7 +500,6 @@ export function registerAuthenticationCases(group: AuthenticationCases) {
           await expectFailure(new D1ApplicationService(db).snapshot(current!.caller, fixture.sessionId))
             .toMatchObject({ status: 403 });
         }
-        await expectFailure(service.account(headers, fixture.sessionId, { action: 'reset_password', userId: fixture.staff.accountId })).toMatchObject({ status: 403 });
       });
 
       it('changes a temporary password, rotates the cookie, and revokes every older login', async () => {
@@ -714,116 +591,11 @@ export function registerAuthenticationCases(group: AuthenticationCases) {
     }
 
     if (group === 'recovery') {
-      it('requires current admin access in every assigned session for reset', async () => {
-        await stmt('INSERT INTO memberships (session_id, account_id) VALUES (?, ?)', fixture.secondSessionId, fixture.contestant.accountId).run();
-        await stmt('UPDATE memberships SET is_admin = 0 WHERE session_id = ? AND account_id = ?', fixture.secondSessionId, fixture.staff.accountId).run();
-        await expectFailure(service.account(adminHeaders, fixture.sessionId, { action: 'reset_password', userId: fixture.contestant.accountId })).toMatchObject({ status: 403 });
-        expect((await service.current(await signIn()))?.status.must_change).toBe(false);
-      });
-
-      it('resets through the organizer and preserves IDs, membership, and issue history', async () => {
-        const oldHeaders = await signIn();
-        const command = {
-          type: 'message', issue_id: fixture.issueId, revision: 1,
-          text: 'Fictional history retained through password reset.', visibility: 'public',
-        };
-        // Seed retained records directly. Password recovery must preserve data
-        // on both the auth-only target and the complete connector schema.
-        await db.batch([
-          stmt(`INSERT INTO history (id, issue_id, actor, at, text, visibility)
-            VALUES (?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), ?, 'public')`,
-          randomUUID(), fixture.issueId, fixture.contestant.accountId, command.text),
-          stmt('INSERT INTO command_receipts (actor, request_id, session_id, command, issue_id) VALUES (?, ?, ?, ?, ?)',
-            fixture.contestant.accountId, randomUUID(), fixture.sessionId, JSON.stringify(command), fixture.issueId),
-          ...notificationStatements(db, fixture.sessionId, ['staff', `team:${fixture.teamId}`]),
-        ]);
-        const before = await fixture.durableState();
-        expect(before.history!.length).toBe(1);
-        const reset = await service.account(adminHeaders, fixture.sessionId, { action: 'reset_password', userId: fixture.contestant.accountId });
-        expect(Boolean(reset.temporaryPassword)).toBe(true);
-        expect(await service.current(oldHeaders)).toBeUndefined();
-        await expectFailure(signIn()).toMatchObject({ status: 401 });
-        const newHeaders = await signIn(username, reset.temporaryPassword);
-        const current = await service.current(newHeaders);
-        expect(current?.user.id).toBe(fixture.contestant.accountId);
-        expect(current?.status.must_change).toBe(true);
-        const after = await fixture.durableState();
-        for (const key of ['issues', 'receipts', 'history']) expect(after[key]).toEqual(before[key]);
-        for (const key of ['sequences', 'notifications']) {
-          expect(after[key]!.filter((row) => String(row.audience).startsWith('team:')))
-            .toEqual(before[key]!.filter((row) => String(row.audience).startsWith('team:')));
-        }
-        expect(after.notifications!.filter((row) => row.audience === 'staff')).toHaveLength(fullApplication ? 2 : 1);
-        // The contestant has a login, so the reset still sends the account a revocation hint.
-        expect((await stmt('SELECT count(*) AS n FROM notifications WHERE audience = ?', `account:${fixture.contestant.accountId}`)
-          .first<{ n: number }>())!.n).toBeGreaterThan(0);
-        expect((await stmt('SELECT team_id FROM memberships WHERE account_id = ?', fixture.contestant.accountId).first<{team_id: string}>())?.team_id).toBe(fixture.teamId);
-        expect((await stmt("SELECT count(*) n FROM account_operations WHERE account_id = ? AND state = 'completed'", fixture.contestant.accountId).first<{n: number}>())?.n).toBe(1);
-      });
-
-      it('rejects self-reset and archived accounts', async () => {
-        await expectFailure(service.account(adminHeaders, fixture.sessionId, { action: 'reset_password', userId: fixture.staff.accountId })).toMatchObject({ status: 400 });
-        await stmt('UPDATE events SET archived = 1 WHERE id = ?', fixture.eventId).run();
-        await expectFailure(service.account(adminHeaders, fixture.sessionId, { action: 'reset_password', userId: fixture.contestant.accountId })).toMatchObject({ status: 403 });
-      });
-
-      it('creates a temporary account with stable identity and restricted membership', async () => {
-        const accountUsername = `new_${randomSecret().slice(0, 20)}`;
-        const signals = async (audience: string) => (await stmt('SELECT count(*) AS n FROM notifications WHERE session_id = ? AND audience = ?', fixture.sessionId, audience).first<{ n: number }>())!.n;
-        const staffBefore = await signals('staff');
-        const result = await service.account(adminHeaders, fixture.sessionId, { action: 'create_account', username: accountUsername, name: `auth-fixture:${fixture.eventId}`, teamId: fixture.teamId, roles: [], isAdmin: false });
-        const row = await stmt('SELECT id FROM accounts WHERE handle = ?', accountUsername).first<{id: string}>();
-        extraIds.push(row!.id);
-        // A new account has no login, so setup writes one staff notification and no account notification.
-        expect(await signals(`account:${row!.id}`)).toBe(0);
-        expect(await signals('staff')).toBe(staffBefore + (fullApplication ? 1 : 0));
-        const current = await service.current(await signIn(accountUsername, result.temporaryPassword));
-        expect(current?.user.id).toBe(row!.id);
-        expect(current?.status.must_change).toBe(true);
-        // Only Better Auth knows the login key. No response shows it.
-        const loginKey = loginKeyFor(row!.id);
-        expect(await stmt('SELECT username, event_id FROM accounts WHERE id = ?', row!.id).first())
-          .toEqual({ username: loginKey, event_id: fixture.eventId });
-        expect(result.signIn).toEqual({ kind: 'event', code: eventCode });
-        expect(JSON.stringify([result, current])).not.toContain(loginKey);
-        await expectFailure(service.account(adminHeaders, fixture.sessionId, { action: 'create_account', username: accountUsername,
-          name: `auth-fixture:${fixture.eventId}`, teamId: fixture.teamId, roles: [], isAdmin: false }))
-          .toMatchObject({ status: 409, message: 'That username is taken in this event. Choose another.' });
-      });
-
-      it('leaves a failed password update restricted and recoverable by another reset', async () => {
-        const old = await signIn();
-        const failed: PasswordHasher = { ...hasher, hash: async () => { throw new Error('Interrupted hash'); } };
-        const interrupted = new D1AuthenticationService(db, identity, failed);
-        await expectFailure(interrupted.account(adminHeaders, fixture.sessionId, { action: 'reset_password', userId: fixture.contestant.accountId })).toThrow('Interrupted hash');
-        expect(await service.current(old)).toBeUndefined();
-        await expectFailure(signIn()).toMatchObject({ status: 401 });
-        const pending = await stmt('SELECT credential_state, must_change FROM accounts WHERE id = ?', fixture.contestant.accountId).first();
-        expect(pending).toEqual({ credential_state: 'pending', must_change: 1 });
-        const reset = await service.account(adminHeaders, fixture.sessionId, { action: 'reset_password', userId: fixture.contestant.accountId });
-        expect((await service.current(await signIn(username, reset.temporaryPassword)))?.status.must_change).toBe(true);
-      });
-
-      it('prevents a superseded reset from writing an older password', async () => {
-        let release: () => void = () => undefined;
-        let started: () => void = () => undefined;
-        const pause = new Promise<void>((resolve) => { release = resolve; });
-        const hashing = new Promise<void>((resolve) => { started = resolve; });
-        const delayed = new D1AuthenticationService(db, identity, { ...hasher, hash: async (value) => { started(); await pause; return hasher.hash(value); } });
-        const first = delayed.account(adminHeaders, fixture.sessionId, { action: 'reset_password', userId: fixture.contestant.accountId });
-        // Attach a rejection handler before another reset supersedes this operation.
-        const firstOutcome = first.then(() => false, () => true);
-        await hashing;
-        const second = await service.account(adminHeaders, fixture.sessionId, { action: 'reset_password', userId: fixture.contestant.accountId });
-        release();
-        expect(await firstOutcome).toBe(true);
-        expect((await service.current(await signIn(username, second.temporaryPassword)))?.status.must_change).toBe(true);
-      });
-
       it('rejects an old password login that races a completed reset', async () => {
         const racingIdentity: IdentityProvider = { ...identity, signIn: async (name, value) => {
           const signed = await identity.signIn(name, value);
-          await service.account(adminHeaders, fixture.sessionId, { action: 'reset_password', userId: fixture.contestant.accountId });
+          await new D1ManageService(db, hasher).issueCredentials((await service.current(adminHeaders))!.caller, crypto.randomUUID(),
+            { eventId: fixture.eventId, accountIds: [fixture.contestant.accountId], contestId: fixture.sessionId });
           return signed;
         } };
         await expectFailure(signIn(username, password, new D1AuthenticationService(db, racingIdentity, hasher))).toMatchObject({ status: 409 });

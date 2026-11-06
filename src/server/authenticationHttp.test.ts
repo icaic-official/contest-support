@@ -18,7 +18,6 @@ function setup() {
     signIn: vi.fn<AuthenticationService['signIn']>().mockResolvedValue({ cookie: 'opaque=fixture; Secure; HttpOnly; SameSite=Strict; Path=/' }),
     signOut: vi.fn<AuthenticationService['signOut']>().mockResolvedValue({ cookie: 'opaque=; Max-Age=0; Path=/' }),
     changePassword: vi.fn<AuthenticationService['changePassword']>().mockResolvedValue({ cookie: 'opaque=changed; Secure; HttpOnly; SameSite=Strict; Path=/' }),
-    account: vi.fn<AuthenticationService['account']>().mockResolvedValue({ temporaryPassword: 'fictional-temporary-password', signIn: { kind: 'site' } }),
   };
   return { service, handle: createAuthenticationHandler(service, { origins: [ORIGIN] }) };
 }
@@ -119,12 +118,11 @@ describe('authentication HTTP boundary', () => {
 
   it('requires the current session CSRF token for every authenticated write', async () => {
     const { handle, service } = setup();
-    for (const path of ['/api/auth/sign-out', '/api/auth/change-password', '/api/accounts']) {
+    for (const path of ['/api/auth/sign-out', '/api/auth/change-password']) {
       expect((await handle(post(path, {}, { 'X-CSRF-Token': 'stale-csrf' }))).status).toBe(403);
     }
     expect(service.signOut).not.toHaveBeenCalled();
     expect(service.changePassword).not.toHaveBeenCalled();
-    expect(service.account).not.toHaveBeenCalled();
     service.current.mockResolvedValue(undefined);
     expect((await handle(post('/api/auth/sign-out'))).status).toBe(401);
   });
@@ -140,17 +138,9 @@ describe('authentication HTTP boundary', () => {
     expect(signedOut.headers.get('Set-Cookie')).toContain('Max-Age=0');
   });
 
-  it('returns temporary credentials only from the authorized account command', async () => {
-    const { handle, service } = setup();
-    const command = { action: 'reset_password', userId: ACCOUNT_ID } as const;
-    const request = post('/api/accounts', { sessionId: SESSION_ID, command });
-    const response = await handle(request);
-    expect(await response.json()).toEqual({ temporaryPassword: 'fictional-temporary-password', signIn: { kind: 'site' } });
-    expect(service.account).toHaveBeenCalledExactlyOnceWith(request.headers, SESSION_ID, command);
-    service.account.mockRejectedValue(new AuthenticationError(403, 'Admin access to every assigned session is required.'));
-    const rejected = await handle(post('/api/accounts', { sessionId: SESSION_ID, command }));
-    expect(rejected.status).toBe(403);
-    expect(await rejected.text()).not.toContain('fictional-temporary-password');
+  it('has no account route, because organizers issue passwords through the management routes', async () => {
+    const { handle } = setup();
+    expect((await handle(post('/api/accounts', { sessionId: SESSION_ID }))).status).toBe(404);
   });
 
   it('rejects invalid, unknown-field and oversized bodies without identity writes', async () => {
@@ -162,10 +152,8 @@ describe('authentication HTTP boundary', () => {
       post('/api/auth/sign-in', { event: 'xxxx-2026', handle: 'helper', password: 'test', isAdmin: true }),
       post('/api/auth/sign-in', { event: 'xxxx-2026', handle: 'helper', password: 'x'.repeat(17_000) }),
       post('/api/auth/sign-in', { username: 'helper', password: 'fictional-password' }),
-      post('/api/accounts', { sessionId: SESSION_ID, command: { action: 'reset_password', userId: ACCOUNT_ID, user: 'forged' } }),
     ]) expect((await handle(request)).status).toBe(400);
     expect(service.signIn).not.toHaveBeenCalled();
-    expect(service.account).not.toHaveBeenCalled();
   });
 
   it('does not expose internal errors or credentials and preserves controlled rejections', async () => {

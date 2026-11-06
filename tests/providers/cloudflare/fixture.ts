@@ -14,7 +14,7 @@ import { createdAccountMarkers, type Actor, type ScenarioData, type TestAccount 
 import { confirmFixtureTarget, readFixtureTarget, type FixtureTarget } from './target.mjs';
 import { readD1AuthFlags } from './diagnostics';
 
-const actors = ['admin', 'otherAdmin', 'contestant', 'otherTeam', 'volunteer', 'specialist', 'jury', 'isolated', 'temporary', 'revoked'] as const satisfies readonly Actor[];
+const actors = ['eventAdmin', 'admin', 'otherAdmin', 'contestant', 'otherTeam', 'volunteer', 'specialist', 'jury', 'isolated', 'temporary', 'revoked'] as const satisfies readonly Actor[];
 const uuid = z.uuid();
 const journalSchema = z.strictObject({
   version: z.literal(1), provider: z.literal('cloudflare'), runId: uuid, eventId: uuid,
@@ -176,16 +176,20 @@ export async function createFixture(path: string, dependencies: Dependencies = {
       const role = actor === 'volunteer' || actor === 'revoked' ? 'volunteer'
         : actor === 'specialist' ? 'specialist' : actor === 'jury' ? 'jury' : undefined;
       queries.push(
-        statement(db, 'INSERT INTO accounts (id, name, username, must_change) VALUES (?, ?, ?, ?)',
-          account.id, name(journal, actor), account.username, Number(actor === 'temporary')),
+        statement(db, 'INSERT INTO accounts (id, name, username, handle, event_id, must_change) VALUES (?, ?, ?, ?, ?, ?)',
+          account.id, name(journal, actor), account.username, account.username, journal.eventId, Number(actor === 'temporary')),
         statement(db, `INSERT INTO ba_user (id, name, email, username, emailVerified, createdAt, updatedAt)
           VALUES (?, ?, ?, ?, 1, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`,
         account.id, name(journal, actor), `${account.username}@accounts.minsky.invalid`, account.username),
         statement(db, `INSERT INTO ba_account (id, accountId, providerId, userId, password, createdAt, updatedAt)
           VALUES (?, ?, 'credential', ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`,
         crypto.randomUUID(), account.id, account.id, hashes.get(actor)!),
-        statement(db, 'INSERT INTO memberships (session_id, account_id, team_id, is_admin) VALUES (?, ?, ?, ?)',
-          sessionId, account.id, team, Number(actor === 'admin' || actor === 'otherAdmin')),
+        ...(actor === 'eventAdmin'
+          // The event admin holds no seat. Its grant reaches every contest of the event.
+          ? [statement(db, `INSERT INTO grants (account_id, scope, event_id, granted_by) VALUES (?, 'event', ?, 'fixture')`,
+            account.id, journal.eventId)]
+          : [statement(db, 'INSERT INTO memberships (session_id, account_id, team_id, is_admin) VALUES (?, ?, ?, ?)',
+            sessionId, account.id, team, Number(actor === 'admin' || actor === 'otherAdmin'))]),
       );
       if (role) queries.push(statement(db,
         'INSERT INTO membership_roles (session_id, account_id, role) VALUES (?, ?, ?)', sessionId, account.id, role));
@@ -194,8 +198,14 @@ export async function createFixture(path: string, dependencies: Dependencies = {
         statement(db, "INSERT INTO membership_roles (session_id, account_id, role) VALUES (?, ?, 'volunteer')", journal.sessionIds[1], account.id),
       );
     }
+    // A team's default entrant has the team's ID. Linking the sign-in lets an event admin move the seat.
+    for (const actor of actors) {
+      const team = actor === 'contestant' || actor === 'temporary' ? journal.teamIds[0]
+        : actor === 'otherTeam' ? journal.teamIds[1] : actor === 'isolated' ? journal.teamIds[2] : undefined;
+      if (team) queries.push(statement(db, 'UPDATE accounts SET entrant_id = ? WHERE id = ?', team, accounts[actor].id));
+    }
     await db.batch(queries);
-    return { sessionId: journal.sessionIds[0], otherSessionId: journal.sessionIds[1], teamId: journal.teamIds[0], accounts, createdAccounts, signIn, origin: target.origin };
+    return { eventId: journal.eventId, sessionId: journal.sessionIds[0], otherSessionId: journal.sessionIds[1], teamId: journal.teamIds[0], accounts, createdAccounts, signIn, origin: target.origin };
   } catch {
     if (saved && existsSync(path)) {
       try {
@@ -251,13 +261,8 @@ async function discoverCreatedAccounts(db: D1Connection, journal: Journal): Prom
     if (rows.length > 1 || rows.some((row) => !uuid.safeParse(row.id).success || marker.id && row.id !== marker.id || Object.values(journal.accountIds).includes(row.id))) {
       throw new Error('A created fixture account has an ambiguous ownership marker.');
     }
-    if (!marker.id && rows[0]) {
-      const related = await statement(db, `SELECT 1 FROM memberships m JOIN account_operations o ON o.account_id = m.account_id
-        WHERE m.account_id = ? AND m.session_id = ? AND o.session_id = m.session_id AND o.actor = ? AND o.action = 'create_account'`,
-      rows[0].id, journal.sessionIds[0], journal.accountIds.admin).first();
-      if (!related) throw new Error('A created account does not have this fixture creation and membership.');
-      marker.id = rows[0].id;
-    }
+    // The fixture event holds the marker's name and handle once. Nothing else creates accounts there.
+    if (!marker.id && rows[0]) marker.id = rows[0].id;
   }
 }
 
@@ -273,7 +278,9 @@ async function validateOwnership(db: D1Connection, journal: Journal): Promise<Ow
   }
   const teams = (await statement(db, 'SELECT id, session_id FROM teams WHERE id IN (?, ?, ?) OR session_id IN (?, ?)',
     ...journal.teamIds, ...journal.sessionIds).all<{ id: string; session_id: string }>()).results;
-  if (teams.some((row) => !journal.teamIds.includes(row.id) || row.session_id !== journal.sessionIds[journal.teamIds.indexOf(row.id) === 2 ? 1 : 0])) {
+  // An entrant that a scenario created has an entry (a teams row) with its own ID, in a fixture contest.
+  if (teams.some((row) => !journal.sessionIds.includes(row.session_id) ||
+      journal.teamIds.includes(row.id) && row.session_id !== journal.sessionIds[journal.teamIds.indexOf(row.id) === 2 ? 1 : 0])) {
     throw new Error('Recovery team does not belong to this run.');
   }
   const accounts = (await statement(db, `SELECT id, name, username, handle FROM accounts WHERE id IN (${marks(ids.length)})`, ...ids)
@@ -306,9 +313,6 @@ async function validateOwnership(db: D1Connection, journal: Journal): Promise<Ow
   if (operations.some((row) => !idSet.has(row.account_id) || !idSet.has(row.actor) || row.session_id !== null && !journal.sessionIds.includes(row.session_id))) {
     throw new Error('A recovery credential operation crosses this fixture boundary.');
   }
-  const installation = await statement(db, `SELECT id FROM installation WHERE event_id = ? OR owner_account_id IN (${marks(ids.length)})`,
-    journal.eventId, ...ids).first();
-  if (installation) throw new Error('An installation record is outside disposable provider fixtures.');
   const images = (await statement(db, 'SELECT id, session_id, issue_id, uploader, original_path, thumbnail_path FROM issue_images WHERE session_id IN (?, ?)',
     ...journal.sessionIds).all<{ id: string; session_id: string; issue_id: string; uploader: string; original_path: string; thumbnail_path: string }>()).results;
   for (const image of images) {
@@ -381,6 +385,7 @@ async function cleanupOnPlatform(path: string, platform: Platform, target: Fixtu
     ...journal.createdAccounts.filter((account) => account.id).map((account) => `handle:${journal.eventId}:${account.username}`), ...ids.map((id) => `change:${id}`)];
   await db.batch([
     statement(db, 'DELETE FROM events WHERE id = ?', journal.eventId),
+    statement(db, `DELETE FROM authority_audit WHERE actor IN (${marks(ids.length)})`, ...ids),
     statement(db, `DELETE FROM account_operations WHERE account_id IN (${marks(ids.length)}) OR actor IN (${marks(ids.length)})`, ...ids, ...ids),
     statement(db, `DELETE FROM ba_user WHERE id IN (${marks(ids.length)})`, ...ids),
     statement(db, `DELETE FROM authentication_limits WHERE key IN (${marks(rateKeys.length)})`, ...rateKeys),
@@ -390,6 +395,8 @@ async function cleanupOnPlatform(path: string, platform: Platform, target: Fixtu
   const checks: D1Statement[] = [
     statement(db, 'SELECT count(*) AS count FROM events WHERE id = ?', journal.eventId),
     statement(db, 'SELECT count(*) AS count FROM sessions WHERE id IN (?, ?)', ...journal.sessionIds),
+    statement(db, 'SELECT count(*) AS count FROM entrants WHERE event_id = ?', journal.eventId),
+    statement(db, `SELECT count(*) AS count FROM authority_audit WHERE event_id = ? OR actor IN (${marks(ids.length)})`, journal.eventId, ...ids),
     ...['teams', 'issues', 'resolutions', 'awards', 'memberships', 'membership_roles', 'admin_audit', 'command_receipts', 'audience_sequences', 'notifications', 'session_issue_sequences', 'issue_images']
       .map((table) => statement(db, `SELECT count(*) AS count FROM ${table} WHERE session_id IN (?, ?)`, ...journal.sessionIds)),
     ...['accounts', 'ba_user'].map((table) => statement(db, `SELECT count(*) AS count FROM ${table} WHERE id IN (${marks(ids.length)})`, ...ids)),

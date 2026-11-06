@@ -1,15 +1,14 @@
 import { z } from 'zod';
-import type { AccountCommand, AccountResult, EventCode, Handle, LoginKey, SignInTarget } from '../../../backend/contracts';
+import type { Handle, LoginKey, SignInTarget } from '../../../backend/contracts';
 import {
   AuthenticationError, signInRefused, type AuthenticationService, type AuthenticationSession,
 } from '../../authentication';
 import type { D1Connection, D1Statement, D1Value } from '../d1/connection';
 import type { IdentityProvider } from './identity';
 import {
-  authorityCheck, loginAccountColumns, manageAccountBindings, manageAccountSql, ownHandleSql, reaches, resolveAuthority,
-  signInAccountSql,
+  loginAccountColumns, ownHandleSql, signInAccountSql,
 } from './authority';
-import { beginCredentialReset, completeCredentialReset, handleSchema, loginKeyFor } from './credentials';
+import { beginCredentialReset, completeCredentialReset, loginKeyFor } from './credentials';
 import { randomSecret, type PasswordHasher } from './password';
 
 /**
@@ -20,15 +19,6 @@ import { randomSecret, type PasswordHasher } from './password';
 export const signInFailureLimits = { windowSeconds: 900, perIp: 200, perUsername: 10 } as const;
 
 const passwordSchema = z.string().min(12).max(128);
-const memberSchema = z.object({
-  teamId: z.string().uuid().nullable(),
-  roles: z.array(z.enum(['volunteer', 'specialist', 'jury'])).max(3),
-  isAdmin: z.boolean(),
-});
-const commandSchema = z.discriminatedUnion('action', [
-  memberSchema.extend({ action: z.literal('create_account'), username: handleSchema, name: z.string().trim().min(1).max(200) }).strict(),
-  z.object({ action: z.literal('reset_password'), userId: z.string().uuid() }).strict(),
-]);
 
 interface Account {
   id: string;
@@ -88,6 +78,9 @@ const currentLoginSql = `SELECT a.*, l.id AS login_id, l.csrf,
     AND l.expires_at > unixepoch() AND l.credential_generation = a.credential_generation
     AND a.credential_state = 'ready'`;
 
+/** The signed-in account's status, with whether it may change its own handle. Binds identitySessionId, accountId. */
+export const currentAccountSql = `SELECT t.*, (${ownHandleSql}) AS own_handle FROM (${currentLoginSql}) t`;
+
 /** Better Auth owns authentication. This adapter owns Minsky access and atomic credentials. */
 export class D1AuthenticationService implements AuthenticationService {
   constructor(
@@ -123,7 +116,7 @@ export class D1AuthenticationService implements AuthenticationService {
   async current(headers: Headers): Promise<AuthenticationSession | undefined> {
     const identity = await this.identity.session(headers);
     if (!identity) return undefined;
-    const row = await this.statement(`SELECT t.*, (${ownHandleSql}) AS own_handle FROM (${currentLoginSql}) t`,
+    const row = await this.statement(currentAccountSql,
       identity.identitySessionId, identity.accountId).first<Login & { own_handle: number }>();
     if (!row) return undefined;
     return {
@@ -229,98 +222,21 @@ export class D1AuthenticationService implements AuthenticationService {
     return { cookie: await this.identity.signOut(headers) };
   }
 
-  /**
-   * The actor must manage the contest, and a target must hold a seat in it that
-   * the actor may manage. The resolver's stamp and the target rule are checked
-   * again inside each batch.
-   */
-  private async adminAssertions(current: AuthenticationSession, sessionId: string, target?: string): Promise<{
-    current: AuthenticationSession; statements: D1Statement[]; assertionId: string; finalCheck: SqlCheck;
-  }> {
-    const refused = () => new AuthenticationError(403, 'Account changes require admin access to all assigned sessions. Archived accounts cannot be changed.');
-    const authority = await resolveAuthority(this.db, current.caller, { scope: 'contest', contestId: sessionId });
-    if (!authority || !reaches(authority, 'contest') || !authority.writable) throw refused();
-    const managed: SqlCheck | undefined = target ? {
-      sql: `${manageAccountSql} AND EXISTS (SELECT 1 FROM memberships WHERE session_id = ? AND account_id = t.id)`,
-      values: [...manageAccountBindings(current.user.id, target), sessionId],
-    } : undefined;
-    if (managed && !(await this.statement(managed.sql, ...managed.values).first())) throw refused();
-    const check = authorityCheck(authority);
-    // Each condition stays at one query level, so the final check that nests
-    // this one stays within D1's expression depth limit of 100.
-    const finalCheck: SqlCheck = managed
-      ? { sql: `${managed.sql} AND EXISTS (${check.sql})`, values: [...managed.values, ...check.values] }
-      : check;
-    const assertionId = crypto.randomUUID();
-    return { current, assertionId, finalCheck, statements: [this.assertion(assertionId, finalCheck.sql, ...finalCheck.values)] };
-  }
-
   private cleanupAssertions(id: string): D1Statement {
     return this.statement('DELETE FROM command_assertions WHERE id IN (?, ?, ?)', id, `${id}:admin`, `${id}:final`);
   }
 
-  async account(headers: Headers, sessionId: string, input: AccountCommand): Promise<AccountResult> {
-    const parsed = commandSchema.safeParse(input);
-    if (!z.string().uuid().safeParse(sessionId).success || !parsed.success) throw new AuthenticationError(400, 'Invalid account request.');
-    const command = parsed.data;
-    const target = command.action === 'create_account' ? crypto.randomUUID() : command.userId;
-    const current = await this.requireCurrent(headers);
-    if (command.action === 'reset_password' && target === current.user.id) throw new AuthenticationError(400, 'Use Change password for your own account.');
-    const gate = await this.adminAssertions(current, sessionId, command.action === 'create_account' ? undefined : target);
-    const operationId = crypto.randomUUID();
-    if (command.action === 'create_account') {
-      if (command.teamId ? command.roles.length > 0 || command.isAdmin : command.roles.length === 0 && !command.isAdmin) {
-        throw new AuthenticationError(400, 'Choose a contestant team or staff roles or admin membership.');
-      }
-      gate.statements.push(
-        // The account takes the contest's event at once, so its handle never
-        // passes through the site namespace inside the batch.
-        this.statement(`INSERT INTO accounts (id, name, username, handle, event_id, must_change, credential_state, credential_operation)
-          SELECT ?, ?, ?, ?, event_id, 1, 'pending', ? FROM sessions WHERE id = ?`,
-        target, command.name, loginKeyFor(target), command.username, operationId, sessionId),
-        this.statement('INSERT INTO memberships (session_id, account_id, team_id, is_admin) VALUES (?, ?, ?, ?)', sessionId, target, command.teamId, Number(command.isAdmin)),
-        ...[...new Set(command.roles)].map((role) => this.statement('INSERT INTO membership_roles (session_id, account_id, role) VALUES (?, ?, ?)', sessionId, target, role)),
-      );
-    } else {
-      // Check before the reset begins, so that a refusal leaves the old password valid.
-      const named = await this.statement('SELECT handle FROM accounts WHERE id = ?', target).first<{ handle: Handle | null }>();
-      if (!named?.handle) throw new AuthenticationError(409, 'Set a username before resetting this account.');
-      // Superseding a failed operation is safe: its final batch checks this ID.
-      gate.statements.push(...beginCredentialReset(this.db, target, operationId));
-    }
-    gate.statements.push(
-      this.statement(`INSERT INTO account_operations (id, account_id, actor, session_id, action, state) VALUES (?, ?, ?, ?, ?, 'pending')`, operationId, target, gate.current.user.id, sessionId, command.action),
-      this.assertion(`${gate.assertionId}:final`, gate.finalCheck.sql, ...gate.finalCheck.values),
-      this.cleanupAssertions(gate.assertionId),
-    );
-    await this.guarded(gate.statements);
-    const password = randomSecret() + 'A9!';
-    await this.completeCredentials(headers, target, operationId, password, true, sessionId);
-    const event = await this.statement(`SELECT e.code FROM accounts a LEFT JOIN events e ON e.id = a.event_id
-      WHERE a.id = ?`, target).first<{ code: EventCode | null }>();
-    return { temporaryPassword: password, signIn: event?.code ? { kind: 'event', code: event.code } : { kind: 'site' } };
-  }
-
-  private async completeCredentials(headers: Headers, target: string, operationId: string, password: string, temporary: boolean, sessionId?: string, prepared?: { hash: string; statements: D1Statement[]; finalCheck: SqlCheck }): Promise<void> {
-    // Hash outside the transaction. A failed hash leaves the persisted gate and
-    // revoked sessions intact. An organizer can issue another reset.
-    const hash = prepared?.hash ?? await this.passwords.hash(password);
+  /** Completes the account's own password change. Organizers issue other passwords through D1ManageService. */
+  private async completeCredentials(target: string, operationId: string, temporary: boolean, prepared: { hash: string; statements: D1Statement[]; finalCheck: SqlCheck }): Promise<void> {
+    const { hash } = prepared;
     const account = await this.statement('SELECT * FROM accounts WHERE id = ?', target).first<Account>();
     if (!account) throw new AuthenticationError(409, 'Account changed. Check its status before retrying.');
     // An account from before usernames gets its login key with its first password.
     const loginKey = account.username ?? loginKeyFor(target);
-    const assertions: D1Statement[] = prepared?.statements ?? [];
-    let adminAssertion: string | undefined;
-    let finalCheck = prepared?.finalCheck;
-    if (sessionId) {
-      const gate = await this.adminAssertions(await this.requireCurrent(headers), sessionId, target);
-      assertions.push(...gate.statements);
-      adminAssertion = gate.assertionId;
-      finalCheck = gate.finalCheck;
-    }
-    if (!finalCheck) throw new AuthenticationError(409, 'Account changed. Check its status before retrying.');
+    const assertions: D1Statement[] = prepared.statements;
+    const { finalCheck } = prepared;
     const assertionId = crypto.randomUUID();
-    const generation = account.credential_generation + (prepared ? 1 : 0);
+    const generation = account.credential_generation + 1;
     assertions.push(
       this.assertion(assertionId, `SELECT 1 FROM accounts WHERE id = ? AND credential_operation = ?
         AND credential_generation = ? AND credential_state = 'pending' AND disabled = 0`, target, operationId, generation),
@@ -328,7 +244,6 @@ export class D1AuthenticationService implements AuthenticationService {
       ...completeCredentialReset(this.db, { id: target, name: account.name, loginKey }, operationId, hash, temporary),
       this.statement('DELETE FROM command_assertions WHERE id = ?', assertionId),
     );
-    if (adminAssertion) assertions.push(this.cleanupAssertions(adminAssertion));
     assertions.push(
       this.assertion(`${assertionId}:final`, `SELECT 1 FROM accounts a JOIN account_operations o ON o.account_id = a.id
         WHERE a.id = ? AND a.credential_generation = ? AND a.credential_state = 'ready'
@@ -360,7 +275,7 @@ export class D1AuthenticationService implements AuthenticationService {
     // Self changes have no external identity update. Hash before the atomic
     // batch so a lone organizer can retry a failed change with the old login.
     const hash = await this.passwords.hash(newPassword);
-    await this.completeCredentials(headers, current.user.id, operationId, newPassword, false, undefined, { hash, finalCheck: {
+    await this.completeCredentials(current.user.id, operationId, false, { hash, finalCheck: {
       // The change deliberately deletes the old identity session and revokes its
       // login. Retain both original deadlines and verify the old login's exact
       // generation while the final completion check verifies its replacement.

@@ -20,7 +20,13 @@ function setup(reply: (request: Request) => Promise<Response> | Response = () =>
     requests.push(request.clone());
     return reply(request);
   };
-  return { auth: createCloudflareAuthentication({ origin: ORIGIN, fetch: fetcher, eventTarget: events }), requests, events };
+  const auth = createCloudflareAuthentication({ origin: ORIGIN, fetch: fetcher, eventTarget: events });
+  /** A same-origin write that carries the login's CSRF token, like the management routes expect. */
+  const write = (command: object) => auth.withCsrf((token) => fetcher(`${ORIGIN}/api/manage`, {
+    method: 'POST', body: JSON.stringify({ requestId: SESSION_ID, command }),
+    headers: { 'Content-Type': 'application/json', 'X-Minsky-Request': '1', 'X-CSRF-Token': token },
+  }));
+  return { auth, requests, events, write };
 }
 
 afterEach(() => {
@@ -88,30 +94,29 @@ describe('Cloudflare browser authentication transport', () => {
 
   it('reads the CSRF token once and reuses it for later writes', async () => {
     let reads = 0;
-    const { auth, requests } = setup((request) => request.method === 'GET'
+    const { requests, write } = setup((request) => request.method === 'GET'
       ? json({ user, status, csrf: `csrf-${++reads}` })
-      : json({ temporaryPassword: 'fictional-temporary-password', signIn: { kind: 'event', code: 'xxxx-2026' } }));
-    const command = { action: 'reset_password', userId: ACCOUNT_ID } as const;
-    await expect(auth.account(SESSION_ID, command)).resolves
-      .toEqual({ temporaryPassword: 'fictional-temporary-password', signIn: { kind: 'event', code: 'xxxx-2026' } });
-    await auth.account(SESSION_ID, command);
+      : json({}));
+    const command = { type: 'set_webmaster_reads', restricted: true } as const;
+    expect((await write(command)).status).toBe(200);
+    await write(command);
     const writes = requests.filter((request) => request.method === 'POST');
     expect(writes.map((request) => request.headers.get('X-CSRF-Token'))).toEqual(['csrf-1', 'csrf-1']);
     expect(requests.filter((request) => request.method === 'GET')).toHaveLength(1);
-    expect(await writes[0]!.json()).toEqual({ sessionId: SESSION_ID, command });
+    expect(await writes[0]!.json()).toEqual({ requestId: SESSION_ID, command });
   });
 
-  const issued = { temporaryPassword: 'fictional-temporary-password', signIn: { kind: 'site' } };
+  const issued = { accountIds: [] };
 
   it('reads a new token after the login changes', async () => {
     let reads = 0;
-    const { auth, requests } = setup((request) => request.method === 'GET'
+    const { auth, requests, write } = setup((request) => request.method === 'GET'
       ? json({ user, status, csrf: `csrf-${++reads}` })
-      : json(new URL(request.url).pathname === '/api/accounts' ? issued : {}));
-    const command = { action: 'reset_password', userId: ACCOUNT_ID } as const;
-    await auth.account(SESSION_ID, command);
+      : json(new URL(request.url).pathname === '/api/manage' ? issued : {}));
+    const command = { type: 'set_webmaster_reads', restricted: true } as const;
+    await write(command);
     await auth.signOut();
-    await auth.account(SESSION_ID, command).catch(() => undefined);
+    await write(command).catch(() => undefined);
     const tokens = requests.filter((request) => request.method === 'POST').map((request) => request.headers.get('X-CSRF-Token'));
     expect(tokens).toEqual(['csrf-1', 'csrf-1', 'csrf-2']);
   });
@@ -119,8 +124,8 @@ describe('Cloudflare browser authentication transport', () => {
   it('does not keep a token from a read that began before a sign-out', async () => {
     const pending: Array<(response: Response) => void> = [];
     let deferReads = false;
-    const { auth, requests } = setup((request) => {
-      if (request.method === 'POST') return json(new URL(request.url).pathname === '/api/accounts' ? issued : {});
+    const { auth, requests, write } = setup((request) => {
+      if (request.method === 'POST') return json(new URL(request.url).pathname === '/api/manage' ? issued : {});
       if (deferReads) return new Promise<Response>((resolve) => { pending.push(resolve); });
       return json({ user, status, csrf: 'csrf-new' });
     });
@@ -131,7 +136,7 @@ describe('Cloudflare browser authentication transport', () => {
     await auth.signOut().catch(() => undefined);
     pending[0]!(json({ user, status, csrf: 'csrf-old' }));
     await stale;
-    await auth.account(SESSION_ID, { action: 'reset_password', userId: ACCOUNT_ID });
+    await write({ type: 'set_webmaster_reads', restricted: true });
     const last = requests.filter((request) => request.method === 'POST').at(-1);
     expect(last?.headers.get('X-CSRF-Token')).toBe('csrf-new');
   });
@@ -162,7 +167,7 @@ describe('Cloudflare browser authentication transport', () => {
 
   it('notifies logout after the server revokes the session and rejects stale writes', async () => {
     let signedOut = false;
-    const { auth } = setup((request) => {
+    const { auth, write } = setup((request) => {
       if (request.method === 'POST') { signedOut = true; return json({}); }
       return signedOut ? json({}, 401) : json({ user, status, csrf: 'test' });
     });
@@ -171,7 +176,7 @@ describe('Cloudflare browser authentication transport', () => {
     try {
       await auth.signOut();
       expect(changed).toHaveBeenLastCalledWith(undefined);
-      await expect(auth.account(SESSION_ID, { action: 'reset_password', userId: ACCOUNT_ID })).rejects.toThrow('Sign in');
+      await expect(write({ type: 'set_webmaster_reads', restricted: true })).rejects.toThrow('Sign in');
     } finally { stop(); }
   });
 

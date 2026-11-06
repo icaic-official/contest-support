@@ -1,23 +1,34 @@
 # Webmaster, event, and contest platform
 
-**Status.** Proposed. Phase 1, `feature/scoped-authority`, implements the contest resolver, migration `0017`, and its gate. The local half of the gate passed. The hosted runs were inconclusive against the 10 percent p95 rule, because `main` itself varied between runs. After a compile-time fix, the branch read faster than `main` at the median, and the owner accepted the gate on 2026-11-02. The [gate record](history/scoped-authority-gate.md) holds the measurements and the decision. Phase 2, `feature/webmaster-management`, implements webmaster management with no migration. Both phases are merged. Phase 3, `feature/event-sign-in`, implements migration `0018`, sign-in by event code or site and handle, and `set_handle`. It waits for review. Phases 4 to 8 are not built.
+**Status.** Proposed. Phase 6, `feature/live-credentials`, is PR #174, an open draft that adds migration `0022`. Phase 1, `feature/scoped-authority`, implements the contest resolver, migration `0017`, and its gate. The local half of the gate passed. The hosted runs were inconclusive against the 10 percent p95 rule, because `main` itself varied between runs. After a compile-time fix, the branch read faster than `main` at the median, and the owner accepted the gate on 2026-11-02. The [gate record](history/scoped-authority-gate.md) holds the measurements and the decision. Phase 2, `feature/webmaster-management`, implements webmaster management with no migration. Both phases are merged. Phase 3, `feature/event-sign-in`, implements migration `0018`, sign-in by event code or site and handle, and `set_handle`. Phase 1 merged as #152, Phase 2 as #153, and Phase 3 as #156. Phase 4, `feature/event-console`, implements migration `0019`, the event console, and the one-webmaster bootstrap. It merged as #161. Phase 5, `feature/contest-clock`, implements migration `0020`, contest schedules, derived intake, personal end times, contest-wide awards, and the calendar. It was rehearsed on 2026-11-05 and merged as #163. Migration `0021` added withdrawal of an unconfirmed contest-wide award and merged as #171. Phase 6 is not merged. Phases 7 and 8 are not built.
 
 Phase 1 differs from this page and the sketches in these points:
 
 - The foreign key on `accounts.event_id` is `DEFERRABLE INITIALLY DEFERRED`. Test cleanups delete an event and then its accounts in one batch, and an immediate key refuses that order.
 - The resolver starts from the contest and its event, then joins the login tables, so the live form reads them once. Only a webmaster's stamp reads `site_settings`.
-- `/api/sessions` lists every contest that the caller can read. For a webmaster, that is every contest of the site.
+- `/api/sessions` (deleted in Phase 4, replaced by `/api/contests`) listed every contest that the caller can read. For a webmaster, that is every contest of the site.
 - `authorityCopies.test.ts` also refuses `FROM grants`. It exempts the two trusted terminal commands, `installation.ts` and `adminRecovery.ts`, which check an admin membership without a login.
+
+Phase 6 differs from this page and the sketches in these points:
+
+- `0022` backfills no scopes. The sketch reads `account_operations.session_id`, and no current code writes that column. Every existing contest is practice, and only a live contest reads a scope.
+- `0022` counts `unready_seats` twice, once before its triggers and once after them. The sketch counts once before them, so a seat written between that count and its trigger could later fail `CHECK (unready_seats >= 0)`. The second count makes the result exact after statement-by-statement application.
+- The sketch refuses an issue when any open contest lies outside `forContests`. `forContests` is empty for a practice target, so that text would also refuse every lost-password reset during an open practice contest. The target contest is therefore exempt from the refusal. Scopes stay live-only. A request with no target still gets the refusal, and the console names the entrant's open contest when it resets one password.
+- An account with no password yet is exempt from that refusal, because it has no sign-in to lose. This keeps the first issue after an assignment working.
+- A request that names a contest in which the account has no seat gets 409. This is the closed choice for a case that the design does not state.
+- The event console shows the count as "Waiting for live passwords: 3" and lists sign-ins, because one entrant can hold several sign-ins. The preview of other contests applies the window rule to contests that share an entrant. `forContestsSql` still decides per account on the server.
+- Assigning an entrant with a sign-in to a ready, open live contest closes it for every team until that seat is issued, so the command needs `closeReporting: true` and the console asks first. `0022` also records each scope's issued window, and a move off that window ends the scope. A disabled seat keeps its contest closed until an organizer removes the seat. Both are the closed behavior.
+- `forContestsSql` and the seat reads live in `authority.ts`, because `authorityCopies.test.ts` keeps every membership join there.
 
 Phase 2 differs from this page and the sketches in these points:
 
 - `PersonInput` has a `username`, not a `handle`, because handles arrive in Phase 3. `add_webmaster` stores the typed name as the username, and `0018` then copies it to the handle.
 - `issueCredentials` takes only the IDs of up to eight other webmasters. It has no `eventId` and no `contestId`, because no event console calls it yet. A retry of a committed request returns each account with `temporaryPassword: null`.
 - `Management.site()` returns only the webmasters, the read restriction, and the contests that the caller has not joined. For an account that is not a webmaster, it returns `null`, not 403. The browser then asks without logging an error.
-- `/api/sessions` and `snapshotSql` are unchanged, so the Phase 1 gate measures the same readers. A webmaster who must join a contest finds it on the **Site** page and on the no-access screen. The site read feeds both.
+- In Phase 1, `/api/sessions` (now `/api/contests`) and `snapshotSql` stayed unchanged, so the Phase 1 gate measures the same readers. A webmaster who must join a contest finds it on the **Site** page and on the no-access screen. The site read feeds both.
 - A webmaster can remove themselves while another enabled webmaster who holds a password remains. They keep their own login, because the batch checks the caller's login after its writes. A webmaster removed by another loses every open session.
 - A contest's activity shows a join as "Joined to read this contest" by "A webmaster" when the webmaster holds no membership there. `admin_audit` stores no actor name, and decision 12 keeps webmasters out of the member list. Showing the name needs a change to `snapshotSql`, which waits for the hosted rerun of the Phase 1 gate.
-- `recoverWebmaster` finds a webmaster by username, and `npm run cloudflare:recover-admin` calls it. `adminRecovery.ts` is deleted, so the command no longer recovers a contest admin who is not a webmaster. `recoverInstallationOwner` stays until Phase 4.
+- `recoverWebmaster` finds a webmaster by username, and `npm run cloudflare:recover-admin` calls it. `adminRecovery.ts` is deleted, so the command no longer recovers a contest admin who is not a webmaster. `recoverInstallationOwner` was deleted in Phase 4.
 - `credentialReset.ts` is now `credentials.ts`. Its `replaceCredentialStatements` puts the existing begin and complete statements into one batch.
 - `authorityCopies.test.ts` does not count `DELETE FROM grants` as a copy of the access check, because a delete reads nothing. Every read of `grants` stays in `authority.ts`.
 
@@ -35,6 +46,51 @@ Phase 3 differs from this page and the sketches in these points:
 - The credential sheet shows the link `<origin>/?event=<code>` for an event account. For a site account, it shows the sign-in page and says to choose **Site sign-in**.
 - The sign-in form remembers the last event code in the browser's `localStorage`, under `minsky-event-code`. It does not remember **Site sign-in**.
 - Two checks need hosted Cloudflare resources and did not run: the sign-in burst at the 200-user step on `minsky-preview` (see "Risks"), and the rehearsal of `0018` on an empty D1 database and on a `minsky-preview` copy.
+
+Phase 4 differs from this page and the sketches in these points:
+
+- Entrant foreign keys are deferred (`teams.entrant_id`, `accounts.entrant_id`), like `accounts.event_id`, because test cleanups delete an event and then its teams and accounts in one batch.
+- The backfill puts same-named teams of an event in one entrant when a chain of shared contestant accounts connects them, so three teams A, B, C where A shares an account with B and B with C all merge. The oldest team of the chain lends its ID and its spelling. Same-named teams with no chain keep their own entrants, because they are different groups. A team also keeps its own entrant when its name is empty, or when an older team of its contest has the same name.
+- An account with any staff authority (a staff seat, a contest admin flag, a role, or a grant) stays staff and is not linked to an entrant, even when it also holds a team seat. Its seats stay. The entrant then shows "No sign-in", and **Add sign-in** (`add_entrant_sign_in`) gives it a new account. So an entrant's password never issues a login that holds staff authority. The rule holds in the backfill, in `contestant_seat_links_entrant`, and in `account_entrant_fixed`. The previous design linked such an account and hid it from staff.
+- `0019` is safe statement by statement. Entrants exist before any key names them, so no statement needs the deferred key at commit. A retry after a partial apply stops at `CREATE TABLE entrants` with "already exists" and changes nothing. Recover with the restore point that `scripts/deploy-workers.mjs` prints before it migrates. Do not rerun the file by hand. `eventRosterMigration.test.ts` applies the file one statement at a time, because the `test:d1` fixture applies it in one batch.
+- After `0019` applies, run `SELECT count(*) FROM teams WHERE entrant_id IS NULL`. The result must be `0`, because every team has an entrant. A higher count means the backfill did not finish, so stop and restore from the restore point.
+- `contestant_is_not_admin` refuses `UPDATE memberships SET is_admin = 1` on a contestant seat. The previous Worker never does this, because its member validation forbids an admin flag with a team seat. `scripts/rollback-check.mjs` still reports only the one documented failure below.
+- A password reset writes one `reset_password` row in `admin_audit` for each contest that seats the account, so contest activity still shows it. Activity names an actor outside the contest "An organizer", and never shows an account ID.
+- A rename of an entrant also renames its sign-in when the sign-in carries the old name, and refreshes each contest of the entrant.
+- `ContestSummary` also holds `eventName`. The picker adds the event name only when two listed contests have the same name.
+- The console and the Site page keep the last overview when a read fails, and show the error with **Retry**. Both read again when the window regains focus. A success ends every earlier request ID, so a toggle retried after a lost answer applies.
+- After a revert, the previous Worker has these limits. A team seat cannot make an account with staff authority into an entrant's sign-in, and it cannot place a webmaster in an event. `add_teams` in a `singles` contest fails (`entry_default_fits`). A linked account whose seat was removed can return only to a team of the same entrant. A seat on another team or a staff seat fails closed (`seat_matches_entrant`). After `delete_team` and a new `add_teams`, the new team has a new entrant, so the old seat cannot return. A trigger cannot lift this, because the current Worker's unassign also removes seats and the sign-in must keep its entrant.
+- `session_changes` keeps `categories`. A contest keeps its category list in `sessions.categories`.
+- The `memberships_team` index is part of `0019`. Unassigning an entrant scanned 2,443 rows of a contest of 1,200 members without it.
+- `set_intake`, `set_image_limits`, and `update_contest` read 74 to 156 rows, above the 60-row command target, because they notify every team of the contest.
+- `issueCredentials` takes `{ eventId | null, accountIds }` and replaces `reset_password`. A contest admin reissues through it for accounts that `manageAccountSql` allows. The contest panel's reveal omits the sign-in link, because the snapshot does not carry the event code.
+- `ContestSummary` is `{ id, name, eventId, manage }`. `Management.event(eventId?)` reads the caller's own event when it has no ID, so an event admin whose event has no contest yet still finds the console. The snapshot's teams carry `entrant_id`, because `set_location` names the entrant, not the entry.
+- `bootstrapSite` takes a site file `{ webmasterHandle, webmasterName }` (`--site`) and creates one webmaster, its site grant, and one `authority_audit` row. It writes no `installation` row. The `recover` install command is gone. `npm run cloudflare:recover-admin` recovers a webmaster.
+- `rollback-check.mjs` reports one failure from the previous release's own tests, in `store.test.ts`, which moves a contestant seat to another team. The triggers `seat_team_fixed` (a move of the seat) and `seat_matches_entrant` (a seat in a team of another entrant) refuse that move. So after a revert, the previous Worker's `save_member` cannot move an entrant's contestant to another team, and the command fails closed. The failure stays until the owner decides whether to accept this limit. The check script has no exception for it. The sketch's header did not name this refusal. Earlier, two more failures in `authority.test.ts` came from the name-only merge of same-named teams. The merge by shared account removed them.
+- `set_event_admin` may remove the last event admin of an event. A webmaster can then name another. The owner accepted this on 2026-11-05.
+- The contest panels keep intake, image limits, categories, team locations, username change, and password reissue. The nav item and the page are named **Team locations**. Contest admins no longer create accounts, edit teams, or assign people.
+- The module map lists three files under `src/event/`. Phase 4 also adds `PeopleTabs.tsx`, `ContestTabs.tsx`, `forms.tsx`, `eventModel.ts`, `EventLink.tsx`, and `useOwnEvent.ts`.
+- `ContestPicker` replaces the pickers of the contestant top bar, the console sidebar, the phone Session tab, and the no-access screen. The Sessions section of the account page keeps its own list, because it shows a Switch button per row.
+
+Phase 5 differs from this page and the sketches in these points:
+
+- `ContestSummary` keeps its Phase 4 flat shape and gains `eventName`, `timeZone`, `contestType`, `schedule`, `intake`, and `canOpen`. `canOpen` replaces the sketch's `seat`, because a calendar row needs only whether the caller can open the contest. `kind` waits for Phase 6.
+- `/api/contests` with `{eventId}` still lists only the contests that the caller can open. `{window}` lists the scheduled contests of the caller's own event that overlap the window, with `canOpen` false for a contest without a seat. A webmaster gets every event. A window is at most 92 days and returns at most 500 contests. A member's read uses `sessions_event_schedule` and a webmaster's uses `sessions_ends`, in two statements. A contest with no schedule is listed only by `{eventId}`.
+- The snapshot's `clock` uses snake_case like the rest of the snapshot, and adds `follows_schedule`. `session.intake_open` now holds the derived value for the viewer, which is the personal value for a contestant. A contestant reads only the contest-wide awards that staff confirmed, and staff read all of them.
+- The SQL fragments take the extra minutes as an expression, `intakeOpenSql(s, extra)`, `intakeStateSql(s, extra)`, and `personalEndSql(s, extra)`, and not an entry. A reader computes the minutes once with `extraMinutesSql(s, entry)` and passes the value. `clockSql` is new. The snapshot reads the minutes in one materialized row, which it joins once. A scheduled contestant snapshot read 126 rows, against 112 without a schedule and the ceiling of 130. Before the join, the same snapshot read 132.
+- `intakeOpenSql` answers while the scheduled end lies ahead without reading any award, so a workflow command during a contest reads nothing extra. After the end it reads the contestant's issues and their awards. A contestant submit measured a flat 47 rows during a contest. After the scheduled end it grows by about 2 rows for each confirmed contest-wide award and by about 2 rows for each issue of the contestant: 129 rows at 31 awards and 171 at 50. Realistic counts of 1 to 3 awards stay near the ceiling of 60. The cost is paid only after the scheduled end, while the extra time keeps the contestant open. Each confirmed contest-wide award also adds about 3 rows to the contestant snapshot, so the 130-row ceiling test fixture needs a higher ceiling once about 2 awards are seeded.
+- The workflow `dependency` carries the intake value for every command, and the read takes `intake_open` from it, so each evaluation computes it once. A command that crosses a time boundary between its read and its batch retries once.
+- Extra minutes are capped at 525,600 for one entry, which keeps the date arithmetic in range. A contest-wide award is 1 to 1,440 minutes.
+- The schedule triggers test their condition inside `COALESCE(..., 0)`. The sketch's condition accepted a start without an end and a malformed instant, because a comparison with NULL is NULL.
+- Migration `0020` has no `awards_session` index, because nothing reads it. The event console shows no extra minutes per entry yet. Phase 7 adds the index with the other foreign-key child indexes.
+- `set_intake` takes a `mode`. `create_contest` requires a schedule. `update_contest` takes an optional one, and an omitted schedule keeps the current value, including none. The edit form shows schedule fields for a contest with no schedule only after **Add a schedule**, so renaming such a contest leaves it unscheduled. `update_contest` never changes the mode, so staff choose **Return to schedule** for a contest that has been held by hand.
+- `/api/contest-awards` takes `{sessionId, requestId, command}` and answers with `AuthenticationError` statuses, 400 for input, 403 for authority, and 409 for state. Each decision, confirmation, and withdrawal writes an `admin_audit` row, `contest_award`, `contest_award_applied`, and `contest_award_withdrawn`. A command notifies the staff and every team of the contest. It read 101 rows to grant and 105 to confirm with 24 teams, above the 60-row target of the workflow commands, like `set_intake`. A contest of 800 teams adds about 800 rows for the team list.
+- The calendar is in the account page's Sessions section and on the site dashboard. The event console has no calendar tab, because its Contests tab lists the schedules. `ContestPicker` shows no start times yet.
+- The index `contest_awards_unconfirmed` (migration `0020`) closes the duplicate award that a lost response, a reload, or an edit could record. It leaves three limits. A retry with different minutes records a second award, because nothing can tell it from a new decision. A retry after staff confirmed the first award records another, for the same reason. Migration `0021` adds the `withdraw` command (see Withdrawing a contest-wide award). The browser keeps the request ID in memory for the same page session (`useContestAwards`), so an ordinary retry returns the first receipt and clears the form. After a reload or an edit the server refuses the retry, the form keeps its text, and the list refreshes.
+- A volunteer or specialist sees the contest-wide awards that wait for confirmation above the queue. Jury see the full panel on the award pages.
+- The new files that the module map does not list are `src/connected/contestClock.ts`, `ContestClock.tsx`, `ContestAwards.tsx`, `Calendar.tsx`, `calendarModel.ts`, `intakeText.ts`, `hooks/useContestAwards.ts`, `src/event/ScheduleFields.tsx`, and `scheduleForm.ts`.
+- A rollback during a running contest closes intake for the scheduled contests until staff reopen them, because the previous Worker reads only `intake_open`.
+- `scripts/rollback-check.mjs` reports the one failure of Phase 4 and no other. The previous Worker's `set_intake` still changes `intake_open` and the version, and a contest that follows its schedule reads as closed through `intake_open` until its switch changes (`previousWorker.test.ts`).
 
 A Worker rollback after Phase 3 loses these:
 
@@ -80,17 +136,17 @@ This design replaces these sections of the [earlier design](history/multi-compet
 
 ## How each person uses the platform
 
-This section describes the target behavior from each person's view. None of it is built.
+This section describes the target behavior from each person's view. Phases 1 to 5 are built. A step that this page marks **Designed, not built** waits for Phase 6. Practice and live contests, and **Issue live passwords**, are the Phase 6 steps. Today every contest has a type and a schedule, and no kind.
 
 ### Quickstart for an organizer
 
 These steps take a new installation to a working event:
 
-1. A maintainer runs `npm run cloudflare:install -- bootstrap --site=site.json` on an empty database. Minsky creates one webmaster and prints a temporary password once.
+1. A maintainer runs `npm run cloudflare:install -- bootstrap` on an empty hosted database, with the flags that the [installation guide](../site/src/content/docs/operators/installation.mdx) lists. The command reaches the hosted database only. It has no local mode. Minsky creates one webmaster and writes a temporary password once, to a private file.
 2. The webmaster opens `https://minsky.example/`, chooses **Site sign-in**, signs in, and changes the temporary password.
-3. The webmaster selects **New event**. The form takes the name "XXXX Olympiad 2026", the event code `xxxx-2026`, the time zone `Asia/Singapore`, and the first event admin, with handle `chen` and name "Chen Li". Minsky shows Chen's credential sheet once. The sheet holds the link `https://minsky.example/?event=xxxx-2026`, the handle, and the temporary password.
+3. The webmaster selects **Create event**. The form takes the name "XXXX Olympiad 2026", the event code `xxxx-2026`, the time zone `Asia/Singapore`, and the first event admin, with handle `chen` and name "Chen Li". Minsky shows Chen's credential sheet once. The sheet holds the link `https://minsky.example/?event=xxxx-2026`, the handle, and the temporary password.
 4. Chen signs in from that link and builds the event. That work covers contests, staff, teams, single contestants, and assignments.
-5. Each staff member and contestant gets a sheet with the same event link. Nobody types an event code that they could mistake.
+5. Each staff member and contestant gets a sheet with the same event link. The link fills in the event code. A person types the code only when they open the plain sign-in page, so keep the code short and easy to read aloud.
 
 The sign-in form labels the handle field **Username**, because people know that word. In code and on this page, the typed name is the **handle**. The stored name that Better Auth knows is the **login key**. Nobody sees or types a login key.
 
@@ -100,7 +156,7 @@ A webmaster works in this order:
 
 1. The webmaster signs in with **Site sign-in**. Webmasters belong to no event, so this form has no event code.
 2. The webmaster lands on the **Site** dashboard. It lists each event with its derived span ("3 to 5 Nov, Asia/Singapore") and its contest and account counts. It also shows a calendar of every event's contests, the webmasters, the setting **Webmasters read contest data only after joining**, and the progress of deletions.
-3. The webmaster selects **New event** (step 3 of the quickstart). One batch creates the event, the admin's account, and the event grant. Then the browser asks for that one account's credentials.
+3. The webmaster selects **Create event** (step 3 of the quickstart). One batch creates the event, the admin's account, and the event grant. Then the browser asks for that one account's credentials.
 4. The webmaster opens any event console and does anything that an event admin can do. For example, the webmaster resets the password of a locked-out event admin.
 5. The webmaster opens a contest. By default, the contest opens at once. While the restriction is on, Minsky first says "Join this contest to read its issues and notes. The contest's admins see your join in their audit." **Join** writes a contest-scope grant. D1 then writes the audit rows itself.
 6. The webmaster adds or removes webmasters. Removing the last enabled webmaster fails with "The last webmaster cannot be removed".
@@ -111,11 +167,11 @@ A webmaster works in this order:
 An event admin builds the event in this order:
 
 1. The event admin signs in at `?event=xxxx-2026` and lands on the **Event** console.
-2. **Contests.** The event admin creates "Practice 1" (practice, teams, 3 Nov 09:00 to 11:00), "Live 1" (live, teams, 3 Nov 13:00 to 18:00, 15 minutes grace), and "Live Singles" (live, singles, 4 Nov 09:00 to 12:00). The console takes and shows times in the event's time zone.
+2. **Contests.** The event admin creates contests with a name, a type (teams, singles, or mixed), and a schedule with a grace period. The console takes and shows times in the event's time zone. **Designed, not built (Phase 6):** a contest kind, so that the event admin can create "Practice 1" as practice and "Live 1" and "Live Singles" as live.
 3. **Entrants.** The event admin imports a list of teams and single contestants. Each row gives a kind, a name, and a handle. Minsky creates the entrant and its one sign-in.
 4. **People.** The event admin imports staff, each with a handle and a name.
 5. **Assignments.** The event admin uses a grid of contests by entrants, and a grid of contests by staff with roles (contest admin, jury, volunteer, and specialist). One entrant can enter several contests. One staff member can serve in several.
-6. **Credentials.** The event admin issues practice passwords and prints sheets. Before "Live 1", the event admin selects **Issue live passwords for Live 1**. Minsky lists the teams and the live contests that each new password will also open. Those are the team's live contests whose window overlaps "Live 1". Minsky issues eight accounts per request with a progress bar. "Live 1" shows "Waiting for live passwords: 3 teams" until the last team is done.
+6. **Credentials.** The event admin issues passwords and prints sheets. **Designed, not built (Phase 6):** before "Live 1", the event admin selects **Issue live passwords for Live 1**. Minsky lists the teams and the live contests that each new password will also open. Those are the team's live contests whose window overlaps "Live 1". Minsky issues eight accounts per request with a progress bar. "Live 1" shows "Waiting for live passwords: 3 teams" until the last team is done.
 7. The event admin adds a second event admin with **Make event admin**.
 
 ### Contest admin
@@ -123,7 +179,7 @@ An event admin builds the event in this order:
 A contest admin manages one contest:
 
 1. The contest admin signs in with the event link. The picker lists the contests of the event with start times in the event's time zone. It opens the contest that runs now, or the next one. The choice stays in the address (`?contest=...`), so a refresh keeps it.
-2. The intake panel says "Following schedule. Opens 13:00, closes 18:15 (15 minutes grace)". **Open now** and **Close now** override the schedule. **Return to schedule** ends the override. A live contest that waits for passwords says so, and no override can open it.
+2. The intake panel says "Following schedule. Opens 13:00, closes 18:15 (15 minutes grace)". **Open now** and **Close now** override the schedule. **Return to schedule** ends the override. **Designed, not built (Phase 6):** a live contest that waits for passwords says so, and no override can open it.
 3. The contest admin edits categories, image limits, and team locations, and publishes announcements, as today.
 4. **Staff.** The contest admin sees the contest's staff and their roles. To add or remove a staff member, the contest admin asks an event admin. An event that wants no contest admins assigns none.
 5. The contest admin reissues a password or changes the handle of an account at the desk. The contest admin can do this only for an account that holds no grant and whose every assignment is one of the admin's contests.
@@ -270,7 +326,7 @@ Access patterns traced through these structures:
 - **Calendar and picker** read `sessions_event_schedule (event_id, starts_at)` for one event, and `sessions_ends` for a webmaster's window.
 - **Event console** reads `accounts_event`, `entrants_event`, and `sessions_event`, then memberships by primary key per contest.
 - **`forContests`** reads the target contest by primary key, the event's contests that start before the target's window ends, and one membership each by primary key.
-- **Deletion** reads `event_deletion_targets_pending`, then deletes by primary key. Every foreign-key child has an index (`0022`).
+- **Deletion** reads `event_deletion_targets_pending`, then deletes by primary key. Every foreign-key child has an index (`0023`).
 
 ### Authority model
 
@@ -357,7 +413,7 @@ Who does what:
 - **Contest admins** manage only their own contest. They keep contest settings (categories, image limits, and team locations), announcements, the intake override, the issue workflow, and confined credential reissue and handle change through `manageAccountSql`. They no longer create accounts, assign entrants, or add and remove staff. `requirementOf` gives `assign_staff` and `unassign_staff` the event level. An event that wants no contest admins assigns none (decision 2).
 - Event admins and webmasters always reach every contest, so the per-contest "last admin" rule (`src/server/adapters/cloudflare/application.ts:428-431`) is dropped.
 
-**Backfill (`0019`).** Teams that share a normalized name inside an event become one entrant, so a team in two existing contests becomes one entrant. Each contestant account links to the entrant of its oldest team. Data with several accounts per team, or with unnamed teams, stays as it is. Seats stay in `memberships`, so legacy oddities keep working.
+**Backfill (`0019`).** Teams that share a normalized name inside an event become one entrant only when they share a contestant account, so a team that the same people entered in two existing contests becomes one entrant. Same-named teams with no shared account stay separate. Each contestant account links to the entrant of its oldest team in its own event. Data with several accounts per team, or with unnamed teams, stays as it is. Seats stay in `memberships`, so legacy oddities keep working.
 
 ### Contest schedule, clock, time awards, and intake
 
@@ -368,7 +424,9 @@ Who does what:
   3. Otherwise `intake_open` decides. That is today's switch, and also the manual override.
 - Intake closure still blocks only new contestant submissions. Staff work and reopening are unaffected (`src/server/workflow.ts:109-118`).
 - **Personal end time** is `ends_at`, plus the minutes of the entry's issue awards whose application staff confirmed, plus the minutes of confirmed contest-wide awards (`personalEndSql`). The snapshot returns it, and the browser only displays it. Minsky still changes no external clock. Staff apply minutes outside Minsky, and Minsky counts only confirmed minutes. The `apply` history text stays true (`src/server/workflow.ts:206`).
-- **Contest-wide award.** The jury grants it, and support or jury confirms its external application, as with issue awards. A repeated grant with the same request ID inserts nothing (`UNIQUE (actor, request_id)`). A repeated confirmation finds `applied_request` equal to its own request and succeeds without a write.
+- **Contest-wide award.** The jury grants it, and support or jury confirms its external application, as with issue awards. A repeated grant with the same request ID inserts nothing (`UNIQUE (actor, request_id)`), and the server checks that receipt first. A new request ID cannot repeat a pending size: the partial unique index `contest_awards_unconfirmed` on `(session_id, minutes) WHERE applied_at IS NULL` allows one unconfirmed award of each size in a contest, whoever granted it (409, "An award of this length is waiting for confirmation."). A reload or an edited explanation after a lost response therefore records no second award. A repeated confirmation finds `applied_request` equal to its own request and succeeds without a write.
+- **Withdrawing a contest-wide award.** Migration `0021` adds `withdrawn_at`, `withdrawn_by`, `withdrawn_name`, and `withdrawn_request`. A jury member runs `{ type: 'withdraw', awardId }` on an award that nobody confirmed. The row stays, so the history is complete, and the award gives no time, because only a confirmed award adds minutes. A contestant reads only confirmed awards, so never reads a withdrawn one. Staff read withdrawn awards, with who withdrew them. The command is idempotent: a repeat with the same request ID and actor returns the award without a second write, and any other request gets 409 ("Someone already withdrew that award."). It writes an `admin_audit` row `contest_award_withdrawn` and notifies the staff and every team, like a grant. An archived event refuses it. The trigger `contest_award_fixed` now also freezes a withdrawn row, and `contest_award_outcome_changed` and `contest_award_outcome_inserted` refuse a half-written withdrawal and an award that is both confirmed and withdrawn. So a confirmed award can never be withdrawn and a withdrawn award can never be confirmed, even by a direct write. A confirm and a withdraw that race let one win, because each `UPDATE` requires the other column to be empty, and the loser fails its own guard. The index `contest_awards_unconfirmed` keeps its name and gains `AND withdrawn_at IS NULL`, so a withdrawal frees the size. The name stays because the guard in `migrations.mjs` accepts a dropped index only when the same file creates the same name again, and no code reads the name (the grant matches the violated columns). The previous Worker, after a rollback, lists a withdrawn award as waiting. Its confirmation of that award fails on the trigger, and a grant of a freed size works. `schedule.test.ts` runs those statements.
+- **Issue awards have the same mistake, and it is not changed here.** `awards` has one row for each issue (`issue_id` and `resolution_id` are `UNIQUE`), the workflow refuses a second award when `state.award` exists, and reopening keeps the award. No command withdraws or replaces an issue award, even before staff confirm it. A wrong issue award stays for good, and the issue cannot take a corrected one. Unlike the contest-wide award, there is no partial unique index to free, so a fix needs a new decision, such as a `withdrawn_at` column and a unique index on the current award only.
 - **Time zone.** The server stores instants only. The browser converts the event-local wall time with `zonedWallTime` and formats with `formatInZone`. A DST gap moves forward, and an overlap takes the earlier instant.
 
 A local behavior check shows a running contest open, a contest in grace open, an ended contest closed, an override that cannot open a waiting live contest, and a contestant with 20 confirmed minutes who may still report.
@@ -383,8 +441,13 @@ The rule has these consequences:
 
 - One issue serves overlapping live contests that share a sign-in. A local behavior check shows that an issue for "Live 1" covers the overlapping "Live 2" and both become ready.
 - An issue never opens a later live contest that does not overlap. An issue on day 1 for "Live 1" does not open "Live 3" on day 3, so "Live 3" gets its own fresh password. A "not ended" rule would break that. A contest that starts exactly at the end plus grace does not overlap.
-- An issue is refused when it would sign a contestant out of a contest outside the set whose intake is open now. That is the earlier Rule 3, restated for automatic intake.
+- An issue is refused when it would sign a contestant out of a contest outside the set whose intake is open now. That is the earlier Rule 3, restated for automatic intake. When two open contests block each other, the refusal tells the organizer to close one contest and then issue.
 - A contestant's own forced change keeps the scope. A reset by either Worker ends it, and the contest closes until reissue.
+- Each scope records the target contest's window at the issue. A schedule move that no longer overlaps that fixed window ends the scope and recounts `unready_seats`, in a D1 trigger. So a postponed contest does not open with old passwords, and small repeated shifts cannot walk away from an issue. An end extension or a shift that still overlaps keeps the scope.
+- A move that would end scopes while the new window still holds the current time, on a contest that is open, gets 409. The organizer closes reporting first. A move that ends the running period is allowed, because the organizer can see that it stops the contest.
+- `assign_entrants` and `add_entrant_sign_in` get 409 when they would close an open live contest, unless the request carries `closeReporting: true`. The batch repeats the check. The console asks first, names the number of teams, tells every team when the contest closes or opens, and then opens the issue sheet for the new sign-ins. An entrant without a sign-in adds no seat, so that assignment does not ask.
+- An issue gets 409 when the account holds a scope for a live contest that has not ended and that lies outside `forContests`, unless the request carries `voidLivePasswords: true`. The console preview says "These passwords stop working for: ...", and only then sends the flag. A stale preview therefore gets the refusal. `recoveryContest` names an open contest, then the entrant's next live contest.
+- `memberships.account_id` is fixed by a trigger, because the count keys on it. No Worker writes it.
 - The hash runs before one batch that holds every write, so an interrupted issue leaves the old password valid. Readiness never shows a gap.
 - `unready_seats` is not in `session_changes`. A credential issue therefore does not fail in-flight staff commands. The submit batch re-checks intake through its dependency value.
 
@@ -413,10 +476,10 @@ The goal is a deletion that is complete across D1, R2, and Durable Objects, safe
    - `live`. A Durable Object `/erase` runs for each contest.
    - `files`. R2 lists and deletes the prefixes `<contestId>/` and `accounts/<id>/`. A final empty listing must come at least 65 minutes after the rows are gone.
    - `done`. The targets go, and the journal row stays as the site record.
-3. **Guards.** In D1, a row of an event, a contest, or an event account disappears only while that event's journal is in step `rows` (`0023`). The journal moves forward one step at a time and keeps naming the same event (`event_deletion_step_order`, `event_deletion_fixed`). So the guard opens once per event and closes for good. An ad hoc `DELETE` from any Worker version, a test, or a console is refused. A site account is never deleted this way.
+3. **Guards.** In D1, a row of an event, a contest, or an event account disappears only while that event's journal is in step `rows` (`0024`). The journal moves forward one step at a time and keeps naming the same event (`event_deletion_step_order`, `event_deletion_fixed`). So the guard opens once per event and closes for good. An ad hoc `DELETE` from any Worker version, a test, or a console is refused. A site account is never deleted this way.
 4. **No other event is reached.** Every delete names target IDs or prefixes derived from them. Activity keys into `accounts` stay `NO ACTION`. If a legacy account acted in another event, the account batch fails on a foreign key, records `blocked`, and stops. It does not cascade into the other event. A local probe shows this. The event stays fenced, and the dashboard names the account. Finishing that deletion needs an owner decision, because it would change the other event's history (see the risks).
 5. **Coverage.** `eventDeletionCoverage.test.ts` seeds two events with every writer and deletes one through `fenceStatements` and `advanceRows`. It compares every table's row count with a database that holds the other event alone. It reads `sqlite_master` and `pragma_foreign_key_list`, so it keeps no table list by hand. It fails when any table that references events, contests, or accounts, directly or through another such table, holds no seeded row. A new table therefore needs a seed row, or the test fails. A local coverage check models it. It covers 31 tables, and only the two expected site records differ.
-6. **Cost.** `0022` indexes every foreign-key child. Without these indexes, each account delete would scan every event's history. A local measurement recorded 11,363 ms for one event at N = 80,000 without one of these indexes. That was local SQLite, not D1.
+6. **Cost.** `0023` indexes every foreign-key child. Without these indexes, each account delete would scan every event's history. A local measurement recorded 11,363 ms for one event at N = 80,000 without one of these indexes. That was local SQLite, not D1.
 7. **Durable Objects.** `/erase` replaces the fixture-only `cleanup()` (`src/server/adapters/cloudflare/live.ts:245-285`). It refuses unless D1 shows the contest in `event_deletion_targets` and no `sessions` row. So no request can wipe a running contest's object.
 8. **Fixtures.** Every test cleanup records its own event in the journal and runs the same rows step (Phase 7). One deletion procedure then serves the product and the tests.
 
@@ -502,7 +565,7 @@ The design adds these files:
 
 | File | Purpose |
 | --- | --- |
-| `src/server/adapters/d1/migrations/0017_scoped_authority.sql` to `0023_deletion_guards.sql` | Schema in the [migration sketch](event-platform-sketches.md#migration-sketch) |
+| `src/server/adapters/d1/migrations/0017_scoped_authority.sql` to `0024_deletion_guards.sql` | Schema in the [migration sketch](event-platform-sketches.md#migration-sketch) |
 | `src/server/adapters/cloudflare/authority.ts` | The one resolver for contest, event, and site, `authorityGuard`, `manageAccountSql`, `requireAuthority`. Only `contestDataSql` leaves the module |
 | `src/server/adapters/cloudflare/manage.ts` | `D1ManageService`: `site`, `event`, `execute`, `requirementOf`, planners |
 | `src/server/adapters/cloudflare/credentials.ts` | `loginKeyFor`, `forContestsSql`, `replaceCredentialStatements`, `D1CredentialService.issue` |
@@ -572,13 +635,14 @@ It keeps the practice and live kinds, the reason for fresh live passwords, batch
 | --- | --- | --- |
 | `0017` | `grants`, `site_settings`, `authority_audit`, `manage_receipts`, `accounts.event_id`, isolation triggers, takeover and join triggers, promotion | The promotion inserts site grants first. Then every other account takes the event of most of its memberships. Accounts with none take the bootstrap event. No row is deleted. Promoted accounts keep their admin memberships, so they still work as contest admins under the previous Worker |
 | `0018` | `events.code` (random `e` + 16 hex), `events.time_zone`, `accounts.handle`, the two handle indexes | Every account with an event or a site grant gets `handle = username`. Usernames were globally unique, so the handle indexes cannot fail. `accounts_username` and `ba_user` are not touched |
-| `0019` | `entrants`, `teams.entrant_id`, `accounts.entrant_id`, `contest_type`, roster triggers | One entrant per normalized team name per event. Team names take the entrant's spelling, which differs only in case and spaces. Accounts link to their oldest team's entrant |
-| `0020` | Schedule columns, `contest_awards`, `awards_session` | Existing contests have no schedule and keep manual intake |
-| `0021` | `kind` (default practice), `credential_scopes`, `unready_seats` | Scopes come from each account's newest completed admin-issued credential, as in the earlier `issued_contest` view. Existing contests are practice, so nothing that is open closes |
-| `0022` | Deletion journal, targets, foreign-key child indexes | Indexes only add entries |
-| `0023` | Delete guards on `events`, `sessions`, `accounts` | No data statement |
+| `0019` | `entrants`, `teams.entrant_id`, `accounts.entrant_id`, `contest_type`, roster triggers | One entrant per normalized team name per event when the teams share a contestant account, else one per team. Merged team names take the entrant's spelling, which differs only in case and spaces. Accounts link to the entrant of their oldest team in their own event |
+| `0020` | Schedule columns, `contest_awards` | Existing contests have no schedule and keep manual intake |
+| `0021` | Contest-award withdrawal columns and triggers | Existing awards stay as they are |
+| `0022` | `kind` (default practice), `credential_scopes`, `unready_seats` | Existing contests are practice, so nothing that is open closes. No scope is backfilled, because only a live contest reads one |
+| `0023` | Deletion journal, targets, foreign-key child indexes | Indexes only add entries |
+| `0024` | Delete guards on `events`, `sessions`, `accounts` | No data statement |
 
-`0020` comes before `0021` because the live password rule needs schedules. `0023` is separate from `0022` because the previous release's test cleanup deletes rows directly (`src/server/adapters/d1/testFixture.ts:205-207`). So `scripts/rollback-check.mjs` for `0022` must still run that cleanup. From `0023` on, the previous release cleans up through the journal.
+`0020` comes before `0022` because the live password rule needs schedules. `0024` is separate from `0023` because the previous release's test cleanup deletes rows directly (`src/server/adapters/d1/testFixture.ts:205-207`). So `scripts/rollback-check.mjs` for `0023` must still run that cleanup. From `0024` on, the previous release cleans up through the journal.
 
 **Promotion of the two development accounts.**
 
@@ -692,7 +756,7 @@ The [type sketch](event-platform-sketches.md#type-sketch) shows the final shape.
      - Overlapping contests.
    - **Browser test.** The contestant clock and the closed-form message. Manual phone-width checks of the volunteer screens.
    - **Revert.** Scheduled contests act manual under the previous Worker.
-6. **`feature/live-credentials` (`0021`).**
+6. **`feature/live-credentials` (`0022`).**
    - **Scope.** Contest kind, `forContestsSql` and `credential_scopes` in `issueCredentials`, `unready_seats`, the live gate, the batched live sheet, and confined reissue by contest admins.
    - **Focused tests.**
      - A live contest stays closed until the last seat is issued.
@@ -704,8 +768,8 @@ The [type sketch](event-platform-sketches.md#type-sketch) shows the final shape.
      - A lost response replays without passwords.
      - `npm run test:auth:hash` for the per-batch CPU.
    - **Browser test.** Issue live passwords and watch the readiness count reach zero.
-   - **Revert.** Readiness columns stay. The previous Worker ignores them.
-7. **`feature/event-deletion` (`0022`).**
+   - **Revert.** Readiness columns stay. The previous Worker ignores them, so after a Worker rollback a live contest opens without the password gate. D1 does not enforce the gate. Organizers must close live contests before a rollback.
+7. **`feature/event-deletion` (`0023`).**
    - **Scope.**
      - `delete_event`, `advanceDeletions` with the lease and the cron task, the `event_deletions` fence in the resolvers and in sign-in, `/erase`, `PrivateBucket.list`, and the dashboard progress.
      - Every test cleanup in the module map moves to the journal.
@@ -719,7 +783,7 @@ The [type sketch](event-platform-sketches.md#type-sketch) shows the final shape.
      - `PrivateBucket.list` on `minsky-preview-images`.
    - **Browser test.** A webmaster deletes a fixture event and sees "Deleted".
    - **Revert.** The previous Worker treats a fenced event as archived. An unfinished deletion pauses until roll-forward, and its journal stays intact.
-8. **`feature/deletion-guards` (`0023`).**
+8. **`feature/deletion-guards` (`0024`).**
    - **Scope.** The three delete guards. Nothing else.
    - **Focused tests.** An ad hoc delete of an event, a contest, or an event account is refused. A site account is never deleted. The rows step of one event cannot delete in another. `eventDeletionCoverage.test.ts` still passes through the guards. `scripts/rollback-check.mjs` runs Phase 7's `npm run test:d1`, whose cleanup already uses the journal.
    - **Browser test.** None. No screen changes.
@@ -742,7 +806,7 @@ The [type sketch](event-platform-sketches.md#type-sketch) shows the final shape.
   - Scheduled contests act manual.
   - A live contest closes after its resets until reissue.
   - Contest admins can assign staff again, because the previous Worker's `manageMember` keeps the contest-level rule (`src/server/adapters/cloudflare/application.ts:422-455`). The isolation trigger still refuses an account of another event.
-- The design accepts one index write per history row, issue, resolution, award, and receipt (`0022`), in exchange for a deletion that does not scan other events.
+- The design accepts one index write per history row, issue, resolution, award, and receipt (`0023`), in exchange for a deletion that does not scan other events.
 - The design accepts that a revocation for a derived seat reaches an open socket within 30 s through the alarm, not through the outbox.
 - The design accepts that a contestant with confirmed extra minutes may report until their personal end plus grace. That follows "extra contest time" literally (decision 4).
 
@@ -777,6 +841,36 @@ The owner made these decisions on 2026-10-27, after the first draft of this desi
 12. **Member lists.** Webmasters do not appear in a contest's member list. The member list shows assigned members, and the audit shows joins.
 13. **Deletion progress.** A deletion shows "done" after 65 minutes. That covers upload reservations that live 3,600 s (`src/server/adapters/d1/migrations/0006_application.sql:34`).
 14. **Own handle.** Decided 2026-11-01. A staff account, admins included, may change its own handle with `set_handle` in Phase 3. A contestant account may not, because its handle is printed on the credential sheet that venue staff use. No setting controls this. Today `set_username` only assigns a username to an account that has none (`src/server/adapters/cloudflare/authentication.ts:238`), so nobody can rename an assigned username before Phase 3.
+15. **Sign-in timing gap.** Decided 2026-11-04. The owner accepted the remaining timing gap of Phase 3 sign-in. A real handle with a wrong password is refused about 26 ms slower than other refusals (local medians, real hasher), because only that path reaches the database reads of Better Auth. An attacker needs the event code first, and the failure limits apply. No code change follows.
+
+The owner made these decisions on 2026-11-05, during the review of Phase 4:
+
+- **Seat move after a revert.** Accepted. The previous Worker's move of a seat to another team is refused after a revert, and it fails closed. The one `store.test.ts` rollback failure stays as a recorded known failure. `scripts/rollback-check.mjs` does not change.
+- **Admin commands above 60 rows.** Accepted. Occasional admin commands may exceed the 60-row target with their own ceilings. Hot-path workflow commands stay under 60. The 300-entrant hosted measurement is still reported.
+- **Last event admin.** Accepted. The last event admin can be removed, because a webmaster can appoint another.
+- **Picker start times.** A follow-up, not in Phase 4.
+
+Rehearsal of `0019` on 2026-11-05, on the separate fictional database `minsky-preview-rehearsal-0019`, deleted afterwards, through `wrangler d1 migrations apply --remote` as deploys run it. Wrangler sends each file to the `/query` endpoint.
+
+- **Atomicity.** Hosted D1 applied a file atomically in this one probe. A file whose third statement failed left no table and no `d1_migrations` row. This is an observation, not a provider promise, so `0019` stays safe statement by statement.
+- **Apply.** `0019` applied in 121 ms of D1 time on 406 teams and 404 accounts. The foreign key check returned no rows. The three-team chain formed one entrant. Unrelated same-named teams stayed apart. The staff account with a team seat stayed unlinked.
+- **Bulk assignment.** The `assign_entrants` insert of 300 entrants took 7 ms of D1 time, read 5,399 rows, wrote 3,000 rows, and seated 300 sign-ins. This measures that one statement through `wrangler d1 execute`, at 1,296 ms including Wrangler and the network. It does not measure the Worker request or the guards in its batch.
+
+Rehearsal of `0019` and `0020` together on 2026-11-05, on the separate fictional database `minsky-preview-rehearsal-0020`, deleted afterwards. The steps were `0001` to `0018`, then fictional data, then `wrangler d1 migrations apply --remote` for `0019` and `0020`, as deploys run it.
+
+- **Data.** 400 teams in 6 contests of 2 events, 300 accounts, and 401 seats. 100 pairs of teams, one in each of two contests, shared one account each, with names that differ in case and trailing space. One account held a staff seat in one contest and a team seat in another. Four teams named "Falcons" in four contests had unrelated accounts. One team had an empty name.
+- **Apply.** `0019` ran 35 commands in 50.61 ms of D1 time. `0020` ran 14 commands in 7.89 ms. Both applied, and `d1_migrations` held 20 rows.
+- **Checks.** `PRAGMA foreign_key_check` returned no rows. `SELECT count(*) FROM teams WHERE entrant_id IS NULL` returned 0. The backfill made 300 entrants: 100 from the shared teams, 4 for the "Falcons", 1 for the empty name, 1 for the staff team, and 194 other teams. 299 of 300 accounts linked to an entrant, and the staff account stayed unlinked. An update that made a contestant seat an admin seat failed with "A contestant holds no admin seat". All 6 existing contests kept `intake_follows_schedule = 0`.
+
+Rehearsal of `0020` again on 2026-11-05, after it gained `contest_awards_unconfirmed`, on the separate fictional database `minsky-preview-rehearsal-0020b`, deleted afterwards. The steps were `0001` to `0019`, then 1 event, 2 contests, and 2 accounts, then `wrangler d1 migrations apply --remote` for `0020`. `0020` ran 15 commands. Awards of 15 and 20 minutes in one contest, and of 15 minutes in another contest, were accepted. After the first 15-minute award was confirmed, a second 15-minute award was accepted. A third 15-minute award in the first contest, while the second waited, failed with `UNIQUE constraint failed: contest_awards.session_id, contest_awards.minutes`. `PRAGMA foreign_key_check` returned no rows.
+
+The owner accepted these decisions on 2026-11-06:
+
+16. **Late entrant in a running live contest.** Decided 2026-11-06. The organizer confirms the assignment. Then reporting closes for every team until that seat is issued. The console asks first, as the live password rule describes.
+17. **Rollback protection for the gate.** Decided 2026-11-06. Rollback protection stays a documented procedure, with no D1 enforcement. Organizers close live contests before a rollback, as the Phase 6 revert note states.
+18. **Named reset during an open practice contest.** Decided 2026-11-06. A named reset stays refused while the contestant holds another open contest, including an open practice contest. No practice exemption is added. The named target contest stays exempt, as the Phase 6 list near the top of this page states.
+19. **Withdrawing single-issue awards.** Decided 2026-11-06. Withdrawing single-issue awards is follow-up work, and it is not built. No command withdraws or replaces an issue award today, as the note on issue awards states.
+20. **Assign control for event admins.** Decided 2026-11-06. Event admins keep the **Assign** control on each staff row, because it is their only way to take a staff seat.
 
 ## Risks
 
@@ -786,7 +880,7 @@ Each risk names its measurement.
 - **Sign-in burst.** At contest start, 800 contestants sign in and make the forced change: a verify, a hash, and a verify each (`src/server/adapters/cloudflare/authentication.ts:310-347`). The sign-in adds one index search for the event code. Measured in Phase 3 at the 200-user step of `npm run load` on `minsky-preview`. The 800-user target stays unmeasured until the owner asks for a capacity run. A free-tier preview run does not establish production capacity.
 - **Hosted D1 limits for chunked deletes and the trigger fan-out on bulk assignment.** The local coverage and behavior checks passed in local SQLite. Measured in Phase 7 by timing a 2,000-issue event with 80,000 history rows on `minsky-preview`, and in Phase 4 by a bulk assignment of 300 entrants there.
 - **Trigger behavior on hosted D1.** The design relies on child `DELETE` triggers that fire during a cascade (for `unready_seats`), on `AFTER` triggers whose order does not matter, and on a column CHECK that reads another column (`kind`). Verified in local SQLite 3.51 only. D1 runs an older SQLite. Measured by running `previousWorker.test.ts`, `eventDeletion.test.ts`, and the readiness tests against `minsky-preview` in Phases 1, 6, and 7.
-- **Plan pins in the rollback check.** `scripts/rollback-check.mjs` runs the previous release's whole `npm run test:d1`. That suite includes the pinned plans of `queryPlans.test.ts` (`src/server/adapters/d1/queryPlans.test.ts:70-77`) and the ceilings of `readVolume.test.ts`. The new indexes, for example `issues_reporter`, `issues_owner`, and `history_actor` in `0022`, could make SQLite choose another index for an old query. Then an old pin fails on a schema whose rollback works. Nothing here shows whether the old pins hold. Measured by the first rollback check of Phase 1 and of Phase 7. A failure caused only by a plan pin is triaged as a pin, not as a rollback break.
+- **Plan pins in the rollback check.** `scripts/rollback-check.mjs` runs the previous release's whole `npm run test:d1`. That suite includes the pinned plans of `queryPlans.test.ts` (`src/server/adapters/d1/queryPlans.test.ts:70-77`) and the ceilings of `readVolume.test.ts`. The new indexes, for example `issues_reporter`, `issues_owner`, and `history_actor` in `0023`, could make SQLite choose another index for an old query. Then an old pin fails on a schema whose rollback works. Nothing here shows whether the old pins hold. Measured by the first rollback check of Phase 1 and of Phase 7. A failure caused only by a plan pin is triaged as a pin, not as a rollback break.
 - **Migration atomicity.** It is unknown whether `wrangler d1 migrations apply` runs a file in one transaction. Measured by rehearsing each file on an empty D1 database and on a `minsky-preview` copy of the development data shape before its pull request is ready.
 - **R2 listing.** `list({prefix})` exists on the Workers R2 binding, and the local test bucket supports it (`src/server/adapters/cloudflare/announcements.test.ts:20`, `src/server/adapters/cloudflare/announcements.test.ts:94`). `PrivateBucket` must expose it. Measured in Phase 7 on `minsky-preview-images`.
 - **A self-hosted installation without a webmaster.** A self-hosted database whose admin has neither username has no webmaster after `0017`. Its admin stays a contest admin of the bootstrap event and cannot create events. `recoverWebmaster` finds only an existing webmaster, and bootstrap needs an empty database. A local probe shows this case in local SQLite. Measured by `SELECT count(*) FROM grants WHERE scope = 'site'` after the upgrade, which the release notes ask self-hosters to run. The follow-up is a trusted terminal command that creates the first webmaster when a database has none.

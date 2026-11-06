@@ -47,6 +47,21 @@ function DialogOverlay({
   )
 }
 
+/**
+ * Radix returns focus to a DialogTrigger. A dialog opened from state has none,
+ * so focus would fall to the page body. This puts it back on the control that
+ * had focus at opening, or on the page heading when that control is gone.
+ */
+function restoreFocus(opener: Element | null) {
+  const usable =
+    opener instanceof HTMLElement &&
+    opener !== document.body &&
+    opener.isConnected &&
+    !opener.matches(":disabled")
+  if (usable) opener.focus()
+  else document.querySelector<HTMLElement>("h1[tabindex]")?.focus()
+}
+
 function DialogContent({
   className,
   children,
@@ -78,6 +93,27 @@ function DialogContent({
         )}
       </DialogPrimitive.Content>
     </DialogPortal>
+  )
+}
+
+/** A DialogContent for a dialog that state opens, with no DialogTrigger. */
+function ReturningDialogContent(props: React.ComponentProps<typeof DialogContent>) {
+  const opener = React.useRef<Element | null>(null)
+  return (
+    <DialogContent
+      {...props}
+      onOpenAutoFocus={(event) => {
+        // Radix sends this before it moves focus, so the opener still holds it.
+        opener.current = document.activeElement
+        props.onOpenAutoFocus?.(event)
+      }}
+      onCloseAutoFocus={(event) => {
+        props.onCloseAutoFocus?.(event)
+        if (event.defaultPrevented) return
+        event.preventDefault()
+        restoreFocus(opener.current)
+      }}
+    />
   )
 }
 
@@ -148,6 +184,7 @@ export {
   Dialog,
   DialogClose,
   DialogContent,
+  ReturningDialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,

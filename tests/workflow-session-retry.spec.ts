@@ -12,11 +12,8 @@ for (const committed of [false, true]) {
     page,
     local,
   }) => {
-    const [originalSession, otherSession] = local.sessions;
-    await local.run(
-      'INSERT INTO memberships (session_id, account_id, team_id) VALUES (?, ?, ?)',
-      otherSession, local.users.contestant, local.teams[2],
-    );
+    const [originalSession] = local.sessions;
+    await local.seatContestantInSecondSession();
     const requests: WorkflowRequest[] = [];
     await page.route('**/api/workflow', async (route) => {
       const request = route.request().postDataJSON() as WorkflowRequest;
@@ -193,10 +190,7 @@ test('a late success in the original session preserves the current session form 
   page,
   local,
 }) => {
-  await local.run(
-    'INSERT INTO memberships (session_id, account_id, team_id) VALUES (?, ?, ?)',
-    local.sessions[1], local.users.contestant, local.teams[2],
-  );
+  await local.seatContestantInSecondSession();
   let completeResponse = () => {};
   const responseReady = new Promise<void>((resolve) => {
     completeResponse = resolve;

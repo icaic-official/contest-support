@@ -13,7 +13,7 @@ Checked on **24 October 2026** against `main` at `c9c369b`, with [PR #73](https:
 - Staff image uploads with fixed visibility and session limits.
 - Team search, jury award lists, and session admin tools.
 - Session announcements with images, for session admins and jury ([PR #62](https://github.com/GiftedNovaHD/minsky/pull/62)).
-- Three interfaces: contestant desktop, staff phone app, and staff console ([PR #44](https://github.com/GiftedNovaHD/minsky/pull/44)).
+- Three interfaces: contestant app, staff phone app, and staff console ([PR #44](https://github.com/GiftedNovaHD/minsky/pull/44)). The contestant app works on phones and laptops (2026-11-05).
 - Cloudflare is the only backend ([PR #57](https://github.com/GiftedNovaHD/minsky/pull/57)). It sits behind a provider contract that a later provider can implement.
 - A verified fresh Cloudflare development installation ([PR #43](https://github.com/GiftedNovaHD/minsky/pull/43)). The owner approved the development switch and a repeat deployment. No accounts, passwords, records, images, or IDs moved from the earlier backend.
 - CI run deduplication ([PR #46](https://github.com/GiftedNovaHD/minsky/pull/46), merged).

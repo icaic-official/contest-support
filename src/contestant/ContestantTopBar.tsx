@@ -11,11 +11,10 @@ import {
   DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { ContestPicker } from "@/connected/ContestPicker";
 import type { SessionSummary } from "@/connected/hooks/useSessionSnapshot";
 import { cn } from "@/lib/utils";
 
@@ -67,45 +66,47 @@ export function ContestantTopBar({
   // keeps focus inside an open menu, so the page cannot take it earlier.
   const afterClose = useRef<(() => void) | undefined>(undefined);
   return (
-    <header className="flex h-14 shrink-0 items-center gap-4 border-b px-5">
+    <header className="flex h-14 shrink-0 items-center gap-1 border-b px-2 lg:gap-4 lg:px-5">
       <Link
         to="/issues"
         aria-label="Minsky, your reports"
-        className="-m-1 flex w-fit shrink-0 rounded-md p-1 outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+        className="flex shrink-0 items-center justify-center rounded-md outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 max-lg:size-11 lg:-m-1 lg:w-fit lg:p-1"
       >
-        <BrandMark />
+        <BrandMark wordClassName="max-lg:sr-only" />
       </Link>
       <div className="min-w-0 leading-tight">
-        <p className="truncate text-sm font-medium">
+        <p
+          className={cn(
+            "truncate text-sm font-medium",
+            sessions.length > 1 && "max-lg:hidden",
+          )}
+        >
           {eventName ?? "Your contest"}
         </p>
         {sessions.length > 1 ? (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
+          <ContestPicker
+            variant="menu"
+            contests={sessions}
+            value={sessionId}
+            disabled={locked}
+            onSelect={onSelectSession}
+            trigger={
               <button
                 type="button"
-                disabled={locked}
-                className="flex items-center gap-1 rounded-sm text-xs text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:opacity-50"
+                className="flex max-w-full items-center gap-1 rounded-sm text-xs text-muted-foreground max-lg:min-h-11 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:opacity-50"
                 aria-label={`Contest session: ${sessionName}. Change session`}
               >
-                {sessionName}
-                <ChevronDown className="size-3" aria-hidden="true" />
+                <span className="min-w-0 text-left">
+                  {/* A phone has no room for a second row, so the picker holds both names. */}
+                  <span className="block truncate text-sm font-medium text-foreground lg:hidden">
+                    {eventName ?? "Your contest"}
+                  </span>
+                  <span className="block truncate">{sessionName}</span>
+                </span>
+                <ChevronDown className="size-3 shrink-0" aria-hidden="true" />
               </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start">
-              <DropdownMenuLabel>Contest session</DropdownMenuLabel>
-              <DropdownMenuRadioGroup
-                value={sessionId}
-                onValueChange={onSelectSession}
-              >
-                {sessions.map((item) => (
-                  <DropdownMenuRadioItem key={item.id} value={item.id}>
-                    {item.name}
-                  </DropdownMenuRadioItem>
-                ))}
-              </DropdownMenuRadioGroup>
-            </DropdownMenuContent>
-          </DropdownMenu>
+            }
+          />
         ) : (
           <p className="truncate text-xs text-muted-foreground">
             {sessionName}
@@ -128,12 +129,15 @@ export function ContestantTopBar({
         {connected ? "Live" : "Reconnecting"}
       </Badge>
       <ThemeToggle />
-      <div className="h-6 w-px bg-border" aria-hidden="true" />
+      <div
+        className="h-6 w-px bg-border max-lg:hidden"
+        aria-hidden="true"
+      />
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button
             variant="ghost"
-            className="h-auto gap-2.5 px-2 py-1 text-left"
+            className="h-auto gap-2.5 px-2 py-1 text-left max-lg:size-11 max-lg:justify-center max-lg:p-0"
             aria-label={`Account menu for ${teamName}`}
           >
             <span
@@ -142,7 +146,7 @@ export function ContestantTopBar({
             >
               {initials(teamName)}
             </span>
-            <span className="leading-tight">
+            <span className="leading-tight max-lg:hidden">
               <span className="block text-sm font-medium">{teamName}</span>
               {location && (
                 <span className="block text-xs font-normal text-muted-foreground">
@@ -150,7 +154,10 @@ export function ContestantTopBar({
                 </span>
               )}
             </span>
-            <ChevronDown className="text-muted-foreground" aria-hidden="true" />
+            <ChevronDown
+              className="text-muted-foreground max-lg:hidden"
+              aria-hidden="true"
+            />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent

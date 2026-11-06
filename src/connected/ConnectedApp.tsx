@@ -199,7 +199,7 @@ export function ConnectedApp() {
               href={documentationUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="underline-offset-4 hover:underline"
+              className="inline-flex items-center underline-offset-4 hover:underline max-lg:min-h-11"
             >
               Documentation{" "}
               <span className="sr-only">(opens in a new tab)</span>↗

@@ -2,37 +2,22 @@ import { z } from 'zod';
 import type { Handle, LoginKey } from '../../../backend/contracts';
 import type { D1Connection, D1Statement, D1Value } from '../d1/connection';
 import { handleSchema, loginKeyFor, replaceCredentialStatements } from './credentials';
-import { passwordHasher, randomSecret, type PasswordHasher } from './password';
+import { passwordHasher, readablePassword, type PasswordHasher } from './password';
 
-// Retain PR #21's competition fields and normalized-name checks. Credentials
-// belong to the trusted operator result, never to the competition file.
+// The site file names the one webmaster. Credentials belong to the trusted
+// operator result, never to the site file.
 const text = z.string().max(200).trim().min(1).refine((value) => !value.includes('\0'));
-const competitionSchema = z.object({
+const siteSchema = z.object({
   /** The webmaster's handle, typed with **Site sign-in**. */
-  adminUsername: handleSchema,
-  adminName: text,
-  eventName: text,
-  sessionName: text,
-  categories: z.array(text).min(1),
-  teams: z.array(z.object({ name: text, location: text }).strict()),
-}).strict().superRefine((input, context) => {
-  if (new Set(input.categories).size !== input.categories.length) {
-    context.addIssue({ code: 'custom', message: 'Category names must be unique.' });
-  }
-  if (new Set(input.teams.map((team) => team.name)).size !== input.teams.length) {
-    context.addIssue({ code: 'custom', message: 'Team names must be unique.' });
-  }
-});
+  webmasterHandle: handleSchema,
+  webmasterName: text,
+}).strict();
 
-export type CompetitionConfiguration = z.infer<typeof competitionSchema>;
+export type SiteConfiguration = z.infer<typeof siteSchema>;
 
-export interface InstallationResult {
-  installationId: string;
+export interface SiteBootstrapResult {
   accountId: string;
-  eventId: string;
-  sessionId: string;
-  teamIds: string[];
-  adminUsername: Handle;
+  handle: Handle;
   temporaryPassword: string;
 }
 
@@ -40,10 +25,10 @@ interface InstallationOptions {
   passwords?: PasswordHasher;
 }
 
-/** Validate public competition settings without returning provider diagnostics. */
-export function validateCompetitionConfiguration(input: unknown): CompetitionConfiguration {
-  const parsed = competitionSchema.safeParse(input);
-  if (!parsed.success) throw new Error('Invalid competition configuration. Check the documented fields and unique names.');
+/** Validate public site settings without returning provider diagnostics. */
+export function validateSiteConfiguration(input: unknown): SiteConfiguration {
+  const parsed = siteSchema.safeParse(input);
+  if (!parsed.success) throw new Error('Invalid site configuration. Check the documented fields.');
   return parsed.data;
 }
 
@@ -83,20 +68,23 @@ function identityStatements(db: D1Connection, accountId: string, hash: string): 
 }
 
 /**
- * Trusted provider operation. The caller must confirm its account and database.
- * Never expose this function through a public or first-login HTTP endpoint.
+ * Trusted provider operation on an empty database. It creates exactly one
+ * webmaster and nothing else: no event, contest, or team. The webmaster then
+ * creates events on the site page. The caller must confirm its account and
+ * database. Never expose this function through a public or first-login HTTP
+ * endpoint.
  */
-export async function bootstrapInstallation(
+export async function bootstrapSite(
   db: D1Connection,
   input: unknown,
   options: InstallationOptions = {},
-): Promise<InstallationResult> {
-  const config = validateCompetitionConfiguration(input);
+): Promise<SiteBootstrapResult> {
+  const config = validateSiteConfiguration(input);
   const empty = await emptyDatabaseCondition(db);
   if (!(await db.prepare(`SELECT 1 AS empty WHERE ${empty}`).first())) {
     throw new Error('The database is not empty. Bootstrap did not start.');
   }
-  const password = randomSecret() + 'A9!';
+  const password = readablePassword();
   // Hash before the batch. A failed hash must leave the empty database intact.
   let hash: string;
   try {
@@ -104,109 +92,26 @@ export async function bootstrapInstallation(
   } catch {
     throw new Error('Password preparation failed. Bootstrap did not start.');
   }
-  const installationId = crypto.randomUUID();
   const accountId = crypto.randomUUID();
-  const eventId = crypto.randomUUID();
-  const sessionId = crypto.randomUUID();
-  const teams = config.teams.map((team) => ({ ...team, id: crypto.randomUUID() }));
   const assertionId = crypto.randomUUID();
-  const operationId = crypto.randomUUID();
   try {
     await db.batch([
       // The emptiness check runs again inside the atomic batch. Concurrent
       // initializations cannot both commit after an earlier empty read.
       assertion(db, assertionId, empty),
       statement(db, `INSERT INTO accounts (id, name, username, handle, must_change) VALUES (?, ?, ?, ?, 1)`,
-        accountId, config.adminName, loginKeyFor(accountId), config.adminUsername),
+        accountId, config.webmasterName, loginKeyFor(accountId), config.webmasterHandle),
       ...identityStatements(db, accountId, hash),
-      // The one webmaster of the site. The grant comes before the membership,
-      // so membership_adopts_event leaves the account outside every event.
       statement(db, `INSERT INTO grants (account_id, scope, granted_by) VALUES (?, 'site', 'trusted_bootstrap')`, accountId),
-      statement(db, 'INSERT INTO events (id, name) VALUES (?, ?)', eventId, config.eventName),
-      statement(db, 'INSERT INTO sessions (id, event_id, name, categories, intake_open) VALUES (?, ?, ?, ?, 0)',
-        sessionId, eventId, config.sessionName, JSON.stringify(config.categories)),
-      ...teams.map((team) => statement(db, 'INSERT INTO teams (id, session_id, name, location) VALUES (?, ?, ?, ?)',
-        team.id, sessionId, team.name, team.location)),
-      statement(db, 'INSERT INTO memberships (session_id, account_id, is_admin) VALUES (?, ?, 1)', sessionId, accountId),
-      statement(db, `INSERT INTO account_operations (id, account_id, actor, session_id, action, state, completed_at)
-        VALUES (?, ?, ?, ?, 'create_account', 'completed', unixepoch())`, operationId, accountId, accountId, sessionId),
-      statement(db, `INSERT INTO admin_audit (id, session_id, actor, action, target)
-        VALUES (?, ?, ?, 'trusted_bootstrap', ?)`, crypto.randomUUID(), sessionId, accountId, accountId),
-      statement(db, 'INSERT INTO installation (singleton, id, owner_account_id, event_id, session_id) VALUES (1, ?, ?, ?, ?)',
-        installationId, accountId, eventId, sessionId),
+      statement(db, `INSERT INTO authority_audit (id, event_id, actor, actor_name, action, target, detail)
+        VALUES (?, NULL, ?, ?, 'trusted_bootstrap', ?, '{}')`, crypto.randomUUID(), accountId, config.webmasterName, accountId),
       statement(db, 'DELETE FROM command_assertions WHERE id = ?', assertionId),
     ]);
   } catch {
     // A transport failure can follow a commit. Do not report it as rollback.
     throw new Error('Installation outcome is unknown. Inspect the installation before retrying.');
   }
-  return { installationId, accountId, eventId, sessionId, teamIds: teams.map((team) => team.id), adminUsername: config.adminUsername, temporaryPassword: password };
-}
-
-const ownerCondition = `EXISTS (SELECT 1 FROM installation i
-  JOIN accounts a ON a.id = i.owner_account_id
-  JOIN memberships m ON m.account_id = a.id AND m.session_id = i.session_id
-  JOIN sessions s ON s.id = i.session_id JOIN events e ON e.id = s.event_id
-  WHERE i.id = ? AND a.id = ? AND a.disabled = 0 AND a.username IS NOT NULL
-    AND m.is_admin = 1 AND e.archived = 0)`;
-
-/** Trusted provider recovery preserves the owner ID and every application record. */
-export async function recoverInstallationOwner(
-  db: D1Connection,
-  target: { installationId: string; accountId: string },
-  options: InstallationOptions = {},
-): Promise<{ accountId: string; adminUsername: Handle; temporaryPassword: string }> {
-  if (!z.object({ installationId: z.string().uuid(), accountId: z.string().uuid() }).safeParse(target).success) {
-    throw new Error('Select the installation and owner by UUID.');
-  }
-  const owner = await statement(db, `SELECT a.handle FROM installation i JOIN accounts a ON a.id = i.owner_account_id
-    WHERE i.id = ? AND a.id = ? AND ${ownerCondition}`,
-  target.installationId, target.accountId, target.installationId, target.accountId).first<{ handle: Handle }>();
-  if (!owner) throw new Error('The selected account is not the active installation owner. Recovery did not start.');
-  const operationId = crypto.randomUUID();
-  const assertionId = crypto.randomUUID();
-  try {
-    await db.batch([
-      assertion(db, assertionId, ownerCondition, target.installationId, target.accountId),
-      statement(db, "UPDATE account_operations SET state = 'superseded' WHERE account_id = ? AND state = 'pending'", target.accountId),
-      statement(db, `UPDATE accounts SET must_change = 1, credential_state = 'pending', credential_operation = ?,
-        credential_generation = credential_generation + 1 WHERE id = ?`, operationId, target.accountId),
-      statement(db, 'UPDATE logins SET revoked = 1 WHERE account_id = ?', target.accountId),
-      statement(db, 'DELETE FROM ba_session WHERE userId = ?', target.accountId),
-      statement(db, `INSERT INTO account_operations (id, account_id, actor, session_id, action, state)
-        SELECT ?, owner_account_id, owner_account_id, session_id, 'reset_password', 'pending' FROM installation WHERE id = ?`,
-      operationId, target.installationId),
-      statement(db, `INSERT INTO admin_audit (id, session_id, actor, action, target, detail)
-        SELECT ?, session_id, owner_account_id, 'trusted_owner_recovery_started', owner_account_id, ?
-        FROM installation WHERE id = ?`, crypto.randomUUID(), JSON.stringify({ operationId }), target.installationId),
-      statement(db, 'DELETE FROM command_assertions WHERE id = ?', assertionId),
-    ]);
-  } catch {
-    throw new Error('Owner recovery outcome is unknown. Inspect the account before retrying.');
-  }
-  const password = randomSecret() + 'A9!';
-  try {
-    // Persist restriction and revocation before expensive hashing. An interrupted
-    // recovery stays restricted. A later trusted recovery supersedes its ID.
-    const hash = await (options.passwords ?? passwordHasher).hash(password);
-    await db.batch([
-      assertion(db, assertionId, `${ownerCondition} AND EXISTS (SELECT 1 FROM accounts
-        WHERE id = ? AND credential_operation = ? AND credential_state = 'pending')`,
-      target.installationId, target.accountId, target.accountId, operationId),
-      ...identityStatements(db, target.accountId, hash),
-      statement(db, 'UPDATE logins SET revoked = 1 WHERE account_id = ?', target.accountId),
-      statement(db, 'DELETE FROM ba_session WHERE userId = ?', target.accountId),
-      statement(db, "UPDATE accounts SET credential_state = 'ready', credential_operation = NULL, must_change = 1 WHERE id = ?", target.accountId),
-      statement(db, "UPDATE account_operations SET state = 'completed', completed_at = unixepoch() WHERE id = ?", operationId),
-      statement(db, `INSERT INTO admin_audit (id, session_id, actor, action, target, detail)
-        SELECT ?, session_id, owner_account_id, 'trusted_owner_recovery', owner_account_id, ?
-        FROM installation WHERE id = ?`, crypto.randomUUID(), JSON.stringify({ operationId }), target.installationId),
-      statement(db, 'DELETE FROM command_assertions WHERE id = ?', assertionId),
-    ]);
-  } catch {
-    throw new Error('Owner recovery did not finish. Inspect the account before retrying trusted recovery.');
-  }
-  return { accountId: target.accountId, adminUsername: owner.handle, temporaryPassword: password };
+  return { accountId, handle: config.webmasterHandle, temporaryPassword: password };
 }
 
 export interface WebmasterRecoveryResult {
@@ -236,7 +141,7 @@ export async function recoverWebmaster(
   const target = { ...found, loginKey: found.login_key };
   if (!target.webmaster) throw new Error('The account is not a webmaster. Recovery did not start.');
   if (target.disabled) throw new Error('The account is disabled. Recovery did not start.');
-  const password = randomSecret() + 'A9!';
+  const password = readablePassword();
   let hash: string;
   try {
     hash = await (options.passwords ?? passwordHasher).hash(password);
@@ -250,7 +155,7 @@ export async function recoverWebmaster(
       assertion(db, assertionId, `EXISTS (SELECT 1 FROM accounts a JOIN grants g ON g.account_id = a.id AND g.scope = 'site'
         WHERE a.id = ? AND a.disabled = 0 AND a.credential_generation = ?)`, target.id, target.credential_generation),
       // The webmaster acts on the own account, which the takeover trigger allows.
-      ...replaceCredentialStatements(db, target, hash, { operationId, actor: target.id, temporary: true }),
+      ...replaceCredentialStatements(db, target, hash, { operationId, actor: target.id, temporary: true, contestId: null }),
       statement(db, `INSERT INTO authority_audit (id, event_id, actor, actor_name, action, target, detail)
         VALUES (?, NULL, ?, ?, 'trusted_webmaster_recovery', ?, ?)`, crypto.randomUUID(), target.id, target.name, target.id,
       JSON.stringify({ operationId })),

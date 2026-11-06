@@ -25,6 +25,19 @@ export const signInPath = "/sign-in";
 /** The webmasters' site page. It belongs to no contest. */
 export const sitePath = "/site";
 
+/** The event console. `/event` opens the caller's own event, `/event/<id>` a named one. */
+export const eventBase = "/event";
+
+export function eventPath(eventId?: string): string {
+  return eventId === undefined ? eventBase : `${eventBase}/${eventId}`;
+}
+
+/** The event console that an address names, or undefined for any other address. */
+export function eventRouteOf(pathname: string): { eventId: string | undefined } | undefined {
+  const match = /^\/event(?:\/([0-9a-f-]{36}))?\/?$/u.exec(pathname);
+  return match ? { eventId: match[1] } : undefined;
+}
+
 /** True for the signed-out entry addresses, which a signed-in person leaves for the queue. */
 export function isEntryPath(pathname: string): boolean {
   const path = pathname.replace(/\/+$/u, "");
@@ -90,10 +103,18 @@ export function useRouteFocus(headingId: string, ready: boolean): void {
       return;
     }
     // Menus restore trigger focus when they close. Focus the new page afterward.
+    let focused = false;
     const frame = window.requestAnimationFrame(() => {
+      focused = true;
       previous.current = pathname;
       document.getElementById(headingId)?.focus();
     });
-    return () => window.cancelAnimationFrame(frame);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      // A quick Back or Forward can return to the earlier address before this
+      // frame runs. Its heading was replaced since the last focus, so the
+      // earlier address needs focus again.
+      if (!focused) previous.current = undefined;
+    };
   }, [hash, headingId, pathname, ready]);
 }

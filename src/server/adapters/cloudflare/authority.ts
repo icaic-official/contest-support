@@ -2,6 +2,7 @@ import type { EntrantKind, ManageLevel, Seat, SignInTarget } from '../../../back
 import type { Role } from '../../../connected/model';
 import type { Caller } from '../../authentication';
 import type { D1Connection, D1Statement, D1Value } from '../d1/connection';
+import { extraMinutesSql, intakeOpenSql, windowEndSql } from './schedule';
 
 const nowSql = "strftime('%Y-%m-%dT%H:%M:%fZ', 'now')";
 
@@ -68,7 +69,8 @@ function contestAuthoritySql(selection: ContestSelection): string {
       OR EXISTS (SELECT 1 FROM membership_roles mr WHERE mr.session_id = s.id AND mr.account_id = a.id))) AS staff,
     (SELECT json_group_array(role) FROM (SELECT role FROM membership_roles mr
       WHERE mr.session_id = s.id AND mr.account_id = a.id ORDER BY role)) AS roles,
-    'team' AS entrant_kind,
+    CASE WHEN m.team_id IS NULL THEN 'team' ELSE COALESCE((SELECT en.kind FROM teams t
+      JOIN entrants en ON en.id = t.entrant_id WHERE t.id = m.team_id), 'team') END AS entrant_kind,
     CASE WHEN gs.account_id IS NOT NULL THEN 'site' WHEN ge.account_id IS NOT NULL THEN 'event'
       WHEN m.is_admin = 1 THEN 'contest' ELSE 'none' END AS manage,
     CASE WHEN gs.account_id IS NOT NULL THEN (NOT (${readsRestrictedSql}) OR EXISTS (SELECT 1 FROM grants gj
@@ -114,6 +116,17 @@ export interface ContestAuthorityRow {
 export function contestDataSql(selection: ContestSelection): string {
   return `SELECT * FROM (${contestAuthoritySql(selection)}) WHERE data = 1`;
 }
+
+/**
+ * The two scopes of a calendar read for the account `login.id`, in two
+ * statements so that each reads its own index. The webmaster row is read once,
+ * so a member's webmaster branch stops before it reads a contest. A member lists the contests of
+ * the account's own event. A webmaster lists the contests of every event. The
+ * calendar lists a contest without opening it, so it needs no seat and reads
+ * schedules only. `s` names the contest row.
+ */
+export const calendarEventSql = 's.event_id = (SELECT event_id FROM accounts WHERE id = login.id)';
+export const calendarWebmasterSql = "SELECT 1 FROM login JOIN grants g ON g.scope = 'site' AND g.account_id = login.id";
 
 /** Callers must come from the trusted authentication service. */
 export function contestDataBindings(caller: Caller, contestId: string): D1Value[] {
@@ -274,11 +287,12 @@ export function manageAccountBindings(actor: string, target: string): D1Value[] 
 
 /**
  * Account `t` may change its own handle: it belongs to an event and holds no
- * contestant seat in any contest (owner decision 14, 2026-11-01). A
+ * contestant seat in any contest, and is not an entrant's sign-in even
+ * while no contest seats it (owner decision 14, 2026-11-01). A
  * contestant's handle is printed on the sheet that venue staff use. A
  * webmaster belongs to no event. The account page reads the same condition.
  */
-export const ownHandleSql = `t.event_id IS NOT NULL
+export const ownHandleSql = `t.event_id IS NOT NULL AND t.entrant_id IS NULL
   AND NOT EXISTS (SELECT 1 FROM memberships m WHERE m.account_id = t.id AND m.team_id IS NOT NULL)`;
 
 /**
@@ -340,3 +354,77 @@ export const contestsToJoinSql = `SELECT s.id, s.name, e.name AS event_name
  */
 export const manageWebmasterSql = `${manageAccountSql}
   AND EXISTS (SELECT 1 FROM grants g WHERE g.scope = 'site' AND g.account_id = t.id)`;
+
+/** The event admins of one event, by account. Binds eventId. */
+export const eventAdminsSql = `SELECT account_id FROM grants WHERE scope = 'event' AND event_id = ? ORDER BY account_id`;
+
+/**
+ * The staff seats that an assignment made in the contests of one event, with
+ * their roles. Event admins and webmasters hold none. Binds eventId.
+ */
+export const eventStaffSql = `SELECT m.session_id AS contest_id, m.account_id, m.is_admin,
+      (SELECT json_group_array(role) FROM (SELECT role FROM membership_roles mr
+        WHERE mr.session_id = m.session_id AND mr.account_id = m.account_id ORDER BY role)) AS roles
+    FROM sessions s JOIN memberships m ON m.session_id = s.id
+    WHERE s.event_id = ? AND m.team_id IS NULL AND (m.is_admin = 1 OR EXISTS (SELECT 1 FROM membership_roles mr
+      WHERE mr.session_id = m.session_id AND mr.account_id = m.account_id))
+    ORDER BY m.session_id, m.account_id`;
+
+/**
+ * The only definition of `forContests`: the live contests of the account's
+ * entries whose window overlaps the target contest's window. A window runs from
+ * the scheduled start to the scheduled end plus grace, and every live contest
+ * has a schedule. So an issue on day 1 never opens a contest on day 3. A
+ * practice target, or none, gives the empty set. Bind the account, then the target.
+ */
+export const forContestsSql = `SELECT s.id FROM sessions t
+  JOIN memberships m ON m.account_id = ? AND m.team_id IS NOT NULL
+  JOIN sessions s ON s.id = m.session_id
+  WHERE t.id = ? AND t.kind = 'live' AND s.kind = 'live' AND s.event_id = t.event_id
+    AND s.starts_at < ${windowEndSql('t')} AND t.starts_at < ${windowEndSql('s')}`;
+
+/**
+ * The open contests that a new password would sign this account out of: its
+ * contestant seats outside `forContests` and other than the target itself.
+ * Bind with `openConflictBindings`.
+ */
+export const openConflictSql = `SELECT s.name FROM memberships m JOIN sessions s ON s.id = m.session_id
+  WHERE m.account_id = ? AND m.team_id IS NOT NULL AND s.id IS NOT ? AND s.id NOT IN (${forContestsSql})
+    AND ${intakeOpenSql('s', extraMinutesSql('s', 'm.team_id'))}`;
+
+export function openConflictBindings(accountId: string, contestId: string | null): D1Value[] {
+  return [accountId, contestId, accountId, contestId];
+}
+
+/**
+ * The live contests, not yet ended, whose password a new issue would void: the
+ * account's scopes outside `forContests` and other than the target. Bind with
+ * `openConflictBindings`.
+ */
+export const voidedScopesSql = `SELECT s.name FROM credential_scopes c JOIN sessions s ON s.id = c.session_id
+  JOIN memberships m ON m.session_id = s.id AND m.account_id = c.account_id AND m.team_id IS NOT NULL
+  WHERE c.account_id = ? AND s.kind = 'live' AND ${nowSql} < ${windowEndSql('s')} AND s.id IS NOT ?
+    AND s.id NOT IN (${forContestsSql})`;
+
+/**
+ * A row when a move would void a seat's password and the contest stays due to run.
+ * Bind the contest, the new start, the new end with grace, that end, and that start.
+ */
+export const moveStopsContestSql = `SELECT 1 FROM sessions s
+  JOIN memberships m ON m.session_id = s.id AND m.team_id IS NOT NULL
+  JOIN credential_scopes c ON c.account_id = m.account_id AND c.session_id = s.id
+  WHERE s.id = ? AND s.kind = 'live' AND ${intakeOpenSql('s')}
+    AND (s.intake_follows_schedule = 0 OR (? <= ${nowSql} AND ${nowSql} < ?))
+    AND NOT (c.issued_from < ? AND ? < c.issued_until)`;
+
+/** The contests that seat an account, with their readiness. */
+export const accountSeatsSql = `SELECT m.session_id, s.kind, s.unready_seats FROM memberships m
+  JOIN sessions s ON s.id = m.session_id WHERE m.account_id = ?`;
+
+/** The contestant seats of an event's live contests without a password issued for them. */
+export const waitingSeatsSql = `SELECT m.session_id AS contest_id, a.id AS account_id, a.name, COALESCE(a.handle, '') AS handle
+  FROM sessions s JOIN memberships m ON m.session_id = s.id AND m.team_id IS NOT NULL
+  JOIN accounts a ON a.id = m.account_id
+  WHERE s.event_id = ? AND s.kind = 'live' AND NOT EXISTS (SELECT 1 FROM credential_scopes c
+    WHERE c.account_id = m.account_id AND c.session_id = m.session_id)
+  ORDER BY a.name, a.id`;

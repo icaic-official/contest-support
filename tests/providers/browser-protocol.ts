@@ -1,8 +1,8 @@
 import type {
-  AccountCommand,
   AccountIdentity,
   Backend,
-  MembershipInput,
+  CredentialIssue,
+  ManageCommand,
   SignInTarget,
 } from '../../src/backend/contracts';
 import type { Command } from '../../src/connected/model';
@@ -35,24 +35,12 @@ export type Request =
   | { type: 'changePassword'; currentPassword: string; newPassword: string }
   | { type: 'authSubscribe'; id: string }
   | { type: 'stop'; id: string }
-  | { type: 'sessions'; userId: string }
+  | { type: 'contests'; eventId?: string }
+  | { type: 'event'; eventId?: string }
   | { type: 'snapshot'; sessionId: string }
   | { type: 'execute'; sessionId: string; requestId: string; command: Command }
-  | { type: 'account'; sessionId: string; command: AccountCommand }
-  | { type: 'setIntake'; sessionId: string; open: boolean }
-  | {
-    type: 'setImageLimits';
-    sessionId: string;
-    limits: Parameters<Backend['admin']['setImageLimits']>[1];
-  }
-  | {
-    type: 'saveMember';
-    sessionId: string;
-    userId: string;
-    member: MembershipInput;
-  }
-  | { type: 'removeMember'; sessionId: string; userId: string }
-  | { type: 'editRoster'; sessionId: string; command: Parameters<Backend['admin']['editRoster']>[1] }
+  | { type: 'manage'; requestId: string; command: ManageCommand }
+  | { type: 'issue'; requestId: string; input: CredentialIssue }
   | { type: 'beginImage'; input: Parameters<Backend['images']['begin']>[0] }
   | {
     type: 'uploadImage';

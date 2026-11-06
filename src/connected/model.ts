@@ -1,3 +1,4 @@
+import "../lib/zodConfig";
 import { z } from "zod";
 import { can, seatOf } from "./capabilities.ts";
 
@@ -17,6 +18,7 @@ const sessionSchema = z.object({
   id: uuid,
   event_id: uuid,
   name: z.string(),
+  /** Derived: whether this viewer may report now. A contestant's end is the personal end. */
   intake_open: z.boolean(),
   categories: z.array(z.string()),
   revision: z.number(),
@@ -72,18 +74,57 @@ const resolutionSchema = z.object({
   reopened_name: z.string().nullable(),
   reason: z.string().nullable(),
 });
+const intakeSchema = z.object({
+  open: z.boolean(),
+  reason: z.enum(["before_start", "running", "grace", "ended", "override_open", "override_closed", "awaiting_live_passwords"]),
+  /** The next instant at which the reason changes by time alone. The browser refreshes then. */
+  changes_at: time.nullable(),
+});
+/** What the schedule, the override, and confirmed awards make of one contest, derived by D1. */
+const clockSchema = z.object({
+  time_zone: z.string(),
+  schedule: z
+    .object({ starts_at: time, ends_at: time, grace_minutes: z.number().int().nonnegative() })
+    .nullable(),
+  follows_schedule: z.boolean(),
+  intake: intakeSchema,
+  /** Contestants only: the scheduled end plus the extra minutes that staff confirmed as applied. */
+  personal_end_at: time.nullable(),
+  extra_minutes: z.number().int().nonnegative(),
+});
+export type ContestClock = z.infer<typeof clockSchema>;
+const contestAwardSchema = z.object({
+  id: uuid,
+  minutes: z.number().int().nonnegative(),
+  explanation: z.string(),
+  actor_name: z.string(),
+  at: time,
+  applied_at: time.nullable(),
+  applied_name: z.string().nullable(),
+  /** Staff read withdrawn awards in the history. A withdrawn award gives no time, and a contestant never reads one. */
+  withdrawn_at: time.nullable().default(null),
+  withdrawn_name: z.string().nullable().default(null),
+});
+export type ContestAward = z.infer<typeof contestAwardSchema>;
 export const snapshotSchema = z.object({
   session: sessionSchema.nullable(),
+  clock: clockSchema.nullish(),
+  /** Staff read every contest-wide award. A contestant reads those that staff confirmed. */
+  contest_awards: z.array(contestAwardSchema).default([]),
   event: z
     .object({ id: uuid, name: z.string(), archived: z.boolean() })
     .nullable(),
   membership: membershipSchema.nullable(),
+  /** Staff only: false when no one holds the specialist role in this contest. Null or absent means unknown. */
+  has_specialist: z.boolean().nullish(),
   teams: z.array(
     z.object({
       id: uuid,
       session_id: uuid,
       name: z.string(),
       location: z.string(),
+      /** The entrant that this entry belongs to. Commands name the entrant, not the entry. */
+      entrant_id: uuid.nullable().optional(),
     }),
   ),
   issues: z.array(issueSchema),
@@ -144,29 +185,57 @@ export type Resolution = z.infer<typeof resolutionSchema>;
 export type Team = Snapshot["teams"][number];
 export type Award = Snapshot["awards"][number];
 export type HistoryEntry = Snapshot["history"][number];
-export type Command =
-  | { type: "submit"; category: string; description: string; team_id?: string }
-  | {
-      type: "claim" | "accept" | "escalate" | "apply";
-      issue_id: string;
-      revision: number;
-    }
-  | {
-      type: "message";
-      issue_id: string;
-      revision: number;
-      text: string;
-      visibility: "public" | "internal";
-    }
-  | { type: "resolve"; issue_id: string; revision: number; summary: string }
-  | { type: "reopen"; issue_id: string; revision: number; reason: string }
-  | {
-      type: "award";
-      issue_id: string;
-      revision: number;
-      minutes: number;
-      explanation: string;
-    };
+/** PostgreSQL btrim(text) removes spaces, and length(text) counts Unicode code points. */
+export function workflowText(value: string): string {
+  return value.replace(/^ +| +$/g, "");
+}
+/**
+ * Text that a command stores. SQLite length() stops at U+0000, so a database
+ * length CHECK would fail with an error the store cannot classify.
+ */
+const commandText = z.string().refine((value) => {
+  if (value.includes("\u0000")) return false;
+  const length = Array.from(workflowText(value)).length;
+  return length >= 1 && length <= 2000;
+});
+/** Matches a UUID of version 1 to 8, as the server checks it. */
+export const uuidPattern =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const target = {
+  issue_id: z.string().regex(uuidPattern),
+  revision: z.number().int().nonnegative(),
+};
+/**
+ * The one definition of a command. The server validates with it and keeps the
+ * original value, not the parsed copy, so extra JSON fields survive for receipt replay.
+ */
+export const commandSchema = z.discriminatedUnion("type", [
+  z.object({
+    type: z.literal("submit"),
+    category: z.string(),
+    description: commandText,
+    team_id: z.string().optional(),
+  }),
+  z.object({
+    type: z.enum(["claim", "accept", "escalate", "apply"]),
+    ...target,
+  }),
+  z.object({
+    type: z.literal("message"),
+    ...target,
+    text: commandText,
+    visibility: z.enum(["public", "internal"]),
+  }),
+  z.object({ type: z.literal("resolve"), ...target, summary: commandText }),
+  z.object({ type: z.literal("reopen"), ...target, reason: commandText }),
+  z.object({
+    type: z.literal("award"),
+    ...target,
+    minutes: z.number().int().min(0).max(2147483647),
+    explanation: commandText,
+  }),
+]);
+export type Command = z.infer<typeof commandSchema>;
 
 /**
  * True when `running` is a command of this type, and for this issue when

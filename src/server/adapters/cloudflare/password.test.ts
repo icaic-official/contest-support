@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { passwordHasher, randomSecret } from "./password";
+import { passwordHasher, randomSecret, readablePassword } from "./password";
 
 describe("Better Auth credential compatibility", () => {
   it("uses independent salts and rejects a different password", async () => {
@@ -20,5 +20,28 @@ describe("Better Auth credential compatibility", () => {
     for (const malformed of ["", "missing-salt", "abc:123", `${"00".repeat(16)}:${"ff".repeat(64)}:extra`]) {
       expect(await passwordHasher.verify(randomSecret(), malformed)).toBe(false);
     }
+  });
+});
+
+describe("readablePassword", () => {
+  it("has 16 characters from an alphabet without look-alike characters", () => {
+    for (let i = 0; i < 200; i += 1) {
+      expect(readablePassword()).toMatch(/^[2-9A-HJ-NP-Za-km-np-z]{16}$/);
+    }
+  });
+
+  it("meets the password length rule and differs between calls", () => {
+    const seen = new Set(Array.from({ length: 50 }, readablePassword));
+    expect(seen.size).toBe(50);
+  });
+
+  it("uses every character of the alphabet with roughly equal frequency", () => {
+    const counts = new Map<string, number>();
+    for (let i = 0; i < 20000; i += 1) {
+      for (const char of readablePassword()) counts.set(char, (counts.get(char) ?? 0) + 1);
+    }
+    expect(counts.size).toBe(56);
+    const expected = (20000 * 16) / 56;
+    for (const count of counts.values()) expect(Math.abs(count - expected)).toBeLessThan(expected * 0.1);
   });
 });

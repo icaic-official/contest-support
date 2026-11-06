@@ -207,24 +207,10 @@ export async function createBrowserBackend(
         ),
     },
     workflows: {
-      sessions: (userId) => call({ type: 'sessions', userId }),
+      contests: (query) => call({ type: 'contests', ...(query?.eventId === undefined ? {} : { eventId: query.eventId }) }),
       snapshot: (sessionId) => call({ type: 'snapshot', sessionId }),
       execute: (sessionId, requestId, command) =>
         call({ type: 'execute', sessionId, requestId, command }),
-    },
-    admin: {
-      account: (sessionId, command) =>
-        call({ type: 'account', sessionId, command }),
-      setIntake: (sessionId, open) =>
-        call({ type: 'setIntake', sessionId, open }),
-      setImageLimits: (sessionId, limits) =>
-        call({ type: 'setImageLimits', sessionId, limits }),
-      saveMember: (sessionId, userId, member) =>
-        call({ type: 'saveMember', sessionId, userId, member }),
-      removeMember: (sessionId, userId) =>
-        call({ type: 'removeMember', sessionId, userId }),
-      editRoster: (sessionId, command) =>
-        call({ type: 'editRoster', sessionId, command }),
     },
     images: {
       begin: (input) => call({ type: 'beginImage', input }),
@@ -261,7 +247,13 @@ export async function createBrowserBackend(
         });
       },
     },
-    manage: { site: unsupported, execute: unsupported, issueCredentials: unsupported },
+    manage: {
+      site: unsupported,
+      event: (eventId) => call({ type: 'event', ...(eventId === undefined ? {} : { eventId }) }),
+      execute: (requestId, command) => call({ type: 'manage', requestId, command }),
+      issueCredentials: (requestId, input) => call({ type: 'issue', requestId, input }),
+    },
+    contestAwards: { execute: unsupported },
     announcements: {
       snapshot: unsupported,
       execute: unsupported,

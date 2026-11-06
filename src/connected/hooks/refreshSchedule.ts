@@ -47,3 +47,26 @@ export function startRefreshSchedule(options: RefreshScheduleOptions): () => voi
     document.removeEventListener("visibilitychange", visible);
   };
 }
+
+/** The longest random delay after a time boundary, so 800 clients do not read in the same second. */
+export const BOUNDARY_JITTER_MS = 15_000;
+/** The longest delay that a browser timer accepts. */
+const TIMER_MAX_MS = 2 ** 31 - 1;
+
+/**
+ * Milliseconds until a refresh at the next time boundary, or undefined when
+ * there is none to wait for. The boundary is server time, so the clock offset
+ * moves it into local time. A random delay of up to 15 seconds follows it.
+ * The server's gate stays authoritative. This read only updates what the
+ * browser shows.
+ */
+export function boundaryDelay(
+  changesAt: string | null | undefined,
+  now: number,
+  clockOffset: number,
+  random: () => number = Math.random,
+): number | undefined {
+  if (!changesAt) return undefined;
+  const delay = Date.parse(changesAt) - (now + clockOffset) + random() * BOUNDARY_JITTER_MS;
+  return delay > TIMER_MAX_MS ? undefined : Math.max(0, delay);
+}

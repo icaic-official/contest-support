@@ -663,6 +663,8 @@ test("session and role changes clear selection and do not grant other roles a ju
   browser,
   local,
 }) => {
+  // The flow takes 29 s of the default 30 s in a full run.
+  test.setTimeout(60_000);
   for (const name of ["admin", "contestant", "volunteer"]) {
     const context = await browser.newContext();
     await local.attach(context);

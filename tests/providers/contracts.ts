@@ -1,6 +1,7 @@
 import type { Backend, SignInTarget } from '../../src/backend/contracts';
 
 export type Actor =
+  | 'eventAdmin'
   | 'admin'
   | 'otherAdmin'
   | 'contestant'
@@ -23,10 +24,12 @@ export interface TestAccount {
 
 /** All identifiers belong to one disposable run. Credentials remain in memory. */
 export interface ScenarioData {
+  eventId: string;
   sessionId: string;
   otherSessionId: string;
   teamId: string;
   accounts: Record<Actor, TestAccount>;
+  /** A single contestant and a staff person, created through the event admin's commands. */
   createdAccounts: Record<'contestant' | 'staff', { name: string; username: string }>;
   /** The event of every fixture account. Created accounts sign in with it. */
   signIn: SignInTarget;

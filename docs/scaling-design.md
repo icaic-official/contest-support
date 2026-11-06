@@ -150,13 +150,13 @@ Rows read include the notification dispatch after a `POST` and the claim in the 
 | `GET /api/avatars` | Contestant | 6,005 | 17 | Flat |
 | `GET /api/announcements` | Any | 104 | 104 | Flat in accounts, issues and teams |
 | `POST /api/auth/sign-in` | Any | 22 | 22 | Flat |
-| `GET /api/sessions` | Any | 12 | 12 | Flat |
+| `GET /api/contests` (then named `/api/sessions`) | Any | 12 | 12 | Flat |
 | `GET /api/auth/session` | Any | 5 | 5 | Flat |
 
 Without the dispatch, the claim request reads 3,541 rows before and 2,648 after, the submit request reads 323 and 179, and the cron tick reads 7,877 and 21 (measured, local).
 The 4,800-account avatar count of 33,616 at `f978488` is inferred from the measured slope of 7 rows for each ready avatar. The avatar statement alone read 33,611 rows at that size ([read-volume baseline](history/read-volume-baseline-2026-10-26.md#h1-avatar-list)). The count of 30 at 4,800 accounts is measured, local, with migration `0016_staff_membership_index.sql`.
 
-Every live hint makes each open screen read `/api/sessions`, `/api/snapshot`, `/api/announcements` and `/api/avatars` again. The sum of those four reads is the cost of one screen for one hint (measured, local parts, inferred sum):
+Every live hint makes each open screen read `/api/contests`, `/api/snapshot`, `/api/announcements` and `/api/avatars` again. The sum of those four reads is the cost of one screen for one hint (measured, local parts, inferred sum):
 
 | Caller | Before | After | At 4,800 accounts and 400 issues, after |
 | --- | --- | --- | --- |

@@ -11,9 +11,9 @@ const directories = [];
 const suites = [
   { name: 'workflow', total: 70, label: 'full D1 workflow', maxWorkers: 1,
     include: ['src/server/adapters/d1/store.test.ts'] },
-  { name: 'accounts', total: 82, label: 'connector accounts', maxWorkers: 4,
+  { name: 'accounts', total: 34, label: 'connector accounts', maxWorkers: 4,
     include: ['authentication.test.ts', 'authenticationRecovery.test.ts',
-      'authenticationInitiation.test.ts', 'authenticationCompletion.test.ts']
+      'authenticationCompletion.test.ts']
       .map((file) => `src/server/adapters/cloudflare/${file}`) },
 ];
 afterEach(async () => {
@@ -272,13 +272,13 @@ test('surviving or incomplete journals retain only this run scratch directory an
       const directory = await mkdtemp(join(scratch, 'minsky-d1-proof-'));
       journal = join(directory, 'fixture.json');
       await writeFile(journal, content, { mode: 0o600 });
-      return result(82);
+      return result(34);
     };
     await assert.rejects(runHostedStore(['accounts', ...setup.arguments], setup.dependencies), /cleanup is incomplete/);
     assert.equal(await readFile(journal, 'utf8'), content);
     assert.equal(await readFile(setup.config, 'utf8'), original);
     await assert.rejects(stat(join(scratch, 'vitest.config.mjs')), { code: 'ENOENT' });
-    assert.deepEqual(setup.reports, ['Hosted connector accounts: 82 passed, 0 failed, 0 skipped.',
+    assert.deepEqual(setup.reports, ['Hosted connector accounts: 34 passed, 0 failed, 0 skipped.',
       `Fixture recovery journal: ${journal}`]);
   }
 });

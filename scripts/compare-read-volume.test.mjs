@@ -12,8 +12,8 @@ describe('read volume comparison', () => {
   });
 
   test('fails when one request type reads more than the limit', () => {
-    const result = compareReadVolume([run({ '/api/sessions': [5], '/api/snapshot': [100] })],
-      [run({ '/api/sessions': [5], '/api/snapshot': [111] })], 10);
+    const result = compareReadVolume([run({ '/api/contests': [5], '/api/snapshot': [100] })],
+      [run({ '/api/contests': [5], '/api/snapshot': [111] })], 10);
     expect(result.pass).toBe(false);
     expect(result.over.map((change) => change.id)).toEqual(['base | /api/snapshot | admin']);
   });

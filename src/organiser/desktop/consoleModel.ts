@@ -31,7 +31,7 @@ export const consolePageLabels: Record<ConsolePage, string> = {
   awards: "Award review",
   overview: "Overview",
   accounts: "Accounts",
-  roster: "Roster",
+  roster: "Team locations",
   settings: "Session settings",
 };
 
@@ -44,7 +44,7 @@ export interface ConsoleNavGroup {
 /**
  * The sidebar groups that a person's combined roles give, in display order.
  * Volunteers and specialists get the support pages. Jury members get Award
- * review. Admins get Overview, Accounts, Roster and Session settings. Admins without
+ * review. Admins get Overview, Accounts, Team locations and Session settings. Admins without
  * support roles still get Queue, as in the phone app. Every person gets
  * Teams & tables.
  */

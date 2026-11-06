@@ -9,6 +9,7 @@ import { applyMigrations } from '../d1/testFixture';
 import { D1AnnouncementService } from './announcements';
 import { D1ApplicationService } from './application';
 import { authorityGuard, contestDataSql, resolveAuthority } from './authority';
+import { D1ManageService } from './manage';
 import { R2AvatarService } from './avatars';
 import { R2ImageService, type PrivateBucket } from './images';
 import { openStoreDatabase } from './tooling/store-database.mjs';
@@ -75,8 +76,9 @@ describe('one authority resolver for every reader', () => {
     await run(`INSERT INTO sessions (id, event_id, name, intake_open, categories) VALUES (?, ?, 'First', 1, '["Devices"]'),
       (?, ?, 'Second', 1, '["Devices"]'), (?, ?, 'Other', 1, '["Devices"]')`,
     contestIds.first, ids.event, contestIds.second, ids.event, contestIds.other, ids.otherEvent);
+    // Distinct names: 0019 makes teams that share a name inside an event one entrant.
     for (const contest of contests) {
-      await run("INSERT INTO teams (id, session_id, name, location) VALUES (?, ?, 'Team', 'A1')", teams[contest], contestIds[contest]);
+      await run("INSERT INTO teams (id, session_id, name, location) VALUES (?, ?, ?, 'A1')", teams[contest], contestIds[contest], `Team ${contest}`);
     }
     for (const person of people) {
       const { accountId, loginId } = callers[person];
@@ -140,7 +142,7 @@ describe('one authority resolver for every reader', () => {
     const caller = callers[person];
     const contestId = contestIds[contest];
     const snapshot = await application().snapshot(caller, contestId).catch(() => undefined);
-    const listed = (await application().sessions(caller)).some((summary) => summary.id === contestId);
+    const listed = (await application().contests(caller)).some((summary) => summary.id === contestId);
     const announcements = await new D1AnnouncementService(db).snapshot(caller, contestId).then(() => true, () => false);
     const avatars = await new R2AvatarService(db, bucket).list(caller, contestId);
     const { issue, image } = issues.get(contest) ?? { issue: '', image: '' };
@@ -172,7 +174,8 @@ describe('one authority resolver for every reader', () => {
   }
 
   async function setsIntake(person: Person, contest: Contest): Promise<boolean> {
-    return application().setIntake(callers[person], contestIds[contest], true).then(() => true, () => false);
+    return new D1ManageService(db, { hash: async () => '', verify: async () => false })
+      .execute(callers[person], randomUUID(), { type: 'set_intake', contestId: contestIds[contest], mode: 'open' }).then(() => true, () => false);
   }
 
   it('gives every reader the same seat for every person in every contest', async () => {

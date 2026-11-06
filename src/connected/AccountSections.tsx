@@ -43,6 +43,8 @@ import {
   teamAccountDescription,
 } from "./accountModel";
 import { AVATAR_SOURCE_MAX_BYTES } from "./avatarPicture";
+import { Calendar } from "./Calendar";
+import { calendarKey } from "./calendarModel";
 import { type AvatarEditorControls, changePictureButtonId } from "./hooks/useAvatarEditor";
 import { megabytes } from "./imageFile";
 import { formatDate, relativeAge } from "./labels";
@@ -397,6 +399,17 @@ export function SessionsSection({
           );
         })}
       </ul>
+      <div className="mt-6">
+        <Calendar
+          currentId={data.sessionId}
+          currentIntake={data.snapshot?.clock?.intake.reason}
+          refreshKey={calendarKey(data.snapshot)}
+          onOpen={(contest) => {
+            data.selectSession(contest.id);
+            onSessionChange();
+          }}
+        />
+      </div>
     </Section>
   );
 }

@@ -1,11 +1,16 @@
+import { lazy } from "react";
 import { useMediaQuery } from "@/connected/hooks/useMediaQuery";
 import { useWorkflowState } from "@/connected/hooks/useWorkflowState";
 import type { ShellProps } from "@/connected/shell";
-import { OrganiserDesktopConsole } from "./desktop/OrganiserDesktopConsole";
-import { OrganiserPhoneApp } from "./phone/OrganiserPhoneApp";
+import { loadDesktopConsole, loadPhoneApp, organiserDesktopQuery } from "./layouts";
 
-/** Viewports at least this wide get the desktop console. */
-export const organiserDesktopQuery = "(min-width: 1024px)";
+// A phone never downloads the desktop console, and a laptop never downloads the phone app.
+const OrganiserDesktopConsole = lazy(() =>
+  loadDesktopConsole().then((m) => ({ default: m.OrganiserDesktopConsole })),
+);
+const OrganiserPhoneApp = lazy(() =>
+  loadPhoneApp().then((m) => ({ default: m.OrganiserPhoneApp })),
+);
 
 /**
  * The organiser UI for volunteers, specialists, jury members and session

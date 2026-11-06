@@ -96,8 +96,10 @@ async function execute(request: Request): Promise<unknown> {
     case 'stop':
       stopSubscription(request.id);
       return;
-    case 'sessions':
-      return backend.workflows.sessions(request.userId);
+    case 'contests':
+      return backend.workflows.contests(request.eventId === undefined ? undefined : { eventId: request.eventId });
+    case 'event':
+      return backend.manage.event(request.eventId);
     case 'snapshot':
       return backend.workflows.snapshot(request.sessionId);
     case 'execute':
@@ -106,22 +108,10 @@ async function execute(request: Request): Promise<unknown> {
         request.requestId,
         request.command,
       );
-    case 'account':
-      return backend.admin.account(request.sessionId, request.command);
-    case 'setIntake':
-      return backend.admin.setIntake(request.sessionId, request.open);
-    case 'setImageLimits':
-      return backend.admin.setImageLimits(request.sessionId, request.limits);
-    case 'saveMember':
-      return backend.admin.saveMember(
-        request.sessionId,
-        request.userId,
-        request.member,
-      );
-    case 'removeMember':
-      return backend.admin.removeMember(request.sessionId, request.userId);
-    case 'editRoster':
-      return backend.admin.editRoster(request.sessionId, request.command);
+    case 'manage':
+      return backend.manage.execute(request.requestId, request.command);
+    case 'issue':
+      return backend.manage.issueCredentials(request.requestId, request.input);
     case 'beginImage':
       return backend.images.begin(request.input);
     case 'uploadImage':

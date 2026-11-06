@@ -1,7 +1,6 @@
 import { z } from 'zod';
 import { hasJsonBody, readJsonBody } from './http';
 import { parseEventCode, parseHandle, type SignInTarget } from '../backend/contracts';
-import { roleSchema } from '../connected/model';
 import { AuthenticationError, signInRefused, type AuthenticationService } from './authentication';
 
 const passwordSchema = z.string().min(1).max(1024);
@@ -9,18 +8,6 @@ const usernameSchema = z.string().min(1).max(128);
 /** `event` is the typed event code, or null for a site sign-in. */
 const signInSchema = z.strictObject({ event: z.string().max(128).nullable(), handle: usernameSchema, password: passwordSchema });
 const passwordChangeSchema = z.strictObject({ currentPassword: passwordSchema, newPassword: passwordSchema });
-const accountSchema = z.strictObject({
-  sessionId: z.uuid(),
-  command: z.discriminatedUnion('action', [
-    z.strictObject({
-      action: z.literal('create_account'), username: usernameSchema,
-      name: z.string().min(1).max(256), teamId: z.uuid().nullable(),
-      roles: z.array(roleSchema).max(3), isAdmin: z.boolean(),
-    }),
-    z.strictObject({ action: z.literal('reset_password'), userId: z.uuid() }),
-  ]),
-});
-
 function json(body: unknown, status = 200, cookie?: string): Response {
   const headers = new Headers({
     'Content-Type': 'application/json; charset=utf-8',
@@ -84,7 +71,7 @@ export function createAuthenticationHandler(
         const result = await service.signIn(target, handle, password);
         return json({}, 200, result.cookie);
       }
-      if (!['/api/auth/sign-out', '/api/auth/change-password', '/api/accounts'].includes(url.pathname)) {
+      if (!['/api/auth/sign-out', '/api/auth/change-password'].includes(url.pathname)) {
         return json({ error: 'The endpoint does not exist.' }, 404);
       }
       const session = await service.current(request.headers);
@@ -97,15 +84,10 @@ export function createAuthenticationHandler(
         const result = await service.signOut(request.headers);
         return json({}, 200, result.cookie);
       }
-      if (url.pathname === '/api/auth/change-password') {
-        const parsed = passwordChangeSchema.safeParse(body);
-        if (!parsed.success) throw new AuthenticationError(400, 'Enter the current and new passwords.');
-        const result = await service.changePassword(request.headers, parsed.data.currentPassword, parsed.data.newPassword);
-        return json({}, 200, result.cookie);
-      }
-      const parsed = accountSchema.safeParse(body);
-      if (!parsed.success) throw new AuthenticationError(400, 'The account command is invalid.');
-      return json(await service.account(request.headers, parsed.data.sessionId, parsed.data.command));
+      const parsed = passwordChangeSchema.safeParse(body);
+      if (!parsed.success) throw new AuthenticationError(400, 'Enter the current and new passwords.');
+      const result = await service.changePassword(request.headers, parsed.data.currentPassword, parsed.data.newPassword);
+      return json({}, 200, result.cookie);
     } catch (error) {
       if (error instanceof AuthenticationError) return json({ error: error.message }, error.status);
       return json({ error: 'The authentication request could not be completed.' }, 503);

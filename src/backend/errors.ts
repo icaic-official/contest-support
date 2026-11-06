@@ -6,6 +6,14 @@ export class WorkflowRejectedError extends Error {
   }
 }
 
+/** The server answered a request with a 4xx status. It refused the request and changed nothing. */
+export class RequestRefusedError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'RequestRefusedError';
+  }
+}
+
 /** `conflict` means the announcement changed after the caller read it. */
 export class AnnouncementRejectedError extends WorkflowRejectedError {
   readonly conflict: boolean;

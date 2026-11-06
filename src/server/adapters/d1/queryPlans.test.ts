@@ -1,9 +1,10 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { openStoreDatabase } from '../cloudflare/tooling/store-database.mjs';
 import { snapshotSql as announcementSnapshotSql } from '../cloudflare/announcements';
-import { sessionsListSql, snapshotSql } from '../cloudflare/application';
+import { calendarSql, contestsListSql, eventContestsSql, snapshotSql } from '../cloudflare/application';
 import { contestDataSql, signInAccountSql } from '../cloudflare/authority';
 import { claimSql } from '../cloudflare/live';
+import { eventConsoleSql, siteEventsSql } from '../cloudflare/manage';
 import type { D1Connection } from './connection';
 import { applyMigrations } from './testFixture';
 
@@ -17,7 +18,11 @@ const queries: Record<string, string> = {
   'announcement snapshot': announcementSnapshotSql,
   'current access': contestDataSql('caller'),
   'current access for live logins': contestDataSql('logins'),
-  'sessions list': sessionsListSql,
+  'contests list': contestsListSql,
+  'event contests list': eventContestsSql,
+  'calendar': calendarSql,
+  ...Object.fromEntries(Object.entries(eventConsoleSql).map(([name, sql]) => [`event console ${name}`, sql])),
+  'site events': siteEventsSql,
   'event sign-in': signInAccountSql.event,
   'site sign-in': signInAccountSql.site,
 };
@@ -28,8 +33,12 @@ const queries: Record<string, string> = {
 // readVolume.test.ts catches a scan of a real table behind an alias with the
 // same name, because it counts rows read on a large session.
 const materializedScans = new Map([
-  [snapshotSql, /^SCAN (?:access|visible_issues|a|i|c)(?: LEFT-JOIN)?$/],
+  [snapshotSql, /^SCAN (?:access|visible_issues|extra_minutes|a|i|c|x)(?: LEFT-JOIN)?$/],
   [announcementSnapshotSql, /^SCAN (?:access|c)$/],
+  // The webmaster row holds the account's site grant, if it has one. It is one row, and it gates the site branch.
+  [calendarSql, /^SCAN webmaster$/],
+  // The site page lists every event, and the site has few.
+  [siteEventsSql, /^SCAN e$/],
 ]);
 // A webmaster reaches every contest of the site, so that branch of the list reads
 // every contest. readVolume.test.ts shows that other callers do not read them.
@@ -57,7 +66,7 @@ describe('D1 query plans', () => {
     return plan.results.map((row) => row.detail)
       .filter((detail) => detail.startsWith('SCAN ') && !/^SCAN (?:CONSTANT ROW|\(subquery-\d+\)|json_each)/.test(detail))
       .filter((detail) => !materializedScans.get(sql)?.test(detail))
-      .filter((detail) => sql !== sessionsListSql || !webmasterContests.test(detail));
+      .filter((detail) => ![contestsListSql, eventContestsSql, calendarSql].includes(sql) || !webmasterContests.test(detail));
   }
 
   async function plan(sql: string): Promise<string> {
@@ -79,8 +88,20 @@ describe('D1 query plans', () => {
     });
   }
 
-  it('finds the sessions of an account through the account index', async () => {
-    expect(await plan(sessionsListSql)).toContain('USING COVERING INDEX memberships_account_session (account_id=?)');
+  it('finds the contests of an account through the account index', async () => {
+    expect(await plan(contestsListSql)).toContain('USING COVERING INDEX memberships_account_session (account_id=?)');
+  });
+
+  it('reads each part of the event console from an event index', async () => {
+    expect(await plan(eventConsoleSql.admins)).toContain('USING COVERING INDEX grants_event (event_id=?)');
+    expect(await plan(eventConsoleSql.people)).toContain('USING INDEX accounts_event (event_id=?)');
+    expect(await plan(eventConsoleSql.entrants)).toContain('USING INDEX entrants_event (event_id=?)');
+    expect(await plan(eventConsoleSql.entrants)).toContain('USING INDEX accounts_entrant (entrant_id=?)');
+    expect(await plan(eventConsoleSql.contests)).toContain('USING INDEX sessions_event (event_id=?)');
+    expect(await plan(eventConsoleSql.staffAssignments)).toContain('USING INDEX sessions_event (event_id=?)');
+    expect(await plan(eventConsoleSql.staffAssignments)).toMatch(/USING INDEX memberships_(?:staff|team) \(session_id=\?/);
+    expect(await plan(eventConsoleSql.entries)).toContain('USING INDEX sessions_event (event_id=?)');
+    expect(await plan(eventConsoleSql.audit)).toContain('USING INDEX authority_audit_scope_at (event_id=?)');
   });
 
   it('finds the grants of a caller through the grant indexes', async () => {

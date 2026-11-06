@@ -1,7 +1,7 @@
 # Frontend architecture
 
 This reference describes the shared frontend, its three layouts, and its browser routes.
-The frontend redesign provides the contestant desktop app, organizer phone app, and organizer desktop console.
+The frontend redesign provides the contestant app, organizer phone app, and organizer desktop console. The contestant app is one responsive app (2026-11-05).
 PR #45 added browser routes and workflow retry protections to the redesigned shells.
 See [the frontend redesign record](history/tickets.md#t0015--organiser-and-contestant-frontend-redesign) and [the fresh Cloudflare development installation record](history/tickets.md#t0021-fresh-cloudflare-development-installation) for the recorded scope.
 
@@ -186,7 +186,7 @@ The server also closes a socket when access is revoked, and the drop starts a re
 
 ## Contestant app
 
-`ContestantApp` (`src/contestant/`) is the UI for team accounts. It is a desktop layout and has no phone layout. It needs a window that is at least 1024 px wide.
+`ContestantApp` (`src/contestant/`) is the UI for team accounts. It is one responsive app. At 1024 px and wider it shows the report list (`ReportsPane`) beside the report. Below 1024 px it shows one screen at a time: the home (`ReportsPane` with the clock, the report button and the list), one report, or the report form. A bottom tab bar (`src/components/tab-bar.tsx`, shared with the organizer phone app) has **Report**, **My reports** and **Account**. It hides while a text field has focus (`useTyping`), and **Report** shows `ReportClosed` instead of the form when intake is closed. `useMediaQuery(desktopQuery)` selects the layout, and both layouts share the same components, state and drafts. The reply box and the form buttons stick to the bottom of the scroll area on a phone. `index.html` sets `interactive-widget=resizes-content`, so an on-screen keyboard shrinks the page and keeps them in view. While a contestant types on a short phone screen, the announcement strip hides (`src/index.css`).
 
 | File | Content |
 | --- | --- |
@@ -233,7 +233,7 @@ Shared organizer parts are one level up, so the desktop console can use them:
 | `actions/ActionSheet.tsx` | `ActionSheet` (a vaul bottom sheet with a **Cancel** button) and `CommandFeedback` (the command error and **Retry last request**). `showCancel` hides **Cancel** when the content has its own **Done** button. `onClosed` runs after the closing animation. |
 | `admin/adminModel.ts` | Pure admin rules: the username pattern, image limit bounds and steps, the membership draft (Staff or Team, roles, Admin), and the request inputs for the `Backend` admin contract. `createAccountCommand`, `setUsernameCommand` and `resetPasswordCommand` build an `AccountCommand`. `membershipInput` builds a `MembershipInput`. `imageLimitsInput` builds the image limits. `adminModel.test.ts` tests them. |
 | `admin/useSessionAdmin.ts` | The admin requests through `requireBackend().admin`: intake, image limits, create account, set username, membership, password reset, removal and roster edits. One request runs at a time (a ref guard). It holds the error, the notice and the one-time credentials. A recorded request refreshes the snapshot. |
-| `admin/SessionSettings.tsx` | `StatusCounts` (icon and label per status), `IntakeSwitch` and `ImageLimitsForm` (number fields with labelled − and + buttons). |
+| `admin/SessionSettings.tsx` | `StatusCounts` (icon and label per status), `IntakePanel` (the intake state with **Open now**, **Close now**, and **Return to schedule**) and `ImageLimitsForm` (number fields with labelled − and + buttons). |
 | `admin/RosterEditors.tsx` | `TeamRosterEditor` (the **Add teams** box, the team filter, rows with **Edit** and **Delete**) and `CategoryEditor` (a draft list with move, remove and add, saved as a whole). The phone **Session** tab and the desktop pages share them. |
 | `admin/rosterModel.ts` | Pure roster rules: reading the **Add teams** lines, the issues and accounts that keep a team, the issues that keep a category, category checks and the `RosterCommand` inputs. `rosterModel.test.ts` tests them. |
 | `admin/AccountForms.tsx` | `MembershipFields`, `CreateAccountForm`, `UsernameForm`, `MembershipForm` and `AssignByIdForm`. |
@@ -256,7 +256,7 @@ These rules apply:
 - An open sheet closes when its action is no longer allowed, for example after the person loses the jury role (`sheetAllowed()`).
 - A staff member without a volunteer or specialist role sees one muted line under the buttons of the bottom bar. On an open issue it says why **Claim** is missing and that the person can still reply and add images. The bar then says that no one owns the issue. A jury member also sees one on a claimed or escalated issue, because only its owner or an admin can resolve it (`missingActionHint()`). A resolved issue and an archived event have no hint.
 - The Find tab keeps its query when the person goes back from a team.
-- The Session tab keeps the behavior of the `AdminPanel` from before the frontend redesign: status counts, the intake switch, image limits (1–50 MB, 1–24 images, 1–120 MB), accounts, a username for accounts without one, membership changes, password reset (not for your own account), removal of session access, assignment by user ID and recent administration activity.
+- The Session tab keeps the behavior of the `AdminPanel` from before the frontend redesign: status counts, the intake panel, image limits (1–50 MB, 1–24 images, 1–120 MB), accounts, a username for accounts without one, membership changes, password reset (not for your own account), removal of session access, assignment by user ID and recent administration activity.
 - A new account and a password reset show the credentials once, in the same sheet. If the admin closes the sheet while the request runs, the sheet opens again for the credentials. Closing the sheet discards them.
 - A password reset and a removal need confirmation in a dialog. The text keeps the meaning of the earlier `window.confirm` text.
 - A Team account needs a team. The form sends no staff roles and no Admin for it, as before.
@@ -436,7 +436,20 @@ export PLAYWRIGHT_BROWSERS_PATH="$HOME/.cache/ms-playwright"
 npx playwright install chromium
 ```
 
-`npm run build` reports a warning: the main JavaScript chunk is about 511 kB, above the 500 kB warning limit. The build still passes. Code splitting is a follow-up.
+## Client weight
+
+The app loads each role's screens on demand. `src/connected/lazyScreens.tsx` holds the lazy imports for the contestant app, the organizer app, the event console and the site page. `src/organiser/layouts.ts` does the same for the organizer desktop console and the phone app. A contestant does not download the staff console, and a phone does not download the desktop console.
+`Workspace` remembers the last role in `localStorage` (`minsky-screen`), and `src/main.tsx` starts that download while the session check runs.
+
+Every module that builds a zod schema imports `src/lib/zodConfig.ts` before it imports `zod`. The Content-Security-Policy forbids `eval`, and zod probes for it when it builds its first schema. With several chunks, the import order of `main.tsx` alone does not decide which chunk runs first. `npm run test:connector:ui:local` fails on a policy violation.
+
+Long lists keep their cost low in three ways:
+
+- `useSessionSnapshot` keeps the identity of every object that did not change between two snapshots (`keepUnchanged`).
+- Queue rows and phone cards are memoized. Each timer subscribes to one shared clock (`useTick`), so a clock tick renders the timers and not the rows.
+- Reads run one at a time. A read that has not started yet serves every caller that arrives before it starts (`refreshQueue.ts`). A page in the background skips live hints and timer reads, and reads once when it becomes visible.
+
+`npm run perf:client` measures this. It builds the app, serves it with Brotli, and runs `scripts/perf/client.spec.ts` against the local fixture with Chromium at 4x CPU slowdown and slow 4G. Set `PERF_RUNS` for the number of loads and `PERF_OUT` for a JSON file. `npm run perf:size` prints the size of each built script and stylesheet. The first number to read is the median of several runs. The machine must be quiet, because the timings share its CPU.
 
 ## Motion
 

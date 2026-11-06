@@ -1,5 +1,5 @@
 import { type ReactNode, useId, useState } from "react";
-import { Search, Settings2, UserPlus } from "lucide-react";
+import { Search, Settings2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,10 +21,9 @@ import {
   Collapsible,
   MemberActions,
 } from "../admin/AccountAccess";
-import { AssignByIdForm, CreateAccountForm } from "../admin/AccountForms";
 import { CredentialReveal } from "../admin/CredentialReveal";
-import { CategoryEditor, TeamRosterEditor } from "../admin/RosterEditors";
-import { ImageLimitsForm, IntakeSwitch } from "../admin/SessionSettings";
+import { CategoryEditor, TeamLocationEditor } from "../admin/RosterEditors";
+import { ImageLimitsForm, IntakePanel } from "../admin/SessionSettings";
 import {
   accountKind,
   limitsOfSession,
@@ -166,10 +165,11 @@ export function OverviewPage({ props }: { props: ConsolePageProps }) {
   );
 }
 
-/** The accounts dialog: a new account, or the actions of one account. */
-type AccountDialog =
-  | { type: "create" }
-  | { type: "member"; userId: string; member: SessionMember };
+/** The accounts dialog: the actions of one account. */
+interface AccountDialog {
+  userId: string;
+  member: SessionMember;
+}
 
 function matchesAccount(
   item: SessionMember,
@@ -185,9 +185,10 @@ function matchesAccount(
 }
 
 /**
- * The accounts of the session in a table, with a filter. Create account and
- * Manage open a dialog. A new account and a password reset end on the
- * one-time credential screen in the same dialog.
+ * The accounts of the session in a table, with a filter. Manage opens a
+ * dialog with the username form and the password reset. A reset ends on the
+ * one-time credential screen in the same dialog. Event admins create accounts
+ * in the event console.
  */
 export function AccountsPage({
   props,
@@ -210,12 +211,10 @@ export function AccountsPage({
   };
   const admin: SessionAdmin = {
     ...requests,
-    createAccount: (account) => requests.createAccount(account).then(reveal),
     resetPassword: (userId) => requests.resetPassword(userId).then(reveal),
   };
-  const disabled = admin.busy || admin.archived;
   const selected =
-    dialog?.type === "member"
+    dialog
       ? (state.members.find((item) => item.person.id === dialog.userId) ??
         dialog.member)
       : undefined;
@@ -225,9 +224,8 @@ export function AccountsPage({
     setOpen(true);
   };
   const close = () => setOpen(false);
-  let title = "Create account";
-  let description: string | undefined =
-    "One account per team. Individual accounts for staff.";
+  let title = "Account";
+  let description: string | undefined;
   if (admin.credentials) {
     title = "Share these credentials securely";
     description = undefined;
@@ -242,17 +240,7 @@ export function AccountsPage({
     <div className="space-y-6">
       <PageHeader
         title="Accounts"
-        description="Team accounts are shared. Staff accounts belong to one person and combine their roles."
-        action={
-          <Button
-            type="button"
-            disabled={disabled}
-            onClick={() => openDialog({ type: "create" })}
-          >
-            <UserPlus aria-hidden="true" />
-            Create account
-          </Button>
-        }
+        description="Team accounts are shared. Staff accounts belong to one person and combine their roles. An event admin creates accounts and assigns them in the event console."
       />
       <div className="relative max-w-xs">
         <label htmlFor={`${id}-filter`} className="sr-only">
@@ -333,11 +321,7 @@ export function AccountsPage({
                       variant="outline"
                       size="sm"
                       onClick={() =>
-                        openDialog({
-                          type: "member",
-                          userId: item.person.id,
-                          member: item,
-                        })
+                        openDialog({ userId: item.person.id, member: item })
                       }
                       aria-label={`Manage ${item.person.name}`}
                     >
@@ -362,16 +346,6 @@ export function AccountsPage({
         </Table>
       </div>
       <div className="grid gap-4 xl:grid-cols-2">
-        <Collapsible title="Assign an existing account by ID">
-          <p className="mb-3 text-sm text-muted-foreground">
-            For trusted provisioning and accounts that already exist.
-          </p>
-          <AssignByIdForm
-            teams={state.teams}
-            disabled={disabled}
-            onAssign={admin.saveMembership}
-          />
-        </Collapsible>
         <Collapsible title="Recent administration activity">
           <AdminActivity state={state} />
         </Collapsible>
@@ -400,18 +374,9 @@ export function AccountsPage({
               <MemberActions
                 key={selected.person.id}
                 member={selected}
-                teams={state.teams}
                 selfId={state.membership?.user_id}
                 admin={admin}
                 onDone={close}
-              />
-            )}
-            {dialog?.type === "create" && (
-              <CreateAccountForm
-                teams={state.teams}
-                disabled={disabled}
-                busy={admin.busy}
-                onCreate={admin.createAccount}
               />
             )}
           </>
@@ -441,7 +406,8 @@ export function SettingsPage({
         title="Session settings"
         description={`These settings apply to ${session.name}.`}
       />
-      <IntakeSwitch
+      <IntakePanel
+        clock={props.state.clock}
         open={session.intake_open}
         disabled={disabled}
         onChange={(next) => {
@@ -467,8 +433,7 @@ export function SettingsPage({
 }
 
 /**
- * The teams of the session. An admin adds many teams from pasted lines, then
- * renames a team, changes its location or deletes a team that nothing uses.
+ * The teams of the session and their locations.
  */
 export function RosterPage({
   props,
@@ -480,15 +445,15 @@ export function RosterPage({
   return (
     <div className="max-w-3xl space-y-6">
       <PageHeader
-        title="Roster"
-        description={`The teams of ${props.state.session?.name ?? "this session"}. Team accounts and issues use these teams.`}
+        title="Team locations"
+        description={`The teams of ${props.state.session?.name ?? "this session"}. An event admin adds and assigns teams in the event console.`}
       />
       {admin.archived && (
         <p role="status" className="rounded-xl border bg-card p-4 text-sm">
-          This event is archived. The roster cannot change.
+          This event is archived. Locations cannot change.
         </p>
       )}
-      <TeamRosterEditor state={props.state} admin={admin} />
+      <TeamLocationEditor state={props.state} admin={admin} />
     </div>
   );
 }

@@ -7,7 +7,7 @@ import { type LocalWorker, expect, test } from "./support/localWorker";
 test.use({ seedIssues: false });
 
 const initialReadPaths = [
-  "/api/sessions",
+  "/api/contests",
   "/api/snapshot",
   "/api/announcements",
   "/api/avatars",

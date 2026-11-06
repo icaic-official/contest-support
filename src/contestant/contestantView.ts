@@ -1,3 +1,4 @@
+import { closedMessage } from "@/connected/contestClock";
 import { type WorkflowEvent, workflowEvent } from "@/connected/historyEvents";
 import { awardMinutesLabel } from "@/connected/labels";
 import type { Attachment, Award, HistoryEntry, Issue, Resolution, Snapshot } from "@/connected/model";
@@ -206,15 +207,20 @@ export function trackerSteps(
   return steps.map((step, index) => ({ ...step, current: index === current }));
 }
 
-/** Why the team cannot send a report now, or undefined when it can. */
+/**
+ * Why the team cannot send a report now, or undefined when it can. `now` is
+ * server time in milliseconds. It names the time that reporting opens or
+ * closed, such as "Reporting opens at 13:00."
+ */
 export function reportBlocker(
-  snapshot: Pick<Snapshot, "event" | "session">,
+  snapshot: Pick<Snapshot, "event" | "session" | "clock">,
+  now: number = Date.now(),
 ): string | undefined {
   if (snapshot.event?.archived) {
     return "This event is archived. Records are read only.";
   }
   if (!snapshot.session?.intake_open) {
-    return "Reporting is closed by the organizers.";
+    return closedMessage(snapshot.clock, now) ?? "Reporting is closed by the organizers.";
   }
   return undefined;
 }

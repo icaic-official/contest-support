@@ -83,14 +83,92 @@ export interface Authentication {
   changePassword(currentPassword: string, newPassword: string): Promise<void>;
 }
 
-export interface SessionSummary {
+/**
+ * When a contest runs. Instants are UTC strings. The event's time zone
+ * decides how the browser shows them. Contests run continuously and may overlap.
+ */
+export interface Schedule {
+  readonly startsAt: string;
+  readonly endsAt: string;
+  /** Minutes after the end during which intake stays open. */
+  readonly graceMinutes: number;
+}
+
+/** The longest grace period, in minutes. D1 enforces the same bound. */
+export const GRACE_MINUTES_MAX = 240;
+
+/** Why intake is open or closed. The override reasons mean that staff hold intake open or closed. */
+/** A live contest stays closed until every contestant seat has a password issued for it. Fixed at creation. */
+export type ContestKind = 'practice' | 'live';
+
+export type IntakeReason = 'before_start' | 'running' | 'grace' | 'ended' | 'override_open' | 'override_closed' | 'awaiting_live_passwords';
+
+/** Derived by D1 at read time from the schedule and the override. Never stored. */
+export interface IntakeState {
+  readonly open: boolean;
+  readonly reason: IntakeReason;
+  /** The next instant at which the reason changes by time alone. Null while an override holds. */
+  readonly changesAt: string | null;
+}
+
+/** `schedule`: intake follows the schedule. `open`, `closed`: staff override it. */
+export type IntakeMode = 'schedule' | 'open' | 'closed';
+
+/**
+ * A contest that the caller may list. `canOpen` is false for a contest of the
+ * caller's event that the caller holds no seat in. `manage` is the caller's
+ * authority over its structure.
+ */
+export interface ContestSummary {
   id: string;
   name: string;
+  eventId: string;
+  eventName: string;
+  timeZone: string;
+  contestType: ContestType;
+  /** Null for a contest created before schedules existed. */
+  schedule: Schedule | null;
+  /** The contest-wide state. A contestant's own state can last longer by confirmed extra time. */
+  intake: IntakeState;
+  canOpen: boolean;
+  manage: ManageLevel;
+}
+
+/**
+ * `eventId`: every contest of that event that the caller may list.
+ * `window`: every scheduled contest of the caller's event that overlaps the
+ * window. A webmaster gets the contests of every event.
+ */
+export type ContestQuery =
+  | { readonly eventId?: string; readonly window?: undefined }
+  | { readonly eventId?: undefined; readonly window: { readonly from: string; readonly to: string } };
+
+export type ContestAwardCommand =
+  | { readonly type: 'grant'; readonly minutes: number; readonly explanation: string }
+  | { readonly type: 'apply'; readonly awardId: string }
+  | { readonly type: 'withdraw'; readonly awardId: string };
+
+/**
+ * Contest-wide time awards give minutes to every contestant of one contest.
+ * Jury grant them. Support or jury confirm that the minutes were applied outside Minsky.
+ * Jury can withdraw an award that nobody has confirmed. The record stays, and it gives no time.
+ * Minsky changes no external contest clock.
+ */
+export interface ContestAwards {
+  /**
+   * Reusing a request ID with the same command must not repeat a write.
+   * Resolves to the award ID. A rejection carries the reason.
+   */
+  execute(sessionId: string, requestId: string, command: ContestAwardCommand): Promise<string>;
 }
 
 export interface Workflows {
-  /** Lists sessions accessible to the authenticated account. */
-  sessions(userId: string): Promise<SessionSummary[]>;
+  /**
+   * Lists the contests that the caller may open. With an event ID, only the
+   * contests of that event. Without one, the caller's own event, or every
+   * contest for a webmaster.
+   */
+  contests(query?: ContestQuery): Promise<ContestSummary[]>;
   snapshot(sessionId: string): Promise<Snapshot>;
   /**
    * Reusing a request ID with the same command must not repeat a write.
@@ -115,80 +193,52 @@ export interface Workflows {
   ): Promise<{ issueId: string; snapshot?: Snapshot | undefined }>;
 }
 
-export interface MembershipInput {
-  teamId: string | null;
-  roles: Role[];
-  isAdmin: boolean;
-}
-
-interface CreateAccountCommand extends MembershipInput {
-  action: 'create_account';
-  username: string;
-  name: string;
-}
-
-export type AccountCommand =
-  | CreateAccountCommand
-  | { action: 'reset_password'; userId: string };
-
-/** A new temporary password, shown once and never stored. */
-export interface AccountResult {
-  temporaryPassword: string;
-  /** The event code or the site that the account names to sign in. */
-  signIn: SignInTarget;
-}
-
-/** A team of a roster edit. The browser chooses the ID, so a retry adds no second team. */
-export interface NewTeam {
-  id: string;
-  name: string;
-  location: string;
-}
-
-/**
- * One roster edit by a session admin. A team that has an issue or an account
- * stays. A category that an issue uses stays. `set_categories` replaces the
- * whole ordered list.
- */
-export type RosterCommand =
-  | { type: 'add_teams'; teams: NewTeam[] }
-  | { type: 'update_team'; teamId: string; name: string; location: string }
-  | { type: 'delete_team'; teamId: string }
-  | { type: 'set_categories'; categories: string[] };
-
-export interface Administration {
-  account(sessionId: string, command: AccountCommand): Promise<AccountResult>;
-  setIntake(sessionId: string, open: boolean): Promise<void>;
-  setImageLimits(
-    sessionId: string,
-    limits: { fileMegabytes: number; count: number; totalMegabytes: number },
-  ): Promise<void>;
-  saveMember(
-    sessionId: string,
-    userId: string,
-    member: MembershipInput,
-  ): Promise<void>;
-  removeMember(sessionId: string, userId: string): Promise<void>;
-  /** Rejects with the reason when the edit would remove a team or category that is in use. */
-  editRoster(sessionId: string, command: RosterCommand): Promise<void>;
-}
-
-/** A new webmaster. The server gives the account a login key that nobody sees. */
+/** A staff account or a webmaster. The server gives it a login key that nobody sees. */
 export interface PersonInput {
   readonly handle: string;
   readonly name: string;
 }
 
+/** Which entrants a contest takes: only single contestants, only teams, or both. */
+export type ContestType = 'singles' | 'mixed' | 'teams';
+
+export interface EntrantInput {
+  readonly kind: EntrantKind;
+  /** The team's name, or the single contestant's name. Unique inside the event. */
+  readonly name: string;
+  /** The entrant's one sign-in. A team shares it. A single contestant owns it. */
+  readonly handle: string;
+}
+
 /**
- * Every site change, and a handle change. The server derives each command's
- * requirement from the command alone, resolves the caller's authority once,
- * and checks it again inside the write batch. Callers never name their own
- * authority.
+ * Every structural change. The server derives each command's requirement from
+ * the command alone, resolves the caller's authority once, and checks it again
+ * inside the write batch. Callers never name their own authority.
  */
 export type ManageCommand =
+  // Site. Requires a webmaster.
+  | { readonly type: 'create_event'; readonly name: string; readonly code: string; readonly timeZone: string; readonly firstAdmin: PersonInput }
   | { readonly type: 'add_webmaster'; readonly person: PersonInput }
   | { readonly type: 'remove_webmaster'; readonly accountId: string }
   | { readonly type: 'set_webmaster_reads'; readonly restricted: boolean }
+  // Event. Requires an event admin of that event, or a webmaster.
+  | { readonly type: 'update_event'; readonly eventId: string; readonly name: string; readonly code: string; readonly timeZone: string }
+  | { readonly type: 'set_event_admin'; readonly eventId: string; readonly accountId: string; readonly admin: boolean }
+  | { readonly type: 'create_people'; readonly eventId: string; readonly people: readonly PersonInput[] }
+  | { readonly type: 'create_entrants'; readonly eventId: string; readonly entrants: readonly EntrantInput[] }
+  | { readonly type: 'rename_entrant'; readonly eventId: string; readonly entrantId: string; readonly name: string }
+  | { readonly type: 'add_entrant_sign_in'; readonly eventId: string; readonly entrantId: string; readonly handle: string; readonly closeReporting?: boolean | undefined }
+  | { readonly type: 'create_contest'; readonly eventId: string; readonly name: string; readonly kind: ContestKind; readonly contestType: ContestType; readonly schedule: Schedule; readonly categories: readonly string[] }
+  | { readonly type: 'update_contest'; readonly contestId: string; readonly name: string; readonly contestType: ContestType; readonly schedule?: Schedule | undefined }
+  | { readonly type: 'assign_entrants'; readonly contestId: string; readonly entries: ReadonlyArray<{ readonly entrantId: string; readonly location: string }>; readonly closeReporting?: boolean | undefined }
+  | { readonly type: 'unassign_entrant'; readonly contestId: string; readonly entrantId: string }
+  | { readonly type: 'assign_staff'; readonly contestId: string; readonly accountId: string; readonly roles: readonly Role[]; readonly admin: boolean }
+  | { readonly type: 'unassign_staff'; readonly contestId: string; readonly accountId: string }
+  // Contest. Requires a contest admin of that contest, or higher.
+  | { readonly type: 'set_intake'; readonly contestId: string; readonly mode: IntakeMode }
+  | { readonly type: 'set_image_limits'; readonly contestId: string; readonly fileMegabytes: number; readonly count: number; readonly totalMegabytes: number }
+  | { readonly type: 'set_categories'; readonly contestId: string; readonly categories: readonly string[] }
+  | { readonly type: 'set_location'; readonly contestId: string; readonly entrantId: string; readonly location: string }
   /** A webmaster's audited join. D1 accepts it only while the site restricts webmaster reads. */
   | { readonly type: 'join_contest'; readonly contestId: string }
   /**
@@ -200,7 +250,10 @@ export type ManageCommand =
 
 /** Created IDs, so a retry with the same request ID returns the same IDs. Never a password. */
 export interface ManageReceipt {
+  readonly eventId?: string;
+  readonly contestId?: string;
   readonly accountIds?: readonly string[];
+  readonly entrantIds?: readonly string[];
 }
 
 /** The most accounts that one credential request issues. Each password hash costs Worker CPU time. */
@@ -225,6 +278,15 @@ export interface SiteOverview {
     readonly ready: boolean;
   }>;
   readonly restrictWebmasterReads: boolean;
+  readonly events: ReadonlyArray<{
+    readonly id: string;
+    readonly name: string;
+    readonly code: string;
+    readonly timeZone: string;
+    readonly archived: boolean;
+    readonly contests: number;
+    readonly accounts: number;
+  }>;
   /** Contests that the caller has not joined. Empty while webmasters read every contest. */
   readonly contestsToJoin: ReadonlyArray<{
     readonly id: string;
@@ -233,10 +295,78 @@ export interface SiteOverview {
   }>;
 }
 
-/** Site administration for webmasters, and handle changes for the accounts that a caller may manage. */
+export interface AuditEntry {
+  readonly id: string;
+  readonly actorName: string;
+  readonly at: string;
+  readonly action: string;
+  readonly target: string | null;
+}
+
+/** What an event admin or a webmaster reads to run one event. */
+export interface EventConsole {
+  readonly event: {
+    readonly id: string;
+    readonly name: string;
+    readonly code: string;
+    readonly timeZone: string;
+    readonly archived: boolean;
+  };
+  readonly manage: ManageLevel;
+  readonly admins: readonly string[];
+  /** Staff accounts of the event. An entrant's sign-in is listed under its entrant. */
+  readonly people: ReadonlyArray<{ readonly id: string; readonly name: string; readonly handle: string | null; readonly ready: boolean }>;
+  readonly entrants: ReadonlyArray<{
+    readonly id: string;
+    readonly kind: EntrantKind;
+    readonly name: string;
+    readonly accountId: string | null;
+    readonly handle: string | null;
+  }>;
+  readonly contests: ReadonlyArray<{
+    readonly id: string;
+    readonly name: string;
+    readonly contestType: ContestType;
+    readonly kind: ContestKind;
+    readonly schedule: Schedule | null;
+    readonly mode: IntakeMode;
+    readonly intake: IntakeState;
+    /** Contestant seats without a password issued for this contest. Empty for a practice contest. */
+    readonly waiting: ReadonlyArray<{ readonly accountId: string; readonly name: string; readonly handle: string }>;
+  }>;
+  /** Staff seats that an assignment made. Event admins and webmasters hold none. */
+  readonly staffAssignments: ReadonlyArray<{
+    readonly contestId: string;
+    readonly accountId: string;
+    readonly admin: boolean;
+    readonly roles: readonly Role[];
+  }>;
+  readonly entries: ReadonlyArray<{ readonly contestId: string; readonly entrantId: string; readonly location: string }>;
+  readonly audit: readonly AuditEntry[];
+}
+
+/**
+ * Which accounts get a password. With an event ID, accounts of that event.
+ * With null, other webmasters, and only a webmaster may ask.
+ */
+export interface CredentialIssue {
+  readonly eventId: string | null;
+  readonly accountIds: readonly string[];
+  /** The contest the organizer issues for. A live target opens the overlapping live contests. */
+  readonly contestId: string | null;
+  /** The organizer saw that this stops the passwords of live contests that have not ended. */
+  readonly voidLivePasswords?: boolean;
+}
+
+/** Site and event administration, and handle changes for the accounts that a caller may manage. */
 export interface Management {
   /** Null when the signed-in account is not a webmaster. */
   site(): Promise<SiteOverview | null>;
+  /**
+   * Requires an event admin of the event, or a webmaster. Without an event ID,
+   * the console of the caller's own event.
+   */
+  event(eventId?: string): Promise<EventConsole>;
   /**
    * Reusing a request ID with the same command returns the first receipt.
    * A rejection carries the reason. Other failures leave the outcome unknown,
@@ -244,11 +374,10 @@ export interface Management {
    */
   execute(requestId: string, command: ManageCommand): Promise<ManageReceipt>;
   /**
-   * Issues a new temporary password for each of up to ISSUE_BATCH other
-   * webmasters, in one batch. Reusing the request ID returns the accounts
-   * without passwords.
+   * Issues a new temporary password for each of up to ISSUE_BATCH accounts, in
+   * one batch. Reusing the request ID returns the accounts without passwords.
    */
-  issueCredentials(requestId: string, accountIds: readonly string[]): Promise<readonly IssuedCredential[]>;
+  issueCredentials(requestId: string, input: CredentialIssue): Promise<readonly IssuedCredential[]>;
 }
 
 export interface StartedImage {
@@ -341,8 +470,8 @@ export interface LiveUpdates {
 export interface Backend {
   auth: Authentication;
   workflows: Workflows;
-  admin: Administration;
   manage: Management;
+  contestAwards: ContestAwards;
   images: ImageTransport;
   announcements: Announcements;
   avatars: Avatars;

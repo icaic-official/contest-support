@@ -17,7 +17,7 @@ The [verification guide](verify-cloudflare-authentication.md) gives exact test c
 The raw Better Auth router is not exposed.
 
 `createCloudflareAuthentication()` implements the existing browser `Authentication` contract.
-Its additional `account()` method supports account administration. The application route `GET /api/sessions` is the only contest list.
+Organizers issue passwords through `POST /api/credentials` of the management routes, not through this adapter. The application route `GET /api/contests` is the only contest list.
 The complete `createCloudflareBackend()` factory wraps this authentication adapter and supplies the remaining operation groups.
 The backend entry point always creates the Cloudflare client. No provider fallback occurs.
 
@@ -32,7 +32,6 @@ Authenticated endpoints read the HttpOnly cookie. Request bodies cannot supply a
 | `GET /api/auth/session` | Cookie | Returns `user`, `status`, and `csrf`. An absent or invalid login returns 401. |
 | `POST /api/auth/sign-out` | Empty object | Revokes the login, deletes its identity session, and clears the cookie. |
 | `POST /api/auth/change-password` | `currentPassword`, `newPassword` | Changes the password and replaces the cookie. Revokes every earlier login. |
-| `POST /api/accounts` | `sessionId`, `command` | Performs `create_account` or `reset_password`. Uses the `AccountCommand` fields. |
 
 The historical authentication Worker uses the session ID as its summary name.
 The complete application Worker routes session reads through the named application schema.
@@ -81,7 +80,8 @@ The synthetic identity email is not a mailbox. SMTP and personal email are unnec
 New passwords contain 12 to 128 characters.
 A password change requires the current password and a different password after Unicode NFKC normalization.
 NFKC converts equivalent Unicode forms to the same password input.
-Temporary passwords use 256 random bits plus a fixed character suffix.
+Temporary passwords have 16 characters from a 56-character alphabet that omits 0, O, 1, l, I and o (about 93 random bits). A person can read one from paper.
+The credential dialog can print one sheet per person. The sheets exist only while the dialog is open.
 Passwords remain in request memory. Neither adapter saves plaintext credentials in browser storage.
 
 An account's application ID is also its Better Auth user ID.

@@ -1,7 +1,7 @@
 import { ImageRequestError } from '../../../src/backend/errors';
 import type { Backend } from '../../../src/backend/contracts';
 import type { ScenarioContext } from '../contracts';
-import { check, rejects, submit } from './assertions';
+import { assignStaff, check, rejects, setImageLimits, submit } from './assertions';
 
 function png(): Blob {
   const bytes = Uint8Array.from(
@@ -138,7 +138,7 @@ export async function images(context: ScenarioContext): Promise<void> {
 }
 
 export async function imageRevocation(context: ScenarioContext): Promise<void> {
-  const admin = await context.connect('admin');
+  const eventAdmin = await context.connect('eventAdmin');
   const staff = await context.connect('volunteer');
   const id = await submit(staff, context.sessionId, context.teamId);
   const body = png();
@@ -167,10 +167,11 @@ export async function imageRevocation(context: ScenarioContext): Promise<void> {
     bytes: body.size,
   });
   await upload(staff, pending.original_path, body);
-  await admin.admin.removeMember(
-    context.sessionId,
-    context.accounts.volunteer.id,
-  );
+  await eventAdmin.manage.execute(crypto.randomUUID(), {
+    type: 'unassign_staff',
+    contestId: context.sessionId,
+    accountId: context.accounts.volunteer.id,
+  });
   try {
     check(
       (await staff.workflows.snapshot(context.sessionId)).membership === null,
@@ -182,15 +183,7 @@ export async function imageRevocation(context: ScenarioContext): Promise<void> {
     );
     await rejects(() => staff.images.finish(context.sessionId, ready.id));
   } finally {
-    await admin.admin.saveMember(
-      context.sessionId,
-      context.accounts.volunteer.id,
-      {
-        teamId: null,
-        roles: ['volunteer'],
-        isAdmin: false,
-      },
-    );
+    await assignStaff(eventAdmin, context.sessionId, context.accounts.volunteer.id, ['volunteer']);
   }
   check(
     await sameBytes(await staff.images.download(ready.original_path), body),
@@ -216,12 +209,12 @@ export async function imageLimits(context: ScenarioContext): Promise<void> {
     check(error instanceof ImageRequestError && error.validation, 'An image-limit rejection must identify invalid input or limits.');
   };
   try {
-    await rejects(() => staff.admin.setImageLimits(context.sessionId, { fileMegabytes: 1, count: 1, totalMegabytes: 1 }));
+    await rejects(() => setImageLimits(staff, context.sessionId, { fileMegabytes: 1, count: 1, totalMegabytes: 1 }));
     for (const limits of [{ fileMegabytes: 0, count: 1, totalMegabytes: 1 },
       { fileMegabytes: 1, count: 0, totalMegabytes: 1 }, { fileMegabytes: 2, count: 1, totalMegabytes: 1 }]) {
-      await rejects(() => admin.admin.setImageLimits(context.sessionId, limits));
+      await rejects(() => setImageLimits(admin, context.sessionId, limits));
     }
-    await admin.admin.setImageLimits(context.sessionId, { fileMegabytes: 1, count: 1, totalMegabytes: 1 });
+    await setImageLimits(admin, context.sessionId, { fileMegabytes: 1, count: 1, totalMegabytes: 1 });
     const configured = (await staff.workflows.snapshot(context.sessionId)).session;
     check(configured?.max_image_bytes === 1_048_576 && configured.max_images_per_issue === 1 && configured.max_image_bytes_per_issue === 1_048_576,
       'The authorized snapshot must retain all configured image limits.');
@@ -235,7 +228,7 @@ export async function imageLimits(context: ScenarioContext): Promise<void> {
     await upload(staff, ready.thumbnail_path, body);
     await staff.images.finish(context.sessionId, ready.id);
     await validation(() => begin(body.size));
-    await admin.admin.setImageLimits(context.sessionId, { fileMegabytes: 2, count: 3, totalMegabytes: 2 });
+    await setImageLimits(admin, context.sessionId, { fileMegabytes: 2, count: 3, totalMegabytes: 2 });
     const remaining = await begin(2_097_152 - body.size);
     await validation(() => begin(1));
     await staff.images.abandon(context.sessionId, remaining.id);
@@ -248,12 +241,12 @@ export async function imageLimits(context: ScenarioContext): Promise<void> {
     const changing = await begin(large.size);
     await upload(staff, changing.original_path, large);
     await upload(staff, changing.thumbnail_path, body);
-    await admin.admin.setImageLimits(context.sessionId, { fileMegabytes: 1, count: 3, totalMegabytes: 1 });
+    await setImageLimits(admin, context.sessionId, { fileMegabytes: 1, count: 3, totalMegabytes: 1 });
     await validation(() => staff.images.finish(context.sessionId, changing.id));
     check(!(await staff.workflows.snapshot(context.sessionId)).attachments.some((image) => image.id === changing.id),
       'A lowered limit must prevent publication of an uploaded image that is now too large.');
     await staff.images.abandon(context.sessionId, changing.id);
   } finally {
-    await admin.admin.setImageLimits(context.sessionId, original);
+    await setImageLimits(admin, context.sessionId, original);
   }
 }

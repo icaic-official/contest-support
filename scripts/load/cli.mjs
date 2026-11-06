@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { cpus, loadavg } from 'node:os';
 import { readFile, writeFile } from 'node:fs/promises';
 import process from 'node:process';
@@ -16,16 +17,17 @@ const { fetch } = globalThis;
 
 const usage = `Usage: npm run load -- <command> [--option=value ...]
 
-  competition --teams=N                 Print a bootstrap competition file with N fictional teams.
-  setup --origin=URL --owner=FILE --fixtures=FILE --staff=N --team-accounts=N [--accounts-per-team=2] [--session=UUID]
-                                        Create the run's accounts through the admin API. Safe to repeat.
+  site                                  Print a bootstrap site file for the load-test webmaster.
+  setup --origin=URL --owner=FILE --fixtures=FILE --staff=N --team-accounts=N
+                                        Create the run's event, contest, and accounts. The webmaster creates the
+                                        event and its event admin, and the event admin does the rest. Safe to repeat.
                                         FILE is the private result of cloudflare:install bootstrap or recover.
   run --fixtures=FILE --results=FILE [--steps=50,200,800] [--ramp-seconds=60] [--step-seconds=120]
       [--issues-per-team-hour=4] [--threads=8] [--max-error-rate=0.05]
                                         Hold each step of simultaneous users and record latency and live delay.
   analytics --results=FILE --account=ID --database=UUID --worker=NAME
                                         Add D1, Worker, and Durable Object cost to the results. Reads CLOUDFLARE_API_TOKEN.
-  cleanup --fixtures=FILE               Remove the run's accounts from the session.
+  cleanup --fixtures=FILE               Remove the run's staff and unused teams from the contest.
 
 Every command accepts --isolated-origin=URL to confirm a target that is not a minsky-preview* Worker.`;
 
@@ -48,31 +50,29 @@ function required(options, ...names) {
 const number = (value, fallback) => (value === undefined ? fallback : Number(value));
 const log = (message) => process.stdout.write(`${message}\n`);
 
-async function competition(options) {
-  required(options, 'teams');
-  const teams = Array.from({ length: Number(options.teams) }, (_, index) => ({
-    name: `Fictional team ${String(index + 1).padStart(4, '0')}`, location: `Fictional desk ${index + 1}`,
-  }));
-  log(JSON.stringify({
-    adminUsername: 'load-organizer', adminName: 'Fictional load-test organizer', eventName: 'Fictional load test',
-    sessionName: 'Fictional load session', categories: ['Problem statement', 'Devices', 'Network', 'Other'], teams,
-  }, null, 2));
+async function site() {
+  log(JSON.stringify({ webmasterHandle: 'load-webmaster', webmasterName: 'Fictional load-test webmaster' }, null, 2));
 }
 
-/** Sign the organizer in, and replace the bootstrap password with the derived one on first use. */
-async function signInAdmin(fixtures, path) {
+/**
+ * Signs in one of the run's managers and replaces the temporary password with
+ * the derived one on first use. The webmaster signs in to the site. The event
+ * admin signs in with the event code.
+ */
+async function signInManager(fixtures, path, who) {
   const client = createClient(fixtures.origin, { record: () => {} });
-  const { admin } = fixtures;
-  const derived = derivePassword(fixtures.secret, admin.username);
-  const password = admin.changed ? derived : admin.temporary;
-  // The bootstrap account is a webmaster, so it signs in to the site.
-  await client.request('sign-in', '/api/auth/sign-in', { method: 'POST', body: { event: null, handle: admin.username, password } });
+  const account = fixtures[who];
+  const derived = derivePassword(fixtures.secret, account.username);
+  const password = account.changed ? derived : account.temporary;
+  await client.request('sign-in', '/api/auth/sign-in', {
+    method: 'POST', body: { event: who === 'webmaster' ? null : fixtures.eventCode, handle: account.username, password },
+  });
   const session = (await client.request('auth-session', '/api/auth/session')).body;
   if (session.status.must_change) {
     await client.request('change-password', '/api/auth/change-password', {
       method: 'POST', csrf: session.csrf, body: { currentPassword: password, newPassword: derived },
     });
-    admin.changed = true;
+    account.changed = true;
     await writeFixtures(path, fixtures);
   }
   return client;
@@ -82,9 +82,20 @@ async function post(client, path, body) {
   return (await client.request('admin', path, { method: 'POST', csrf: await csrfToken(client), body })).body;
 }
 
+/** One management command with a new request ID. */
+function manage(client, command) {
+  return post(client, '/api/manage', { requestId: randomUUID(), command });
+}
+
 async function snapshot(client, sessionId) {
   return (await client.request('snapshot', `/api/snapshot?sessionId=${sessionId}`)).body;
 }
+
+const chunks = (items, size) => Array.from({ length: Math.ceil(items.length / size) }, (_, index) => items.slice(index * size, (index + 1) * size));
+
+/** The most accounts that one credential request issues, and the most rows that one command takes. */
+const ISSUE_BATCH = 8;
+const COMMAND_BATCH = 300;
 
 async function setup(options) {
   required(options, 'fixtures');
@@ -105,52 +116,85 @@ async function setup(options) {
   required(options, 'staff', 'team-accounts');
   const staffCount = Number(options.staff);
   const teamAccounts = Number(options['team-accounts']);
-  const perTeam = number(options['accounts-per-team'], 2);
-  const client = await signInAdmin(fixtures, options.fixtures);
-  if (!fixtures.sessionId) {
-    const sessions = (await client.request('sessions', '/api/sessions')).body;
-    fixtures.sessionId = options.session ?? (sessions.length === 1 ? sessions[0].id : undefined);
-    if (!sessions.some((session) => session.id === fixtures.sessionId)) {
-      throw new Error(`The organizer belongs to ${sessions.length} sessions. Choose one with --session.`);
-    }
-    await writeFixtures(options.fixtures, fixtures);
-  }
-  await post(client, '/api/admin', { action: 'set_intake', sessionId: fixtures.sessionId, open: true });
-  const current = await snapshot(client, fixtures.sessionId);
-  const teams = [...current.teams].sort((a, b) => a.name.localeCompare(b.name));
-  if (teams.length < Math.ceil(teamAccounts / perTeam)) {
-    throw new Error(`The session has ${teams.length} teams. ${teamAccounts} team accounts at ${perTeam} per team need more.`);
-  }
   const prefix = accountPrefix(fixtures);
-  const wanted = [
-    ...Array.from({ length: staffCount }, (_, index) => ({
-      username: `${prefix}s${String(index + 1).padStart(4, '0')}`, kind: 'staff', teamId: null,
-    })),
-    ...Array.from({ length: teamAccounts }, (_, index) => {
-      const team = Math.floor(index / perTeam);
-      return { username: `${prefix}t${String(team + 1).padStart(4, '0')}-${(index % perTeam) + 1}`, kind: 'team', teamId: teams[team].id };
-    }),
-  ];
-  const members = new Map(current.members.map((member) => [member.person.username, member.person.id]));
+  if (!fixtures.eventId) {
+    // The webmaster makes the event and its first event admin, and issues that admin's first password.
+    const webmaster = await signInManager(fixtures, options.fixtures, 'webmaster');
+    const code = `load-${fixtures.runId}`;
+    const created = await manage(webmaster, {
+      type: 'create_event', name: `Fictional load test ${fixtures.runId}`, code, timeZone: 'UTC',
+      firstAdmin: { handle: `${prefix}eadmin`, name: 'Fictional load-test event admin' },
+    });
+    const [issued] = await post(webmaster, '/api/credentials', {
+      requestId: randomUUID(), eventId: created.eventId, accountIds: created.accountIds,
+    });
+    Object.assign(fixtures, { eventId: created.eventId, eventCode: code,
+      admin: { username: issued.handle, temporary: issued.temporaryPassword, changed: false } });
+    await writeFixtures(options.fixtures, fixtures);
+    log(`Created event ${code}.`);
+  }
+  const client = await signInManager(fixtures, options.fixtures, 'admin');
+  if (!fixtures.sessionId) {
+    const created = await manage(client, {
+      type: 'create_contest', eventId: fixtures.eventId, name: 'Fictional load session', contestType: 'teams',
+      categories: ['Problem statement', 'Devices', 'Network', 'Other'],
+    });
+    fixtures.sessionId = created.contestId;
+    await writeFixtures(options.fixtures, fixtures);
+    await manage(client, { type: 'set_intake', contestId: fixtures.sessionId, open: true });
+  }
+  const consoleView = async () => (await client.request('event', '/api/event')).body;
+  let view = await consoleView();
+  const handles = new Set([...view.people.map((person) => person.handle), ...view.entrants.map((entrant) => entrant.handle)]);
+  const staffWanted = Array.from({ length: staffCount }, (_, index) => `${prefix}s${String(index + 1).padStart(4, '0')}`);
+  const teamsWanted = Array.from({ length: teamAccounts }, (_, index) => `${prefix}t${String(index + 1).padStart(4, '0')}`);
+  for (const batch of chunks(staffWanted.filter((handle) => !handles.has(handle)), COMMAND_BATCH)) {
+    await manage(client, { type: 'create_people', eventId: fixtures.eventId,
+      people: batch.map((handle) => ({ handle, name: `Fictional ${handle}` })) });
+  }
+  for (const batch of chunks(teamsWanted.filter((handle) => !handles.has(handle)), COMMAND_BATCH)) {
+    await manage(client, { type: 'create_entrants', eventId: fixtures.eventId,
+      entrants: batch.map((handle) => ({ kind: 'team', handle, name: `Fictional team ${handle}` })) });
+  }
+  view = await consoleView();
+  const person = new Map(view.people.map((item) => [item.handle, item]));
+  const entrant = new Map(view.entrants.map((item) => [item.handle, item]));
+  const seatedStaff = new Set(view.staffAssignments.filter((item) => item.contestId === fixtures.sessionId).map((item) => item.accountId));
+  const seatedEntrants = new Set(view.entries.filter((item) => item.contestId === fixtures.sessionId).map((item) => item.entrantId));
+  for (const handle of staffWanted) {
+    const id = person.get(handle).id;
+    if (!seatedStaff.has(id)) await manage(client, { type: 'assign_staff', contestId: fixtures.sessionId, accountId: id, roles: ['volunteer'], admin: false });
+  }
+  const unseated = teamsWanted.map((handle) => entrant.get(handle)).filter((item) => !seatedEntrants.has(item.id));
+  for (const batch of chunks(unseated, COMMAND_BATCH)) {
+    await manage(client, { type: 'assign_entrants', contestId: fixtures.sessionId,
+      entries: batch.map((item) => ({ entrantId: item.id, location: `Fictional desk ${item.handle}` })) });
+  }
+  // A team account submits for its entry, which is the contest's teams row with the entrant's name.
+  const entries = new Map((await snapshot(client, fixtures.sessionId)).teams.map((team) => [team.name, team.id]));
   const known = new Map(fixtures.accounts.map((account) => [account.username, account]));
-  // An account from a fixture file older than event sign-in has no event code, so it gets a reset.
-  const todo = wanted.filter((account) => !known.get(account.username)?.event || !members.has(account.username));
-  log(`${wanted.length - todo.length} of ${wanted.length} accounts exist. Creating or resetting ${todo.length}.`);
+  const wanted = [
+    ...staffWanted.map((handle) => ({ username: handle, kind: 'staff', teamId: null, id: person.get(handle).id })),
+    ...teamsWanted.map((handle) => ({ username: handle, kind: 'team', teamId: entries.get(entrant.get(handle).name), id: entrant.get(handle).accountId })),
+  ];
+  const todo = wanted.filter((account) => !known.get(account.username)?.event);
+  log(`${wanted.length - todo.length} of ${wanted.length} accounts exist. Issuing passwords for ${todo.length}.`);
   let done = 0;
-  const work = async (account) => {
-    const command = members.has(account.username)
-      ? { action: 'reset_password', userId: members.get(account.username) }
-      : { action: 'create_account', username: account.username, name: `Fictional ${account.username}`,
-          teamId: account.teamId, roles: account.kind === 'staff' ? ['volunteer'] : [], isAdmin: false };
-    const result = await post(client, '/api/accounts', { sessionId: fixtures.sessionId, command });
-    known.set(account.username, { ...account, event: result.signIn.code, temporary: result.temporaryPassword, changed: false });
-    if (++done % 50 === 0) {
+  const queue = chunks(todo, ISSUE_BATCH);
+  const work = async (batch) => {
+    const issued = await post(client, '/api/credentials', {
+      requestId: randomUUID(), eventId: fixtures.eventId, accountIds: batch.map((account) => account.id),
+    });
+    for (const [index, account] of batch.entries()) {
+      known.set(account.username, { ...account, event: fixtures.eventCode, temporary: issued[index].temporaryPassword, changed: false });
+    }
+    done += batch.length;
+    if (Math.floor(done / 50) !== Math.floor((done - batch.length) / 50)) {
       fixtures.accounts = [...known.values()];
       await writeFixtures(options.fixtures, fixtures);
       log(`${done} of ${todo.length} accounts ready.`);
     }
   };
-  const queue = [...todo];
   try {
     await Promise.all(Array.from({ length: number(options.concurrency, 6) }, async () => {
       while (queue.length) await work(queue.shift());
@@ -159,21 +203,30 @@ async function setup(options) {
     fixtures.accounts = [...known.values()];
     await writeFixtures(options.fixtures, fixtures);
   }
-  log(`Setup complete: ${staffCount} staff and ${teamAccounts} team accounts in session ${fixtures.sessionId}.`);
+  log(`Setup complete: ${staffCount} staff and ${teamAccounts} team accounts in contest ${fixtures.sessionId}.`);
 }
 
 async function cleanup(options) {
   required(options, 'fixtures');
   const fixtures = await readFixtures(options.fixtures);
   checkTarget(fixtures.origin, options['isolated-origin']);
-  const client = await signInAdmin(fixtures, options.fixtures);
+  const client = await signInManager(fixtures, options.fixtures, 'admin');
   const prefix = accountPrefix(fixtures);
-  const members = (await snapshot(client, fixtures.sessionId)).members
-    .filter((member) => member.person.username?.startsWith(prefix));
-  for (const member of members) {
-    await post(client, '/api/admin', { action: 'remove_member', sessionId: fixtures.sessionId, userId: member.person.id });
+  const view = (await client.request('event', '/api/event')).body;
+  let removed = 0;
+  for (const item of view.people.filter((candidate) => candidate.handle?.startsWith(prefix))) {
+    await manage(client, { type: 'unassign_staff', contestId: fixtures.sessionId, accountId: item.id });
+    removed++;
   }
-  log(`Removed ${members.length} run ${fixtures.runId} accounts from the session. Issues and history stay, because Minsky keeps them.`);
+  let kept = 0;
+  for (const item of view.entrants.filter((candidate) => candidate.handle?.startsWith(prefix))) {
+    // A team with an issue stays, because Minsky keeps issues and their history.
+    try {
+      await manage(client, { type: 'unassign_entrant', contestId: fixtures.sessionId, entrantId: item.id });
+      removed++;
+    } catch { kept++; }
+  }
+  log(`Removed ${removed} run ${fixtures.runId} seats from the contest. ${kept} teams with issues stay, because Minsky keeps issues and history.`);
 }
 
 /**
@@ -181,7 +234,7 @@ async function cleanup(options) {
  * not the load. Bulk account creation leaves such a backlog for many minutes.
  */
 async function preflight(fixtures, path) {
-  const client = await signInAdmin(fixtures, path);
+  const client = await signInManager(fixtures, path, 'admin');
   const started = now();
   const socket = client.webSocket(`/api/updates?sessionId=${fixtures.sessionId}`);
   const ready = await new Promise((resolve) => {
@@ -214,7 +267,8 @@ async function run(options) {
   const staffAccounts = fixtures.accounts.filter((account) => account.kind === 'staff');
   const teamAccounts = fixtures.accounts.filter((account) => account.kind === 'team');
   const staffShare = staffAccounts.length / fixtures.accounts.length;
-  const perTeam = teamAccounts.length / new Set(teamAccounts.map((account) => account.teamId)).size;
+  // An entrant has one sign-in, so a team has one account.
+  const perTeam = 1;
   for (const users of steps) {
     const counts = activeCounts(users, staffShare);
     if (counts.staff > staffAccounts.length || counts.team > teamAccounts.length) {
@@ -276,7 +330,7 @@ async function run(options) {
     while (canaries) {
       await Promise.allSettled([
         anonymous.request('canary:static', '/minsky-revision.json'),
-        anonymous.request('canary:anonymous-api', '/api/sessions', { expected: 401 }),
+        anonymous.request('canary:anonymous-api', '/api/contests', { expected: 401 }),
       ]);
       await delay(2000);
     }
@@ -420,7 +474,7 @@ async function analytics(options) {
   }
 }
 
-const commands = { competition, setup, run, analytics, cleanup };
+const commands = { site, setup, run, analytics, cleanup };
 
 const options = parseOptions(process.argv.slice(2));
 if (!commands[options.command]) {

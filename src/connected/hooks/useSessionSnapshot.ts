@@ -6,12 +6,15 @@ import {
   useState,
 } from "react";
 import { backend } from "@/backend";
-import type { SessionSummary } from "@/backend/contracts";
+import type { ContestSummary } from "@/backend/contracts";
 import { errorMessage } from "@/backend/errors";
+import { keepUnchanged } from "../keepUnchanged";
 import type { Snapshot } from "../model";
-import { startRefreshSchedule } from "./refreshSchedule";
+import { createRefreshQueue } from "./refreshQueue";
+import { boundaryDelay, startRefreshSchedule } from "./refreshSchedule";
 
-export type { SessionSummary };
+/** A contest that the person may open. */
+export type SessionSummary = ContestSummary;
 
 /** Shared session data for every UI. Read it; do not copy it into state. */
 export interface SessionData {
@@ -44,6 +47,11 @@ export interface SessionData {
   selectSession: (sessionId: string) => void;
 }
 
+/** True while the tab is in the background. The refresh schedule reads again when it returns. */
+function inBackground(): boolean {
+  return document.visibilityState === "hidden";
+}
+
 /**
  * Loads the person's sessions and the selected session snapshot. It refreshes
  * on live changes, on focus, when the tab becomes visible and when the browser
@@ -63,14 +71,18 @@ export function useSessionSnapshot(userId: string): SessionData {
   // Server time of the newest snapshot shown. An older snapshot never replaces it.
   const shownAt = useRef(0);
   const generation = useRef(0);
-  const refreshQueue = useRef<Promise<void>>(Promise.resolve());
+  // The session that the last successful read showed, so the subscribe effect
+  // does not read it again straight after the read that selected it.
+  const readFor = useRef<string>(undefined);
+  const [queue] = useState(createRefreshQueue);
   const refresh = useCallback(() => {
     const run = generation.current;
     // Serialize reads so an older Realtime response cannot overwrite a newer
     // revision. A write waits for its own refresh before enabling controls.
-    const task = refreshQueue.current.then(async () => {
+    // A read that has not started yet serves every caller that arrives before it starts.
+    return queue.read(run, async () => {
       try {
-        const list = await backend.workflows.sessions(userId);
+        const list = await backend.workflows.contests();
         const nextSession = list.some((s) => s.id === sessionId)
           ? sessionId
           : (list[0]?.id ?? "");
@@ -78,9 +90,10 @@ export function useSessionSnapshot(userId: string): SessionData {
           ? await backend.workflows.snapshot(nextSession)
           : undefined;
         if (run !== generation.current) return;
-        setSessions(list);
+        readFor.current = nextSession;
+        setSessions((shown) => keepUnchanged(shown, list));
         setSessionId(nextSession);
-        setState(next?.membership ? next : undefined);
+        setState((shown) => (next?.membership ? keepUnchanged(shown, next) : undefined));
         if (next) {
           clockOffset.current = Date.parse(next.server_time) - Date.now();
           shownAt.current = Date.parse(next.server_time);
@@ -94,13 +107,11 @@ export function useSessionSnapshot(userId: string): SessionData {
       }
       setLoaded(true);
     });
-    refreshQueue.current = task;
-    return task;
-  }, [sessionId, userId]);
+  }, [queue, sessionId]);
   const applySnapshot = useCallback(
     (forSession: string, next: Snapshot) => {
       const run = generation.current;
-      const task = refreshQueue.current.then(() => {
+      return queue.after(() => {
         if (run !== generation.current || forSession !== sessionId) return false;
         if (!next.membership) return false;
         const at = Date.parse(next.server_time);
@@ -108,34 +119,32 @@ export function useSessionSnapshot(userId: string): SessionData {
         if (at < shownAt.current) return true;
         shownAt.current = at;
         clockOffset.current = at - Date.now();
-        setState(next);
+        setState((shown) => keepUnchanged(shown, next));
         setRefreshError("");
         setLoaded(true);
         return true;
       });
-      refreshQueue.current = task.then(
-        () => undefined,
-        () => undefined,
-      );
-      return task;
     },
-    [sessionId],
+    [queue, sessionId],
   );
   useEffect(() => {
-    void refresh();
+    if (readFor.current !== sessionId) void refresh();
     setConnected(false);
     // The first refresh selects a session. Empty IDs produce invalid live filters.
     const unsubscribe = sessionId
       ? backend.updates.subscribe({
           sessionId,
           userId,
+          // A hidden page shows nothing. It reads once when the person returns.
           onChange: () => {
+            if (inBackground()) return;
             setUpdates((count) => count + 1);
             void refresh();
           },
           // A drop can mean that the server revoked access, so read at once.
           onConnection: (isConnected) => {
             setConnected(isConnected);
+            if (inBackground()) return;
             setUpdates((count) => count + 1);
             void refresh();
           },
@@ -153,6 +162,7 @@ export function useSessionSnapshot(userId: string): SessionData {
   const tick = useRef<() => void>(undefined);
   useEffect(() => {
     tick.current = () => {
+      if (inBackground()) return;
       setUpdates((count) => count + 1);
       void refresh();
     };
@@ -167,8 +177,18 @@ export function useSessionSnapshot(userId: string): SessionData {
       }),
     [connected],
   );
+  // Refresh when the schedule changes the contest's intake or end. Time sends
+  // no live hint, so the browser waits for the boundary and adds a random delay.
+  const changesAt = state?.clock?.intake.changes_at;
+  useEffect(() => {
+    const delay = boundaryDelay(changesAt, Date.now(), clockOffset.current);
+    if (delay === undefined) return undefined;
+    const timer = window.setTimeout(() => tick.current?.(), delay);
+    return () => window.clearTimeout(timer);
+  }, [changesAt]);
   const selectSession = useCallback((next: string) => {
     generation.current++;
+    readFor.current = undefined;
     setState(undefined);
     setLoaded(false);
     setSessionId(next);

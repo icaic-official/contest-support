@@ -30,7 +30,7 @@ A username is unique inside its event. Staff can change their own username on th
 
 The frontend redesign ([PR #44](https://github.com/GiftedNovaHD/minsky/pull/44), merged at `a25f9f1` on 2026-10-21) gives three UIs. After sign-in, the membership selects one:
 
-- **Contestant desktop app.** A membership with a team gets this app. It shows the team's reports, a live timer, a progress tracker, public messages, team-visible images and the report form. It has no phone layout and needs a window at least 1024 px wide.
+- **Contestant app.** A membership with a team gets this app. It shows the team's reports, a live timer, a progress tracker, public messages, team-visible images and the report form. It works on phones and laptops. Below 1024 px wide it shows one screen at a time. A window at least 1024 px wide.
 - **Organizer phone app.** Staff in a window narrower than 1024 px get bottom tabs by role: Queue, Mine, Find, Awards, Session and Me. Issues open in a full-screen view with an action bar and bottom sheets.
 - **Organizer desktop console.** Staff in a window 1024 px wide or wider get a sidebar, a queue table, an issue side sheet, a ⌘K command palette, Award review and the admin pages.
 
@@ -62,7 +62,7 @@ Use the hosted development app for the shared development data.
 
 [`lapiz.deploy.json`](lapiz.deploy.json) and [`.lapiz/`](.lapiz) run a preview of the Cloudflare application on a Lapiz host.
 The preview uses only local emulation of D1, R2, and Durable Objects in `.lapiz/state/`. It never connects to hosted Cloudflare resources.
-On the first start, `.lapiz/bootstrap.ts` bootstraps the installation from `src/server/adapters/cloudflare/tooling/competition.example.json`.
+On the first start, `.lapiz/bootstrap.ts` bootstraps one webmaster from `src/server/adapters/cloudflare/tooling/site.example.json`.
 
 The preview prints the first admin's username and temporary password in its start log on each start. This is deliberate, for debugging. The first admin is a webmaster and signs in with **Site sign-in**.
 Anyone who can read that log can sign in as that admin. Use only fictional data in the preview.
@@ -96,8 +96,10 @@ Anyone who can read that log can sign in as that admin. Use only fictional data 
 | `npm run test:auth:hosted -- --account=… --database=…` | Run account cases on the explicit isolated hosted authentication D1 target. |
 | `npm run test:auth:http -- --account=… --database=… --origin=…` | Check the isolated deployed authentication Worker. |
 | `npm run test:auth:hash` | Measure password cost in a temporary local Worker. |
-| `npm run load -- <command>` | Run a load test against an isolated installation: `competition`, `setup`, `run`, `analytics`, and `cleanup`. See [Run a load test](docs/run-load-tests.md). |
+| `npm run load -- <command>` | Run a load test against an isolated installation: `site`, `setup`, `run`, `analytics`, and `cleanup`. See [Run a load test](docs/run-load-tests.md). |
 | `npm run perf:reads` | Count the D1 calls, statements, rows read and rows written of each API request at several data sizes. It uses a temporary local database with fictional data and no Cloudflare credentials. Add `-- --plan=base` for the 1,200-account shape only, `-- --explain` for query plans, and `-- --out=<file.json>` for the raw records. Compare saved records with `node scripts/compare-read-volume.mjs --base=<files> --head=<files>`. |
+| `npm run perf:client` | Build the app and measure first load at 4x CPU slowdown on slow 4G, heap, component renders, and snapshot reads, with a 500-issue queue on the local fixture. Set `PERF_RUNS` and `PERF_OUT=<file.json>`. See [Client weight](docs/frontend-architecture.md#client-weight). |
+| `npm run perf:size` | Print the raw, gzip and Brotli size of each script and stylesheet in `dist/assets`. |
 | `npm run test:e2e:smoke` | Run the critical-path browser files `tests/landing.spec.ts` and `tests/journey.spec.ts`. |
 | `npm run test:e2e` | Run every mocked browser test, including the smoke files. The specs use the Cloudflare client. They serve the real Worker routes from the test process. See [the browser suite](#the-mocked-browser-suite). |
 | `npm run test:providers:list` | List the shared provider scenarios without hosted credentials. |
@@ -198,7 +200,7 @@ Backend:
 - [Session announcements](docs/session-announcements.md) is the reference for announcement behavior in the Cloudflare implementation.
 - [Cloudflare backend design](docs/cloudflare-backend-design.md) explains the implemented server boundaries.
 - [Scaling design](docs/scaling-design.md) explains where one installation saturates under load and ranks the changes that raise capacity.
-- [Webmaster, event, and contest platform](docs/event-platform-design.md) is the design for one shared site. Its first two phases, one authority resolver and webmaster management, are merged. Phase 3, sign-in by event code, waits for review on `feature/event-sign-in`. The later phases are proposed. The [sketches page](docs/event-platform-sketches.md) holds its type and migration sketches.
+- [Webmaster, event, and contest platform](docs/event-platform-design.md) is the design for one shared site. Its first four phases are merged: the authority resolver, webmaster management, sign-in by event code, and the event console. The later phases are proposed. The [sketches page](docs/event-platform-sketches.md) holds its type and migration sketches.
 - [Cloudflare authentication reference](docs/cloudflare-authentication.md) and the [authentication choice](docs/cloudflare-authentication-choice.md).
 - [Add a backend provider](docs/add-provider.md) gives contributor interfaces, registration points, installation, cleanup, and required shared verification.
 

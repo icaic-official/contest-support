@@ -1,4 +1,4 @@
-import { useId, useState } from "react";
+import { useCallback, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   Camera,
   CheckCheck,
@@ -27,6 +27,10 @@ import {
   type Membership,
   type Snapshot,
 } from "@/connected/model";
+import { Calendar } from "@/connected/Calendar";
+import { calendarKey } from "@/connected/calendarModel";
+import { ContestAwardsPanel } from "@/connected/ContestAwards";
+import { ContestPicker } from "@/connected/ContestPicker";
 import { PictureEditor } from "@/connected/PictureEditor";
 import type { ShellProps } from "@/connected/shell";
 import { searchTeams, unresolvedCount } from "@/connected/teamSearch";
@@ -82,20 +86,45 @@ function IssueList({
   issues: readonly Issue[];
   props: PhoneTabProps;
 }) {
+  const { state, workflow } = props;
+  // The tab builds new callbacks on every render, and it renders every second.
+  // The cards call the latest ones through these stable wrappers.
+  const latest = useRef(props);
+  useLayoutEffect(() => {
+    latest.current = props;
+  });
+  const open = useCallback((id: string) => latest.current.openIssue(id), []);
+  const run = useCallback(
+    (issue: Issue, action: CardAction) =>
+      latest.current.runCardAction(issue, action),
+    [],
+  );
+  const teams = useMemo(
+    () => new Map(state.teams.map((team) => [team.id, team])),
+    [state.teams],
+  );
   return (
     <ul className="space-y-2.5">
-      {issues.map((issue) => (
-        <IssueCard
-          key={issue.id}
-          issue={issue}
-          state={props.state}
-          now={props.now}
-          command={props.workflow.command}
-          action={props.cardAction(issue)}
-          onOpen={() => props.openIssue(issue.id)}
-          onAction={(action) => props.runCardAction(issue, action)}
-        />
-      ))}
+      {issues.map((issue) => {
+        const action = props.cardAction(issue);
+        return (
+          <IssueCard
+            key={issue.id}
+            issue={issue}
+            team={teams.get(issue.team_id)}
+            resolutions={state.resolutions}
+            clockOffset={props.shell.data.clockOffset}
+            locked={workflow.command.locked}
+            running={
+              action !== undefined &&
+              isRunning(workflow.command.running, action, issue.id)
+            }
+            action={action}
+            onOpen={open}
+            onAction={run}
+          />
+        );
+      })}
     </ul>
   );
 }
@@ -116,6 +145,7 @@ export function QueueTab(props: PhoneTabProps) {
   const canClaim = oldest ? props.cardAction(oldest) === "claim" : false;
   return (
     <div className="space-y-4">
+      <ContestAwardsPanel state={state} member={member} refresh={props.shell.data.refresh} pendingOnly />
       {oldest && canClaim && (
         <section
           aria-label="Oldest waiting issue"
@@ -392,6 +422,7 @@ export function AwardsTab(props: PhoneTabProps) {
   const archived = Boolean(state.event?.archived);
   return (
     <div className="space-y-4">
+      <ContestAwardsPanel state={state} member={props.member} refresh={props.shell.data.refresh} />
       <div
         role="group"
         aria-label="Award lists"
@@ -537,34 +568,34 @@ export function MeTab(props: PhoneTabProps & { onSessionChange: () => void }) {
           Contest session
         </h2>
         {data.sessions.length > 1 ? (
-          <fieldset
+          <ContestPicker
+            variant="radios"
+            legend="Choose a contest session"
+            contests={data.sessions}
+            value={data.sessionId}
             disabled={workflow.command.locked}
-            className="divide-y rounded-xl border bg-card"
-          >
-            <legend className="sr-only">Choose a contest session</legend>
-            {data.sessions.map((session) => (
-              <label key={session.id} className={cn(rowClass, "cursor-pointer")}>
-                <input
-                  type="radio"
-                  name={`${id}-sessions`}
-                  value={session.id}
-                  checked={session.id === data.sessionId}
-                  onChange={() => {
-                    data.selectSession(session.id);
-                    props.onSessionChange();
-                  }}
-                  className="size-4 accent-current"
-                />
-                <span className="flex-1">{session.name}</span>
-              </label>
-            ))}
-          </fieldset>
+            onSelect={(sessionId) => {
+              data.selectSession(sessionId);
+              props.onSessionChange();
+            }}
+          />
         ) : (
           <p className="rounded-xl border bg-card p-3 text-[15px]">
             {state.session?.name}
           </p>
         )}
       </section>
+      <div className="rounded-xl border bg-card p-3">
+        <Calendar
+          currentId={data.sessionId}
+          currentIntake={data.snapshot?.clock?.intake.reason}
+          refreshKey={calendarKey(data.snapshot)}
+          onOpen={(contest) => {
+            data.selectSession(contest.id);
+            props.onSessionChange();
+          }}
+        />
+      </div>
       <div className="divide-y rounded-xl border bg-card">
         <button
           id={changePictureButtonId}

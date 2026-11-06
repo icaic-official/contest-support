@@ -5,11 +5,14 @@ import {
   useRef,
   useState,
 } from "react";
+import { useLocation, useNavigate } from "react-router";
 import { backend } from "@/backend";
 import type { ContestSummary } from "@/backend/contracts";
 import { errorMessage } from "@/backend/errors";
+import { defaultContest, orderContests } from "../contestList";
 import { keepUnchanged } from "../keepUnchanged";
 import type { Snapshot } from "../model";
+import { contestOfSearch, searchWithContest } from "../navigation";
 import { createRefreshQueue } from "./refreshQueue";
 import { boundaryDelay, startRefreshSchedule } from "./refreshSchedule";
 
@@ -53,11 +56,16 @@ function inBackground(): boolean {
 }
 
 /**
- * Loads the person's sessions and the selected session snapshot. It refreshes
- * on live changes, on focus, when the tab becomes visible and when the browser
- * comes back online. A timer refreshes every 10 seconds while the live channel
- * is down, and every 60 seconds while it is connected. The timer also drives
- * the independent reads: each tick adds one to `updates`.
+ * Loads the person's sessions and the selected session snapshot. The first
+ * read opens the contest that `?contest=` names, else the one that runs now,
+ * else the next one. `sessionId` is the only record of the choice. For a
+ * person with several contests the address holds a copy, so a reload keeps
+ * the choice. The hook reads the address once, when it starts.
+ *
+ * It refreshes on live changes, on focus, when the tab becomes visible and
+ * when the browser comes back online. A timer refreshes every 10 seconds
+ * while the live channel is down, and every 60 seconds while it is connected.
+ * The timer also drives the independent reads: each tick adds one to `updates`.
  */
 export function useSessionSnapshot(userId: string): SessionData {
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
@@ -67,6 +75,11 @@ export function useSessionSnapshot(userId: string): SessionData {
   const [refreshError, setRefreshError] = useState("");
   const [connected, setConnected] = useState(false);
   const [updates, setUpdates] = useState(0);
+  const location = useLocation();
+  const navigate = useNavigate();
+  // The contest that the address named when the page loaded. A read honors it
+  // until one read succeeds. A later access loss then falls back to the default.
+  const addressed = useRef(contestOfSearch(location.search));
   const clockOffset = useRef(0);
   // Server time of the newest snapshot shown. An older snapshot never replaces it.
   const shownAt = useRef(0);
@@ -82,15 +95,21 @@ export function useSessionSnapshot(userId: string): SessionData {
     // A read that has not started yet serves every caller that arrives before it starts.
     return queue.read(run, async () => {
       try {
-        const list = await backend.workflows.contests();
-        const nextSession = list.some((s) => s.id === sessionId)
+        const list = orderContests(await backend.workflows.contests());
+        // Only a listed ID reaches the snapshot read and the live channel.
+        const isListed = (id: string) => list.some((s) => s.id === id);
+        const seed = addressed.current;
+        const nextSession = isListed(sessionId)
           ? sessionId
-          : (list[0]?.id ?? "");
+          : seed !== undefined && isListed(seed)
+            ? seed
+            : (defaultContest(list)?.id ?? "");
         const next = nextSession
           ? await backend.workflows.snapshot(nextSession)
           : undefined;
         if (run !== generation.current) return;
         readFor.current = nextSession;
+        addressed.current = undefined;
         setSessions((shown) => keepUnchanged(shown, list));
         setSessionId(nextSession);
         setState((shown) => (next?.membership ? keepUnchanged(shown, next) : undefined));
@@ -186,6 +205,23 @@ export function useSessionSnapshot(userId: string): SessionData {
     const timer = window.setTimeout(() => tick.current?.(), delay);
     return () => window.clearTimeout(timer);
   }, [changesAt]);
+  // The address follows the choice and never decides it. A replace adds no
+  // history entry. The hash, the router state and the other parameters stay,
+  // because the account page reads the hash and the state to place focus.
+  const several = sessions.length > 1;
+  useEffect(() => {
+    if (!sessionId || !several) return;
+    if (contestOfSearch(location.search) === sessionId) return;
+    const state: unknown = location.state;
+    void navigate(
+      {
+        pathname: location.pathname,
+        search: searchWithContest(location.search, sessionId),
+        hash: location.hash,
+      },
+      { replace: true, state, preventScrollReset: true },
+    );
+  }, [location, navigate, sessionId, several]);
   const selectSession = useCallback((next: string) => {
     generation.current++;
     readFor.current = undefined;

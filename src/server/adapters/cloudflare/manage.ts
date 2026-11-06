@@ -17,6 +17,7 @@ import {
   waitingSeatsSql,
   moveStopsContestSql,
   voidedScopesSql,
+  notBeingDeletedSql,
 } from './authority';
 import { handleSchema, loginKeyFor, replaceCredentialStatements } from './credentials';
 import { readablePassword, type PasswordHasher } from './password';
@@ -304,7 +305,7 @@ export const eventConsoleSql = {
 export const siteEventsSql = `SELECT e.id, e.name, e.code, e.time_zone, e.archived,
     (SELECT count(*) FROM sessions s WHERE s.event_id = e.id) AS contests,
     (SELECT count(*) FROM accounts a WHERE a.event_id = e.id) AS accounts
-  FROM events e ORDER BY e.name, e.id`;
+  FROM events e WHERE ${notBeingDeletedSql('e.id')} ORDER BY e.name, e.id`;
 
 /**
  * Site and event administration. Every change runs one path: parse, receipt

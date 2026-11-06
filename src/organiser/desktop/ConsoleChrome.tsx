@@ -190,8 +190,12 @@ export function ConsoleSidebar({
   intake?:
     | {
         open: boolean;
+        /** Whether a schedule drives intake, or staff set it by hand over the schedule. */
+        schedule: "none" | "follows" | "overridden";
         disabled: boolean;
         onChange: (open: boolean) => void;
+        /** Opens the panel where staff return intake to the schedule. */
+        onReturn: () => void;
       }
     | undefined;
   /** True while the account page is open. */
@@ -352,7 +356,19 @@ export function ConsoleSidebar({
             {intake.open
               ? "Teams can submit new reports."
               : "Teams cannot submit new reports."}
+            {intake.schedule === "follows" && " Switching this overrides the schedule."}
+            {intake.schedule === "overridden" && " Set by hand. This overrides the schedule."}
           </p>
+          {intake.schedule === "overridden" && (
+            <Button
+              type="button"
+              variant="link"
+              className="mt-1 h-auto p-0 text-xs"
+              onClick={intake.onReturn}
+            >
+              Return to schedule in settings
+            </Button>
+          )}
         </div>
       )}
       <div className="border-t p-2">

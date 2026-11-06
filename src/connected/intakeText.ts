@@ -15,5 +15,7 @@ export function intakeHeadline(reason: IntakeReason): string {
       return "Intake open (set by staff)";
     case "override_closed":
       return "Intake closed (set by staff)";
+    case "awaiting_live_passwords":
+      return "Waiting for live passwords";
   }
 }

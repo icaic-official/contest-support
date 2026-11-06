@@ -1,6 +1,6 @@
 import { useId, useMemo, useRef, useState } from "react";
 import { Pencil } from "lucide-react";
-import type { ContestType, EventConsole, Schedule } from "@/backend/contracts";
+import type { ContestKind, ContestType, EventConsole, Schedule } from "@/backend/contracts";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -16,7 +16,8 @@ import { intakeHeadline } from "@/connected/intakeText";
 import { rosterTextMax, teamsPerCommandMax } from "@/connected/roster";
 import { viewerNote } from "@/connected/zonedTime";
 import { staffRoles } from "@/organiser/admin/adminModel";
-import { acceptsKind, contestTypeLabels, seatedEntrants } from "./eventModel";
+import { ConfirmDialog } from "@/organiser/admin/AccountAccess";
+import { acceptsKind, alsoOpens, contestTypeLabels, seatedEntrants, voidedBy } from "./eventModel";
 import { CommandError, Panel, fieldClass, focusAfterRemoval } from "./forms";
 import { ScheduleFields } from "./ScheduleFields";
 import {
@@ -76,6 +77,7 @@ export function ContestsTab({ data, state }: TabProps) {
   const id = useId();
   const [name, setName] = useState("");
   const [type, setType] = useState<ContestType>("teams");
+  const [kind, setKind] = useState<ContestKind>("practice");
   const timeZone = data.event.timeZone;
   const [draft, setDraft] = useState<ScheduleDraft>(() => emptyDraft(timeZone));
   const [editing, setEditing] = useState<EventConsole["contests"][number]>();
@@ -98,6 +100,7 @@ export function ContestsTab({ data, state }: TabProps) {
                 type: "create_contest",
                 eventId: data.event.id,
                 name: trimmed,
+                kind,
                 contestType: type,
                 schedule: parsed.schedule,
                 categories: defaultCategories,
@@ -120,6 +123,19 @@ export function ContestsTab({ data, state }: TabProps) {
           <div className="space-y-1.5">
             <Label htmlFor={`${id}-type`}>Contest type</Label>
             <TypeSelect id={`${id}-type`} value={type} disabled={locked} onChange={setType} />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor={`${id}-kind`}>Contest kind</Label>
+            <select
+              id={`${id}-kind`}
+              value={kind}
+              disabled={locked}
+              onChange={(event) => setKind(event.target.value as ContestKind)}
+              className={selectClass}
+            >
+              <option value="practice">Practice</option>
+              <option value="live">Live: closed until every sign-in has a live password</option>
+            </select>
           </div>
           <div className="sm:col-span-2">
             <ScheduleFields draft={draft} timeZone={timeZone} disabled={locked} onChange={setDraft} />
@@ -144,7 +160,9 @@ export function ContestsTab({ data, state }: TabProps) {
               <li key={contest.id} className="flex flex-wrap items-center gap-x-3 gap-y-2 py-3">
                 <div className="min-w-0 flex-1 basis-36 leading-tight">
                   <p className="truncate text-sm font-medium">{contest.name}</p>
-                  <p className="text-xs text-muted-foreground">{contestTypeLabels[contest.contestType]}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {contest.kind === "live" ? "Live" : "Practice"} · {contestTypeLabels[contest.contestType]}
+                  </p>
                   <p className="text-xs text-muted-foreground">
                     {contest.schedule ? describeSchedule(contest.schedule, timeZone) : "No schedule"}
                     {contest.schedule && viewerNote(contest.schedule.startsAt, timeZone, "datetime") && (
@@ -169,6 +187,14 @@ export function ContestsTab({ data, state }: TabProps) {
                     <Pencil aria-hidden="true" />
                   </Button>
                 </div>
+                {contest.waiting.length > 0 && (
+                  <LivePasswords
+                    contest={contest}
+                    data={data}
+                    disabled={locked}
+                    onIssue={(voids) => void state.issue(contest.waiting.map((seat) => seat.accountId), contest.id, voids)}
+                  />
+                )}
               </li>
             ))}
           </ul>
@@ -202,6 +228,37 @@ export function ContestsTab({ data, state }: TabProps) {
           <CommandError message={state.error} />
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+/** Who still waits for a live password, and which contests the new passwords also open. */
+function LivePasswords({
+  contest,
+  data,
+  disabled,
+  onIssue,
+}: {
+  contest: EventConsole["contests"][number];
+  data: EventConsole;
+  disabled: boolean;
+  onIssue: (voidLivePasswords: boolean) => void;
+}) {
+  const others = alsoOpens(data, contest);
+  const voided = voidedBy(data, contest, contest.waiting.map((seat) => seat.accountId));
+  return (
+    <div className="basis-full space-y-2 rounded-xl border p-3">
+      <p className="text-sm font-medium">Waiting for live passwords: {contest.waiting.length}</p>
+      <p className="text-xs break-words text-muted-foreground">{contest.waiting.map((seat) => seat.name).join(", ")}</p>
+      {others.length > 0 && (
+        <p className="text-xs text-muted-foreground">These passwords also open: {others.map((other) => other.name).join(", ")}.</p>
+      )}
+      {voided.length > 0 && (
+        <p className="text-sm font-medium">These passwords stop working for: {voided.map((other) => other.name).join(", ")}.</p>
+      )}
+      <Button type="button" variant="secondary" className="h-auto min-h-11 whitespace-normal" disabled={disabled} onClick={() => onIssue(voided.length > 0)}>
+        Issue live passwords for {contest.name}
+      </Button>
     </div>
   );
 }
@@ -326,6 +383,7 @@ function EntrantAssignments({
   const locked = data.event.archived;
   const [picked, setPicked] = useState<ReadonlySet<string>>(new Set());
   const [location, setLocation] = useState("");
+  const [confirming, setConfirming] = useState(false);
   const seated = useMemo(() => seatedEntrants(data, contest.id), [data, contest.id]);
   const entries = new Map(data.entries.filter((entry) => entry.contestId === contest.id).map((entry) => [entry.entrantId, entry]));
   const eligible = data.entrants.filter((entrant) => acceptsKind(contest.contestType, entrant.kind));
@@ -338,25 +396,45 @@ function EntrantAssignments({
     else next.delete(entrantId);
     setPicked(next);
   };
+  const closes = contest.kind === "live" && contest.intake.open && chosen.some((entrant) => entrant.accountId);
+  const assign = () => {
+    void state
+      .execute({
+        type: "assign_entrants",
+        contestId: contest.id,
+        entries: chosen.map((entrant) => ({ entrantId: entrant.id, location: location.trim() })),
+        ...(closes ? { closeReporting: true } : {}),
+      })
+      .then((receipt) => {
+        if (!receipt) return;
+        setPicked(new Set());
+        const accountIds = receipt.accountIds ?? [];
+        if (closes && accountIds.length > 0) void state.issue(accountIds, contest.id, voidedBy(data, contest, accountIds).length > 0);
+      });
+  };
   return (
     <Panel
       title={`Entrants in ${contest.name} · ${seated.size}`}
       description={`This contest takes: ${contestTypeLabels[contest.contestType].toLowerCase()}. Assigning gives each entrant's sign-in a seat.`}
     >
       <div className="space-y-4">
+        <ConfirmDialog
+          returnFocus
+          open={confirming}
+          onOpenChange={setConfirming}
+          title={`Close reporting in ${contest.name}?`}
+          description={`Reporting closes for ${entries.size} ${entries.size === 1 ? "team" : "teams"} until the new sign-ins have passwords. Minsky issues them next.`}
+          confirmLabel="Assign and close reporting"
+          onConfirm={assign}
+        />
         {open.length > 0 ? (
           <form
             className="space-y-3"
             onSubmit={(event) => {
               event.preventDefault();
               if (locked || chosen.length === 0) return;
-              void state
-                .execute({
-                  type: "assign_entrants",
-                  contestId: contest.id,
-                  entries: chosen.map((entrant) => ({ entrantId: entrant.id, location: location.trim() })),
-                })
-                .then((receipt) => receipt && setPicked(new Set()));
+              if (closes) setConfirming(true);
+              else assign();
             }}
           >
             <fieldset className="min-w-0 space-y-1">
@@ -514,20 +592,24 @@ function StaffRow({
   onAssign: (roles: typeof staffRoles, admin: boolean) => void;
   onRemove: () => void;
 }) {
-  const [roles, setRoles] = useState<ReadonlySet<string>>(new Set(seat?.roles ?? ["volunteer"]));
+  const [roles, setRoles] = useState<ReadonlySet<string>>(new Set(seat?.roles ?? []));
   const [admin, setAdmin] = useState(seat?.admin ?? false);
   // A changed seat resets the draft in place. A new key would remount the row and drop focus.
   const seatKey = JSON.stringify(seat ?? null);
   const [seenSeat, setSeenSeat] = useState(seatKey);
   if (seenSeat !== seatKey) {
     setSeenSeat(seatKey);
-    setRoles(new Set(seat?.roles ?? ["volunteer"]));
+    setRoles(new Set(seat?.roles ?? []));
     setAdmin(seat?.admin ?? false);
   }
   const assignRef = useRef<HTMLButtonElement>(null);
   const chosen = staffRoles.filter((role) => roles.has(role));
   const changed =
     !seat || admin !== seat.admin || chosen.join() !== staffRoles.filter((role) => seat.roles.includes(role)).join();
+  const picked = [...chosen.map((role) => role.charAt(0).toUpperCase() + role.slice(1)), ...(admin ? ["Contest admin"] : [])].join(", ");
+  const nothingPicked = chosen.length === 0 && !admin;
+  const blocked = !changed || nothingPicked;
+  const hintId = useId();
   const pill =
     "flex h-11 cursor-pointer items-center gap-2 rounded-full border px-3 text-sm has-[:checked]:border-primary has-[:checked]:bg-primary has-[:checked]:text-primary-foreground has-[:focus-visible]:ring-[3px] has-[:focus-visible]:ring-ring/50 has-[:disabled]:opacity-50";
   return (
@@ -564,20 +646,22 @@ function StaffRow({
           <span className="sr-only">{name}: </span>Contest admin
         </label>
       </fieldset>
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <Button
           type="button"
           variant="secondary"
           className="h-11"
           ref={assignRef}
-          aria-disabled={!changed || (chosen.length === 0 && !admin) ? true : undefined}
+          aria-disabled={blocked ? true : undefined}
+          aria-describedby={blocked ? hintId : undefined}
           disabled={disabled}
-          aria-label={`${seat ? "Update" : "Assign"} ${name}`}
+          aria-label={`${seat ? "Update" : "Assign"} ${name}${picked ? ` as ${picked}` : ""}`}
           onClick={() => {
-            if (changed && (chosen.length > 0 || admin)) onAssign(chosen, admin);
+            if (!blocked) onAssign(chosen, admin);
           }}
         >
           {seat ? "Update" : "Assign"}
+          {picked && ` as ${picked}`}
         </Button>
         {seat && (
           <Button
@@ -593,6 +677,11 @@ function StaffRow({
           >
             Remove
           </Button>
+        )}
+        {blocked && !disabled && (
+          <p id={hintId} className="text-xs text-muted-foreground">
+            {nothingPicked ? "Pick at least one role or Contest admin." : "Nothing has changed."}
+          </p>
         )}
       </div>
     </li>

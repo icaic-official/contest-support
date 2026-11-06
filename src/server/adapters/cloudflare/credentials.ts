@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import { parseHandle, type LoginKey } from '../../../backend/contracts';
 import type { D1Connection, D1Statement, D1Value } from '../d1/connection';
+import { forContestsSql } from './authority';
+import { windowEndSql } from './schedule';
 
 /** Typed text to a handle, through `parseHandle`. */
 export const handleSchema = z.string().transform((text, context) => {
@@ -71,21 +73,26 @@ export function completeCredentialReset(
 }
 
 /**
- * Replace a password in one batch: begin the reset, record the operation, and
- * complete it. The caller hashes before the batch, so an interrupted issue
- * changes nothing and the old password stays valid. The account_operations
- * insert runs the takeover trigger, so a refused actor rolls back every write.
+ * Replace a password in one batch: begin the reset, record the operation,
+ * complete it, and name the live contests it opens. The caller hashes before the
+ * batch, so an interrupted issue changes nothing and the old password stays
+ * valid. The account_operations insert runs the takeover trigger, so a refused
+ * actor rolls back every write. Its other trigger ends the old scopes, so the
+ * new ones come after it.
  */
 export function replaceCredentialStatements(
   db: D1Connection,
   account: CredentialAccount,
   hash: string,
-  options: { operationId: string; actor: string; temporary: boolean },
+  options: { operationId: string; actor: string; temporary: boolean; contestId: string | null },
 ): D1Statement[] {
   return [
     ...beginCredentialReset(db, account.id, options.operationId),
     statement(db, `INSERT INTO account_operations (id, account_id, actor, action, state) VALUES (?, ?, ?, 'reset_password', 'pending')`,
       options.operationId, account.id, options.actor),
     ...completeCredentialReset(db, account, options.operationId, hash, options.temporary),
+    statement(db, `INSERT INTO credential_scopes (account_id, session_id, operation_id, issued_from, issued_until)
+        SELECT ?, f.id, ?, t.starts_at, ${windowEndSql('t')} FROM (${forContestsSql}) f JOIN sessions t ON t.id = ?`,
+    account.id, options.operationId, account.id, options.contestId, options.contestId),
   ];
 }

@@ -179,7 +179,7 @@ export function AccountPage({
             <Camera className="size-3.5" />
           </span>
         </button>
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1 max-lg:min-w-40">
           <p className="truncate text-lg font-semibold">{title}</p>
           <p className="truncate font-mono text-sm text-muted-foreground">
             {login}
@@ -207,7 +207,7 @@ export function AccountPage({
             )}
           </div>
         </div>
-        <Button type="button" variant="outline" onClick={shell.signOut}>
+        <Button type="button" variant="outline" className="max-lg:h-11" onClick={shell.signOut}>
           <LogOut aria-hidden="true" />
           Sign out
         </Button>
@@ -227,7 +227,7 @@ export function AccountPage({
                     href={`#${id}`}
                     aria-current={hash === `#${id}` ? "location" : undefined}
                     className={cn(
-                      "flex items-center gap-2 rounded-md px-3 py-1.5 text-sm text-muted-foreground outline-none hover:bg-accent hover:text-accent-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50",
+                      "flex items-center gap-2 rounded-md px-3 py-1.5 text-sm text-muted-foreground outline-none max-lg:min-h-11 hover:bg-accent hover:text-accent-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50",
                       "aria-[current=location]:bg-accent aria-[current=location]:font-medium aria-[current=location]:text-accent-foreground",
                     )}
                   >

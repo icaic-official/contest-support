@@ -10,6 +10,7 @@ import {
   Scale,
   Send,
 } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -388,9 +389,26 @@ export function ResolveForm({ issue, command, onDone }: IssueFormProps) {
  * Requests a specialist handoff. The owner stays responsible until a
  * specialist accepts.
  */
-export function EscalateForm({ issue, command, onDone }: IssueFormProps) {
+export function EscalateForm({
+  issue,
+  command,
+  onDone,
+  noSpecialist = false,
+}: IssueFormProps & {
+  /** True when no one holds the specialist role in this contest. */
+  noSpecialist?: boolean;
+}) {
   return (
     <div className="space-y-3">
+      {noSpecialist && (
+        <Alert>
+          <AlertDescription>
+            No specialist is assigned to this contest. Nobody can accept this
+            handoff until an admin assigns one. You can still resolve the
+            issue yourself.
+          </AlertDescription>
+        </Alert>
+      )}
       <p className="text-sm text-muted-foreground">
         Optional. If you can fix this yourself, resolve it instead. A
         handoff sends a request to the specialists. You stay the owner until

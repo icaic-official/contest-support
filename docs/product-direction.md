@@ -6,7 +6,10 @@ The user selects later scope after feedback on the development installation.
 
 Interface decision (2026-10-17): organizers and contestants get different UIs. This is not one layout with parts hidden.
 Organizers mainly use phones, so they get a phone-first app. At 1024 px and wider, they get a separate desktop console.
-Contestants use computers and get a desktop app. There is no contestant phone layout.
+Contestants get one responsive app (2026-11-05). At 1024 px and wider it shows the report list beside the report. Below 1024 px it shows one screen at a time: the home, one report, or the report form.
+The home shows the contest clock, its end time and the **Report an issue** button first, without scrolling. It works at 390 px and 320 px with no sideways scroll and with 44 px touch targets.
+On a phone, a bottom tab bar with **Report**, **My reports** and **Account** reaches reporting in one tap from any screen (2026-11-06). The bar hides while a person types.
+The report form and the reply box keep their send buttons in view when the on-screen keyboard is open.
 The membership selects the UI after sign-in. A membership with a team gets the contestant app.
 All UIs share one design system, shadcn/ui with Tailwind CSS, and the same data hooks.
 [T0015](history/tickets.md#t0015--organiser-and-contestant-frontend-redesign) implements this decision. It replaces the sidebar workspace from the 2026-10-02 decision below.

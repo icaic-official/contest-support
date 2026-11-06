@@ -25,10 +25,36 @@ function stamp(instant: string, zone: string, now: number): string {
   return formatInZone(instant, zone, zonedParts(instant, zone).date === today ? "time" : "datetime");
 }
 
+const closedByHand = "Reporting is closed by the organizers.";
+
+/**
+ * Where the schedule puts this viewer now, and when that changes. A hand
+ * override hides both from `intake`, so the clock derives them again.
+ */
+function scheduledIntake(schedule: NonNullable<ContestClock["schedule"]>, endAt: string, now: number): ContestClock["intake"] {
+  const start = Date.parse(schedule.starts_at);
+  const end = Date.parse(endAt);
+  const closes = end + schedule.grace_minutes * 60_000;
+  const phase = (reason: ContestClock["intake"]["reason"], until: number | null) => ({
+    open: false,
+    reason,
+    changes_at: until === null ? null : new Date(until).toISOString(),
+  });
+  if (now < start) return phase("before_start", start);
+  if (now < end) return phase("running", end);
+  if (now < closes) return phase("grace", closes);
+  return phase("ended", null);
+}
+
 /** The clock as lines of text. `now` is server time in milliseconds. */
 export function clockText(clock: ContestClock, now: number): ClockText {
   const zone = clock.time_zone;
   const schedule = clock.schedule;
+  if (schedule && clock.intake.reason === "override_closed") {
+    // The contestant keeps the own clock and end time. The closure is the second line.
+    const text = clockText({ ...clock, intake: scheduledIntake(schedule, clock.personal_end_at ?? schedule.ends_at, now) }, now);
+    return { ...text, details: [closedByHand, ...text.details] };
+  }
   const { reason, changes_at: changesAt } = clock.intake;
   const left = changesAt ? formatCountdown(Date.parse(changesAt) - now) : undefined;
   if (!schedule) {
@@ -39,6 +65,8 @@ export function clockText(clock: ContestClock, now: number): ClockText {
   const details: string[] = [];
   const startNote = viewerNote(schedule.starts_at, zone, "time");
   switch (reason) {
+    case "awaiting_live_passwords":
+      return { headline: "Reporting opens when every team has its live password.", details };
     case "before_start":
       if (left) details.push(`Opens in ${left}.`);
       if (startNote) details.push(`${startNote}.`);
@@ -67,7 +95,7 @@ export function clockText(clock: ContestClock, now: number): ClockText {
     case "override_open":
       return { headline: "Reporting is open. The organizers are holding it open.", details: [] };
     case "override_closed":
-      return { headline: "Reporting is closed by the organizers.", details: [] };
+      return { headline: closedByHand, details: [] };
   }
 }
 
@@ -77,6 +105,7 @@ export function closedMessage(clock: ContestClock | null | undefined, now: numbe
   switch (clock.intake.reason) {
     case "before_start":
     case "ended":
+    case "awaiting_live_passwords":
       return clockText(clock, now).headline;
     default:
       return "Reporting is closed by the organizers.";

@@ -11,7 +11,7 @@ const instantSchema = z.string();
 const scheduleSchema = z.object({ startsAt: instantSchema, endsAt: instantSchema, graceMinutes: z.number().int() });
 const intakeSchema = z.object({
   open: z.boolean(),
-  reason: z.enum(['before_start', 'running', 'grace', 'ended', 'override_open', 'override_closed']),
+  reason: z.enum(['before_start', 'running', 'grace', 'ended', 'override_open', 'override_closed', 'awaiting_live_passwords']),
   changesAt: instantSchema.nullable(),
 });
 const contestsSchema = z.array(z.object({
@@ -41,7 +41,8 @@ const consoleSchema = z.object({
     id: z.uuid(), kind: z.enum(['team', 'single']), name: z.string(), accountId: z.uuid().nullable(), handle: z.string().nullable(),
   })),
   contests: z.array(z.object({
-    id: z.uuid(), name: z.string(), contestType: z.enum(['singles', 'mixed', 'teams']),
+    id: z.uuid(), name: z.string(), contestType: z.enum(['singles', 'mixed', 'teams']), kind: z.enum(['practice', 'live']),
+    waiting: z.array(z.object({ accountId: z.uuid(), name: z.string(), handle: z.string() })),
     schedule: scheduleSchema.nullable(), mode: z.enum(['schedule', 'open', 'closed']), intake: intakeSchema,
   })),
   staffAssignments: z.array(z.object({
@@ -315,8 +316,8 @@ export function createCloudflareBackend(options: {
       async execute(requestId, command) {
         return receiptSchema.parse(await readJson(await post('/api/manage', { requestId, command })));
       },
-      async issueCredentials(requestId, { eventId, accountIds }) {
-        return issuedSchema.parse(await readJson(await post('/api/credentials', { requestId, eventId, accountIds })));
+      async issueCredentials(requestId, { eventId, accountIds, contestId, voidLivePasswords }) {
+        return issuedSchema.parse(await readJson(await post('/api/credentials', { requestId, eventId, accountIds, contestId, voidLivePasswords })));
       },
     },
     contestAwards: {

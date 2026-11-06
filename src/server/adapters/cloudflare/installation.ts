@@ -2,7 +2,7 @@ import { z } from 'zod';
 import type { Handle, LoginKey } from '../../../backend/contracts';
 import type { D1Connection, D1Statement, D1Value } from '../d1/connection';
 import { handleSchema, loginKeyFor, replaceCredentialStatements } from './credentials';
-import { passwordHasher, randomSecret, type PasswordHasher } from './password';
+import { passwordHasher, readablePassword, type PasswordHasher } from './password';
 
 // The site file names the one webmaster. Credentials belong to the trusted
 // operator result, never to the site file.
@@ -84,7 +84,7 @@ export async function bootstrapSite(
   if (!(await db.prepare(`SELECT 1 AS empty WHERE ${empty}`).first())) {
     throw new Error('The database is not empty. Bootstrap did not start.');
   }
-  const password = randomSecret() + 'A9!';
+  const password = readablePassword();
   // Hash before the batch. A failed hash must leave the empty database intact.
   let hash: string;
   try {
@@ -141,7 +141,7 @@ export async function recoverWebmaster(
   const target = { ...found, loginKey: found.login_key };
   if (!target.webmaster) throw new Error('The account is not a webmaster. Recovery did not start.');
   if (target.disabled) throw new Error('The account is disabled. Recovery did not start.');
-  const password = randomSecret() + 'A9!';
+  const password = readablePassword();
   let hash: string;
   try {
     hash = await (options.passwords ?? passwordHasher).hash(password);
@@ -155,7 +155,7 @@ export async function recoverWebmaster(
       assertion(db, assertionId, `EXISTS (SELECT 1 FROM accounts a JOIN grants g ON g.account_id = a.id AND g.scope = 'site'
         WHERE a.id = ? AND a.disabled = 0 AND a.credential_generation = ?)`, target.id, target.credential_generation),
       // The webmaster acts on the own account, which the takeover trigger allows.
-      ...replaceCredentialStatements(db, target, hash, { operationId, actor: target.id, temporary: true }),
+      ...replaceCredentialStatements(db, target, hash, { operationId, actor: target.id, temporary: true, contestId: null }),
       statement(db, `INSERT INTO authority_audit (id, event_id, actor, actor_name, action, target, detail)
         VALUES (?, NULL, ?, ?, 'trusted_webmaster_recovery', ?, ?)`, crypto.randomUUID(), target.id, target.name, target.id,
       JSON.stringify({ operationId })),

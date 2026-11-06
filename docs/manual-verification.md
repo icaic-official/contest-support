@@ -28,7 +28,7 @@ Work only in a clearly identified development or test session.
 
 T0015 replaced the earlier workspace with three UIs. The membership and the window width select the UI:
 
-- A contestant account gets the contestant desktop app. Use a window at least 1024 px wide, such as 1280 × 800.
+- A contestant account gets the contestant app. Use 1280 × 800 for the laptop layout, and 390 × 844 and 320 × 740 for the phone layout.
 - A staff account below 1024 px gets the organizer phone app. Use 390 × 844, and 320 × 740 for the narrow check.
 - A staff account at 1024 px and wider gets the organizer desktop console. Use 1280 × 800.
 
@@ -235,7 +235,7 @@ Sign in as the same accounts.
 11. In a long queue, scroll to a row far down. Make its claim fail, for example when another volunteer claims the issue first. Check that the error stays pinned to the top of the page. Do the same with a lost connection. Check that **Retry last request** stays in view.
 12. Select **Report for a team**. Type a description and add a second team. Press Escape. Open the dialog again. Check that the description, the category and the teams are still there. Send the report. Check that the next report form is empty.
 
-### Contestant desktop app (1280 × 800)
+### Contestant app (1280 × 800)
 
 Sign in as a contestant.
 
@@ -244,6 +244,23 @@ Sign in as a contestant.
 3. Select **Report an issue**. Check the category tiles, the description limit of 2,000 characters and the team location.
 4. Send a reply with Enter. Add a line with Shift+Enter.
 5. Close contestant intake as admin. Check that **Report an issue** is disabled with a reason.
+
+### Contestant app on a phone (390 × 844 and 320 × 740)
+
+Sign in as a contestant on a phone, or in a window that is narrower than 1024 px.
+
+1. Check the sign-in page. It has no sideways scroll, and every button is at least 44 px high.
+2. Check the home. The contest clock with its end time and **Report an issue** show without scrolling. The report list is below.
+3. Select **Report an issue**. Open the keyboard in the description field. Check that the field, **Cancel** and **Send report** stay in view. Send the report.
+4. Check that the report fills the screen, the timer shows at the top, and the **My reports** tab goes back to the home.
+5. Open the keyboard in the reply box. Check that the box and **Send** stay in view. Send a reply. Check that staff replies and team-visible images show without a refresh, and that internal notes never show.
+6. After a resolution, reopen the report with the keyboard open. Check that the reason field shows above the keyboard.
+7. Open an awarded report, the contest picker (with two sessions), the account menu, **My account** and the calendar. Check that nothing scrolls sideways and every control is at least 44 px.
+8. Turn the phone to landscape and back. Check that the open report and the drafts stay.
+9. Check the bottom tabs on every top-level screen (home, an open report, the report form, the account page). There are three: **Report**, **My reports** and **Account**. Each is at least 44 px high, and the current one is marked. Check that no content hides behind them.
+10. Open **Account**, then tap **Report** once. Check that the report form opens. Press the browser Back button and check that the account page returns.
+11. Open the keyboard in a text field. Check that the tabs hide and **Send report** stays in view. Close the keyboard and check that the tabs return.
+12. Close contestant intake as admin. Tap **Report**. Check that it shows why reporting is closed and the contest clock, with no form.
 
 ### Account page (1280 × 800 and 1024 × 768)
 

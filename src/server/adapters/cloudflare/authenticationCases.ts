@@ -595,7 +595,7 @@ export function registerAuthenticationCases(group: AuthenticationCases) {
         const racingIdentity: IdentityProvider = { ...identity, signIn: async (name, value) => {
           const signed = await identity.signIn(name, value);
           await new D1ManageService(db, hasher).issueCredentials((await service.current(adminHeaders))!.caller, crypto.randomUUID(),
-            { eventId: fixture.eventId, accountIds: [fixture.contestant.accountId] });
+            { eventId: fixture.eventId, accountIds: [fixture.contestant.accountId], contestId: fixture.sessionId });
           return signed;
         } };
         await expectFailure(signIn(username, password, new D1AuthenticationService(db, racingIdentity, hasher))).toMatchObject({ status: 409 });

@@ -464,7 +464,7 @@ function IssueSheetBody({
         >
           <CommandFeedback command={command} className="mb-3" />
           {dialog === "resolve" && <ResolveForm {...formProps} />}
-          {dialog === "escalate" && <EscalateForm {...formProps} />}
+          {dialog === "escalate" && <EscalateForm {...formProps} noSpecialist={shell.data.snapshot?.has_specialist === false} />}
           {dialog === "reopen" && <ReopenForm {...formProps} />}
         </ActionDialog>
       )}

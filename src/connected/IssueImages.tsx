@@ -102,7 +102,7 @@ export function IssueImages({
       {removals.map((item) => (
         <div className="image-removal-retry" key={item.id}>
           <p>The files for {item.original_name} still need to be deleted.</p>
-          <button type="button" className="quiet" disabled={busy} onClick={() => {
+          <button type="button" className="quiet max-lg:min-h-11" disabled={busy} onClick={() => {
             void remove(item);
           }}>
             Retry removal
@@ -152,13 +152,13 @@ export function IssueImages({
                 <a
                   href={fullUrl}
                   download={active.original_name}
-                  className="inline-flex h-9 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+                  className="inline-flex h-9 items-center rounded-md bg-primary px-4 max-lg:h-11 text-sm font-medium text-primary-foreground hover:bg-primary/90"
                 >
                   Download image
                 </a>
               )}
               {active.uploader === userId && !archived && (
-                <button type="button" className="quiet" disabled={busy} onClick={() => {
+                <button type="button" className="quiet max-lg:min-h-11" disabled={busy} onClick={() => {
                   void remove(active);
                 }}>
                   Remove image
@@ -166,7 +166,7 @@ export function IssueImages({
               )}
               <button
                 type="button"
-                className="quiet inline-flex h-9 items-center rounded-md border px-4 text-sm font-medium hover:bg-accent"
+                className="quiet inline-flex h-9 items-center rounded-md border px-4 text-sm font-medium hover:bg-accent max-lg:h-11 max-lg:min-w-11"
                 onClick={dismissPreview}
               >
                 Close

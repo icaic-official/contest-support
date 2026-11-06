@@ -13,7 +13,6 @@ import {
 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { SlidingIndicator } from "@/components/ui/sliding-indicator";
 import type { CommandRunner } from "@/connected/hooks/useCommand";
 import type { SessionData } from "@/connected/hooks/useSessionSnapshot";
 import {
@@ -33,7 +32,7 @@ import {
 } from "../components/issueDisplay";
 import type { OrganiserTab } from "../organiserModel";
 
-const tabMeta: Record<OrganiserTab, { label: string; icon: LucideIcon }> = {
+export const tabMeta: Record<OrganiserTab, { label: string; icon: LucideIcon }> = {
   queue: { label: "Queue", icon: Inbox },
   mine: { label: "Mine", icon: UserRoundCheck },
   awards: { label: "Awards", icon: Scale },
@@ -44,54 +43,6 @@ const tabMeta: Record<OrganiserTab, { label: string; icon: LucideIcon }> = {
 
 export function tabLabel(tab: OrganiserTab): string {
   return tabMeta[tab].label;
-}
-
-/** The bottom tab bar. Each tab is a button of at least 44 by 44 pixels. */
-export function TabBar({
-  tabs,
-  current,
-  onSelect,
-}: {
-  tabs: readonly OrganiserTab[];
-  current: OrganiserTab;
-  onSelect: (tab: OrganiserTab) => void;
-}) {
-  return (
-    <nav
-      aria-label="Organizer sections"
-      className="shrink-0 border-t bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur"
-    >
-      <ul
-        className="relative isolate grid"
-        style={{ gridTemplateColumns: `repeat(${tabs.length}, minmax(0, 1fr))` }}
-      >
-        <SlidingIndicator className="top-0 left-0 h-[3px] w-[calc(var(--indicator-w)-2rem)] translate-x-[calc(var(--indicator-x)+1rem)] rounded-b-full bg-foreground" />
-        {tabs.map((tab) => {
-          const { label, icon: Icon } = tabMeta[tab];
-          const active = tab === current;
-          return (
-            <li key={tab}>
-              <button
-                type="button"
-                aria-current={active ? "page" : undefined}
-                onClick={() => onSelect(tab)}
-                className={cn(
-                  "flex h-14 w-full flex-col items-center justify-center gap-0.5 text-[11px] font-medium transition-colors duration-(--motion-fast) ease-out active:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none",
-                  active ? "text-foreground" : "text-muted-foreground",
-                )}
-              >
-                <Icon
-                  aria-hidden="true"
-                  className={cn("size-5", active && "stroke-[2.4]")}
-                />
-                {label}
-              </button>
-            </li>
-          );
-        })}
-      </ul>
-    </nav>
-  );
 }
 
 /**

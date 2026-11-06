@@ -21,7 +21,7 @@ An admin must add your account to a session. Use `npm run cloudflare:recover-adm
 ## Find application code
 
 `src/connected/` owns authentication checks, browser routes, session data, and workflow retry protection.
-`src/contestant/` contains the contestant desktop app.
+`src/contestant/` contains the contestant app. It has one layout for phones and laptops.
 `src/organiser/` contains the organizer phone app, desktop console, and shared forms.
 `src/screens/` contains the landing page and the sign-in, password change, and session-access screens.
 Features use the selected backend contracts. Provider SDKs stay inside provider implementations.

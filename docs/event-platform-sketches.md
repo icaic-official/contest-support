@@ -746,7 +746,7 @@ const windowEndSql = (s: string) =>
 /**
  * `forContests` for one account and one target contest: the live contests of the account's
  * entries whose window overlaps the target's window. A window runs from the scheduled start to
- * the scheduled end plus grace. Every live contest has a schedule (0021 CHECK on kind). This is
+ * the scheduled end plus grace. Every live contest has a schedule (0022 CHECK on kind). This is
  * the only definition. An issue on day 1 for Live 1 never opens Live 3 on day 3, so each live
  * contest that does not overlap gets its own fresh password. The plan reads the target by
  * primary key, the event's contests that start before the target window ends
@@ -873,7 +873,7 @@ export const DELETE_CHUNK = 100;
 /**
  * Statements for the delete_event plan. One batch, after the site authority guard. From this
  * batch on, the resolvers and sign-in refuse the event (`NOT EXISTS event_deletions`), and the
- * 0023 guards let the rows step delete its rows.
+ * 0024 guards let the rows step delete its rows.
  */
 export function fenceStatements(db: D1Connection, actor: { id: AccountId; name: string },
   eventId: EventId, confirmName: string, assertionId: string): D1Statement[] {
@@ -1083,7 +1083,7 @@ export function recoverWebmaster(db: D1Connection, input: { handle: string }):
 
 ## Migration sketch
 
-This SQL file is a sketch of D1 migrations `0017` to `0023`, with a marker line before each file, and no migration in the repository holds it yet.
+This SQL file is a sketch of D1 migrations `0017` to `0024`, with a marker line before each file, and no migration in the repository holds it yet.
 
 ```sql
 -- D1 migration sketch for the webmaster, event, and contest platform. Not implemented.
@@ -1581,7 +1581,7 @@ END;
 
 -- ==== 0020_contest_schedule.sql (Phase 5) additive: yes ====
 -- Scheduled start and end, grace, automatic intake with a manual override, contest-wide awards.
--- This file comes before the live password rule (0021), because that rule's default scope is
+-- This file comes before the live password rule (0022), because that rule's default scope is
 -- "the live contests whose window overlaps", and a window needs a schedule.
 -- Previous Worker: reads intake_open only. A contest that follows its schedule acts as manual
 -- with its last intake_open value (closed by default) until roll-forward. Staff can still use
@@ -1655,7 +1655,7 @@ BEGIN
 END;
 
 
--- ==== 0021_live_credentials.sql (Phase 6) additive: yes ====
+-- ==== 0022_live_credentials.sql (Phase 6) additive: yes ====
 -- The 2026-10-25 live password rule: a live contest's intake stays closed until every
 -- contestant sign-in in it holds a completed password issued for it.
 -- Previous Worker: its resets insert account_operations rows, which clear the scopes below,
@@ -1740,10 +1740,10 @@ BEGIN
 END;
 
 
--- ==== 0022_event_deletion.sql (Phase 7) additive: yes ====
+-- ==== 0023_event_deletion.sql (Phase 7) additive: yes ====
 -- A deletion journal that survives the cascade, plus indexes that keep the cascade and the
 -- account deletes from scanning other events' rows. The guards that make the journal the only
--- way to delete come in 0023, one release later, so that the previous release's test cleanup
+-- way to delete come in 0024, one release later, so that the previous release's test cleanup
 -- (src/server/adapters/d1/testFixture.ts:205-207 deletes rows directly) still passes scripts/rollback-check.mjs here.
 -- Previous Worker: archived = 1 already makes it refuse every write (src/server/adapters/cloudflare/application.ts:222,
 -- src/server/adapters/d1/store.ts:143). It does not read the journal.
@@ -1769,7 +1769,7 @@ CREATE TABLE event_deletions (
 ) STRICT;
 CREATE INDEX event_deletions_open ON event_deletions(lease_until) WHERE finished_at IS NULL;
 -- The journal only moves forward, and it keeps naming the same event. So the step 'rows', which
--- the 0023 guards read, opens once per event and closes for good.
+-- the 0024 guards read, opens once per event and closes for good.
 CREATE TRIGGER event_deletion_step_order BEFORE UPDATE OF step ON event_deletions
 WHEN NEW.step IS NOT OLD.step AND NOT ((OLD.step = 'rows' AND NEW.step = 'live')
   OR (OLD.step = 'live' AND NEW.step = 'files') OR (OLD.step = 'files' AND NEW.step = 'done'))
@@ -1819,7 +1819,7 @@ CREATE INDEX account_operations_actor ON account_operations(actor);
 CREATE INDEX account_operations_session ON account_operations(session_id) WHERE session_id IS NOT NULL;
 
 
--- ==== 0023_deletion_guards.sql (Phase 8) additive: yes ====
+-- ==== 0024_deletion_guards.sql (Phase 8) additive: yes ====
 -- Only a deletion journal in step 'rows' lets a row of an event, a contest, or an event account
 -- disappear. The guards read this design's journal. An ad hoc DELETE,
 -- from any Worker version, a test, or a console, is refused. A site account (event_id NULL)

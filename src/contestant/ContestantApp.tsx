@@ -31,6 +31,9 @@ import { ReportList } from "./ReportList";
 
 type ContestantTab = "report" | "reports" | "account";
 
+/** Marks the history entry of a phone screen above the home. */
+const screenMark = "contestantScreen";
+
 const contestantTabs = [
   { id: "report", label: "Report", icon: SquarePen },
   { id: "reports", label: "My reports", icon: ListChecks },
@@ -57,7 +60,7 @@ export function ContestantApp(props: ShellProps) {
   const workflow = useWorkflowState(data);
   const { command, selectedIssueId, selectIssue } = workflow;
   const now = useNow(data.clockOffset);
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
   const navigate = useNavigate();
   const typing = useTyping();
   const accountPage = pathname.replace(/\/+$/u, "") === "/account";
@@ -93,6 +96,29 @@ export function ContestantApp(props: ShellProps) {
     ? "contestant-account-heading"
     : contestantHeadingId;
   useRouteFocus(headingId, Boolean(membership));
+
+  // Phone: a screen above the home takes one history entry, so Back returns
+  // to the home and a typed report survives. Leaving by a tap drops the entry.
+  const away = !desktop && (reporting || issueOpen);
+  useEffect(() => {
+    if (!away) return;
+    // React Router keeps the navigation state of an entry under `usr`.
+    const marked = () =>
+      Boolean((window.history.state as { usr?: Record<string, unknown> } | null)?.usr?.[screenMark]);
+    if (!marked()) void navigate({ pathname, search }, { state: { [screenMark]: true } });
+    const onPop = () => {
+      if (marked()) return;
+      setReporting(false);
+      setIssueOpen(false);
+    };
+    window.addEventListener("popstate", onPop);
+    return () => {
+      window.removeEventListener("popstate", onPop);
+      if (marked()) void navigate(-1);
+    };
+    // Only a change of `away` may run this effect again.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [away]);
   if (!state || !membership || !state.session || !membership.team_id) {
     return (
       <NoSessionAccess
@@ -145,7 +171,8 @@ export function ContestantApp(props: ShellProps) {
       void navigate("/account");
       return;
     }
-    if (accountPage) void navigate("/issues");
+    // From the account page, this entry is the one the report screen needs.
+    if (accountPage) void navigate("/issues", { state: { [screenMark]: tab === "report" } });
     setIssueOpen(false);
     setReporting(tab === "report");
     requestFocus();

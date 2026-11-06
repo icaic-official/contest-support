@@ -384,3 +384,52 @@ for (const width of widths) {
     testInfo.annotations.push({ type: "width", description: String(width) });
   });
 }
+
+test("Back from the report form, an open report and the closed screen returns to the home", async ({ browser, local }) => {
+  test.setTimeout(90_000);
+  const at = (minutes: number) => `strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '${minutes >= 0 ? "+" : ""}${minutes} minutes')`;
+  await local.run(
+    `UPDATE sessions SET starts_at = ${at(-30)}, ends_at = ${at(95)}, grace_minutes = 0, intake_follows_schedule = 1 WHERE id = ?`,
+    local.sessions[0],
+  );
+  const page = await signInPage(browser, local, "contestant", 390, 844);
+  const reportButton = page.getByRole("button", { name: "Report an issue" });
+  const reports = page.getByRole("navigation", { name: "Reports" });
+  const origin = new URL(page.url()).origin;
+
+  // The form keeps a typed report while Back goes home.
+  await reportButton.click();
+  await page.getByText("Devices", { exact: true }).click();
+  await page.getByLabel("What is happening?").fill("Mouse is dead");
+  await page.goBack();
+  expect(new URL(page.url()).origin, "Back stays in the app").toBe(origin);
+  await expect(reports).toBeVisible();
+  await reportButton.click();
+  await expect(page.getByLabel("What is happening?")).toHaveValue("Mouse is dead");
+
+  // A sent report opens as its own screen, and Back returns to the list.
+  await page.getByRole("button", { name: "Send report" }).click();
+  await expect(page.getByRole("region", { name: "Your report" })).toContainText("Mouse is dead");
+  await page.goBack();
+  expect(new URL(page.url()).origin, "Back stays in the app").toBe(origin);
+  await expect(reports).toBeVisible();
+  await expect(page.getByRole("region", { name: "Report details" })).toHaveCount(0);
+
+  // A report opened from the list returns the same way.
+  await reports.getByRole("button").first().click();
+  await expect(page.getByRole("region", { name: "Your report" })).toBeVisible();
+  await page.goBack();
+  await expect(reports).toBeVisible();
+
+  // The closed screen returns to the home.
+  await local.run(
+    `UPDATE sessions SET starts_at = ${at(30)}, ends_at = ${at(120)}, intake_follows_schedule = 1 WHERE id = ?`,
+    local.sessions[0],
+  );
+  await page.reload();
+  await page.getByRole("navigation", { name: "Contestant sections" }).getByRole("button", { name: "Report", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Reporting is closed" })).toBeVisible();
+  await page.goBack();
+  expect(new URL(page.url()).origin, "Back stays in the app").toBe(origin);
+  await expect(reports).toBeVisible();
+});

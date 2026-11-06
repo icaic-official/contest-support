@@ -252,11 +252,15 @@ Sign in as a contestant on a phone, or in a window that is narrower than 1024 px
 1. Check the sign-in page. It has no sideways scroll, and every button is at least 44 px high.
 2. Check the home. The contest clock with its end time and **Report an issue** show without scrolling. The report list is below.
 3. Select **Report an issue**. Open the keyboard in the description field. Check that the field, **Cancel** and **Send report** stay in view. Send the report.
-4. Check that the report fills the screen, the timer shows at the top, and **Your reports** goes back to the home.
+4. Check that the report fills the screen, the timer shows at the top, and the **My reports** tab goes back to the home.
 5. Open the keyboard in the reply box. Check that the box and **Send** stay in view. Send a reply. Check that staff replies and team-visible images show without a refresh, and that internal notes never show.
 6. After a resolution, reopen the report with the keyboard open. Check that the reason field shows above the keyboard.
 7. Open an awarded report, the contest picker (with two sessions), the account menu, **My account** and the calendar. Check that nothing scrolls sideways and every control is at least 44 px.
 8. Turn the phone to landscape and back. Check that the open report and the drafts stay.
+9. Check the bottom tabs on every top-level screen (home, an open report, the report form, the account page). There are three: **Report**, **My reports** and **Account**. Each is at least 44 px high, and the current one is marked. Check that no content hides behind them.
+10. Open **Account**, then tap **Report** once. Check that the report form opens. Press the browser Back button and check that the account page returns.
+11. Open the keyboard in a text field. Check that the tabs hide and **Send report** stays in view. Close the keyboard and check that the tabs return.
+12. Close contestant intake as admin. Tap **Report**. Check that it shows why reporting is closed and the contest clock, with no form.
 
 ### Account page (1280 × 800 and 1024 × 768)
 

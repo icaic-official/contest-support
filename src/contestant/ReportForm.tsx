@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import { ContestClock } from "@/connected/ContestClock";
+import type { ContestClock as ClockData } from "@/connected/model";
 import { contestantHeadingId } from "./contestantView";
 
 /** The report form fields. The shell keeps them while the person navigates. */
@@ -14,6 +16,33 @@ export interface ReportDraft {
 }
 
 const maxDescription = 2000;
+
+/** The phone Report tab while reporting is closed: the reason and the clock, no form. */
+export function ReportClosed({
+  clock,
+  now,
+  message,
+}: {
+  clock: ClockData | null | undefined;
+  now: number;
+  message: string;
+}) {
+  return (
+    <div className="mx-auto max-w-3xl p-4">
+      <h1
+        id={contestantHeadingId}
+        tabIndex={-1}
+        className="text-xl font-semibold tracking-tight outline-none"
+      >
+        Reporting is closed
+      </h1>
+      <p role="alert" className="mt-2 mb-4 text-muted-foreground">
+        {message} Raise your hand if you need help now.
+      </p>
+      <ContestClock clock={clock} now={now} />
+    </div>
+  );
+}
 
 /** The "Report an issue" page with category tiles and a description. */
 export function ReportForm({

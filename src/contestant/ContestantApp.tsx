@@ -1,8 +1,9 @@
-import { ChevronLeft, CircleAlert, Plus, RotateCw } from "lucide-react";
+import { CircleAlert, CircleUserRound, ListChecks, Plus, RotateCw, SquarePen } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useLocation } from "react-router";
+import { useLocation, useNavigate } from "react-router";
 import { AccountPage, useOpenPasswordChange } from "@/connected/AccountPage";
 import { useRouteFocus } from "@/connected/navigation";
+import { TabBar } from "@/components/tab-bar";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { ContestClock } from "@/connected/ContestClock";
@@ -24,14 +25,25 @@ import {
   teamIssues,
 } from "./contestantView";
 import { IssuePage } from "./IssuePage";
-import { ReportForm, type ReportDraft } from "./ReportForm";
+import { useTyping } from "./useTyping";
+import { ReportClosed, ReportForm, type ReportDraft } from "./ReportForm";
 import { ReportList } from "./ReportList";
+
+type ContestantTab = "report" | "reports" | "account";
+
+const contestantTabs = [
+  { id: "report", label: "Report", icon: SquarePen },
+  { id: "reports", label: "My reports", icon: ListChecks },
+  { id: "account", label: "Account", icon: CircleUserRound },
+] as const;
 
 /**
  * The contestant UI for team accounts. One app serves laptops and phones.
  * At 1024 px and wider it shows the report list beside the report. Below
  * that width it shows one screen at a time: the home (clock, report button
- * and report list), one report, or the report form. Both layouts share the
+ * and report list), one report, or the report form.
+ * A bottom tab bar (Report, My reports, Account) reaches each from any
+ * screen. Both layouts share the
  * same components and state (mockup for the laptop layout:
  * design/redesign/f-contestant-desktop.html).
  *
@@ -46,6 +58,8 @@ export function ContestantApp(props: ShellProps) {
   const { command, selectedIssueId, selectIssue } = workflow;
   const now = useNow(data.clockOffset);
   const { pathname } = useLocation();
+  const navigate = useNavigate();
+  const typing = useTyping();
   const accountPage = pathname.replace(/\/+$/u, "") === "/account";
   const desktop = useMediaQuery(desktopQuery);
   const [reporting, setReporting] = useState(false);
@@ -124,10 +138,23 @@ export function ContestantApp(props: ShellProps) {
       requestFocus();
     }
   }
-  function closeIssue() {
+
+  /** The phone tab bar: Report, My reports and Account. */
+  function selectTab(tab: ContestantTab) {
+    if (tab === "account") {
+      void navigate("/account");
+      return;
+    }
+    if (accountPage) void navigate("/issues");
     setIssueOpen(false);
+    setReporting(tab === "report");
     requestFocus();
   }
+  const currentTab: ContestantTab = accountPage
+    ? "account"
+    : reporting
+      ? "report"
+      : "reports";
 
   const alerts = (
     // Sticky, so an error and its retry stay in view while scrolled.
@@ -179,7 +206,9 @@ export function ContestantApp(props: ShellProps) {
       headingId={desktop ? undefined : contestantHeadingId}
     />
   );
-  const detail = reporting ? (
+  const detail = reporting && blocker && !desktop ? (
+    <ReportClosed clock={state.clock} now={now} message={blocker} />
+  ) : reporting ? (
     <ReportForm
       categories={state.session.categories}
       teamName={team?.name}
@@ -340,18 +369,6 @@ export function ContestantApp(props: ShellProps) {
             className="relative flex min-h-0 flex-1 flex-col outline-none"
             aria-busy={command.busy}
           >
-            {view === "issue" && (
-              <div className="shrink-0 border-b px-2">
-                <Button
-                  variant="ghost"
-                  className="-ml-1 h-11"
-                  onClick={closeIssue}
-                >
-                  <ChevronLeft aria-hidden="true" />
-                  Your reports
-                </Button>
-              </div>
-            )}
             <div className="min-h-0 flex-1 overflow-y-auto">
               {alerts}
               {status}
@@ -360,6 +377,14 @@ export function ContestantApp(props: ShellProps) {
           </div>
         )}
       </div>
+      {!desktop && !typing && (
+        <TabBar
+          label="Contestant sections"
+          items={contestantTabs}
+          current={currentTab}
+          onSelect={selectTab}
+        />
+      )}
     </div>
   );
 }

@@ -266,7 +266,7 @@ for (const width of widths) {
     expect(issue.status).toBe("claimed");
 
     // The list and an awarded report.
-    await page.getByRole("button", { name: "Your reports" }).click();
+    await tab(page, "My reports").click();
     await expect(page.getByRole("heading", { name: "Your reports" })).toBeFocused();
     const list = page.getByRole("navigation", { name: "Reports" });
     await expect(list.getByRole("button", { name: /Keyboard stopped/ })).toBeVisible();
@@ -275,7 +275,7 @@ for (const width of widths) {
     await expect(page.getByRole("region", { name: /award|Award/ }).first()).toBeVisible();
     await expect(page.getByRole("heading", { name: "5 minutes" })).toBeVisible();
     await check(page, "award", "13-award", dir);
-    await page.getByRole("button", { name: "Your reports" }).click();
+    await tab(page, "My reports").click();
 
     // The contest picker.
     await local.seatContestantInSecondSession();
@@ -302,6 +302,85 @@ for (const width of widths) {
 
     await admin.context().close();
     await volunteer.context().close();
+    testInfo.annotations.push({ type: "width", description: String(width) });
+  });
+}
+
+const tabs = (page: Page) => page.getByRole("navigation", { name: "Contestant sections" });
+const tab = (page: Page, name: string) => tabs(page).getByRole("button", { name, exact: true });
+
+for (const width of widths) {
+  test(`the bottom tabs reach reporting in one tap on a ${width} px phone`, async ({ browser, local }, testInfo) => {
+    test.setTimeout(90_000);
+    const dir = shots ? `${shots}/${width}` : undefined;
+    const at = (minutes: number) => `strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '${minutes >= 0 ? "+" : ""}${minutes} minutes')`;
+    await local.run(
+      `UPDATE sessions SET starts_at = ${at(-30)}, ends_at = ${at(95)}, grace_minutes = 0, intake_follows_schedule = 1 WHERE id = ?`,
+      local.sessions[0],
+    );
+    const page = await signInPage(browser, local, "contestant", width, heightFor(width));
+
+    // Three tabs, My reports current on the home, and the content is not behind the bar.
+    await expect(tab(page, "My reports")).toHaveAttribute("aria-current", "page");
+    await expect(tabs(page).getByRole("button")).toHaveCount(3);
+    await expect(tab(page, "Report")).not.toHaveAttribute("aria-current");
+    await check(page, "home with tabs", "20-tabs-home", dir);
+    const bar = await tabs(page).boundingBox();
+    const clock = await page.getByRole("region", { name: "Contest clock" }).boundingBox();
+    expect(clock!.y + clock!.height, "clock above the bar").toBeLessThanOrEqual(bar!.y);
+
+    // From Account, one tap opens the report form.
+    await tab(page, "Account").click();
+    await expect(page.getByRole("heading", { name: "My account", exact: true })).toBeVisible();
+    await expect(tab(page, "Account")).toHaveAttribute("aria-current", "page");
+    await check(page, "account with tabs", "21-tabs-account", dir);
+    await tab(page, "Report").click();
+    await expect(page.getByRole("heading", { name: "Report an issue" })).toBeFocused();
+    await expect(page.getByLabel("What is happening?")).toBeVisible();
+    await expect(tab(page, "Report")).toHaveAttribute("aria-current", "page");
+    await check(page, "report with tabs", "22-tabs-report", dir);
+
+    // The bar steps aside while a field has focus, so Send stays free, and returns after.
+    const description = page.getByLabel("What is happening?");
+    await withKeyboard(page, width, async () => {
+      await description.focus();
+      await expect(tabs(page)).toBeHidden();
+      await expectInView(page.getByRole("button", { name: "Send report" }), "send above keyboard");
+    });
+    await page.getByRole("heading", { name: "Report an issue" }).focus();
+    await expect(tabs(page)).toBeVisible();
+
+    // Back returns to the account page. Enter on a focused tab works.
+    await page.goBack();
+    await expect(page.getByRole("heading", { name: "My account", exact: true })).toBeVisible();
+    await tab(page, "My reports").focus();
+    await page.keyboard.press("Enter");
+    await expect(page.getByRole("complementary", { name: "Your reports" })).toBeVisible();
+    await expect(tab(page, "My reports")).toHaveAttribute("aria-current", "page");
+
+    // A sent report opens as its own screen. My reports returns to the list.
+    await tab(page, "Report").click();
+    await page.getByText("Devices", { exact: true }).click();
+    await description.fill("Mouse is dead");
+    await page.getByRole("button", { name: "Send report" }).click();
+    await expect(page.getByRole("region", { name: "Your report" })).toContainText("Mouse is dead");
+    await expect(tab(page, "My reports")).toHaveAttribute("aria-current", "page");
+    await tab(page, "My reports").click();
+    await expect(page.getByRole("navigation", { name: "Reports" })).toBeVisible();
+    await expect(page.getByRole("region", { name: "Report details" })).toHaveCount(0);
+
+    // Closed intake: Report shows the closed message and clock, with no form.
+    await local.run(
+      `UPDATE sessions SET starts_at = ${at(30)}, ends_at = ${at(120)}, intake_follows_schedule = 1 WHERE id = ?`,
+      local.sessions[0],
+    );
+    await page.reload();
+    await expect(tab(page, "Report")).toBeVisible();
+    await tab(page, "Report").click();
+    await expect(page.getByRole("heading", { name: "Reporting is closed" })).toBeFocused();
+    await expect(page.getByRole("region", { name: "Contest clock" })).toBeVisible();
+    await expect(page.getByLabel("What is happening?")).toHaveCount(0);
+    await check(page, "report closed", "23-tabs-closed", dir);
     testInfo.annotations.push({ type: "width", description: String(width) });
   });
 }

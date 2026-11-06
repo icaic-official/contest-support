@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import { ContestClock } from "@/connected/ContestClock";
+import type { ContestClock as ClockData } from "@/connected/model";
 import { contestantHeadingId } from "./contestantView";
 
 /** The report form fields. The shell keeps them while the person navigates. */
@@ -14,6 +16,33 @@ export interface ReportDraft {
 }
 
 const maxDescription = 2000;
+
+/** The phone Report tab while reporting is closed: the reason and the clock, no form. */
+export function ReportClosed({
+  clock,
+  now,
+  message,
+}: {
+  clock: ClockData | null | undefined;
+  now: number;
+  message: string;
+}) {
+  return (
+    <div className="mx-auto max-w-3xl p-4">
+      <h1
+        id={contestantHeadingId}
+        tabIndex={-1}
+        className="text-xl font-semibold tracking-tight outline-none"
+      >
+        Reporting is closed
+      </h1>
+      <p role="alert" className="mt-2 mb-4 text-muted-foreground">
+        {message} Raise your hand if you need help now.
+      </p>
+      <ContestClock clock={clock} now={now} />
+    </div>
+  );
+}
 
 /** The "Report an issue" page with category tiles and a description. */
 export function ReportForm({
@@ -47,11 +76,11 @@ export function ReportForm({
     : (categories[0] ?? "");
   const place = [teamName, location].filter(Boolean).join(" · ");
   return (
-    <div className="mx-auto max-w-3xl p-8">
+    <div className="mx-auto max-w-3xl p-4 lg:p-8">
       <h1
         id={contestantHeadingId}
         tabIndex={-1}
-        className="text-2xl font-semibold tracking-tight outline-none"
+        className="text-xl font-semibold tracking-tight outline-none lg:text-2xl"
       >
         Report an issue
       </h1>
@@ -94,12 +123,12 @@ export function ReportForm({
           <legend className="text-sm font-medium">
             What kind of problem?
           </legend>
-          <div className="mt-2 grid grid-cols-3 gap-3">
+          <div className="mt-2 grid grid-cols-2 gap-3 lg:grid-cols-3">
             {categories.map((name) => (
               <label
                 key={name}
                 className={cn(
-                  "cursor-pointer rounded-xl border p-4 transition-colors hover:bg-accent/50",
+                  "min-h-11 min-w-0 cursor-pointer rounded-xl border p-3 transition-colors hover:bg-accent/50 lg:p-4",
                   "has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring",
                   "has-[:checked]:border-primary has-[:checked]:ring-1 has-[:checked]:ring-primary",
                   "has-[:disabled]:cursor-not-allowed",
@@ -114,7 +143,7 @@ export function ReportForm({
                   onChange={() => onDraft({ ...draft, category: name })}
                 />
                 <Tag className="size-5 text-muted-foreground" aria-hidden="true" />
-                <span className="mt-2 block font-medium">{name}</span>
+                <span className="mt-2 block font-medium break-words">{name}</span>
               </label>
             ))}
           </div>
@@ -135,7 +164,7 @@ export function ReportForm({
             />
             <p
               id={`${id}-description-help`}
-              className="flex justify-between gap-4 text-xs text-muted-foreground"
+              className="flex flex-wrap justify-between gap-x-4 text-xs text-muted-foreground"
             >
               <span>
                 Staff can see your report and reply here. Do not include
@@ -147,12 +176,18 @@ export function ReportForm({
             </p>
           </div>
         </fieldset>
-        <div className="mt-4 flex justify-end gap-2">
-          <Button type="button" variant="outline" onClick={onCancel}>
+        <div className="sticky bottom-0 -mx-4 mt-4 grid grid-cols-2 gap-2 border-t bg-background px-4 py-3 lg:static lg:mx-0 lg:flex lg:justify-end lg:border-0 lg:px-0 lg:py-0">
+          <Button
+            type="button"
+            variant="outline"
+            className="h-11 lg:h-9"
+            onClick={onCancel}
+          >
             Cancel
           </Button>
           <Button
             type="submit"
+            className="h-11 lg:h-9"
             disabled={Boolean(blocker) || locked || !draft.description.trim()}
             loading={sending}
           >

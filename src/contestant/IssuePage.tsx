@@ -64,7 +64,7 @@ const stepIcons: Record<TrackerStep["id"], typeof Send> = {
 /** The four-step progress tracker. */
 function Tracker({ steps }: { steps: readonly TrackerStep[] }) {
   return (
-    <ol className="grid grid-cols-4 gap-3" aria-label="Progress">
+    <ol className="grid grid-cols-2 gap-3 lg:grid-cols-4" aria-label="Progress">
       {steps.map((step, index) => {
         const Icon = step.done ? Check : stepIcons[step.id];
         return (
@@ -85,7 +85,7 @@ function Tracker({ steps }: { steps: readonly TrackerStep[] }) {
               {index < steps.length - 1 && (
                 <span
                   className={cn(
-                    "h-0.5 flex-1 rounded transition-colors duration-(--motion-base) ease-out",
+                    "h-0.5 flex-1 rounded transition-colors duration-(--motion-base) ease-out max-lg:hidden",
                     step.done ? "bg-primary" : "bg-border",
                   )}
                 />
@@ -159,7 +159,7 @@ export function IssuePage({
   const locked = command.locked || archived;
 
   return (
-    <article className="mx-auto max-w-4xl space-y-6 p-8">
+    <article className="mx-auto max-w-4xl space-y-4 p-4 lg:space-y-6 lg:p-8">
       <header>
         <p className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
           <span className="font-mono">ISS-{issue.number}</span>
@@ -177,7 +177,7 @@ export function IssuePage({
         <h1
           id={contestantHeadingId}
           tabIndex={-1}
-          className="mt-1 text-2xl font-semibold tracking-tight outline-none"
+          className="mt-1 text-xl font-semibold tracking-tight break-words outline-none lg:text-2xl"
         >
           {issueHeadline(issue, { location, reopened })}
         </h1>
@@ -190,9 +190,9 @@ export function IssuePage({
 
       <section
         aria-label="Your report"
-        className="rounded-xl border bg-card p-6"
+        className="rounded-xl border bg-card p-4 lg:p-6"
       >
-        <div className="flex items-start gap-6">
+        <div className="flex flex-col-reverse gap-4 lg:flex-row lg:items-start lg:gap-6">
           <div className="min-w-0 flex-1">
             <h2 className="text-xs font-normal text-muted-foreground">
               Your report
@@ -201,8 +201,8 @@ export function IssuePage({
               {issue.description}
             </p>
           </div>
-          <div className="text-right">
-            <p className="flex items-center justify-end gap-1.5 text-xs text-muted-foreground">
+          <div className="lg:text-right">
+            <p className="flex items-center gap-1.5 text-xs text-muted-foreground lg:justify-end">
               {active && (
                 <span
                   aria-hidden="true"
@@ -219,7 +219,7 @@ export function IssuePage({
             </p>
           </div>
         </div>
-        <div className="mt-6 border-t pt-6">
+        <div className="mt-4 border-t pt-4 lg:mt-6 lg:pt-6">
           <Tracker steps={trackerSteps(issue, award, wallTime)} />
         </div>
       </section>
@@ -227,7 +227,7 @@ export function IssuePage({
       {current && !active && (
         <section
           aria-labelledby={`${id}-resolution`}
-          className="rounded-xl border border-emerald-500/40 bg-emerald-500/5 p-5"
+          className="rounded-xl border border-emerald-500/40 bg-emerald-500/5 p-4 lg:p-5"
         >
           <h2
             id={`${id}-resolution`}
@@ -264,14 +264,14 @@ export function IssuePage({
                 <Label htmlFor={`${id}-reason`}>
                   What is still wrong? Staff and your team can see this reason.
                 </Label>
-                <div className="flex gap-2">
+                <div className="flex flex-col gap-2 lg:flex-row">
                   <Textarea
                     id={`${id}-reason`}
                     autoFocus
                     required
                     maxLength={2000}
                     rows={2}
-                    className="min-h-10 flex-1"
+                    className="min-h-20 flex-1 lg:min-h-10"
                     value={reopenDraft}
                     disabled={locked}
                     onChange={(event) => onReopenDraft(event.target.value)}
@@ -279,6 +279,7 @@ export function IssuePage({
                   <Button
                     type="submit"
                     variant="outline"
+                    className="h-11 lg:h-9"
                     disabled={locked || !reopenDraft.trim()}
                     loading={isRunning(command.running, "reopen", issue.id)}
                   >
@@ -293,7 +294,7 @@ export function IssuePage({
                 <Button
                   type="button"
                   variant="link"
-                  className="h-auto justify-self-start p-0 text-muted-foreground"
+                  className="h-auto justify-self-start p-0 text-muted-foreground max-lg:min-h-11"
                   onClick={() => setReopenOpen(false)}
                 >
                   Keep it resolved
@@ -302,7 +303,7 @@ export function IssuePage({
             ) : (
               <Button
                 variant="link"
-                className="mt-3 h-auto p-0 text-muted-foreground hover:text-foreground has-[>svg]:px-0"
+                className="mt-3 h-auto p-0 text-left whitespace-normal text-muted-foreground hover:text-foreground has-[>svg]:px-0 max-lg:min-h-11"
                 disabled={locked}
                 onClick={() => setReopenOpen(true)}
               >
@@ -314,7 +315,7 @@ export function IssuePage({
       )}
 
       {earlier.length > 0 && (
-        <section aria-labelledby={`${id}-earlier`} className="rounded-xl border p-5">
+        <section aria-labelledby={`${id}-earlier`} className="rounded-xl border p-4 lg:p-5">
           <h2 id={`${id}-earlier`} className="text-sm font-medium">
             Earlier resolutions
           </h2>
@@ -340,9 +341,9 @@ export function IssuePage({
       {award && (
         <section
           aria-labelledby={`${id}-award`}
-          className="grid grid-cols-[auto_1fr] items-center gap-5 rounded-xl border bg-card p-5"
+          className="grid grid-cols-[auto_1fr] items-center gap-3 rounded-xl border bg-card p-4 lg:gap-5 lg:p-5"
         >
-          <div className="px-4 text-center" aria-hidden="true">
+          <div className="px-2 text-center lg:px-4" aria-hidden="true">
             <p className="text-4xl font-bold tabular-nums">
               {award.minutes === 0 ? "0" : `+${award.minutes}`}
             </p>
@@ -407,7 +408,7 @@ export function IssuePage({
       )}
 
       <section aria-labelledby={`${id}-messages`} className="rounded-xl border bg-card">
-        <div className="flex items-baseline gap-2 border-b px-5 py-4">
+        <div className="flex flex-wrap items-baseline gap-x-2 border-b px-4 py-3 lg:px-5 lg:py-4">
           <h2 id={`${id}-messages`} className="font-semibold">
             Messages
           </h2>
@@ -415,7 +416,7 @@ export function IssuePage({
             Staff and your team
           </span>
         </div>
-        <ol className="space-y-4 p-5" aria-label="Messages and updates">
+        <ol className="space-y-4 p-4 lg:p-5" aria-label="Messages and updates">
           {items.map((item) =>
             item.kind === "event" ? (
               <li
@@ -423,7 +424,7 @@ export function IssuePage({
                 className="flex items-center gap-3 text-xs text-muted-foreground"
               >
                 <span aria-hidden="true" className="h-px flex-1 bg-border" />
-                <span className="max-w-[70%] text-center break-words">
+                <span className="max-w-[85%] text-center break-words lg:max-w-[70%]">
                   {item.text} ·{" "}
                   <time dateTime={item.entry.at} title={formatDate(item.entry.at)}>
                     {wallTime(item.entry.at)}
@@ -433,7 +434,7 @@ export function IssuePage({
               </li>
             ) : item.mine ? (
               <li key={item.entry.id} className="flex justify-end">
-                <div className="max-w-[70%] rounded-2xl rounded-br-md bg-primary px-4 py-2.5 text-primary-foreground">
+                <div className="max-w-[85%] rounded-2xl rounded-br-md lg:max-w-[70%] bg-primary px-4 py-2.5 text-primary-foreground">
                   <p className="text-xs opacity-70">
                     You ·{" "}
                     <time dateTime={item.entry.at} title={formatDate(item.entry.at)}>
@@ -453,7 +454,7 @@ export function IssuePage({
                 >
                   {initials(item.entry.actor_name)}
                 </span>
-                <div className="max-w-[70%] rounded-2xl rounded-bl-md border px-4 py-2.5">
+                <div className="max-w-[85%] min-w-0 rounded-2xl rounded-bl-md lg:max-w-[70%] border px-4 py-2.5">
                   <p className="text-xs text-muted-foreground">
                     {item.entry.actor_name} ·{" "}
                     <time dateTime={item.entry.at} title={formatDate(item.entry.at)}>
@@ -469,7 +470,7 @@ export function IssuePage({
           )}
         </ol>
         {images.length > 0 && snapshot.session && (
-          <div className="px-5 pb-5">
+          <div className="px-4 pb-4 lg:px-5 lg:pb-5">
             <IssueImages
               sessionId={snapshot.session.id}
               issueId={issue.id}
@@ -489,7 +490,7 @@ export function IssuePage({
         )}
         {active && !archived && (
           <form
-            className="flex items-end gap-2 border-t p-4"
+            className="sticky bottom-0 flex items-end gap-2 rounded-b-xl border-t bg-card p-3 lg:static lg:p-4"
             onSubmit={(event) => {
               event.preventDefault();
               if (locked || !replyDraft.trim()) return;
@@ -509,7 +510,7 @@ export function IssuePage({
               rows={1}
               maxLength={2000}
               required
-              className="max-h-40 min-h-10 flex-1"
+              className="max-h-40 min-h-11 flex-1 lg:min-h-10"
               placeholder="Add details for staff…"
               value={replyDraft}
               // Read-only, not disabled, so focus stays here while it sends.
@@ -530,7 +531,7 @@ export function IssuePage({
             />
             <Button
               type="submit"
-              className="h-10"
+              className="h-11 lg:h-10"
               disabled={command.locked || !replyDraft.trim()}
               loading={isRunning(command.running, "message", issue.id)}
             >

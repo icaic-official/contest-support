@@ -7,6 +7,7 @@ import {
   workspacePaths,
   type WorkspacePage,
 } from "@/connected/navigation";
+import { TabBar } from "@/components/tab-bar";
 import { Button } from "@/components/ui/button";
 import { inlineActionReturnsToList } from "@/connected/hooks/inlineAction";
 import { useNow } from "@/connected/hooks/useNow";
@@ -31,8 +32,8 @@ import {
   type CardAction,
   PhoneHeader,
   PhoneStatus,
-  TabBar,
   tabLabel,
+  tabMeta,
 } from "./PhoneParts";
 import {
   AwardsTab,
@@ -256,7 +257,8 @@ export function OrganiserPhoneApp({
             )}
           </div>
           <TabBar
-            tabs={tabs}
+            label="Organizer sections"
+            items={tabs.map((id) => ({ id, ...tabMeta[id] }))}
             current={currentTab}
             onSelect={(next) => {
               void navigate(tabPaths[next]);

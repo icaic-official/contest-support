@@ -26,7 +26,7 @@ export function PasswordInput({
         type="button"
         variant="ghost"
         size="icon"
-        className="absolute top-1/2 right-1 -translate-y-1/2"
+        className="absolute top-1/2 right-0 -translate-y-1/2 max-lg:size-11"
         aria-label={shown ? "Hide password" : "Show password"}
         aria-pressed={shown}
         aria-controls={id}

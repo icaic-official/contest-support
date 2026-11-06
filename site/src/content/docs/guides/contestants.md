@@ -5,6 +5,15 @@ description: Submit a report, read replies, and understand time awards.
 
 Sign in from the link on your team's sign-in sheet. The link fills in your event code. See [Sign in](/guides/getting-started/).
 
+## Use a phone or a laptop
+
+The same page works on a phone and on a laptop.
+
+- **On a phone**, three tabs stay at the bottom of the screen: **Report**, **My reports** and **Account**. **Report** opens the report form in one tap, from any screen. **My reports** shows the contest clock, your end time and your reports. Select a report to read it, and select **My reports** to go back. **Account** opens your account page. When reporting is closed, **Report** shows why and the clock, with no form.
+- **On a laptop**, a window 1024 px wide or wider shows your reports on the left and the open report on the right.
+
+When the keyboard is open on a phone, the tabs hide, and the text field and the **Send** button stay in view. Your draft stays if you turn the phone.
+
 ## Report a problem
 
 1. Select **Report an issue**.

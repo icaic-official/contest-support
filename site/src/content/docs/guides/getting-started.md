@@ -34,7 +34,7 @@ An account with no session membership sees no data. Ask your organizer to add yo
 
 | You are | Screen |
 | --- | --- |
-| Contestant | Desktop layout. Use a window at least 1024 px wide. |
+| Contestant | One screen at a time on a phone. List and report side by side in a window 1024 px wide or wider. |
 | Staff, window under 1024 px | Phone app with tabs at the bottom. |
 | Staff, window 1024 px or wider | Console with a sidebar. |
 

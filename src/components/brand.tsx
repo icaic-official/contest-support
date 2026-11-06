@@ -1,7 +1,13 @@
 import { cn } from "@/lib/utils";
 
 /** The Minsky mark and name. */
-export function BrandMark({ className }: { className?: string }) {
+export function BrandMark({
+  className,
+  wordClassName,
+}: {
+  className?: string;
+  wordClassName?: string;
+}) {
   return (
     <span
       className={cn(
@@ -15,7 +21,7 @@ export function BrandMark({ className }: { className?: string }) {
       >
         M
       </span>
-      Minsky
+      <span className={wordClassName}>Minsky</span>
     </span>
   );
 }

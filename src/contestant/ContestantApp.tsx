@@ -1,14 +1,21 @@
-import { CircleAlert, Plus, RotateCw } from "lucide-react";
+import { CircleAlert, CircleUserRound, ListChecks, Plus, RotateCw, SquarePen } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useLocation } from "react-router";
+import { useLocation, useNavigate } from "react-router";
 import { AccountPage, useOpenPasswordChange } from "@/connected/AccountPage";
 import { useRouteFocus } from "@/connected/navigation";
+import { TabBar } from "@/components/tab-bar";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { ContestClock } from "@/connected/ContestClock";
+import { desktopQuery, useMediaQuery } from "@/connected/hooks/useMediaQuery";
 import { useNow } from "@/connected/hooks/useNow";
 import { useWorkflowState } from "@/connected/hooks/useWorkflowState";
-import { isRunning } from "@/connected/model";
+import {
+  type ContestClock as ClockData,
+  isRunning,
+  type Issue,
+  type Resolution,
+} from "@/connected/model";
 import type { ShellProps } from "@/connected/shell";
 import { NoSessionAccess } from "@/screens/NoSessionAccess";
 import { ContestantTopBar } from "./ContestantTopBar";
@@ -18,12 +25,30 @@ import {
   teamIssues,
 } from "./contestantView";
 import { IssuePage } from "./IssuePage";
-import { ReportForm, type ReportDraft } from "./ReportForm";
+import { useTyping } from "./useTyping";
+import { ReportClosed, ReportForm, type ReportDraft } from "./ReportForm";
 import { ReportList } from "./ReportList";
 
+type ContestantTab = "report" | "reports" | "account";
+
+/** Marks the history entry of a phone screen above the home. */
+const screenMark = "contestantScreen";
+
+const contestantTabs = [
+  { id: "report", label: "Report", icon: SquarePen },
+  { id: "reports", label: "My reports", icon: ListChecks },
+  { id: "account", label: "Account", icon: CircleUserRound },
+] as const;
+
 /**
- * The contestant UI for team accounts. It is a desktop app with no phone
- * layout (mockup: design/redesign/f-contestant-desktop.html).
+ * The contestant UI for team accounts. One app serves laptops and phones.
+ * At 1024 px and wider it shows the report list beside the report. Below
+ * that width it shows one screen at a time: the home (clock, report button
+ * and report list), one report, or the report form.
+ * A bottom tab bar (Report, My reports, Account) reaches each from any
+ * screen. Both layouts share the
+ * same components and state (mockup for the laptop layout:
+ * design/redesign/f-contestant-desktop.html).
  *
  * Contestant views must never contain internal notes or staff-only images.
  * The server omits them for team accounts, and contestantView.ts filters
@@ -35,9 +60,15 @@ export function ContestantApp(props: ShellProps) {
   const workflow = useWorkflowState(data);
   const { command, selectedIssueId, selectIssue } = workflow;
   const now = useNow(data.clockOffset);
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
+  const navigate = useNavigate();
+  const typing = useTyping();
   const accountPage = pathname.replace(/\/+$/u, "") === "/account";
+  const desktop = useMediaQuery(desktopQuery);
   const [reporting, setReporting] = useState(false);
+  // Phone only: whether the selected report fills the screen. The first
+  // report is always selected, so the home needs its own flag.
+  const [issueOpen, setIssueOpen] = useState(false);
   const [reportDraft, setReportDraft] = useState<ReportDraft>({
     category: "",
     description: "",
@@ -65,6 +96,29 @@ export function ContestantApp(props: ShellProps) {
     ? "contestant-account-heading"
     : contestantHeadingId;
   useRouteFocus(headingId, Boolean(membership));
+
+  // Phone: a screen above the home takes one history entry, so Back returns
+  // to the home and a typed report survives. Leaving by a tap drops the entry.
+  const away = !desktop && (reporting || issueOpen);
+  useEffect(() => {
+    if (!away) return;
+    // React Router keeps the navigation state of an entry under `usr`.
+    const marked = () =>
+      Boolean((window.history.state as { usr?: Record<string, unknown> } | null)?.usr?.[screenMark]);
+    if (!marked()) void navigate({ pathname, search }, { state: { [screenMark]: true } });
+    const onPop = () => {
+      if (marked()) return;
+      setReporting(false);
+      setIssueOpen(false);
+    };
+    window.addEventListener("popstate", onPop);
+    return () => {
+      window.removeEventListener("popstate", onPop);
+      if (marked()) void navigate(-1);
+    };
+    // Only a change of `away` may run this effect again.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [away]);
   if (!state || !membership || !state.session || !membership.team_id) {
     return (
       <NoSessionAccess
@@ -81,15 +135,18 @@ export function ContestantApp(props: ShellProps) {
   const issues = teamIssues(state.issues, teamId);
   const issue = issues.find((item) => item.id === selectedIssueId) ?? issues[0];
   const blocker = reportBlocker(state, now);
+  const view = reporting ? "report" : issueOpen && issue ? "issue" : "home";
 
   /** Clears the open report and the report form after the session changes. */
   function resetForSession() {
     selectIssue("");
     setReporting(false);
+    setIssueOpen(false);
   }
 
   function openIssue(issueId: string) {
     setReporting(false);
+    setIssueOpen(true);
     selectIssue(issueId);
     requestFocus();
   }
@@ -99,19 +156,167 @@ export function ContestantApp(props: ShellProps) {
   }
   function closeReport() {
     setReporting(false);
-    if (issue) {
+    if (issue && (desktop || issueOpen)) {
       requestFocus();
-    } else {
+    } else if (desktop) {
       window.requestAnimationFrame(() => reportButton.current?.focus());
+    } else {
+      requestFocus();
     }
   }
+
+  /** The phone tab bar: Report, My reports and Account. */
+  function selectTab(tab: ContestantTab) {
+    if (tab === "account") {
+      void navigate("/account");
+      return;
+    }
+    // From the account page, this entry is the one the report screen needs.
+    if (accountPage) void navigate("/issues", { state: { [screenMark]: tab === "report" } });
+    setIssueOpen(false);
+    setReporting(tab === "report");
+    requestFocus();
+  }
+  const currentTab: ContestantTab = accountPage
+    ? "account"
+    : reporting
+      ? "report"
+      : "reports";
+
+  const alerts = (
+    // Sticky, so an error and its retry stay in view while scrolled.
+    <div className="sticky top-0 z-10 mx-auto w-full max-w-4xl shrink-0 space-y-2 px-4 pt-2 empty:hidden lg:px-8 lg:pt-4">
+      {data.refreshError && (
+        <Alert variant="destructive" className="shadow-md">
+          <CircleAlert aria-hidden="true" />
+          <AlertDescription>{data.refreshError}</AlertDescription>
+        </Alert>
+      )}
+      {command.error && (
+        <Alert variant="destructive" className="shadow-md">
+          <CircleAlert aria-hidden="true" />
+          <AlertDescription className="flex flex-wrap items-center gap-3">
+            <span className="min-w-0 flex-1">{command.error}</span>
+            {command.pending && !command.busy && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="max-lg:h-11"
+                onClick={command.retry}
+              >
+                <RotateCw aria-hidden="true" />
+                Retry last request
+              </Button>
+            )}
+          </AlertDescription>
+        </Alert>
+      )}
+    </div>
+  );
+  const status = (
+    <p role="status" className="sr-only">
+      {command.notice}
+    </p>
+  );
+  const reportsPane = (
+    <ReportsPane
+      clock={state.clock}
+      now={now}
+      reportButton={reportButton}
+      reportDisabled={Boolean(blocker) || command.locked}
+      availability={blocker ?? "A helper comes to your table."}
+      onReport={openReport}
+      issues={issues}
+      resolutions={state.resolutions}
+      selectedId={reporting || !desktop ? undefined : issue?.id}
+      onSelect={openIssue}
+      headingId={desktop ? undefined : contestantHeadingId}
+    />
+  );
+  const detail = reporting && blocker && !desktop ? (
+    <ReportClosed clock={state.clock} now={now} message={blocker} />
+  ) : reporting ? (
+    <ReportForm
+      categories={state.session.categories}
+      teamName={team?.name}
+      location={team?.location}
+      blocker={blocker}
+      locked={command.locked}
+      sending={isRunning(command.running, "submit")}
+      draft={reportDraft}
+      onDraft={setReportDraft}
+      onCancel={closeReport}
+      onSubmit={(draft) => {
+        void command.act(
+          {
+            type: "submit",
+            category: draft.category,
+            description: draft.description,
+          },
+          {
+            // Runs once the server records the report, also after a
+            // retry. useWorkflowState then selects the new issue.
+            onSuccess: () => {
+              setReportDraft({ category: "", description: "" });
+              setReporting(false);
+              setIssueOpen(true);
+              requestFocus();
+            },
+          },
+        );
+      }}
+    />
+  ) : issue ? (
+    <IssuePage
+      key={issue.id}
+      issue={issue}
+      snapshot={state}
+      userId={user.id}
+      location={team?.location}
+      now={now}
+      command={command}
+      replyDraft={replyDrafts[issue.id] ?? ""}
+      onReplyDraft={(value) =>
+        setReplyDrafts((drafts) => ({ ...drafts, [issue.id]: value }))
+      }
+      reopenDraft={reopenDrafts[issue.id] ?? ""}
+      onReopenDraft={(value) =>
+        setReopenDrafts((drafts) => ({ ...drafts, [issue.id]: value }))
+      }
+      refresh={data.refresh}
+    />
+  ) : (
+    <div className="mx-auto max-w-xl p-8 pt-24 text-center">
+      <h1
+        id={contestantHeadingId}
+        tabIndex={-1}
+        className="text-2xl font-semibold tracking-tight outline-none"
+      >
+        No reports yet
+      </h1>
+      <p className="mt-2 text-muted-foreground">
+        {blocker ??
+          "When something goes wrong at your table, use Report an issue. A helper will come to you."}
+      </p>
+      {!blocker && (
+        <Button
+          className="mt-6"
+          disabled={command.locked}
+          onClick={openReport}
+        >
+          <Plus aria-hidden="true" />
+          Report an issue
+        </Button>
+      )}
+    </div>
+  );
 
   return (
     <div
       data-ui="contestant"
-      className="flex h-full min-w-[1024px] flex-col bg-background text-foreground"
+      className="flex h-full flex-col bg-background text-foreground"
     >
-      {!accountPage && (
+      {!accountPage && (desktop || view !== "home") && (
         <a
           href="#contestant-main"
           className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:rounded-md focus:bg-background focus:px-3 focus:py-2 focus:ring-2 focus:ring-ring"
@@ -137,7 +342,7 @@ export function ContestantApp(props: ShellProps) {
         signOut={signOut}
       />
       {accountPage && (
-        <div className="relative min-h-0 flex-1 overflow-y-auto p-8">
+        <div className="relative min-h-0 flex-1 overflow-y-auto p-4 lg:p-8">
           <AccountPage
             shell={props}
             state={state}
@@ -154,154 +359,131 @@ export function ContestantApp(props: ShellProps) {
         className={
           accountPage
             ? "hidden"
-            : "grid min-h-0 flex-1 grid-cols-[320px_1fr] grid-rows-[minmax(0,1fr)]"
+            : desktop
+              ? "grid min-h-0 flex-1 grid-cols-[320px_1fr] grid-rows-[minmax(0,1fr)]"
+              : "flex min-h-0 flex-1 flex-col"
         }
       >
-        <aside
-          aria-label="Your reports"
-          className="flex min-h-0 flex-col border-r bg-sidebar"
-        >
-          <div className="p-4">
-            <ContestClock clock={state.clock} now={now} />
-            <Button
-              ref={reportButton}
-              className="h-10 w-full"
-              disabled={Boolean(blocker) || command.locked}
-              aria-describedby="report-availability"
-              onClick={openReport}
+        {desktop ? (
+          <>
+            {reportsPane}
+            {/* ConnectedApp already renders the page's <main> landmark. */}
+            <div
+              id="contestant-main"
+              role="region"
+              aria-label="Report details"
+              tabIndex={-1}
+              className="relative min-h-0 overflow-y-auto outline-none"
+              aria-busy={command.busy}
             >
-              <Plus aria-hidden="true" />
-              Report an issue
-            </Button>
-            <p
-              id="report-availability"
-              className="mt-2 text-center text-xs text-muted-foreground"
-            >
-              {blocker ?? "A helper comes to your table."}
-            </p>
-          </div>
-          <h2 className="px-4 pb-2 text-xs font-medium text-muted-foreground">
-            Your reports
-          </h2>
-          <ReportList
-            issues={issues}
-            resolutions={state.resolutions}
-            selectedId={reporting ? undefined : issue?.id}
-            now={now}
-            onSelect={openIssue}
-          />
-        </aside>
-        {/* ConnectedApp already renders the page's <main> landmark. */}
-        <div
-          id="contestant-main"
-          role="region"
-          aria-label="Report details"
-          tabIndex={-1}
-          className="relative min-h-0 overflow-y-auto outline-none"
-          aria-busy={command.busy}
-        >
-          {/* Sticky, so an error and its retry stay in view while scrolled. */}
-          <div className="sticky top-0 z-10 mx-auto max-w-4xl space-y-2 px-8 pt-4 empty:hidden">
-            {data.refreshError && (
-              <Alert variant="destructive" className="shadow-md">
-                <CircleAlert aria-hidden="true" />
-                <AlertDescription>{data.refreshError}</AlertDescription>
-              </Alert>
-            )}
-            {command.error && (
-              <Alert variant="destructive" className="shadow-md">
-                <CircleAlert aria-hidden="true" />
-                <AlertDescription className="flex items-center gap-3">
-                  <span className="flex-1">{command.error}</span>
-                  {command.pending && !command.busy && (
-                    <Button size="sm" variant="outline" onClick={command.retry}>
-                      <RotateCw aria-hidden="true" />
-                      Retry last request
-                    </Button>
-                  )}
-                </AlertDescription>
-              </Alert>
-            )}
-          </div>
-          <p role="status" className="sr-only">
-            {command.notice}
-          </p>
-          {reporting ? (
-            <ReportForm
-              categories={state.session.categories}
-              teamName={team?.name}
-              location={team?.location}
-              blocker={blocker}
-              locked={command.locked}
-              sending={isRunning(command.running, "submit")}
-              draft={reportDraft}
-              onDraft={setReportDraft}
-              onCancel={closeReport}
-              onSubmit={(draft) => {
-                void command.act(
-                  {
-                    type: "submit",
-                    category: draft.category,
-                    description: draft.description,
-                  },
-                  {
-                    // Runs once the server records the report, also after a
-                    // retry. useWorkflowState then selects the new issue.
-                    onSuccess: () => {
-                      setReportDraft({ category: "", description: "" });
-                      setReporting(false);
-                      requestFocus();
-                    },
-                  },
-                );
-              }}
-            />
-          ) : issue ? (
-            <IssuePage
-              key={issue.id}
-              issue={issue}
-              snapshot={state}
-              userId={user.id}
-              location={team?.location}
-              now={now}
-              command={command}
-              replyDraft={replyDrafts[issue.id] ?? ""}
-              onReplyDraft={(value) =>
-                setReplyDrafts((drafts) => ({ ...drafts, [issue.id]: value }))
-              }
-              reopenDraft={reopenDrafts[issue.id] ?? ""}
-              onReopenDraft={(value) =>
-                setReopenDrafts((drafts) => ({ ...drafts, [issue.id]: value }))
-              }
-              refresh={data.refresh}
-            />
-          ) : (
-            <div className="mx-auto max-w-xl p-8 pt-24 text-center">
-              <h1
-                id={contestantHeadingId}
-                tabIndex={-1}
-                className="text-2xl font-semibold tracking-tight outline-none"
-              >
-                No reports yet
-              </h1>
-              <p className="mt-2 text-muted-foreground">
-                {blocker ??
-                  "When something goes wrong at your table, use Report an issue. A helper will come to you."}
-              </p>
-              {!blocker && (
-                <Button
-                  className="mt-6"
-                  disabled={command.locked}
-                  onClick={openReport}
-                >
-                  <Plus aria-hidden="true" />
-                  Report an issue
-                </Button>
-              )}
+              {alerts}
+              {status}
+              {detail}
             </div>
-          )}
-        </div>
+          </>
+        ) : view === "home" ? (
+          <div className="flex min-h-0 flex-1 flex-col" aria-busy={command.busy}>
+            {alerts}
+            {status}
+            {reportsPane}
+          </div>
+        ) : (
+          <div
+            id="contestant-main"
+            role="region"
+            aria-label="Report details"
+            tabIndex={-1}
+            className="relative flex min-h-0 flex-1 flex-col outline-none"
+            aria-busy={command.busy}
+          >
+            <div className="min-h-0 flex-1 overflow-y-auto">
+              {alerts}
+              {status}
+              {detail}
+            </div>
+          </div>
+        )}
       </div>
+      {!desktop && !typing && (
+        <TabBar
+          label="Contestant sections"
+          items={contestantTabs}
+          current={currentTab}
+          onSelect={selectTab}
+        />
+      )}
     </div>
+  );
+}
+
+/**
+ * The clock, the report button and the team's reports. It is the left column
+ * on a laptop and the home screen on a phone.
+ */
+function ReportsPane({
+  clock,
+  now,
+  reportButton,
+  reportDisabled,
+  availability,
+  onReport,
+  issues,
+  resolutions,
+  selectedId,
+  onSelect,
+  headingId,
+}: {
+  clock: ClockData | null | undefined;
+  now: number;
+  reportButton: React.RefObject<HTMLButtonElement | null>;
+  reportDisabled: boolean;
+  availability: string;
+  onReport: () => void;
+  issues: readonly Issue[];
+  resolutions: readonly Resolution[];
+  selectedId: string | undefined;
+  onSelect: (issueId: string) => void;
+  /** Set on a phone, where this pane holds the page heading. */
+  headingId: string | undefined;
+}) {
+  return (
+    <aside
+      aria-label="Your reports"
+      className="flex min-h-0 flex-1 flex-col bg-sidebar lg:flex-none lg:border-r"
+    >
+      <div className="p-4">
+        <ContestClock clock={clock} now={now} />
+        <Button
+          ref={reportButton}
+          className="h-11 w-full lg:h-10"
+          disabled={reportDisabled}
+          aria-describedby="report-availability"
+          onClick={onReport}
+        >
+          <Plus aria-hidden="true" />
+          Report an issue
+        </Button>
+        <p
+          id="report-availability"
+          className="mt-2 text-center text-xs text-muted-foreground"
+        >
+          {availability}
+        </p>
+      </div>
+      <h2
+        id={headingId}
+        tabIndex={headingId ? -1 : undefined}
+        className="px-4 pb-2 text-xs font-medium text-muted-foreground outline-none"
+      >
+        Your reports
+      </h2>
+      <ReportList
+        issues={issues}
+        resolutions={resolutions}
+        selectedId={selectedId}
+        now={now}
+        onSelect={onSelect}
+      />
+    </aside>
   );
 }

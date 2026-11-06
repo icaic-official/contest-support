@@ -28,7 +28,7 @@ Choose the event's name, code, and time zone with care. No screen can change the
 6. Select **Create event**.
 7. Give the sign-in link, the username, and the temporary password to the event admin in person. Minsky shows the password once.
 
-If the password does not arrive, the page says so. Select **Open console**, then select **Issue password** beside that person.
+If the password does not arrive, the page says so. Select **Open console**, then **People**, then **Issue password** beside that person.
 
 The event admin then [sets up the event](/guides/event-admin/).
 To do that work yourself, select **Open console** on the event.

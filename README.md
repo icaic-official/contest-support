@@ -26,7 +26,7 @@ The [user and operator guides](https://minsky-docs.icaic-minsky.workers.dev) exp
 ## Run the complete app locally
 
 These steps run the real Worker on local D1, R2, and Durable Object emulation. You do not need a Cloudflare account.
-You need Node.js 22.13 or later within 22.x, or Node.js 24 or later. Docker is not required.
+You need Node.js 22.22 or later within 22.x, or Node.js 24 or later. Docker is not required.
 
 ```sh
 npm ci
@@ -109,20 +109,20 @@ These commands connect to a Cloudflare account. Several of them change hosted da
 | `npm run cloudflare:recover-admin -- --config <file> --username <name>` | Reset a webmaster password in the remote `DB` database that the Wrangler file names. Prints the temporary password once. See [the recovery procedure](site/src/content/docs/operators/installation.mdx#recover-a-webmaster-password). |
 | `npm run cloud:hosting-login` | Sign in to Cloudflare with Wrangler. |
 | `npm run load -- <command>` | Run a [load test](docs/run-load-tests.md) against an isolated installation: `site`, `setup`, `run`, `analytics`, and `cleanup`. |
-| `npm run test:auth:hosted -- --account=… --database=…` | Run account cases on an isolated hosted D1 target. |
-| `npm run test:auth:http -- --account=… --database=… --origin=…` | Check an isolated deployed authentication Worker. |
-| `npm run test:connector:ui -- --config=… --account=… --database=… --origin=…` | Run the React journey against an isolated hosted application. |
-| `npm run test:connector:workflow:hosted -- --config=… --account=… --database=…` | Run every workflow case on an isolated D1-only target. |
-| `npm run test:connector:accounts:hosted -- --config=… --account=… --database=…` | Check account guards on the same target. |
-| `npm run test:providers -- --provider=cloudflare --config=… --account=… --database=… --origin=…` | Run the [shared provider scenarios](docs/run-provider-tests.md) in a browser. |
 
-These commands are for the maintainers' own Cloudflare account:
+These commands work only with the maintainers' own Cloudflare account. The hosted suites refuse any other target:
 
 | Command | Purpose |
 | --- | --- |
 | `npm run deploy` | Build the app, apply new D1 migrations, and publish it. Workers Builds runs it on `minsky-dev` for each push to `main`. See [Workers Builds](docs/cloudflare-builds.md). |
 | `npm run docs:deploy` | Build and publish the `minsky-docs` Worker, if Workers Builds cannot. |
 | `npm run ci:worker` | Run the dry-run deploy of the `minsky-ci` Worker. |
+| `npm run test:auth:hosted -- --account=… --database=…` | Run account cases on the isolated hosted D1 target. |
+| `npm run test:auth:http -- --account=… --database=… --origin=…` | Check the isolated deployed authentication Worker. |
+| `npm run test:connector:ui -- --config=… --account=… --database=… --origin=…` | Run the React journey against the isolated hosted application. |
+| `npm run test:connector:workflow:hosted -- --config=… --account=… --database=…` | Run every workflow case on the isolated D1-only target. |
+| `npm run test:connector:accounts:hosted -- --config=… --account=… --database=…` | Check account guards on the same target. |
+| `npm run test:providers -- --provider=cloudflare --config=… --account=… --database=… --origin=…` | Run the [shared provider scenarios](docs/run-provider-tests.md) in a browser. |
 | `npm run token:create -- <request.json> --out <file>` | Create a scoped Cloudflare API token for an agent task. See [API tokens for agents](AGENTS.md#api-tokens-for-agents). |
 | `npm run token:list` | List the tokens that agents created. |
 | `npm run token:delete -- <id>` | Delete a token that an agent created. |

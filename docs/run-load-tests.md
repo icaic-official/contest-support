@@ -15,7 +15,7 @@ You need:
 
 - A checkout of the revision that you want to measure, with `npm ci` complete.
 - A Cloudflare account on Workers Paid, for a fresh installation made with [Install on Cloudflare](../site/src/content/docs/operators/installation.mdx). Give its Worker, D1 database, and R2 bucket new names, for example `minsky-preview-load`, `minsky-preview-load`, and `minsky-preview-load-images`.
-- Node.js 22.13 or later within 22.x, or Node.js 24 or later, on a machine with at least 8 CPU cores and 50 Mbit/s or more download bandwidth. A step of 800 users opens 800 WebSocket connections from this machine.
+- Node.js 22.22 or later within 22.x, or Node.js 24 or later, on a machine with at least 8 CPU cores and 50 Mbit/s or more download bandwidth. A step of 800 users opens 800 WebSocket connections from this machine.
 
 Only failed sign-ins count toward the sign-in limit, so one machine can sign in every account (`signInFailureLimits`).
 

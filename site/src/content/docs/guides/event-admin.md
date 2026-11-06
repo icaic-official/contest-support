@@ -24,7 +24,7 @@ Work through the sections below in this order.
 6. Enter **Grace after the end (minutes)**, a whole number from 0 to 240.
 7. Select **Create contest**.
 
-If a time does not exist in the event's zone because clocks move forward, Minsky uses the first minute after the gap. If a time occurs twice, Minsky uses the earlier one.
+If a time does not exist in the event's zone because clocks move forward, Minsky moves it forward by the length of the gap, so 02:30 becomes 03:30. If a time occurs twice, Minsky uses the earlier one.
 
 A new contest has one category, **General**, and the default image limits. A contest admin [changes them](/guides/administration/).
 

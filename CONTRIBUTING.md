@@ -47,7 +47,7 @@ If your change affects a screen, also run `npm run test:e2e` and `npm run test:c
 If your change adds a D1 migration, also run `node scripts/rollback-check.mjs`.
 The [README](README.md#commands) lists every command.
 
-Browser suites and hosted suites do not run automatically. Hosted suites need isolated resources in your own Cloudflare account. They need none of the maintainers' credentials.
+Browser suites and hosted suites do not run automatically. Hosted suites accept only the maintainers' isolated CI resources, so a maintainer runs them when a change needs them.
 
 ### Run the mocked browser suite
 

@@ -5,7 +5,7 @@ description: Set up a checkout, run the app without a Cloudflare account, and ru
 
 ## Set up
 
-Use Node.js 22.13 or later in the 22.x line, or Node.js 24 or later. The documentation site needs Node.js 22.23.4 or later. Then run `npm ci`.
+Use Node.js 22.22 or later in the 22.x line, or Node.js 24 or later. The documentation site needs Node.js 22.23.4 or later. Then run `npm ci`.
 
 ## Run the complete app locally
 
@@ -45,7 +45,7 @@ npm run test:connector:runtime # Cloudflare connector on a local Worker
 
 Before the first browser test, run `npx playwright install chromium`. Then run `npm run test:e2e`.
 
-The README's [command table](https://github.com/GiftedNovaHD/minsky#commands) lists every command. Hosted test commands need your own isolated Cloudflare resources. Check their targets first, and never point them at real data.
+The README's [command table](https://github.com/GiftedNovaHD/minsky#commands) lists every command. Hosted test commands accept only the maintainers' isolated CI resources.
 
 ## Submit a change
 

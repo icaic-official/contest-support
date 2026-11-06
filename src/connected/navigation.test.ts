@@ -1,0 +1,43 @@
+import { describe, expect, it } from "vitest";
+import { contestOfSearch, searchWithContest } from "./navigation";
+
+describe("contestOfSearch", () => {
+  it("reads the contest parameter", () => {
+    expect(contestOfSearch("?contest=abc")).toBe("abc");
+    expect(contestOfSearch("?tab=1&contest=abc&x=y")).toBe("abc");
+  });
+
+  it("reads a percent-encoded value as typed", () => {
+    expect(contestOfSearch("?contest=a%20b")).toBe("a b");
+  });
+
+  it("returns undefined when the parameter is missing or empty", () => {
+    expect(contestOfSearch("")).toBeUndefined();
+    expect(contestOfSearch("?other=1")).toBeUndefined();
+    expect(contestOfSearch("?contest=")).toBeUndefined();
+  });
+
+  it("reads the first of two parameters", () => {
+    expect(contestOfSearch("?contest=a&contest=b")).toBe("a");
+  });
+});
+
+describe("searchWithContest", () => {
+  it("adds the parameter to an empty search", () => {
+    expect(searchWithContest("", "abc")).toBe("?contest=abc");
+  });
+
+  it("replaces the parameter and keeps every other one in its place", () => {
+    expect(searchWithContest("?a=1&contest=old&b=2", "new")).toBe("?a=1&contest=new&b=2");
+  });
+
+  it("keeps other parameters when it adds the parameter", () => {
+    expect(searchWithContest("?a=1&b=two", "abc")).toBe("?a=1&b=two&contest=abc");
+  });
+
+  it("round-trips the value it writes", () => {
+    const search = searchWithContest("?a=1", "a b&c");
+    expect(contestOfSearch(search)).toBe("a b&c");
+    expect(new URLSearchParams(search).get("a")).toBe("1");
+  });
+});

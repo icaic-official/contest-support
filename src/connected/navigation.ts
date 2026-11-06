@@ -38,6 +38,20 @@ export function eventRouteOf(pathname: string): { eventId: string | undefined } 
   return match ? { eventId: match[1] } : undefined;
 }
 
+const contestParam = "contest";
+
+/** The contest that an address names with `?contest=`, or undefined when it names none. */
+export function contestOfSearch(search: string): string | undefined {
+  return new URLSearchParams(search).get(contestParam) || undefined;
+}
+
+/** The search text with `?contest=` set to this contest. Every other parameter stays. */
+export function searchWithContest(search: string, contestId: string): string {
+  const params = new URLSearchParams(search);
+  params.set(contestParam, contestId);
+  return `?${params}`;
+}
+
 /** True for the signed-out entry addresses, which a signed-in person leaves for the queue. */
 export function isEntryPath(pathname: string): boolean {
   const path = pathname.replace(/\/+$/u, "");

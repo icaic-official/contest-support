@@ -1,0 +1,223 @@
+import { describe, expect, it } from "vitest";
+import type { ContestSummary, IntakeReason } from "@/backend/contracts";
+import {
+  contestLabel,
+  contestRows,
+  defaultContest,
+  orderContests,
+  rowText,
+} from "./contestList";
+
+const hour = 3_600_000;
+const base = Date.parse("2026-11-03T13:00:00.000Z");
+const at = (hours: number) => new Date(base + hours * hour).toISOString();
+
+const OPEN: ReadonlySet<IntakeReason> = new Set(["running", "grace", "override_open"]);
+
+function contest(
+  id: string,
+  options: {
+    name?: string;
+    eventName?: string;
+    timeZone?: string;
+    /** Hours from the base time for the start and the end, or none. */
+    hours?: [start: number, end: number];
+    reason?: IntakeReason;
+  } = {},
+): ContestSummary {
+  const reason = options.reason ?? "before_start";
+  return {
+    id,
+    name: options.name ?? id,
+    eventId: "event",
+    eventName: options.eventName ?? "Spring",
+    timeZone: options.timeZone ?? "UTC",
+    contestType: "teams",
+    schedule: options.hours
+      ? { startsAt: at(options.hours[0]), endsAt: at(options.hours[1]), graceMinutes: 0 }
+      : null,
+    intake: { open: OPEN.has(reason), reason, changesAt: null },
+    canOpen: true,
+    manage: "none",
+  };
+}
+
+const ids = (list: readonly ContestSummary[]) => list.map((item) => item.id);
+
+describe("contestLabel", () => {
+  it("names the event only when two listed contests share a name", () => {
+    const finals = contest("1", { name: "Finals", eventName: "Spring" });
+    const other = contest("2", { name: "Finals", eventName: "Autumn" });
+    const practice = contest("3", { name: "Practice", eventName: "Spring" });
+    const all = [finals, other, practice];
+    expect(contestLabel(all, finals)).toBe("Finals · Spring");
+    expect(contestLabel(all, other)).toBe("Finals · Autumn");
+    expect(contestLabel(all, practice)).toBe("Practice");
+  });
+});
+
+describe("orderContests", () => {
+  it("sorts by start time, whatever the names and the input order", () => {
+    const late = contest("a", { name: "Aardvark", hours: [48, 52] });
+    const early = contest("b", { name: "Zebra", hours: [0, 4] });
+    const middle = contest("c", { name: "Mole", hours: [24, 28] });
+    expect(ids(orderContests([late, early, middle]))).toEqual(["b", "c", "a"]);
+  });
+
+  it("breaks a tie in the start time by ID", () => {
+    const second = contest("2", { hours: [0, 4] });
+    const first = contest("1", { hours: [0, 6] });
+    expect(ids(orderContests([second, first]))).toEqual(["1", "2"]);
+  });
+
+  it("compares instants, not text, when two zones format the start differently", () => {
+    const earlier = contest("a", { hours: [0, 4], timeZone: "Asia/Singapore" });
+    const later = contest("b", { hours: [1, 5], timeZone: "America/New_York" });
+    expect(ids(orderContests([later, earlier]))).toEqual(["a", "b"]);
+  });
+
+  it("puts a contest with no schedule after every scheduled one, by name and then ID", () => {
+    const scheduled = contest("s", { name: "Scheduled", hours: [100, 104] });
+    const beta = contest("2", { name: "Beta" });
+    const alpha = contest("3", { name: "Alpha" });
+    const alsoBeta = contest("1", { name: "Beta" });
+    expect(ids(orderContests([beta, alpha, scheduled, alsoBeta]))).toEqual(["s", "3", "1", "2"]);
+  });
+
+  it("returns a new list and leaves the input as it was", () => {
+    const input = [contest("b", { hours: [5, 6] }), contest("a", { hours: [1, 2] })];
+    const copy = [...input];
+    const ordered = orderContests(input);
+    expect(ordered).not.toBe(input);
+    expect(input).toEqual(copy);
+  });
+});
+
+describe("defaultContest", () => {
+  it("is undefined for an empty list", () => {
+    expect(defaultContest([])).toBeUndefined();
+  });
+
+  it("prefers the first contest that takes reports now", () => {
+    const list = orderContests([
+      contest("past", { hours: [-30, -26], reason: "ended" }),
+      contest("now", { hours: [-1, 3], reason: "running" }),
+      contest("next", { hours: [24, 28] }),
+    ]);
+    expect(defaultContest(list)?.id).toBe("now");
+  });
+
+  it.each<IntakeReason>(["running", "grace", "override_open"])(
+    "counts %s as running now",
+    (reason) => {
+      const list = orderContests([
+        contest("next", { hours: [24, 28] }),
+        contest("now", { hours: [30, 34], reason }),
+      ]);
+      expect(defaultContest(list)?.id).toBe("now");
+    },
+  );
+
+  it("opens the next scheduled contest when none takes reports", () => {
+    const list = orderContests([
+      contest("past", { hours: [-30, -26], reason: "ended" }),
+      contest("next", { hours: [24, 28] }),
+      contest("later", { hours: [48, 52] }),
+    ]);
+    expect(defaultContest(list)?.id).toBe("next");
+  });
+
+  it("treats a contest that staff closed or that waits for passwords as not ended", () => {
+    const list = orderContests([
+      contest("past", { hours: [-30, -26], reason: "ended" }),
+      contest("held", { hours: [-1, 3], reason: "override_closed" }),
+    ]);
+    expect(defaultContest(list)?.id).toBe("held");
+    const waiting = orderContests([
+      contest("past", { hours: [-30, -26], reason: "ended" }),
+      contest("live", { hours: [-1, 3], reason: "awaiting_live_passwords" }),
+    ]);
+    expect(defaultContest(waiting)?.id).toBe("live");
+  });
+
+  it("opens the contest that ended last when every scheduled contest has ended", () => {
+    const list = orderContests([
+      contest("long", { hours: [-100, -10], reason: "ended" }),
+      contest("short", { hours: [-50, -20], reason: "ended" }),
+      contest("first", { hours: [-120, -90], reason: "ended" }),
+    ]);
+    expect(defaultContest(list)?.id).toBe("long");
+  });
+
+  it("falls back to the first listed contest when none has a schedule or an open intake", () => {
+    const list = orderContests([
+      contest("b", { name: "Beta", reason: "override_closed" }),
+      contest("a", { name: "Alpha", reason: "override_closed" }),
+    ]);
+    expect(defaultContest(list)?.id).toBe("a");
+  });
+
+  it("opens an unscheduled contest that staff opened before a scheduled one that has not started", () => {
+    const list = orderContests([
+      contest("next", { hours: [24, 28] }),
+      contest("held-open", { name: "Held open", reason: "override_open" }),
+    ]);
+    expect(defaultContest(list)?.id).toBe("held-open");
+  });
+});
+
+describe("contestRows", () => {
+  const notes: Array<[IntakeReason, string | null]> = [
+    ["before_start", null],
+    ["running", "Running now"],
+    ["grace", "Running now"],
+    ["override_open", "Running now"],
+    ["override_closed", "Closed by staff"],
+    ["awaiting_live_passwords", "Waiting for live passwords"],
+    ["ended", "Ended"],
+  ];
+
+  it.each(notes)("marks the intake reason %s with %j", (reason, marker) => {
+    const [row] = contestRows([contest("a", { hours: [0, 4], reason })]);
+    expect(row?.marker).toBe(marker);
+  });
+
+  it("shows the start in the event's zone and no time for an unscheduled contest", () => {
+    const rows = contestRows([
+      contest("a", { hours: [0, 4], timeZone: "Asia/Singapore" }),
+      contest("b", { name: "No schedule", timeZone: "Asia/Singapore" }),
+    ]);
+    expect(rows[0]?.start).toContain("21:00");
+    expect(rows[1]?.start).toBeNull();
+  });
+
+  it("adds a zone label only when the listed contests span more than one zone", () => {
+    const same = contestRows([
+      contest("a", { hours: [0, 4], timeZone: "Asia/Singapore" }),
+      contest("b", { hours: [5, 9], timeZone: "Asia/Singapore" }),
+    ]);
+    expect(same[0]?.start).not.toContain("GMT");
+    const mixed = contestRows([
+      contest("a", { hours: [0, 4], timeZone: "Asia/Singapore" }),
+      contest("b", { hours: [5, 9], timeZone: "UTC" }),
+    ]);
+    expect(mixed[0]?.start).toContain("GMT+8");
+    expect(mixed[0]?.start).toContain("21:00");
+  });
+
+  it("keeps the order of its input", () => {
+    const rows = contestRows([contest("b"), contest("a")]);
+    expect(rows.map((row) => row.id)).toEqual(["b", "a"]);
+  });
+});
+
+describe("rowText", () => {
+  it("joins the name, the start and the note, and skips what a row lacks", () => {
+    expect(rowText({ id: "1", name: "Live 1", start: "Tue 3 Nov, 13:00", marker: "Running now" }))
+      .toBe("Live 1 · Tue 3 Nov, 13:00 · Running now");
+    expect(rowText({ id: "1", name: "Live 1", start: "Tue 3 Nov, 13:00", marker: null }))
+      .toBe("Live 1 · Tue 3 Nov, 13:00");
+    expect(rowText({ id: "1", name: "Old one", start: null, marker: "Closed by staff" }))
+      .toBe("Old one · Closed by staff");
+  });
+});

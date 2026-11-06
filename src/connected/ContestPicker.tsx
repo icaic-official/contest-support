@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import { contestLabel } from "./contestList";
 
 interface PickerProps {
   contests: readonly ContestSummary[];
@@ -17,12 +18,6 @@ interface PickerProps {
   value: string;
   onSelect: (contestId: string) => void;
   disabled?: boolean | undefined;
-}
-
-/** A contest's name, with its event when another listed contest has the same name. */
-export function contestLabel(contests: readonly ContestSummary[], contest: ContestSummary): string {
-  const shared = contests.some((other) => other.id !== contest.id && other.name === contest.name);
-  return shared ? `${contest.name} · ${contest.eventName}` : contest.name;
 }
 
 /**

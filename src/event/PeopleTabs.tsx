@@ -17,7 +17,7 @@ import { rosterTextMax } from "@/connected/roster";
 import { UsernameForm } from "@/organiser/admin/AccountForms";
 import { PersonAvatar } from "@/organiser/components/issueDisplay";
 import { ConfirmDialog } from "@/organiser/admin/AccountAccess";
-import { entrantInputs, personInputs } from "./eventModel";
+import { entrantInputs, personInputs, recoveryContest, voidedBy } from "./eventModel";
 import { CommandError, LinesForm, Panel, fieldClass } from "./forms";
 import type { EventConsoleState } from "./useEventConsole";
 
@@ -193,6 +193,22 @@ export function EntrantsTab({ data, state }: TabProps) {
   const [renaming, setRenaming] = useState<EventConsole["entrants"][number]>();
   const [resetting, setResetting] = useState<EventConsole["entrants"][number]>();
   const [adding, setAdding] = useState<EventConsole["entrants"][number]>();
+  const [closingHandle, setClosingHandle] = useState<string | null>(null);
+  const closing = adding ? closingContests(data, adding.id) : [];
+  const closingTeams = data.entries.filter((entry) => closing.some((contest) => contest.id === entry.contestId)).length;
+  const addSignIn = (entrant: EventConsole["entrants"][number], handle: string, closeReporting = false) => {
+    void state
+      .execute({ type: "add_entrant_sign_in", eventId: data.event.id, entrantId: entrant.id, handle, ...(closeReporting ? { closeReporting } : {}) })
+      .then((receipt) => {
+        if (!receipt) return;
+        setAdding(undefined);
+        void state.issue(receipt.accountIds ?? [], recoveryContest(data, entrant.id));
+      });
+  };
+  const resetTarget = resetting ? recoveryContest(data, resetting.id) : null;
+  const resetVoids = resetting?.accountId
+    ? voidedBy(data, data.contests.find((contest) => contest.id === resetTarget), [resetting.accountId])
+    : [];
   const id = useId();
   return (
     <div className="space-y-5">
@@ -350,13 +366,8 @@ export function EntrantsTab({ data, state }: TabProps) {
               current={null}
               disabled={locked}
               onSubmit={(handle) => {
-                void state
-                  .execute({ type: "add_entrant_sign_in", eventId: data.event.id, entrantId: adding.id, handle })
-                  .then((receipt) => {
-                    if (!receipt) return;
-                    setAdding(undefined);
-                    void state.issue(receipt.accountIds ?? []);
-                  });
+                if (closingContests(data, adding.id).length > 0) setClosingHandle(handle);
+                else addSignIn(adding, handle);
               }}
             />
           )}
@@ -365,17 +376,35 @@ export function EntrantsTab({ data, state }: TabProps) {
       </Dialog>
       <ConfirmDialog
         returnFocus
+        open={closingHandle !== null}
+        onOpenChange={(open) => !open && setClosingHandle(null)}
+        title={`Close reporting in ${closing.map((contest) => contest.name).join(", ")}?`}
+        description={`Reporting closes for ${closingTeams} ${closingTeams === 1 ? "team" : "teams"} until this sign-in has its password. Minsky issues it next.`}
+        confirmLabel="Add sign-in and close reporting"
+        onConfirm={() => {
+          if (adding && closingHandle !== null) addSignIn(adding, closingHandle, true);
+          setClosingHandle(null);
+        }}
+      />
+      <ConfirmDialog
+        returnFocus
         open={!!resetting}
         onOpenChange={(open) => !open && setResetting(undefined)}
         title={`Reset the password of ${resetting?.name ?? "this entrant"}?`}
-        description="The current password stops working for everyone who shares it, and every open session ends. The new password is shown once."
+        description={`The current password stops working for everyone who shares it, and every open session ends. The new password is shown once.${resetVoids.length > 0 ? ` These passwords stop working for: ${resetVoids.map((contest) => contest.name).join(", ")}.` : ""}`}
         confirmLabel="Reset password"
         onConfirm={() => {
-          if (resetting?.accountId) void state.issue([resetting.accountId]);
+          if (resetting?.accountId) void state.issue([resetting.accountId], resetTarget, resetVoids.length > 0);
         }}
       />
     </div>
   );
+}
+
+/** The running live contests of this entrant that a new sign-in closes. */
+function closingContests(data: EventConsole, entrantId: string): EventConsole["contests"] {
+  return data.contests.filter((contest) => contest.kind === "live" && contest.intake.open
+    && data.entries.some((entry) => entry.contestId === contest.id && entry.entrantId === entrantId));
 }
 
 function RenameForm({

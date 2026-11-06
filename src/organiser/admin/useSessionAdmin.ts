@@ -95,6 +95,7 @@ export function useSessionAdmin(
     const [issued] = await backend.manage.issueCredentials(crypto.randomUUID(), {
       eventId: state.event?.id ?? null,
       accountIds: [userId],
+      contestId: sessionId || null,
     });
     if (!issued?.temporaryPassword) throw new Error("The password was not issued. Try again.");
     return { username: issued.handle, password: issued.temporaryPassword };

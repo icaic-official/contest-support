@@ -447,6 +447,45 @@ async function seedWorld(db: D1Connection): Promise<void> {
     SELECT ${uuid(7, 'i')}, 'Waiting team ' || i, 'waiting' || i, 'waiting' || i, '${world.event}', ${uuid(6, 'i')}, 0 FROM n`);
 }
 
+describe('rows read by live passwords with 800 seats', () => {
+  let db: D1Connection;
+  let dispose: () => Promise<void>;
+  const hasher = { hash: async () => 'fictional-hash', verify: async () => false };
+  const admin = { accountId: world.account(1201), loginId: '00000000-0000-4000-8004-000000001201' };
+  const live = '00000000-0000-4000-8009-000000000001';
+  const seat = (i: string) => uuid(8, i);
+
+  beforeAll(async () => {
+    const platform = await openStoreDatabase({ configPath, remoteBindings: false });
+    await applyMigrations(platform.db);
+    await seedWorld(platform.db);
+    ({ db, dispose } = platform);
+    const series = 'WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 800)';
+    const run = (sql: string) => db.prepare(sql).run();
+    await run(`INSERT INTO sessions (id, event_id, name, kind, starts_at, ends_at, intake_follows_schedule)
+      VALUES ('${live}', '${world.event}', 'Live', 'live', strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '+1 hour'), strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '+2 hours'), 1)`);
+    await run(`${series} INSERT INTO entrants (id, event_id, kind, name) SELECT ${seat('i')}, '${world.event}', 'team', 'Seat ' || i FROM n`);
+    await run(`${series} INSERT INTO accounts (id, name, username, handle, event_id, entrant_id, must_change)
+      SELECT ${seat('i')}, 'Seat ' || i, 'seat' || i, 'seat' || i, '${world.event}', ${seat('i')}, 0 FROM n`);
+    await run(`${series} INSERT INTO teams (id, session_id, entrant_id, name) SELECT ${seat('i')}, '${live}', ${seat('i')}, 'Seat ' || i FROM n`);
+  });
+  afterAll(async () => { await dispose?.(); });
+
+  // Measured on 2026-11-06: 509 rows for a batch, and 9,620 rows for the console. Each ceiling sits about 20% above.
+  it('issues one batch of eight and reads the console within the ceilings', async () => {
+    expect((await db.prepare('SELECT unready_seats FROM sessions WHERE id = ?').bind(live).first<{ unready_seats: number }>())!.unready_seats).toBe(800);
+    const issuing = metered(db);
+    const accountIds = Array.from({ length: 8 }, (_, i) => `00000000-0000-4000-8008-${String(i + 1).padStart(12, '0')}`);
+    const issued = await new D1ManageService(issuing.connection, hasher).issueCredentials(admin, randomUUID(), { eventId: world.event, accountIds, contestId: live });
+    expect(issued.every((row) => row.temporaryPassword)).toBe(true);
+    const reading = metered(db);
+    const console_ = await new D1ManageService(reading.connection, hasher).event(admin, world.event);
+    expect(console_.contests.find((contest) => contest.id === live)!.waiting).toHaveLength(792);
+    expect(issuing.usage.rowsRead).toBeLessThan(620);
+    expect(reading.usage.rowsRead).toBeLessThan(11_500);
+  });
+});
+
 describe('rows read by management commands in a session with 1,200 accounts', () => {
   let db: D1Connection;
   let dispose: () => Promise<void>;
@@ -481,7 +520,7 @@ describe('rows read by management commands in a session with 1,200 accounts', ()
       [{ type: 'unassign_staff', contestId: world.contest, accountId: world.account(1202) }, 1201, 50],
       [{ type: 'assign_entrants', contestId: world.contest, entries: [{ entrantId: fresh!, location: 'Hall 9' }] }, 1201, 150],
       [{ type: 'update_contest', contestId: world.contest, name: 'Scale session', contestType: 'teams', schedule: testSchedule }, 1201, 135],
-      [{ type: 'create_contest', eventId: world.event, name: 'Another', contestType: 'mixed', schedule: testSchedule, categories: ['Other'] }, 1201, 30],
+      [{ type: 'create_contest', kind: 'practice', eventId: world.event, name: 'Another', contestType: 'mixed', schedule: testSchedule, categories: ['Other'] }, 1201, 30],
       [{ type: 'create_people', eventId: world.event, people: [{ handle: 'fresh-person', name: 'Fresh person' }] }, 1201, 40],
     ];
     for (const [command, n, ceiling] of commands) {

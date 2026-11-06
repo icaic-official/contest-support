@@ -102,7 +102,7 @@ export function useSite(): SiteState {
     async (accountId: string, eventId?: string) =>
       (
         await run(`issue:${accountId}`, (requestId) =>
-          backend.manage.issueCredentials(requestId, { eventId: eventId ?? null, accountIds: [accountId] }),
+          backend.manage.issueCredentials(requestId, { eventId: eventId ?? null, accountIds: [accountId], contestId: null }),
         )
       )?.[0],
     [run],

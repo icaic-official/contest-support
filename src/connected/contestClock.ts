@@ -65,6 +65,8 @@ export function clockText(clock: ContestClock, now: number): ClockText {
   const details: string[] = [];
   const startNote = viewerNote(schedule.starts_at, zone, "time");
   switch (reason) {
+    case "awaiting_live_passwords":
+      return { headline: "Reporting opens when every team has its live password.", details };
     case "before_start":
       if (left) details.push(`Opens in ${left}.`);
       if (startNote) details.push(`${startNote}.`);
@@ -103,6 +105,7 @@ export function closedMessage(clock: ContestClock | null | undefined, now: numbe
   switch (clock.intake.reason) {
     case "before_start":
     case "ended":
+    case "awaiting_live_passwords":
       return clockText(clock, now).headline;
     default:
       return "Reporting is closed by the organizers.";

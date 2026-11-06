@@ -14,13 +14,26 @@ An event admin or a webmaster creates accounts and assigns people. A contest adm
 - **Contests.** Create a contest with a type: teams, single contestants, or both.
 - **Assignments.** Choose a contest. Select entrants, give them a location, and assign them. Give each person roles, or make them a contest admin, and choose **Assign**.
 
-After each creation, a credential sheet shows each temporary password once, in batches of eight. If a password did not arrive, choose **Issue again**.
+After each creation, a credential sheet shows each temporary password once, in batches of eight. If a password did not arrive, choose **Issue again**. **Print sheets** prints one card for each person.
+
+## Issue live passwords
+
+A live contest stays closed until every sign-in in it has a password issued for that contest. **Open now** cannot open it earlier.
+
+1. Create the contest with the kind **Live**. The kind cannot change later.
+2. Assign its entrants. **Contests** shows "Waiting for live passwords" with a count and the names.
+3. Choose **Issue live passwords**. Minsky issues eight accounts at a time. The panel also names the overlapping live contests that these passwords open.
+4. Print or share the sheet. When the count reaches zero, the panel disappears and the contest follows its schedule.
+
+A person's own password change keeps the contest ready. A reset by staff closes the contest until that person has a new password. Assigning another entrant to a live contest also closes it until that entrant has a password.
 
 ## Reset a password
 
 1. Confirm who is asking.
 2. Reset from the account sheet (phone) or **Manage** (console).
 3. Give the new temporary password privately.
+
+Minsky refuses a reset that would sign a contestant out of an open contest that the reset does not name. A reset from the contest's own page or from **Entrants** names the open contest. If the contestant has a second open contest, close it first, or wait until it ends.
 
 The reset signs the account out everywhere. History stays. The account keeps its username.
 Resets and username changes affect the whole account. A contest admin can use them only for an account that sits in no other contest. An event admin can use them for every account of the event.
@@ -104,3 +117,13 @@ Session admins and jury members post announcements to the whole session. See [Po
 
 Archived events stay readable. Changes, uploads, limit changes, and team and category edits stop. Nothing is deleted.
 A webmaster creates events on the **Site** page. The [installer](/operators/installation/#6-create-the-first-webmaster) creates only the first webmaster. An event admin then creates contests in the event console.
+
+## Changes that affect live passwords
+
+A live contest stays closed until every contestant seat has a password issued for it. These changes affect that state:
+
+- **Assign an entrant, or add a sign-in, while reporting is open.** Minsky asks first and names the number of teams. If you confirm, reporting closes for every team, and Minsky opens the password sheet. Reporting opens again when the last password is issued.
+- **Move a contest.** If the new time no longer overlaps the time that the passwords were issued for, those passwords no longer count, and the contest waits for new ones. An end extension, or a shift that still overlaps, keeps them. If the move would stop a contest that should still be running, Minsky refuses it. Close reporting first.
+- **Issue a password for a later contest.** If the person holds a password for a live contest that has not ended, the preview says "These passwords stop working for" and names the contest. Reissue for that contest later.
+- **Two open contests block a reset.** Close one contest, then issue the password.
+- **Roll back the Worker.** After a rollback, live contests open without this check. Close live contests before a rollback.

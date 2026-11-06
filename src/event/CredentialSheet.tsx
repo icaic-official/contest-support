@@ -146,6 +146,14 @@ export function CredentialSheet({
             </AlertDescription>
           </Alert>
         )}
+        {sheet.busy && (
+          <progress
+            className="h-2 w-full"
+            aria-label="Passwords issued"
+            max={sheet.rows.length}
+            value={sheet.rows.filter((row) => row.state !== "waiting").length}
+          />
+        )}
         <p role="status" className="min-h-4 text-xs text-muted-foreground">
           {sheet.busy ? "Issuing passwords…" : copied}
         </p>

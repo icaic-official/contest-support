@@ -6,6 +6,7 @@ import {
   ISSUE_BATCH,
   type PersonInput,
   parseHandle,
+  type Schedule,
 } from "@/backend/contracts";
 import { hasControlCharacter, rosterKey, rosterTextMax, teamsPerCommandMax } from "@/connected/roster";
 
@@ -94,4 +95,62 @@ export function issueBatches(ids: readonly string[]): string[][] {
   const batches: string[][] = [];
   for (let at = 0; at < ids.length; at += ISSUE_BATCH) batches.push(ids.slice(at, at + ISSUE_BATCH));
   return batches;
+}
+
+type ConsoleContest = EventConsole["contests"][number];
+
+function windowOf({ startsAt, endsAt, graceMinutes }: Schedule): { start: number; end: number } {
+  return { start: Date.parse(startsAt), end: Date.parse(endsAt) + graceMinutes * 60_000 };
+}
+
+/**
+ * The other live contests that a live password for `contest` also opens, for the
+ * organizer's preview. `forContestsSql` decides on the server, per account. This
+ * applies the same window rule to the contests that share an entrant.
+ */
+export function alsoOpens(console: EventConsole, contest: ConsoleContest): ConsoleContest[] {
+  if (!contest.schedule) return [];
+  const target = windowOf(contest.schedule);
+  const seated = seatedEntrants(console, contest.id);
+  return console.contests.filter((other) => {
+    if (other.id === contest.id || other.kind !== "live" || !other.schedule) return false;
+    const { start, end } = windowOf(other.schedule);
+    return start < target.end && target.start < end
+      && console.entries.some((entry) => entry.contestId === other.id && seated.has(entry.entrantId));
+  });
+}
+
+/**
+ * The contest to name when an organizer resets one entrant's password: an open
+ * contest of that entrant, live first, then the entrant's next live contest. The
+ * server refuses a reset that would sign the contestant out of an open contest that
+ * the request does not name.
+ */
+export function recoveryContest(console: EventConsole, entrantId: string): string | null {
+  const open = console.contests.filter((contest) => contest.intake.open
+    && console.entries.some((entry) => entry.contestId === contest.id && entry.entrantId === entrantId));
+  const next = console.contests
+    .filter((contest) => contest.kind === "live" && notEnded(contest) && isEntered(console, contest.id, entrantId))
+    .sort((a, b) => Date.parse(a.schedule?.startsAt ?? "") - Date.parse(b.schedule?.startsAt ?? ""))[0];
+  return (open.find((contest) => contest.kind === "live") ?? next ?? open[0])?.id ?? null;
+}
+
+function notEnded(contest: ConsoleContest): boolean {
+  return !!contest.schedule && Date.now() < windowOf(contest.schedule).end;
+}
+
+function isEntered(console: EventConsole, contestId: string, entrantId: string): boolean {
+  return console.entries.some((entry) => entry.contestId === contestId && entry.entrantId === entrantId);
+}
+
+/**
+ * The live contests, not yet ended, where these accounts hold a password that an
+ * issue for `target` would stop. `voidedScopesSql` decides on the server.
+ */
+export function voidedBy(console: EventConsole, target: ConsoleContest | undefined, accountIds: readonly string[]): ConsoleContest[] {
+  const kept = new Set(target ? [target.id, ...alsoOpens(console, target).map((other) => other.id)] : []);
+  const entrants = console.entrants.filter((entrant) => entrant.accountId && accountIds.includes(entrant.accountId));
+  return console.contests.filter((contest) => contest.kind === "live" && !kept.has(contest.id) && notEnded(contest)
+    && entrants.some((entrant) => isEntered(console, contest.id, entrant.id)
+      && !contest.waiting.some((seat) => seat.accountId === entrant.accountId)));
 }

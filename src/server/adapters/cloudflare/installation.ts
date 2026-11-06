@@ -155,7 +155,7 @@ export async function recoverWebmaster(
       assertion(db, assertionId, `EXISTS (SELECT 1 FROM accounts a JOIN grants g ON g.account_id = a.id AND g.scope = 'site'
         WHERE a.id = ? AND a.disabled = 0 AND a.credential_generation = ?)`, target.id, target.credential_generation),
       // The webmaster acts on the own account, which the takeover trigger allows.
-      ...replaceCredentialStatements(db, target, hash, { operationId, actor: target.id, temporary: true }),
+      ...replaceCredentialStatements(db, target, hash, { operationId, actor: target.id, temporary: true, contestId: null }),
       statement(db, `INSERT INTO authority_audit (id, event_id, actor, actor_name, action, target, detail)
         VALUES (?, NULL, ?, ?, 'trusted_webmaster_recovery', ?, ?)`, crypto.randomUUID(), target.id, target.name, target.id,
       JSON.stringify({ operationId })),

@@ -28,7 +28,7 @@ export async function accountCreation(context: ScenarioContext): Promise<void> {
   const [entrantId] = entrants.entrantIds!;
   await rejects(() => manage(contestAdmin, { type: 'assign_entrants', contestId: context.sessionId, entries: [{ entrantId: entrantId!, location: 'Desk' }] }));
   await manage(eventAdmin, { type: 'assign_entrants', contestId: context.sessionId, entries: [{ entrantId: entrantId!, location: 'Desk' }] });
-  const issued = await eventAdmin.manage.issueCredentials(crypto.randomUUID(), { eventId: context.eventId, accountIds: entrants.accountIds! });
+  const issued = await eventAdmin.manage.issueCredentials(crypto.randomUUID(), { eventId: context.eventId, accountIds: entrants.accountIds!, contestId: null });
   const temporaryPassword = issued[0]?.temporaryPassword;
   check(temporaryPassword, 'The event admin must receive a temporary password for a new account.');
   const teamClient = await context.connect();
@@ -49,8 +49,8 @@ export async function accountCreation(context: ScenarioContext): Promise<void> {
   // A response that the client loses leaves the passwords unknown. The retry returns the accounts without them.
   const lostRequest = crypto.randomUUID();
   context.discardNextAccountResponse(eventAdmin);
-  await rejects(() => eventAdmin.manage.issueCredentials(lostRequest, { eventId: context.eventId, accountIds: [staffId] }));
-  const replayed = await eventAdmin.manage.issueCredentials(lostRequest, { eventId: context.eventId, accountIds: [staffId] });
+  await rejects(() => eventAdmin.manage.issueCredentials(lostRequest, { eventId: context.eventId, accountIds: [staffId], contestId: null }));
+  const replayed = await eventAdmin.manage.issueCredentials(lostRequest, { eventId: context.eventId, accountIds: [staffId], contestId: null });
   check(replayed.length === 1 && replayed[0]!.temporaryPassword === null, 'A retry of a committed issue must not return the password again.');
   const members = (await eventAdmin.workflows.snapshot(context.sessionId)).members;
   const matching = members.filter((member) => member.person.username === staff.username);
@@ -58,7 +58,7 @@ export async function accountCreation(context: ScenarioContext): Promise<void> {
   check(matching[0]!.person.id === staffId && matching[0]!.person.name === staff.name && matching[0]!.membership.team_id === null &&
     !matching[0]!.membership.is_admin && ['volunteer', 'jury'].every((role) => matching[0]!.membership.roles.includes(role as 'volunteer' | 'jury')),
   'The created staff account must retain its person and combined roles.');
-  const recovered = (await eventAdmin.manage.issueCredentials(crypto.randomUUID(), { eventId: context.eventId, accountIds: [staffId] }))[0]?.temporaryPassword;
+  const recovered = (await eventAdmin.manage.issueCredentials(crypto.randomUUID(), { eventId: context.eventId, accountIds: [staffId], contestId: null }))[0]?.temporaryPassword;
   check(recovered, 'Issuing again must recover a password lost with the first response.');
   const staffClient = await context.connect();
   await staffClient.auth.signIn(context.signIn, staff.username, recovered);
@@ -101,14 +101,14 @@ export async function revocation(context: ScenarioContext): Promise<void> {
   await submit(member, context.sessionId, context.teamId);
   // The contest admin of one contest cannot reissue for a person who also sits in another.
   await rejects(() =>
-    admin.manage.issueCredentials(crypto.randomUUID(), { eventId: context.eventId, accountIds: [user.id] })
+    admin.manage.issueCredentials(crypto.randomUUID(), { eventId: context.eventId, accountIds: [user.id], contestId: null })
   );
   check(
     (await member.auth.accountStatus()).session_valid,
     'A rejected cross-contest reissue must preserve the existing login.',
   );
   await manage(eventAdmin, { type: 'unassign_staff', contestId: context.otherSessionId, accountId: user.id });
-  const reset = (await admin.manage.issueCredentials(crypto.randomUUID(), { eventId: context.eventId, accountIds: [user.id] }))[0]?.temporaryPassword;
+  const reset = (await admin.manage.issueCredentials(crypto.randomUUID(), { eventId: context.eventId, accountIds: [user.id], contestId: null }))[0]?.temporaryPassword;
   check(
     reset,
     'A reissue must return temporary credentials to the administrator.',

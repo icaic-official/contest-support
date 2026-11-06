@@ -121,6 +121,7 @@ Before the real deploy, check in **Workers & Pages** that no Worker has your `wo
 ## 6. Create the first webmaster
 
 Bootstrap creates exactly one webmaster and nothing else. It makes no event, contest, or team.
+The bootstrap command reaches your hosted D1 database only. It has no local mode, so run it with the Cloudflare credentials of the installation.
 Edit `site.json`: `webmasterName` and `webmasterHandle`.
 A handle is 3–32 lowercase letters, digits, `_`, or `-`, starting with a letter or digit.
 
@@ -134,7 +135,7 @@ Bootstrap is atomic and refuses a database that already has data.
 The webmaster types the handle with **Site sign-in**.
 
 Then the webmaster opens the **Site** page and chooses **Create event**. The form takes the event name, an event code, a time zone, and the first event admin. Minsky shows that admin's temporary password once.
-The event admin runs the event in the **event console** (`/event`): **People**, **Entrants**, **Contests**, and **Assignments**. Staff and teams sign in with the event code. Their credential sheets carry the link `<origin>/?event=<code>`.
+The event admin runs the event in the **event console** (`/event`): **People**, **Entrants**, **Contests**, and **Assignments**. Staff and teams sign in with the event code. Their credential sheets carry the link `<origin>/?event=<code>`, which fills in the code. A person types the code only when they open the plain sign-in page. Choose a short code that people can read aloud.
 Only event admins and webmasters create accounts and assign people. A contest admin keeps the contest settings, announcements, and the issue workflow.
 
 | Problem | Do this |

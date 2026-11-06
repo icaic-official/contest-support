@@ -1,7 +1,15 @@
-import { CheckCheck } from "lucide-react";
+import { CheckCheck, Undo2 } from "lucide-react";
 import { useId, useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  ReturningDialogContent as DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -9,7 +17,7 @@ import { can } from "./capabilities";
 import { keepFocus } from "./hooks/useRefreshOnReturn";
 import { type ContestAwardRunner, useContestAwards } from "./hooks/useContestAwards";
 import { awardMinutesLabel } from "./labels";
-import type { Membership, Snapshot } from "./model";
+import type { ContestAward, Membership, Snapshot } from "./model";
 import { seatOf } from "./capabilities";
 
 /** The most minutes that one contest-wide award gives. D1 enforces the same bound. */
@@ -103,7 +111,10 @@ export function ContestAwardsPanel({
   const mayGrant = can(seat, "award");
   const mayApply = can(seat, "apply");
   const archived = Boolean(state.event?.archived);
-  const awards = pendingOnly ? state.contest_awards.filter((award) => !award.applied_at) : state.contest_awards;
+  const [withdrawing, setWithdrawing] = useState<ContestAward>();
+  const awards = pendingOnly
+    ? state.contest_awards.filter((award) => !award.applied_at && !award.withdrawn_at)
+    : state.contest_awards;
   if (!sessionId || (pendingOnly && awards.length === 0)) return null;
   return (
     <section aria-labelledby={`${id}-title`} className="rounded-xl border bg-card p-4">
@@ -131,24 +142,44 @@ export function ContestAwardsPanel({
                 <span className="min-w-0 flex-1 basis-40 text-sm break-words">“{award.explanation}”</span>
               </p>
               <p className="mt-1 text-xs text-muted-foreground">Decided by {award.actor_name}</p>
-              {award.applied_at ? (
+              {award.withdrawn_at ? (
+                <p className="mt-1.5 flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <Undo2 aria-hidden="true" className="size-3.5" />
+                  Withdrawn by {award.withdrawn_name} · gives no time
+                </p>
+              ) : award.applied_at ? (
                 <p className="mt-1.5 flex items-center gap-1.5 text-xs text-status-resolved">
                   <CheckCheck aria-hidden="true" className="size-3.5" />
                   Applied · confirmed by {award.applied_name}
                 </p>
               ) : (
-                mayApply &&
                 !archived && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="mt-2 h-11 w-full aria-disabled:pointer-events-none aria-disabled:opacity-50 sm:w-fit"
-                    aria-disabled={runner.busy}
-                    onClick={() => void runner.run({ type: "apply", awardId: award.id }).then(() => keepFocus())}
-                  >
-                    <CheckCheck aria-hidden="true" />
-                    Confirm applied externally
-                  </Button>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {mayApply && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="h-11 w-full aria-disabled:pointer-events-none aria-disabled:opacity-50 sm:w-fit"
+                        aria-disabled={runner.busy}
+                        onClick={() => void runner.run({ type: "apply", awardId: award.id }).then(() => keepFocus())}
+                      >
+                        <CheckCheck aria-hidden="true" />
+                        Confirm applied externally
+                      </Button>
+                    )}
+                    {mayGrant && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        className="h-11 w-full sm:w-fit"
+                        aria-label={`Withdraw the ${awardMinutesLabel(award.minutes)} award`}
+                        onClick={() => setWithdrawing(award)}
+                      >
+                        <Undo2 aria-hidden="true" />
+                        Withdraw
+                      </Button>
+                    )}
+                  </div>
                 )
               )}
             </li>
@@ -158,6 +189,35 @@ export function ContestAwardsPanel({
         <p className="mt-3 text-sm text-muted-foreground">No award for the whole contest yet.</p>
       )}
       {!pendingOnly && mayGrant && !archived && <AwardForm runner={runner} disabled={runner.busy} />}
+      <Dialog open={withdrawing !== undefined} onOpenChange={(open) => !open && !runner.busy && setWithdrawing(undefined)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader className="text-left">
+            <DialogTitle>Withdraw this award?</DialogTitle>
+            <DialogDescription>
+              {withdrawing ? `${awardMinutesLabel(withdrawing.minutes)} for every contestant. ` : ""}
+              The award stays in the history as withdrawn. It gives no time, and contestants never see it.
+              You cannot undo this, but you can record a new award. Staff are told.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button type="button" variant="outline" className="h-11" disabled={runner.busy} onClick={() => setWithdrawing(undefined)}>
+              Keep the award
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              className="h-11"
+              disabled={runner.busy}
+              onClick={() => {
+                if (!withdrawing) return;
+                void runner.run({ type: "withdraw", awardId: withdrawing.id }).then(() => setWithdrawing(undefined));
+              }}
+            >
+              Withdraw award
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </section>
   );
 }

@@ -142,11 +142,13 @@ export type ContestQuery =
 
 export type ContestAwardCommand =
   | { readonly type: 'grant'; readonly minutes: number; readonly explanation: string }
-  | { readonly type: 'apply'; readonly awardId: string };
+  | { readonly type: 'apply'; readonly awardId: string }
+  | { readonly type: 'withdraw'; readonly awardId: string };
 
 /**
  * Contest-wide time awards give minutes to every contestant of one contest.
  * Jury grant them. Support or jury confirm that the minutes were applied outside Minsky.
+ * Jury can withdraw an award that nobody has confirmed. The record stays, and it gives no time.
  * Minsky changes no external contest clock.
  */
 export interface ContestAwards {

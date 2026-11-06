@@ -41,6 +41,9 @@ test("an organizer issues live passwords from one sheet, and the readiness count
   await tab(page, "Contests").click();
   await createLive(page, "Live 1");
   await createLive(page, "Live 2");
+  // The form defaults to 09:00 to 11:00 today, so a run inside that window would open intake and ask to close reporting first.
+  await local.run("UPDATE sessions SET starts_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '+1 day'), ends_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '+2 days') WHERE name IN ('Live 1', 'Live 2')");
+  await page.reload();
   await tab(page, "Entrants").click();
   await page.getByLabel("Entrants, one per line: name, username", { exact: true })
     .fill("Team Orion, team-orion\nTeam Vega, team-vega");

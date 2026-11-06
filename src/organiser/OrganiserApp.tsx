@@ -1,8 +1,16 @@
-import { desktopQuery, useMediaQuery } from "@/connected/hooks/useMediaQuery";
+import { lazy } from "react";
+import { useMediaQuery } from "@/connected/hooks/useMediaQuery";
 import { useWorkflowState } from "@/connected/hooks/useWorkflowState";
 import type { ShellProps } from "@/connected/shell";
-import { OrganiserDesktopConsole } from "./desktop/OrganiserDesktopConsole";
-import { OrganiserPhoneApp } from "./phone/OrganiserPhoneApp";
+import { loadDesktopConsole, loadPhoneApp, organiserDesktopQuery } from "./layouts";
+
+// A phone never downloads the desktop console, and a laptop never downloads the phone app.
+const OrganiserDesktopConsole = lazy(() =>
+  loadDesktopConsole().then((m) => ({ default: m.OrganiserDesktopConsole })),
+);
+const OrganiserPhoneApp = lazy(() =>
+  loadPhoneApp().then((m) => ({ default: m.OrganiserPhoneApp })),
+);
 
 /**
  * The organiser UI for volunteers, specialists, jury members and session
@@ -12,7 +20,7 @@ import { OrganiserPhoneApp } from "./phone/OrganiserPhoneApp";
  */
 export function OrganiserApp(props: ShellProps) {
   const workflow = useWorkflowState(props.data);
-  const desktop = useMediaQuery(desktopQuery);
+  const desktop = useMediaQuery(organiserDesktopQuery);
   return desktop ? (
     <OrganiserDesktopConsole shell={props} workflow={workflow} />
   ) : (

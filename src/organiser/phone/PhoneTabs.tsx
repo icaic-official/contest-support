@@ -1,4 +1,4 @@
-import { useId, useState } from "react";
+import { useCallback, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   Camera,
   CheckCheck,
@@ -86,20 +86,45 @@ function IssueList({
   issues: readonly Issue[];
   props: PhoneTabProps;
 }) {
+  const { state, workflow } = props;
+  // The tab builds new callbacks on every render, and it renders every second.
+  // The cards call the latest ones through these stable wrappers.
+  const latest = useRef(props);
+  useLayoutEffect(() => {
+    latest.current = props;
+  });
+  const open = useCallback((id: string) => latest.current.openIssue(id), []);
+  const run = useCallback(
+    (issue: Issue, action: CardAction) =>
+      latest.current.runCardAction(issue, action),
+    [],
+  );
+  const teams = useMemo(
+    () => new Map(state.teams.map((team) => [team.id, team])),
+    [state.teams],
+  );
   return (
     <ul className="space-y-2.5">
-      {issues.map((issue) => (
-        <IssueCard
-          key={issue.id}
-          issue={issue}
-          state={props.state}
-          now={props.now}
-          command={props.workflow.command}
-          action={props.cardAction(issue)}
-          onOpen={() => props.openIssue(issue.id)}
-          onAction={(action) => props.runCardAction(issue, action)}
-        />
-      ))}
+      {issues.map((issue) => {
+        const action = props.cardAction(issue);
+        return (
+          <IssueCard
+            key={issue.id}
+            issue={issue}
+            team={teams.get(issue.team_id)}
+            resolutions={state.resolutions}
+            clockOffset={props.shell.data.clockOffset}
+            locked={workflow.command.locked}
+            running={
+              action !== undefined &&
+              isRunning(workflow.command.running, action, issue.id)
+            }
+            action={action}
+            onOpen={open}
+            onAction={run}
+          />
+        );
+      })}
     </ul>
   );
 }

@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { memo, type ReactNode } from "react";
 import {
   Archive,
   CircleUserRound,
@@ -15,7 +15,12 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import type { CommandRunner } from "@/connected/hooks/useCommand";
 import type { SessionData } from "@/connected/hooks/useSessionSnapshot";
-import { isRunning, type Issue, type Snapshot } from "@/connected/model";
+import {
+  type Issue,
+  type Resolution,
+  type Snapshot,
+  type Team,
+} from "@/connected/model";
 import { cn } from "@/lib/utils";
 import { CommandFeedback } from "../actions/ActionSheet";
 import {
@@ -23,7 +28,7 @@ import {
   PersonAvatar,
   PlaceTile,
   StatusBadge,
-  UnresolvedTimer,
+  LiveUnresolvedTimer,
 } from "../components/issueDisplay";
 import type { OrganiserTab } from "../organiserModel";
 
@@ -138,30 +143,35 @@ export type CardAction = "claim" | "accept";
  * timer, the team, the description, the category and the owner. The whole
  * card opens the issue. Claim or Accept is a separate button.
  */
-export function IssueCard({
+export const IssueCard = memo(function IssueCard({
   issue,
-  state,
-  now,
-  command,
+  team,
+  resolutions,
+  clockOffset,
+  locked,
+  running,
   action,
   onOpen,
   onAction,
 }: {
   issue: Issue;
-  state: Snapshot;
-  now: number;
-  command: CommandRunner;
+  team: Team | undefined;
+  resolutions: readonly Resolution[];
+  clockOffset: { readonly current: number };
+  /** True while a command runs. Controls are disabled. */
+  locked: boolean;
+  /** True while this card's own action runs. */
+  running: boolean;
   action?: CardAction | undefined;
-  onOpen: () => void;
-  onAction: (action: CardAction) => void;
+  onOpen: (issueId: string) => void;
+  onAction: (issue: Issue, action: CardAction) => void;
 }) {
-  const team = state.teams.find((item) => item.id === issue.team_id);
   return (
     <li className="relative rounded-xl border bg-card p-3 transition-colors duration-(--motion-fast) ease-out has-[>button:active]:bg-accent has-[>button:focus-visible]:ring-[3px] has-[>button:focus-visible]:ring-ring/50">
       <button
         id={`issue-card-${issue.id}`}
         type="button"
-        onClick={onOpen}
+        onClick={() => onOpen(issue.id)}
         className="absolute inset-0 rounded-xl outline-none"
       >
         <span className="sr-only">
@@ -176,10 +186,10 @@ export function IssueCard({
             <span className="font-mono text-xs text-muted-foreground">
               ISS-{issue.number}
             </span>
-            <UnresolvedTimer
+            <LiveUnresolvedTimer
               issue={issue}
-              resolutions={state.resolutions}
-              now={now}
+              resolutions={resolutions}
+              clockOffset={clockOffset}
               className="ml-auto text-sm"
             />
           </div>
@@ -205,9 +215,9 @@ export function IssueCard({
               <Button
                 type="button"
                 className="pointer-events-auto relative h-11"
-                disabled={command.locked}
-                loading={isRunning(command.running, action, issue.id)}
-                onClick={() => onAction(action)}
+                disabled={locked}
+                loading={running}
+                onClick={() => onAction(issue, action)}
                 aria-label={`${action === "claim" ? "Claim" : "Accept handoff for"} ISS-${issue.number}`}
               >
                 {action === "claim" ? (
@@ -223,7 +233,7 @@ export function IssueCard({
       </div>
     </li>
   );
-}
+});
 
 /** A message for an empty list. */
 export function EmptyList({ children }: { children: ReactNode }) {

@@ -1,3 +1,4 @@
+import '../../lib/zodConfig';
 import { z } from 'zod';
 import type { Announcements, Avatars, Backend, LiveUpdates } from '../contracts';
 import { AnnouncementRejectedError, ImageRequestError, RequestRefusedError, WorkflowRejectedError, workflowRejectionMessage } from '../errors';

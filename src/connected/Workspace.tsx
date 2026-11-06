@@ -3,8 +3,6 @@ import { Link, Navigate, useLocation } from "react-router";
 import { BuildId } from "@/components/build-id";
 import { RenderErrorBoundary } from "@/components/render-error-boundary";
 import { Button } from "@/components/ui/button";
-import { ContestantApp } from "@/contestant/ContestantApp";
-import { OrganiserApp } from "@/organiser/OrganiserApp";
 import { NoSessionAccess } from "@/screens/NoSessionAccess";
 import { Announcements } from "./Announcements";
 import { AvatarProvider } from "./Avatars";
@@ -13,9 +11,15 @@ import { useSessionSnapshot } from "./hooks/useSessionSnapshot";
 import { type UiKind, uiKindFor } from "./model";
 import type { ShellProps } from "./shell";
 import { canOpenPage, eventPath, eventRouteOf, isEntryPath, pageForPath, sitePath } from "./navigation";
-import { EventConsolePage } from "@/event/EventConsole";
 import { useNoContestLanding } from "@/event/useOwnEvent";
-import { SiteDashboard } from "@/site/SiteDashboard";
+import {
+  ContestantApp,
+  EventConsolePage,
+  OrganiserApp,
+  SiteDashboard,
+  WithScreen,
+  rememberScreen,
+} from "./lazyScreens";
 
 /**
  * Loads the session data and selects the UI from the membership: team
@@ -41,6 +45,9 @@ export function Workspace({
   }, [connected, onLiveChange]);
   const membership = data.snapshot?.membership;
   const current = membership ? uiKindFor(membership) : undefined;
+  useEffect(() => {
+    if (current) rememberScreen(current);
+  }, [current]);
   const [kind, setKind] = useState<UiKind>();
   if (current && current !== kind) setKind(current);
   const page = pageForPath(pathname);
@@ -50,13 +57,15 @@ export function Workspace({
   const eventRoute = eventRouteOf(pathname);
   if (eventRoute) {
     return (
-      <EventConsolePage
-        key={eventRoute.eventId ?? ""}
-        eventId={eventRoute.eventId}
-        user={props.user}
-        signOut={props.signOut}
-        hasContests={data.sessions.length > 0}
-      />
+      <WithScreen>
+        <EventConsolePage
+          key={eventRoute.eventId ?? ""}
+          eventId={eventRoute.eventId}
+          user={props.user}
+          signOut={props.signOut}
+          hasContests={data.sessions.length > 0}
+        />
+      </WithScreen>
     );
   }
   if (noContest && landing === "event") return <Navigate to={eventPath()} replace />;
@@ -66,7 +75,11 @@ export function Workspace({
   // The site page needs no readable contest, so a webmaster who must join
   // first can still reach the setting that asks for the join.
   if (pathname.replace(/\/+$/u, "") === sitePath) {
-    return <SiteDashboard user={props.user} data={data} signOut={props.signOut} />;
+    return (
+      <WithScreen>
+        <SiteDashboard user={props.user} data={data} signOut={props.signOut} />
+      </WithScreen>
+    );
   }
   if (isEntryPath(pathname)) return <Navigate to="/issues" replace />;
   if (!page) {
@@ -99,7 +112,7 @@ export function Workspace({
         {/* A crash in one UI keeps the announcements and build id visible. */}
         <div className="min-h-0 flex-1">
           <RenderErrorBoundary scope="region" resetKey={pathname}>
-            {app}
+            <WithScreen>{app}</WithScreen>
           </RenderErrorBoundary>
         </div>
         <p className="px-4 py-0.5 text-right text-[11px] text-muted-foreground">

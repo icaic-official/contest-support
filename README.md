@@ -199,7 +199,7 @@ Backend:
 - [Session announcements](docs/session-announcements.md) is the reference for announcement behavior in the Cloudflare implementation.
 - [Cloudflare backend design](docs/cloudflare-backend-design.md) explains the implemented server boundaries.
 - [Scaling design](docs/scaling-design.md) explains where one installation saturates under load and ranks the changes that raise capacity.
-- [Webmaster, event, and contest platform](docs/event-platform-design.md) is the design for one shared site. Its first two phases, one authority resolver and webmaster management, are merged. Phase 3, sign-in by event code, waits for review on `feature/event-sign-in`. The later phases are proposed. The [sketches page](docs/event-platform-sketches.md) holds its type and migration sketches.
+- [Webmaster, event, and contest platform](docs/event-platform-design.md) is the design for one shared site. Its first four phases are merged: the authority resolver, webmaster management, sign-in by event code, and the event console. The later phases are proposed. The [sketches page](docs/event-platform-sketches.md) holds its type and migration sketches.
 - [Cloudflare authentication reference](docs/cloudflare-authentication.md) and the [authentication choice](docs/cloudflare-authentication-choice.md).
 - [Add a backend provider](docs/add-provider.md) gives contributor interfaces, registration points, installation, cleanup, and required shared verification.
 

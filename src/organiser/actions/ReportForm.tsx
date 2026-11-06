@@ -31,7 +31,7 @@ export const emptyReport: ReportDraft = {
 };
 
 /**
- * Reports an issue for one or more teams. Staff find each team with the T0008
+ * Reports an issue for one or more teams. Staff find each team with the
  * fuzzy team search. Staff can report while contestant intake is closed.
  * Each team gets its own issue, with its own timer, owner and award. The form
  * sends one command per team, so a failure leaves only the unsent teams.

@@ -1,222 +1,155 @@
 # Minsky
 
-Minsky helps contest teams and staff report, triage, resolve, and review technical problems.
-Contestants and staff report issues; volunteers and specialists handle them through a shared queue.
-Jury members record time awards, and staff confirm their application to the external contest clock.
-Administrators manage accounts, roles, and contestant intake.
-Staff can attach images to issues and choose staff-only or team visibility.
+Minsky is a support desk for contests.
+Teams report technical problems. Volunteers and specialists resolve them from one shared queue.
+The jury records time awards, and staff confirm when an award reaches the contest's own clock.
 
-The app uses React, TypeScript, Vite, Tailwind CSS, and shadcn/ui.
-Its shared [backend contract](docs/backend-contracts.md) defines the provider boundary. Cloudflare is the only implementation.
-The [development application](https://minsky-dev.icaic-minsky.workers.dev) runs Cloudflare. See [run log](docs/history/run-log.md) for its deployed source.
-The Cloudflare installation serves the frontend and API through Workers, with D1, private R2 images, and Durable Object live updates.
+Minsky runs on Cloudflare Workers, D1, R2, and Durable Objects. One installation can host many events.
 
-The frontend separates contestant screens, organizer screens, and shared session hooks.
-`src/connected/` owns account checks, workspace state, browser routes, and workflow retry protection.
-See [frontend architecture](docs/frontend-architecture.md) for module responsibilities, browser paths, and access checks.
+**Project status.** Minsky is in development.
+No production installation exists, and it has not been verified in a live contest or at its target of 800 simultaneous users.
+It needs a network connection. No license has been chosen yet, so the code is not yet open for reuse.
+[Feature status](site/src/content/docs/reference/status.md) lists what works and what is not built.
 
-[Read the user and operator guides](https://minsky-docs.icaic-minsky.workers.dev).
-Use [the installation guide](site/src/content/docs/operators/installation.mdx) for an isolated Cloudflare instance.
-The owner merged the fresh Cloudflare development installation in [PR #43](https://github.com/GiftedNovaHD/minsky/pull/43) at `4e43739` on 2026-10-19.
-The owner separately approved the Cloudflare switch and a repeat automated deployment.
-It transferred no accounts, passwords, records, images, or IDs from the earlier backend.
-See [run log](docs/history/run-log.md#t0021-approved-activation-2026-10-19) for the deployment results and [activation](docs/activate-cloudflare-development.md) for the procedure.
-These are development installations that require connectivity. Live-contest readiness and capacity for 800 simultaneous users remain unverified.
+## What Minsky does
 
-## User interfaces
+- Every report has a timer that starts on submission and survives a page refresh. The timer stops on resolution and resumes if the issue reopens, without counting resolved time.
+- The issue owner stays responsible during a handoff until a specialist accepts it.
+- Public replies and internal staff notes are separate. Contestants never see internal notes.
+- Staff attach JPEG, PNG, and WebP images, and each image is either team-visible or staff-only.
+- The jury records an award separately from the confirmation that staff applied it. Minsky does not change the external contest clock.
+- A webmaster runs the site and creates events. Event admins create contests, accounts, and credential sheets. Contest intake follows a schedule, with a manual override.
+- Contestants get one app that works on phones and laptops. Staff get a phone app below 1024 px and a desktop console at 1024 px and wider.
 
-A person signs in with an event code, a username, and a password. The sign-in link on a credential sheet, `/?event=<code>`, fills in the code, and the device remembers it. A webmaster belongs to no event and selects **Site sign-in** instead.
-A username is unique inside its event. Staff can change their own username on the account page. A team account cannot.
+The [user and operator guides](https://minsky-docs.icaic-minsky.workers.dev) explain each of these tasks.
 
-The frontend redesign ([PR #44](https://github.com/GiftedNovaHD/minsky/pull/44), merged at `a25f9f1` on 2026-10-21) gives three UIs. After sign-in, the membership selects one:
+## Run the complete app locally
 
-- **Contestant app.** A membership with a team gets this app. It shows the team's reports, a live timer, a progress tracker, public messages, team-visible images and the report form. It works on phones and laptops. Below 1024 px wide it shows one screen at a time. A window at least 1024 px wide.
-- **Organizer phone app.** Staff in a window narrower than 1024 px get bottom tabs by role: Queue, Mine, Find, Awards, Session and Me. Issues open in a full-screen view with an action bar and bottom sheets.
-- **Organizer desktop console.** Staff in a window 1024 px wide or wider get a sidebar, a queue table, an issue side sheet, a ⌘K command palette, Award review and the admin pages.
-
-The jury award lists are in the phone **Awards** tab and the desktop **Award review** page.
-All UIs use shadcn/ui, Tailwind CSS and the same data hooks, with light and dark themes.
-See [frontend architecture](docs/frontend-architecture.md) and the [design record](design/redesign/README.md).
-
-## Local development
-
-Use npm with Node.js 22.13 or later within 22.x, or Node.js 24 or later. Docker is not required.
-The live development backend is Cloudflare.
-The Worker is `minsky-dev`. The D1 database is `minsky-development`.
-The development app is [https://minsky-dev.icaic-minsky.workers.dev](https://minsky-dev.icaic-minsky.workers.dev).
-A plain Vite server does not provide that API.
-For a separate Cloudflare installation, use the [installation guide](site/src/content/docs/operators/installation.mdx).
+These steps run the real Worker on local D1, R2, and Durable Object emulation. You do not need a Cloudflare account.
+You need Node.js 22.13 or later within 22.x, or Node.js 24 or later. Docker is not required.
 
 ```sh
 npm ci
+npx esbuild .lapiz/bootstrap.ts --bundle --platform=node --format=esm --packages=external --outfile=.lapiz/build/bootstrap.mjs --log-level=warning
+npx vite build --outDir .lapiz/dist --emptyOutDir
+PORT=8787 LAPIZ_PREVIEW_HOSTNAME=localhost:8787 node .lapiz/run.mjs
+npx wrangler dev --config .lapiz/wrangler.preview.json --persist-to .lapiz/state --ip 127.0.0.1 --port 8787 --local-protocol https
+```
+
+The `run.mjs` step prints `username=webmaster temporary password=...` and saves the line in `.lapiz/state/admin.txt`.
+
+1. Open <https://localhost:8787> and accept the warning for the self-signed certificate.
+2. Select **Sign in**, then **Site sign-in**.
+3. Enter the printed username and temporary password. Minsky then asks you for a new password.
+
+To start again with empty data, delete `.lapiz/state/`.
+Anyone who can read that folder or the start log can sign in as the webmaster, so use only fictional data.
+This setup is for development only. Live updates have not been checked on it.
+
+With [`lapiz.deploy.json`](lapiz.deploy.json), the same files run a preview on a Lapiz host, which supplies `PORT` and `LAPIZ_PREVIEW_HOSTNAME`.
+On a Lapiz host, the start log shows the webmaster password on each start.
+`npm run typecheck` does not check `.lapiz/bootstrap.ts`, because esbuild bundles it without type checks.
+
+### Run only the frontend
+
+`npm run dev` starts Vite at <http://127.0.0.1:5173>. The landing page loads, but sign-in fails because a plain Vite server has no API.
+Copy the environment file first:
+
+```sh
 cp .env.example .env.local
 npm run dev
 ```
 
-Open [http://127.0.0.1:5173](http://127.0.0.1:5173). The landing page shows. Select **Sign in** to open the sign-in page.
-Sign-in on that Vite server fails because the API is absent.
-Use `npm run test:connector:ui:local` for a temporary local Cloudflare application.
-Use the hosted development app for the shared development data.
-
-### Lapiz preview
-
-[`lapiz.deploy.json`](lapiz.deploy.json) and [`.lapiz/`](.lapiz) run a preview of the Cloudflare application on a Lapiz host.
-The preview uses only local emulation of D1, R2, and Durable Objects in `.lapiz/state/`. It never connects to hosted Cloudflare resources.
-On the first start, `.lapiz/bootstrap.ts` bootstraps one webmaster from `src/server/adapters/cloudflare/tooling/site.example.json`.
-
-The preview prints the first admin's username and temporary password in its start log on each start. This is deliberate, for debugging. The first admin is a webmaster and signs in with **Site sign-in**.
-Anyone who can read that log can sign in as that admin. Use only fictional data in the preview.
-
-`npm run typecheck` does not check `.lapiz/bootstrap.ts`. The preview setup bundles it with esbuild, which does not check types.
-
-## Checks and common commands
-
-| Command | Purpose |
-| --- | --- |
-| `npm run dev` | Start the local frontend. |
-| `npm run build` | Check types and create static assets in `dist/`. |
-| `npm run deploy` | Build the Cloudflare app, apply new D1 migrations, and publish it through guarded deployment tooling. Workers Builds runs it on `minsky-dev` for each push to `main`. Branch previews on `minsky-preview` are switched off. A manual run needs `WORKERS_CI_BRANCH`, `WORKERS_CI_COMMIT_SHA`, and the approved target settings. |
-| `node scripts/deploy-workers.mjs --check --site=app` | Validate the selected deployment target without provider changes. Use `--site=docs` for independent docs settings. |
-| `node scripts/deploy-workers.mjs --build --site=app` | Build the Cloudflare app and record its revision before guarded publication. |
-| `npm run preview` | Serve built assets locally. |
-| `npm run typecheck` | Check TypeScript. |
-| `npm run lint` | Run ESLint. |
-| `npm run ci` | Run the Workers Builds check: installs, type checking, lint, unit tests, both builds, audits, and the Gitleaks scan. |
-| `npm test` | Run unit and script tests without cloud credentials. |
-| `npm run test:d1` | Run every D1 workflow case with local emulation and current identity guards. |
-| `node scripts/rollback-check.mjs` | Run the previous release's `npm run test:d1` against this checkout's D1 migrations. The script checks out `origin/main` into a temporary Git worktree outside the repository, adds this checkout's new migration files, and installs packages there. Add `--base=<revision>` to name another previous release. It uses only temporary local resources. |
-| `npm run test:connector:runtime` | Run the complete connector through a temporary local HTTPS Worker, D1, R2, and Durable Objects. |
-| `npm run test:connector:ui:local` | Build a temporary Cloudflare frontend and run the complete React journey on local HTTPS and real emulated bindings. |
-| `npm run test:connector:ui -- --config=… --account=… --database=… --origin=…` | Run the complete React journey against the confirmed hosted Cloudflare CI application. |
-| `npm run test:connector:workflow:hosted -- --config=… --account=… --database=…` | Run every workflow case on the confirmed D1-only store CI target. |
-| `npm run test:connector:accounts:hosted -- --config=… --account=… --database=…` | Check account guards on the same D1-only store CI target. |
-| `npm run cloudflare:install -- plan --settings=… --config=…` | Inspect an independent Cloudflare installation plan without provider changes. See the [installation guide](site/src/content/docs/operators/installation.mdx). |
-| `npm run test:auth` | Run Cloudflare account and permission tests on local D1. |
-| `npm run test:auth:browser` | Check cookies, origins, and request protection with a local HTTPS Worker and Chromium. |
-| `npm run test:auth:hosted -- --account=… --database=…` | Run account cases on the explicit isolated hosted authentication D1 target. |
-| `npm run test:auth:http -- --account=… --database=… --origin=…` | Check the isolated deployed authentication Worker. |
-| `npm run test:auth:hash` | Measure password cost in a temporary local Worker. |
-| `npm run load -- <command>` | Run a load test against an isolated installation: `site`, `setup`, `run`, `analytics`, and `cleanup`. See [Run a load test](docs/run-load-tests.md). |
-| `npm run perf:reads` | Count the D1 calls, statements, rows read and rows written of each API request at several data sizes. It uses a temporary local database with fictional data and no Cloudflare credentials. Add `-- --plan=base` for the 1,200-account shape only, `-- --explain` for query plans, and `-- --out=<file.json>` for the raw records. Compare saved records with `node scripts/compare-read-volume.mjs --base=<files> --head=<files>`. |
-| `npm run perf:client` | Build the app and measure first load at 4x CPU slowdown on slow 4G, heap, component renders, and snapshot reads, with a 500-issue queue on the local fixture. Set `PERF_RUNS` and `PERF_OUT=<file.json>`. See [Client weight](docs/frontend-architecture.md#client-weight). |
-| `npm run perf:size` | Print the raw, gzip and Brotli size of each script and stylesheet in `dist/assets`. |
-| `npm run test:e2e:smoke` | Run the critical-path browser files `tests/landing.spec.ts` and `tests/journey.spec.ts`. |
-| `npm run test:e2e` | Run every mocked browser test, including the smoke files. The specs use the Cloudflare client. They serve the real Worker routes from the test process. See [the browser suite](#the-mocked-browser-suite). |
-| `npm run test:providers:list` | List the shared provider scenarios without hosted credentials. |
-| `npm run test:providers -- --provider=cloudflare --config=… --account=… --database=… --origin=…` | Run the same contracts through the isolated Cloudflare browser adapter. |
-
-Install the Chromium build that matches the installed Playwright (1.64) before browser tests:
-
-```sh
-npx playwright install chromium
-```
-
-If the default browser folder is not writable, set `PLAYWRIGHT_BROWSERS_PATH` to a writable folder before the install and before each test run.
 If your shell sets `NODE_ENV=production`, unset it before `npm run dev` or `npm run test:e2e`. Otherwise the page stays blank.
 
-These commands connect to provider accounts. Several of them change hosted data or deployments. Confirm the target before you run them.
+## Install Minsky for a contest
+
+Follow the [Cloudflare installation guide](site/src/content/docs/operators/installation.mdx). It needs your own Cloudflare account on the Workers Paid plan.
+That guide creates the resources, applies the migrations, and creates the first webmaster.
+
+## Commands
+
+These commands run without cloud credentials:
 
 | Command | Purpose |
 | --- | --- |
-| `npm run cloudflare:recover-admin -- --username <name>` | Reset the password of a webmaster in the remote `DB` database. Prints the temporary password once in that terminal. |
+| `npm run dev` | Start the frontend only. |
+| `npm run build` | Check types and build static assets in `dist/`. |
+| `npm run preview` | Serve the built assets. |
+| `npm run typecheck` | Check TypeScript. |
+| `npm run lint` | Run ESLint. |
+| `npm test` | Run unit and script tests. |
+| `npm run ci` | Run the complete CI check: installs, types, lint, tests, both builds, audits, and the Gitleaks scan. Needs Node.js 22.23.4 or later for the docs build. |
+| `npm run test:d1` | Run every D1 workflow case on local emulation. |
+| `npm run test:auth` | Run account and permission tests on local D1. |
+| `npm run test:auth:browser` | Check cookies, origins, and request protection with a local HTTPS Worker and Chromium. |
+| `npm run test:auth:hash` | Measure the password hash cost in a temporary local Worker. |
+| `npm run test:connector:runtime` | Run the complete connector on a temporary local HTTPS Worker. |
+| `npm run test:connector:ui:local` | Run the complete React journey on local HTTPS and emulated bindings. |
+| `npm run test:e2e` | Run every mocked browser test. See [the browser suite](CONTRIBUTING.md#run-the-mocked-browser-suite). |
+| `npm run test:e2e:smoke` | Run `tests/landing.spec.ts` and `tests/journey.spec.ts`. |
+| `npm run test:providers:list` | List the shared provider scenarios. |
+| `node scripts/rollback-check.mjs` | Run the previous release's `npm run test:d1` against this checkout's migrations. Add `--base=<revision>` to name the release. |
+| `npm run perf:reads` | Count D1 calls and rows for each API request, on a temporary local database. Add `-- --plan=base`, `-- --explain`, or `-- --out=<file.json>`. Compare saved records with `node scripts/compare-read-volume.mjs --base=<files> --head=<files>`. |
+| `npm run perf:client` | Measure first load, heap, renders, and snapshot reads with a 500-issue queue. Set `PERF_RUNS` and `PERF_OUT=<file.json>`. |
+| `npm run perf:size` | Print the raw, gzip, and Brotli size of each file in `dist/assets`. |
+| `npm run docs:dev` | Start the documentation site. Needs Node.js 22.23.4 or later and `npm ci --prefix site`. |
+| `npm run docs:build` | Build the site and check its local links and anchors. |
+| `npm run docs:preview` | Serve the built site, including search. |
+| `npm run docs:test` | Check navigation, search, and phone layouts with Chromium. Build the docs first. |
+
+Before browser tests, run `npx playwright install chromium` once.
+If the default browser folder is not writable, set `PLAYWRIGHT_BROWSERS_PATH` before the install and before each test run.
+
+These commands connect to a Cloudflare account. Several of them change hosted data or deployments, so confirm the target first:
+
+| Command | Purpose |
+| --- | --- |
+| `npm run cloudflare:install -- plan --settings=… --config=…` | Inspect an installation plan without changes. See the [installation guide](site/src/content/docs/operators/installation.mdx). |
+| `npm run cloudflare:recover-admin -- --config <file> --username <name>` | Reset a webmaster password in the remote `DB` database that the Wrangler file names. Prints the temporary password once. See [the recovery procedure](site/src/content/docs/operators/installation.mdx#recover-a-webmaster-password). |
 | `npm run cloud:hosting-login` | Sign in to Cloudflare with Wrangler. |
-| `npm run token:create -- <request.json> --out <file>` | Create a scoped Cloudflare API token for an agent task. Needs `CLOUDFLARE_TOKEN_ADMIN`. See [API tokens for agents](AGENTS.md#api-tokens-for-agents). |
-| `npm run token:list` | List the tokens that agents created, with their permissions and expiry. |
+| `npm run load -- <command>` | Run a [load test](docs/run-load-tests.md) against an isolated installation: `site`, `setup`, `run`, `analytics`, and `cleanup`. |
+| `npm run test:auth:hosted -- --account=… --database=…` | Run account cases on an isolated hosted D1 target. |
+| `npm run test:auth:http -- --account=… --database=… --origin=…` | Check an isolated deployed authentication Worker. |
+| `npm run test:connector:ui -- --config=… --account=… --database=… --origin=…` | Run the React journey against an isolated hosted application. |
+| `npm run test:connector:workflow:hosted -- --config=… --account=… --database=…` | Run every workflow case on an isolated D1-only target. |
+| `npm run test:connector:accounts:hosted -- --config=… --account=… --database=…` | Check account guards on the same target. |
+| `npm run test:providers -- --provider=cloudflare --config=… --account=… --database=… --origin=…` | Run the [shared provider scenarios](docs/run-provider-tests.md) in a browser. |
+
+These commands are for the maintainers' own Cloudflare account:
+
+| Command | Purpose |
+| --- | --- |
+| `npm run deploy` | Build the app, apply new D1 migrations, and publish it. Workers Builds runs it on `minsky-dev` for each push to `main`. See [Workers Builds](docs/cloudflare-builds.md). |
+| `npm run docs:deploy` | Build and publish the `minsky-docs` Worker, if Workers Builds cannot. |
+| `npm run ci:worker` | Run the dry-run deploy of the `minsky-ci` Worker. |
+| `npm run token:create -- <request.json> --out <file>` | Create a scoped Cloudflare API token for an agent task. See [API tokens for agents](AGENTS.md#api-tokens-for-agents). |
+| `npm run token:list` | List the tokens that agents created. |
 | `npm run token:delete -- <id>` | Delete a token that an agent created. |
 
-For shared adapter checks, follow [Run the shared provider tests](docs/run-provider-tests.md).
-The two hosted store commands accept the optional [D1 API transport](docs/run-provider-tests.md#use-the-d1-api-transport).
-Run those API commands in sequence. Default binding checks and protected CI keep their existing transport.
-Cloudflare cookies and API requests require the same origin. A plain Vite server does not supply that API.
-If a hosted fixture cleanup fails, follow [Recover an incomplete fixture](docs/run-provider-tests.md#recover-an-incomplete-fixture).
+## Repository layout
 
-### The mocked browser suite
-
-`npm run test:e2e` starts a Vite server.
-Playwright routes each `/api` request to the Worker HTTP handlers in `src/server`.
-UI specs use in-memory data from `tests/support/worker.ts`.
-Workflow specs use the real Cloudflare services on a local D1 database from `tests/support/localWorker.ts`.
-Identity and the live socket are simulated. No hosted provider is contacted. A test fails if a page requests another host.
-
-The server uses port 4173. Set `PLAYWRIGHT_PORT` to use another port, for example when two checkouts run the suite at the same time:
-
-```sh
-PLAYWRIGHT_PORT=4401 npm run test:e2e
-```
-
-Outside CI, Playwright reuses a server that already listens on the port. Give each checkout its own port so that a run does not test another checkout's server.
+| Path | Contents |
+| --- | --- |
+| `src/backend/` | The `Backend` contract in `contracts.ts` and its Cloudflare client. |
+| `src/connected/` | Account checks, workspace state, browser routes, and workflow retry protection. |
+| `src/contestant/`, `src/organiser/`, `src/event/`, `src/site/` | The contestant app, the staff phone app and console, the event console, and the webmaster pages. |
+| `src/screens/`, `src/components/` | The landing, sign-in, and password screens, and the shared UI components. |
+| `src/server/` | The workflow rules and the Cloudflare and D1 adapters, with the D1 migrations in `adapters/d1/migrations/`. |
+| `site/` | The documentation site. |
+| `tests/` | Browser and connector tests. |
+| `scripts/` | CI, deployment, load, and performance tools. |
 
 ## Documentation
 
-### Write and publish the site
+- The [user and operator guides](https://minsky-docs.icaic-minsky.workers.dev) explain how to use and install Minsky. Their source is in `site/src/content/docs/`.
+- The [developer documentation index](docs/README.md) lists the architecture, testing, and operations pages.
+- The [roadmap](ROADMAP.md) states the project's goals and target stack.
 
-Use Node.js 22.23.4 or later for the documentation tools.
-The public guides are Markdown files in `site/src/content/docs/`.
+## Contribute
 
-```sh
-npm ci
-npm ci --prefix site
-npm run docs:dev
-```
+Read [CONTRIBUTING.md](CONTRIBUTING.md) before you open a pull request.
 
-| Command | Purpose |
-| --- | --- |
-| `npm run docs:dev` | Start the documentation server locally. |
-| `npm run docs:build` | Build the static site and check local links and anchors. |
-| `npm run docs:preview` | Serve the built site, including search. |
-| `npm run docs:test` | Check navigation, search, and phone layouts with Chromium. Build the docs first. |
-| `npm run docs:deploy` | Build and publish only the `minsky-docs` Worker. Use it only when Workers Builds cannot publish. |
+## License
 
-The deployment configuration is `wrangler.docs.jsonc`.
-See [the writing and deployment guide](site/src/content/docs/contributing/documentation.mdx).
-Four Workers Builds triggers check and publish this repository. A branch push runs the checks. Branch previews on `minsky-preview` are switched off, because Workers Builds cannot limit their token to the preview resources. A merge into `main` publishes `minsky-dev` and the docs.
-[Build and publication flow](docs/cloudflare-builds.md#build-and-publication-flow) describes each trigger and what each push does.
-See [Workers Builds setup](docs/cloudflare-builds.md) for the dashboard steps and [CI settings](docs/cloudflare-build-settings.md) for on-demand browser and hosted commands.
-Automatic GitHub Actions publication is removed.
-The fresh Cloudflare development candidate and a separate empty installation pass the complete application checks.
-The approved activation and a later automated deployment passed their recorded application checks. Those runs used the retired Actions publisher.
-The [Cloudflare activation record](docs/history/run-log.md#t0021-approved-activation-2026-10-19) separates protected checks from stable URL verification.
-
-### Repository records
-
-Plans and rules:
-
-- [Contributor rules](AGENTS.md), the [planning record](PLAN.md), and the [roadmap](ROADMAP.md) for the technology stack.
-  [AGENTS.md](AGENTS.md#api-tokens-for-agents) also states which Cloudflare tokens and resources agents can create.
-- [Product direction](docs/product-direction.md) — agreed requirements and open decisions.
-- [Development tickets](docs/history/tickets.md) are the retired ticket records. Pull requests now record each change.
-- [Writing guide](docs/writing-guide.md) and [documentation release plan](docs/documentation-release-plan.md).
-- [Code quality](docs/code-quality.md) — CI summary, dependency policy, secret scanning, and review requirements.
-
-Frontend:
-
-- [Frontend architecture](docs/frontend-architecture.md) — UI selection, shells, data hooks, the jury award lists, and the Tailwind and shadcn/ui setup.
-- [Frontend redesign record](design/redesign/README.md) — the mockups, the chosen direction, and how its open decisions were resolved.
-
-Backend:
-
-- [Backend contracts](docs/backend-contracts.md) describe the provider interfaces and their behavior.
-- [Server workflow reference](docs/server-workflow.md) inventories existing rules and the shared service and persistence boundaries.
-- [Session announcements](docs/session-announcements.md) is the reference for announcement behavior in the Cloudflare implementation.
-- [Cloudflare backend design](docs/cloudflare-backend-design.md) explains the implemented server boundaries.
-- [Scaling design](docs/scaling-design.md) explains where one installation saturates under load and ranks the changes that raise capacity.
-- [Webmaster, event, and contest platform](docs/event-platform-design.md) is the design for one shared site. Its first four phases are merged: the authority resolver, webmaster management, sign-in by event code, and the event console. The later phases are proposed. The [sketches page](docs/event-platform-sketches.md) holds its type and migration sketches.
-- [Cloudflare authentication reference](docs/cloudflare-authentication.md) and the [authentication choice](docs/cloudflare-authentication-choice.md).
-- [Add a backend provider](docs/add-provider.md) gives contributor interfaces, registration points, installation, cleanup, and required shared verification.
-
-Operations:
-
-- [Workers Builds setup](docs/cloudflare-builds.md) — the CI Worker, docs publication, and application publication from `main` — and [CI settings](docs/cloudflare-build-settings.md).
-- [Cloudflare installation](site/src/content/docs/operators/installation.mdx) gives the complete installation procedure and owner recovery.
-- [Activate Cloudflare development](docs/activate-cloudflare-development.md) gives the approval, deployment, admin recovery, and repair steps.
-
-Verification:
-
-- [Manual verification](docs/manual-verification.md) — workflow and interface checks.
-- [Run the shared provider tests](docs/run-provider-tests.md) and [shared provider test contracts](docs/provider-test-contracts.md).
-- [Verify Cloudflare authentication](docs/verify-cloudflare-authentication.md).
-- [Run a load test](docs/run-load-tests.md) against an isolated installation before a contest.
-
-History:
-
-- [Project history](docs/history/README.md) — the run log, planning log, run reports, and superseded specifications. These are dated records, not current instructions.
+No license has been chosen yet. Until one is added, the default copyright rules apply.

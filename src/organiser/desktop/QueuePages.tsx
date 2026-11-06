@@ -90,7 +90,7 @@ function queueTabId(tab: QueueTab): string {
 const footnote = "Press J or K to move between rows.";
 
 /**
- * The issue queue: status cards, status tabs with counts, the T0008 team
+ * The issue queue: status cards, status tabs with counts, the team
  * filter and the issue table. It sorts by unresolved time until a header is clicked.
  */
 export function QueuePage({
@@ -290,7 +290,7 @@ export function HandoffsPage({ props }: { props: ConsolePageProps }) {
 }
 
 /**
- * Every team with its location and unresolved reports. The T0008 fuzzy
+ * Every team with its location and unresolved reports. The fuzzy
  * search matches names, locations and tables. A team opens its issues.
  */
 export function TeamsPage({

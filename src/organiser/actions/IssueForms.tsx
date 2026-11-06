@@ -96,7 +96,7 @@ export const emptyReply: ReplyDraft = { text: "", visibility: "public" };
 /**
  * Sends a reply to the team or an internal note for staff. Internal mode has
  * an amber striped surface. After a recorded reply the draft clears, also
- * after a retry of the same request (T0012).
+ * after a retry of the same request.
  *
  * The phone sheets use the stacked layout. The desktop console uses the
  * composer layout: the message first, then the audience switch and Send in

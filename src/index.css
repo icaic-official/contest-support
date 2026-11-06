@@ -8,7 +8,7 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
-/* shadcn/ui "New York" zinc tokens, as used in design/redesign/src/_shadcn-head.html. */
+/* shadcn/ui "New York" zinc tokens. */
 :root {
   --radius: 0.5rem;
   --background: hsl(0 0% 100%);

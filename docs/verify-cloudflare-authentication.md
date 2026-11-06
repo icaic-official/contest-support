@@ -2,10 +2,12 @@
 
 Use this guide for the fictional authentication fixtures.
 These procedures test the separate authentication CI target. They do not migrate accounts or deploy the development application.
-Cloudflare serves the development application through its complete connector.
 See the [API reference](cloudflare-authentication.md) and [identity choice](cloudflare-authentication-choice.md) for behavior and resource limits.
 For the complete connector, use the separate [direct store procedure](run-provider-tests.md#run-direct-cloudflare-store-checks).
 That procedure requires the D1-only `minsky-connector-store-ci` target and all 34 hosted account cases.
+
+Anyone can run the local checks. The hosted sections are for maintainers. Each hosted runner compares its target with fixed values in the code, and it refuses any other target.
+`<account-id>` means the `account_id` value in `wrangler.jsonc`.
 
 ## Run local checks
 
@@ -18,8 +20,8 @@ npm run test:auth
 npm run test:auth:browser
 ```
 
-The first suite runs all 83 local account, permission, failure, and race cases.
-The suite uses four fixed files under `src/server/adapters/cloudflare/`:
+The first suite runs every local account, permission, failure, and race case.
+The suite uses three fixed files under `src/server/adapters/cloudflare/`:
 
 | File | Cases |
 | --- | --- |
@@ -27,18 +29,18 @@ The suite uses four fixed files under `src/server/adapters/cloudflare/`:
 | `authenticationRecovery.test.ts` | Organizer account operations, interrupted operations, and recovery. |
 | `authenticationCompletion.test.ts` | Current-access races when credential operations complete. |
 
-Cases run serially within each file. Up to four files run concurrently.
+Cases run serially within each file. The files run concurrently, with up to four workers.
 Each file owns a temporary local D1 database and identity service.
 Each case creates new UUID-scoped records. Fixture setup, credential snapshots, and cleanup checks use D1 batches.
 These batches retain the row assertions and exact fixture ownership checks.
 Local runs use a low-cost scrypt in the same stored format, because each Better Auth hash or check takes about 110 ms.
 `password.test.ts` checks the maintained hasher. Hosted runs use the maintained hasher.
-`npm test` runs these four files with a 30 second case limit.
+`npm test` runs these three files with a 30 second case limit.
 `npm run test:auth` uses a 120 second limit.
 Hosted runs also use 120 seconds, because they use maintained scrypt, which is slow on a busy builder.
 The browser suite creates a separate temporary D1 database and a local HTTPS Worker on port 8788.
 It uses Chromium with a self-signed local certificate.
-Expect all 83 account cases and three browser cases to pass.
+Expect every account case and the three browser cases to pass.
 The local expiry probe checks a self password change after that change deletes the original identity session.
 For that case only, the test double replaces `strftime('now')` with a read of a one-row test clock.
 It moves the clock inside the same batch, after the session delete.
@@ -66,15 +68,13 @@ npx wrangler whoami
 npx wrangler d1 info minsky-auth-ci --config wrangler.auth-ci.jsonc --json
 ```
 
-Expect account `458ad6a930b0fb717796dfa19ca6a2b1` and database `5d746d29-0a66-4346-96a6-4974126685d7`.
+Expect account `<account-id>` and database `5d746d29-0a66-4346-96a6-4974126685d7`.
 The database name must be `minsky-auth-ci`. Stop if any value differs.
 The local authentication tests use temporary local databases.
-The Cloudflare development database and the earlier D1 proof database are separate targets.
+The Cloudflare development database is a separate target.
 
 The committed Worker configuration requests a 1,000 ms CPU cap per request.
 Cloudflare requires Workers Paid for that setting.
-An earlier protected password-change request exceeded runtime resources.
-That result describes its recorded configuration. See [run log](history/run-log.md) for later Paid activation and hosted results.
 Before deploying the Worker, confirm that an authorized account owner activated Workers Paid for the configured account.
 On Free, deployment fails with error `100328`. Do not reduce password cost to bypass that requirement.
 
@@ -85,7 +85,7 @@ npx wrangler d1 migrations apply minsky-auth-ci --remote --config wrangler.auth-
 npx wrangler deploy --config wrangler.auth-ci.jsonc
 ```
 
-Expect all ten repository migrations, `0001` through `0010`, on an empty target.
+Expect every migration in `src/server/adapters/d1/migrations` on an empty target.
 Expect `No migrations to apply` on an up-to-date target.
 Expect deployment only to `https://minsky-auth-ci.icaic-minsky.workers.dev`.
 The Worker requires the existing `AUTH_SECRET`. Preserve that secret on ordinary deployments.
@@ -102,7 +102,7 @@ Run hosted D1 account cases with both explicit target identifiers:
 
 ```sh
 npm run test:auth:hosted -- \
-  --account=458ad6a930b0fb717796dfa19ca6a2b1 \
+  --account=<account-id> \
   --database=5d746d29-0a66-4346-96a6-4974126685d7
 ```
 
@@ -112,7 +112,7 @@ Use the separate hosted HTTP runner to call the deployed Worker:
 
 ```sh
 npm run test:auth:http -- \
-  --account=458ad6a930b0fb717796dfa19ca6a2b1 \
+  --account=<account-id> \
   --database=5d746d29-0a66-4346-96a6-4974126685d7 \
   --origin=https://minsky-auth-ci.icaic-minsky.workers.dev
 ```
@@ -120,7 +120,7 @@ npm run test:auth:http -- \
 The runners reject missing or different targets before fixture writes.
 For a focused D1 rerun, append `--test-name-pattern=PATTERN` using a test-name expression.
 The target arguments remain mandatory. Record focused results separately from a complete run.
-This filter applies only to the historical `test:auth:hosted` runner.
+This filter applies only to the `test:auth:hosted` runner.
 The complete connector account runner rejects filters and overrides. It requires all 34 hosted cases without failures or skips.
 Its numeric progress reports appear at least every 15 seconds while the test process runs.
 Reports include completed and total cases, active cases, elapsed time, and the age of the oldest active case.
@@ -139,11 +139,11 @@ Measure local Worker hashing and verification with this command:
 npm run test:auth:hash
 ```
 
-For hosted CPU evidence, run each operation separately:
+For hosted CPU evidence, run each operation separately. The hosted runs are for maintainers:
 
 ```sh
-npm run test:auth:hash -- --hosted --operation=hash --account=458ad6a930b0fb717796dfa19ca6a2b1
-npm run test:auth:hash -- --hosted --operation=verify --account=458ad6a930b0fb717796dfa19ca6a2b1
+npm run test:auth:hash -- --hosted --operation=hash --account=<account-id>
+npm run test:auth:hash -- --hosted --operation=verify --account=<account-id>
 ```
 
 Each hosted run creates one temporary Worker without database bindings and deletes it afterward.
@@ -154,7 +154,6 @@ Local elapsed time and hosted client time are not hosted CPU measurements.
 
 ## Run hosted checks on demand
 
-The GitHub `cloudflare_auth` job is removed. No GitHub workflow runs these checks.
 Run the hosted authentication checks with the commands in [CI settings](cloudflare-build-settings.md#on-demand-checks).
 Run them on the reviewed revision. They migrate and deploy only `minsky-auth-ci`.
 They do not deploy the application.
@@ -162,14 +161,8 @@ Your Wrangler credentials need D1 access and deployment access to the isolated a
 The Worker must already have its private `AUTH_SECRET`.
 Ordinary checks run local browser security tests without hosted credentials.
 
-Record local tests and local CLI runs against hosted resources separately.
+Record local tests and runs against hosted resources separately.
 A credential-blocked run is not a pass.
-
-These earlier records remain:
-
-- The historical `cloud-test` allowlist included `main` and the exact Cloudflare authentication branch. The shared server workflow branch remained outside it.
-- See [the run record](history/run-log.md#t0018-cloudflare-authentication-2026-10-18) for the initial rejection and later hosted resource limit.
-- The [PR #41 follow-up](history/run-log.md#pr-41-review-corrections-and-paid-authentication-2026-10-18) records the passing protected run on Workers Paid.
 
 ## Recover interrupted fixtures
 
@@ -191,8 +184,6 @@ Never print credential-table contents. Inspect counts and IDs instead.
 Repeat the count checks before removing the journal.
 Do not reset the database or delete another run's records.
 
-For an interrupted account operation in an authorized fixture, use organizer-assisted reset after checking current permissions.
-The organizer must administer every assigned session. Archived memberships block recovery through the account API.
-The complete connector adds trusted, provider-owned [installation-owner recovery](../site/src/content/docs/operators/installation.mdx#recover-the-owner).
-That procedure passed the recorded empty-installation checks. Confirm the exact installation and owner before recovery.
-Use `npm run cloudflare:recover-admin` to reset a webmaster password.
+For an interrupted account operation in an authorized fixture, reset the password after you check current permissions.
+A webmaster or the event's admin can reset it. A contest admin can reset it only when that admin administers every contest of the account and none of those events is archived.
+To recover the webmaster of an installation, use [Recover a webmaster password](../site/src/content/docs/operators/installation.mdx#recover-a-webmaster-password). Confirm the exact installation and webmaster before recovery.

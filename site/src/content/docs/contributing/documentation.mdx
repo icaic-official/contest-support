@@ -1,6 +1,6 @@
 ---
 title: Write these docs
-description: Edit pages, add diagrams, and check the site before you submit.
+description: Run the site, edit pages, add diagrams, and check your change before you submit it.
 ---
 
 import Diagram from '../../../components/Diagram.astro';
@@ -9,12 +9,18 @@ The site uses [Astro Starlight](https://starlight.astro.build/guides/authoring-c
 
 ## Run the site
 
+The site needs Node.js 22.23.4 or later.
+
 ```sh
-npm ci && npm ci --prefix site
+npm ci --prefix site
 npm run docs:dev
 ```
 
+`npm run docs:dev` prints a local address and reloads the page when you save. Search works only in a production build, so it stays empty here. To try search, run `npm run docs:build` and then `npm run docs:preview`.
+
 ## Write a page
+
+Start from this form:
 
 ```md
 ---
@@ -30,7 +36,9 @@ description: One line about what the reader achieves.
 
 Add the page to the sidebar in `site/astro.config.mjs`.
 
-- Keep it short. Give each page one purpose.
+Follow the [writing guide](https://github.com/GiftedNovaHD/minsky/blob/main/docs/writing-guide.md), and apply these rules:
+
+- Give each page one purpose.
 - Use exact interface labels in **bold**.
 - Check every claim against the code. The code is the source of truth.
 - Link to the page that owns a topic instead of repeating it.
@@ -50,27 +58,35 @@ import Diagram from '../../../components/Diagram.astro';
 <Diagram name="NAME" alt="What the diagram shows, in one or two sentences." />
 ```
 
-For example, `<Diagram name="award-flow" alt="…" />` shows:
+For example, `<Diagram name="award-flow" alt="..." />` shows:
 
 <Diagram name="award-flow" alt="Award flow. A resolved issue gets an award decision from the jury, then staff confirm that they applied it externally." />
 
 The renderer supports rectangles, diamonds, ellipses, lines, arrows, free drawing, and text.
 Arrows can have the open arrow or the filled triangle arrowhead.
 Text uses the site font. Text in Excalidraw's Code font uses the site's monospace font.
-Dark mode inverts the colours, as Excalidraw does.
-Images, frames, and other arrowheads are not supported; the build fails if a diagram uses them.
+Dark mode inverts the colors, as Excalidraw does.
+The renderer does not support images, frames, or other arrowheads. The build fails if a diagram uses them.
 To edit a diagram, open its file in Excalidraw.
 
 ## Check before you submit
 
+Install the test tools once. `docs:test` runs Playwright from the repository root.
+
 ```sh
-npm run docs:build   # also checks links and anchors
-npm run docs:test    # navigation, search, phone layout, 404
+npm ci
+npx playwright install chromium
 ```
 
+Then run the checks:
+
+```sh
+npm run docs:build   # builds the site and checks links and anchors
+npm run docs:test    # checks navigation, search, phone layout, and the 404 page
+```
+
+Run `docs:build` first, because `docs:test` serves the site that it built.
+
 Check the page in light and dark mode and at phone width.
-Wait for `Workers Builds: minsky-ci` to pass. It runs `npm run ci` on every branch push. That builds the site and checks links, but does not run `docs:test`.
-A branch push also uploads a docs preview version. Its preview URL is in the `minsky-docs` build log.
-A merge to `main` publishes the docs to the stable URL.
-A fork pull request does not push a branch here, so it does not start a build.
-Manual publishing (`npm run docs:deploy`) is only for when Workers Builds cannot publish; see `docs/cloudflare-builds.md`.
+
+A pull request from a fork starts no build in this repository, so state your results in the pull request. See [CONTRIBUTING.md](https://github.com/GiftedNovaHD/minsky/blob/main/CONTRIBUTING.md) for the rest of the workflow.

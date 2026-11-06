@@ -1,38 +1,44 @@
-# Roadmap 
-This file provides an overview of the general direction that Minsky will be heading. 
+# Roadmap
 
-## Guiding Goals
-In general, we wish for the platform's model to operate in a similar fashion to Codeforces and Let's Encrypt. 
-- Free for every contest. This means that organizers are free to deploy this application to any contest they host for free, regardless of whether they have the infrastructure to support it or not. As such, the maintenance and hosting requirements should be funded by sponsors instead of organizers.
-- Self-hostable anywhere. We wish to adhere to a similar model like Codeforces and Let's Encrypt.
-- Highly reliable hosting. Everyone around the world should have access to efficient contest support. 
+This page states Minsky's goals and the stack that it may move to.
+[Product direction](docs/product-direction.md) owns the product requirements.
+[Cloudflare backend design](docs/cloudflare-backend-design.md) explains the system as built.
 
-## Current stack 
+## Goals
+
+The hosting model follows Codeforces and Let's Encrypt.
+
+- **Free for every contest.** Organizers run a contest on Minsky at no cost, whether or not they have infrastructure of their own. Sponsors fund the hosting and maintenance, not organizers.
+- **Self-hostable.** Anyone can run the same code on their own infrastructure.
+- **Reliable hosting.** Contests anywhere in the world can reach support.
+
+## Current stack
+
 | Layer | Service |
 | --- | --- |
 | Language | TypeScript |
-| Frontend | React + Vite |
-| Auth | better-auth |
-| Compute | Cloudflare Workers (`minsky-dev`, `minsky-docs`) |
+| Frontend | React and Vite |
+| Authentication | Better Auth |
+| Compute | Cloudflare Workers |
 | Database | Cloudflare D1 (SQLite) |
-| Blob storage | Cloudflare R2 (issue and announcement images) |
-| Realtime | Durable Objects, one per contest session |
-| CI/CD | Cloudflare Workers Builds |
-| Tests | Vitest (unit), Playwright (end-to-end) |
+| Blob storage | Cloudflare R2, for issue and announcement images |
+| Live updates | Durable Objects, one for each contest |
+| CI and publication | Cloudflare Workers Builds |
+| Tests | Vitest and Playwright |
 
-**Limitation**: each D1 database has a single primary, runs one query at a time, and is capped at 10 GB.
+Each D1 database has one primary, runs one query at a time, and is limited to 10 GB.
+[Scaling design](docs/scaling-design.md) states where this limit applies to Minsky.
 
-On 2026-10-23 the owner selected Cloudflare as the live backend. Cloudflare is the only backend. The provider contracts stay for a later provider.
-This file owns the stack direction. [Product direction](docs/product-direction.md) owns product requirements.
-See [Cloudflare backend design](docs/cloudflare-backend-design.md) for the implemented boundaries.
+## Target stack
 
-## Target Stack
+The target stack is a proposal. None of the parts that differ from the current stack are built.
+
 ```mermaid
 flowchart LR
-  U[Browser / phone] --> W[Workers: API + SSR assets]
+  U[Browser or phone] --> W[Workers: API and assets]
   W -->|Hyperdrive, cache off for issue state| PG[(PlanetScale Postgres)]
   W --> R2[(R2: images)]
-  W --> DO[Durable Object per contest]
+  W --> DO[Durable Object for each contest]
   DO -.->|hibernatable WebSockets| U
   W --> Q[Queues: emails, exports, webhooks]
   Q --> M[Cloudflare Email Service]
@@ -40,26 +46,28 @@ flowchart LR
 
 | Layer | Service | Reason |
 | --- | --- | --- |
-| Compute | Cloudflare Workers | Global, autoscaling, cheap |
-| Database | PlanetScale Postgres via Hyperdrive | Portable, handles concurrent writes |
-| Query layer | Drizzle ORM (proposed) | One schema for Postgres and SQLite |
-| Realtime | Durable Objects, one per contest | WebSocket fan-out, idle sockets cost nothing |
+| Compute | Cloudflare Workers | Global and autoscaling, at low cost |
+| Database | PlanetScale Postgres through Hyperdrive | Portable, and handles concurrent writes |
+| Query layer | Drizzle ORM | One schema for Postgres and SQLite |
+| Live updates | Durable Objects, one for each contest | WebSocket fan-out, and idle sockets cost nothing |
 | Blob storage | R2 | No egress fees |
-| Background jobs | Cloudflare Queues | Email, CSV export, webhooks |
-| Email | Cloudflare Email Service | Notifications, magic links |
-| Auth | better-auth | Provider-agnostic, data stays in Postgres |
-| Observability | Workers Logs + Sentry | Logs plus error tracking |
-| Backups | Nightly `pg_dump` → R2 | Off-site restore path |
-| CI/CD | Cloudflare Workers Builds | Checks on every branch push and docs publication. No GitHub Actions. |
----
+| Background jobs | Cloudflare Queues | Email, CSV export, and webhooks |
+| Email | Cloudflare Email Service | Notifications and magic links |
+| Authentication | Better Auth | Works with any provider, and the data stays in Postgres |
+| Observability | Workers Logs and Sentry | Logs and error tracking |
+| Backups | Nightly `pg_dump` to R2 | An off-site restore path |
+| CI and publication | Cloudflare Workers Builds | Checks on every branch push, and docs publication |
 
-## Adapter matrix
-| Port | Cloudflare | AWS | GCP | Azure | Self-host (Docker) |
+## Other providers
+
+Cloudflare is the only implementation. The contracts in `src/backend/contracts.ts` stay so that a later provider can implement them.
+This table shows how each part could map to another host. None of these adapters exist.
+
+| Part | Cloudflare | AWS | GCP | Azure | Self-hosted with Docker |
 | --- | --- | --- | --- | --- | --- |
 | Compute | Workers | Lambda or ECS Fargate | Cloud Run | Container Apps | Node server |
-| Database | PlanetScale / D1 | RDS Postgres | Cloud SQL Postgres | Azure Database for PostgreSQL | Postgres |
-| Realtime | Durable Objects | API Gateway WebSockets | Cloud Run WebSockets + Pub/Sub | Web PubSub | `ws` + Postgres `LISTEN/NOTIFY` |
-| Blob | R2 | S3 | Cloud Storage | Blob Storage | Any S3-compatible store |
+| Database | PlanetScale or D1 | RDS Postgres | Cloud SQL Postgres | Azure Database for PostgreSQL | Postgres |
+| Live updates | Durable Objects | API Gateway WebSockets | Cloud Run WebSockets and Pub/Sub | Web PubSub | `ws` and Postgres `LISTEN/NOTIFY` |
+| Blob storage | R2 | S3 | Cloud Storage | Blob Storage | Any S3-compatible store |
 | Queue | Queues | SQS | Pub/Sub | Service Bus | Postgres-backed job queue |
 | Email | Email Service | SES | Third-party SMTP | Azure Communication Services | SMTP |
-

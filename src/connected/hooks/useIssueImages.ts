@@ -81,7 +81,7 @@ export interface IssueImagesState {
  * Loads thumbnails, uploads images with a fixed visibility, opens previews
  * and removes images. The visibility of an upload cannot change while it
  * waits for a retry. A late preview response for a closed or replaced
- * preview is ignored (T0013).
+ * preview is ignored.
  */
 export function useIssueImages({
   sessionId,

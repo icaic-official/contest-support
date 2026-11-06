@@ -232,7 +232,7 @@ export function PersonAvatar({
 }
 
 /**
- * The resolution that a jury decision refers to (T0009). A pending award
+ * The resolution that a jury decision refers to. A pending award
  * refers to the resolution of its decision, also when the issue was reopened
  * later. "Reopened" marks a pending award on an unresolved issue.
  */

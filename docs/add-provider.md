@@ -2,12 +2,12 @@
 
 Use this guide to add a provider without changing Minsky's application behavior.
 A provider supplies identity, persistence, private image storage, and live updates through the existing contracts.
-Cloudflare is the only implementation and the live backend. On 2026-10-25 the owner removed the earlier Supabase implementation. Its records are in [the history](history/supabase-provider-records.md). The contracts stay so that a later provider can implement them. AWS, GCP, and Azure remain future contributions.
+Cloudflare is the only implementation. The contracts stay so that a later provider can implement them.
 There is no generic database adapter or infrastructure provisioning interface.
 
 ## Prepare an isolated implementation
 
-1. Read [the backend contracts](backend-contracts.md) and [the shared server workflow](server-workflow.md).
+1. Read [the backend contracts](backend-contracts.md) and [the server workflow reference](server-workflow.md).
 2. Read [the provider test contracts](provider-test-contracts.md).
 3. Inspect `package.json` for the current verification commands.
 4. Open a GitHub issue with the provider's scope, resource targets, costs, and verification requirements.
@@ -23,21 +23,21 @@ Use these interfaces and components:
 
 | Boundary | Required implementation or reusable component |
 | --- | --- |
-| [`Backend`](../src/backend/contracts.ts) | Supply all seven groups: `auth`, `workflows`, `admin`, `images`, `announcements`, `avatars`, and `updates`. Preserve their types and error meanings. |
+| [`Backend`](../src/backend/contracts.ts) | Supply all eight groups: `auth`, `workflows`, `manage`, `contestAwards`, `images`, `announcements`, `avatars`, and `updates`. Preserve their types and error meanings. |
 | [`Command` and `snapshotSchema`](../src/connected/model.ts) | Reuse the existing commands, roles, and validated snapshot structure. The jury worklist consumes this same snapshot. |
+| [`capabilityRule`](../src/connected/capabilities.ts) | Reuse the one table of what a seat may do. Workflow decisions and the browser's page gates read it. |
 | [`WorkflowPersistence`](../src/server/workflow.ts) | Implement `read()` and `commit()` for `WorkflowService`. Keep database queries and transaction controls inside the adapter. |
 | [`Caller`](../src/server/authentication.ts) | Derive `accountId` and `loginId` from trusted authentication. Never accept a caller identity from a request body. |
-| [`AuthenticationService`](../src/server/authentication.ts) | Implement this interface if you reuse `createAuthenticationHandler()`. It covers current login, sign-in, sign-out, password changes, account commands, and session listing. |
+| [`AuthenticationService`](../src/server/authentication.ts) | Implement `current`, `signIn`, `signOut`, and `changePassword` if you reuse `createAuthenticationHandler()`. |
 | [`createAuthenticationHandler()`](../src/server/authenticationHttp.ts) | Reuse the existing same-origin authentication routes when your protocol matches. It checks bounded JSON, origins, request protection, and typed errors. |
 | [`imageFile.ts`](../src/connected/imageFile.ts) | Reuse file validation, object-key construction, and image error classification where applicable. |
 
 Place provider clients, credentials, storage bindings, deployment settings, and maintenance code inside the provider implementation and its tooling.
 Use `src/backend/<provider>/` for browser adapters and `src/server/adapters/<provider>/` for server adapters.
 Keep shared UI code and workflow rules free of provider imports.
-Implementation paths under `src/backend/<provider>/` and adapter paths are already restricted in shared code.
+ESLint already restricts implementation paths under `src/backend/<provider>/` and adapter paths in shared code.
 Add an unrecognized SDK to `providerImportPattern` in [`eslint.config.js`](../eslint.config.js).
 That pattern applies to shared UI, server rules, and scenario imports.
-The UI uses the contracts, shared errors, and selected backend factory.
 Use literal dynamic import paths. ESLint rejects computed UI paths and checks literal imports and re-exports.
 Run `npx vitest run scripts/provider-boundaries.test.mjs` to check this boundary.
 This lint check does not prove the behavior of a new provider. Run the shared and provider-specific checks below.
@@ -50,13 +50,13 @@ Use a trusted database timestamp for each commit.
 Return `retry` for a detected state conflict and let the shared service bound retries.
 Preserve the distinction between confirmed rejection and an unknown write outcome.
 
-Application reads, administration, images, announcements, and live delivery currently remain provider implementations.
-There is no shared persistence interface for every operation.
-Add a shared interface only when current callers need one.
+Contest reads, management, contest-wide awards, images, announcements, avatars, and live delivery stay inside the provider implementation.
+So do the authority resolver and the derivation of intake, which are SQL in the Cloudflare adapter. A new provider must give the same answers. [The Cloudflare design](cloudflare-backend-design.md) explains those rules.
+There is no shared persistence interface for every operation. Add a shared interface only when current callers need one.
 
 ## Select and reuse browser transport
 
-Register the provider in [`src/backend/index.ts`](../src/backend/index.ts).
+[`src/backend/index.ts`](../src/backend/index.ts) always creates the Cloudflare backend. Add explicit selection there for a second provider.
 Add its explicit public build configuration and setup error.
 Reject an unsupported selection. Do not fall back silently to another provider.
 Keep secret keys and privileged clients out of `VITE_*` values and frontend bundles.
@@ -72,7 +72,6 @@ The current factory supports an origin and injectable fetch, WebSocket, and brow
 It does not support arbitrary route mappings or a different authentication protocol.
 When a second implementation needs this transport, move the shared code once and update its callers.
 Do not create a provider-specific copy or a speculative transport framework.
-No second HTTP provider currently exists, so this guide adds no transport abstraction.
 The HTTP protocol is an internal application boundary, without a stable external API commitment.
 
 ## Own installation and recovery
@@ -88,16 +87,16 @@ Supply one authoritative installation procedure with these parts:
 - Prerequisites, provider permissions, resource names, and costs.
 - Public configuration and private secret names, with exact commands and expected results.
 - Resource creation, migration order, application deployment, and isolated previews.
-- Bootstrap of a new organizer-created administrator with a temporary password.
+- Bootstrap of the first webmaster with a temporary password.
 - The mandatory password change before application access.
-- Owner recovery through trusted provider access, with prior-session revocation and another mandatory password change.
+- Webmaster recovery through trusted provider access, with prior-session revocation and another mandatory password change.
 - Recovery after partial failure, without repeating first-install initialization or resetting shared resources.
 - Exact cleanup commands for disposable installation resources and UUID-owned test fixtures.
 
 Bootstrap is provider-owned. There is no common bootstrap interface.
-The Cloudflare `cloudflare:install` command creates its installation and administrator through its own guarded tooling.
+The Cloudflare `cloudflare:install` command creates its installation and first webmaster through its own guarded tooling.
 It is not a universal installer.
-Use the [Cloudflare installation procedure](../site/src/content/docs/operators/installation.mdx) as an implemented example.
+Use [Install on Cloudflare](../site/src/content/docs/operators/installation.mdx) as an implemented example.
 Keep passwords and privileged credentials in private files or memory.
 Exclude them from chat, logs, Git, browser storage, and ordinary CI artifacts.
 Session cookies remain inside the authentication transport.
@@ -134,7 +133,6 @@ Include identity records, database rows, exact storage keys, and durable live-de
 Retain the recovery journal if cleanup fails.
 
 Do not change repository settings or hosted resources as an incidental registration step.
-Obtain the authorization required by the repository's current workflow.
 
 ## Verify and report limits
 
@@ -158,11 +156,11 @@ A new provider needs the registration changes above before it can use that runne
 Document its exact target, environment variables, verification command, and recovery command in that guide.
 
 Every provider must pass the same shared behavior scenarios.
-The shared scenarios do not cover `announcements` or `avatars` yet. Use the [announcement reference](session-announcements.md), the [avatar contract](backend-contracts.md#avatars), and their local tests for those groups.
+The shared scenarios do not cover `announcements`, `avatars`, or `contestAwards`, and they cover only some `manage` commands. Use the [announcement reference](session-announcements.md), the [avatar contract](backend-contracts.md#avatars), the [management commands](backend-contracts.md#management), and their local tests for those groups.
 Additional provider-specific checks must cover authorization, atomic commits, concurrent changes, identity expiry, revocation, and partial failures.
 Use the [additional check requirements](provider-test-contracts.md#requirements-for-another-provider) as the acceptance checklist.
-Verify a fresh installation, owner recovery, and the authenticated UI journey independently of fixture setup.
+Verify a fresh installation, webmaster recovery, and the authenticated UI journey independently of fixture setup.
 
-Record the tested revision, exact target, result, and scoped cleanup outcome.
+Record the tested revision, exact target, result, and scoped cleanup outcome in the pull request.
 Separate local emulation results from CLI runs against hosted resources.
 State any unverified behavior. Passing one provider's scenarios does not verify another implementation.

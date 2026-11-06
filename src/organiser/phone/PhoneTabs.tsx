@@ -268,7 +268,7 @@ export function MineTab(props: PhoneTabProps) {
 }
 
 /**
- * Finds teams by name, location or table with the T0008 fuzzy search, and
+ * Finds teams by name, location or table with the fuzzy search, and
  * issues by number. A team opens its issues.
  */
 export function FindTab(props: PhoneTabProps) {

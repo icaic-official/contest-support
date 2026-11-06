@@ -1,46 +1,60 @@
 ---
 title: Feature status
-description: What is merged, what is pending, and what is not verified.
+description: What works now, what is not built, and what is not verified.
 ---
 
-Checked on **24 October 2026** against `main` at `c9c369b`, with [PR #73](https://github.com/GiftedNovaHD/minsky/pull/73) applied. This is a dated record, not a live dashboard.
+Checked on **7 November 2026** against `main` at `7db8fff`. This page records a reading of the code on that date. It does not record a test run.
 
-## In main
+No production installation exists.
 
-- Username accounts, organizer-created passwords, and organizer recovery.
-- Issue lifecycle with timer, handoffs, resolutions, reopening, and awards.
-- Public replies and internal notes.
-- Staff image uploads with fixed visibility and session limits.
-- Team search, jury award lists, and session admin tools.
-- Session announcements with images, for session admins and jury ([PR #62](https://github.com/GiftedNovaHD/minsky/pull/62)).
-- Three interfaces: contestant app, staff phone app, and staff console ([PR #44](https://github.com/GiftedNovaHD/minsky/pull/44)). The contestant app works on phones and laptops (2026-11-05).
-- Cloudflare is the only backend ([PR #57](https://github.com/GiftedNovaHD/minsky/pull/57)). It sits behind a provider contract that a later provider can implement.
-- A verified fresh Cloudflare development installation ([PR #43](https://github.com/GiftedNovaHD/minsky/pull/43)). The owner approved the development switch and a repeat deployment. No accounts, passwords, records, images, or IDs moved from the earlier backend.
-- CI run deduplication ([PR #46](https://github.com/GiftedNovaHD/minsky/pull/46), merged).
-- Workers Builds runs `npm run ci` for branches in this repository ([PR #45](https://github.com/GiftedNovaHD/minsky/pull/45)). A second trigger checks each push to `main` again and then publishes the development app. A third trigger for a shared branch preview exists, but its branch builds are switched off. Workers Builds cannot limit its token to the preview resources ([PR #73](https://github.com/GiftedNovaHD/minsky/pull/73)). GitHub Actions checks are removed.
-- Workers Builds publishes these docs from `main` ([PR #48](https://github.com/GiftedNovaHD/minsky/pull/48)).
+## What works now
 
-## Not in main
+These features are in `main`:
 
-| Work | State |
-| --- | --- |
-| Container packaging | Open, [PR #21](https://github.com/GiftedNovaHD/minsky/pull/21). Deferred. |
+- **Site and events.** One installation hosts many events. Webmasters create events and manage webmasters. Each event has one time zone, its own accounts, and its own event code.
+- **Event console.** Event admins create contests, people, and entrants. They assign entrants and staff to contests, and issue credentials on printable sheets.
+- **Accounts.** Organizers create usernames and temporary passwords. Each person changes the temporary password at the first sign-in. Organizers reset lost passwords.
+- **Contests.** Each contest has a type, a kind, and a schedule. Intake follows the schedule, with a grace period and a hand override.
+- **Live contests.** A live contest stays closed until every sign-in has a password issued for that contest.
+- **Issues.** The lifecycle has a timer, handoffs, resolutions, and reopening. Public replies and internal notes are separate.
+- **Awards.** The jury records issue awards and contest-wide awards. Staff confirm each award separately after they apply it in the external contest system. Confirmed minutes extend a contestant's end time.
+- **Images.** Staff upload images with a fixed visibility, within limits for each contest.
+- **Announcements.** Contest admins and jury publish announcements with images.
+- **Other tools.** The app has team search, jury award lists, a calendar, and profile pictures.
+- **Interfaces.** The app has a contestant app for phones and laptops, a staff phone app, and a staff console.
+- **Backend.** Cloudflare is the only backend. It uses one Worker, D1, private R2, and a Durable Object.
 
-## Environments
+## What is not built
 
-| Environment | State |
-| --- | --- |
-| [minsky-dev](https://minsky-dev.icaic-minsky.workers.dev) | Development only. Uses Cloudflare. Can run an older revision than `main`. |
-| [minsky-preview](https://minsky-preview.icaic-minsky.workers.dev) | Shared branch preview with test data only. Branch builds are switched off. It still serves `980653e`. |
-| Docs | This site. Its own Worker. Workers Builds publishes it from `main` and uploads preview versions for other branches. |
-| Production | None. |
+These features do not exist:
 
-## Not verified
+- Deleting an event, a contest, a person, or an entrant.
+- A control that archives an event. The read-only state exists, but no screen or command sets it.
+- A screen that changes an event's name, code, or time zone.
+- Importing a roster from a file. The event console takes pasted lines.
+- Configurable roles.
+- Linked reports for recurrences and duplicates, affected-team rosters for shared incidents, and awards with recipient exceptions.
+- Browser push notifications.
+- Email. Minsky sends none.
+- Image uploads by contestants.
+- Offline capture and venue-local operation.
+- Another hosting provider or a container package.
 
-- Live-contest use and 800 simultaneous users.
-- Offline use. Minsky needs a network connection.
-- Container packaging.
-- Session announcements on hosted Cloudflare, and announcement image upload in a browser.
-- An open-source license is not chosen yet.
+## What is not verified
+
+These claims have no evidence yet:
+
+- Live-contest use.
+- Capacity for 800 simultaneous users, ordinary actions within two seconds for 95% of requests, and live updates within three seconds.
+- The current installation procedure on a fresh hosted installation. See the [verification limit](/operators/installation/).
+- Webmaster recovery and the upgrade procedure on a hosted installation.
+- Announcements and their images on a hosted installation.
+- Live updates in the [complete local run](/contributing/development/#run-the-complete-app-locally).
+
+Minsky needs a network connection.
 
 Before you rely on an installation, record its source revision and verification results.
+
+## License
+
+An open-source license is not chosen yet.

@@ -1,6 +1,6 @@
 ---
 title: Sign in
-description: Get your account, change your temporary password, choose a session, and set a profile picture.
+description: Get your account, change your temporary password, choose a contest, and set a profile picture.
 ---
 
 ## Sign in the first time
@@ -11,32 +11,50 @@ There is no public registration.
 
 1. Open the sign-in link. The form already shows your event code.
 2. Enter your username and the temporary password, and select **Sign in**.
-3. Set a new password. You cannot see contest data until you do.
+3. Enter the temporary password again, and choose a new password of 12 to 128 characters. You cannot see contest data until you do.
 
 The device remembers the event code for the next sign-in. If the form shows no code, type the code from your sign-in details.
 A wrong event code, username, or password gives the same message. Check all three with your organizer.
 
+A team shares one account. A single contestant has their own account. Each staff member has a personal account, so the history shows who acted.
+
 Webmasters run the whole site and belong to no event. A webmaster selects **Site sign-in** on the sign-in page, which asks for no event code.
 
-Teams share one account. Each staff member has a personal account, so the history shows who acted.
+## Choose a contest
 
-## Choose a session
+Each contest has its own teams, issues, and awards. Some screens call a contest a session, for example **Contest session** and **Session settings**.
 
-Each session has its own teams, issues, and awards.
-If you belong to more than one, select the session:
+If you can open more than one contest, select the contest in one of these places:
 
-- **Contestants:** the session menu in the top bar.
-- **Staff:** the switcher at the top of the sidebar, or the **Me** tab on a phone.
+| You use | Control |
+| --- | --- |
+| The contestant app | The contest menu in the top bar |
+| The staff console | The menu at the top of the sidebar |
+| The staff phone app | **Contest session** on the **Me** tab |
+| The account page in the console or the contestant app | **Switch** under **Sessions** |
 
-An account with no session membership sees no data. Ask your organizer to add you.
+A page reload opens the first contest in the list again, so check the contest name after a reload.
+
+An account with no contest sees **Session access** and no data. Ask your organizer to assign you, and then select **Refresh access**.
+
+## Read the calendar
+
+The calendar lists the scheduled contests of your event for seven days, grouped by day in the event's time zone. Staff on a phone find it on the **Me** tab. Everyone else finds it under **Sessions** on the account page.
+
+- **Open** switches to a contest that you can open.
+- "You have no seat here" marks a contest that you cannot open.
+- **Today** returns to the current seven days.
+
+Webmasters see every event on the **Site** page.
 
 ## Find your screens
 
 | You are | Screen |
 | --- | --- |
-| Contestant | One screen at a time on a phone. List and report side by side in a window 1024 px wide or wider. |
-| Staff, window under 1024 px | Phone app with tabs at the bottom. |
-| Staff, window 1024 px or wider | Console with a sidebar. |
+| Contestant, window under 1024 px | One screen at a time, with tabs at the bottom |
+| Contestant, window 1024 px or wider | Your reports beside the open report |
+| Staff, window under 1024 px | Phone app with tabs at the bottom |
+| Staff, window 1024 px or wider | Console with a sidebar |
 
 Your roles decide the tabs and pages. Several roles combine.
 
@@ -44,20 +62,35 @@ Your roles decide the tabs and pages. Several roles combine.
 | --- | --- | --- |
 | Volunteer or specialist | **Queue**, **Mine**, **Find**, **Me** | **Queue**, **Assigned to me**, **Handoffs**, **Teams & tables** |
 | Jury | **Awards**, **Find**, **Me** | **Award review**, **Teams & tables** |
-| Session admin | adds **Session** | adds **Overview**, **Accounts**, **Session settings** |
+| Contest admin | **Queue**, **Find**, **Session**, **Me** | **Queue**, **Teams & tables**, **Overview**, **Accounts**, **Team locations**, **Session settings** |
 
-Open your account settings to change your password, switch session, choose a theme or sign out.
-In the console, select your name at the bottom of the sidebar. As a contestant, open the account menu at the top right and select **My account**. On a phone, use the **Me** tab.
+The account page shows a contest admin as **Session admin**.
+An event admin or a webmaster works as a contest admin in a contest. These people also see **Event console**, and a webmaster also sees **Site**.
 
-The queue is `/issues`, award review is `/jury`, administration is `/administration`, and account details are `/account`.
-You can bookmark a section or use Back and Forward.
+To reach your account settings, use one of these controls:
+
+- In the console, select your name at the bottom of the sidebar.
+- In the staff phone app, select **Me**.
+- In the contestant app on a laptop, open the account menu at the top right and select **My account**.
+- In the contestant app on a phone, select **Account**.
+
+These addresses open a section directly, and you can bookmark them:
+
+| Address | Section |
+| --- | --- |
+| `/issues` | The queue, or your reports as a contestant |
+| `/jury` | Award review |
+| `/administration` | Contest administration |
+| `/account` | Account settings |
+| `/event` | Event console |
+| `/site` | Site page |
+
 Opening a section asks you to sign in when needed and checks your permissions.
-A refresh keeps the section and loads current session data.
 
 ## Set a profile picture
 
 Your picture shows next to your name, for example on the issues that you own.
-Staff see the pictures of the other staff in the same session. A team account sees only its own picture.
+Staff see the pictures of the other staff in the same contest. A team account sees only its own picture.
 
 1. Open your account settings.
 2. Select **Change picture**. On the account page you can also select your avatar at the top.
@@ -69,15 +102,18 @@ Minsky saves a smaller copy of the image. The copy has no location or camera dat
 If the save fails and the button reads **Try again**, select it. Minsky does not save a second picture.
 
 To remove your picture, select **Remove picture** and confirm. Your initials show instead.
-The picture belongs to your account, so it is the same in every session. Other staff see a change within about a minute.
+The picture belongs to your account, so it is the same in every contest.
 
 ## Change your username
 
 Staff can change their own username on the account page, in the **Username** field. Your password stays, and you stay signed in. Use the new username at your next sign-in.
-A team account cannot change its username, because venue staff read it from the team's sign-in sheet. Ask an admin instead.
-An account that is on a team in any session cannot change its username either.
+
+A team account cannot change its username, because venue staff read it from the team's sign-in sheet.
+An account on a team in any contest cannot change its username either. A webmaster has no control for this.
 
 ## Forgot your password
 
 Ask your organizer. They check your identity and give you a new temporary password.
 Minsky sends no email. Your history stays linked to your account.
+
+If no webmaster can sign in, an operator follows [Recover a webmaster password](/operators/installation/#recover-a-webmaster-password).

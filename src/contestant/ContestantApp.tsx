@@ -47,8 +47,7 @@ const contestantTabs = [
  * and report list), one report, or the report form.
  * A bottom tab bar (Report, My reports, Account) reaches each from any
  * screen. Both layouts share the
- * same components and state (mockup for the laptop layout:
- * design/redesign/f-contestant-desktop.html).
+ * same components and state.
  *
  * Contestant views must never contain internal notes or staff-only images.
  * The server omits them for team accounts, and contestantView.ts filters

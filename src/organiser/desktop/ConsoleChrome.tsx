@@ -468,7 +468,7 @@ const themeChoices: readonly {
 
 /**
  * The ⌘K command palette. It finds issues by number or report text, teams by
- * the T0008 fuzzy search, pages and common actions. It does its own
+ * the fuzzy search, pages and common actions. It does its own
  * filtering, so the cmdk filter is off.
  */
 export function CommandPalette({

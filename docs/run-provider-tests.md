@@ -1,16 +1,17 @@
 # Run the shared provider tests
 
-Use this guide to check an implemented provider against Minsky's shared behavior scenarios.
-Use an isolated test backend. Never use development or production accounts.
+Use this guide to check the Cloudflare provider against Minsky's shared behavior scenarios.
 For the suite's responsibilities and limits, see [the test contracts](provider-test-contracts.md).
 
-The Cloudflare driver runs 11 shared scenarios.
-On 2026-10-19, protected runs at `2125875` passed all 11 cases. A later change needs fresh hosted verification.
-Record local checks and CLI runs against hosted resources separately. Keep earlier protected GitHub runs as dated evidence.
-See [run log](history/run-log.md) for tested revisions, results, and cleanup evidence.
-For a new implementation, complete [Add a backend provider](add-provider.md) before using this runner.
-The runner currently accepts only `cloudflare`.
-The commands below verify existing implementations. They do not register a provider or provision a new installation.
+The hosted commands are for maintainers. Each runner compares its target with fixed values in the code, and it refuses any other target. So these commands work only with access to the maintainers' Cloudflare account.
+`<account-id>` means the `account_id` value in `wrangler.jsonc`.
+Anyone can run [List the scenarios without credentials](#list-the-scenarios-without-credentials) and [Check the complete Cloudflare runtime separately](#check-the-complete-cloudflare-runtime-separately).
+
+Use an isolated test backend. Never use development or production accounts.
+The runner accepts only `cloudflare`. For a new implementation, complete [Add a backend provider](add-provider.md) first.
+The commands below verify an existing implementation. They do not register a provider or provision a new installation.
+
+A hosted result applies only to the revision that it tested. Record local checks and hosted runs separately, each with its revision and target.
 
 ## List the scenarios without credentials
 
@@ -26,7 +27,7 @@ The commands below verify existing implementations. They do not register a provi
    npm run test:providers:list
    ```
 
-The command lists the cases without creating accounts, records, or a browser session.
+The command prints `Total: 11 tests in 1 file`. It does not create accounts, records, or a browser session.
 `npm run ci` runs this list. It does not run the hosted provider commands below.
 
 ## Run against Cloudflare
@@ -35,15 +36,14 @@ The Cloudflare driver permits only this separate connector CI target:
 
 | Resource | Required value |
 | --- | --- |
-| Account | `458ad6a930b0fb717796dfa19ca6a2b1` |
+| Account | `<account-id>` |
 | D1 database | `minsky-connector-ci`, UUID `de43cf95-c024-4e44-860d-8ff179e4e08d` |
 | Worker | `minsky-connector-ci` |
 | R2 bucket | `minsky-connector-ci-images` |
 | Origin | `https://minsky-connector-ci.icaic-minsky.workers.dev` |
 | Configuration | `src/server/adapters/cloudflare/deploy/connector-ci.wrangler.jsonc` |
 
-Do not substitute the authentication CI, transaction-proof, development, or production resources.
-The target guard rejects those substitutions before fixture creation.
+Do not substitute any other resource. The target guard rejects a substitution before it creates a fixture.
 
 1. Prepare the isolated D1 schema, activate R2, and create the private bucket.
 2. Deploy the reviewed complete application and its private `AUTH_SECRET` to the configured Worker.
@@ -54,7 +54,7 @@ The target guard rejects those substitutions before fixture creation.
    ```sh
    npm run test:providers -- --provider=cloudflare \
      --config=src/server/adapters/cloudflare/deploy/connector-ci.wrangler.jsonc \
-     --account=458ad6a930b0fb717796dfa19ca6a2b1 \
+     --account=<account-id> \
      --database=de43cf95-c024-4e44-860d-8ff179e4e08d \
      --origin=https://minsky-connector-ci.icaic-minsky.workers.dev
    ```
@@ -66,7 +66,7 @@ Only test bridge assets come from the local Vite server.
 
 A passing run exits with code zero after all 11 cases and cleanup.
 Cleanup verifies the owned D1 records, exact R2 keys, and Durable Object state before deleting the identifiers-only journal.
-The selected Worker must expose the trusted `SessionMaintenance` service entrypoint from this revision.
+The selected Worker must expose the trusted `SessionMaintenance` service entrypoint.
 The fixture checks that internal binding before it creates records. It does not use a public setup or cleanup route.
 Do not enable credential-bearing traces, screenshots, video, or request debug logs.
 
@@ -80,8 +80,8 @@ npm run test:connector:runtime
 
 This command accepts no provider target.
 It uses fictional accounts, Chromium, and temporary local D1, R2, and Durable Object resources.
-One complete runtime case passes locally.
-That result does not establish hosted deployment or a fresh installation.
+It runs one complete runtime case.
+A pass does not establish hosted deployment or a fresh installation.
 
 Run the complete React journey against a temporary local application:
 
@@ -92,7 +92,7 @@ npm run test:connector:ui:local
 This command builds a separate Cloudflare frontend without replacing the default `dist` output.
 It uses the same UI assertions as the guarded hosted journey, with separate local fixture setup.
 It accepts no targets or filters and deletes its temporary build, bindings, and browser artifacts afterward.
-Local emulation does not replace the required hosted Cloudflare evidence.
+Local emulation does not replace hosted Cloudflare checks.
 
 ## Run direct Cloudflare store checks
 
@@ -100,14 +100,14 @@ The direct workflow and account suites require this separate D1-only target:
 
 | Resource | Required value |
 | --- | --- |
-| Account | `458ad6a930b0fb717796dfa19ca6a2b1` |
+| Account | `<account-id>` |
 | D1 database | `minsky-connector-store-ci`, UUID `341350ba-7c74-4c46-8b21-edfdcda475f5` |
 | Configuration | `src/server/adapters/cloudflare/deploy/connector-store-ci.wrangler.jsonc` |
 
 This configuration contains one D1 binding and no application entrypoint.
 Do not bind this database to a deployed Worker.
 These suites require no R2 bucket or Durable Object namespace.
-Their target guards reject the full connector, authentication, historical proof, and development configurations.
+Their target guards reject every other configuration.
 The shared browser and product UI suites continue to use `minsky-connector-ci` above.
 
 Shared Cloudflare clients report endpoint names, status counts, and request durations before logout.
@@ -126,7 +126,7 @@ Check existing Wrangler access before preparing the schema:
 npx wrangler whoami
 node src/server/adapters/cloudflare/tooling/store-target.mjs migrate \
   --config=src/server/adapters/cloudflare/deploy/connector-store-ci.wrangler.jsonc \
-  --account=458ad6a930b0fb717796dfa19ca6a2b1 \
+  --account=<account-id> \
   --database=341350ba-7c74-4c46-8b21-edfdcda475f5
 ```
 
@@ -141,37 +141,40 @@ Run the complete workflow suite:
 ```sh
 npm run test:connector:workflow:hosted -- \
   --config=src/server/adapters/cloudflare/deploy/connector-store-ci.wrangler.jsonc \
-  --account=458ad6a930b0fb717796dfa19ca6a2b1 \
+  --account=<account-id> \
   --database=341350ba-7c74-4c46-8b21-edfdcda475f5
 ```
 
-The expected result is `Hosted full D1 workflow: 70 passed, 0 failed, 0 skipped.`
+The runner prints `Hosted full D1 workflow: <passed> passed, <failed> failed, <skipped> skipped.` Every case must pass without a skip.
 This runner uses production identity guards and the reviewed D1-only configuration.
 It requires the checkout's exact applied migration list, but applies no migrations itself.
 Its result does not check Worker execution, images, the product UI, or live delivery.
+
+The runner has a known fault. `test-store.mjs` requires a total of 70 cases for this suite, and `src/server/adapters/d1/store.test.ts` has 94 cases (measured on a local D1 database on 2026-11-07).
+From the code, the command therefore exits with `All 70 full D1 workflow cases must pass without skips.` even when every case passes. Nobody has confirmed this on a hosted run.
 
 Check account permissions and credential races on the same isolated store schema:
 
 ```sh
 npm run test:connector:accounts:hosted -- \
   --config=src/server/adapters/cloudflare/deploy/connector-store-ci.wrangler.jsonc \
-  --account=458ad6a930b0fb717796dfa19ca6a2b1 \
+  --account=<account-id> \
   --database=341350ba-7c74-4c46-8b21-edfdcda475f5
 ```
 
 The expected result is `Hosted connector accounts: 34 passed, 0 failed, 0 skipped.`
 This command checks current permissions, identity expiry, credential generation, revocation, and rollback inside account batches.
 It uses maintained password hashing and the same reviewed D1-only configuration.
-The runner includes four fixed authentication files:
+The runner includes three fixed authentication files:
 
 - `src/server/adapters/cloudflare/authentication.test.ts`
 - `src/server/adapters/cloudflare/authenticationRecovery.test.ts`
 - `src/server/adapters/cloudflare/authenticationCompletion.test.ts`
 
-Cases run serially within each file. Up to four files run concurrently.
+Cases run serially within each file. The files run concurrently, with up to four workers.
 Each case creates its own UUID-scoped fixture. Each file owns its identity service and database proxy.
 Fixture setup, credential snapshots, and cleanup checks use D1 batches with the same row assertions.
-The local `npm run test:auth` suite includes one additional expiry-clock probe and must pass all 83 cases.
+The local `npm run test:auth` suite adds one expiry-clock probe to these cases, and every case must pass.
 Record that local result separately from the 34 hosted cases.
 Both connector runners reject test filters, count overrides, and configuration overrides beyond the documented target and transport options.
 Both direct D1 runners retain their own fixture journals if cleanup fails. They use the original reviewed repository configuration.
@@ -187,10 +190,9 @@ The final result still requires every case to pass without failures or skips.
 ### Use the D1 API transport
 
 The commands above use native D1 bindings through the local Wrangler preview proxy.
-This remains the default transport.
+This is the default transport.
 If that local proxy disconnects, you can select `--transport=api` for these two store suites.
-Read-only probes reproduced a failure while the local proxy forwarded requests to the remote preview Worker.
-The underlying connection fault remains unresolved. This option bypasses that proxy for database requests.
+This option bypasses the proxy for database requests. The underlying connection fault is unresolved.
 
 Use the same prepared D1-only CI target and existing Wrangler access.
 The runner confirms the account, database, configuration, and applied migrations before it starts fixtures.
@@ -204,32 +206,31 @@ Run the complete workflow suite first:
 npm run test:connector:workflow:hosted -- \
   --transport=api \
   --config=src/server/adapters/cloudflare/deploy/connector-store-ci.wrangler.jsonc \
-  --account=458ad6a930b0fb717796dfa19ca6a2b1 \
+  --account=<account-id> \
   --database=341350ba-7c74-4c46-8b21-edfdcda475f5
 ```
 
-The expected result is `Hosted full D1 workflow: 70 passed, 0 failed, 0 skipped.`
+The runner prints the same line and has the same known fault as the binding transport.
 After that command finishes, run the complete account suite:
 
 ```sh
 npm run test:connector:accounts:hosted -- \
   --transport=api \
   --config=src/server/adapters/cloudflare/deploy/connector-store-ci.wrangler.jsonc \
-  --account=458ad6a930b0fb717796dfa19ca6a2b1 \
+  --account=<account-id> \
   --database=341350ba-7c74-4c46-8b21-edfdcda475f5
 ```
 
 The expected result is `Hosted connector accounts: 34 passed, 0 failed, 0 skipped.`
 The API option uses the same files, assertions, case counts, and timeouts as the binding transport.
-The API transport runs files in sequence with one worker. Native account checks retain four workers.
+The API transport runs files in sequence with one worker. Native account checks use up to four workers.
 Tests can still run concurrent operations inside each case. The runner adds no retries or case filters.
 Each database batch uses one API request and retains transaction rollback, result metadata, numeric values, and null values.
 
 Run these API commands in sequence. Do not run another API store check concurrently.
 Both API suites space request starts by 300 milliseconds.
 One active file can make about 1,000 requests in five minutes at that pace.
-A four-file API run passed 81 cases and timed out one case.
-Sequential files give each case the full request budget without increasing that timeout.
+Sequential files give each case the full request budget without increasing its timeout.
 Cloudflare's [shared API limit](https://developers.cloudflare.com/fundamentals/api/reference/limits/) is 1,200 requests in five minutes.
 Other API activity can use the same allowance. An HTTP 429 response fails the check without a retry.
 
@@ -247,7 +248,7 @@ After deploying the full application, check the actual product UI separately:
 ```sh
 node src/server/adapters/cloudflare/tooling/test-ui.mjs \
   --config=src/server/adapters/cloudflare/deploy/connector-ci.wrangler.jsonc \
-  --account=458ad6a930b0fb717796dfa19ca6a2b1 \
+  --account=<account-id> \
   --database=de43cf95-c024-4e44-860d-8ff179e4e08d \
   --origin=https://minsky-connector-ci.icaic-minsky.workers.dev
 ```
@@ -255,20 +256,18 @@ node src/server/adapters/cloudflare/tooling/test-ui.mjs \
 The required result is one hosted UI case with no failures, skips, or retries and verified fixture cleanup.
 The journey checks all nine commands, jury worklist transitions, images, live updates, and account administration.
 Follow [the installation guide](../site/src/content/docs/operators/installation.mdx) for the separate empty-installation procedure.
-Record the tested source revision and installation result in the [run log](history/run-log.md).
+Record the tested source revision and the result in the pull request.
 
 ## Run hosted checks on demand
 
-GitHub Actions no longer runs these checks.
-A maintainer or coding agent runs them on the reviewed revision.
+Run these checks by hand on the reviewed revision. Workers Builds does not run them.
 
-For the complete Cloudflare connector, run the hosted commands in this guide on the reviewed revision.
-Do not point them at the development database.
+Do not point the hosted commands in this guide at the development database.
 The test commands do not migrate, deploy, or create resources.
 Before you run them, migrate the store and connector CI databases and deploy the isolated application Worker, as [Run against Cloudflare](#run-against-cloudflare) states.
 The private bucket, service activation, and initial Worker secret must exist before those commands can pass.
-Record the result and tested revision in [run log](history/run-log.md), separately from other hosted CLI results.
-Earlier authentication runs do not check this connector path.
+Record the result and tested revision in the pull request, separately from other hosted results.
+Authentication runs do not check this connector path.
 
 ## Recover an incomplete fixture
 
@@ -281,7 +280,7 @@ Earlier authentication runs do not check this connector path.
    ```sh
    npm run test:providers -- --provider=cloudflare \
      --config=src/server/adapters/cloudflare/deploy/connector-ci.wrangler.jsonc \
-     --account=458ad6a930b0fb717796dfa19ca6a2b1 \
+     --account=<account-id> \
      --database=de43cf95-c024-4e44-860d-8ff179e4e08d \
      --origin=https://minsky-connector-ci.icaic-minsky.workers.dev \
      --recover=/absolute/path/recovery.json
@@ -298,11 +297,10 @@ Recovery skips scenario execution and normal backend prerequisites, but retains 
 ### Recover direct D1 fixtures
 
 There is no automatic recovery command for the direct workflow or account suites.
-The historical transaction-proof DELETE commands omit modern identity and account records. Do not use those commands for these journals.
 
-Past GitHub Actions runs stored journals under `$RUNNER_TEMP/minsky-connector-store-*/minsky-d1-proof-*/fixture.json`.
-Local runs use the same nested directory names under the system temporary directory.
-Current runs use the original reviewed repository configuration. They create no temporary Wrangler configuration copy.
+The runner prints each retained journal as `Fixture recovery journal: <path>`.
+The path is `minsky-connector-store-*/minsky-d1-proof-*/fixture.json` under the system temporary directory, or under `RUNNER_TEMP` when that variable is set.
+Runs use the original reviewed repository configuration. They create no temporary Wrangler configuration copy.
 
 1. Retain each `fixture.json` journal and its containing `minsky-connector-store-*` directory.
 2. Retain the original repository configuration from that run's source revision.
@@ -310,7 +308,7 @@ Current runs use the original reviewed repository configuration. They create no 
 4. Check that the original migrations and foreign-key constraints remain installed.
 5. Stop the interrupted test process before inspecting or deleting its records.
 
-Current direct runs use `minsky-connector-store-ci`.
+Direct runs use `minsky-connector-store-ci`.
 An older journal can refer to the full connector database. Keep that original target and schema when investigating the journal.
 Do not redirect an old journal to the new store database.
 If the original database has a Worker binding, check its fixture coordinator state separately before declaring cleanup complete.

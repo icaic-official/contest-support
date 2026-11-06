@@ -17,7 +17,7 @@ export type OrganiserTab = "queue" | "mine" | "awards" | "find" | "session" | "m
 
 /**
  * Jury members without support roles or admin rights see resolved issues
- * only. This is the same rule as before T0015.
+ * only.
  */
 export function isJuryOnly(member: Membership): boolean {
   const seat = seatOf(member);
@@ -57,7 +57,7 @@ export function visibleIssues(
 /**
  * The issues that this person can open. Jury members can also open an issue
  * that was reopened after its award, while the award waits for external
- * application (T0009). The ordinary jury queue stays resolved only.
+ * application. The ordinary jury queue stays resolved only.
  */
 export function openableIssues(state: Snapshot, member: Membership): Issue[] {
   const issues = visibleIssues(state.issues, member);
@@ -80,7 +80,7 @@ export const awardListLabels: Record<AwardList, string> = {
 };
 
 /**
- * The jury award lists. "decide" and "apply" are the T0009 worklists:
+ * The jury award lists. "decide" and "apply" are the worklists:
  * resolved issues without an award, oldest resolution first, and every award
  * that waits for external application, also on a reopened issue and with
  * zero minutes, oldest decision first. "done" holds resolved issues with an

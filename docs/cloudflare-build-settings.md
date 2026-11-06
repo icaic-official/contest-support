@@ -1,19 +1,15 @@
 # Worker deployment and CI settings
 
-This reference describes `scripts/ci.mjs`, `wrangler.ci.jsonc`, and `scripts/deploy-workers.mjs`.
-The [setup guide](cloudflare-builds.md) owns the dashboard steps.
-The [application publication steps](cloudflare-builds.md#publish-the-application) own the `minsky-dev` trigger.
-The [activation guide](activate-cloudflare-development.md) owns the backend switch approval.
+This reference is for maintainers of this project's own Cloudflare resources. An outside contributor needs only the [CI summary](cloudflare-builds.md).
+It describes `scripts/ci.mjs`, `wrangler.ci.jsonc`, and `scripts/deploy-workers.mjs`.
+The [setup guide](cloudflare-builds.md) owns the dashboard steps, including the [`minsky-dev` trigger](cloudflare-builds.md#publish-the-application).
+`<account-id>` means the `account_id` value in `wrangler.jsonc`.
 
 ## Workers Builds
 
 Workers Builds on the Workers Paid plan includes 6,000 build minutes per month.
-Further minutes cost $0.005 each.
 A build times out at 20 minutes.
-Paid plans allow 6 concurrent builds, 4 vCPU, 8 GB of memory, and 20 GB of disk.
-These figures are from [Workers Builds limits and pricing](https://developers.cloudflare.com/workers/ci-cd/builds/limits-and-pricing/).
-The $5 Workers Paid plan is the plan that includes that allowance.
-See [Workers pricing](https://developers.cloudflare.com/workers/platform/pricing/).
+See [Workers Builds limits and pricing](https://developers.cloudflare.com/workers/ci-cd/builds/limits-and-pricing/).
 
 | Setting | Value |
 | --- | --- |
@@ -27,39 +23,22 @@ See [Workers pricing](https://developers.cloudflare.com/workers/platform/pricing
 | Build variable | `SKIP_DEPENDENCY_INSTALL=1` |
 | Node.js | `NODE_VERSION=22.23.4` on both `minsky-ci` triggers. `.nvmrc` contains `22`. |
 
-Both `minsky-ci` triggers set the build variable `NODE_VERSION` to `22.23.4`.
-That value is already set in Cloudflare.
-It keeps CI on Node.js 22.23.4 when the build image's default Node.js changes.
+`NODE_VERSION` keeps CI on Node.js 22.23.4 when the build image's default Node.js changes.
 
 `npm run ci` installs both lockfiles, then runs the app production build, ESLint, unit tests, the provider scenario list, the docs build, both `npm audit` checks, and a checksum-verified Gitleaks scan.
 The app build starts with `tsc -b`, so it is also the type check. It runs first so that type errors fail early.
-Vitest uses every CPU. It starts the four short authentication files first, because a fresh install has no earlier test durations and Vitest would otherwise start them last.
+Vitest uses every CPU. It starts the three short authentication files first, because a fresh install has no earlier test durations and Vitest would otherwise start them last.
+
 `npm run ci:worker` runs `wrangler versions upload --config wrangler.ci.jsonc --dry-run`.
-[Version upload](https://developers.cloudflare.com/workers/versions-and-deployments/deployment-management/) does not send traffic.
-The dry run does not upload a version.
+The dry run does not upload a version and does not send traffic.
 The first real `wrangler versions upload` of a new Worker fails until `wrangler deploy` has created it.
-This repository does not run that first deploy from CI.
 
 A push to a branch in `GiftedNovaHD/minsky` starts one build when preview builds are enabled.
 A fork pull request does not push a branch to this repository, so it does not start a build.
-There is no weekly run when nobody pushes.
-Secret and dependency scans run on each build instead.
-
-Pages builds are a separate product.
-The [Pages limits](https://developers.cloudflare.com/pages/platform/limits/) page gives the Free plan 500 builds per month, and higher quotas on Pages Pro and Business.
-Those quotas are not the Workers Paid build minutes above.
-Pages also deploys a site. This CI target must not deploy `minsky-dev` or `minsky-docs`.
-
-Containers and Sandbox bill through [Containers pricing](https://developers.cloudflare.com/containers/platform/pricing/).
-The Workers Paid plan includes 375 vCPU-minutes, 25 GiB-hours of memory, and 200 GB-hours of disk per month.
-Memory and disk use the instance size for the whole time the instance runs.
-CPU uses active time.
-A container runner would also be a deployed Worker.
-This change does not add one.
+There is no scheduled run. Secret and dependency scans run on each build.
 
 ## Docs Workers Builds
 
-The `minsky-docs` Worker has these two triggers since 2026-10-24.
 [Publish the docs](cloudflare-builds.md#publish-the-docs) explains the behavior and the dashboard steps.
 
 | Setting | Production trigger | Preview trigger |
@@ -75,9 +54,8 @@ The `minsky-docs` Worker has these two triggers since 2026-10-24.
 
 ## Application Workers Builds
 
-The `minsky-dev` Worker has one trigger. The owner chose automatic publication of `main` on 2026-10-24.
+The `minsky-dev` Worker has one trigger.
 [Publish the application](cloudflare-builds.md#publish-the-application) explains the behavior and the dashboard steps.
-These settings are proposed. They take effect when the owner connects the trigger.
 
 | Setting | Value |
 | --- | --- |
@@ -91,12 +69,12 @@ These settings are proposed. They take effect when the owner connects the trigge
 
 The build runs `npm run ci` once more on `main`, after `minsky-ci` has checked the same commit.
 That repeat makes the publication depend on checks in the same build. The deploy step cannot run after a failed check.
-The combined build time of checks and publication is not measured yet. It must stay under the 20 minute build limit.
+The combined build time of checks and publication is not measured. It must stay under the 20 minute build limit.
 
 ## Preview Workers Builds
 
-The `minsky-preview` Worker publishes branch previews. [Publish branch previews](cloudflare-builds.md#publish-branch-previews) explains the behavior and the dashboard steps.
-The owner connected this trigger on 2026-10-24 and switched off its branch builds the same day, because its token cannot be limited to the preview resources. The table lists the settings for when branch builds are on.
+The `minsky-preview` Worker publishes branch previews when its branch builds are on. They are switched off, because its token cannot be limited to the preview resources.
+[Publish branch previews](cloudflare-builds.md#publish-branch-previews) explains the behavior and the dashboard steps. The table lists the settings for when branch builds are on.
 
 | Setting | Value |
 | --- | --- |
@@ -113,7 +91,7 @@ They hold only test data.
 
 ## On-demand checks
 
-Coding agents run these commands. They are not part of `npm run ci`.
+These commands are not part of `npm run ci`. Run them by hand.
 
 The smoke set is `tests/landing.spec.ts` and `tests/journey.spec.ts`.
 The first file checks the sign-in gate and skip navigation.
@@ -125,7 +103,7 @@ npx playwright install chromium
 npm run test:e2e:smoke
 ```
 
-The full mocked browser suite, local authentication browser, local connector UI, and docs browser are separate:
+The full mocked browser suite, local authentication browser, local connector runtime, local connector UI, and docs browser are separate:
 
 ```sh
 npx playwright install --with-deps chromium
@@ -138,24 +116,19 @@ npm run docs:test
 ```
 
 `npm run test:e2e` includes the smoke files and the other mocked browser files.
-`npm run test:connector:runtime` starts a temporary local Worker. It is not a browser test.
-The [build image](https://developers.cloudflare.com/workers/ci-cd/builds/build-image/) preinstalls `libgbm1` and does not list Chromium or the rest of the Playwright libraries.
-Its docs do not say a build can install apt packages.
-That is why the smoke set stays on demand.
-A Containers instance could run a Playwright image inside the included amounts for a short run.
-For example, 10 minutes on the published `standard-1` size (1/2 vCPU, 4 GiB, 8 GB disk) is 5 vCPU-minutes at full CPU, 2/3 GiB-hour, and 4/3 GB-hours.
-Those amounts sit inside the included 375 vCPU-minutes, 25 GiB-hours, and 200 GB-hours.
-This paragraph is arithmetic from the pricing page. It is not a measured bill.
-The hosted connector job used a 45 minute limit and the hosted authentication job used 35 minutes.
-Both exceed the 20 minute Workers Builds timeout, so they cannot move into a build command.
+`npm run test:connector:runtime` runs in Vitest. It starts a temporary local Worker and opens Chromium.
+These suites stay on demand, because the [build image](https://developers.cloudflare.com/workers/ci-cd/builds/build-image/) preinstalls `libgbm1` and does not list Chromium or the rest of the Playwright libraries.
+Its docs do not say that a build can install apt packages.
+
+Hosted suites stay on demand too. `test-store.mjs` gives each store suite a 30 minute limit, which is longer than the 20 minute build limit.
 
 Hosted Cloudflare authentication checks change only the isolated authentication CI Worker:
 
 ```sh
 npx wrangler d1 migrations apply minsky-auth-ci --remote --config wrangler.auth-ci.jsonc
 npx wrangler deploy --config wrangler.auth-ci.jsonc
-npm run test:auth:hosted -- --account=458ad6a930b0fb717796dfa19ca6a2b1 --database=5d746d29-0a66-4346-96a6-4974126685d7
-npm run test:auth:http -- --account=458ad6a930b0fb717796dfa19ca6a2b1 --database=5d746d29-0a66-4346-96a6-4974126685d7 --origin=https://minsky-auth-ci.icaic-minsky.workers.dev
+npm run test:auth:hosted -- --account=<account-id> --database=5d746d29-0a66-4346-96a6-4974126685d7
+npm run test:auth:http -- --account=<account-id> --database=5d746d29-0a66-4346-96a6-4974126685d7 --origin=https://minsky-auth-ci.icaic-minsky.workers.dev
 ```
 
 Hosted connector commands stay in [Run the shared provider tests](run-provider-tests.md).
@@ -163,7 +136,6 @@ Run them only against the documented CI database names.
 
 ## Publication commands
 
-The GitHub Actions jobs `checks`, `secrets`, `dependencies`, `deploy`, and `deploy-app` are removed.
 Publication is an explicit, guarded command. Run it only after an explicit request.
 
 `scripts/deploy-workers.mjs` reads the pushed branch and commit from two variables:
@@ -174,10 +146,12 @@ Publication is an explicit, guarded command. Run it only after an explicit reque
 A manual run sets both variables itself. `main` selects the stable Workers. On other branches, the script publishes only the app, and only on the `minsky-preview` build.
 Publication also requires `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`.
 `CLOUDFLARE_API_TOKEN` is the token for the target checks, the migrations, and the upload.
-`CLOUDFLARE_ACCOUNT_ID` must be `458ad6a930b0fb717796dfa19ca6a2b1`.
+`CLOUDFLARE_ACCOUNT_ID` must be `<account-id>`.
 `--check` and `--build` do not read `CLOUDFLARE_API_TOKEN`.
 A stable app publication also reads the backend values in [Repository settings](#repository-settings).
-The branch check uses `git ls-remote` on the public repository. It needs no GitHub token.
+
+The branch check runs `git ls-remote` on `https://github.com/GiftedNovaHD/minsky.git` with terminal prompts off. The script passes no GitHub token.
+If the machine cannot read that URL, the check stops with `The GitHub branch lookup failed.` The repository is private, so a manual run needs Git credentials for that URL.
 
 ## Repository settings
 
@@ -188,18 +162,16 @@ The [setup guide](cloudflare-builds.md#connect-the-worker) lists the exact value
 | Kind | Name | Value |
 | --- | --- | --- |
 | Build API token | `CLOUDFLARE_API_TOKEN` | Private user token limited to the account. |
-| Retired variable | `CLOUDFLARE_DEPLOY_ENABLED` | Nothing reads it. |
-| Retired variable | `MINSKY_DEV_BACKEND` | Nothing reads it since 2026-10-24. The app always publishes the complete Cloudflare Worker. |
 | Build variable | `MINSKY_DEV_CLOUDFLARE_CONFIG` | Repository-relative generated Wrangler path. |
-| Build variable | `MINSKY_DEV_DATABASE_ID` | Exact approved development D1 UUID. |
-| Build variable | `MINSKY_DEV_DATABASE_NAME` | Exact approved development D1 name. |
-| Build variable | `MINSKY_DEV_BUCKET_NAME` | Exact approved private development bucket name. |
+| Build variable | `MINSKY_DEV_DATABASE_ID` | Exact development D1 UUID. |
+| Build variable | `MINSKY_DEV_DATABASE_NAME` | Exact development D1 name. |
+| Build variable | `MINSKY_DEV_BUCKET_NAME` | Exact private development bucket name. |
 
-Set `CLOUDFLARE_ACCOUNT_ID` to `458ad6a930b0fb717796dfa19ca6a2b1` and `VITE_ENVIRONMENT` to `development`.
+Set `CLOUDFLARE_ACCOUNT_ID` to `<account-id>` and `VITE_ENVIRONMENT` to `development`.
 The token needs Worker publication and settings inspection access.
 Cloudflare app checks also need D1 metadata, migration query, and migration apply access. They also need R2 bucket and public-domain metadata access and Worker secret-name inspection.
 The automatic Workers Builds token has no D1 access.
-Review these permissions against the exact account before activation. Do not grant access to another account.
+Review these permissions against the exact account before you connect the trigger. Do not grant access to another account.
 The deployment token never becomes a frontend variable. Its secret value reaches only the publishing step.
 The build child excludes Cloudflare, GitHub, and authentication secrets.
 `npm run ci` removes `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_API_KEY`, and `AUTH_SECRET` before it installs packages or runs checks.
@@ -222,7 +194,6 @@ Install the locked dependencies before these commands:
 
 These commands require the branch and commit variables under [Publication commands](#publication-commands).
 They are deployment commands, not substitutes for local `npm run build`.
-The removed `deploy:preview` command cannot upload an assets-only app version.
 
 | Site and mode | Configuration | Worker | Assets |
 | --- | --- | --- | --- |
@@ -239,7 +210,7 @@ The provider validator rejects extra bindings, unknown variables, and environmen
 
 The generated full Worker includes application code, static assets, `DB`, `IMAGES`, `LIVE_UPDATES`, and `ASSETS`.
 It includes Durable Object migration tag `v1`, a one-minute recovery cron, and a 1,000 ms CPU cap.
-The configs disable Cloudflare preview URLs. Branch previews replace the separate `minsky-preview` Worker, which binds only preview resources.
+The application configs disable Cloudflare preview URLs. Cloudflare does not create them for Workers that use a Durable Object. Branch previews replace the separate `minsky-preview` Worker, which binds only preview resources.
 A branch build selects the preview only when `VITE_ENVIRONMENT` is `preview`. Other branch builds skip the app.
 A `main` build with `VITE_ENVIRONMENT=preview` skips the app, because `minsky-dev` publishes `main`.
 
@@ -277,9 +248,9 @@ A mismatch fails the command. The script withholds provider diagnostics and secr
 These checks verify publication, selection, bindings, and an anonymous denial.
 Authenticated authorization, private images, recovery, and live updates require the separate application checks.
 
-Workers Builds now publishes the docs and their preview versions. See [Publish the docs](cloudflare-builds.md#publish-the-docs).
-The script's `--site=docs` path remains a manual fallback for `main`.
+Workers Builds publishes the docs and their preview versions. See [Publish the docs](cloudflare-builds.md#publish-the-docs).
+The script's `--site=docs` path is a manual fallback for `main`.
 On other branches, the script skips the docs, because the `minsky-docs` build uploads their preview versions.
 The script publishes each Worker with `wrangler deploy` and the reviewed configuration.
 Docs deployment never reads app backend variables or configuration.
-A stable Cloudflare publication applies new development migrations. Bootstrap, secret creation, and approved activation remain separate operations.
+A stable Cloudflare publication applies new development migrations. Bootstrap and secret creation are separate operations.

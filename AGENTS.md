@@ -10,7 +10,7 @@
 - If a pull request or GitHub issue describes the work, read it.
 - Read relevant documents under `docs/` when they exist.
 - Do not assume that planned files or features exist.
-- Treat historical run reports as records of those runs. Check the repository to establish current state.
+- Check the repository to establish current state.
 
 ## Technical communication
 
@@ -67,13 +67,8 @@ On 2026-10-24 the owner chose automatic publication of `main` to `minsky-dev` th
 Do not deploy, except to preview resources. Production deployments need the owner's approval, as stated above.
 The owner reviews and merges.
 
-T0021's separately approved Cloudflare activation and repeat deployment retain their dated evidence in [run log](docs/history/run-log.md#t0021-approved-activation-2026-10-19).
 The retired Supabase projects `Minsky` and `Minsky CI` and the `SUPABASE_*` repository secrets still exist until the owner deletes them. Do not use or change them. Development, CI, and installation-verification resources remain separate.
-Earlier provider permissions and exact protected branch limits remain in the [planning log](docs/history/plan-log.md) and dated run records.
-Those historical approvals do not authorize a new activation or deployment.
-Statements in those records that Supabase is the active backend are superseded by the 2026-10-23 decision.
-Statements that the project keeps or uses its own Supabase projects are superseded by the 2026-10-24 decision.
-Statements that the Supabase adapter stays as a second implementation are superseded by the 2026-10-25 decision.
+Earlier approvals in Git history do not authorize a new activation or deployment.
 
 ## API tokens for agents
 
@@ -100,7 +95,7 @@ A token that can create tokens can grant itself any permission. So these rules a
 - Subtract before adding. Remove code that the current architecture no longer needs.
 - Use the current shared contracts and application paths. Remove obsolete proof modes, duplicate helpers, and unused stubs.
 - Keep one authoritative procedure or reference for each task. Update incoming links when you remove a duplicate page.
-- Preserve unique decisions and evidence in dated records. Do not present historical probes as current instructions.
+- Keep decisions that are still in force in `PLAN.md`. Record the evidence for a change in its pull request. Git history holds older records. Do not present old probes as current instructions.
 - Add an abstraction only when current callers need it.
 - Measure reader load by layers to trace and mutable context to remember. Remove pass-through wrappers that hide no meaningful decision.
 - Prefer local derived values. Before adding a layer or state, check that it reduces reader load elsewhere.
@@ -152,9 +147,7 @@ A token that can create tokens can grant itself any permission. So these rules a
 - Start each change from updated `main`.
 - Name branches as the [Contributions](#contributions) section states. If a GitHub issue describes the change, reference it in the PR description.
 
-On 2026-10-27 the owner retired the development ticket system. Each pull request records the scope, decisions, and verification of its change.
-[docs/history/tickets.md](docs/history/tickets.md) keeps tickets T0001 to T0025 as a historical record. Do not add tickets to it.
-Historical branch exceptions remain in the [planning log](docs/history/plan-log.md).
+Each pull request records the scope, decisions, and verification of its change.
 
 Complete these steps in sequence:
 
@@ -202,8 +195,7 @@ Report a manual publication separately from merge. Record its exact source revis
 Prepare compatible backend changes before a dependent frontend merges, or pause frontend deployment for that release.
 Hosted Cloudflare checks are on-demand commands against isolated targets.
 Ordinary Workers Builds checks run without cloud credentials.
-Record local cloud runs separately from earlier protected GitHub Actions runs.
-Neither replaces the other. GitHub Actions no longer runs those checks.
+Record each hosted check in the pull request with its revision and target.
 
 CI fixtures create temporary accounts and records scoped by UUID.
 They delete only their own data.
@@ -249,13 +241,12 @@ Follow the [documentation release plan](docs/documentation-release-plan.md).
 Write for readers without project conversations or access to the maintainers' provider accounts.
 State prerequisites, exact commands, expected results, permissions, and failure recovery where relevant.
 Label development, experimental, and unverified behavior explicitly.
-Update affected guides with behavior changes. Keep historical run reports separate from current instructions.
+Update affected guides with behavior changes.
 Do not call an installation path supported until its documented procedure passes on an isolated installation.
 
 Update relevant documents in the same change as behavior or workflow changes.
 Distinguish proposed, implemented, and verified capabilities.
-Use the original plan in the [planning log](docs/history/plan-log.md) as the initial baseline.
-Record later decisions explicitly in the appropriate document.
+Record decisions explicitly in the appropriate document.
 Do not leave conflicting instructions.
 
 ## Product and provider constraints

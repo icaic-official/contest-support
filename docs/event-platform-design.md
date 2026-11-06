@@ -864,6 +864,14 @@ Rehearsal of `0019` and `0020` together on 2026-11-05, on the separate fictional
 
 Rehearsal of `0020` again on 2026-11-05, after it gained `contest_awards_unconfirmed`, on the separate fictional database `minsky-preview-rehearsal-0020b`, deleted afterwards. The steps were `0001` to `0019`, then 1 event, 2 contests, and 2 accounts, then `wrangler d1 migrations apply --remote` for `0020`. `0020` ran 15 commands. Awards of 15 and 20 minutes in one contest, and of 15 minutes in another contest, were accepted. After the first 15-minute award was confirmed, a second 15-minute award was accepted. A third 15-minute award in the first contest, while the second waited, failed with `UNIQUE constraint failed: contest_awards.session_id, contest_awards.minutes`. `PRAGMA foreign_key_check` returned no rows.
 
+The owner accepted these decisions on 2026-11-06:
+
+16. **Late entrant in a running live contest.** Decided 2026-11-06. The organizer confirms the assignment. Then reporting closes for every team until that seat is issued. The console asks first, as the live password rule describes.
+17. **Rollback protection for the gate.** Decided 2026-11-06. Rollback protection stays a documented procedure, with no D1 enforcement. Organizers close live contests before a rollback, as the Phase 6 revert note states.
+18. **Named reset during an open practice contest.** Decided 2026-11-06. A named reset stays refused while the contestant holds another open contest, including an open practice contest. No practice exemption is added. The named target contest stays exempt, as the Phase 6 list near the top of this page states.
+19. **Withdrawing single-issue awards.** Decided 2026-11-06. Withdrawing single-issue awards is follow-up work, and it is not built. No command withdraws or replaces an issue award today, as the note on issue awards states.
+20. **Assign control for event admins.** Decided 2026-11-06. Event admins keep the **Assign** control on each staff row, because it is their only way to take a staff seat.
+
 ## Risks
 
 Each risk names its measurement.

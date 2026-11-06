@@ -355,6 +355,12 @@ export function OrganiserDesktopConsole({
                 member.is_admin
                   ? {
                       open: session.intake_open,
+                      schedule: !state.clock?.schedule
+                        ? "none"
+                        : state.clock.follows_schedule
+                          ? "follows"
+                          : "overridden",
+                      onReturn: () => navigate("settings"),
                       disabled: admin.busy || admin.archived,
                       onChange: (open) => {
                         void admin.setIntake(open ? 'open' : 'closed');

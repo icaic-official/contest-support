@@ -127,6 +127,8 @@ SELECT json_object(
       AND (a.staff = 1 OR (a.team_id IS NOT NULL AND k.applied_at IS NOT NULL)) ORDER BY k.at, k.id)), '[]')),
   'membership', (SELECT json_object('session_id', ?, 'user_id', account_id,
     'team_id', team_id, 'roles', json(roles), 'is_admin', json(CASE WHEN is_admin THEN 'true' ELSE 'false' END)) FROM access),
+  'has_specialist', (SELECT json(CASE WHEN EXISTS (SELECT 1 FROM membership_roles r
+      WHERE r.session_id = a.session_id AND r.role = 'specialist') THEN 'true' ELSE 'false' END) FROM access a WHERE a.staff = 1),
   'teams', json(COALESCE((SELECT json_group_array(json(row)) FROM (
     SELECT json_object('id', t.id, 'session_id', t.session_id, 'name', t.name, 'location', t.location, 'entrant_id', t.entrant_id) AS row
     FROM teams t CROSS JOIN access a WHERE t.session_id = ? AND (a.staff = 1 OR t.id = a.team_id) ORDER BY t.name, t.id)), '[]')),

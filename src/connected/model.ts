@@ -114,6 +114,8 @@ export const snapshotSchema = z.object({
     .object({ id: uuid, name: z.string(), archived: z.boolean() })
     .nullable(),
   membership: membershipSchema.nullable(),
+  /** Staff only: false when no one holds the specialist role in this contest. Null or absent means unknown. */
+  has_specialist: z.boolean().nullish(),
   teams: z.array(
     z.object({
       id: uuid,

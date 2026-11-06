@@ -97,7 +97,16 @@ describe("clockText", () => {
 
   it("says that organizers hold intake by hand", () => {
     expect(clockText(clock({ reason: "override_open" }), 0).headline).toMatch(/holding it open/);
-    expect(clockText(clock({ reason: "override_closed" }), 0).headline).toBe("Reporting is closed by the organizers.");
+  });
+
+  it("keeps the schedule's own clock when organizers close intake by hand", () => {
+    const closed = clock({ reason: "override_closed", follows_schedule: false });
+    const running = clockText(closed, at("2026-11-03T08:00:00.000Z"));
+    expect(running.headline).toMatch(/^Ends in /);
+    expect(running.details[0]).toBe("Reporting is closed by the organizers.");
+    expect(running.details.join(" ")).toMatch(/The contest ends at /);
+    expect(clockText(closed, at("2026-11-03T04:00:00.000Z")).headline).toMatch(/^Reporting opens at /);
+    expect(clockText(closed, at("2026-11-03T11:00:00.000Z")).headline).toMatch(/^Reporting closed at /);
   });
 
   it("shows only open or closed for a contest with no schedule", () => {

@@ -305,7 +305,7 @@ export function PhoneIssueView({
       case "resolve":
         return <ResolveForm {...formProps} />;
       case "escalate":
-        return <EscalateForm {...formProps} />;
+        return <EscalateForm {...formProps} noSpecialist={shell.data.snapshot?.has_specialist === false} />;
       case "reopen":
         return <ReopenForm {...formProps} />;
       case "award":

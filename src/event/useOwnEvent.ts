@@ -1,20 +1,31 @@
 import { useEffect, useState } from "react";
 import { backend } from "@/backend";
 
+type Landing = "unknown" | "site" | "event" | "none";
+
 /**
- * Whether the caller has an event console of their own. It asks only while
- * `enabled`, which a caller with no contest sets. The console read answers
- * for an event admin, and refuses everyone else.
+ * Where a caller with no contest belongs. A webmaster has no event, so the
+ * site read comes first and the event read is never sent for one. Otherwise
+ * the console read answers for an event admin and refuses everyone else.
  */
-export function useOwnEvent(enabled: boolean): "unknown" | "yes" | "no" {
-  const [answer, setAnswer] = useState<"unknown" | "yes" | "no">("unknown");
+export function useNoContestLanding(enabled: boolean): Landing {
+  const [answer, setAnswer] = useState<Landing>("unknown");
   useEffect(() => {
     if (!enabled) return;
     let current = true;
-    backend.manage.event().then(
-      () => current && setAnswer("yes"),
-      () => current && setAnswer("no"),
-    );
+    const settle = (next: Landing) => {
+      if (current) setAnswer(next);
+    };
+    backend.manage
+      .site()
+      .catch(() => null)
+      .then((site) => {
+        if (site) return settle("site");
+        return backend.manage.event().then(
+          () => settle("event"),
+          () => settle("none"),
+        );
+      });
     return () => {
       current = false;
     };

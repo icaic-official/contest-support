@@ -56,6 +56,8 @@ SELECT json_object(
   'membership', (SELECT json_object('session_id', ?, 'user_id', c.account_id,
     'team_id', c.team_id, 'roles', json(c.roles), 'is_admin', json(CASE WHEN c.is_admin THEN 'true' ELSE 'false' END))
     WHERE c.account_id IS NOT NULL),
+  'has_specialist', (SELECT json(CASE WHEN EXISTS (SELECT 1 FROM membership_roles r
+      WHERE r.session_id = c.session_id AND r.role = 'specialist') THEN 'true' ELSE 'false' END) WHERE c.staff = 1),
   'teams', json(COALESCE((SELECT json_group_array(json(row)) FROM (
     SELECT json_object('id', id, 'session_id', session_id, 'name', name, 'location', location, 'entrant_id', entrant_id) AS row FROM (
       SELECT t.* FROM teams t WHERE c.staff = 1 AND t.session_id = ?

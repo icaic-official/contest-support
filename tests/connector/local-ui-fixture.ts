@@ -3,6 +3,7 @@ import type { EventCode } from '../../src/backend/contracts';
 import type { D1Connection } from '../../src/server/adapters/d1/connection';
 import { passwordHasher, randomSecret } from '../../src/server/adapters/cloudflare/password';
 import { avatarKey } from '../../src/server/adapters/cloudflare/avatars';
+import { deleteFixtureRows, fenceFixtureEvent, forgetFixtureEvent } from '../../src/server/adapters/cloudflare/eventDeletionFixture';
 import { maintainFixtureSessions, type LiveEnvironment } from '../../src/server/adapters/cloudflare/live';
 import type { Actor, TestAccount } from '../providers/contracts';
 import type { UiFixture } from './ui-journey';
@@ -75,9 +76,9 @@ export async function createLocalUiFixture(env: LocalUiEnvironment, origin: stri
   await db.batch(queries);
   await env.IMAGES.put(control.key, Uint8Array.from([1, 2, 3]));
 
-  async function maintain(phase: 'prepare' | 'finish') {
+  async function eraseLiveState() {
     const result = await maintainFixtureSessions(new Request('https://maintenance.internal/sessions', {
-      method: 'POST', body: JSON.stringify({ phase, runId, eventId, sessionIds }),
+      method: 'POST', body: JSON.stringify({ eventId }),
     }), env);
     if (!result.ok || (await result.json() as { verified?: boolean }).verified !== true) {
       throw new Error('Local fixture Durable Object cleanup is unverified.');
@@ -88,11 +89,9 @@ export async function createLocalUiFixture(env: LocalUiEnvironment, origin: stri
     async close() {
       // Browser contexts close before this fence. No new fixture command or
       // image reservation may commit while exact object IDs are collected.
+      await fenceFixtureEvent(db, eventId);
       const ids = Object.values(accounts).map((account) => account.id);
       const marks = ids.map(() => '?').join(',');
-      await db.batch([write('UPDATE events SET archived = 1 WHERE id = ?', eventId),
-        write(`UPDATE accounts SET disabled = 1 WHERE id IN (${marks})`, ...ids)]);
-      await maintain('prepare');
       const images = (await write('SELECT original_path, thumbnail_path FROM issue_images WHERE session_id IN (?, ?)', ...sessionIds)
         .all<{ original_path: string; thumbnail_path: string }>()).results;
       const avatars = (await write(`SELECT id, account_id FROM account_avatars WHERE account_id IN (${marks})`, ...ids)
@@ -100,19 +99,12 @@ export async function createLocalUiFixture(env: LocalUiEnvironment, origin: stri
       const keys = [...images.flatMap((image) => [image.original_path, image.thumbnail_path]),
         ...avatars.map((avatar) => avatarKey(avatar.account_id, avatar.id))];
       if (keys.length) await env.IMAGES.delete(keys);
-      const rateKeys = Object.values(accounts).flatMap((account) => [`handle:${eventId}:${account.username}`, `change:${account.id}`]);
-      rateKeys.push(...['127.0.0.1', '::1', '198.51.100.17'].map((ip) => `ip:${createHash('sha256').update(`${secret}:${ip}`).digest('hex')}`));
-      await db.batch([
-        write('DELETE FROM events WHERE id = ?', eventId),
-        write(`DELETE FROM authority_audit WHERE actor IN (${marks})`, ...ids),
-        write(`DELETE FROM account_operations WHERE account_id IN (${marks}) OR actor IN (${marks})`, ...ids, ...ids),
-        write(`DELETE FROM ba_user WHERE id IN (${marks})`, ...ids),
-        write(`DELETE FROM authentication_limits WHERE key IN (${rateKeys.map(() => '?').join(',')})`, ...rateKeys),
-        write(`DELETE FROM account_avatars WHERE account_id IN (${marks})`, ...ids),
-        write(`DELETE FROM accounts WHERE id IN (${marks})`, ...ids),
-      ]);
+      await deleteFixtureRows(db, eventId);
+      const rateKeys = ['127.0.0.1', '::1', '198.51.100.17'].map((ip) => `ip:${createHash('sha256').update(`${secret}:${ip}`).digest('hex')}`);
+      await write(`DELETE FROM authentication_limits WHERE key IN (${rateKeys.map(() => '?').join(',')})`, ...rateKeys).run();
       if (keys.length) await env.IMAGES.delete(keys);
-      await maintain('finish');
+      await eraseLiveState();
+      await forgetFixtureEvent(db, eventId);
       const expected: Record<string, number> = { accounts: 1, events: 1, sessions: 1, authentication_limits: 1 };
       const tables = ['accounts', 'events', 'sessions', 'authentication_limits', 'teams', 'issues', 'history', 'resolutions', 'awards',
         'memberships', 'membership_roles', 'admin_audit', 'command_receipts', 'audience_sequences', 'notifications', 'session_issue_sequences',

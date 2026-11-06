@@ -32,6 +32,7 @@ function knownLength(bucket: PrivateBucket): PrivateBucket {
     get: (key, options) => bucket.get(key, options),
     put: async (key, body, options) =>
       bucket.put(key, body instanceof Uint8Array ? body : new Uint8Array(await new Response(body).arrayBuffer()), options),
+    list: (options) => bucket.list(options),
     delete: (keys) => bucket.delete(keys),
   };
 }

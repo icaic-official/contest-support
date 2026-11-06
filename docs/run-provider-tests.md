@@ -68,6 +68,7 @@ A passing run exits with code zero after all 11 cases and cleanup.
 Cleanup verifies the owned D1 records, exact R2 keys, and Durable Object state before deleting the identifiers-only journal.
 The selected Worker must expose the trusted `SessionMaintenance` service entrypoint from this revision.
 The fixture checks that internal binding before it creates records. It does not use a public setup or cleanup route.
+Cleanup posts the fixture's event ID to that binding after the rows step. The binding erases only the contests that the event's deletion journal names.
 Do not enable credential-bearing traces, screenshots, video, or request debug logs.
 
 ## Check the complete Cloudflare runtime separately

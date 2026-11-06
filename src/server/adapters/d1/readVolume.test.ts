@@ -351,6 +351,7 @@ describe('rows read for a session with 1,200 accounts and 100 issues', () => {
       get: async () => ({ size: 1, body: new Response('x').body!, arrayBuffer: async () => new ArrayBuffer(1) }),
       put: async () => null,
       delete: async () => {},
+      list: async () => ({ objects: [], truncated: false }),
     };
     const staff = ['acc-1', 'acc-2', 'acc-3'];
     for (const [n, owners, ceiling] of [

@@ -17,7 +17,6 @@ const sha256 = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest(
 
 interface TestBucket extends Omit<PrivateBucket, 'put'> {
   put(key: string, body: Uint8Array | ReadableStream<Uint8Array>, options?: Parameters<PrivateBucket['put']>[2]): Promise<unknown | null>;
-  list(options: { prefix: string }): Promise<{ objects: Array<{ key: string }> }>;
 }
 
 describe('Cloudflare session announcements with local D1 and R2 bindings', () => {

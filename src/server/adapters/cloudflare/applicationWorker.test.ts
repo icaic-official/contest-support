@@ -26,7 +26,7 @@ describe('full Worker installation boundary with real local D1', () => {
     env = {
       DB: db, AUTH_ORIGIN: origin, AUTH_SECRET: randomUUID() + randomUUID(),
       ASSETS: { fetch: async () => new Response(null, { status: 404 }) },
-      IMAGES: { get: async () => null, put: async () => null, delete: async () => {} },
+      IMAGES: { get: async () => null, put: async () => null, delete: async () => {}, list: async () => ({ objects: [], truncated: false }) },
       LIVE_UPDATES: { idFromName: (name) => name, get: () => ({ fetch: async () => new Response(null, { status: 204 }) }) },
     };
   }, timeout);

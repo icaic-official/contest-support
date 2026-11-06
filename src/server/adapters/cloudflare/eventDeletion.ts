@@ -1,6 +1,9 @@
 import type { DeletionStep } from '../../../backend/contracts';
 import { bound, isAssertionFailure } from '../d1/assertions';
 import type { D1Connection, D1Statement } from '../d1/connection';
+import type { PrivateBucket } from './images';
+import { eraseLiveContest, type LiveNamespace } from './live';
+import { logEvent } from './log';
 
 /** Issues per statement and accounts per batch in the rows step. */
 export const DELETE_CHUNK = 100;
@@ -174,4 +177,173 @@ export function finishStatements(db: D1Connection, eventId: string): D1Statement
     bound(db, `DELETE FROM event_deletion_targets WHERE event_id = ? AND ${inStep('files')}`, eventId, eventId),
     bound(db, `UPDATE event_deletions SET step = 'done', finished_at = ${NOW_SQL} WHERE event_id = ? AND step = 'files'`, eventId),
   ];
+}
+
+/**
+ * One run stops at this time, below the 30 seconds of `waitUntil`, and at this
+ * count of D1, R2, and Durable Object calls, below the Workers subrequest limit,
+ * because the cron shares that limit with its other tasks.
+ */
+export const DELETION_BUDGET = { milliseconds: 20_000, calls: 400 } as const;
+
+// Longer than a run's budget, so two runners rarely share a deletion. Shorter than the
+// minute between cron ticks, so the next tick always finds the lease of a budget stop expired.
+const LEASE_SECONDS = 55;
+// An issue image reservation lives 3,600 seconds. A later upload's Worker has died by then.
+const FILES_WAIT_SECONDS = 3900;
+const TARGET_PAGE = 50;
+const LIST_LIMIT = 1000;
+
+class Budget {
+  private calls = 0;
+  private readonly startedAt = Date.now();
+
+  constructor(private readonly limits: { readonly milliseconds: number; readonly calls: number }) {}
+
+  spend(calls = 1): void {
+    this.calls += calls;
+  }
+
+  exhausted(): boolean {
+    return this.calls >= this.limits.calls || Date.now() - this.startedAt >= this.limits.milliseconds;
+  }
+}
+
+export interface DeletionEnvironment {
+  readonly DB: D1Connection;
+  readonly IMAGES: Pick<PrivateBucket, 'list' | 'delete'>;
+  readonly LIVE_UPDATES: LiveNamespace;
+}
+
+interface StepRun {
+  readonly env: DeletionEnvironment;
+  readonly eventId: string;
+  readonly budget: Budget;
+}
+
+/** Reads the current state, does the difference, and names the step to run next, or null to stop for now. */
+type StepHandler = (run: StepRun) => Promise<DeletionStep | null>;
+
+async function markDone(db: D1Connection, eventId: string, kind: 'contest' | 'avatar_owner', step: DeletionStep, ids: readonly string[]): Promise<void> {
+  if (ids.length === 0) return;
+  await bound(db, `UPDATE event_deletion_targets SET done = 1 WHERE event_id = ? AND kind = ?
+    AND id IN (SELECT value FROM json_each(?)) AND ${inStep(step)}`, eventId, kind, JSON.stringify(ids), eventId).run();
+}
+
+// advanceRows makes at most three calls, except for a blocked chunk, which ends this run's work on the deletion.
+const ROWS_UNIT_CALLS = 3;
+
+const deleteRows: StepHandler = async ({ env, eventId, budget }) => {
+  while (!budget.exhausted()) {
+    budget.spend(ROWS_UNIT_CALLS);
+    const progress = await advanceRows(env.DB, eventId);
+    if (progress === 'rows_done') return 'live';
+    if (progress === 'blocked') return null;
+  }
+  return null;
+};
+
+const eraseLiveState: StepHandler = async ({ env, eventId, budget }) => {
+  for (;;) {
+    budget.spend();
+    const { results } = await bound(env.DB, `SELECT id FROM event_deletion_targets
+      WHERE event_id = ? AND kind = 'contest' AND done = 0 ORDER BY id LIMIT ?`, eventId, TARGET_PAGE).all<{ id: string }>();
+    if (results.length === 0) break;
+    const erased: string[] = [];
+    for (const { id } of results) {
+      if (budget.exhausted()) break;
+      budget.spend();
+      await eraseLiveContest(env, eventId, id);
+      erased.push(id);
+    }
+    budget.spend();
+    await markDone(env.DB, eventId, 'contest', 'live', erased);
+    if (budget.exhausted()) return null;
+  }
+  budget.spend();
+  await env.DB.batch(nextStepStatements(env.DB, eventId, 'live', 'files'));
+  return 'files';
+};
+
+/** True only when a complete listing from the start found no object. */
+async function clearPrefix(bucket: DeletionEnvironment['IMAGES'], prefix: string, budget: Budget): Promise<boolean> {
+  let found = false;
+  let cursor: string | undefined;
+  for (;;) {
+    budget.spend();
+    const page = await bucket.list({ prefix, limit: LIST_LIMIT, ...(cursor ? { cursor } : {}) });
+    if (page.objects.length > 0) {
+      found = true;
+      budget.spend();
+      await bucket.delete(page.objects.map((object) => object.key));
+    }
+    if (!page.truncated) return !found;
+    cursor = page.cursor;
+    if (!cursor || budget.exhausted()) return false;
+  }
+}
+
+const removeFiles: StepHandler = async ({ env, eventId, budget }) => {
+  // Without this wait, a one-minute cron would list every prefix for 65 minutes.
+  budget.spend();
+  const waiting = await bound(env.DB, `UPDATE event_deletions SET lease_until = unixepoch(rows_done_at) + ${FILES_WAIT_SECONDS}
+    WHERE event_id = ? AND step = 'files' AND unixepoch() < unixepoch(rows_done_at) + ${FILES_WAIT_SECONDS}
+    RETURNING event_id`, eventId).first();
+  if (waiting) return null;
+  for (;;) {
+    budget.spend();
+    const { results } = await bound(env.DB, `SELECT kind, id FROM event_deletion_targets
+      WHERE event_id = ? AND kind IN ('avatar_owner', 'contest') AND done = 0 ORDER BY kind, id LIMIT ?`, eventId, TARGET_PAGE)
+      .all<{ kind: 'contest' | 'avatar_owner'; id: string }>();
+    if (results.length === 0) break;
+    const empty = { contest: [] as string[], avatar_owner: [] as string[] };
+    for (const { kind, id } of results) {
+      if (budget.exhausted()) break;
+      if (await clearPrefix(env.IMAGES, kind === 'contest' ? `${id}/` : `accounts/${id}/`, budget)) empty[kind].push(id);
+    }
+    budget.spend(2);
+    await markDone(env.DB, eventId, 'contest', 'files', empty.contest);
+    await markDone(env.DB, eventId, 'avatar_owner', 'files', empty.avatar_owner);
+    if (budget.exhausted()) return null;
+  }
+  budget.spend();
+  await env.DB.batch(finishStatements(env.DB, eventId));
+  return 'done';
+};
+
+const stepHandlers: Record<DeletionStep, StepHandler> = {
+  rows: deleteRows,
+  live: eraseLiveState,
+  files: removeFiles,
+  done: async () => null,
+};
+
+/** Claims one open deletion whose lease has expired. With none open, it reads no row. Bind the lease seconds. */
+export const CLAIM_DELETION_SQL = `UPDATE event_deletions SET lease_until = unixepoch() + ?
+  WHERE event_id = (SELECT event_id FROM event_deletions WHERE finished_at IS NULL AND lease_until <= unixepoch()
+    ORDER BY lease_until LIMIT 1)
+  RETURNING event_id, step`;
+
+/**
+ * Advances the open deletions within one budget. It runs from the minute cron and
+ * after a management command. When the budget ends, the lease expires and a later
+ * tick continues. A deletion that fails does not stop the others. It stays leased,
+ * so this run does not claim it again, and the run throws at the end.
+ */
+export async function advanceDeletions(env: DeletionEnvironment, limits: { readonly milliseconds: number; readonly calls: number } = DELETION_BUDGET): Promise<void> {
+  const budget = new Budget(limits);
+  let failed = 0;
+  while (!budget.exhausted()) {
+    budget.spend();
+    const claimed = await bound(env.DB, CLAIM_DELETION_SQL, LEASE_SECONDS).first<{ event_id: string; step: DeletionStep }>();
+    if (!claimed) break;
+    try {
+      let step: DeletionStep | null = claimed.step;
+      while (step) step = await stepHandlers[step]({ env, eventId: claimed.event_id, budget });
+    } catch (error) {
+      failed += 1;
+      logEvent('error', 'deletion.advance_failed', { task: 'advance-deletions', error });
+    }
+  }
+  if (failed > 0) throw new Error('An event deletion requires another attempt.');
 }

@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { openStoreDatabase } from '../cloudflare/tooling/store-database.mjs';
 import applicationWorker, { type ApplicationEnvironment } from '../cloudflare/applicationWorker';
+import { CLAIM_DELETION_SQL } from '../cloudflare/eventDeletion';
 import type { D1Binding, D1Connection, D1Statement } from './connection';
 import { applyMigrations } from './testFixture';
 
@@ -115,6 +116,10 @@ async function seed(db: D1Connection): Promise<void> {
 
   await run(`${series(20)} INSERT INTO authentication_limits (key, window_start, attempts) SELECT 'username:user' || i, unixepoch(), 1 FROM n`);
   await run("INSERT INTO authentication_limits (key, window_start, attempts) VALUES ('ip:old-1', unixepoch() - 172800, 1), ('ip:old-2', unixepoch() - 172800, 1)");
+  await run(`${series(20)} INSERT INTO event_deletions (event_id, event_name, event_code, requested_by, requested_by_name, step, rows_done_at, finished_at)
+    SELECT 'finished-' || i, 'Gone', 'gone', 'acc-1', 'Person 1', 'done', ${now}, ${now} FROM n`);
+  await run(`INSERT INTO event_deletions (event_id, event_name, event_code, requested_by, requested_by_name, lease_until, blocked)
+    VALUES ('leased', 'Blocked', 'blocked', 'acc-1', 'Person 1', unixepoch() + 3600, 'acc-1')`);
   // The seed writes notifications through triggers. The cron under test finds none to deliver.
   await run('UPDATE notifications SET delivered = 1');
 }
@@ -130,7 +135,7 @@ describe('the minute cron on an installation with 1,000 images and 500 signed-in
     const env: ApplicationEnvironment = {
       DB: recording.db, AUTH_ORIGIN: 'https://cron.example.invalid', AUTH_SECRET: 'c'.repeat(64),
       ASSETS: { fetch: async () => new Response(null, { status: 404 }) },
-      IMAGES: { get: async () => null, put: async () => null, delete: async (keys) => { removedKeys.push(...keys); } },
+      IMAGES: { get: async () => null, put: async () => null, delete: async (keys) => { removedKeys.push(...keys); }, list: async () => ({ objects: [], truncated: false }) },
       LIVE_UPDATES: { idFromName: (name) => name, get: () => ({ fetch: async () => new Response(null, { status: 204 }) }) },
     };
     await applicationWorker.scheduled({}, env);
@@ -203,6 +208,16 @@ describe('the minute cron on an installation with 1,000 images and 500 signed-in
       }
     }
     expect(scans.filter((scan) => !scan.startsWith('SCAN authentication_limits:'))).toEqual([]);
+  });
+
+  // D1's counter reports 1 for the index seek and 1 for RETURNING, also on an empty table.
+  // No row of the seed's 20 finished deletions or its one leased deletion adds to it.
+  it('probes for open deletions without reading a journal row', () => {
+    for (const log of ticks) {
+      const claims = log.filter((entry) => entry.sql === CLAIM_DELETION_SQL);
+      expect(claims).toHaveLength(1);
+      expect(claims[0]?.rowsRead).toBeLessThanOrEqual(2);
+    }
   });
 
   // Before the cleanup indexes, one tick scanned every image and sign-in: about

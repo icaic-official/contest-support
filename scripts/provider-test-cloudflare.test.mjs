@@ -345,7 +345,7 @@ describe('Cloudflare fixture setup and exact cleanup with real local D1/R2', () 
     }
   });
 
-  test('preserves a foreign account and authentication counter that share an uncreated planned username', async () => {
+  test('preserves a foreign account that shares an uncreated planned username, and removes the event\'s counter for that name', async () => {
     environment();
     const path = journalPath();
     const fixture = await createFixture(path, dependencies());
@@ -361,14 +361,10 @@ describe('Cloudflare fixture setup and exact cleanup with real local D1/R2', () 
       await cleanupFixture(path, dependencies());
       expect(await statement('SELECT id,name,username FROM accounts WHERE id=?', foreign).first())
         .toEqual({ id: foreign, name: 'Unrelated control account', username: marker.username });
-      expect(await statement('SELECT key,window_start,attempts FROM authentication_limits WHERE key=?', counterKey).first())
-        .toEqual({ key: counterKey, window_start: 123, attempts: 7 });
+      expect(await statement('SELECT key FROM authentication_limits WHERE key=?', counterKey).first()).toBeNull();
     } finally {
       if (existsSync(path)) await cleanupFixture(path, dependencies());
-      await platform.env.DB.batch([
-        statement('DELETE FROM authentication_limits WHERE key=?', counterKey),
-        statement('DELETE FROM accounts WHERE id=?', foreign),
-      ]);
+      await statement('DELETE FROM accounts WHERE id=?', foreign).run();
     }
   });
 
@@ -397,7 +393,7 @@ describe('Cloudflare fixture setup and exact cleanup with real local D1/R2', () 
       let failFinish = true;
       const interrupted = dependencies({ openPlatform: async () => ({ env: { ...platform.env, MAINTENANCE: {
         fetch: async (input, init) => {
-          if (init?.body && JSON.parse(init.body).phase === 'finish' && failFinish) { failFinish = false; throw new Error('Interrupted final fixture confirmation'); }
+          if (init?.body && failFinish) { failFinish = false; throw new Error('Interrupted final fixture confirmation'); }
           return maintenance.fetch(input, init);
         },
       } }, dispose: async () => {} }) });

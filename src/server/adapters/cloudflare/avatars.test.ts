@@ -19,14 +19,11 @@ const png = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 
 const jpeg = Uint8Array.from([0xff, 0xd8, 0xff, 0xe0, 9, 8, 7, 6, 5, 4, 3, 2, 1]);
 const sha256 = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('hex');
 
-interface TestBucket extends PrivateBucket {
-  list(options: { prefix: string }): Promise<{ objects: Array<{ key: string }> }>;
-}
 
 describe('Cloudflare avatars with local D1 and R2 bindings', () => {
   let directory: string;
   let db: D1Connection;
-  let bucket: TestBucket;
+  let bucket: PrivateBucket;
   let dispose: () => Promise<void>;
   let fixture: D1Fixture;
   let avatars: R2AvatarService;
@@ -47,7 +44,7 @@ describe('Cloudflare avatars with local D1 and R2 bindings', () => {
       d1_databases: [{ binding: 'DB', database_name: 'minsky-avatar-tests', database_id: randomUUID() }],
       r2_buckets: [{ binding: 'IMAGES', bucket_name: 'minsky-avatar-tests' }],
     }));
-    const platform = await getPlatformProxy<{ DB: D1Connection; IMAGES: TestBucket }>({
+    const platform = await getPlatformProxy<{ DB: D1Connection; IMAGES: PrivateBucket }>({
       configPath, persist: false, remoteBindings: false, envFiles: [],
     });
     db = platform.env.DB;
@@ -224,7 +221,7 @@ describe('Cloudflare avatars with local D1 and R2 bindings', () => {
     const abandonedKey = avatarKey(staff.accountId, abandoned);
     await db.prepare('UPDATE account_avatars SET expires_at = unixepoch() - 1 WHERE id = ?').bind(abandoned).run();
 
-    const stuck = new R2AvatarService(db, { get: bucket.get.bind(bucket), put: bucket.put.bind(bucket),
+    const stuck = new R2AvatarService(db, { get: bucket.get.bind(bucket), put: bucket.put.bind(bucket), list: bucket.list.bind(bucket),
       delete: async () => { throw new Error('Storage unavailable.'); } });
     const replaced = await upload(specialist, png, randomUUID(), stuck);
     const current = await upload(specialist, jpeg, randomUUID(), stuck);
@@ -267,6 +264,7 @@ describe('avatar reads match the reference rule for every caller, session, and a
     get: async () => ({ size: 1, body: new Response('x').body!, arrayBuffer: async () => new ArrayBuffer(1) }),
     put: async () => null,
     delete: async () => {},
+    list: async () => ({ objects: [], truncated: false }),
   };
 
   beforeAll(async () => {

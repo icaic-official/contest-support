@@ -1,13 +1,16 @@
 import { randomUUID } from 'node:crypto';
+import { attachmentPath } from '../../../connected/imageFile';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { D1ApplicationService } from '../cloudflare/application';
 import { contestDataBindings, contestDataSql, resolveAuthority, signInAccountSql } from '../cloudflare/authority';
-import { advanceRows, fenceStatements, type RowsProgress } from '../cloudflare/eventDeletion';
+import { advanceDeletions, advanceRows, CLAIM_DELETION_SQL, fenceStatements, type DeletionEnvironment, type RowsProgress } from '../cloudflare/eventDeletion';
+import { eraseLiveContest } from '../cloudflare/live';
 import { openStoreDatabase } from '../cloudflare/tooling/store-database.mjs';
 import { bound } from './assertions';
-import type { D1Connection, D1Statement } from './connection';
+import type { D1Connection } from './connection';
 import {
-  readTables, rowsNaming, seedEvent, seedInertSeat, seedWebmaster, tableNames, type SeededEvent, type SeededWebmaster,
+  crashingEnvironment, FakeBucket, FakeLiveNamespace, fillStores, interceptCalls, readTables, rowsNaming, seedEvent, seedInertSeat, seedWebmaster,
+  tableNames, type CrashMode, type SeededEvent, type SeededWebmaster,
 } from './eventDeletionHarness';
 import { applyMigrations } from './testFixture';
 
@@ -136,124 +139,355 @@ describe('event deletion', () => {
     }
   });
 
+  /** One environment per test, so that each test reads its own files and live state. */
+  function stores(): { bucket: FakeBucket; live: FakeLiveNamespace; env: DeletionEnvironment } {
+    const bucket = new FakeBucket();
+    const live = new FakeLiveNamespace(db);
+    return { bucket, live, env: { DB: db, IMAGES: bucket, LIVE_UPDATES: live } };
+  }
+
+  async function finished(event: SeededEvent): Promise<boolean> {
+    return (await rows(`SELECT 1 FROM event_deletions WHERE event_id = ? AND step = 'done'`, event.eventId)).length > 0;
+  }
+
+  /** What a passing hour and an expired lease do, which a test cannot wait for. */
+  async function passTime(event: SeededEvent): Promise<void> {
+    await bound(db, `UPDATE event_deletions SET lease_until = 0,
+      rows_done_at = CASE WHEN rows_done_at IS NULL THEN NULL ELSE strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-66 minutes') END
+      WHERE event_id = ? AND finished_at IS NULL`, event.eventId).run();
+  }
+
+  /** Fences unless a journal row exists, then runs ticks until the deletion is done. Every step starts from the current state. */
+  async function runToEnd(env: DeletionEnvironment, event: SeededEvent): Promise<void> {
+    if (!(await rows('SELECT 1 FROM event_deletions WHERE event_id = ?', event.eventId)).length) await fence(env.DB, event);
+    for (let tick = 0; tick < 100; tick += 1) {
+      await passTime(event);
+      await advanceDeletions(env);
+      if (await finished(event)) return;
+    }
+    throw new Error('The deletion did not finish.');
+  }
+
   describe('a crash', () => {
-    type CrashMode = 'never ran' | 'response lost';
+    const modes: CrashMode[] = ['never ran', 'response lost'];
 
-    /** The process dies at call `at`: that call throws, with or without its effect, and every later call throws. */
-    function crashing(connection: D1Connection, at: number, mode: CrashMode): { db: D1Connection; calls: () => number } {
-      let calls = 0;
-      const enter = async <T>(run: () => Promise<T>): Promise<T> => {
-        calls += 1;
-        if (calls > at) throw new Error('The process is gone.');
-        if (calls < at) return run();
-        if (mode === 'response lost') await run();
-        throw new Error('The process died at this call.');
-      };
-      const parts = new WeakMap<object, D1Statement>();
-      const wrap = (inner: D1Statement): D1Statement => {
-        const wrapped: D1Statement = {
-          bind: (...values) => wrap(inner.bind(...values)),
-          first: <T>() => enter(() => inner.first<T>()),
-          all: <T>() => enter(() => inner.all<T>()),
-          run: () => enter(() => inner.run()),
-        };
-        parts.set(wrapped, inner);
-        return wrapped;
-      };
-      return {
-        calls: () => calls,
-        db: {
-          prepare: (sql) => wrap(connection.prepare(sql)),
-          batch: (statements) => enter(() => connection.batch(statements.map((statement) => parts.get(statement)!))),
-        },
-      };
-    }
-
-    async function fenced(event: SeededEvent): Promise<boolean> {
-      return (await rows('SELECT 1 FROM event_deletions WHERE event_id = ?', event.eventId)).length > 0;
-    }
-
-    /** Fences unless a journal row exists, then deletes the rows. Both steps start from the current state. */
-    async function converge(connection: D1Connection, event: SeededEvent, limit?: number): Promise<void> {
-      if (!await fenced(event)) await fence(connection, event);
-      expect(await deleteRows(connection, event, limit)).toBe('rows_done');
-    }
-
-    for (const limit of [100, 1]) {
-      it(`at any call of the fence and the rows step, with chunks of ${limit}, converges to the same state`, async () => {
-        const clean = await seedEvent(db, webmaster);
-        const counter = crashing(db, Number.MAX_SAFE_INTEGER, 'never ran');
-        await converge(counter.db, clean, limit);
-        const total = counter.calls();
-        const expected = await footprint(clean);
-        await forget(clean);
-        expect(total).toBeGreaterThan(5);
-        const modes: CrashMode[] = ['never ran', 'response lost'];
-        for (let at = 1; at <= total; at += 1) {
-          for (const mode of modes) {
-            const event = await seedEvent(db, webmaster);
-            const crash = crashing(db, at, mode);
-            await expect(converge(crash.db, event, limit), `call ${at}, ${mode}`).rejects.toThrow();
-            await converge(db, event, limit);
-            expect(await footprint(event), `call ${at}, ${mode}`).toEqual(expected);
-            await forget(event);
-          }
+    it('at any D1, R2, or Durable Object call converges to the same state', async () => {
+      const clean = await seedEvent(db, webmaster);
+      const cleanStores = stores();
+      fillStores(clean, cleanStores.bucket, cleanStores.live);
+      const counter = crashingEnvironment(cleanStores.env, Number.MAX_SAFE_INTEGER, 'never ran');
+      await runToEnd(counter.env, clean);
+      const total = counter.calls();
+      const expected = await footprint(clean);
+      expect(Object.keys(expected).sort()).toEqual(['authority_audit', 'event_deletions']);
+      expect(cleanStores.bucket.objects.size).toBe(0);
+      await forget(clean);
+      expect(total).toBeGreaterThan(30);
+      for (let at = 1; at <= total; at += 1) {
+        for (const mode of modes) {
+          const label = `call ${at}, ${mode}`;
+          const event = await seedEvent(db, webmaster);
+          const { bucket, live, env } = stores();
+          fillStores(event, bucket, live);
+          bucket.add(['control/other-event/file']);
+          await expect(runToEnd(crashingEnvironment(env, at, mode).env, event), label).rejects.toThrow();
+          await runToEnd(env, event);
+          expect(await footprint(event), label).toEqual(expected);
+          expect([...bucket.objects], label).toEqual(['control/other-event/file']);
+          expect([event.practice, event.live].every((contest) => live.state(contest).empty), label).toBe(true);
+          await forget(event);
         }
-      });
-    }
+      }
+    });
+
+    it('at any call of the rows step with chunks of 1 converges to the same state', async () => {
+      const converge = async (connection: D1Connection, event: SeededEvent) => {
+        if (!(await rows('SELECT 1 FROM event_deletions WHERE event_id = ?', event.eventId)).length) await fence(connection, event);
+        expect(await deleteRows(connection, event, 1)).toBe('rows_done');
+      };
+      const clean = await seedEvent(db, webmaster);
+      const counter = crashingEnvironment(stores().env, Number.MAX_SAFE_INTEGER, 'never ran');
+      await converge(counter.env.DB, clean);
+      const total = counter.calls();
+      const expected = await footprint(clean);
+      await forget(clean);
+      for (let at = 1; at <= total; at += 1) {
+        for (const mode of modes) {
+          const event = await seedEvent(db, webmaster);
+          await expect(converge(crashingEnvironment(stores().env, at, mode).env.DB, event), `call ${at}, ${mode}`).rejects.toThrow();
+          await converge(db, event);
+          expect(await footprint(event), `call ${at}, ${mode}`).toEqual(expected);
+          await forget(event);
+        }
+      }
+    });
   });
 
   describe('concurrent runners', () => {
     it('reach the same end when two run at once', async () => {
       const clean = await seedEvent(db, webmaster);
-      await fence(db, clean);
-      await deleteRows(db, clean);
+      await runToEnd(stores().env, clean);
       const expected = await footprint(clean);
       await forget(clean);
       const event = await seedEvent(db, webmaster);
+      const { bucket, live, env } = stores();
+      fillStores(event, bucket, live);
       await fence(db, event);
-      expect(await Promise.all([deleteRows(db, event, 1), deleteRows(db, event, 1)])).toEqual(['rows_done', 'rows_done']);
+      for (let tick = 0; tick < 20 && !await finished(event); tick += 1) {
+        await passTime(event);
+        await Promise.all([advanceDeletions(env), advanceDeletions(env)]);
+      }
       expect(await footprint(event)).toEqual(expected);
+      expect(bucket.objects.size).toBe(0);
       await forget(event);
     });
 
-    it('do not let a stale runner mark a contest done after the step moved on', async () => {
+    it('reach the same end when two share the rows step', async () => {
       const event = await seedEvent(db, webmaster);
       await fence(db, event);
-      await bound(db, 'DELETE FROM issues WHERE session_id IN (?, ?)', event.practice, event.live).run();
+      expect(await Promise.all([deleteRows(db, event, 1), deleteRows(db, event, 1)])).toEqual(['rows_done', 'rows_done']);
+      await forget(event);
+    });
+
+    /** A runner that stops just before the first call that matches, until the test releases it. */
+    function pausingAt(pattern: RegExp) {
       let entered: () => void = () => undefined;
       let release: () => void = () => undefined;
-      const atBatch = new Promise<void>((resolve) => { entered = resolve; });
+      const atCall = new Promise<void>((resolve) => { entered = resolve; });
       const released = new Promise<void>((resolve) => { release = resolve; });
-      const holding: D1Connection = {
-        prepare: (sql) => db.prepare(sql),
-        batch: async (statements) => {
-          entered();
-          await released;
-          return db.batch(statements);
-        },
+      let paused = false;
+      return {
+        atCall,
+        release,
+        db: interceptCalls(db, async (sql) => {
+          if (!paused && sql.some((text) => pattern.test(text))) {
+            paused = true;
+            entered();
+            await released;
+          }
+        }),
       };
-      const stale = advanceRows(holding, event.eventId);
-      await atBatch;
-      expect(await deleteRows(db, event)).toBe('rows_done');
-      release();
-      await stale;
+    }
+
+    it('do not let a stale rows runner skip the files of a contest', async () => {
+      const event = await seedEvent(db, webmaster);
+      const { bucket, live, env } = stores();
+      fillStores(event, bucket, live);
+      await fence(db, event);
+      await bound(db, 'DELETE FROM issues WHERE session_id IN (?, ?)', event.practice, event.live).run();
+      const stale = pausingAt(/^DELETE FROM sessions/);
+      const running = advanceRows(stale.db, event.eventId);
+      await stale.atCall;
+      await passTime(event);
+      await advanceDeletions(env);
+      expect((await rows<{ step: string }>('SELECT step FROM event_deletions WHERE event_id = ?', event.eventId))[0]?.step).toBe('files');
+      stale.release();
+      await running;
       expect(await rows(`SELECT id FROM event_deletion_targets WHERE event_id = ? AND kind = 'contest' AND done = 1`, event.eventId)).toEqual([]);
+      await runToEnd(env, event);
+      expect(bucket.objects.size).toBe(0);
+      await forget(event);
+    });
+
+    it('do not let a stale live runner skip the files of a contest', async () => {
+      const event = await seedEvent(db, webmaster);
+      const { bucket, live, env } = stores();
+      fillStores(event, bucket, live);
+      await fence(db, event);
+      await deleteRows(db, event);
+      const stale = pausingAt(/SET done = 1/);
+      const running = advanceDeletions({ ...env, DB: stale.db });
+      await stale.atCall;
+      await passTime(event);
+      await advanceDeletions(env);
+      expect((await rows<{ step: string }>('SELECT step FROM event_deletions WHERE event_id = ?', event.eventId))[0]?.step).toBe('done');
+      await forget(event);
+      stale.release();
+      await running;
+      expect(bucket.objects.size).toBe(0);
+    });
+  });
+
+  describe('the live step', () => {
+    it('refuses to erase a contest that exists, or that no journal names', async () => {
+      const event = await seedEvent(db, webmaster);
+      const { live } = stores();
+      live.state(event.live).fill(event.live);
+      await expect(eraseLiveContest({ LIVE_UPDATES: live }, event.eventId, event.live)).rejects.toThrow('not erased');
+      await fence(db, event);
+      await expect(eraseLiveContest({ LIVE_UPDATES: live }, event.eventId, event.live)).rejects.toThrow('not erased');
+      expect(live.state(event.live).empty).toBe(false);
+      await deleteRows(db, event);
+      await eraseLiveContest({ LIVE_UPDATES: live }, event.eventId, event.live);
+      expect(live.state(event.live).empty).toBe(true);
+      await forget(event);
+      await expect(eraseLiveContest({ LIVE_UPDATES: live }, event.eventId, event.live)).rejects.toThrow('not erased');
+    });
+  });
+
+  describe('the files step', () => {
+    it('makes no R2 call and no claim for 65 minutes after the rows go', async () => {
+      const event = await seedEvent(db, webmaster);
+      const { bucket, live, env } = stores();
+      fillStores(event, bucket, live);
+      await fence(db, event);
+      const calls: string[] = [];
+      const counted: DeletionEnvironment = { ...env, IMAGES: {
+        list: (options) => { calls.push(options.prefix); return bucket.list(options); },
+        delete: (keys) => bucket.delete(keys),
+      } };
+      await advanceDeletions(counted);
+      expect(calls).toEqual([]);
+      const row = (await rows<{ step: string; wait: number }>(`SELECT step, lease_until - unixepoch(rows_done_at) AS wait FROM event_deletions WHERE event_id = ?`, event.eventId))[0];
+      expect(row).toEqual({ step: 'files', wait: 3900 });
+      expect(await bound(db, CLAIM_DELETION_SQL, 55).first()).toBeNull();
+      await runToEnd(env, event);
+      await forget(event);
+    });
+
+    it('covers the keys of issue images, announcement images, and avatars, and follows every page', async () => {
+      const event = await seedEvent(db, webmaster);
+      const { bucket, live, env } = stores();
+      fillStores(event, bucket, live);
+      expect(event.objects).toContainEqual(attachmentPath(event.practice, event.objects[0]!.split('/')[1]!, event.objects[0]!.split('/')[2]!, 'original'));
+      expect(event.objects.filter((key) => key.startsWith(`${event.live}/announcements/`))).toHaveLength(1);
+      expect(event.objects.filter((key) => key.startsWith(`accounts/${event.eventAdmin.accountId}/`))).toHaveLength(1);
+      bucket.pageSize = 2;
+      bucket.add([1, 2, 3, 4, 5].map((n) => `${event.practice}/many/${n}`));
+      bucket.emptyFirstPage.add(`${event.live}/`);
+      bucket.add(['control/file', `${event.practice}-not-this-contest/file`]);
+      await runToEnd(env, event);
+      expect([...bucket.objects].sort()).toEqual([`${event.practice}-not-this-contest/file`, 'control/file'].sort());
+      await forget(event);
+    });
+
+    it('marks a prefix done only after a complete listing finds no object', async () => {
+      const event = await seedEvent(db, webmaster);
+      const { bucket, live, env } = stores();
+      fillStores(event, bucket, live);
+      await fence(db, event);
+      await advanceDeletions(env);
+      await passTime(event);
+      bucket.pageSize = 1;
+      const marksBeforeEmpty: number[] = [];
+      const watching: DeletionEnvironment = { ...env, IMAGES: {
+        list: async (options) => {
+          const page = await bucket.list(options);
+          if (page.objects.length > 0) {
+            marksBeforeEmpty.push((await rows(`SELECT 1 FROM event_deletion_targets WHERE event_id = ? AND done = 1 AND kind = 'contest' AND ? LIKE id || '/%'`,
+              event.eventId, options.prefix)).length);
+          }
+          return page;
+        },
+        delete: (keys) => bucket.delete(keys),
+      } };
+      await advanceDeletions(watching);
+      expect(marksBeforeEmpty.every((marked) => marked === 0)).toBe(true);
+      expect(marksBeforeEmpty.length).toBeGreaterThan(0);
+      expect(await finished(event)).toBe(true);
+      await forget(event);
+    });
+  });
+
+  describe('the budget', () => {
+    it('stops at its count of calls, and later ticks finish', async () => {
+      const event = await seedEvent(db, webmaster);
+      const { bucket, live, env } = stores();
+      fillStores(event, bucket, live);
+      await fence(db, event);
+      const counter = crashingEnvironment(env, Number.MAX_SAFE_INTEGER, 'never ran');
+      await advanceDeletions(counter.env, { milliseconds: 20_000, calls: 4 });
+      expect(counter.calls()).toBeLessThan(12);
+      expect(await finished(event)).toBe(false);
+      for (let tick = 0; tick < 100 && !await finished(event); tick += 1) {
+        await passTime(event);
+        await advanceDeletions(env, { milliseconds: 20_000, calls: 4 });
+      }
+      expect(await finished(event)).toBe(true);
+      await forget(event);
+    });
+
+    it('stops at its time, and leaves the lease for a later tick', async () => {
+      const event = await seedEvent(db, webmaster);
+      const { env } = stores();
+      await fence(db, event);
+      await advanceDeletions(env, { milliseconds: 0, calls: 400 });
+      expect(await rows('SELECT lease_until FROM event_deletions WHERE event_id = ?', event.eventId)).toEqual([{ lease_until: 0 }]);
+      await runToEnd(env, event);
+      await forget(event);
+    });
+
+    it('lets one failing deletion leave the others to finish, and then reports the failure', async () => {
+      const failing = await seedEvent(db, webmaster);
+      const other = await seedEvent(db, webmaster);
+      const { bucket, live, env } = stores();
+      fillStores(failing, bucket, live);
+      fillStores(other, bucket, live);
+      await fence(db, failing);
+      await fence(db, other);
+      await advanceDeletions(env);
+      await passTime(failing);
+      await passTime(other);
+      const logged = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      await expect(advanceDeletions({ ...env, IMAGES: {
+        list: async (options) => {
+          if (options.prefix.startsWith(failing.practice) || options.prefix.startsWith(failing.live) || options.prefix.includes(failing.eventAdmin.accountId)) {
+            throw new Error('Storage unavailable.');
+          }
+          return bucket.list(options);
+        },
+        delete: (keys) => bucket.delete(keys),
+      } })).rejects.toThrow('requires another attempt');
+      expect(logged.mock.calls.flat().join('')).toContain('deletion.advance_failed');
+      logged.mockRestore();
+      expect(await finished(other)).toBe(true);
+      expect(await finished(failing)).toBe(false);
+      await runToEnd(env, failing);
+      await forget(failing);
+      await forget(other);
+    });
+  });
+
+  describe('statement plans', () => {
+    it('searches every statement of a complete deletion through an index', async () => {
+      const event = await seedEvent(db, webmaster);
+      const { bucket, live, env } = stores();
+      fillStores(event, bucket, live);
+      const recorded = new Map<string, readonly (string | number | null)[]>();
+      const recording: DeletionEnvironment = { ...env, DB: interceptCalls(db, async (sql, values) => {
+        sql.forEach((text, index) => recorded.set(text, values[index] ?? []));
+      }) };
+      await runToEnd(recording, event);
+      expect(recorded.size).toBeGreaterThan(15);
+      const scans: string[] = [];
+      for (const [sql, values] of recorded) {
+        const plan = await bound(db, `EXPLAIN QUERY PLAN ${sql}`, ...values).all<{ detail: string }>();
+        for (const { detail } of plan.results) {
+          // A scan of the installation table reads its one row.
+          if (/^SCAN /.test(detail) && !/^SCAN (?:CONSTANT ROW|\(subquery-\d+\)|json_each|installation\b)/.test(detail)) {
+            scans.push(`${detail}: ${sql.replace(/\s+/g, ' ').slice(0, 90)}`);
+          }
+        }
+      }
+      expect(scans).toEqual([]);
       await forget(event);
     });
   });
 
   describe('a second event', () => {
-    it('keeps every row that names it, apart from site records', async () => {
+    it('keeps every row that names it, its files, and its live state', async () => {
       const event = await seedEvent(db, webmaster);
       const other = await seedEvent(db, webmaster);
+      const { bucket, live, env } = stores();
+      fillStores(event, bucket, live);
+      fillStores(other, bucket, live);
       const before = rowsNaming(await readTables(db, tables), other.ids);
-      await fence(db, event);
-      await deleteRows(db, event);
+      await runToEnd(env, event);
       const after = rowsNaming(await readTables(db, tables), other.ids);
       expect(Object.fromEntries(after)).toEqual(Object.fromEntries(before));
-      await fence(db, other);
-      await deleteRows(db, other);
+      expect([...bucket.objects].sort()).toEqual([...other.objects].sort());
+      for (const contest of [other.practice, other.live]) expect(live.state(contest).empty).toBe(false);
+      await runToEnd(env, other);
       await forget(event);
       await forget(other);
     });

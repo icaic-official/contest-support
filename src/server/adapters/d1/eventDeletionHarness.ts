@@ -2,6 +2,9 @@ import { randomUUID } from 'node:crypto';
 import { attachmentPath } from '../../../connected/imageFile';
 import type { Caller } from '../../authentication';
 import { avatarKey } from '../cloudflare/avatars';
+import type { DeletionEnvironment } from '../cloudflare/eventDeletion';
+import type { PrivateBucket } from '../cloudflare/images';
+import { SessionLiveCoordinator, type LiveNamespace } from '../cloudflare/live';
 import { bound } from './assertions';
 import type { D1Connection, D1Statement, D1Value } from './connection';
 
@@ -263,4 +266,170 @@ export function rowsNaming(tables: ReadonlyMap<string, TableRows[]>, ids: readon
     if (naming.length > 0) found.set(table, naming);
   }
   return found;
+}
+
+/** An R2 bucket in memory. It can return short pages and an empty page, as R2 may. */
+export class FakeBucket implements Pick<PrivateBucket, 'list' | 'delete'> {
+  readonly objects = new Set<string>();
+  pageSize = 1000;
+  /** The next listing of each prefix here returns an empty page that says more follow. */
+  readonly emptyFirstPage = new Set<string>();
+
+  add(keys: readonly string[]): void {
+    for (const key of keys) this.objects.add(key);
+  }
+
+  async list({ prefix, cursor, limit = 1000 }: { prefix: string; cursor?: string; limit?: number }) {
+    if (this.emptyFirstPage.delete(prefix)) return { objects: [], truncated: true, cursor: '0' };
+    const keys = [...this.objects].filter((key) => key.startsWith(prefix)).sort();
+    const start = Number(cursor ?? 0);
+    const end = start + Math.min(limit, this.pageSize);
+    return {
+      objects: keys.slice(start, end).map((key) => ({ key })),
+      truncated: end < keys.length,
+      ...(end < keys.length ? { cursor: String(end) } : {}),
+    };
+  }
+
+  async delete(keys: string[]): Promise<void> {
+    for (const key of keys) this.objects.delete(key);
+  }
+}
+
+class FakeLiveSocket {
+  readyState = 1;
+  attachment: unknown = {};
+  send(): void { /* A deletion test reads no message. */ }
+  close(): void { this.readyState = 3; }
+  serializeAttachment(value: unknown): void { this.attachment = value; }
+  deserializeAttachment(): unknown { return this.attachment; }
+}
+
+/** The storage, alarm, and sockets of one Durable Object, in memory. */
+export class FakeLiveState {
+  readonly data = new Map<string, unknown>();
+  readonly sockets: FakeLiveSocket[] = [];
+  alarmAt: number | null = null;
+  readonly storage = {
+    get: async <T>(key: string) => this.data.get(key) as T | undefined,
+    put: async <T>(key: string, value: T) => { this.data.set(key, value); },
+    setAlarm: async (at: number) => { this.alarmAt = at; },
+    deleteAlarm: async () => { this.alarmAt = null; },
+    getAlarm: async () => this.alarmAt,
+    deleteAll: async () => { this.data.clear(); },
+    list: async <T>() => new Map(this.data) as Map<string, T>,
+  };
+  acceptWebSocket(socket: FakeLiveSocket): void { this.sockets.push(socket); }
+  getWebSockets(): FakeLiveSocket[] { return this.sockets.filter((socket) => socket.readyState === 1); }
+
+  /** Holds what a running contest holds: a cursor, an alarm, and an open socket. */
+  fill(sessionId: string): void {
+    this.data.set(`sequence:${sessionId}:staff`, 1);
+    this.alarmAt = 1;
+    this.sockets.push(new FakeLiveSocket());
+  }
+
+  get empty(): boolean {
+    return this.data.size === 0 && this.alarmAt === null && this.getWebSockets().length === 0;
+  }
+}
+
+/** Real coordinators over in-memory state, one per contest. */
+export class FakeLiveNamespace implements LiveNamespace {
+  readonly states = new Map<string, FakeLiveState>();
+
+  constructor(private readonly db: D1Connection) {}
+
+  state(name: string): FakeLiveState {
+    const state = this.states.get(name) ?? new FakeLiveState();
+    this.states.set(name, state);
+    return state;
+  }
+
+  idFromName(name: string): unknown {
+    return name;
+  }
+
+  get(id: unknown): { fetch(request: Request): Promise<Response> } {
+    const coordinator = new SessionLiveCoordinator(this.state(String(id)), { DB: this.db });
+    return { fetch: (request) => coordinator.fetch(request) };
+  }
+}
+
+/** Puts the event's files and live state in the fakes, as its real use would. */
+export function fillStores(event: SeededEvent, bucket: FakeBucket, live: FakeLiveNamespace): void {
+  bucket.add(event.objects);
+  for (const contest of [event.practice, event.live]) live.state(contest).fill(contest);
+}
+
+export type CrashMode = 'never ran' | 'response lost';
+
+/**
+ * The process dies at call `at` of the D1, R2, and Durable Object calls together:
+ * that call throws, with or without its effect, and every later call throws.
+ */
+export function crashingEnvironment(env: DeletionEnvironment, at: number, mode: CrashMode): { env: DeletionEnvironment; calls: () => number } {
+  let calls = 0;
+  const enter = async <T>(run: () => Promise<T>): Promise<T> => {
+    calls += 1;
+    if (calls > at) throw new Error('The process is gone.');
+    if (calls < at) return run();
+    if (mode === 'response lost') await run();
+    throw new Error('The process died at this call.');
+  };
+  const inner = new WeakMap<D1Statement, D1Statement>();
+  const wrap = (statement: D1Statement): D1Statement => {
+    const wrapped: D1Statement = {
+      bind: (...values) => wrap(statement.bind(...values)),
+      first: <T>() => enter(() => statement.first<T>()),
+      all: <T>() => enter(() => statement.all<T>()),
+      run: () => enter(() => statement.run()),
+    };
+    inner.set(wrapped, statement);
+    return wrapped;
+  };
+  return {
+    calls: () => calls,
+    env: {
+      DB: {
+        prepare: (sql) => wrap(env.DB.prepare(sql)),
+        batch: (statements) => enter(() => env.DB.batch(statements.map((statement) => inner.get(statement) ?? statement))),
+      },
+      IMAGES: {
+        list: (options) => enter(() => env.IMAGES.list(options)),
+        delete: (keys) => enter(() => env.IMAGES.delete(keys)),
+      },
+      LIVE_UPDATES: {
+        idFromName: (name) => env.LIVE_UPDATES.idFromName(name),
+        get: (id) => ({ fetch: (request) => enter(() => env.LIVE_UPDATES.get(id).fetch(request)) }),
+      },
+    },
+  };
+}
+
+/** Runs `hook` before every D1 call, with the SQL of that call. A batch has the SQL of each statement. */
+export function interceptCalls(db: D1Connection, hook: (sql: readonly string[], values: ReadonlyArray<readonly D1Value[]>) => Promise<void>): D1Connection {
+  const parts = new WeakMap<D1Statement, { statement: D1Statement; sql: string; values: readonly D1Value[] }>();
+  const wrap = (statement: D1Statement, sql: string, values: readonly D1Value[]): D1Statement => {
+    const before = () => hook([sql], [values]);
+    const wrapped: D1Statement = {
+      bind: (...next) => wrap(statement.bind(...next), sql, next),
+      first: async <T>() => { await before(); return statement.first<T>(); },
+      all: async <T>() => { await before(); return statement.all<T>(); },
+      run: async () => { await before(); return statement.run(); },
+    };
+    parts.set(wrapped, { statement, sql, values });
+    return wrapped;
+  };
+  return {
+    prepare: (sql) => wrap(db.prepare(sql), sql, []),
+    batch: async (statements) => {
+      const items = statements.flatMap((statement) => {
+        const part = parts.get(statement);
+        return part ? [part] : [];
+      });
+      await hook(items.map((item) => item.sql), items.map((item) => item.values));
+      return db.batch(items.map((item) => item.statement));
+    },
+  };
 }

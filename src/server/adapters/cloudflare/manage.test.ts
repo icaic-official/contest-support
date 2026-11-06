@@ -483,7 +483,7 @@ describe('event, roster, and contest commands', () => {
       entrants: list.map(([name, kind]) => ({ kind, name, handle: name.toLowerCase().replaceAll(' ', '-') })),
     })).entrantIds!;
   const createContest = async (by: Name, eventId: string, name: string, contestType: 'singles' | 'mixed' | 'teams') =>
-    (await execute(by, { type: 'create_contest', eventId, name, contestType, schedule: testSchedule, categories: ['Devices', 'Other'] })).contestId!;
+    (await execute(by, { type: 'create_contest', kind: 'practice', eventId, name, contestType, schedule: testSchedule, categories: ['Devices', 'Other'] })).contestId!;
   const seatsOf = (contestId: string) =>
     rows<{ account_id: string; team_id: string | null }>('SELECT account_id, team_id FROM memberships WHERE session_id = ? ORDER BY account_id', contestId);
   const addIssue = (contestId: string, entryId: string, category: string) => run(
@@ -723,7 +723,7 @@ describe('event, roster, and contest commands', () => {
   });
 
   it('creates a contest that follows its schedule, and keeps the schedule apart from the intake mode', async () => {
-    const created = await execute('eventAdmin', { type: 'create_contest', eventId: ids.event, name: 'Scheduled', contestType: 'teams',
+    const created = await execute('eventAdmin', { type: 'create_contest', kind: 'practice', eventId: ids.event, name: 'Scheduled', contestType: 'teams',
       schedule: { startsAt: '2030-03-01T01:00:00.000Z', endsAt: '2030-03-01T04:00:00.000Z', graceMinutes: 15 }, categories: ['Other'] });
     const id = created.contestId!;
     expect(await rows('SELECT starts_at, ends_at, grace_minutes, intake_follows_schedule FROM sessions WHERE id = ?', id))
@@ -752,7 +752,7 @@ describe('event, roster, and contest commands', () => {
     expect(await rows('SELECT name, starts_at, ends_at FROM sessions WHERE id = ?', ids.contest))
       .toEqual([{ name: 'Renamed only', starts_at: null, ends_at: null }]);
     // A scheduled contest keeps its schedule the same way.
-    const created = await execute('eventAdmin', { type: 'create_contest', eventId: ids.event, name: 'Keeps', contestType: 'teams',
+    const created = await execute('eventAdmin', { type: 'create_contest', kind: 'practice', eventId: ids.event, name: 'Keeps', contestType: 'teams',
       schedule: { startsAt: '2030-03-01T01:00:00.000Z', endsAt: '2030-03-01T04:00:00.000Z', graceMinutes: 15 }, categories: ['Other'] });
     await execute('eventAdmin', { type: 'update_contest', contestId: created.contestId!, name: 'Kept', contestType: 'teams' });
     expect(await rows('SELECT name, starts_at, ends_at, grace_minutes FROM sessions WHERE id = ?', created.contestId!))
@@ -760,7 +760,7 @@ describe('event, roster, and contest commands', () => {
   });
 
   it('refuses a schedule that cannot run, and the schedule switch for a contest with no schedule', async () => {
-    const create = (schedule: object) => execute('eventAdmin', { type: 'create_contest', eventId: ids.event, name: 'Bad', contestType: 'teams',
+    const create = (schedule: object) => execute('eventAdmin', { type: 'create_contest', kind: 'practice', eventId: ids.event, name: 'Bad', contestType: 'teams',
       schedule, categories: ['Other'] } as unknown as ManageCommand);
     const times = { startsAt: '2030-03-01T01:00:00.000Z', endsAt: '2030-03-01T04:00:00.000Z' };
     await expect(create({ ...times, endsAt: times.startsAt, graceMinutes: 0 })).rejects.toMatchObject({ status: 400 });
@@ -813,7 +813,7 @@ describe('event, roster, and contest commands', () => {
     await run('UPDATE events SET archived = 1 WHERE id = ?', ids.event);
     for (const command of [
       { type: 'create_people', eventId: ids.event, people: [{ handle: 'late', name: 'Late' }] },
-      { type: 'create_contest', eventId: ids.event, name: 'Late', contestType: 'teams', schedule: testSchedule, categories: ['Other'] },
+      { type: 'create_contest', kind: 'practice', eventId: ids.event, name: 'Late', contestType: 'teams', schedule: testSchedule, categories: ['Other'] },
       { type: 'set_intake', contestId: ids.contest, mode: 'open' },
     ] satisfies ManageCommand[]) {
       await expect(execute('eventAdmin', command)).rejects.toMatchObject({ status: 403, message: 'This event is archived.' });
@@ -1028,7 +1028,7 @@ describe('event, roster, and contest commands', () => {
       create_entrants: { type: 'create_entrants', eventId: event, entrants: [{ kind: 'team', name: 'Team', handle: 'team' }] },
       rename_entrant: { type: 'rename_entrant', eventId: event, entrantId: entrant, name: 'Renamed' },
       add_entrant_sign_in: { type: 'add_entrant_sign_in', eventId: event, entrantId: entrant, handle: 'late-team' },
-      create_contest: { type: 'create_contest', eventId: event, name: 'New', contestType: 'teams', schedule: testSchedule, categories: ['Other'] },
+      create_contest: { type: 'create_contest', kind: 'practice', eventId: event, name: 'New', contestType: 'teams', schedule: testSchedule, categories: ['Other'] },
       update_contest: { type: 'update_contest', contestId: contest, name: 'New', contestType: 'teams', schedule: testSchedule },
       assign_entrants: { type: 'assign_entrants', contestId: contest, entries: [{ entrantId: entrant, location: '' }] },
       unassign_entrant: { type: 'unassign_entrant', contestId: contest, entrantId: entrant },

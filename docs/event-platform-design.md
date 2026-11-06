@@ -1,6 +1,6 @@
 # Webmaster, event, and contest platform
 
-**Status.** Proposed. Phase 1, `feature/scoped-authority`, implements the contest resolver, migration `0017`, and its gate. The local half of the gate passed. The hosted runs were inconclusive against the 10 percent p95 rule, because `main` itself varied between runs. After a compile-time fix, the branch read faster than `main` at the median, and the owner accepted the gate on 2026-11-02. The [gate record](history/scoped-authority-gate.md) holds the measurements and the decision. Phase 2, `feature/webmaster-management`, implements webmaster management with no migration. Both phases are merged. Phase 3, `feature/event-sign-in`, implements migration `0018`, sign-in by event code or site and handle, and `set_handle`. Phase 1 merged as #152, Phase 2 as #153, and Phase 3 as #156. Phase 4, `feature/event-console`, implements migration `0019`, the event console, and the one-webmaster bootstrap. It merged as #161. Phase 5, `feature/contest-clock`, implements migration `0020`, contest schedules, derived intake, personal end times, contest-wide awards, and the calendar. It is PR #163 into `main`, rehearsed on 2026-11-05, and waits for review. Phases 6 to 8 are not built.
+**Status.** Proposed. Phase 6, `feature/live-credentials`, is PR #174, an open draft that adds migration `0022`. Phase 1, `feature/scoped-authority`, implements the contest resolver, migration `0017`, and its gate. The local half of the gate passed. The hosted runs were inconclusive against the 10 percent p95 rule, because `main` itself varied between runs. After a compile-time fix, the branch read faster than `main` at the median, and the owner accepted the gate on 2026-11-02. The [gate record](history/scoped-authority-gate.md) holds the measurements and the decision. Phase 2, `feature/webmaster-management`, implements webmaster management with no migration. Both phases are merged. Phase 3, `feature/event-sign-in`, implements migration `0018`, sign-in by event code or site and handle, and `set_handle`. Phase 1 merged as #152, Phase 2 as #153, and Phase 3 as #156. Phase 4, `feature/event-console`, implements migration `0019`, the event console, and the one-webmaster bootstrap. It merged as #161. Phase 5, `feature/contest-clock`, implements migration `0020`, contest schedules, derived intake, personal end times, contest-wide awards, and the calendar. It was rehearsed on 2026-11-05 and merged as #163. Migration `0021` added withdrawal of an unconfirmed contest-wide award and merged as #171. Phase 6 is not merged. Phases 7 and 8 are not built.
 
 Phase 1 differs from this page and the sketches in these points:
 
@@ -8,6 +8,17 @@ Phase 1 differs from this page and the sketches in these points:
 - The resolver starts from the contest and its event, then joins the login tables, so the live form reads them once. Only a webmaster's stamp reads `site_settings`.
 - `/api/sessions` (deleted in Phase 4, replaced by `/api/contests`) listed every contest that the caller can read. For a webmaster, that is every contest of the site.
 - `authorityCopies.test.ts` also refuses `FROM grants`. It exempts the two trusted terminal commands, `installation.ts` and `adminRecovery.ts`, which check an admin membership without a login.
+
+Phase 6 differs from this page and the sketches in these points:
+
+- `0022` backfills no scopes. The sketch reads `account_operations.session_id`, and no current code writes that column. Every existing contest is practice, and only a live contest reads a scope.
+- `0022` counts `unready_seats` twice, once before its triggers and once after them. The sketch counts once before them, so a seat written between that count and its trigger could later fail `CHECK (unready_seats >= 0)`. The second count makes the result exact after statement-by-statement application.
+- The sketch refuses an issue when any open contest lies outside `forContests`. `forContests` is empty for a practice target, so that text would also refuse every lost-password reset during an open practice contest. The target contest is therefore exempt from the refusal. Scopes stay live-only. A request with no target still gets the refusal, and the console names the entrant's open contest when it resets one password.
+- An account with no password yet is exempt from that refusal, because it has no sign-in to lose. This keeps the first issue after an assignment working.
+- A request that names a contest in which the account has no seat gets 409. This is the closed choice for a case that the design does not state.
+- The event console shows the count as "Waiting for live passwords: 3" and lists sign-ins, because one entrant can hold several sign-ins. The preview of other contests applies the window rule to contests that share an entrant. `forContestsSql` still decides per account on the server.
+- Assigning an entrant with a sign-in to a ready, open live contest closes it for every team until that seat is issued, so the command needs `closeReporting: true` and the console asks first. `0022` also records each scope's issued window, and a move off that window ends the scope. A disabled seat keeps its contest closed until an organizer removes the seat. Both are the closed behavior.
+- `forContestsSql` and the seat reads live in `authority.ts`, because `authorityCopies.test.ts` keeps every membership join there.
 
 Phase 2 differs from this page and the sketches in these points:
 
@@ -315,7 +326,7 @@ Access patterns traced through these structures:
 - **Calendar and picker** read `sessions_event_schedule (event_id, starts_at)` for one event, and `sessions_ends` for a webmaster's window.
 - **Event console** reads `accounts_event`, `entrants_event`, and `sessions_event`, then memberships by primary key per contest.
 - **`forContests`** reads the target contest by primary key, the event's contests that start before the target's window ends, and one membership each by primary key.
-- **Deletion** reads `event_deletion_targets_pending`, then deletes by primary key. Every foreign-key child has an index (`0022`).
+- **Deletion** reads `event_deletion_targets_pending`, then deletes by primary key. Every foreign-key child has an index (`0023`).
 
 ### Authority model
 
@@ -430,8 +441,13 @@ The rule has these consequences:
 
 - One issue serves overlapping live contests that share a sign-in. A local behavior check shows that an issue for "Live 1" covers the overlapping "Live 2" and both become ready.
 - An issue never opens a later live contest that does not overlap. An issue on day 1 for "Live 1" does not open "Live 3" on day 3, so "Live 3" gets its own fresh password. A "not ended" rule would break that. A contest that starts exactly at the end plus grace does not overlap.
-- An issue is refused when it would sign a contestant out of a contest outside the set whose intake is open now. That is the earlier Rule 3, restated for automatic intake.
+- An issue is refused when it would sign a contestant out of a contest outside the set whose intake is open now. That is the earlier Rule 3, restated for automatic intake. When two open contests block each other, the refusal tells the organizer to close one contest and then issue.
 - A contestant's own forced change keeps the scope. A reset by either Worker ends it, and the contest closes until reissue.
+- Each scope records the target contest's window at the issue. A schedule move that no longer overlaps that fixed window ends the scope and recounts `unready_seats`, in a D1 trigger. So a postponed contest does not open with old passwords, and small repeated shifts cannot walk away from an issue. An end extension or a shift that still overlaps keeps the scope.
+- A move that would end scopes while the new window still holds the current time, on a contest that is open, gets 409. The organizer closes reporting first. A move that ends the running period is allowed, because the organizer can see that it stops the contest.
+- `assign_entrants` and `add_entrant_sign_in` get 409 when they would close an open live contest, unless the request carries `closeReporting: true`. The batch repeats the check. The console asks first, names the number of teams, tells every team when the contest closes or opens, and then opens the issue sheet for the new sign-ins. An entrant without a sign-in adds no seat, so that assignment does not ask.
+- An issue gets 409 when the account holds a scope for a live contest that has not ended and that lies outside `forContests`, unless the request carries `voidLivePasswords: true`. The console preview says "These passwords stop working for: ...", and only then sends the flag. A stale preview therefore gets the refusal. `recoveryContest` names an open contest, then the entrant's next live contest.
+- `memberships.account_id` is fixed by a trigger, because the count keys on it. No Worker writes it.
 - The hash runs before one batch that holds every write, so an interrupted issue leaves the old password valid. Readiness never shows a gap.
 - `unready_seats` is not in `session_changes`. A credential issue therefore does not fail in-flight staff commands. The submit batch re-checks intake through its dependency value.
 
@@ -460,10 +476,10 @@ The goal is a deletion that is complete across D1, R2, and Durable Objects, safe
    - `live`. A Durable Object `/erase` runs for each contest.
    - `files`. R2 lists and deletes the prefixes `<contestId>/` and `accounts/<id>/`. A final empty listing must come at least 65 minutes after the rows are gone.
    - `done`. The targets go, and the journal row stays as the site record.
-3. **Guards.** In D1, a row of an event, a contest, or an event account disappears only while that event's journal is in step `rows` (`0023`). The journal moves forward one step at a time and keeps naming the same event (`event_deletion_step_order`, `event_deletion_fixed`). So the guard opens once per event and closes for good. An ad hoc `DELETE` from any Worker version, a test, or a console is refused. A site account is never deleted this way.
+3. **Guards.** In D1, a row of an event, a contest, or an event account disappears only while that event's journal is in step `rows` (`0024`). The journal moves forward one step at a time and keeps naming the same event (`event_deletion_step_order`, `event_deletion_fixed`). So the guard opens once per event and closes for good. An ad hoc `DELETE` from any Worker version, a test, or a console is refused. A site account is never deleted this way.
 4. **No other event is reached.** Every delete names target IDs or prefixes derived from them. Activity keys into `accounts` stay `NO ACTION`. If a legacy account acted in another event, the account batch fails on a foreign key, records `blocked`, and stops. It does not cascade into the other event. A local probe shows this. The event stays fenced, and the dashboard names the account. Finishing that deletion needs an owner decision, because it would change the other event's history (see the risks).
 5. **Coverage.** `eventDeletionCoverage.test.ts` seeds two events with every writer and deletes one through `fenceStatements` and `advanceRows`. It compares every table's row count with a database that holds the other event alone. It reads `sqlite_master` and `pragma_foreign_key_list`, so it keeps no table list by hand. It fails when any table that references events, contests, or accounts, directly or through another such table, holds no seeded row. A new table therefore needs a seed row, or the test fails. A local coverage check models it. It covers 31 tables, and only the two expected site records differ.
-6. **Cost.** `0022` indexes every foreign-key child. Without these indexes, each account delete would scan every event's history. A local measurement recorded 11,363 ms for one event at N = 80,000 without one of these indexes. That was local SQLite, not D1.
+6. **Cost.** `0023` indexes every foreign-key child. Without these indexes, each account delete would scan every event's history. A local measurement recorded 11,363 ms for one event at N = 80,000 without one of these indexes. That was local SQLite, not D1.
 7. **Durable Objects.** `/erase` replaces the fixture-only `cleanup()` (`src/server/adapters/cloudflare/live.ts:245-285`). It refuses unless D1 shows the contest in `event_deletion_targets` and no `sessions` row. So no request can wipe a running contest's object.
 8. **Fixtures.** Every test cleanup records its own event in the journal and runs the same rows step (Phase 7). One deletion procedure then serves the product and the tests.
 
@@ -549,7 +565,7 @@ The design adds these files:
 
 | File | Purpose |
 | --- | --- |
-| `src/server/adapters/d1/migrations/0017_scoped_authority.sql` to `0023_deletion_guards.sql` | Schema in the [migration sketch](event-platform-sketches.md#migration-sketch) |
+| `src/server/adapters/d1/migrations/0017_scoped_authority.sql` to `0024_deletion_guards.sql` | Schema in the [migration sketch](event-platform-sketches.md#migration-sketch) |
 | `src/server/adapters/cloudflare/authority.ts` | The one resolver for contest, event, and site, `authorityGuard`, `manageAccountSql`, `requireAuthority`. Only `contestDataSql` leaves the module |
 | `src/server/adapters/cloudflare/manage.ts` | `D1ManageService`: `site`, `event`, `execute`, `requirementOf`, planners |
 | `src/server/adapters/cloudflare/credentials.ts` | `loginKeyFor`, `forContestsSql`, `replaceCredentialStatements`, `D1CredentialService.issue` |
@@ -621,11 +637,12 @@ It keeps the practice and live kinds, the reason for fresh live passwords, batch
 | `0018` | `events.code` (random `e` + 16 hex), `events.time_zone`, `accounts.handle`, the two handle indexes | Every account with an event or a site grant gets `handle = username`. Usernames were globally unique, so the handle indexes cannot fail. `accounts_username` and `ba_user` are not touched |
 | `0019` | `entrants`, `teams.entrant_id`, `accounts.entrant_id`, `contest_type`, roster triggers | One entrant per normalized team name per event when the teams share a contestant account, else one per team. Merged team names take the entrant's spelling, which differs only in case and spaces. Accounts link to the entrant of their oldest team in their own event |
 | `0020` | Schedule columns, `contest_awards` | Existing contests have no schedule and keep manual intake |
-| `0021` | `kind` (default practice), `credential_scopes`, `unready_seats` | Scopes come from each account's newest completed admin-issued credential, as in the earlier `issued_contest` view. Existing contests are practice, so nothing that is open closes |
-| `0022` | Deletion journal, targets, foreign-key child indexes | Indexes only add entries |
-| `0023` | Delete guards on `events`, `sessions`, `accounts` | No data statement |
+| `0021` | Contest-award withdrawal columns and triggers | Existing awards stay as they are |
+| `0022` | `kind` (default practice), `credential_scopes`, `unready_seats` | Existing contests are practice, so nothing that is open closes. No scope is backfilled, because only a live contest reads one |
+| `0023` | Deletion journal, targets, foreign-key child indexes | Indexes only add entries |
+| `0024` | Delete guards on `events`, `sessions`, `accounts` | No data statement |
 
-`0020` comes before `0021` because the live password rule needs schedules. `0023` is separate from `0022` because the previous release's test cleanup deletes rows directly (`src/server/adapters/d1/testFixture.ts:205-207`). So `scripts/rollback-check.mjs` for `0022` must still run that cleanup. From `0023` on, the previous release cleans up through the journal.
+`0020` comes before `0022` because the live password rule needs schedules. `0024` is separate from `0023` because the previous release's test cleanup deletes rows directly (`src/server/adapters/d1/testFixture.ts:205-207`). So `scripts/rollback-check.mjs` for `0023` must still run that cleanup. From `0024` on, the previous release cleans up through the journal.
 
 **Promotion of the two development accounts.**
 
@@ -739,7 +756,7 @@ The [type sketch](event-platform-sketches.md#type-sketch) shows the final shape.
      - Overlapping contests.
    - **Browser test.** The contestant clock and the closed-form message. Manual phone-width checks of the volunteer screens.
    - **Revert.** Scheduled contests act manual under the previous Worker.
-6. **`feature/live-credentials` (`0021`).**
+6. **`feature/live-credentials` (`0022`).**
    - **Scope.** Contest kind, `forContestsSql` and `credential_scopes` in `issueCredentials`, `unready_seats`, the live gate, the batched live sheet, and confined reissue by contest admins.
    - **Focused tests.**
      - A live contest stays closed until the last seat is issued.
@@ -751,8 +768,8 @@ The [type sketch](event-platform-sketches.md#type-sketch) shows the final shape.
      - A lost response replays without passwords.
      - `npm run test:auth:hash` for the per-batch CPU.
    - **Browser test.** Issue live passwords and watch the readiness count reach zero.
-   - **Revert.** Readiness columns stay. The previous Worker ignores them.
-7. **`feature/event-deletion` (`0022`).**
+   - **Revert.** Readiness columns stay. The previous Worker ignores them, so after a Worker rollback a live contest opens without the password gate. D1 does not enforce the gate. Organizers must close live contests before a rollback.
+7. **`feature/event-deletion` (`0023`).**
    - **Scope.**
      - `delete_event`, `advanceDeletions` with the lease and the cron task, the `event_deletions` fence in the resolvers and in sign-in, `/erase`, `PrivateBucket.list`, and the dashboard progress.
      - Every test cleanup in the module map moves to the journal.
@@ -766,7 +783,7 @@ The [type sketch](event-platform-sketches.md#type-sketch) shows the final shape.
      - `PrivateBucket.list` on `minsky-preview-images`.
    - **Browser test.** A webmaster deletes a fixture event and sees "Deleted".
    - **Revert.** The previous Worker treats a fenced event as archived. An unfinished deletion pauses until roll-forward, and its journal stays intact.
-8. **`feature/deletion-guards` (`0023`).**
+8. **`feature/deletion-guards` (`0024`).**
    - **Scope.** The three delete guards. Nothing else.
    - **Focused tests.** An ad hoc delete of an event, a contest, or an event account is refused. A site account is never deleted. The rows step of one event cannot delete in another. `eventDeletionCoverage.test.ts` still passes through the guards. `scripts/rollback-check.mjs` runs Phase 7's `npm run test:d1`, whose cleanup already uses the journal.
    - **Browser test.** None. No screen changes.
@@ -789,7 +806,7 @@ The [type sketch](event-platform-sketches.md#type-sketch) shows the final shape.
   - Scheduled contests act manual.
   - A live contest closes after its resets until reissue.
   - Contest admins can assign staff again, because the previous Worker's `manageMember` keeps the contest-level rule (`src/server/adapters/cloudflare/application.ts:422-455`). The isolation trigger still refuses an account of another event.
-- The design accepts one index write per history row, issue, resolution, award, and receipt (`0022`), in exchange for a deletion that does not scan other events.
+- The design accepts one index write per history row, issue, resolution, award, and receipt (`0023`), in exchange for a deletion that does not scan other events.
 - The design accepts that a revocation for a derived seat reaches an open socket within 30 s through the alarm, not through the outbox.
 - The design accepts that a contestant with confirmed extra minutes may report until their personal end plus grace. That follows "extra contest time" literally (decision 4).
 
@@ -847,6 +864,14 @@ Rehearsal of `0019` and `0020` together on 2026-11-05, on the separate fictional
 
 Rehearsal of `0020` again on 2026-11-05, after it gained `contest_awards_unconfirmed`, on the separate fictional database `minsky-preview-rehearsal-0020b`, deleted afterwards. The steps were `0001` to `0019`, then 1 event, 2 contests, and 2 accounts, then `wrangler d1 migrations apply --remote` for `0020`. `0020` ran 15 commands. Awards of 15 and 20 minutes in one contest, and of 15 minutes in another contest, were accepted. After the first 15-minute award was confirmed, a second 15-minute award was accepted. A third 15-minute award in the first contest, while the second waited, failed with `UNIQUE constraint failed: contest_awards.session_id, contest_awards.minutes`. `PRAGMA foreign_key_check` returned no rows.
 
+The owner accepted these decisions on 2026-11-06:
+
+16. **Late entrant in a running live contest.** Decided 2026-11-06. The organizer confirms the assignment. Then reporting closes for every team until that seat is issued. The console asks first, as the live password rule describes.
+17. **Rollback protection for the gate.** Decided 2026-11-06. Rollback protection stays a documented procedure, with no D1 enforcement. Organizers close live contests before a rollback, as the Phase 6 revert note states.
+18. **Named reset during an open practice contest.** Decided 2026-11-06. A named reset stays refused while the contestant holds another open contest, including an open practice contest. No practice exemption is added. The named target contest stays exempt, as the Phase 6 list near the top of this page states.
+19. **Withdrawing single-issue awards.** Decided 2026-11-06. Withdrawing single-issue awards is follow-up work, and it is not built. No command withdraws or replaces an issue award today, as the note on issue awards states.
+20. **Assign control for event admins.** Decided 2026-11-06. Event admins keep the **Assign** control on each staff row, because it is their only way to take a staff seat.
+
 ## Risks
 
 Each risk names its measurement.
@@ -855,7 +880,7 @@ Each risk names its measurement.
 - **Sign-in burst.** At contest start, 800 contestants sign in and make the forced change: a verify, a hash, and a verify each (`src/server/adapters/cloudflare/authentication.ts:310-347`). The sign-in adds one index search for the event code. Measured in Phase 3 at the 200-user step of `npm run load` on `minsky-preview`. The 800-user target stays unmeasured until the owner asks for a capacity run. A free-tier preview run does not establish production capacity.
 - **Hosted D1 limits for chunked deletes and the trigger fan-out on bulk assignment.** The local coverage and behavior checks passed in local SQLite. Measured in Phase 7 by timing a 2,000-issue event with 80,000 history rows on `minsky-preview`, and in Phase 4 by a bulk assignment of 300 entrants there.
 - **Trigger behavior on hosted D1.** The design relies on child `DELETE` triggers that fire during a cascade (for `unready_seats`), on `AFTER` triggers whose order does not matter, and on a column CHECK that reads another column (`kind`). Verified in local SQLite 3.51 only. D1 runs an older SQLite. Measured by running `previousWorker.test.ts`, `eventDeletion.test.ts`, and the readiness tests against `minsky-preview` in Phases 1, 6, and 7.
-- **Plan pins in the rollback check.** `scripts/rollback-check.mjs` runs the previous release's whole `npm run test:d1`. That suite includes the pinned plans of `queryPlans.test.ts` (`src/server/adapters/d1/queryPlans.test.ts:70-77`) and the ceilings of `readVolume.test.ts`. The new indexes, for example `issues_reporter`, `issues_owner`, and `history_actor` in `0022`, could make SQLite choose another index for an old query. Then an old pin fails on a schema whose rollback works. Nothing here shows whether the old pins hold. Measured by the first rollback check of Phase 1 and of Phase 7. A failure caused only by a plan pin is triaged as a pin, not as a rollback break.
+- **Plan pins in the rollback check.** `scripts/rollback-check.mjs` runs the previous release's whole `npm run test:d1`. That suite includes the pinned plans of `queryPlans.test.ts` (`src/server/adapters/d1/queryPlans.test.ts:70-77`) and the ceilings of `readVolume.test.ts`. The new indexes, for example `issues_reporter`, `issues_owner`, and `history_actor` in `0023`, could make SQLite choose another index for an old query. Then an old pin fails on a schema whose rollback works. Nothing here shows whether the old pins hold. Measured by the first rollback check of Phase 1 and of Phase 7. A failure caused only by a plan pin is triaged as a pin, not as a rollback break.
 - **Migration atomicity.** It is unknown whether `wrangler d1 migrations apply` runs a file in one transaction. Measured by rehearsing each file on an empty D1 database and on a `minsky-preview` copy of the development data shape before its pull request is ready.
 - **R2 listing.** `list({prefix})` exists on the Workers R2 binding, and the local test bucket supports it (`src/server/adapters/cloudflare/announcements.test.ts:20`, `src/server/adapters/cloudflare/announcements.test.ts:94`). `PrivateBucket` must expose it. Measured in Phase 7 on `minsky-preview-images`.
 - **A self-hosted installation without a webmaster.** A self-hosted database whose admin has neither username has no webmaster after `0017`. Its admin stays a contest admin of the bootstrap event and cannot create events. `recoverWebmaster` finds only an existing webmaster, and bootstrap needs an empty database. A local probe shows this case in local SQLite. Measured by `SELECT count(*) FROM grants WHERE scope = 'site'` after the upgrade, which the release notes ask self-hosters to run. The follow-up is a trusted terminal command that creates the first webmaster when a database has none.

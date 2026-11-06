@@ -151,7 +151,7 @@ export function EventConsolePage({
           code={data.event.code}
           names={names}
           handles={handles}
-          onIssueAgain={(ids) => void state.issue(ids)}
+          onIssueAgain={(ids) => void state.issue(ids, state.sheet?.contestId, state.sheet?.voidLivePasswords)}
           onClose={state.dismissSheet}
         />
       )}

@@ -122,6 +122,7 @@ describe("closedMessage and closesAt", () => {
     expect(closedMessage(clock({ reason: "before_start" }), at("2026-11-03T04:00:00.000Z"))).toMatch(/^Reporting opens at .*13:00\.$/);
     expect(closedMessage(clock({ reason: "ended" }), at("2026-11-03T11:00:00.000Z"))).toMatch(/^Reporting closed at .*18:15\.$/);
     expect(closedMessage(clock({ reason: "override_closed" }), 0)).toBe("Reporting is closed by the organizers.");
+    expect(closedMessage(clock({ reason: "awaiting_live_passwords" }), 0)).toBe("Reporting opens when every team has its live password.");
   });
 
   it("adds grace to the personal end", () => {

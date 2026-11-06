@@ -269,6 +269,9 @@ export interface IssuedCredential {
   readonly temporaryPassword: string | null;
 }
 
+/** The steps of one event's permanent deletion, in order. */
+export type DeletionStep = 'rows' | 'live' | 'files' | 'done';
+
 export interface SiteOverview {
   readonly webmasters: ReadonlyArray<{
     readonly id: string;

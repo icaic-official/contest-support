@@ -207,7 +207,7 @@ describe('site commands for webmasters', () => {
     const issuing = new D1ManageService(db, passwordHasher);
     const [issued] = await issuing.issueCredentials(caller('first'), requestId, { eventId: null, accountIds: [added] });
     expect(issued).toMatchObject({ accountId: added, handle: 'newcomer' });
-    expect(issued!.temporaryPassword).toMatch(/^.{12,}$/);
+    expect(issued!.temporaryPassword).toMatch(/^[2-9A-HJ-NP-Za-km-np-z]{16}$/);
     expect((await siteOf('first')).webmasters).toContainEqual(expect.objectContaining({ id: added, ready: true }));
     const authentication = new D1AuthenticationService(db, createBetterAuthIdentity(db, {
       origin: 'http://127.0.0.1:8788', secret: randomSecret(), secureCookies: false,

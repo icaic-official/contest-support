@@ -18,6 +18,7 @@ const commandSchema = z.discriminatedUnion('type', [
     explanation: z.string().trim().min(1).max(2000).refine(noNul),
   }),
   z.strictObject({ type: z.literal('apply'), awardId: uuid }),
+  z.strictObject({ type: z.literal('withdraw'), awardId: uuid }),
 ]) satisfies z.ZodType<ContestAwardCommand>;
 
 const now = "strftime('%Y-%m-%dT%H:%M:%fZ', 'now')";
@@ -28,11 +29,16 @@ const now = "strftime('%Y-%m-%dT%H:%M:%fZ', 'now')";
  */
 const roleSql = (row: string, roles: readonly string[]) => `(${row}.staff = 1 AND EXISTS (SELECT 1 FROM json_each(${row}.roles)
   WHERE value IN (${roles.map((role) => `'${role}'`).join(', ')})))`;
-const guardSql = { grant: roleSql('c', ['jury']), apply: roleSql('c', ['jury', 'volunteer', 'specialist']) } as const;
+const guardSql = {
+  grant: roleSql('c', ['jury']),
+  withdraw: roleSql('c', ['jury']),
+  apply: roleSql('c', ['jury', 'volunteer', 'specialist']),
+} as const;
 
 interface AwardRow {
   id: string; session_id: string; minutes: number; explanation: string; actor: string;
   applied_at: string | null; applied_request: string | null; applied_by: string | null;
+  withdrawn_at: string | null; withdrawn_request: string | null; withdrawn_by: string | null;
 }
 
 /**
@@ -40,7 +46,9 @@ interface AwardRow {
  * The decision and the confirmation of its external application are separate
  * records. Minsky changes no external contest clock. Staff apply the minutes
  * outside Minsky, and only confirmed minutes extend a personal end time.
- * A repeated grant or confirmation never writes twice.
+ * A jury member can withdraw an award that staff have not confirmed. The row stays
+ * with the withdrawal recorded, the size is free again, and the award gives no time.
+ * A repeated grant, confirmation, or withdrawal never writes twice.
  */
 export class D1ContestAwardService {
   constructor(private readonly db: D1Connection) {}
@@ -50,7 +58,8 @@ export class D1ContestAwardService {
   }
 
   private award(id: string, sessionId: string): Promise<AwardRow | null> {
-    return this.statement(`SELECT id, session_id, minutes, explanation, actor, applied_at, applied_request, applied_by
+    return this.statement(`SELECT id, session_id, minutes, explanation, actor, applied_at, applied_request, applied_by,
+        withdrawn_at, withdrawn_request, withdrawn_by
       FROM contest_awards WHERE id = ? AND session_id = ?`, id, sessionId).first<AwardRow>();
   }
 
@@ -62,10 +71,12 @@ export class D1ContestAwardService {
     }
     const command = parsed.data;
     const current = await this.statement(contestDataSql('caller'), ...contestDataBindings(caller, sessionId)).first<ContestAuthorityRow>();
-    if (!current || !can(seatFromRow(current), command.type === 'grant' ? 'award' : 'apply')) {
+    if (!current || !can(seatFromRow(current), command.type === 'apply' ? 'apply' : 'award')) {
       throw new AuthenticationError(403, command.type === 'grant'
         ? 'Only jury can grant a time award to the whole contest.'
-        : 'Only support and jury can confirm that a time award was applied.');
+        : command.type === 'withdraw'
+          ? 'Only jury can withdraw a time award.'
+          : 'Only support and jury can confirm that a time award was applied.');
     }
     if (current.archived) throw new AuthenticationError(409, 'This event is archived.');
 
@@ -121,6 +132,36 @@ export class D1ContestAwardService {
 
     const award = await this.award(command.awardId, sessionId);
     if (!award) throw new AuthenticationError(409, 'That award is not in this contest. Refresh the page.');
+    if (command.type === 'withdraw') {
+      const withdrawnBy = (row: AwardRow) => {
+        if (row.withdrawn_request === requestId && row.withdrawn_by === caller.accountId) return row.id;
+        throw new AuthenticationError(409, 'Someone already withdrew that award.');
+      };
+      const confirmed = new AuthenticationError(409, 'Staff already confirmed that award. A confirmed award cannot be withdrawn.');
+      if (award.withdrawn_at !== null) return withdrawnBy(award);
+      if (award.applied_at !== null) throw confirmed;
+      try {
+        await this.db.batch([
+          guard,
+          this.statement(`UPDATE contest_awards SET withdrawn_at = ${now}, withdrawn_by = ?,
+            withdrawn_name = (SELECT name FROM accounts WHERE id = ?), withdrawn_request = ?
+            WHERE id = ? AND session_id = ? AND applied_at IS NULL AND withdrawn_at IS NULL`,
+          caller.accountId, caller.accountId, requestId, award.id, sessionId),
+          assertion(this.db, `${guardId}:state`, 'SELECT 1 WHERE changes() = 1'),
+          audit('contest_award_withdrawn', { award: award.id, minutes: award.minutes }),
+          ...notificationStatements(this.db, sessionId, audiences),
+          ...finish,
+        ]);
+      } catch (error) {
+        const latest = await this.award(award.id, sessionId);
+        if (latest?.withdrawn_at) return withdrawnBy(latest);
+        if (latest?.applied_at) throw confirmed;
+        throw refusal(error);
+      }
+      return award.id;
+    }
+    const withdrawnError = new AuthenticationError(409, 'That award was withdrawn. Refresh the page.');
+    if (award.withdrawn_at !== null) throw withdrawnError;
     const confirmedBy = (row: AwardRow) => {
       if (row.applied_request === requestId && row.applied_by === caller.accountId) return row.id;
       throw new AuthenticationError(409, 'Someone already confirmed that this award was applied.');
@@ -131,7 +172,7 @@ export class D1ContestAwardService {
         guard,
         this.statement(`UPDATE contest_awards SET applied_at = ${now}, applied_by = ?,
           applied_name = (SELECT name FROM accounts WHERE id = ?), applied_request = ?
-          WHERE id = ? AND session_id = ? AND applied_at IS NULL`,
+          WHERE id = ? AND session_id = ? AND applied_at IS NULL AND withdrawn_at IS NULL`,
         caller.accountId, caller.accountId, requestId, award.id, sessionId),
         assertion(this.db, `${guardId}:state`, 'SELECT 1 WHERE changes() = 1'),
         audit('contest_award_applied', { award: award.id, minutes: award.minutes }),
@@ -141,6 +182,7 @@ export class D1ContestAwardService {
     } catch (error) {
       const latest = await this.award(award.id, sessionId);
       if (latest?.applied_at) return confirmedBy(latest);
+      if (latest?.withdrawn_at) throw withdrawnError;
       throw refusal(error);
     }
     return award.id;

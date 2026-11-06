@@ -245,6 +245,45 @@ test.describe("contest-wide time awards", () => {
     });
   }
 
+  test("jury withdraws a wrong award after a confirmation dialog, and the size is free again", async ({ browser, local }) => {
+    test.setTimeout(90_000);
+    await schedule(local, -30, 60);
+    const jury = await signIn(browser, local, "jury");
+    await jury.getByRole("navigation", { name: "Console pages" }).getByRole("button", { name: /^Award review/ }).click();
+    const panel = jury.getByRole("region", { name: "Time awards for the whole contest" });
+    const record = async (explanation: string) => {
+      await panel.getByLabel("Minutes for every contestant").fill("15");
+      await panel.getByLabel("Why").fill(explanation);
+      await panel.getByRole("button", { name: "Record the decision" }).click();
+      await expect(panel.getByRole("list", { name: "Contest-wide awards" })).toContainText(explanation);
+    };
+    await record("Wrong contest.");
+    const volunteer = await signIn(browser, local, "volunteer", phone);
+    await expect(volunteer.getByRole("region", { name: "Time awards to confirm" })).toContainText("15 minutes");
+
+    await panel.getByRole("button", { name: "Withdraw the 15 minutes award" }).click();
+    const dialog = jury.getByRole("dialog", { name: "Withdraw this award?" });
+    await dialog.getByRole("button", { name: "Keep the award" }).click();
+    await expect(dialog).toBeHidden();
+    expect(await local.rows("SELECT id FROM contest_awards WHERE withdrawn_at IS NOT NULL")).toEqual([]);
+
+    await panel.getByRole("button", { name: "Withdraw the 15 minutes award" }).click();
+    await dialog.getByRole("button", { name: "Withdraw award", exact: true }).click();
+    await expect(panel).toContainText("Withdrawn by Test jury · gives no time");
+    await expect(panel.getByRole("button", { name: /^Withdraw the/ })).toHaveCount(0);
+    expect(await local.rows("SELECT id FROM contest_awards WHERE session_id = ?", local.sessions[0])).toHaveLength(1);
+
+    // The volunteer's card goes away on the next read, and the contestant never sees the award.
+    await volunteer.reload();
+    await expect(volunteer.getByRole("region", { name: "Time awards to confirm" })).toHaveCount(0);
+    const contestant = await signIn(browser, local, "contestant");
+    await expect(contestant.getByRole("region", { name: "Contest clock" })).not.toContainText("Your end time");
+    await expect(contestant.getByText("Wrong contest.")).toHaveCount(0);
+
+    await record("Right contest.");
+    expect(await local.rows("SELECT id FROM contest_awards WHERE session_id = ?", local.sessions[0])).toHaveLength(2);
+  });
+
   test("a contestant sees no award controls, and the Worker refuses a grant from a contestant", async ({ browser, local }) => {
     await schedule(local, -30, 60);
     const contestant = await signIn(browser, local, "contestant");

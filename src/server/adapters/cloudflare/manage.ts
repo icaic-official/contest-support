@@ -13,7 +13,7 @@ import {
   manageWebmasterSql, reaches, resolveAuthority, webmastersSql, type Authority, type Target,
 } from './authority';
 import { handleSchema, loginKeyFor, replaceCredentialStatements } from './credentials';
-import { randomSecret, type PasswordHasher } from './password';
+import { readablePassword, type PasswordHasher } from './password';
 import { intakeModeOf, intakeStateSql, parseIntake, scheduleOf, type ScheduleColumns } from './schedule';
 
 const noControl = (value: string) => !hasControlCharacter(value);
@@ -416,7 +416,7 @@ export class D1ManageService {
     const passwords = new Map<string, string>();
     const statements: D1Statement[] = [];
     for (const target of targets) {
-      const password = randomSecret() + 'A9!';
+      const password = readablePassword();
       passwords.set(target.id, password);
       const seats = await this.statement('SELECT session_id FROM memberships WHERE account_id = ?', target.id)
         .all<{ session_id: string }>();

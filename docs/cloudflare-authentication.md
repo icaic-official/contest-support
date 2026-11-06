@@ -80,7 +80,8 @@ The synthetic identity email is not a mailbox. SMTP and personal email are unnec
 New passwords contain 12 to 128 characters.
 A password change requires the current password and a different password after Unicode NFKC normalization.
 NFKC converts equivalent Unicode forms to the same password input.
-Temporary passwords use 256 random bits plus a fixed character suffix.
+Temporary passwords have 16 characters from a 56-character alphabet that omits 0, O, 1, l, I and o (about 93 random bits). A person can read one from paper.
+The credential dialog can print one sheet per person. The sheets exist only while the dialog is open.
 Passwords remain in request memory. Neither adapter saves plaintext credentials in browser storage.
 
 An account's application ID is also its Better Auth user ID.

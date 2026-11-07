@@ -238,6 +238,40 @@ test.describe("a staff member with several contests", () => {
   });
 });
 
+test.describe("a contest in the address whose snapshot fails", () => {
+  test("shows the picker on that contest, and the person can leave it", async ({ page, local }) => {
+    const ids = await three(local);
+    await signIn(page);
+    await page.route("**/api/snapshot*", (route) =>
+      new URL(route.request().url()).searchParams.get("sessionId") === ids.ended
+        ? route.fulfill({ status: 500, json: { error: "Unavailable." } })
+        : route.fallback());
+    await page.goto(`/issues?contest=${ids.ended}`);
+    await expect(page.getByRole("alert").filter({ hasText: "Unavailable." })).toBeVisible();
+    const select = page.getByLabel("Contest session", { exact: true });
+    await expect(select).toHaveValue(ids.ended);
+    await at(page, "/issues", ids.ended);
+    await select.selectOption(ids.running);
+    await expect(triggerFor(page, "Charlie")).toBeVisible();
+    await at(page, "/issues", ids.running);
+  });
+
+  test("keeps the address when the first list read fails, and a retry opens that contest", async ({ page, local }) => {
+    const ids = await three(local);
+    await signIn(page);
+    let listFails = true;
+    await page.route("**/api/contests*", (route) =>
+      listFails ? route.fulfill({ status: 500, json: { error: "Unavailable." } }) : route.fallback());
+    await page.goto(`/issues?contest=${ids.ended}`);
+    await expect(page.getByRole("alert").filter({ hasText: "Unavailable." })).toBeVisible();
+    await expect(page.getByLabel("Contest session", { exact: true })).toHaveCount(0);
+    listFails = false;
+    await page.getByRole("button", { name: "Refresh access", exact: true }).click();
+    await expect(triggerFor(page, "Delta")).toBeVisible();
+    await at(page, "/issues", ids.ended);
+  });
+});
+
 test.describe("a contestant with one contest", () => {
   test("gets no contest parameter in the address", async ({ page, local }) => {
     const seats = await local.rows("SELECT session_id FROM memberships WHERE account_id = ?", local.users.contestant);

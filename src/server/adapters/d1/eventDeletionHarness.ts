@@ -300,7 +300,7 @@ export function changedRows(before: ReadonlyMap<string, string[]>, after: Readon
 }
 
 /** An event that holds only its roster. */
-export const seedRoster = (db: D1Connection, webmaster: SeededWebmaster): Promise<SeededEvent> => seedEvent(db, webmaster, false);
+export const seedRoster = (db: D1Connection, webmaster: SeededWebmaster): Promise<SeededEvent> => seedEvent(db, webmaster, /* activity= */ false);
 
 /** An R2 bucket in memory. It can return short pages and an empty page, as R2 may. */
 export class FakeBucket implements Pick<PrivateBucket, 'list' | 'delete'> {

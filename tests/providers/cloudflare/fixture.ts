@@ -355,7 +355,9 @@ async function cleanupOnPlatform(path: string, platform: Platform, target: Fixtu
   const journal = await readJournal(path, target);
   const db = platform.env.DB;
   await discoverCreatedAccounts(db, journal);
-  await validateOwnership(db, journal);
+  // A minute cron can delete rows from the fence on, so the journal keeps the file identities from before it.
+  journal.images = (await validateOwnership(db, journal)).map(({ id, session_id, issue_id }) => ({ id, session_id, issue_id }));
+  journal.avatars = await ownedAvatars(db, journal);
   // Retain discovered UUIDs before any deletion, including a lost create response.
   const discoveredPath = `${path}.${crypto.randomUUID()}.next`;
   await writeFile(discoveredPath, JSON.stringify(journal), { flag: 'wx', mode: 0o600 });

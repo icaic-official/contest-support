@@ -60,16 +60,28 @@ test("a staff member downloads the staff screens, so the patterns see them", asy
   expect(scripts.some((path) => /ContestantApp/.test(path))).toBe(false);
 });
 
-// A contestant who types /site or /event gets the staff screen of that page, because
-// the page asks the server before it decides. The queue is the page that a contestant
-// opens for any address that the contestant cannot use, as for /administration.
-for (const path of ["/site", "/event", `/event/${randomUUID()}`]) {
-  test(`a contestant who types ${path.replace(/[0-9a-f-]{36}/u, "<id>")} downloads no staff screen and lands on the queue`, async ({ page, local }) => {
+// A person with no authority over the site or an event gets the refusal page that the
+// staff screen shows, and that screen's code stays undownloaded.
+const refusedPages: Array<{ path: string; heading: string; message: string }> = [
+  { path: "/site", heading: "Site", message: "Only a webmaster can open the site page." },
+  { path: "/event", heading: "Event console", message: "Only an event admin or a webmaster can change this event." },
+  {
+    path: `/event/${randomUUID()}`,
+    heading: "Event console",
+    message: "Only an event admin or a webmaster can change this event.",
+  },
+];
+
+for (const { path, heading, message } of refusedPages) {
+  test(`a contestant who types ${path.replace(/[0-9a-f-]{36}/u, "<id>")} gets the refusal page and downloads no staff screen`, async ({ page, local }) => {
     await seatThreeContests(local, { next: "Alpha", ended: "Delta", running: "Charlie" });
     await signIn(page, "contestant");
     const scripts = watchScripts(page);
     await page.goto(path);
-    await expect.soft(page).toHaveURL((url) => url.pathname === "/issues");
+    await expect(page.getByRole("heading", { level: 1, name: heading })).toBeVisible();
+    await expect(page.getByText(message)).toBeVisible();
+    expect(new URL(page.url()).pathname).toBe(path);
+    await page.getByRole("link", { name: "Open contests" }).click();
     await expect(page.getByRole("heading", { name: "Your reports" })).toBeVisible();
     expect(scripts.some((script) => /ContestantApp/.test(script)), "the contestant screen was recorded").toBe(true);
     expect(scripts.filter(isStaffScreen)).toEqual([]);

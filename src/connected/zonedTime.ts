@@ -3,7 +3,7 @@
  * Everything here is pure and uses Intl only, so it needs no date library.
  */
 
-type Style = "time" | "date" | "datetime";
+type Style = "time" | "date" | "datetime" | "datetimeYear";
 
 const formatters = new Map<string, Intl.DateTimeFormat>();
 
@@ -67,6 +67,7 @@ const options: Record<Style, Intl.DateTimeFormatOptions> = {
   time: { hour: "2-digit", minute: "2-digit", hourCycle: "h23" },
   date: { weekday: "short", day: "numeric", month: "short" },
   datetime: { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hourCycle: "h23" },
+  datetimeYear: { weekday: "short", day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hourCycle: "h23" },
 };
 
 /** Formats an instant in a zone, for example `13:00`, `Tue 3 Nov`, or `Tue 3 Nov, 13:00`. */

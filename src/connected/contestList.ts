@@ -1,6 +1,6 @@
 import type { ContestSummary, IntakeReason } from "@/backend/contracts";
 import { intakeHeadline } from "./intakeText";
-import { formatInZone, zoneLabel } from "./zonedTime";
+import { formatInZone, zonedParts, zoneLabel } from "./zonedTime";
 
 /**
  * The note on a contest row. The server derives the reason, so the row needs
@@ -88,11 +88,15 @@ export interface ContestRow {
 export function contestRows(contests: readonly ContestSummary[]): ContestRow[] {
   // A person who reaches several events can see times from several zones.
   const withZone = new Set(contests.map((contest) => contest.timeZone)).size > 1;
+  const years = contests.flatMap(({ schedule, timeZone }) =>
+    schedule ? [zonedParts(schedule.startsAt, timeZone).date.slice(0, 4)] : [],
+  );
+  const withYear = new Set(years).size > 1;
   return contests.map((contest) => {
     let start: string | null = null;
     if (contest.schedule) {
       const { startsAt } = contest.schedule;
-      start = formatInZone(startsAt, contest.timeZone, "datetime");
+      start = formatInZone(startsAt, contest.timeZone, withYear ? "datetimeYear" : "datetime");
       if (withZone) start += ` ${zoneLabel(contest.timeZone, Date.parse(startsAt))}`;
     }
     return {

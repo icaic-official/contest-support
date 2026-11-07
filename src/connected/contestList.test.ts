@@ -278,6 +278,28 @@ describe("contestRows", () => {
     expect(mixed[0]?.start).toContain("21:00");
   });
 
+  it("adds the year only when the listed contests start in more than one calendar year", () => {
+    const same = contestRows([contest("a", { hours: [0, 4] }), contest("b", { hours: [24, 28] })]);
+    expect(same[0]?.start).not.toContain("2026");
+    const yearLater = 365 * 24;
+    const mixed = contestRows([contest("a", { hours: [0, 4] }), contest("b", { hours: [yearLater, yearLater + 4] })]);
+    expect(mixed[0]?.start).toContain("2026");
+    expect(mixed[1]?.start).toContain("2027");
+  });
+
+  it("compares the years in the event's zone, and ignores a contest with no schedule", () => {
+    // 2026-12-31T20:00Z is already 2027 in Singapore, and so is the second start.
+    const newYearsEve = (58 * 24) + 7;
+    const rows = contestRows([
+      contest("a", { hours: [newYearsEve, newYearsEve + 4], timeZone: "Asia/Singapore" }),
+      contest("b", { hours: [newYearsEve + 36, newYearsEve + 40], timeZone: "Asia/Singapore" }),
+      contest("c", { name: "No schedule", timeZone: "Asia/Singapore" }),
+    ]);
+    expect(rows[0]?.start).toContain("04:00");
+    expect(rows[0]?.start).not.toContain("2027");
+    expect(rows[1]?.start).not.toContain("2027");
+  });
+
   it("marks a row open exactly when the intake takes reports", () => {
     const rows = contestRows(notes.map(([reason], index) => contest(String(index), { reason })));
     expect(rows.map((row) => row.open)).toEqual(notes.map(([reason]) => OPEN.has(reason)));

@@ -59,3 +59,79 @@ test("a staff member downloads the staff screens, so the patterns see them", asy
   expect(scripts.some((path) => /OrganiserDesktopConsole/.test(path))).toBe(true);
   expect(scripts.some((path) => /ContestantApp/.test(path))).toBe(false);
 });
+
+// A contestant who types /site or /event gets the staff screen of that page, because
+// the page asks the server before it decides. The queue is the page that a contestant
+// opens for any address that the contestant cannot use, as for /administration.
+for (const path of ["/site", "/event", `/event/${randomUUID()}`]) {
+  test(`a contestant who types ${path.replace(/[0-9a-f-]{36}/u, "<id>")} downloads no staff screen and lands on the queue`, async ({ page, local }) => {
+    await seatThreeContests(local, { next: "Alpha", ended: "Delta", running: "Charlie" });
+    await signIn(page, "contestant");
+    const scripts = watchScripts(page);
+    await page.goto(path);
+    await expect.soft(page).toHaveURL((url) => url.pathname === "/issues");
+    await expect(page.getByRole("heading", { name: "Your reports" })).toBeVisible();
+    expect(scripts.some((script) => /ContestantApp/.test(script)), "the contestant screen was recorded").toBe(true);
+    expect(scripts.filter(isStaffScreen)).toEqual([]);
+  });
+}
+
+// The first read of the contest list tells a contestant from a webmaster or an event admin.
+// Until it ends, the page shows the wait and downloads nothing, whoever the person is.
+const levelScreens = /\/(EventConsole|SiteDashboard)[.-]/;
+
+/** Holds every read of the contest list until `release` is called. */
+async function holdContestList(page: Page) {
+  let release: () => void = () => undefined;
+  const held = new Promise<void>((resolve) => (release = resolve));
+  await page.route("**/api/contests*", async (route) => {
+    await held;
+    await route.fallback();
+  });
+  return release;
+}
+
+test.describe("a webmaster", () => {
+  test.use({ webmaster: "admin", withEventAdmin: false });
+
+  test("who reloads /site waits for the contest list and then reaches the page", async ({ page, local }) => {
+    expect(await local.rows("SELECT 1 FROM grants WHERE scope = 'site' AND account_id = ?", local.users.admin)).toHaveLength(1);
+    await page.goto("/sign-in");
+    await page.getByRole("button", { name: "Site sign-in", exact: true }).click();
+    await page.getByLabel("Username", { exact: true }).fill("admin");
+    await page.getByLabel("Password", { exact: true }).fill("fixture-password");
+    await page.getByRole("button", { name: "Sign in", exact: true }).click();
+    await expect(page.locator('[data-ui="organiser-desktop"], [data-ui="organiser-phone"]')).toBeVisible({ timeout: 15_000 });
+    const release = await holdContestList(page);
+    const scripts = watchScripts(page);
+    await page.goto("/site");
+    await expect(page.getByRole("status").filter({ hasText: "Loading…" })).toBeVisible();
+    expect(new URL(page.url()).pathname).toBe("/site");
+    expect(scripts.filter((script) => levelScreens.test(script))).toEqual([]);
+    release();
+    await expect(page.getByRole("heading", { level: 1, name: "Site" })).toBeVisible();
+    expect(new URL(page.url()).pathname).toBe("/site");
+  });
+});
+
+test.describe("an event admin", () => {
+  test.use({ withEventAdmin: true });
+
+  test("who reloads /event waits for the contest list and then reaches the console", async ({ page, local }) => {
+    expect(await local.rows("SELECT 1 FROM grants WHERE scope = 'event' AND account_id = ?", local.eventAdmin)).toHaveLength(1);
+    await page.goto("/sign-in");
+    await page.getByLabel("Username", { exact: true }).fill("eventadmin");
+    await page.getByLabel("Password", { exact: true }).fill("fixture-password");
+    await page.getByRole("button", { name: "Sign in", exact: true }).click();
+    await expect(page.locator('[data-ui="organiser-desktop"], [data-ui="organiser-phone"]')).toBeVisible({ timeout: 15_000 });
+    const release = await holdContestList(page);
+    const scripts = watchScripts(page);
+    await page.goto("/event");
+    await expect(page.getByRole("status").filter({ hasText: "Loading…" })).toBeVisible();
+    expect(new URL(page.url()).pathname).toBe("/event");
+    expect(scripts.filter((script) => levelScreens.test(script))).toEqual([]);
+    release();
+    await expect(page.getByRole("heading", { level: 1, name: "Jury verification" })).toBeVisible();
+    expect(new URL(page.url()).pathname).toBe("/event");
+  });
+});

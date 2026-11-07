@@ -508,9 +508,11 @@ function Events({ site, state }: { site: SiteOverview; state: SiteState }) {
   const [creating, setCreating] = useState(false);
   const [credentials, setCredentials] = useState<(Credentials & { eventName: string }) | undefined>();
   const [notice, setNotice] = useState("");
-  const [deleting, setDeleting] = useState<SiteEvent | undefined>();
-  // The deleted event's row, which opened the dialog, is gone. So focus moves to its progress.
-  const deleted = useRef(false);
+  const [deletingId, setDeletingId] = useState<string | undefined>();
+  // Read from the site on each render, so the dialog shows a rename. It closes when the event leaves the list.
+  const deleting = site.events.find((item) => item.id === deletingId);
+  // Outlives the dialog, because focus moves after it closes. A reload can close it before its own command returns.
+  const openedId = useRef<string | undefined>(undefined);
   return (
     <SiteCard
       title={`Events · ${site.events.length}`}
@@ -553,7 +555,8 @@ function Events({ site, state }: { site: SiteOverview; state: SiteState }) {
                   aria-label={`Delete ${deletionConfirmation(item).text}`}
                   onClick={() => {
                     state.clearError();
-                    setDeleting(item);
+                    openedId.current = item.id;
+                    setDeletingId(item.id);
                   }}
                 >
                   <Trash2 aria-hidden="true" />
@@ -573,11 +576,11 @@ function Events({ site, state }: { site: SiteOverview; state: SiteState }) {
         error={state.error}
         onOpenChange={(open) => {
           // The dialog stays open while its request runs, so its outcome closes it and places focus.
-          if (!open && !state.busy) setDeleting(undefined);
+          if (!open && !state.busy) setDeletingId(undefined);
         }}
         onCloseAutoFocus={(event) => {
-          if (!deleted.current) return;
-          deleted.current = false;
+          // The row that opened the dialog is gone, whoever deleted the event. So focus moves to its progress.
+          if (!site.deletions.some((deletion) => deletion.eventId === openedId.current)) return;
           event.preventDefault();
           document.getElementById(deletionsHeadingId)?.focus();
         }}
@@ -586,8 +589,7 @@ function Events({ site, state }: { site: SiteOverview; state: SiteState }) {
           const receipt = await state.execute({ type: "delete_event", eventId: deleting.id, confirmName });
           if (!receipt) return;
           setNotice(`Deleting ${deletionConfirmation(deleting).text}. Its progress is under Deletions.`);
-          deleted.current = true;
-          setDeleting(undefined);
+          setDeletingId(undefined);
         }}
       />
       <CreateEvent

@@ -216,8 +216,7 @@ test.describe('deleting an event', () => {
     await openSite(page);
     await page.getByRole('button', { name: `Delete ${name}`, exact: true }).click();
     const dialog = page.getByRole('dialog', { name: `Delete ${name}?` });
-    const typed = dialog.getByLabel('Type the event name to confirm');
-    await typed.fill(name);
+    await dialog.getByLabel('Type the event name to confirm').fill(name);
     await local.manage(local.users.admin, { type: 'update_event', eventId: eventId ?? '', name: renamed, code, timeZone: 'UTC' });
     await dialog.getByRole('button', { name: 'Delete event', exact: true }).click();
     const after = page.getByRole('dialog', { name: `Delete ${renamed}?` });
@@ -225,7 +224,7 @@ test.describe('deleting an event', () => {
     await expect(after.getByText(`The name is: ${renamed}`, { exact: true })).toBeVisible();
     const confirm = after.getByRole('button', { name: 'Delete event', exact: true });
     await expect(confirm).toBeDisabled();
-    await typed.fill(renamed);
+    await after.getByLabel('Type the event name to confirm').fill(renamed);
     await confirm.click();
     await expect(after).toHaveCount(0);
     await expect(page.getByRole('heading', { name: /^Deletions/ })).toBeFocused();

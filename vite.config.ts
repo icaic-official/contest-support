@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { statfsSync } from "node:fs";
+import { accessSync, constants, statfsSync } from "node:fs";
 import { fileURLToPath, URL } from "node:url";
 import { defineConfig } from "vitest/config";
 import { BaseSequencer, type TestSpecification } from "vitest/node";
@@ -20,12 +20,14 @@ class SlowFirstSequencer extends BaseSequencer {
   }
 }
 
-// A local D1 database lives in SQLite files under the temp directory, and each commit waits for
-// the disk. A process that writes to the same disk makes that wait longer.
-// A full run holds about 50 MB at its peak, so use tmpfs only when it has 512 MiB free.
+// A local D1 database lives in SQLite files under the temp directory, and each commit writes to
+// that disk. A process that writes to the same disk slows the commits.
+// A full run holds about 50 MB at its peak, so use tmpfs only when this process can write to it
+// and it has 512 MiB free. A read-only mount has free space that no test can use.
 function memoryTempDirectory(): string | undefined {
   if (process.env.TMPDIR) return undefined;
   try {
+    accessSync("/dev/shm", constants.W_OK);
     const { bavail, bsize } = statfsSync("/dev/shm");
     return bavail * bsize >= 512 * 1024 * 1024 ? "/dev/shm" : undefined;
   } catch {

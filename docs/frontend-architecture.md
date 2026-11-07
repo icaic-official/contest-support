@@ -108,13 +108,14 @@ The desktop console and the contestant app change the password in place, in the 
 
 ### The contest in the address
 
-A person with more than one contest has `?contest=<contest ID>` in the address.
-A person with one contest has no such parameter.
+Minsky writes `?contest=<contest ID>` to the address only for a person with more than one contest.
+A person with one contest gets no parameter from Minsky. A used tab or an old link can still carry a stale one, and that stale value stays in the address.
 The hook that holds the selection, `useSessionSnapshot`, is the only authority over the contest. The address never decides it.
 
-- **Read.** The hook reads `?contest=` once, when it starts. Its first read opens that contest only if the contest is in the list. Otherwise it opens the contest that takes reports now, or the next one. `defaultContest` in `src/connected/contestList.ts` makes that choice. An unlisted or malformed value never reaches a snapshot read or the live channel. The hook forgets the value after the first read succeeds. A failed first read keeps it, so a retry still uses it. A later loss of access then falls back to the default contest.
+- **Read.** The hook reads `?contest=` once, when it starts. Its first read opens that contest only if the contest is in the list. Otherwise it opens the contest that takes reports now, or the next one. `defaultContest` in `src/connected/contestList.ts` makes that choice. An unlisted or malformed value never reaches a snapshot read or the live channel. The hook forgets the value after the first read succeeds. A failed first read keeps it, so a retry still uses it. A later loss of access then falls back to the default contest. If the list arrives and only the snapshot read fails, the hook still publishes the list and the contest that it chose. The no-access screen then shows the picker, so the person can leave that contest.
 - **Write.** After each change of contest, an effect copies the choice to the address. It uses `navigate` with `replace`, so it adds no history entry. It keeps the hash, the router state and every other parameter. The account page needs the hash and the state to place focus.
-- **Links.** A link or a redirect inside the app drops the parameter. The effect writes it again. Browser Back and Forward keep the current contest. The effect writes it to the address that they restore.
+- **Navigation in flight.** `BrowserRouter` renders a navigation in a transition, after `history` has written it. While the rendered path or search differs from `window.location`, the effect writes nothing, because a replace from the older location would overwrite the new entry. The effect runs again when the new location commits. It does not compare the hash, because the skip link writes `#main` without the router. Only a production build shows the race with `<Navigate>`, because development StrictMode runs that effect a second time. `npm run test:connector:ui:local` checks those redirects on a production build.
+- **Links.** A link or a redirect inside the app drops the parameter. The effect writes it to the new address when the navigation commits. Browser Back and Forward keep the current contest in the same way. The phone password form keeps the search itself, because it unmounts the hook.
 - **Never removed.** The hook does not remove the parameter. A stale value is harmless, because the next load checks it against the list.
 
 Route checks wait for a loaded snapshot with current membership.
@@ -189,13 +190,17 @@ Use these values in every UI so that the text stays the same.
 `src/connected/contestList.ts` holds the rules. They use no React, so the hook can use them too.
 
 - `orderContests` sorts by start time, then by ID. A contest with no schedule comes last, by name, then ID. `useSessionSnapshot` applies it once, so every consumer sees one order.
-- `contestRows` gives each row a name, a start time and a note. The name has the event name only when another listed contest has the same name. The start time is in the event's time zone. It gets a zone label only when the listed contests span more than one zone. A contest with no schedule has no start time.
-- The note comes from `intake.reason` of the contest list. The browser uses no clock for it. The list reads again at least every 60 seconds, so the note can be that old.
+- `defaultContest` chooses the contest to open when the person has chosen none. Among contests with an open intake, it takes the first `running`, then the first `grace`, then the first with any other open reason. Otherwise it takes the first scheduled contest that has not ended and whose `endsAt` is after now. A contest that staff hold closed or that waits for passwords stays eligible during its window, and a past one does not, because those reasons never expire. Otherwise it takes the scheduled contest with the latest `endsAt`, then the first listed.
+- The hook passes `Date.now() + clockOffset.current` to `defaultContest`. This default is the only use of a clock in these rules. The offset comes from a snapshot, so it is 0 on the first read, and the first default uses the device clock. A wrong device clock can open another contest first, and it changes no permission.
+- `contestRows` gives each row a name, a start time and a note. The name has the event name only when another listed contest has the same name. The start time is in the event's time zone. It gets a zone label only when the listed contests span more than one zone. It gets the year only when the listed contests start in more than one calendar year in their events' zones. A contest with no schedule has no start time.
+- The note comes from `intake.reason` of the contest list. The browser uses no clock for it. While the tab is visible, the list reads again at least every 60 seconds, so the note can be that old. A hidden tab skips those reads and reads once when the person returns.
 
 | `intake.reason` | Note |
 | --- | --- |
-| `running`, `grace`, `override_open` | Running now |
-| `override_closed` | Closed by staff |
+| `running` | Running now |
+| `grace` | Intake open (grace period) |
+| `override_open` | Intake open (set by staff) |
+| `override_closed` | Intake closed (set by staff) |
 | `awaiting_live_passwords` | Waiting for live passwords |
 | `ended` | Ended |
 | `before_start` | No note. The start time says it. |

@@ -28,8 +28,10 @@ If you belong to more than one, select the session:
 - **Contestants:** the session menu in the top bar.
 - **Staff:** the switcher at the top of the sidebar, or the **Me** tab on a phone.
 
-Each contest shows its start time in the event's time zone. The contest that runs now says "Running now".
-Minsky opens that contest first, or the next one. A reload keeps your choice.
+Each contest shows its start time in the event's time zone. The start time has the year only when your contests start in different years.
+A note says what the contest does now. For example, "Running now", "Intake open (grace period)", "Intake closed (set by staff)", "Waiting for live passwords", or "Ended". A contest that has not started has no note.
+
+Minsky opens the contest that takes reports now. If none does, it opens the first contest whose time has not ended, and otherwise the one that ended last. A reload keeps your choice.
 
 An account with no session membership sees no data. Ask your organizer to add you.
 

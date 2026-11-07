@@ -82,7 +82,7 @@ Anyone who can read that log can sign in as that admin. Use only fictional data 
 | `npm run typecheck` | Check TypeScript. |
 | `npm run lint` | Run ESLint. |
 | `npm run ci` | Run the Workers Builds check: installs, type checking, lint, unit tests, both builds, audits, and the Gitleaks scan. |
-| `npm test` | Run unit and script tests without cloud credentials. |
+| `npm test` | Run unit and script tests without cloud credentials. Local D1 keeps its files in `/dev/shm` when `TMPDIR` is unset and `/dev/shm` has 512 MiB free, so commits do not wait for the disk. |
 | `npm run test:d1` | Run every D1 workflow case with local emulation and current identity guards. |
 | `node scripts/rollback-check.mjs` | Run the previous release's `npm run test:d1` against this checkout's D1 migrations. The script checks out `origin/main` into a temporary Git worktree outside the repository, adds this checkout's new migration files, and installs packages there. Add `--base=<revision>` to name another previous release. It uses only temporary local resources. |
 | `npm run test:connector:runtime` | Run the complete connector through a temporary local HTTPS Worker, D1, R2, and Durable Objects. |

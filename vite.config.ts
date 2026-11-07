@@ -1,4 +1,5 @@
 import { execFileSync } from "node:child_process";
+import { statfsSync } from "node:fs";
 import { fileURLToPath, URL } from "node:url";
 import { defineConfig } from "vitest/config";
 import { BaseSequencer, type TestSpecification } from "vitest/node";
@@ -18,6 +19,20 @@ class SlowFirstSequencer extends BaseSequencer {
     return [...sorted.filter(slow), ...sorted.filter((file) => !slow(file))];
   }
 }
+
+// A local D1 database lives in SQLite files under the temp directory, and each commit waits for
+// the disk. A process that writes to the same disk makes that wait longer.
+// A full run holds about 50 MB at its peak, so use tmpfs only when it has 512 MiB free.
+function memoryTempDirectory(): string | undefined {
+  if (process.env.TMPDIR) return undefined;
+  try {
+    const { bavail, bsize } = statfsSync("/dev/shm");
+    return bavail * bsize >= 512 * 1024 * 1024 ? "/dev/shm" : undefined;
+  } catch {
+    return undefined;
+  }
+}
+const tempDirectory = memoryTempDirectory();
 
 // The footer shows this commit. Workers Builds supplies it; a local build asks git.
 function buildId(): string {
@@ -54,6 +69,7 @@ export default defineConfig({
     // Most test time waits on local Workers runtimes (each D1 call crosses the Wrangler
     // proxy, about 5 ms) and password hashing. Use every CPU instead of Vitest's default of one fewer.
     maxWorkers: "100%",
+    ...(tempDirectory ? { env: { TMPDIR: tempDirectory } } : {}),
     sequence: { sequencer: SlowFirstSequencer },
   },
 });

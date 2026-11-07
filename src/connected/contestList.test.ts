@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ContestSummary, IntakeReason } from "@/backend/contracts";
+import { keepUnchanged } from "./keepUnchanged";
 import {
   type ContestRow,
   contestLabel,
@@ -84,6 +85,12 @@ describe("orderContests", () => {
     const alpha = contest("3", { name: "Alpha" });
     const alsoBeta = contest("1", { name: "Beta" });
     expect(ids(orderContests([beta, alpha, scheduled, alsoBeta]))).toEqual(["s", "3", "1", "2"]);
+  });
+
+  it("lets a refresh with the same contests keep the list that is on screen", () => {
+    const shown = orderContests([contest("a", { hours: [0, 4] }), contest("b", { hours: [5, 9] })]);
+    const read = JSON.parse(JSON.stringify([...shown].reverse())) as ContestSummary[];
+    expect(keepUnchanged(shown, orderContests(read))).toBe(shown);
   });
 
   it("returns a new list and leaves the input as it was", () => {

@@ -230,10 +230,10 @@ export async function advanceRows(db: D1Connection, eventId: string, limit?: num
       bound(db, `INSERT INTO command_assertions (id, valid) VALUES (?, CASE WHEN EXISTS (SELECT 1 FROM sessions WHERE event_id = ?)
         OR EXISTS (SELECT 1 FROM accounts WHERE event_id = ?) THEN 0 ELSE 1 END)`, assertionId, eventId, eventId),
       // The accounts of this event took their own receipts. A webmaster's stay, and they hold command text such as a
-      // person's name. A create_event receipt names the event only in its result, and a contest command names only the
-      // contest. A UUID cannot match another event. Each delete_event receipt stays, so its replay still answers.
-      // This reads every receipt, once per deletion.
-      bound(db, `DELETE FROM manage_receipts WHERE (instr(command, ?) > 0 OR instr(result, ?) > 0
+      // person's name. Every command of an event names it in `eventId`, a create_event receipt names it in its result,
+      // and a contest command names only the contest. Only these fields decide, because a name can hold pasted text.
+      // Each delete_event receipt stays, so its replay still answers. This reads every receipt, once per deletion.
+      bound(db, `DELETE FROM manage_receipts WHERE (json_extract(command, '$.eventId') = ? OR json_extract(result, '$.eventId') = ?
           OR json_extract(command, '$.contestId') IN (SELECT id FROM event_deletion_targets WHERE event_id = ? AND kind = 'contest'))
         AND json_extract(command, '$.type') <> 'delete_event' AND ${inStep('rows')}`, eventId, eventId, eventId, eventId),
       bound(db, `DELETE FROM events WHERE id = ? AND ${inStep('rows')}`, eventId, eventId),

@@ -283,15 +283,47 @@ describe('event deletion', () => {
         await manage().execute(webmaster, randomUUID(), { type: 'update_contest', contestId: contestId!, name: `Renamed ${person}`, contestType: 'teams' });
         return { eventId: eventId!, name, contestId: contestId! };
       };
+      // A Record, so that a new command must name itself here and show that its receipt goes.
+      const everyOtherCommand = async ({ eventId, contestId }: { eventId: string; contestId: string }, person: string): Promise<void> => {
+        const send = (command: ManageCommand) => manage().execute(webmaster, randomUUID(), command);
+        const tag = randomUUID().slice(0, 8);
+        const staff = (await send({ type: 'create_people', eventId, people: [{ handle: `staff-${tag}` as Handle, name: person }] })).accountIds![0]!;
+        const entrantId = (await send({ type: 'create_entrants', eventId, entrants: [{ kind: 'team', name: person, handle: `team-${tag}` as Handle }] })).entrantIds![0]!;
+        const noSignIn = randomUUID();
+        await bound(db, `INSERT INTO entrants (id, event_id, kind, name) VALUES (?, ?, 'team', 'Legacy team')`, noSignIn, eventId).run();
+        const rest: Record<Exclude<ManageCommand['type'], 'add_webmaster' | 'remove_webmaster' | 'set_webmaster_reads' | 'delete_event' | 'create_event' | 'create_people' | 'create_entrants' | 'create_contest' | 'update_contest' | 'join_contest'>, ManageCommand> = {
+          update_event: { type: 'update_event', eventId, name: `Receipts ${tag}`, code: `r-${tag}`, timeZone: 'UTC' },
+          rename_entrant: { type: 'rename_entrant', eventId, entrantId, name: `${person} two` },
+          add_entrant_sign_in: { type: 'add_entrant_sign_in', eventId, entrantId: noSignIn, handle: `second-${tag}` as Handle },
+          assign_entrants: { type: 'assign_entrants', contestId, entries: [{ entrantId, location: person }] },
+          set_location: { type: 'set_location', contestId, entrantId, location: `${person} two` },
+          assign_staff: { type: 'assign_staff', contestId, accountId: staff, admin: true, roles: ['volunteer'] },
+          set_event_admin: { type: 'set_event_admin', eventId, accountId: staff, admin: true },
+          set_intake: { type: 'set_intake', contestId, mode: 'open' },
+          set_image_limits: { type: 'set_image_limits', contestId, fileMegabytes: 1, count: 1, totalMegabytes: 2 },
+          set_categories: { type: 'set_categories', contestId, categories: [person] },
+          set_handle: { type: 'set_handle', eventId, accountId: staff, handle: `renamed-${tag}` as Handle },
+          unassign_staff: { type: 'unassign_staff', contestId, accountId: staff },
+          unassign_entrant: { type: 'unassign_entrant', contestId, entrantId },
+        };
+        for (const command of Object.values(rest)) await send(command);
+        // A webmaster joins only while the site setting is on, and these test files run one at a time.
+        await send({ type: 'set_webmaster_reads', restricted: true });
+        await send({ type: 'join_contest', contestId });
+        await send({ type: 'set_webmaster_reads', restricted: false });
+        await manage().issueCredentials(webmaster, randomUUID(), { eventId, accountIds: [staff], contestId: null, voidLivePasswords: false });
+      };
       const receiptsNaming = (...ids: string[]) => rows(`SELECT actor, request_id, command, result, at FROM manage_receipts
         WHERE ${ids.map(() => '(instr(command, ?) > 0 OR instr(result, ?) > 0)').join(' OR ')} ORDER BY request_id`, ...ids.flatMap((id) => [id, id]));
       const doomed = await createEvent('Fictional Secret Person');
+      await everyOtherCommand(doomed, 'Fictional Secret Person');
+      const doomedName = (await rows<{ name: string }>('SELECT name FROM events WHERE id = ?', doomed.eventId))[0]!.name;
       const kept = await createEvent('Fictional Kept Person');
       const keptBefore = await receiptsNaming(kept.eventId, kept.contestId);
       expect(keptBefore.length).toBeGreaterThanOrEqual(4);
 
       const requestId = randomUUID();
-      const remove: ManageCommand = { type: 'delete_event', eventId: doomed.eventId, confirmName: doomed.name };
+      const remove: ManageCommand = { type: 'delete_event', eventId: doomed.eventId, confirmName: doomedName };
       await manage().execute(webmaster, requestId, remove);
       expect(await deleteRows(db, doomed)).toBe('rows_done');
 
@@ -995,7 +1027,7 @@ describe('event deletion', () => {
       for (const [sql, values] of recorded) {
         const plan = await bound(db, `EXPLAIN QUERY PLAN ${sql}`, ...values).all<{ detail: string }>();
         for (const { detail } of plan.results) {
-          // A scan of the installation table reads its one row. The receipts are matched by text, once per deletion.
+          // A scan of the installation table reads its one row. The receipts are matched by their fields, once per deletion.
           if (/^SCAN /.test(detail) && !/^SCAN (?:CONSTANT ROW|\(subquery-\d+\)|json_each|installation\b|manage_receipts\b)/.test(detail)) {
             scans.push(`${detail}: ${sql.replace(/\s+/g, ' ').slice(0, 90)}`);
           }

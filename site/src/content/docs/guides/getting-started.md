@@ -22,16 +22,17 @@ Teams share one account. Each staff member has a personal account, so the histor
 
 ## Choose a session
 
-Each session has its own teams, issues, and awards.
+Each session is one contest. It has its own teams, issues, and awards.
 If you belong to more than one, select the session:
 
 - **Contestants:** the session menu in the top bar.
 - **Staff:** the switcher at the top of the sidebar, or the **Me** tab on a phone.
 
-Each contest shows its start time in the event's time zone. The start time has the year only when your contests start in different years.
-A note says what the contest does now, such as "Running now", "Intake open (grace period)", "Intake closed (set by staff)", "Waiting for live passwords", or "Ended". A contest that has not started has no note.
+The list shows the sessions in the order of their start times. A session with a schedule shows its start time in the event's time zone. The start time has the year only when your sessions start in different years.
 
-Minsky opens the contest that takes reports now. If none does, it opens the first contest whose time has not ended, and otherwise the one that ended last. A reload keeps your choice.
+Intake is the time when contestants can send new reports. A note under the name says what the session does now: "Running now", "Intake open (grace period)", "Intake open (set by staff)", "Intake closed (set by staff)", "Waiting for live passwords", or "Ended". A session that follows its schedule and has not started has no note, because its start time says it.
+
+Minsky opens the session whose intake is open. If no intake is open, it opens the first session that has not ended. If every session has ended, it opens the one that ended last. A reload keeps your choice.
 
 An account with no session membership sees no data. Ask your organizer to add you.
 

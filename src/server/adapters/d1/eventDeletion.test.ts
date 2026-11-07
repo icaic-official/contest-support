@@ -415,6 +415,38 @@ describe('event deletion', () => {
     });
   });
 
+  describe('a stale live runner', () => {
+    it('stops erasing once the step has moved', async () => {
+      const event = await seedEvent(db, webmaster);
+      const { bucket, live, env } = stores();
+      fillStores(event, bucket, live);
+      await fence(db, event);
+      await deleteRows(db, event);
+      let entered: () => void = () => undefined;
+      let release: () => void = () => undefined;
+      const atRead = new Promise<void>((resolve) => { entered = resolve; });
+      const released = new Promise<void>((resolve) => { release = resolve; });
+      let paused = false;
+      const holding = interceptCalls(db, async (sql) => {
+        if (!paused && sql.some((text) => text.includes("kind = 'contest' AND done = 0"))) {
+          paused = true;
+          entered();
+          await released;
+        }
+      });
+      const counter = crashingEnvironment({ ...env, DB: holding }, Number.MAX_SAFE_INTEGER, 'never ran');
+      const running = advanceDeletions(counter.env);
+      await atRead;
+      await passTime(event);
+      await advanceDeletions(env);
+      release();
+      await running;
+      expect(counter.calls()).toBeLessThan(12);
+      await runToEnd(env, event);
+      await forget(event);
+    });
+  });
+
   describe('the live step', () => {
     it('refuses to erase a contest that exists, or that no journal names', async () => {
       const event = await seedEvent(db, webmaster);

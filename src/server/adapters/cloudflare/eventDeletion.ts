@@ -6,10 +6,10 @@ import { eraseLiveContest, type LiveNamespace } from './live';
 import { logEvent } from './log';
 
 /** Issues per statement and accounts per batch in the rows step. */
-export const DELETE_CHUNK = 100;
+const DELETE_CHUNK = 100;
 
 /** A blocked deletion looks again after this time, because another event's deletion can clear it. */
-export const BLOCKED_RETRY_SECONDS = 3600;
+const BLOCKED_RETRY_SECONDS = 3600;
 
 const NOW_SQL = "strftime('%Y-%m-%dT%H:%M:%fZ', 'now')";
 
@@ -191,7 +191,7 @@ export const DELETION_BUDGET = { milliseconds: 20_000, calls: 400 } as const;
 const LEASE_SECONDS = 55;
 // An issue image reservation lives 3,600 seconds. A later upload's Worker has died by then.
 const FILES_WAIT_SECONDS = 3900;
-export const DELETIONS_SHOWN = 50;
+const DELETIONS_SHOWN = 50;
 const TARGET_PAGE = 50;
 const LIST_LIMIT = 1000;
 
@@ -247,8 +247,9 @@ const deleteRows: StepHandler = async ({ env, eventId, budget }) => {
 const eraseLiveState: StepHandler = async ({ env, eventId, budget }) => {
   for (;;) {
     budget.spend();
+    // A runner whose lease expired finds nothing here once the step has moved, and it stops erasing.
     const { results } = await bound(env.DB, `SELECT id FROM event_deletion_targets
-      WHERE event_id = ? AND kind = 'contest' AND done = 0 ORDER BY id LIMIT ?`, eventId, TARGET_PAGE).all<{ id: string }>();
+      WHERE event_id = ? AND kind = 'contest' AND done = 0 AND ${inStep('live')} ORDER BY id LIMIT ?`, eventId, eventId, TARGET_PAGE).all<{ id: string }>();
     if (results.length === 0) break;
     const erased: string[] = [];
     for (const { id } of results) {

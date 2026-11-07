@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
-import type { Page } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
 import { contrastOf } from "./support/contrast";
-import { endRunningContest, seatThreeContests } from "./support/contests";
+import { addLaterContest, endRunningContest, seatThreeContests } from "./support/contests";
 import { type LocalWorker, expect, test } from "./support/localWorker";
 
 // The contestant sees three contests. One starts in 2031, one ended in 2020,
@@ -20,6 +20,8 @@ async function signIn(page: Page, username = "contestant") {
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await expect(page.getByText("Live", { exact: true })).toBeVisible({ timeout: 15_000 });
 }
+
+const focusEvent = (page: Page) => page.evaluate(() => window.dispatchEvent(new Event("focus")));
 
 const trigger = (page: Page) =>
   page.getByRole("button", { name: /^Contest session: .* Change session$/ });
@@ -70,9 +72,13 @@ test.describe("a contestant with several contests", () => {
     expect(new Set(reads.snapshots)).toEqual(new Set([ids.running]));
   });
 
+  // The 2032 contest ends later than the 2031 one. The rule for the next contest
+  // opens the earlier of the two, so a rule that picks the contest that ends last
+  // opens Yankee and fails these two tests.
   test("opens the next contest when none runs", async ({ page, local }) => {
     const ids = await seatThreeContests(local, { next: "Mike", ended: "Alpha", running: "Zulu" });
     await endRunningContest(local, ids.running);
+    await addLaterContest(local, "Yankee");
     await signIn(page);
     await expect(triggerFor(page, "Mike")).toBeVisible();
     await at(page, "/issues", ids.next);
@@ -82,6 +88,7 @@ test.describe("a contestant with several contests", () => {
     const ids = await seatThreeContests(local, { next: "Mike", ended: "Alpha", running: "Zulu" });
     await endRunningContest(local, ids.running);
     await local.run("UPDATE sessions SET intake_follows_schedule = 0, intake_open = 0 WHERE id = ?", ids.ended);
+    await addLaterContest(local, "Yankee");
     await signIn(page);
     await expect(triggerFor(page, "Mike")).toBeVisible();
     await at(page, "/issues", ids.next);
@@ -110,6 +117,54 @@ test.describe("a contestant with several contests", () => {
     await page.goto(`/issues?contest=${ids.ended}`);
     await expect(triggerFor(page, "Delta")).toBeVisible();
     expect(new Set(reads.snapshots)).toEqual(new Set([ids.ended]));
+  });
+
+  test("falls back to the default contest when the chosen contest is lost, not to the one that the address named", async ({ page, local }) => {
+    const ids = await three(local);
+    await signIn(page);
+    await page.goto(`/issues?contest=${ids.ended}`);
+    await expect(triggerFor(page, "Delta")).toBeVisible();
+    await choose(page, "Alpha");
+    await at(page, "/issues", ids.next);
+    await local.run("DELETE FROM memberships WHERE session_id = ? AND account_id = ?", ids.next, local.users.contestant);
+    await focusEvent(page);
+    await expect(triggerFor(page, "Charlie")).toBeVisible();
+    await at(page, "/issues", ids.running);
+  });
+
+  test("keeps another parameter of the address when it writes the contest", async ({ page, local }) => {
+    const ids = await three(local);
+    await signIn(page);
+    await page.goto("/issues?utm=1");
+    await expect(page).toHaveURL(
+      (url) =>
+        url.pathname === "/issues" &&
+        url.searchParams.get("utm") === "1" &&
+        url.searchParams.get("contest") === ids.running,
+    );
+  });
+
+  test("takes the server clock, not a device clock that runs behind, when a lost contest sends the person to the default", async ({ page, local }) => {
+    // The device clock runs two hours behind the server.
+    await page.addInitScript(() => {
+      const deviceNow = Date.now;
+      Date.now = () => deviceNow() - 2 * 3_600_000;
+    });
+    const ids = await three(local);
+    // Staff hold Delta closed. It ended one hour ago by the server clock, and
+    // one hour ahead by the device clock.
+    await local.run(
+      `UPDATE sessions SET intake_follows_schedule = 0, intake_open = 0,
+         starts_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-3 hours'),
+         ends_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-1 hours') WHERE id = ?`,
+      ids.ended,
+    );
+    await signIn(page);
+    await expect(triggerFor(page, "Charlie")).toBeVisible();
+    await local.run("DELETE FROM memberships WHERE session_id = ? AND account_id = ?", ids.running, local.users.contestant);
+    await focusEvent(page);
+    await expect(triggerFor(page, "Alpha")).toBeVisible();
+    await at(page, "/issues", ids.next);
   });
 
   test("keeps the contest when the person goes to another page and back", async ({ page, local }) => {
@@ -219,7 +274,7 @@ test.describe("a staff member with several contests", () => {
     await expect(page.getByRole("heading", { name: "Award review", exact: true })).toBeVisible();
     await local.run("DELETE FROM membership_roles WHERE session_id = ? AND account_id = ?", ids.next, local.users.jury);
     await local.run("DELETE FROM memberships WHERE session_id = ? AND account_id = ?", ids.next, local.users.jury);
-    await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+    await focusEvent(page);
     await at(page, "/issues", ids.running);
     await expect(page.locator('[data-ui="organiser-desktop"]')).toBeVisible();
   });
@@ -308,6 +363,16 @@ test.describe("the rows of the picker", () => {
     await expect(menu.getByText("Running now")).toHaveCount(1);
   });
 
+  test("set the second line of a contest that takes reports in a heavier weight", async ({ page, local }) => {
+    await three(local);
+    await signIn(page);
+    await trigger(page).click();
+    const items = page.getByRole("menuitemradio");
+    const weight = (item: Locator, line: RegExp) =>
+      item.getByText(line).evaluate((element) => Number(getComputedStyle(element).fontWeight));
+    expect(await weight(items.nth(1), /· Running now$/)).toBeGreaterThan(await weight(items.nth(0), /· Ended$/));
+  });
+
   test("say Running now only for the contest that runs", async ({ page, local }) => {
     const ids = await three(local);
     await local.run("UPDATE sessions SET intake_follows_schedule = 0, intake_open = 1 WHERE id = ?", ids.ended);
@@ -392,7 +457,7 @@ test.describe("the rows of the picker", () => {
     await at(page, "/issues", ids.next);
   });
 
-  test("move through the phone radio rows with the arrow keys", async ({ page, local }) => {
+  test("choose the next phone radio row with the arrow key", async ({ page, local }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     const ids = await three(local);
     await signIn(page, "jury");
@@ -404,7 +469,7 @@ test.describe("the rows of the picker", () => {
     await at(page, "/account", ids.next);
   });
 
-  test("move through the select of the no-access screen with the arrow keys", async ({ page, local }) => {
+  test("choose the next contest in the select of the no-access screen with the arrow key", async ({ page, local }) => {
     const ids = await three(local);
     await signIn(page);
     await page.route("**/api/snapshot*", (route) => route.fulfill({ status: 500, json: { error: "Unavailable." } }));

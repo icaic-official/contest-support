@@ -64,3 +64,26 @@ export async function endRunningContest(local: LocalWorker, contestId: string, a
     contestId,
   );
 }
+
+/**
+ * Adds a contest that starts in 2032, after every contest that `seatThreeContests`
+ * makes, and seats the contestant in it. It has not started, so its intake is
+ * closed, and it ends later than any other contest.
+ */
+export async function addLaterContest(local: LocalWorker, name: string) {
+  const id = randomUUID();
+  await local.run(
+    `INSERT INTO sessions (id, event_id, name, intake_open, starts_at, ends_at, grace_minutes, intake_follows_schedule)
+     VALUES (?, ?, ?, 0, '2032-03-04T13:00:00.000Z', '2032-03-04T17:00:00.000Z', 0, 1)`,
+    id,
+    local.event,
+    name,
+  );
+  await local.run(
+    "INSERT INTO teams (id, session_id, name, location, entrant_id) VALUES (?, ?, 'Aurora', 'A12', ?)",
+    randomUUID(),
+    id,
+    local.teams[0],
+  );
+  return id;
+}

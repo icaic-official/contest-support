@@ -73,10 +73,18 @@ describe("orderContests", () => {
     expect(ids(orderContests([second, first]))).toEqual(["1", "2"]);
   });
 
-  it("compares instants, not text, when two zones format the start differently", () => {
-    const earlier = contest("a", { hours: [0, 4], timeZone: "Asia/Singapore" });
-    const later = contest("b", { hours: [1, 5], timeZone: "America/New_York" });
-    expect(ids(orderContests([later, earlier]))).toEqual(["a", "b"]);
+  it("compares instants, not text, when the offsets of two starts reverse their text order", () => {
+    const schedule = (startsAt: string, endsAt: string) => ({ startsAt, endsAt, graceMinutes: 0 });
+    // 20:00+08:00 is 12:00Z, an earlier instant than 14:00Z, but its text sorts after.
+    const earlier = {
+      ...contest("z", { timeZone: "Asia/Singapore" }),
+      schedule: schedule("2026-11-03T20:00:00+08:00", "2026-11-03T22:00:00+08:00"),
+    };
+    const later = {
+      ...contest("a", { timeZone: "America/New_York" }),
+      schedule: schedule("2026-11-03T14:00:00.000Z", "2026-11-03T16:00:00.000Z"),
+    };
+    expect(ids(orderContests([later, earlier]))).toEqual(["z", "a"]);
   });
 
   it("puts a contest with no schedule after every scheduled one, by name and then ID", () => {
@@ -186,6 +194,14 @@ describe("defaultContest", () => {
       expect(defaultContest(list, base)?.id).toBe("next");
     },
   );
+
+  it("skips a contest that the server calls ended, although a device clock that runs behind puts its end ahead", () => {
+    const list = orderContests([
+      contest("past", { hours: [-30, -26], reason: "ended" }),
+      contest("next", { hours: [24, 28] }),
+    ]);
+    expect(defaultContest(list, base - 100 * hour)?.id).toBe("next");
+  });
 
   it("treats a window that ends exactly now as past", () => {
     const list = orderContests([

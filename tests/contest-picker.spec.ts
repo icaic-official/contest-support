@@ -164,8 +164,9 @@ test.describe("a contestant with several contests", () => {
   // held, the page has the new list but not yet the new contest. The list that the
   // page gets omits the open contest from the moment of the loss, so a read that the
   // live connection started earlier still ends with the open contest and its snapshot.
-  // The hold takes only the read of the contest that the person falls back to.
-  test("marks one contest as open while the snapshot of the next contest loads after the open one is lost", async ({ page, local }) => {
+  // The page still shows the data of the open contest, so the picker still lists it
+  // and marks it. The hold takes only the read of the contest that the person falls back to.
+  test("marks the open contest while the snapshot of the next contest loads after the open one is lost", async ({ page, local }) => {
     const ids = await three(local);
     let listed: Array<{ id: string }> = [];
     page.on("response", async (response) => {
@@ -177,23 +178,17 @@ test.describe("a contestant with several contests", () => {
     let lost = false;
     await page.route("**/api/contests*", (route) =>
       lost ? route.fulfill({ json: listed.filter(({ id }) => id !== ids.running) }) : route.fallback());
-    let held = 0;
-    let release: () => void = () => undefined;
-    const released = new Promise<void>((resolve) => (release = resolve));
-    await page.route("**/api/snapshot*", async (route) => {
-      if (new URL(route.request().url()).searchParams.get("sessionId") !== ids.next) return route.fallback();
-      held++;
-      await released;
-      await route.fallback();
-    });
+    const reads = await holdSnapshotReads(page, ids.next);
     lost = true;
     await focusEvent(page);
-    await expect.poll(() => held).toBeGreaterThan(0);
+    await expect.poll(reads.held).toBeGreaterThan(0);
     await settle(page);
     await trigger(page).click();
-    await expect(page.getByRole("menu").getByRole("menuitemradio", { checked: true })).toHaveCount(1);
+    const menu = page.getByRole("menu");
+    await expect(menu.getByRole("menuitemradio")).toHaveCount(3);
+    await expect(menu.getByRole("menuitemradio", { checked: true })).toHaveAccessibleName(/^Charlie/);
     await page.keyboard.press("Escape");
-    release();
+    reads.release();
     await expect(triggerFor(page, "Alpha")).toBeVisible();
     await at(page, "/issues", ids.next);
   });

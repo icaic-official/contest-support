@@ -193,6 +193,35 @@ test.describe("a contestant with several contests", () => {
     await at(page, "/issues", ids.next);
   });
 
+  // A read that keeps the open contest publishes its list before its snapshot, so a
+  // row that changed does not wait for a slow snapshot read. A read that began before
+  // the change must not hold the queue, so the hold starts with the first list that
+  // carries the change.
+  test("shows a changed note of a contest while the snapshot of the open contest loads", async ({ page, local }) => {
+    const ids = await three(local);
+    await signIn(page);
+    await at(page, "/issues", ids.running);
+    let changed = false;
+    let reads: Awaited<ReturnType<typeof holdSnapshotReads>> | undefined;
+    await page.route("**/api/contests*", async (route) => {
+      if (changed) reads ??= await holdSnapshotReads(page, ids.running);
+      await route.fallback();
+    });
+    await local.run("UPDATE sessions SET intake_follows_schedule = 0, intake_open = 1 WHERE id = ?", ids.ended);
+    changed = true;
+    await focusEvent(page);
+    await expect.poll(() => reads?.held() ?? 0).toBeGreaterThan(0);
+    await trigger(page).click();
+    const menu = page.getByRole("menu");
+    await expect(menu.getByRole("menuitemradio").first()).toHaveAccessibleName(
+      /^Delta \S.*17:00 · Intake open \(set by staff\)$/,
+    );
+    await expect(menu.getByRole("menuitemradio", { checked: true })).toHaveAccessibleName(/^Charlie/);
+    await page.keyboard.press("Escape");
+    reads?.release();
+    await expect(trigger(page)).toBeVisible();
+  });
+
   // The person picks another contest while a list read of the open contest is in
   // flight. That read is stale when its list arrives. It must read no snapshot of
   // the contest that the person left, because the next read waits behind it.

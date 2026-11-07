@@ -82,7 +82,7 @@ function DeleteEventForm({
   return (
     <form onSubmit={submit} className="min-w-0 space-y-4">
       <DialogHeader className="text-left">
-        <DialogTitle className="pr-6 leading-snug break-words">
+        <DialogTitle className="pr-6 leading-snug break-words whitespace-pre-wrap">
           Delete {label === "name" ? text : `the unnamed event ${text}`}?
         </DialogTitle>
         <DialogDescription>
@@ -109,7 +109,7 @@ function DeleteEventForm({
           onChange={(input) => setTyped(input.target.value)}
           className="h-11"
         />
-        <p className="text-xs break-words text-muted-foreground">The {label} is: {text}</p>
+        <p className="text-xs break-words whitespace-pre-wrap text-muted-foreground">The {label} is: {text}</p>
       </div>
       <DialogFooter className="gap-2">
         <Button type="button" variant="outline" className="h-11" disabled={busy} onClick={onCancel}>

@@ -103,7 +103,7 @@ export function useSessionSnapshot(userId: string): SessionData {
           ? sessionId
           : seed !== undefined && isListed(seed)
             ? seed
-            : (defaultContest(list)?.id ?? "");
+            : (defaultContest(list, Date.now() + clockOffset.current)?.id ?? "");
         const next = nextSession
           ? await backend.workflows.snapshot(nextSession)
           : undefined;

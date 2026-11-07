@@ -44,20 +44,28 @@ function endsAt(contest: ContestSummary): number {
 }
 
 /**
- * The contest to open when the person has chosen none: the one that takes
- * reports now, else the next one, else the one that ended last. `ordered`
- * comes from `orderContests`.
+ * The contest to open when the person has chosen none. A contest that takes
+ * reports comes first: `running`, then `grace`, then any other open reason.
+ * Next comes the first scheduled contest whose window has not ended at `now`.
+ * The window decides here because a held or waiting reason never expires, so
+ * a contest from last month can still carry one. Last comes the scheduled
+ * contest that ends latest, then the first listed. `ordered` comes from
+ * `orderContests`.
  */
-export function defaultContest(ordered: readonly ContestSummary[]): ContestSummary | undefined {
-  const open = ordered.find((contest) => contest.intake.open);
-  if (open) return open;
-  const next = ordered.find((contest) => contest.schedule && contest.intake.reason !== "ended");
+export function defaultContest(ordered: readonly ContestSummary[], now: number): ContestSummary | undefined {
+  const open = ordered.filter((contest) => contest.intake.open);
+  const withReason = (reason: IntakeReason) => open.find((contest) => contest.intake.reason === reason);
+  const taking = withReason("running") ?? withReason("grace") ?? open[0];
+  if (taking) return taking;
+  const next = ordered.find(
+    (contest) => contest.schedule && contest.intake.reason !== "ended" && endsAt(contest) > now,
+  );
   if (next) return next;
-  let lastEnded: ContestSummary | undefined;
+  let latest: ContestSummary | undefined;
   for (const contest of ordered) {
-    if (contest.schedule && (!lastEnded || endsAt(contest) >= endsAt(lastEnded))) lastEnded = contest;
+    if (contest.schedule && (!latest || endsAt(contest) >= endsAt(latest))) latest = contest;
   }
-  return lastEnded ?? ordered[0];
+  return latest ?? ordered[0];
 }
 
 /** One line of the contest picker. */

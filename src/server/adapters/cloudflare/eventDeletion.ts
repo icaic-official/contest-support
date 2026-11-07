@@ -157,7 +157,7 @@ export async function advanceRows(db: D1Connection, eventId: string, limit: numb
   if (accounts.results.length > 0) return deleteAccounts(db, eventId, accounts.results.map(({ id }) => id));
   await db.batch([
     bound(db, `DELETE FROM events WHERE id = ? AND ${inStep('rows')}`, eventId, eventId),
-    bound(db, 'DELETE FROM authentication_limits WHERE key >= ? AND key < ?', `handle:${eventId}:`, `handle:${eventId};`),
+    bound(db, `DELETE FROM authentication_limits WHERE key >= ? AND key < ? AND ${inStep('rows')}`, `handle:${eventId}:`, `handle:${eventId};`, eventId),
     ...nextStepStatements(db, eventId, 'rows', 'live', `rows_done_at = ${NOW_SQL}, blocked = NULL`),
   ]);
   return 'rows_done';

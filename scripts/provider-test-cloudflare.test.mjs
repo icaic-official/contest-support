@@ -7,7 +7,7 @@ import { URL } from 'node:url';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest';
 import { getPlatformProxy } from 'wrangler';
 import { renderWranglerConfiguration } from '../src/server/adapters/cloudflare/tooling/configuration.mjs';
-import { removeFixtureEvent } from '../src/server/adapters/cloudflare/eventDeletionFixture';
+import { deleteFixtureRows, removeFixtureEvent } from '../src/server/adapters/cloudflare/eventDeletionFixture';
 import { maintainFixtureSessions, SessionLiveCoordinator } from '../src/server/adapters/cloudflare/live';
 import { avatarKey } from '../src/server/adapters/cloudflare/avatars';
 import { passwordHasher } from '../src/server/adapters/cloudflare/password';
@@ -410,6 +410,41 @@ describe('Cloudflare fixture setup and exact cleanup with real local D1/R2', () 
       // A foreign account has no event, so it stays in this local database, which the file discards.
       if (existsSync(path)) await cleanupFixture(path, dependencies());
     }
+  });
+
+  test('keeps the keys of the files when the minute cron deletes the rows just after the fence', async () => {
+    environment();
+    const path = journalPath();
+    const fixture = await createFixture(path, dependencies());
+    const [issueId, imageId, avatarId] = [randomUUID(), randomUUID(), randomUUID()];
+    const original = `${fixture.sessionId}/${issueId}/${imageId}/original`;
+    const thumbnail = `${fixture.sessionId}/${issueId}/${imageId}/thumbnail`;
+    const avatar = avatarKey(fixture.accounts.volunteer.id, avatarId);
+    await platform.env.DB.batch([
+      statement(`INSERT INTO issues (id, session_id, team_id, reporter, number, category, description, status)
+        VALUES (?, ?, ?, ?, 1, 'Other', 'Fictional fixture issue', 'open')`, issueId, fixture.sessionId, fixture.teamId, fixture.accounts.contestant.id),
+      statement(`INSERT INTO issue_images (id, session_id, issue_id, uploader, request_id, uploader_name, visibility,
+        declared_bytes, original_name, original_path, thumbnail_path) VALUES (?, ?, ?, ?, ?, 'Fixture uploader', 'public', 17, 'fictional.png', ?, ?)`,
+      imageId, fixture.sessionId, issueId, fixture.accounts.volunteer.id, randomUUID(), original, thumbnail),
+      statement(`INSERT INTO account_avatars (id, account_id, request_id, byte_size, content_type, digest, state, ready_at)
+        VALUES (?, ?, ?, 3, 'image/png', ?, 'ready', '2026-10-25T00:00:00.000Z')`, avatarId, fixture.accounts.volunteer.id, randomUUID(), 'a'.repeat(64)),
+    ]);
+    for (const key of [original, thumbnail, avatar]) await platform.env.IMAGES.put(key, new Uint8Array([1, 2, 3]));
+    let cronRan = false;
+    const cronAfterFence = dependencies({ openPlatform: async () => ({ env: { ...platform.env, DB: {
+      prepare: (sql) => platform.env.DB.prepare(sql),
+      batch: async (statements) => {
+        const results = await platform.env.DB.batch(statements);
+        if (!cronRan && await statement('SELECT 1 FROM event_deletions WHERE event_id = ?', fixture.eventId).first()) {
+          cronRan = true;
+          await deleteFixtureRows(platform.env.DB, fixture.eventId);
+        }
+        return results;
+      },
+    } }, dispose: async () => {} }) });
+    await cleanupFixture(path, cronAfterFence);
+    expect(cronRan).toBe(true);
+    for (const key of [original, thumbnail, avatar]) expect(await platform.env.IMAGES.head(key)).toBeNull();
   });
 
   test('removes exact fixture Durable Object cursors while preserving another session object', async () => {

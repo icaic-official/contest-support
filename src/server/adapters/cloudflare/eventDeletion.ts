@@ -156,9 +156,27 @@ async function tryDeleteAccounts(db: D1Connection, eventId: string, ids: readonl
   }
 }
 
-/** Earlier accounts commit one at a time, and the first that fails is the one to name. */
+/**
+ * Adds a target for each contest and account of the event that a target does not cover, and returns whether it
+ * added one. A writer that skips the guard can add rows after the fence. Without a target, such a contest would
+ * cascade away with no live erase and no file pass, and such an account would fail the event's key.
+ */
+async function reconcileTargets(db: D1Connection, eventId: string): Promise<boolean> {
+  const added = (kind: 'contest' | 'account', table: 'sessions' | 'accounts') => bound(db, `INSERT INTO event_deletion_targets (event_id, kind, id)
+    SELECT event_id, '${kind}', id FROM ${table} WHERE event_id = ? AND ${inStep('rows')}
+    ON CONFLICT (event_id, kind, id) DO UPDATE SET done = 0 WHERE done = 1 RETURNING id`, eventId, eventId);
+  // A D1 batch returns one result for each statement.
+  const results = await db.batch([added('contest', 'sessions'), added('account', 'accounts')]) as Array<{ results: unknown[] }>;
+  return results.some((result) => result.results.length > 0);
+}
+
+/**
+ * Earlier accounts commit one at a time, and the first that fails is the one to name.
+ * A contest that arrived after the fence can hold the refused row, and it goes first.
+ */
 async function deleteAccounts(db: D1Connection, eventId: string, ids: readonly string[]): Promise<RowsProgress> {
   if (await tryDeleteAccounts(db, eventId, ids)) return 'more';
+  if (await reconcileTargets(db, eventId)) return 'more';
   for (const id of ids) {
     if (!await tryDeleteAccounts(db, eventId, [id])) {
       await bound(db, `UPDATE event_deletions SET blocked = ?, lease_until = unixepoch() + ${BLOCKED_RETRY_SECONDS}
@@ -203,18 +221,29 @@ export async function advanceRows(db: D1Connection, eventId: string, limit?: num
   const accounts = await bound(db, `SELECT id FROM event_deletion_targets
     WHERE event_id = ? AND kind = 'account' AND done = 0 ORDER BY id LIMIT ?`, eventId, limit ?? DELETE_CHUNK).all<{ id: string }>();
   if (accounts.results.length > 0) return deleteAccounts(db, eventId, accounts.results.map(({ id }) => id));
-  await db.batch([
-    // The accounts of this event took their own receipts. A webmaster's stay, and they hold command text such as a
-    // person's name. A create_event receipt names the event only in its result, and a contest command names only the
-    // contest. A UUID cannot match another event. Each delete_event receipt stays, so its replay still answers.
-    // This reads every receipt, once per deletion.
-    bound(db, `DELETE FROM manage_receipts WHERE (instr(command, ?) > 0 OR instr(result, ?) > 0
-        OR json_extract(command, '$.contestId') IN (SELECT id FROM event_deletion_targets WHERE event_id = ? AND kind = 'contest'))
-      AND json_extract(command, '$.type') <> 'delete_event' AND ${inStep('rows')}`, eventId, eventId, eventId, eventId),
-    bound(db, `DELETE FROM events WHERE id = ? AND ${inStep('rows')}`, eventId, eventId),
-    bound(db, `DELETE FROM authentication_limits WHERE key >= ? AND key < ? AND ${inStep('rows')}`, `handle:${eventId}:`, `handle:${eventId};`, eventId),
-    ...nextStepStatements(db, eventId, 'rows', 'live', `rows_done_at = ${NOW_SQL}, blocked = NULL`),
-  ]);
+  if (await reconcileTargets(db, eventId)) return 'more';
+  const assertionId = crypto.randomUUID();
+  try {
+    await db.batch([
+      // A row that arrived after the reconcile fails this batch, and the next unit adds its target.
+      bound(db, `INSERT INTO command_assertions (id, valid) VALUES (?, CASE WHEN EXISTS (SELECT 1 FROM sessions WHERE event_id = ?)
+        OR EXISTS (SELECT 1 FROM accounts WHERE event_id = ?) THEN 0 ELSE 1 END)`, assertionId, eventId, eventId),
+      // The accounts of this event took their own receipts. A webmaster's stay, and they hold command text such as a
+      // person's name. A create_event receipt names the event only in its result, and a contest command names only the
+      // contest. A UUID cannot match another event. Each delete_event receipt stays, so its replay still answers.
+      // This reads every receipt, once per deletion.
+      bound(db, `DELETE FROM manage_receipts WHERE (instr(command, ?) > 0 OR instr(result, ?) > 0
+          OR json_extract(command, '$.contestId') IN (SELECT id FROM event_deletion_targets WHERE event_id = ? AND kind = 'contest'))
+        AND json_extract(command, '$.type') <> 'delete_event' AND ${inStep('rows')}`, eventId, eventId, eventId, eventId),
+      bound(db, `DELETE FROM events WHERE id = ? AND ${inStep('rows')}`, eventId, eventId),
+      bound(db, `DELETE FROM authentication_limits WHERE key >= ? AND key < ? AND ${inStep('rows')}`, `handle:${eventId}:`, `handle:${eventId};`, eventId),
+      ...nextStepStatements(db, eventId, 'rows', 'live', `rows_done_at = ${NOW_SQL}, blocked = NULL`),
+      bound(db, 'DELETE FROM command_assertions WHERE id = ?', assertionId),
+    ]);
+  } catch (error) {
+    if (isAssertionFailure(error)) return 'more';
+    throw error;
+  }
   return 'rows_done';
 }
 
@@ -286,8 +315,11 @@ async function markDone(db: D1Connection, eventId: string, kind: 'contest' | 'av
     AND id IN (SELECT value FROM json_each(?)) AND ${inStep(step)}`, eventId, kind, JSON.stringify(ids), eventId).run();
 }
 
-/** advanceRows makes at most this many calls, except for a blocked chunk, which ends this run's work on the deletion. */
-export const ROWS_UNIT_CALLS = 3;
+/**
+ * advanceRows makes at most this many calls: the state, the next chunk's read, a reconcile, and the write.
+ * A refused chunk makes more, and it ends this run's work on the deletion.
+ */
+export const ROWS_UNIT_CALLS = 4;
 
 const deleteRows: StepHandler = async ({ env, eventId, budget }) => {
   while (!budget.exhausted()) {

@@ -129,6 +129,47 @@ describe('event deletion', () => {
     });
   });
 
+  describe('the legacy installation row', () => {
+    type Placement = (event: SeededEvent, other: SeededEvent) => [owner: string, eventId: string, sessionId: string];
+    const naming: Array<[string, Placement]> = [
+      ['its owner', (event, other) => [event.eventAdmin.accountId, other.eventId, other.practice]],
+      ['its contest', (event, other) => [other.eventAdmin.accountId, other.eventId, event.practice]],
+      ['its event', (event, other) => [other.eventAdmin.accountId, event.eventId, other.practice]],
+    ];
+
+    async function withInstallation(placement: Placement, check: (event: SeededEvent) => Promise<void>): Promise<void> {
+      // The row is one for the whole site, so a database that holds one cannot run this test.
+      if ((await rows('SELECT 1 FROM installation')).length > 0) return;
+      const event = await seedEvent(db, webmaster);
+      const other = await seedEvent(db, webmaster);
+      await bound(db, 'INSERT INTO installation (singleton, id, owner_account_id, event_id, session_id) VALUES (1, ?, ?, ?, ?)',
+        randomUUID(), ...placement(event, other)).run();
+      await fence(db, event);
+      await check(event);
+      await bound(db, 'DELETE FROM installation').run();
+      await deleteRows(db, event);
+      await runToEnd(stores().env, other);
+      await forget(event);
+      await forget(other);
+    }
+
+    for (const [label, placement] of naming) {
+      it(`goes when it names the event by ${label}, so it blocks nothing`, async () => {
+        await withInstallation(placement, async (event) => {
+          expect(await rows('SELECT 1 FROM installation')).toEqual([]);
+          expect(await deleteRows(db, event)).toBe('rows_done');
+        });
+      });
+    }
+
+    it('stays when it names only another event', async () => {
+      await withInstallation((_, other) => [other.eventAdmin.accountId, other.eventId, other.practice], async (event) => {
+        expect(await rows('SELECT 1 FROM installation')).toHaveLength(1);
+        expect(await deleteRows(db, event)).toBe('rows_done');
+      });
+    });
+  });
+
   describe('the delete_event command', () => {
     const manage = () => new D1ManageService(db, fastPasswords);
     const command = (event: SeededEvent, confirmName = event.name): ManageCommand =>

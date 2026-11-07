@@ -19,7 +19,7 @@ import { openStoreDatabase } from '../cloudflare/tooling/store-database.mjs';
 import { bound } from './assertions';
 import type { D1Binding, D1Connection } from './connection';
 import {
-  changedRows, crashingEnvironment, FakeBucket, FakeLiveNamespace, fillStores, interceptCalls, readTables, rowsNaming, seedEvent, seedInertSeat, seedWebmaster,
+  changedRows, crashingEnvironment, FakeBucket, FakeLiveNamespace, fillStores, interceptCalls, maskedRow, readTables, rowsNaming, seedEvent, seedInertSeat, seedWebmaster,
   tableNames, type CrashMode, type SeededEvent, type SeededWebmaster,
 } from './eventDeletionHarness';
 import { applyMigrations } from './testFixture';
@@ -73,7 +73,7 @@ describe('event deletion', () => {
 
   /** The rows that still name this event, with each ID replaced by its seed position, so two seeds compare equal. */
   async function footprint(event: SeededEvent): Promise<Record<string, string[]>> {
-    const found = rowsNaming(await readTables(db, tables), event.ids);
+    const found = rowsNaming(await readTables(db, tables), event.ids, maskedRow);
     const position = new Map(event.ids.map((id, index) => [id, `<${index}>`]));
     return Object.fromEntries([...found].map(([table, table_rows]) => [table, table_rows.map((row) =>
       row.replaceAll(event.code, '<code>').replace(UUID, (id) => position.get(id) ?? '<uuid>')).sort()]));

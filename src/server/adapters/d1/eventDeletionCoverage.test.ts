@@ -5,7 +5,7 @@ import { openStoreDatabase } from '../cloudflare/tooling/store-database.mjs';
 import { bound } from './assertions';
 import type { D1Connection } from './connection';
 import {
-  maskedRow, readTables, rowsNaming, seedEvent, seedInstallation, seedWebmaster, tableNames, type SeededEvent,
+  readTables, rowsNaming, seedEvent, seedInstallation, seedWebmaster, tableNames, type SeededEvent,
   type SeededWebmaster, type TableRows,
 } from './eventDeletionHarness';
 import { applyMigrations } from './testFixture';
@@ -104,7 +104,7 @@ function rowSet(tables: ReadonlyMap<string, TableRows[]>, webmasterId: string): 
     if (table === 'accounts' && row.id === webmasterId) return { ...row, access_version: '<moved>' };
     return row;
   };
-  return new Map([...tables].map(([table, rows]) => [table, new Set(rows.map((row) => maskedRow(steady(table, row))))]));
+  return new Map([...tables].map(([table, rows]) => [table, new Set(rows.map((row) => JSON.stringify(steady(table, row))))]));
 }
 
 describe('event deletion coverage', () => {

@@ -256,7 +256,7 @@ export async function readTables(db: D1Connection, tables: readonly string[]): P
 
 const TIMESTAMP = /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z/g;
 
-/** A row with its volatile times masked. */
+/** A row with its volatile times masked, so that rows of two seeds compare equal. */
 export function maskedRow(row: TableRows): string {
   return JSON.stringify(row, (key, value: unknown) => {
     if (typeof value === 'string') return value.replace(TIMESTAMP, '<time>');
@@ -265,11 +265,14 @@ export function maskedRow(row: TableRows): string {
   });
 }
 
-/** The masked rows that name one of the IDs, per table. */
-export function rowsNaming(tables: ReadonlyMap<string, TableRows[]>, ids: readonly string[]): Map<string, string[]> {
+/**
+ * The rows that name one of the IDs, per table. Two readings of one database compare raw, so that a rewritten
+ * time shows. Elapsed time comes from persisted timestamps. Only rows of two different seeds need `maskedRow`.
+ */
+export function rowsNaming(tables: ReadonlyMap<string, TableRows[]>, ids: readonly string[], show: (row: TableRows) => string = (row) => JSON.stringify(row)): Map<string, string[]> {
   const found = new Map<string, string[]>();
   for (const [table, rows] of tables) {
-    const naming = rows.map(maskedRow).filter((row) => ids.some((id) => row.includes(id))).sort();
+    const naming = rows.map(show).filter((row) => ids.some((id) => row.includes(id))).sort();
     if (naming.length > 0) found.set(table, naming);
   }
   return found;

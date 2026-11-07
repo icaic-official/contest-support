@@ -104,6 +104,10 @@ export function useSessionSnapshot(userId: string): SessionData {
       let listed: { list: SessionSummary[]; nextSession: string } | undefined;
       try {
         const list = orderContests(await backend.workflows.contests());
+        // A read that a change of contest or a remount has made stale reads no
+        // snapshot. The queue runs the next read only when this one ends, and a
+        // snapshot read that hangs would hold the list of that next read.
+        if (run !== generation.current) return;
         // Only a listed ID reaches the snapshot read and the live channel.
         const isListed = (id: string) => list.some((s) => s.id === id);
         const seed = addressed.current;
@@ -119,7 +123,7 @@ export function useSessionSnapshot(userId: string): SessionData {
         // stays in it. Otherwise the picker would have no open row for one read.
         // The selected ID always waits for the snapshot. A change of it
         // restarts the effect below, which drops this read.
-        if (run === generation.current && (sessionId === "" || nextSession === sessionId)) {
+        if (sessionId === "" || nextSession === sessionId) {
           setSessions((shown) => keepUnchanged(shown, list));
         }
         const next = nextSession

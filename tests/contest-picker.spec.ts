@@ -207,7 +207,7 @@ test.describe("a contestant with several contests", () => {
     await page.keyboard.press("Enter");
     await expect(page).toHaveURL((url) => url.hash === "#main");
     await choose(page, "Alpha");
-    await at(page, "/issues", ids.next);
+    await expect(page).toHaveURL((url) => url.pathname === "/issues" && url.searchParams.get("contest") === ids.next);
   });
 });
 
@@ -353,6 +353,19 @@ test.describe("the rows of the picker", () => {
       expect(await contrastOf(item.getByText(/17:00 · Ended$/))).toBeGreaterThanOrEqual(4.5);
     });
   }
+
+  test("color the second line only on the focused row, when a click opens the menu", async ({ page, local }) => {
+    await three(local);
+    await signIn(page);
+    await trigger(page).click();
+    await expect(page.getByRole("menu")).toBeFocused();
+    const row = page.getByRole("menuitemradio").first();
+    const color = () => row.getByText(/17:00 · Ended$/).evaluate((line) => getComputedStyle(line).color);
+    const unfocused = await color();
+    await row.hover();
+    await expect(row).toBeFocused();
+    await expect.poll(color).not.toBe(unfocused);
+  });
 
   test("open, move and choose with the keyboard, and close without a change on Escape", async ({ page, local }) => {
     const ids = await three(local);

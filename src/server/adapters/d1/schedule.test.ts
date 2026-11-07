@@ -4,6 +4,7 @@ import type { Caller } from '../../authentication';
 import { WorkflowService } from '../../workflow';
 import type { Command } from '../../../connected/model';
 import { D1ApplicationService } from '../cloudflare/application';
+import { removeFixtureEvent } from '../cloudflare/eventDeletionFixture';
 import { D1ContestAwardService } from '../cloudflare/contestAwards';
 import { openStoreDatabase } from '../cloudflare/tooling/store-database.mjs';
 import type { D1Connection, D1Value } from './connection';
@@ -479,8 +480,7 @@ describe('contest schedule, clock, time awards, and intake', () => {
           .toEqual([fixture.sessionId, fixture.secondSessionId].sort());
         expect((await application.contests(fixture.staff, { window }))[0]!.schedule).not.toBeNull();
       } finally {
-        await run('DELETE FROM sessions WHERE id IN (?, ?)', closed, otherContest);
-        await run('DELETE FROM events WHERE id = ?', otherEvent);
+        await removeFixtureEvent(db, otherEvent);
       }
     });
   });
@@ -501,7 +501,6 @@ describe('contest schedule, clock, time awards, and intake', () => {
       await expect(run('UPDATE sessions SET grace_minutes = 241 WHERE id = ?', fixture.sessionId)).rejects.toThrow(/CHECK/);
       const valid = randomUUID();
       await insert('2026-11-03T09:00:00.000Z', '2026-11-03T10:00:00.000Z', 1, valid);
-      await run('DELETE FROM sessions WHERE id = ?', valid);
     });
 
     it('counts a schedule change in the contest version', async () => {

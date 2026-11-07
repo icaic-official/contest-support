@@ -7,6 +7,7 @@ import { URL } from 'node:url';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest';
 import { getPlatformProxy } from 'wrangler';
 import { renderWranglerConfiguration } from '../src/server/adapters/cloudflare/tooling/configuration.mjs';
+import { removeFixtureEvent } from '../src/server/adapters/cloudflare/eventDeletionFixture';
 import { maintainFixtureSessions, SessionLiveCoordinator } from '../src/server/adapters/cloudflare/live';
 import { avatarKey } from '../src/server/adapters/cloudflare/avatars';
 import { passwordHasher } from '../src/server/adapters/cloudflare/password';
@@ -363,8 +364,8 @@ describe('Cloudflare fixture setup and exact cleanup with real local D1/R2', () 
         .toEqual({ id: foreign, name: 'Unrelated control account', username: marker.username });
       expect(await statement('SELECT key FROM authentication_limits WHERE key=?', counterKey).first()).toBeNull();
     } finally {
+      // A foreign account has no event, so it stays in this local database, which the file discards.
       if (existsSync(path)) await cleanupFixture(path, dependencies());
-      await statement('DELETE FROM accounts WHERE id=?', foreign).run();
     }
   });
 
@@ -406,8 +407,8 @@ describe('Cloudflare fixture setup and exact cleanup with real local D1/R2', () 
       expect(await statement('SELECT key FROM authentication_limits WHERE key=?', counterKey).first()).toBeNull();
       expect(await statement('SELECT id FROM accounts WHERE id=?', foreign).first()).toEqual({ id: foreign });
     } finally {
+      // A foreign account has no event, so it stays in this local database, which the file discards.
       if (existsSync(path)) await cleanupFixture(path, dependencies());
-      await statement('DELETE FROM accounts WHERE id=?', foreign).run();
     }
   });
 
@@ -438,7 +439,7 @@ describe('Cloudflare fixture setup and exact cleanup with real local D1/R2', () 
       expect(liveObject(fixture.sessionId).data.size).toBe(0);
     } finally {
       if (existsSync(path)) await cleanupFixture(path, dependencies());
-      await statement('DELETE FROM events WHERE id = ?', otherEvent).run();
+      await removeFixtureEvent(platform.env.DB, otherEvent);
     }
   });
 
@@ -481,7 +482,7 @@ describe('Cloudflare fixture setup and exact cleanup with real local D1/R2', () 
     try {
       await platform.env.DB.batch([
         statement('INSERT INTO events (id, name) VALUES (?, ?)', foreignEvent, 'Unrelated test event'),
-        statement('INSERT INTO accounts (id, name) VALUES (?, ?)', foreignAccount, 'Unrelated test account'),
+        statement('INSERT INTO accounts (id, name, event_id) VALUES (?, ?, ?)', foreignAccount, 'Unrelated test account', foreignEvent),
         statement(`INSERT INTO issues (id, session_id, team_id, reporter, number, category, description, status)
           VALUES (?, ?, ?, ?, 1, 'Other', 'Fictional fixture issue', 'open')`, issueId, fixture.sessionId, fixture.teamId, fixture.accounts.contestant.id),
         statement(`INSERT INTO issue_images (id, session_id, issue_id, uploader, request_id, uploader_name, visibility,
@@ -550,9 +551,7 @@ describe('Cloudflare fixture setup and exact cleanup with real local D1/R2', () 
     } finally {
       if (existsSync(path)) await cleanupFixture(path, dependencies());
       await platform.env.IMAGES.delete([foreignKey, foreignAvatarKey]);
-      await statement('DELETE FROM account_avatars WHERE id = ?', foreignAvatar).run();
-      await statement('DELETE FROM events WHERE id = ?', foreignEvent).run();
-      await statement('DELETE FROM accounts WHERE id = ?', foreignAccount).run();
+      await removeFixtureEvent(platform.env.DB, foreignEvent);
       await statement('DELETE FROM authentication_limits WHERE key = ?', rateKey).run();
     }
   });

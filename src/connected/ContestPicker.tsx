@@ -1,4 +1,4 @@
-import { type ReactElement, useId } from "react";
+import { type ReactElement, useId, useMemo } from "react";
 import type { ContestSummary } from "@/backend/contracts";
 import {
   DropdownMenu,
@@ -70,7 +70,8 @@ export function ContestPicker(
 ) {
   const { value, onSelect, disabled } = props;
   const id = useId();
-  const rows = contestRows(props.contests);
+  // The parent renders every second for the clocks. The rows change only with the contests.
+  const rows = useMemo(() => contestRows(props.contests), [props.contests]);
   if (props.variant === "menu") {
     return (
       <DropdownMenu>

@@ -22,10 +22,11 @@ export type SessionSummary = ContestSummary;
 /** Shared session data for every UI. Read it; do not copy it into state. */
 export interface SessionData {
   /**
-   * The contests that the person may open. The first read fills it before the
-   * snapshot arrives, so it can be full while `sessionId` is "" and `loaded`
-   * is false. A later read changes it with `sessionId`, so `sessionId` is
-   * either "" or in this list.
+   * The contests that the person may open. A read that starts with no chosen
+   * contest fills it before the snapshot arrives, so it can be full while
+   * `sessionId` is "", whether `loaded` is true or false. A screen that shows
+   * a picker waits for `sessionId`. Once a contest is chosen, a read changes
+   * `sessions` and `sessionId` together, so `sessionId` is "" or in this list.
    */
   sessions: SessionSummary[];
   /** The selected session, or "" before the first refresh. */
@@ -106,7 +107,8 @@ export function useSessionSnapshot(userId: string): SessionData {
         const list = orderContests(await backend.workflows.contests());
         // A read that a change of contest or a remount has made stale reads no
         // snapshot. The queue runs the next read only when this one ends, and a
-        // snapshot read that hangs would hold the list of that next read.
+        // snapshot read that hangs would hold the list of that next read. A read
+        // that goes stale during its snapshot read still holds the queue.
         if (run !== generation.current) return;
         // Only a listed ID reaches the snapshot read and the live channel.
         const isListed = (id: string) => list.some((s) => s.id === id);
@@ -117,10 +119,10 @@ export function useSessionSnapshot(userId: string): SessionData {
             ? seed
             : (defaultContest(list, Date.now() + clockOffset.current)?.id ?? "");
         listed = { list, nextSession };
-        // The first list goes out before the snapshot read, so that a screen
-        // that needs only the list, such as the site page, never waits on the
-        // snapshot. A later list goes out early only when the open contest
-        // stays in it. Otherwise the picker would have no open row for one read.
+        // The list goes out before the snapshot read in two cases. No contest is
+        // chosen yet, so a screen that needs only the list, such as the site
+        // page, never waits on the snapshot. Or the chosen contest stays in the
+        // list. Otherwise the picker would have no open row for one read.
         // The selected ID always waits for the snapshot. A change of it
         // restarts the effect below, which drops this read.
         if (sessionId === "" || nextSession === sessionId) {

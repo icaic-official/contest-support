@@ -141,6 +141,32 @@ test.describe("a contestant with several contests", () => {
     await at(page, "/issues", ids.running);
   });
 
+  // The list read ends before the snapshot read starts. While the snapshot read is
+  // held, the page has the new list but not yet the new contest.
+  test("marks one contest as open while the snapshot of the next contest loads after the open one is lost", async ({ page, local }) => {
+    const ids = await three(local);
+    await signIn(page);
+    await at(page, "/issues", ids.running);
+    const reads: string[] = [];
+    let release: () => void = () => undefined;
+    const held = new Promise<void>((resolve) => (release = resolve));
+    await page.route("**/api/snapshot*", async (route) => {
+      reads.push(new URL(route.request().url()).searchParams.get("sessionId") ?? "");
+      await held;
+      await route.fallback();
+    });
+    await local.run("DELETE FROM memberships WHERE session_id = ? AND account_id = ?", ids.running, local.users.contestant);
+    await focusEvent(page);
+    await expect.poll(() => reads).toEqual([ids.next]);
+    await settle(page);
+    await trigger(page).click();
+    await expect(page.getByRole("menu").getByRole("menuitemradio", { checked: true })).toHaveCount(1);
+    await page.keyboard.press("Escape");
+    release();
+    await expect(triggerFor(page, "Alpha")).toBeVisible();
+    await at(page, "/issues", ids.next);
+  });
+
   test("keeps another parameter of the address when it writes the contest", async ({ page, local }) => {
     const ids = await three(local);
     await signIn(page);

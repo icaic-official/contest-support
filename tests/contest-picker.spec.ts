@@ -142,22 +142,27 @@ test.describe("a contestant with several contests", () => {
   });
 
   // The list read ends before the snapshot read starts. While the snapshot read is
-  // held, the page has the new list but not yet the new contest.
+  // held, the page has the new list but not yet the new contest. The live connection
+  // starts a read after the sign-in, and that read must end before the seat goes, or it
+  // reads the open contest without a seat. So the test waits for the network to idle,
+  // and the hold takes only the read of the contest that the person falls back to.
   test("marks one contest as open while the snapshot of the next contest loads after the open one is lost", async ({ page, local }) => {
     const ids = await three(local);
     await signIn(page);
     await at(page, "/issues", ids.running);
-    const reads: string[] = [];
+    await page.waitForLoadState("networkidle");
+    let held = 0;
     let release: () => void = () => undefined;
-    const held = new Promise<void>((resolve) => (release = resolve));
+    const released = new Promise<void>((resolve) => (release = resolve));
     await page.route("**/api/snapshot*", async (route) => {
-      reads.push(new URL(route.request().url()).searchParams.get("sessionId") ?? "");
-      await held;
+      if (new URL(route.request().url()).searchParams.get("sessionId") !== ids.next) return route.fallback();
+      held++;
+      await released;
       await route.fallback();
     });
     await local.run("DELETE FROM memberships WHERE session_id = ? AND account_id = ?", ids.running, local.users.contestant);
     await focusEvent(page);
-    await expect.poll(() => reads).toEqual([ids.next]);
+    await expect.poll(() => held).toBeGreaterThan(0);
     await settle(page);
     await trigger(page).click();
     await expect(page.getByRole("menu").getByRole("menuitemradio", { checked: true })).toHaveCount(1);

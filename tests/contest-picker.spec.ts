@@ -62,6 +62,25 @@ async function watchReads(page: Page) {
   return { snapshots, sockets };
 }
 
+/**
+ * Holds every snapshot read that starts after this call, or only the reads of
+ * `only`, until `release` runs. `held` counts the reads that wait.
+ */
+async function holdSnapshotReads(page: Page, only?: string) {
+  let held = 0;
+  let release: () => void = () => undefined;
+  const released = new Promise<void>((resolve) => (release = resolve));
+  await page.route("**/api/snapshot*", async (route) => {
+    if (only !== undefined && new URL(route.request().url()).searchParams.get("sessionId") !== only) {
+      return route.fallback();
+    }
+    held++;
+    await released;
+    await route.fallback();
+  });
+  return { held: () => held, release };
+}
+
 const at = (page: Page, path: string, contest: string, hash = "") =>
   expect(page).toHaveURL(
     (url) =>
@@ -429,6 +448,51 @@ test.describe("a contest in the address whose snapshot fails", () => {
     await page.getByRole("button", { name: "Refresh access", exact: true }).click();
     await expect(triggerFor(page, "Delta")).toBeVisible();
     await at(page, "/issues", ids.ended);
+  });
+});
+
+// A read that has chosen no contest can already hold the list, so the page has
+// several contests and none selected. A select with no matching row shows its
+// first row, which is a contest that the person did not choose.
+test.describe("the no-access screen while a read has chosen no contest", () => {
+  test("offers no contest select on the error screen while a retry reads the snapshot", async ({ page, local }) => {
+    await three(local);
+    await signIn(page);
+    let listFails = true;
+    await page.route("**/api/contests*", (route) =>
+      listFails ? route.fulfill({ status: 500, json: { error: "Unavailable." } }) : route.fallback());
+    await page.goto("/issues");
+    const alert = page.getByRole("alert").filter({ hasText: "Unavailable." });
+    await expect(alert).toBeVisible();
+    listFails = false;
+    const reads = await holdSnapshotReads(page);
+    await page.getByRole("button", { name: "Refresh access", exact: true }).click();
+    await expect.poll(reads.held).toBeGreaterThan(0);
+    await settle(page);
+    await expect(alert).toBeVisible();
+    await expect(page.getByLabel("Contest session", { exact: true })).toHaveCount(0);
+    reads.release();
+    await expect(trigger(page)).toBeVisible();
+  });
+
+  test("offers no contest select after the person regains contests, while the snapshot loads", async ({ page, local }) => {
+    await three(local);
+    let none = false;
+    await page.route("**/api/contests*", (route) => (none ? route.fulfill({ json: [] }) : route.fallback()));
+    await signIn(page);
+    none = true;
+    await focusEvent(page);
+    const heading = page.getByRole("heading", { name: "Session access" });
+    await expect(heading).toBeVisible();
+    none = false;
+    const reads = await holdSnapshotReads(page);
+    await focusEvent(page);
+    await expect.poll(reads.held).toBeGreaterThan(0);
+    await settle(page);
+    await expect(heading).toBeVisible();
+    await expect(page.getByLabel("Contest session", { exact: true })).toHaveCount(0);
+    reads.release();
+    await expect(trigger(page)).toBeVisible();
   });
 });
 

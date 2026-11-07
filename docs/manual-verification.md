@@ -38,10 +38,10 @@ An event admin and a webmaster also use the event console at `/event`. A webmast
 Unless a step names one UI, do the step in the organizer phone app and again in the organizer desktop console.
 Section 7 lists the checks for each UI.
 
-No screen or command archives an event. To test an archived event, run this command against your test database. Never run it on an event that holds real data.
+No screen or command archives an event. To test an archived event, run this command against your test database. Never run it on an event that holds real data. Replace the values in capitals. This command has not been run.
 
 ```sh
-npx wrangler d1 execute <test-database> --remote --config <test-wrangler-config> --command "UPDATE events SET archived = 1 WHERE id = '<event-id>'"
+npx wrangler d1 execute TEST_DATABASE --remote --config TEST_WRANGLER_CONFIG --command "UPDATE events SET archived = 1 WHERE id = 'EVENT_ID'"
 ```
 
 ## 1. Login and session access

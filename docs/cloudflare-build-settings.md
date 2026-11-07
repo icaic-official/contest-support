@@ -3,7 +3,7 @@
 This reference is for maintainers of this project's own Cloudflare resources. An outside contributor needs only the [CI summary](cloudflare-builds.md).
 It describes `scripts/ci.mjs`, `wrangler.ci.jsonc`, and `scripts/deploy-workers.mjs`.
 The [setup guide](cloudflare-builds.md) owns the dashboard steps, including the [`minsky-dev` trigger](cloudflare-builds.md#publish-the-application).
-`<account-id>` means the `account_id` value in `wrangler.jsonc`.
+`<account-id>` means the `account_id` value in `wrangler.jsonc`. Before you paste a command, set `CLOUDFLARE_ACCOUNT_ID` to that value.
 
 ## Workers Builds
 
@@ -127,8 +127,8 @@ Hosted Cloudflare authentication checks change only the isolated authentication 
 ```sh
 npx wrangler d1 migrations apply minsky-auth-ci --remote --config wrangler.auth-ci.jsonc
 npx wrangler deploy --config wrangler.auth-ci.jsonc
-npm run test:auth:hosted -- --account=<account-id> --database=5d746d29-0a66-4346-96a6-4974126685d7
-npm run test:auth:http -- --account=<account-id> --database=5d746d29-0a66-4346-96a6-4974126685d7 --origin=https://minsky-auth-ci.icaic-minsky.workers.dev
+npm run test:auth:hosted -- --account="$CLOUDFLARE_ACCOUNT_ID" --database=5d746d29-0a66-4346-96a6-4974126685d7
+npm run test:auth:http -- --account="$CLOUDFLARE_ACCOUNT_ID" --database=5d746d29-0a66-4346-96a6-4974126685d7 --origin=https://minsky-auth-ci.icaic-minsky.workers.dev
 ```
 
 Hosted connector commands stay in [Run the shared provider tests](run-provider-tests.md).

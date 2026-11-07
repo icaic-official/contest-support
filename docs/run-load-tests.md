@@ -145,10 +145,10 @@ Analytics reach the Cloudflare API one or two minutes after the requests. Wait 3
 
 ```sh
 CLOUDFLARE_API_TOKEN=… npm run load -- analytics --results="$MINSKY_INSTALL_PRIVATE_DIR/results.json" \
-	--account=<account-id> --database=D1_UUID --worker=minsky-preview-load
+	--account="$CLOUDFLARE_ACCOUNT_ID" --database=D1_UUID --worker=minsky-preview-load
 ```
 
-`<account-id>` is your Cloudflare account ID. The token needs read access to account analytics. Supply it through your private environment, never as an argument.
+Set `CLOUDFLARE_ACCOUNT_ID` to your Cloudflare account ID. The token needs read access to account analytics. Supply it through your private environment, never as an argument.
 The command adds, for each step, the average per minute of D1 queries, rows read and written, Worker requests and CPU time, and Durable Object CPU time. It uses only the minutes that lie wholly inside the step, so use `--step-seconds` of at least 120.
 It also lists the 10 D1 statements with the largest total duration in the whole run.
 

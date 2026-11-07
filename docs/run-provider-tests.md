@@ -4,7 +4,7 @@ Use this guide to check the Cloudflare provider against Minsky's shared behavior
 For the suite's responsibilities and limits, see [the test contracts](provider-test-contracts.md).
 
 The hosted commands are for maintainers. Each runner compares its target with fixed values in the code, and it refuses any other target. So these commands work only with access to the maintainers' Cloudflare account.
-`<account-id>` means the `account_id` value in `wrangler.jsonc`.
+`<account-id>` means the `account_id` value in `wrangler.jsonc`. Before you paste a command, set `CLOUDFLARE_ACCOUNT_ID` to that value.
 Anyone can run [List the scenarios without credentials](#list-the-scenarios-without-credentials) and [Check the complete Cloudflare runtime separately](#check-the-complete-cloudflare-runtime-separately).
 
 Use an isolated test backend. Never use development or production accounts.
@@ -54,7 +54,7 @@ Do not substitute any other resource. The target guard rejects a substitution be
    ```sh
    npm run test:providers -- --provider=cloudflare \
      --config=src/server/adapters/cloudflare/deploy/connector-ci.wrangler.jsonc \
-     --account=<account-id> \
+     --account="$CLOUDFLARE_ACCOUNT_ID" \
      --database=de43cf95-c024-4e44-860d-8ff179e4e08d \
      --origin=https://minsky-connector-ci.icaic-minsky.workers.dev
    ```
@@ -126,7 +126,7 @@ Check existing Wrangler access before preparing the schema:
 npx wrangler whoami
 node src/server/adapters/cloudflare/tooling/store-target.mjs migrate \
   --config=src/server/adapters/cloudflare/deploy/connector-store-ci.wrangler.jsonc \
-  --account=<account-id> \
+  --account="$CLOUDFLARE_ACCOUNT_ID" \
   --database=341350ba-7c74-4c46-8b21-edfdcda475f5
 ```
 
@@ -141,7 +141,7 @@ Run the complete workflow suite:
 ```sh
 npm run test:connector:workflow:hosted -- \
   --config=src/server/adapters/cloudflare/deploy/connector-store-ci.wrangler.jsonc \
-  --account=<account-id> \
+  --account="$CLOUDFLARE_ACCOUNT_ID" \
   --database=341350ba-7c74-4c46-8b21-edfdcda475f5
 ```
 
@@ -158,7 +158,7 @@ Check account permissions and credential races on the same isolated store schema
 ```sh
 npm run test:connector:accounts:hosted -- \
   --config=src/server/adapters/cloudflare/deploy/connector-store-ci.wrangler.jsonc \
-  --account=<account-id> \
+  --account="$CLOUDFLARE_ACCOUNT_ID" \
   --database=341350ba-7c74-4c46-8b21-edfdcda475f5
 ```
 
@@ -206,7 +206,7 @@ Run the complete workflow suite first:
 npm run test:connector:workflow:hosted -- \
   --transport=api \
   --config=src/server/adapters/cloudflare/deploy/connector-store-ci.wrangler.jsonc \
-  --account=<account-id> \
+  --account="$CLOUDFLARE_ACCOUNT_ID" \
   --database=341350ba-7c74-4c46-8b21-edfdcda475f5
 ```
 
@@ -217,7 +217,7 @@ After that command finishes, run the complete account suite:
 npm run test:connector:accounts:hosted -- \
   --transport=api \
   --config=src/server/adapters/cloudflare/deploy/connector-store-ci.wrangler.jsonc \
-  --account=<account-id> \
+  --account="$CLOUDFLARE_ACCOUNT_ID" \
   --database=341350ba-7c74-4c46-8b21-edfdcda475f5
 ```
 
@@ -248,7 +248,7 @@ After deploying the full application, check the actual product UI separately:
 ```sh
 node src/server/adapters/cloudflare/tooling/test-ui.mjs \
   --config=src/server/adapters/cloudflare/deploy/connector-ci.wrangler.jsonc \
-  --account=<account-id> \
+  --account="$CLOUDFLARE_ACCOUNT_ID" \
   --database=de43cf95-c024-4e44-860d-8ff179e4e08d \
   --origin=https://minsky-connector-ci.icaic-minsky.workers.dev
 ```
@@ -280,7 +280,7 @@ Authentication runs do not check this connector path.
    ```sh
    npm run test:providers -- --provider=cloudflare \
      --config=src/server/adapters/cloudflare/deploy/connector-ci.wrangler.jsonc \
-     --account=<account-id> \
+     --account="$CLOUDFLARE_ACCOUNT_ID" \
      --database=de43cf95-c024-4e44-860d-8ff179e4e08d \
      --origin=https://minsky-connector-ci.icaic-minsky.workers.dev \
      --recover=/absolute/path/recovery.json

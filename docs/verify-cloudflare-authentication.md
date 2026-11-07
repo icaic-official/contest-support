@@ -7,7 +7,7 @@ For the complete connector, use the separate [direct store procedure](run-provid
 That procedure requires the D1-only `minsky-connector-store-ci` target and all 34 hosted account cases.
 
 Anyone can run the local checks. The hosted sections are for maintainers. Each hosted runner compares its target with fixed values in the code, and it refuses any other target.
-`<account-id>` means the `account_id` value in `wrangler.jsonc`.
+`<account-id>` means the `account_id` value in `wrangler.jsonc`. Before you paste a command, set `CLOUDFLARE_ACCOUNT_ID` to that value.
 
 ## Run local checks
 
@@ -102,7 +102,7 @@ Run hosted D1 account cases with both explicit target identifiers:
 
 ```sh
 npm run test:auth:hosted -- \
-  --account=<account-id> \
+  --account="$CLOUDFLARE_ACCOUNT_ID" \
   --database=5d746d29-0a66-4346-96a6-4974126685d7
 ```
 
@@ -112,7 +112,7 @@ Use the separate hosted HTTP runner to call the deployed Worker:
 
 ```sh
 npm run test:auth:http -- \
-  --account=<account-id> \
+  --account="$CLOUDFLARE_ACCOUNT_ID" \
   --database=5d746d29-0a66-4346-96a6-4974126685d7 \
   --origin=https://minsky-auth-ci.icaic-minsky.workers.dev
 ```
@@ -142,8 +142,8 @@ npm run test:auth:hash
 For hosted CPU evidence, run each operation separately. The hosted runs are for maintainers:
 
 ```sh
-npm run test:auth:hash -- --hosted --operation=hash --account=<account-id>
-npm run test:auth:hash -- --hosted --operation=verify --account=<account-id>
+npm run test:auth:hash -- --hosted --operation=hash --account="$CLOUDFLARE_ACCOUNT_ID"
+npm run test:auth:hash -- --hosted --operation=verify --account="$CLOUDFLARE_ACCOUNT_ID"
 ```
 
 Each hosted run creates one temporary Worker without database bindings and deletes it afterward.

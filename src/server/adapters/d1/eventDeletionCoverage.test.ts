@@ -15,22 +15,29 @@ const remote = Boolean(connectorConfig);
 const configPath = connectorConfig ?? 'src/server/adapters/cloudflare/deploy/connector-store-ci.wrangler.jsonc';
 vi.setConfig({ testTimeout: remote ? 600_000 : 120_000, hookTimeout: remote ? 600_000 : 120_000 });
 
-/**
- * The tables that name an event, a contest, or an account, directly or through
- * another such table. The schema decides, so a new table joins this list by itself.
- */
-async function referencingTables(db: D1Connection, tables: readonly string[]): Promise<Set<string>> {
-  const parents = new Map<string, string[]>();
+interface ForeignKey {
+  readonly child: string;
+  readonly parent: string;
+  readonly onDelete: string;
+}
+
+async function foreignKeys(db: D1Connection, tables: readonly string[]): Promise<ForeignKey[]> {
+  const keys: ForeignKey[] = [];
   for (const table of tables) {
-    const { results } = await db.prepare(`PRAGMA foreign_key_list("${table}")`).all<{ table: string }>();
-    parents.set(table, results.map((row) => row.table));
+    const { results } = await db.prepare(`PRAGMA foreign_key_list("${table}")`).all<{ table: string; on_delete: string }>();
+    keys.push(...results.map((row) => ({ child: table, parent: row.table, onDelete: row.on_delete })));
   }
-  const reached = new Set(['events', 'sessions', 'accounts']);
+  return keys;
+}
+
+/** Every table that the given keys reach from the given parents. */
+function reachedFrom(parents: readonly string[], keys: readonly ForeignKey[]): Set<string> {
+  const reached = new Set(parents);
   for (let grew = true; grew;) {
     grew = false;
-    for (const [table, names] of parents) {
-      if (!reached.has(table) && names.some((name) => reached.has(name))) {
-        reached.add(table);
+    for (const { child, parent } of keys) {
+      if (!reached.has(child) && reached.has(parent)) {
+        reached.add(child);
         grew = true;
       }
     }
@@ -38,23 +45,16 @@ async function referencingTables(db: D1Connection, tables: readonly string[]): P
   return reached;
 }
 
+/**
+ * The tables that name an event, a contest, or an account, directly or through
+ * another such table. The schema decides, so a new table joins this list by itself.
+ */
+const referencingTables = (keys: readonly ForeignKey[]) => reachedFrom(['events', 'sessions', 'accounts'], keys);
+
 /** The tables that an `ON DELETE CASCADE` chain reaches from one parent. */
-async function cascadeChildren(db: D1Connection, tables: readonly string[], parent: string): Promise<Set<string>> {
-  const edges: Array<{ child: string; parent: string }> = [];
-  for (const table of tables) {
-    const { results } = await db.prepare(`PRAGMA foreign_key_list("${table}")`).all<{ table: string; on_delete: string }>();
-    edges.push(...results.filter((row) => row.on_delete === 'CASCADE').map((row) => ({ child: table, parent: row.table })));
-  }
-  const reached = new Set<string>();
-  for (let grew = true; grew;) {
-    grew = false;
-    for (const edge of edges) {
-      if (!reached.has(edge.child) && (edge.parent === parent || reached.has(edge.parent))) {
-        reached.add(edge.child);
-        grew = true;
-      }
-    }
-  }
+function cascadeChildren(keys: readonly ForeignKey[], parent: string): Set<string> {
+  const reached = reachedFrom([parent], keys.filter(({ onDelete }) => onDelete === 'CASCADE'));
+  reached.delete(parent);
   return reached;
 }
 
@@ -118,6 +118,7 @@ describe('event deletion coverage', () => {
   let dispose: () => Promise<void>;
   let webmaster: SeededWebmaster;
   let tables: string[];
+  let keys: ForeignKey[];
 
   beforeAll(async () => {
     const platform = await openStoreDatabase({ configPath, remoteBindings: remote });
@@ -126,6 +127,7 @@ describe('event deletion coverage', () => {
     if (!remote) await applyMigrations(db);
     webmaster = await seedWebmaster(db);
     tables = await tableNames(db);
+    keys = await foreignKeys(db, tables);
   });
   afterAll(async () => { await dispose?.(); });
 
@@ -152,7 +154,7 @@ describe('event deletion coverage', () => {
     const deleted = await seedEvent(db, webmaster);
     const heldInstallation = await seedInstallation(db, deleted);
     const seeded = rowsNaming(await readTables(db, tables), deleted.ids);
-    const required = await referencingTables(db, tables);
+    const required = referencingTables(keys);
     expect(required.size).toBeGreaterThan(25);
     // The singleton names the site's first event, so only a database without one can seed it.
     if (!heldInstallation) required.delete('installation');
@@ -184,8 +186,11 @@ describe('event deletion coverage', () => {
     expect(counts).toEqual({ journal: 1, target: 2 + deleted.accounts.length + 1, audit: 1 });
     await forget(deleted);
 
-    await deleteRows(kept);
-    await forget(kept);
+    // A hosted database is shared and must not grow. A local one goes with this file.
+    if (remote) {
+      await deleteRows(kept);
+      await forget(kept);
+    }
   });
 
   it('reports a table that names an event, a contest, or an account when no chain reaches it or the seed leaves it empty', () => {
@@ -203,12 +208,12 @@ describe('event deletion coverage', () => {
 
   it('classifies every table that a contest delete cascades into, so a new one must choose', async () => {
     const classified = [...CONTEST_ACTIVITY.map(({ table }) => table), ...ROSTER_SIZED, ...CHUNKED_WITH_A_PARENT].sort();
-    expect([...await cascadeChildren(db, tables, 'sessions')].sort()).toEqual(classified);
+    expect([...cascadeChildren(keys, 'sessions')].sort()).toEqual(classified);
   });
 
   it('classifies every table that an event delete cascades into, so a new one must choose', async () => {
-    const underContests = await cascadeChildren(db, tables, 'sessions');
-    const underEvents = [...await cascadeChildren(db, tables, 'events')].filter((table) => table !== 'sessions' && !underContests.has(table)).sort();
+    const underContests = cascadeChildren(keys, 'sessions');
+    const underEvents = [...cascadeChildren(keys, 'events')].filter((table) => table !== 'sessions' && !underContests.has(table)).sort();
     expect(underEvents).toEqual(UNDER_THE_EVENT_ROW);
   });
 
@@ -216,7 +221,7 @@ describe('event deletion coverage', () => {
     const classified = [...ACCOUNT_ROWS_IN_A_CONTEST.map(({ table }) => table), ...ACCOUNT_OWN_ROWS,
       // A role belongs to a seat, and a seat blocks.
       'membership_roles'].sort();
-    expect([...await cascadeChildren(db, tables, 'accounts')].sort()).toEqual(classified);
+    expect([...cascadeChildren(keys, 'accounts')].sort()).toEqual(classified);
   });
 
   it('cascades a live contest with seats with and without scopes without a failed count', async () => {

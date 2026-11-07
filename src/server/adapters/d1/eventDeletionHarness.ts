@@ -112,7 +112,8 @@ export async function seedEvent(db: D1Connection, webmaster: SeededWebmaster, ac
   const originalKey = attachmentPath(practice, issue, originalImage, 'original');
   const thumbnailKey = attachmentPath(practice, issue, originalImage, 'thumbnail');
   const announcementKey = `${live}/announcements/${announcement}/${announcementImage}`;
-  const objects = [originalKey, thumbnailKey, announcementKey, avatarKey(eventAdmin.accountId, avatar)];
+  // A roster holds no avatar row, so no target would remove that file. The contest prefixes cover the others.
+  const objects = [originalKey, thumbnailKey, announcementKey, ...(activity ? [avatarKey(eventAdmin.accountId, avatar)] : [])];
   const reporter = contestant.accountId;
   const staff = volunteer.accountId;
   const site = webmaster.accountId;

@@ -1,17 +1,23 @@
 import { randomUUID } from 'node:crypto';
-import { beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { ACCOUNT_ROWS_IN_A_CONTEST } from '../cloudflare/eventDeletion';
 import { bound } from './assertions';
 import type { D1Binding } from './connection';
-import { changedRows, deletionSuite, readTables, rowsNaming, seedEvent, seedInertSeat, type SeededEvent, type SeededWebmaster } from './eventDeletionHarness';
+import { changedRows, deletionSuite, readTables, rowsNaming, seedEvent, seedInertSeat, seedRoster, type SeededEvent, type SeededWebmaster } from './eventDeletionHarness';
 
 describe('event deletion', () => {
   const suite = deletionSuite();
-  const { deleteRows, fence, forget, rows, runToEnd, stores } = suite;
+  const { cleanUp, deleteRows, fence, forget, rows } = suite;
   let db: D1Binding;
   let webmaster: SeededWebmaster;
   let tables: string[];
-  beforeAll(() => { ({ db, webmaster, tables } = suite.opened()); });
+  /** The neighbor of every test here. Each test removes what it adds that would block the neighbor's own deletion. */
+  let other: SeededEvent;
+  beforeAll(async () => {
+    ({ db, webmaster, tables } = suite.opened());
+    other = await seedEvent(db, webmaster);
+  });
+  afterAll(() => cleanUp(other));
 
   describe('the legacy installation row', () => {
     type Placement = (event: SeededEvent, other: SeededEvent) => [owner: string, eventId: string, sessionId: string];
@@ -24,8 +30,7 @@ describe('event deletion', () => {
     async function withInstallation(placement: Placement, check: (event: SeededEvent) => Promise<void>): Promise<void> {
       // The row is one for the whole site, so a database that holds one cannot run this test.
       if ((await rows('SELECT 1 FROM installation')).length > 0) return;
-      const event = await seedEvent(db, webmaster);
-      const other = await seedEvent(db, webmaster);
+      const event = await seedRoster(db, webmaster);
       await bound(db, 'INSERT INTO installation (singleton, id, owner_account_id, event_id, session_id) VALUES (1, ?, ?, ?, ?)',
         randomUUID(), ...placement(event, other)).run();
       try {
@@ -34,10 +39,7 @@ describe('event deletion', () => {
       } finally {
         await bound(db, 'DELETE FROM installation').run();
       }
-      await deleteRows(db, event);
-      await runToEnd(stores().env, other);
-      await forget(event);
-      await forget(other);
+      await cleanUp(event);
     }
 
     for (const [label, placement] of naming) {
@@ -88,8 +90,7 @@ describe('event deletion', () => {
 
     for (const { table, column } of ACCOUNT_ROWS_IN_A_CONTEST.filter((row) => row.table !== 'memberships')) {
       it(`blocks on a row of ${table} in another event, without a cascade`, async () => {
-        const event = await seedEvent(db, webmaster);
-        const other = await seedEvent(db, webmaster);
+        const event = await seedRoster(db, webmaster);
         await contestRowsOfAnAccount[table]!(event.volunteer.accountId, other);
         const before = rowsNaming(await readTables(db, tables), other.ids);
         await fence(db, event);
@@ -98,15 +99,12 @@ describe('event deletion', () => {
         expect(Object.fromEntries(rowsNaming(await readTables(db, tables), other.ids))).toEqual(Object.fromEntries(before));
         await bound(db, `DELETE FROM ${table} WHERE ${column} = ?`, event.volunteer.accountId).run();
         expect(await deleteRows(db, event)).toBe('rows_done');
-        await runToEnd(stores().env, other);
         await forget(event);
-        await forget(other);
       });
     }
 
     it('blocks on a scoped operation between two of its accounts when no audit row names it, and the row stays', async () => {
-      const event = await seedEvent(db, webmaster);
-      const other = await seedEvent(db, webmaster);
+      const event = await seedRoster(db, webmaster);
       // The actor sorts first, so its retry alone runs the delete of the operation.
       const [actorId, accountId] = [event.volunteer.accountId, event.contestAdmin.accountId].sort() as [string, string];
       const operation = randomUUID();
@@ -120,13 +118,11 @@ describe('event deletion', () => {
       expect(await rows('SELECT session_id FROM account_operations WHERE id = ?', operation)).toEqual([{ session_id: other.practice }]);
       await bound(db, 'DELETE FROM account_operations WHERE id = ?', operation).run();
       expect(await deleteRows(db, event)).toBe('rows_done');
-      await runToEnd(stores().env, other);
       await forget(event);
-      await forget(other);
     });
 
     it('blocks two deletions on each other through operations with no contest, until the statement in the operator guide removes them', async () => {
-      const [first, second] = [await seedEvent(db, webmaster), await seedEvent(db, webmaster)];
+      const [first, second] = [await seedRoster(db, webmaster), await seedRoster(db, webmaster)];
       const [a, b] = [first.volunteer.accountId, second.volunteer.accountId];
       await bound(db, `INSERT INTO account_operations (id, account_id, actor, session_id, action, state) VALUES
         (?, ?, ?, NULL, 'set_username', 'completed'), (?, ?, ?, NULL, 'set_username', 'completed')`, randomUUID(), b, a, randomUUID(), a, b).run();
@@ -145,8 +141,7 @@ describe('event deletion', () => {
     });
 
     it('writes only one access row to the outbox of another event for an inert seat there', async () => {
-      const event = await seedEvent(db, webmaster);
-      const other = await seedEvent(db, webmaster);
+      const event = await seedRoster(db, webmaster);
       const legacy = await seedInertSeat(db, event, other.practice);
       const before = rowsNaming(await readTables(db, tables), other.ids);
       await fence(db, event);
@@ -157,15 +152,11 @@ describe('event deletion', () => {
         expect(added).toEqual([expect.stringContaining(`"audience":"account:${legacy}"`)]);
       }
       await bound(db, 'DELETE FROM memberships WHERE account_id = ?', legacy).run();
-      await deleteRows(db, event);
-      await runToEnd(stores().env, other);
-      await forget(event);
-      await forget(other);
+      await cleanUp(event);
     });
 
     it('moves only the access version of an account of another event with an inert seat in this one', async () => {
-      const event = await seedEvent(db, webmaster);
-      const other = await seedEvent(db, webmaster);
+      const event = await seedRoster(db, webmaster);
       const legacy = await seedInertSeat(db, other, event.practice);
       const before = rowsNaming(await readTables(db, tables), other.ids);
       const version = async () => (await rows<{ access_version: number }>('SELECT access_version FROM accounts WHERE id = ?', legacy))[0]?.access_version ?? 0;
@@ -179,15 +170,12 @@ describe('event deletion', () => {
       expect(changes.accounts?.added).toEqual([expect.stringContaining(legacy)]);
       expect(await version()).toBe(versionBefore + 1);
       expect(await rows('SELECT revoked FROM logins WHERE account_id = ?', legacy)).toEqual([{ revoked: 0 }]);
-      await runToEnd(stores().env, other);
       await forget(event);
-      await forget(other);
     });
 
     for (const limit of [100, 1]) {
       it(`blocks on an actor outside the event and finishes after the blocker goes, with chunks of ${limit}`, async () => {
-        const event = await seedEvent(db, webmaster);
-        const other = await seedEvent(db, webmaster);
+        const event = await seedRoster(db, webmaster);
         const historyId = randomUUID();
         const issue = (await rows<{ id: string }>('SELECT id FROM issues WHERE session_id = ? LIMIT 1', other.live))[0]!.id;
         await bound(db, `INSERT INTO history (id, issue_id, actor, actor_name, at, text, visibility)
@@ -205,15 +193,11 @@ describe('event deletion', () => {
         await bound(db, 'DELETE FROM history WHERE id = ?', historyId).run();
         expect(await deleteRows(db, event, limit)).toBe('rows_done');
         expect(await blockedName(event)).toBeNull();
-        await fence(db, other);
-        await deleteRows(db, other);
         await forget(event);
-        await forget(other);
       });
 
       it(`blocks on an inert seat in another event, without a cascade, with chunks of ${limit}`, async () => {
-        const event = await seedEvent(db, webmaster);
-        const other = await seedEvent(db, webmaster);
+        const event = await seedRoster(db, webmaster);
         const legacy = await seedInertSeat(db, event, other.practice);
         await fence(db, event);
         const before = rowsNaming(await readTables(db, tables), other.ids);
@@ -222,15 +206,11 @@ describe('event deletion', () => {
         expect(Object.fromEntries(rowsNaming(await readTables(db, tables), other.ids))).toEqual(Object.fromEntries(before));
         await bound(db, 'DELETE FROM memberships WHERE account_id = ? AND session_id = ?', legacy, other.practice).run();
         expect(await deleteRows(db, event, limit)).toBe('rows_done');
-        await fence(db, other);
-        await deleteRows(db, other);
         await forget(event);
-        await forget(other);
       });
 
       it(`blocks on an operation on an account outside the targets, with chunks of ${limit}`, async () => {
-        const event = await seedEvent(db, webmaster);
-        const other = await seedEvent(db, webmaster);
+        const event = await seedRoster(db, webmaster);
         const operation = randomUUID();
         await bound(db, `INSERT INTO account_operations (id, account_id, actor, session_id, action, state)
           VALUES (?, ?, ?, NULL, 'set_username', 'completed')`, operation, other.volunteer.accountId, event.waiting.accountId).run();
@@ -240,10 +220,7 @@ describe('event deletion', () => {
         expect(await rows('SELECT id FROM account_operations WHERE id = ?', operation)).toHaveLength(1);
         await bound(db, 'DELETE FROM account_operations WHERE id = ?', operation).run();
         expect(await deleteRows(db, event, limit)).toBe('rows_done');
-        await fence(db, other);
-        await deleteRows(db, other);
         await forget(event);
-        await forget(other);
       });
     }
   });

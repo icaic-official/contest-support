@@ -12,12 +12,11 @@ import { authorityGuard, contestDataBindings, contestDataSql, resolveAuthority, 
 import {
   advanceDeletions, advanceRows, CLAIM_DELETION_SQL, CONTEST_ACTIVITY, fenceStatements, ROWS_UNIT_CALLS, type DeletionEnvironment,
 } from '../cloudflare/eventDeletion';
-import { removeFixtureEvent } from '../cloudflare/eventDeletionFixture';
 import { eraseLiveContest } from '../cloudflare/live';
 import { bound } from './assertions';
 import type { D1Binding, D1Connection } from './connection';
 import {
-  crashingEnvironment, deletionSuite, fillStores, interceptCalls, readTables, rowsNaming, seedEvent, seedInertSeat,
+  crashingEnvironment, deletionSuite, fillStores, interceptCalls, readTables, rowsNaming, seedEvent, seedInertSeat, seedRoster,
   type SeededEvent, type SeededWebmaster,
 } from './eventDeletionHarness';
 
@@ -25,7 +24,7 @@ const fastPasswords: PasswordHasher = { hash: async () => 'fictional-test-hash',
 
 describe('event deletion', () => {
   const suite = deletionSuite();
-  const { actor, rows, fence, deleteRows, forget, footprint, stores, finished, passTime, runToEnd } = suite;
+  const { actor, rows, fence, deleteRows, forget, cleanUp, footprint, stores, finished, passTime, runToEnd } = suite;
   let db: D1Binding;
   let webmaster: SeededWebmaster;
   let tables: string[];
@@ -33,17 +32,16 @@ describe('event deletion', () => {
 
   describe('the fence', () => {
     it('refuses a wrong name and changes nothing', async () => {
-      const event = await seedEvent(db, webmaster);
+      const event = await seedRoster(db, webmaster);
       const before = await footprint(event);
       await expect(fence(db, event, `${event.name} `)).rejects.toThrow(/valid = 1/);
       expect(await footprint(event)).toEqual(before);
       await fence(db, event);
-      await deleteRows(db, event);
-      await forget(event);
+      await cleanUp(event);
     });
 
     it('refuses a write whose authority read came before the fence', async () => {
-      const event = await seedEvent(db, webmaster);
+      const event = await seedRoster(db, webmaster);
       const authority = await resolveAuthority(db, webmaster, { scope: 'event', eventId: event.eventId });
       if (!authority) throw new Error('The webmaster has no authority over the event.');
       await fence(db, event);
@@ -53,8 +51,7 @@ describe('event deletion', () => {
         bound(db, `INSERT INTO sessions (id, event_id, name) VALUES (?, ?, 'Late contest')`, late, event.eventId),
       ])).rejects.toThrow(/valid = 1/);
       expect(await rows('SELECT 1 FROM sessions WHERE id = ?', late)).toEqual([]);
-      await deleteRows(db, event);
-      await forget(event);
+      await cleanUp(event);
     });
 
     it('stops every reader of the event at once, and a repeat changes nothing', async () => {
@@ -91,8 +88,7 @@ describe('event deletion', () => {
       const fenced = await footprint(event);
       await expect(fence(db, event)).rejects.toThrow(/valid = 1/);
       expect(await footprint(event)).toEqual(fenced);
-      await deleteRows(db, event);
-      await forget(event);
+      await cleanUp(event);
     });
   });
 
@@ -102,7 +98,7 @@ describe('event deletion', () => {
       ({ type: 'delete_event', eventId: event.eventId, confirmName });
 
     it('refuses everyone but a webmaster, and a wrong name, without a change', async () => {
-      const event = await seedEvent(db, webmaster);
+      const event = await seedRoster(db, webmaster);
       const before = await footprint(event);
       for (const caller of [event.eventAdmin, event.contestAdmin, event.volunteer, event.contestant]) {
         await expect(manage().execute(caller, randomUUID(), command(event))).rejects.toMatchObject({ status: 403 });
@@ -114,13 +110,11 @@ describe('event deletion', () => {
       await expect(manage().execute(webmaster, randomUUID(), { type: 'delete_event', eventId: 'not-an-event', confirmName: 'Nobody' }))
         .rejects.toMatchObject({ status: 400 });
       expect(await footprint(event)).toEqual(before);
-      await fence(db, event);
-      await deleteRows(db, event);
-      await forget(event);
+      await cleanUp(event);
     });
 
     it('fences once, writes one site audit row, and answers a replay with its receipt', async () => {
-      const event = await seedEvent(db, webmaster);
+      const event = await seedRoster(db, webmaster);
       const requestId = randomUUID();
       const receipt = await manage().execute(webmaster, requestId, command(event));
       expect(receipt).toEqual({ eventId: event.eventId });
@@ -132,9 +126,8 @@ describe('event deletion', () => {
           detail: JSON.stringify({ name: event.name, code: event.code }) }]);
       expect(await rows('SELECT requested_by, requested_by_name, step, lease_until FROM event_deletions WHERE event_id = ?', event.eventId))
         .toEqual([{ requested_by: webmaster.accountId, requested_by_name: webmaster.name, step: 'rows', lease_until: 0 }]);
-      await deleteRows(db, event);
       await bound(db, `DELETE FROM manage_receipts WHERE actor = ? AND request_id = ?`, webmaster.accountId, requestId).run();
-      await forget(event);
+      await cleanUp(event);
     });
 
     describe('a legacy event', () => {
@@ -236,7 +229,7 @@ describe('event deletion', () => {
 
       await bound(db, 'DELETE FROM manage_receipts WHERE actor = ? AND request_id = ?', webmaster.accountId, requestId).run();
       await forget(doomed);
-      await removeFixtureEvent(db, kept.eventId);
+      await cleanUp(kept);
     });
 
     it('keeps a receipt of another event whose pasted text holds the deleted event ID, so its replay still answers', async () => {
@@ -255,11 +248,11 @@ describe('event deletion', () => {
       expect(await manage().execute(webmaster, requestId, pasted)).toEqual(answer);
       await bound(db, 'DELETE FROM manage_receipts WHERE actor = ? AND request_id IN (?, ?)', webmaster.accountId, requestId, removeRequest).run();
       await forget({ eventId: doomed });
-      await removeFixtureEvent(db, kept);
+      await cleanUp({ eventId: kept });
     });
 
     it('gives a fenced event code the refusal of an unknown code', async () => {
-      const event = await seedEvent(db, webmaster);
+      const event = await seedRoster(db, webmaster);
       const identity = createBetterAuthIdentity(db, { origin: 'http://127.0.0.1:8788', secret: 's'.repeat(64), secureCookies: false });
       const auth = new D1AuthenticationService(db, identity, passwordHasher);
       const refusal = async (code: string) => {
@@ -270,9 +263,8 @@ describe('event deletion', () => {
       const unknown = await refusal(`unknown-${randomUUID().slice(0, 8)}`);
       await fence(db, event);
       expect(await refusal(event.code)).toEqual(unknown);
-      await deleteRows(db, event);
       await bound(db, `DELETE FROM authentication_limits WHERE key LIKE ?`, `handle:code:%:${event.contestant.handle}`).run();
-      await forget(event);
+      await cleanUp(event);
     });
 
     it('shows progress on the site page, and omits the event from its list', async () => {
@@ -299,8 +291,8 @@ describe('event deletion', () => {
     });
 
     it('names the blocking account on the site page', async () => {
-      const event = await seedEvent(db, webmaster);
-      const other = await seedEvent(db, webmaster);
+      const event = await seedRoster(db, webmaster);
+      const other = await seedRoster(db, webmaster);
       const legacy = await seedInertSeat(db, event, other.practice);
       await fence(db, event);
       const { env } = stores();
@@ -309,20 +301,48 @@ describe('event deletion', () => {
       const blockedAccount = (await rows<{ handle: string }>('SELECT handle FROM accounts WHERE id = ?', legacy))[0];
       expect(deletion?.blockedBy).toEqual({ name: 'Fictional legacy', handle: blockedAccount?.handle });
       await bound(db, 'DELETE FROM memberships WHERE account_id = ?', legacy).run();
-      await runToEnd(env, event);
-      await fence(db, other);
-      await deleteRows(db, other);
-      await forget(event);
-      await forget(other);
+      await cleanUp(event, other);
     });
   });
 
   describe('the rows step', () => {
-    for (const limit of [100, 1]) {
-      it(`leaves only the journal and the site records with chunks of ${limit}`, async () => {
+    /** What a long contest leaves: an outbox that nothing deletes, and an audit trail. */
+    async function seedLongContest(contest: string, actorId: string, count: number): Promise<void> {
+      const series = `WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < ${count})`;
+      await db.batch([
+        bound(db, `INSERT INTO audience_sequences (session_id, audience, sequence) VALUES (?, 'staff', 1)
+          ON CONFLICT (session_id, audience) DO NOTHING`, contest),
+        bound(db, `${series} INSERT INTO notifications (id, session_id, audience, sequence, delivered)
+          SELECT lower(hex(randomblob(16))), ?, 'staff', 1000 + i, 1 FROM n`, contest),
+        bound(db, `${series} INSERT INTO admin_audit (id, session_id, actor, action)
+          SELECT lower(hex(randomblob(16))), ?, ?, 'save_member' FROM n`, contest, actorId),
+      ]);
+    }
+
+    /** The rows of each activity table in the event's two contests, in one request. */
+    async function activityCounts(event: SeededEvent): Promise<Record<string, number>> {
+      const counts = CONTEST_ACTIVITY.map(({ table }) => `(SELECT count(*) FROM ${table} WHERE session_id IN (?1, ?2)) AS ${table}`);
+      return (await rows<Record<string, number>>(`SELECT ${counts.join(', ')}`, event.practice, event.live))[0]!;
+    }
+
+    // One seed and one run carry each assertion, because each needs only that a full deletion runs unit by unit.
+    for (const limit of [undefined, 1]) {
+      it(`leaves only the journal and the site records, within ROWS_UNIT_CALLS a unit, with chunks of ${limit ?? 'the default'}`, async () => {
         const event = await seedEvent(db, webmaster);
+        await seedLongContest(event.live, event.contestAdmin.accountId, 3);
         await fence(db, event);
-        expect(await deleteRows(db, event, limit)).toBe('rows_done');
+        const counter = crashingEnvironment(stores().env, Number.MAX_SAFE_INTEGER, 'never ran');
+        const total = (counts: Record<string, number>) => Object.values(counts).reduce((sum, count) => sum + count, 0);
+        let before = await activityCounts(event);
+        for (;;) {
+          const called = counter.calls();
+          const progress = await advanceRows(counter.env.DB, event.eventId, limit);
+          expect(counter.calls() - called).toBeLessThanOrEqual(ROWS_UNIT_CALLS);
+          const after = await activityCounts(event);
+          expect(total(before) - total(after)).toBeLessThanOrEqual(limit ?? Number.POSITIVE_INFINITY);
+          before = after;
+          if (progress === 'rows_done') break;
+        }
         const left = await footprint(event);
         expect(Object.keys(left).sort()).toEqual(['authority_audit', 'event_deletion_targets', 'event_deletions']);
         expect(left.authority_audit!.every((row) => row.includes('"event_id":null'))).toBe(true);
@@ -337,70 +357,24 @@ describe('event deletion', () => {
       });
     }
 
-    /** What a long contest leaves: an outbox that nothing deletes, and an audit trail. */
-    async function seedLongContest(contest: string, actorId: string, count: number): Promise<void> {
-      const series = `WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < ${count})`;
-      await db.batch([
-        bound(db, `INSERT INTO audience_sequences (session_id, audience, sequence) VALUES (?, 'staff', 1)
-          ON CONFLICT (session_id, audience) DO NOTHING`, contest),
-        bound(db, `${series} INSERT INTO notifications (id, session_id, audience, sequence, delivered)
-          SELECT lower(hex(randomblob(16))), ?, 'staff', 1000 + i, 1 FROM n`, contest),
-        bound(db, `${series} INSERT INTO admin_audit (id, session_id, actor, action)
-          SELECT lower(hex(randomblob(16))), ?, ?, 'save_member' FROM n`, contest, actorId),
-      ]);
-    }
-
-    async function countInContest(table: string, contest: string): Promise<number> {
-      return (await rows<{ n: number }>(`SELECT count(*) AS n FROM ${table} WHERE session_id = ?`, contest))[0]?.n ?? 0;
-    }
-
     it('removes a long contest in bounded statements, so the contest row cascades no outbox and no audit', async () => {
-      const event = await seedEvent(db, webmaster);
+      const event = await seedRoster(db, webmaster);
       await seedLongContest(event.live, event.contestAdmin.accountId, 2500);
       await fence(db, event);
       const largest = { notifications: 0, admin_audit: 0 };
+      let before = await activityCounts(event);
       for (;;) {
-        const before = { notifications: await countInContest('notifications', event.live), admin_audit: await countInContest('admin_audit', event.live) };
         const progress = await advanceRows(db, event.eventId);
-        largest.notifications = Math.max(largest.notifications, before.notifications - await countInContest('notifications', event.live));
-        largest.admin_audit = Math.max(largest.admin_audit, before.admin_audit - await countInContest('admin_audit', event.live));
+        const after = await activityCounts(event);
+        largest.notifications = Math.max(largest.notifications, before.notifications! - after.notifications!);
+        largest.admin_audit = Math.max(largest.admin_audit, before.admin_audit! - after.admin_audit!);
+        before = after;
         if (progress === 'rows_done') break;
         expect(progress).toBe('more');
       }
       expect(largest).toEqual({ notifications: 1000, admin_audit: 1000 });
       await forget(event);
     });
-
-    it('removes at most one row of each activity table in a unit with chunks of 1', async () => {
-      const event = await seedEvent(db, webmaster);
-      await seedLongContest(event.live, event.contestAdmin.accountId, 3);
-      await fence(db, event);
-      const counts = async () => Promise.all(CONTEST_ACTIVITY.map(async ({ table }) =>
-        await countInContest(table, event.practice) + await countInContest(table, event.live)));
-      for (;;) {
-        const before = await counts();
-        const progress = await advanceRows(db, event.eventId, 1);
-        const after = await counts();
-        expect(before.reduce((sum, count, index) => sum + count - (after[index] ?? 0), 0)).toBeLessThanOrEqual(1);
-        if (progress === 'rows_done') break;
-      }
-      await forget(event);
-    });
-
-    for (const limit of [undefined, 1]) {
-      it(`spends no more than ROWS_UNIT_CALLS in a unit with chunks of ${limit ?? 'the default'}`, async () => {
-        const event = await seedEvent(db, webmaster);
-        await fence(db, event);
-        const counter = crashingEnvironment(stores().env, Number.MAX_SAFE_INTEGER, 'never ran');
-        for (;;) {
-          const before = counter.calls();
-          const progress = await advanceRows(counter.env.DB, event.eventId, limit);
-          expect(counter.calls() - before).toBeLessThanOrEqual(ROWS_UNIT_CALLS);
-          if (progress === 'rows_done') break;
-        }
-        await forget(event);
-      });
-    }
   });
 
   describe('rows that arrive after the fence', () => {
@@ -408,7 +382,7 @@ describe('event deletion', () => {
       bound(db, `INSERT INTO sessions (id, event_id, name) VALUES (?, ?, 'Late contest')`, id, event.eventId).run();
 
     it('take a contest through every step, so its live state and its files go', async () => {
-      const event = await seedEvent(db, webmaster);
+      const event = await seedRoster(db, webmaster);
       const { bucket, live, env } = stores();
       fillStores(event, bucket, live);
       await fence(db, event);
@@ -424,7 +398,7 @@ describe('event deletion', () => {
     });
 
     it('take an account, so the last batch does not fail for ever', async () => {
-      const event = await seedEvent(db, webmaster);
+      const event = await seedRoster(db, webmaster);
       await fence(db, event);
       const late = randomUUID();
       await bound(db, `INSERT INTO accounts (id, name, username, handle, event_id, must_change) VALUES (?, 'Late', ?, ?, ?, 0)`,
@@ -435,7 +409,7 @@ describe('event deletion', () => {
     });
 
     it('do not make a seat in a late contest look like a seat in another event', async () => {
-      const event = await seedEvent(db, webmaster);
+      const event = await seedRoster(db, webmaster);
       await fence(db, event);
       const late = randomUUID();
       await lateContest(event, late);
@@ -447,7 +421,7 @@ describe('event deletion', () => {
     });
 
     it('fail the last batch when they arrive after the check, and the next unit adds them', async () => {
-      const event = await seedEvent(db, webmaster);
+      const event = await seedRoster(db, webmaster);
       await fence(db, event);
       const late = randomUUID();
       let arrived = false;
@@ -513,7 +487,7 @@ describe('event deletion', () => {
     }
 
     it('do not let a stale rows runner skip the files of a contest', async () => {
-      const event = await seedEvent(db, webmaster);
+      const event = await seedRoster(db, webmaster);
       const { bucket, live, env } = stores();
       fillStores(event, bucket, live);
       await fence(db, event);
@@ -533,7 +507,7 @@ describe('event deletion', () => {
     });
 
     it('do not let a stale live runner skip the files of a contest', async () => {
-      const event = await seedEvent(db, webmaster);
+      const event = await seedRoster(db, webmaster);
       const { bucket, live, env } = stores();
       fillStores(event, bucket, live);
       await fence(db, event);
@@ -553,7 +527,7 @@ describe('event deletion', () => {
 
   describe('a stale live runner', () => {
     it('stops erasing once the step has moved', async () => {
-      const event = await seedEvent(db, webmaster);
+      const event = await seedRoster(db, webmaster);
       const { bucket, live, env } = stores();
       fillStores(event, bucket, live);
       await fence(db, event);
@@ -578,14 +552,13 @@ describe('event deletion', () => {
       release();
       await running;
       expect(counter.calls()).toBeLessThan(12);
-      await runToEnd(env, event);
-      await forget(event);
+      await cleanUp(event);
     });
   });
 
   describe('the live step', () => {
     it('refuses to erase a contest that exists, or that no journal names', async () => {
-      const event = await seedEvent(db, webmaster);
+      const event = await seedRoster(db, webmaster);
       const { live } = stores();
       live.state(event.live).fill(event.live);
       await expect(eraseLiveContest({ LIVE_UPDATES: live }, event.eventId, event.live)).rejects.toThrow('not erased');
@@ -602,7 +575,7 @@ describe('event deletion', () => {
 
   describe('the files step', () => {
     it('makes no R2 call and no claim for 65 minutes after the rows go', async () => {
-      const event = await seedEvent(db, webmaster);
+      const event = await seedRoster(db, webmaster);
       const { bucket, live, env } = stores();
       fillStores(event, bucket, live);
       await fence(db, event);
@@ -670,7 +643,7 @@ describe('event deletion', () => {
       .filter((line) => line.startsWith('{')).map((line) => JSON.parse(line) as object);
 
     it('stops at its count of calls, and later ticks finish', async () => {
-      const event = await seedEvent(db, webmaster);
+      const event = await seedRoster(db, webmaster);
       const { bucket, live, env } = stores();
       fillStores(event, bucket, live);
       await fence(db, event);
@@ -687,7 +660,7 @@ describe('event deletion', () => {
     });
 
     it('stops at its time, and leaves the lease for a later tick', async () => {
-      const event = await seedEvent(db, webmaster);
+      const event = await seedRoster(db, webmaster);
       const { env } = stores();
       await fence(db, event);
       await advanceDeletions(env, { milliseconds: 0, calls: 400 });
@@ -697,8 +670,8 @@ describe('event deletion', () => {
     });
 
     it('lets one failing deletion leave the others to finish, and then reports the failure', async () => {
-      const failing = await seedEvent(db, webmaster);
-      const other = await seedEvent(db, webmaster);
+      const failing = await seedRoster(db, webmaster);
+      const other = await seedRoster(db, webmaster);
       const { bucket, live, env } = stores();
       fillStores(failing, bucket, live);
       fillStores(other, bucket, live);
@@ -727,7 +700,7 @@ describe('event deletion', () => {
     });
 
     it('logs fixed words for a key failure that D1 hides, and no text of the error', async () => {
-      const event = await seedEvent(db, webmaster);
+      const event = await seedRoster(db, webmaster);
       const other = await seedEvent(db, webmaster);
       const historyId = randomUUID();
       const issue = (await rows<{ id: string }>('SELECT id FROM issues WHERE session_id = ? LIMIT 1', other.live))[0]!.id;
@@ -758,9 +731,8 @@ describe('event deletion', () => {
       await bound(db, 'DELETE FROM history WHERE id = ?', historyId).run();
       await passTime(event);
       expect(await deleteRows(db, event)).toBe('rows_done');
-      await runToEnd(stores().env, other);
       await forget(event);
-      await forget(other);
+      await cleanUp(other);
     });
 
     it('logs the last batch for a key that fails when that batch commits, and sets no block', async () => {
@@ -783,7 +755,7 @@ describe('event deletion', () => {
       await bound(db, 'UPDATE sessions SET event_id = ? WHERE id = ?', eventId, contest).run();
       await passTime({ eventId });
       expect(await deleteRows(db, { eventId })).toBe('rows_done');
-      await removeFixtureEvent(db, otherId);
+      await cleanUp({ eventId: otherId });
       await forget({ eventId });
     });
   });
@@ -833,15 +805,13 @@ describe('event deletion', () => {
         expect(state.alarmAt).toBe(1);
         expect(state.getWebSockets()).toHaveLength(1);
       }
-      await runToEnd(env, other);
-      await forget(event);
-      await forget(other);
+      await cleanUp(event, other);
     });
   });
 
   describe('the journal triggers', () => {
     it('moves forward one step at a time and keeps naming the same event', async () => {
-      const event = await seedEvent(db, webmaster);
+      const event = await seedRoster(db, webmaster);
       await fence(db, event);
       for (const step of ['files', 'done', 'rows']) {
         await expect(bound(db, `UPDATE event_deletions SET step = ?, rows_done_at = 'x', finished_at = CASE WHEN ? = 'done' THEN 'x' END WHERE event_id = ?`,

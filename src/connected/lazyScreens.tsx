@@ -20,8 +20,8 @@ export const SiteDashboard = lazy(() =>
   import("@/site/SiteDashboard").then((m) => ({ default: m.SiteDashboard })),
 );
 
-/** A short wait, for a screen whose code or first data is not ready. */
-export function ScreenWait() {
+/** A short wait for a screen whose code is not ready. */
+function ScreenWait() {
   return (
     <p
       role="status"

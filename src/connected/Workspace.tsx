@@ -25,7 +25,6 @@ import {
   ContestantApp,
   EventConsolePage,
   OrganiserApp,
-  ScreenWait,
   SiteDashboard,
   WithScreen,
   rememberScreen,
@@ -69,7 +68,8 @@ export function Workspace({
   // Both screens are staff code. A person with neither level never downloads them.
   if (eventRoute || onSitePage) {
     const access = levelScreenAccess(data.sessions, data.loaded);
-    if (access === "wait") return <ScreenWait />;
+    // The wait for the first session, which has Sign out, because a read can hang.
+    if (access === "wait") return <SessionAccess {...props} data={data} />;
     if (access === "deny") return <NoLevelAccess page={onSitePage ? "site" : "event"} signOut={props.signOut} />;
   }
   if (eventRoute) {

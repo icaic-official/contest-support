@@ -98,6 +98,10 @@ export function canOpenPage(page: WorkspacePage, member: Membership): boolean {
  * - `wait`: the first read of the list has not ended.
  * - `deny`: the person has neither level.
  * - `open`: show the screen.
+ *
+ * `read` says that a read has ended, and a non-empty list needs no more. The
+ * session hook publishes the list before it reads the snapshot, and it sends no
+ * snapshot read for an empty list. So the wait is never on a snapshot.
  */
 export function levelScreenAccess(
   contests: readonly Pick<ContestSummary, "manage">[],

@@ -221,6 +221,8 @@ export type ManageCommand =
   | { readonly type: 'add_webmaster'; readonly person: PersonInput }
   | { readonly type: 'remove_webmaster'; readonly accountId: string }
   | { readonly type: 'set_webmaster_reads'; readonly restricted: boolean }
+  /** Deletes the event for good, after the caller types its exact name. */
+  | { readonly type: 'delete_event'; readonly eventId: string; readonly confirmName: string }
   // Event. Requires an event admin of that event, or a webmaster.
   | { readonly type: 'update_event'; readonly eventId: string; readonly name: string; readonly code: string; readonly timeZone: string }
   | { readonly type: 'set_event_admin'; readonly eventId: string; readonly accountId: string; readonly admin: boolean }
@@ -272,6 +274,23 @@ export interface IssuedCredential {
 /** The steps of one event's permanent deletion, in order. */
 export type DeletionStep = 'rows' | 'live' | 'files' | 'done';
 
+/** The progress of one event's permanent deletion, and later its site record. */
+export interface EventDeletion {
+  readonly eventId: string;
+  readonly eventName: string;
+  readonly eventCode: string;
+  readonly step: DeletionStep;
+  readonly requestedAt: string;
+  readonly requestedByName: string;
+  /** The account that stops the deletion, because it also has activity in another event. */
+  readonly blockedBy: { readonly name: string; readonly handle: string | null } | null;
+  /** The time of the final file check. Null until the rows are gone. */
+  readonly filesDueAt: string | null;
+  /** What is left in the current step. */
+  readonly remaining: number;
+  readonly finishedAt: string | null;
+}
+
 export interface SiteOverview {
   readonly webmasters: ReadonlyArray<{
     readonly id: string;
@@ -290,6 +309,8 @@ export interface SiteOverview {
     readonly contests: number;
     readonly accounts: number;
   }>;
+  /** The open deletions and the latest finished ones. */
+  readonly deletions: readonly EventDeletion[];
   /** Contests that the caller has not joined. Empty while webmasters read every contest. */
   readonly contestsToJoin: ReadonlyArray<{
     readonly id: string;

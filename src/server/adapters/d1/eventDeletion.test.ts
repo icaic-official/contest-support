@@ -1,13 +1,19 @@
 import { randomUUID } from 'node:crypto';
 import { attachmentPath } from '../../../connected/imageFile';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import type { EventCode, Handle, ManageCommand } from '../../../backend/contracts';
+import { AuthenticationError } from '../../authentication';
 import { D1ApplicationService } from '../cloudflare/application';
+import { D1AuthenticationService } from '../cloudflare/authentication';
+import { createBetterAuthIdentity } from '../cloudflare/identity';
+import { D1ManageService } from '../cloudflare/manage';
+import { passwordHasher, type PasswordHasher } from '../cloudflare/password';
 import { contestDataBindings, contestDataSql, resolveAuthority, signInAccountSql } from '../cloudflare/authority';
 import { advanceDeletions, advanceRows, CLAIM_DELETION_SQL, fenceStatements, type DeletionEnvironment, type RowsProgress } from '../cloudflare/eventDeletion';
 import { eraseLiveContest } from '../cloudflare/live';
 import { openStoreDatabase } from '../cloudflare/tooling/store-database.mjs';
 import { bound } from './assertions';
-import type { D1Connection } from './connection';
+import type { D1Binding, D1Connection } from './connection';
 import {
   crashingEnvironment, FakeBucket, FakeLiveNamespace, fillStores, interceptCalls, readTables, rowsNaming, seedEvent, seedInertSeat, seedWebmaster,
   tableNames, type CrashMode, type SeededEvent, type SeededWebmaster,
@@ -20,10 +26,11 @@ const configPath = connectorConfig ?? 'src/server/adapters/cloudflare/deploy/con
 // Each hosted request waits for the runner's reviewed interval.
 vi.setConfig({ testTimeout: remote ? 3_600_000 : 300_000, hookTimeout: remote ? 600_000 : 120_000 });
 
+const fastPasswords: PasswordHasher = { hash: async () => 'fictional-test-hash', verify: async () => false };
 const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/g;
 
 describe('event deletion', () => {
-  let db: D1Connection;
+  let db: D1Binding;
   let dispose: () => Promise<void>;
   let webmaster: SeededWebmaster;
   let tables: string[];
@@ -115,6 +122,106 @@ describe('event deletion', () => {
       expect(await footprint(event)).toEqual(fenced);
       await deleteRows(db, event);
       await forget(event);
+    });
+  });
+
+  describe('the delete_event command', () => {
+    const manage = () => new D1ManageService(db, fastPasswords);
+    const command = (event: SeededEvent, confirmName = event.name): ManageCommand =>
+      ({ type: 'delete_event', eventId: event.eventId, confirmName });
+
+    it('refuses everyone but a webmaster, and a wrong name, without a change', async () => {
+      const event = await seedEvent(db, webmaster);
+      const before = await footprint(event);
+      for (const caller of [event.eventAdmin, event.contestAdmin, event.volunteer, event.contestant]) {
+        await expect(manage().execute(caller, randomUUID(), command(event))).rejects.toMatchObject({ status: 403 });
+      }
+      await expect(manage().execute(webmaster, randomUUID(), command(event, `${event.name}x`)))
+        .rejects.toMatchObject({ status: 409, message: 'The name does not match. Type the event name exactly.' });
+      await expect(manage().execute(webmaster, randomUUID(), { type: 'delete_event', eventId: randomUUID(), confirmName: 'Nobody' }))
+        .rejects.toMatchObject({ status: 409, message: 'That event no longer exists. Refresh the page.' });
+      await expect(manage().execute(webmaster, randomUUID(), { type: 'delete_event', eventId: 'not-an-event', confirmName: 'Nobody' }))
+        .rejects.toMatchObject({ status: 400 });
+      expect(await footprint(event)).toEqual(before);
+      await fence(db, event);
+      await deleteRows(db, event);
+      await forget(event);
+    });
+
+    it('fences once, writes one site audit row, and answers a replay with its receipt', async () => {
+      const event = await seedEvent(db, webmaster);
+      const requestId = randomUUID();
+      const receipt = await manage().execute(webmaster, requestId, command(event));
+      expect(receipt).toEqual({ eventId: event.eventId });
+      expect(await manage().execute(webmaster, requestId, command(event))).toEqual(receipt);
+      await expect(manage().execute(webmaster, randomUUID(), command(event)))
+        .rejects.toMatchObject({ status: 409, message: 'This event is already being deleted.' });
+      expect(await rows(`SELECT event_id, actor, actor_name, detail FROM authority_audit WHERE action = 'delete_event' AND target = ?`, event.eventId))
+        .toEqual([{ event_id: null, actor: webmaster.accountId, actor_name: webmaster.name,
+          detail: JSON.stringify({ name: event.name, code: event.code }) }]);
+      expect(await rows('SELECT requested_by, requested_by_name, step, lease_until FROM event_deletions WHERE event_id = ?', event.eventId))
+        .toEqual([{ requested_by: webmaster.accountId, requested_by_name: webmaster.name, step: 'rows', lease_until: 0 }]);
+      await deleteRows(db, event);
+      await bound(db, `DELETE FROM manage_receipts WHERE actor = ? AND request_id = ?`, webmaster.accountId, requestId).run();
+      await forget(event);
+    });
+
+    it('gives a fenced event code the refusal of an unknown code', async () => {
+      const event = await seedEvent(db, webmaster);
+      const identity = createBetterAuthIdentity(db, { origin: 'http://127.0.0.1:8788', secret: 's'.repeat(64), secureCookies: false });
+      const auth = new D1AuthenticationService(db, identity, passwordHasher);
+      const refusal = async (code: string) => {
+        const error = await auth.signIn({ kind: 'event', code: code as EventCode }, event.contestant.handle as Handle, 'a-wrong-password').catch((caught: unknown) => caught);
+        expect(error).toBeInstanceOf(AuthenticationError);
+        return { status: (error as AuthenticationError).status, message: (error as AuthenticationError).message };
+      };
+      const unknown = await refusal(`unknown-${randomUUID().slice(0, 8)}`);
+      await fence(db, event);
+      expect(await refusal(event.code)).toEqual(unknown);
+      await deleteRows(db, event);
+      await bound(db, `DELETE FROM authentication_limits WHERE key LIKE ?`, `handle:code:%:${event.contestant.handle}`).run();
+      await forget(event);
+    });
+
+    it('shows progress on the site page, and omits the event from its list', async () => {
+      const event = await seedEvent(db, webmaster);
+      const shown = async () => (await manage().site(webmaster))?.deletions.find((deletion) => deletion.eventId === event.eventId);
+      expect(await shown()).toBeUndefined();
+      expect((await manage().site(webmaster))?.events.map((item) => item.id)).toContain(event.eventId);
+      await fence(db, event);
+      expect((await manage().site(webmaster))?.events.map((item) => item.id)).not.toContain(event.eventId);
+      expect(await shown()).toMatchObject({
+        eventName: event.name, eventCode: event.code, step: 'rows', requestedByName: webmaster.name, blockedBy: null,
+        filesDueAt: null, finishedAt: null, remaining: 2 + event.accounts.length,
+      });
+      const { bucket, live, env } = stores();
+      fillStores(event, bucket, live);
+      await advanceDeletions(env);
+      const waiting = await shown();
+      expect(waiting).toMatchObject({ step: 'files', remaining: 3, finishedAt: null });
+      expect(Date.parse(waiting?.filesDueAt ?? '') - Date.now()).toBeGreaterThan(60 * 60_000);
+      await runToEnd(env, event);
+      expect(await shown()).toMatchObject({ step: 'done', remaining: 0 });
+      expect((await shown())?.finishedAt).toEqual(expect.any(String));
+      await forget(event);
+    });
+
+    it('names the blocking account on the site page', async () => {
+      const event = await seedEvent(db, webmaster);
+      const other = await seedEvent(db, webmaster);
+      const legacy = await seedInertSeat(db, event, other.practice);
+      await fence(db, event);
+      const { env } = stores();
+      await advanceDeletions(env);
+      const deletion = (await manage().site(webmaster))?.deletions.find((item) => item.eventId === event.eventId);
+      const blockedAccount = (await rows<{ handle: string }>('SELECT handle FROM accounts WHERE id = ?', legacy))[0];
+      expect(deletion?.blockedBy).toEqual({ name: 'Fictional legacy', handle: blockedAccount?.handle });
+      await bound(db, 'DELETE FROM memberships WHERE account_id = ?', legacy).run();
+      await runToEnd(env, event);
+      await fence(db, other);
+      await deleteRows(db, other);
+      await forget(event);
+      await forget(other);
     });
   });
 

@@ -1022,6 +1022,7 @@ describe('event, roster, and contest commands', () => {
       add_webmaster: { type: 'add_webmaster', person: { handle: 'newcomer', name: 'Newcomer' } },
       remove_webmaster: { type: 'remove_webmaster', accountId: account },
       set_webmaster_reads: { type: 'set_webmaster_reads', restricted: true },
+      delete_event: { type: 'delete_event', eventId: event, confirmName: 'New' },
       update_event: { type: 'update_event', eventId: event, name: 'New', code: 'new-code', timeZone: 'UTC' },
       set_event_admin: { type: 'set_event_admin', eventId: event, accountId: account, admin: true },
       create_people: { type: 'create_people', eventId: event, people: [{ handle: 'person', name: 'Person' }] },

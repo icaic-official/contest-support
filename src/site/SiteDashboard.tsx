@@ -1,6 +1,6 @@
-import { type FormEvent, type ReactNode, useId, useState } from "react";
+import { type FormEvent, type ReactNode, useId, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router";
-import { CalendarPlus, Clock, KeyRound, LogOut, ShieldCheck, UserMinus, UserPlus } from "lucide-react";
+import { CalendarPlus, Clock, KeyRound, LogOut, ShieldCheck, Trash2, UserMinus, UserPlus } from "lucide-react";
 import { type AccountIdentity, type EventCode, type PersonInput, type SiteOverview, parseEventCode, parseHandle } from "@/backend/contracts";
 import { BrandMark } from "@/components/brand";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -28,10 +28,13 @@ import { CredentialReveal } from "@/organiser/admin/CredentialReveal";
 import { usernamePattern } from "@/organiser/admin/adminModel";
 import type { Credentials } from "@/organiser/admin/useSessionAdmin";
 import { PersonAvatar } from "@/organiser/components/issueDisplay";
+import { DeleteEventDialog } from "./DeleteEventDialog";
+import { Deletions } from "./Deletions";
 import { JoinContests } from "./JoinContests";
 import { joinContest, type SiteState, useSite } from "./useSite";
 
 const headingId = "site-heading";
+const deletionsHeadingId = "site-deletions";
 
 /**
  * The webmaster's site page: the webmasters, the read restriction, and the
@@ -106,6 +109,11 @@ export function SiteDashboard({
           <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-2">
             <div className="space-y-5">
               <Events site={site} state={state} />
+              {site.deletions.length > 0 && (
+                <SiteCard title={`Deletions · ${site.deletions.length}`} headingId={deletionsHeadingId}>
+                  <Deletions deletions={site.deletions} />
+                </SiteCard>
+              )}
               <Webmasters site={site} self={user.id} state={state} />
             </div>
             <div className="space-y-5">
@@ -196,17 +204,21 @@ function SiteHeader({
 function SiteCard({
   title,
   action,
+  headingId,
   children,
 }: {
   title: string;
   action?: ReactNode;
+  /** A heading that a finished command can move focus to. */
+  headingId?: string;
   children: ReactNode;
 }) {
-  const id = useId();
+  const generatedId = useId();
+  const id = headingId ?? generatedId;
   return (
     <section aria-labelledby={id} className="rounded-xl border bg-card">
       <div className="flex min-h-12 items-center justify-between gap-2 border-b px-4 py-2">
-        <h2 id={id} className="text-sm font-semibold">
+        <h2 id={id} tabIndex={headingId ? -1 : undefined} className="text-sm font-semibold outline-none">
           {title}
         </h2>
         {action}
@@ -496,6 +508,9 @@ function Events({ site, state }: { site: SiteOverview; state: SiteState }) {
   const [creating, setCreating] = useState(false);
   const [credentials, setCredentials] = useState<(Credentials & { eventName: string }) | undefined>();
   const [notice, setNotice] = useState("");
+  const [deleting, setDeleting] = useState<SiteEvent | undefined>();
+  // The deleted event's row, which opened the dialog, is gone. So focus moves to its progress.
+  const deleted = useRef(false);
   return (
     <SiteCard
       title={`Events · ${site.events.length}`}
@@ -525,11 +540,26 @@ function Events({ site, state }: { site: SiteOverview; state: SiteState }) {
                   {item.accounts} {item.accounts === 1 ? "account" : "accounts"}
                 </p>
               </div>
-              <Button asChild variant="outline" className="ml-auto h-11">
-                <Link to={eventPath(item.id)} aria-label={`Open the console of ${item.name}`}>
-                  Open console
-                </Link>
-              </Button>
+              <div className="ml-auto flex flex-wrap gap-2">
+                <Button asChild variant="outline" className="h-11">
+                  <Link to={eventPath(item.id)} aria-label={`Open the console of ${item.name}`}>
+                    Open console
+                  </Link>
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-11"
+                  aria-label={`Delete ${item.name}`}
+                  onClick={() => {
+                    state.clearError();
+                    setDeleting(item);
+                  }}
+                >
+                  <Trash2 aria-hidden="true" />
+                  Delete event
+                </Button>
+              </div>
             </li>
           ))}
         </ul>
@@ -537,6 +567,28 @@ function Events({ site, state }: { site: SiteOverview; state: SiteState }) {
       <p role="status" className="mt-2 text-xs text-muted-foreground empty:hidden">
         {notice}
       </p>
+      <DeleteEventDialog
+        event={deleting}
+        busy={state.busy}
+        error={state.error}
+        onOpenChange={(open) => {
+          if (!open) setDeleting(undefined);
+        }}
+        onCloseAutoFocus={(event) => {
+          if (!deleted.current) return;
+          deleted.current = false;
+          event.preventDefault();
+          document.getElementById(deletionsHeadingId)?.focus();
+        }}
+        onDelete={async (confirmName) => {
+          if (!deleting) return;
+          const receipt = await state.execute({ type: "delete_event", eventId: deleting.id, confirmName });
+          if (!receipt) return;
+          setNotice(`Deleting ${deleting.name}. Its progress is under Deletions.`);
+          deleted.current = true;
+          setDeleting(undefined);
+        }}
+      />
       <CreateEvent
         open={creating}
         busy={state.busy}

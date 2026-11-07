@@ -1,3 +1,5 @@
+import type { Page } from '@playwright/test';
+import type { ManageCommand } from '../src/backend/contracts';
 import { expect, test } from './support/localWorker';
 
 // A webmaster reaches every contest of the shared test database, so the
@@ -66,5 +68,76 @@ test('a webmaster turns the restriction on, joins a contest, and sees the join i
     await expect(join).not.toContainText(local.users.admin);
   } finally {
     await local.manage(local.users.admin, { type: 'set_webmaster_reads', restricted: false });
+  }
+});
+
+test.describe('deleting an event', () => {
+  async function openSite(page: Page) {
+    await page.goto('/sign-in');
+    await page.getByRole('button', { name: 'Site sign-in', exact: true }).click();
+    await page.getByLabel('Username', { exact: true }).fill('admin');
+    await page.getByLabel('Password', { exact: true }).fill(crypto.randomUUID());
+    await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+    await page.waitForURL((url) => !url.pathname.startsWith('/sign-in'));
+    await page.goto('/site');
+    await expect(page.getByRole('heading', { name: 'Site', level: 1 })).toBeVisible();
+  }
+
+  const newEvent = async (local: { manage(user: string, command: ManageCommand): Promise<unknown>; users: { admin: string } }) => {
+    const unique = crypto.randomUUID().slice(0, 8);
+    const name = `Doomed event ${unique}`;
+    await local.manage(local.users.admin, {
+      type: 'create_event', name, code: `doomed-${unique}`, timeZone: 'UTC',
+      firstAdmin: { handle: `admin-${unique}`, name: 'Fictional admin' },
+    });
+    return name;
+  };
+
+  test('names what is lost, needs the exact name, and shows progress, by keyboard', async ({ page, local }) => {
+    const name = await newEvent(local);
+    await openSite(page);
+    const open = page.getByRole('button', { name: `Delete ${name}`, exact: true });
+    await open.focus();
+    await page.keyboard.press('Enter');
+    const dialog = page.getByRole('dialog', { name: `Delete ${name}?` });
+    await expect(dialog).toContainText('0 contests and 1 account');
+    await expect(dialog).toContainText('Every issue, reply, note, award, image, and announcement');
+    await expect(dialog).toContainText('You cannot undo this.');
+    const confirm = dialog.getByRole('button', { name: 'Delete event', exact: true });
+    const typed = dialog.getByLabel('Type the event name to confirm');
+    await expect(confirm).toBeDisabled();
+    await typed.fill(name.toUpperCase());
+    await expect(confirm).toBeDisabled();
+    await page.keyboard.press('Escape');
+    await expect(dialog).toHaveCount(0);
+    await expect(open).toBeFocused();
+
+    await open.click();
+    await typed.fill(name);
+    await expect(confirm).toBeEnabled();
+    await typed.press('Enter');
+    const deletions = page.getByRole('region', { name: /^Deletions/ });
+    await expect(deletions.getByText(name)).toBeVisible();
+    await expect(deletions.getByText('Deleting contests and accounts')).toBeVisible();
+    await expect(open).toHaveCount(0);
+    await expect(page.getByRole('heading', { name: /^Deletions/ })).toBeFocused();
+    await expect(page.getByText(`Deleting ${name}. Its progress is under Deletions.`)).toBeVisible();
+  });
+
+  for (const width of [320, 390]) {
+    test(`fits a phone of ${width} pixels`, async ({ page, local }) => {
+      await page.setViewportSize({ width, height: 720 });
+      const name = await newEvent(local);
+      await openSite(page);
+      const fits = () => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth);
+      expect(await fits()).toBe(true);
+      await page.getByRole('button', { name: `Delete ${name}`, exact: true }).click();
+      const dialog = page.getByRole('dialog', { name: `Delete ${name}?` });
+      await dialog.getByLabel('Type the event name to confirm').fill(name);
+      expect(await fits()).toBe(true);
+      await dialog.getByRole('button', { name: 'Delete event', exact: true }).click();
+      await expect(page.getByRole('region', { name: /^Deletions/ }).getByText(name)).toBeVisible();
+      expect(await fits()).toBe(true);
+    });
   }
 });

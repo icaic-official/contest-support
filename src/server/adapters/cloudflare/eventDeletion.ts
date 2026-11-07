@@ -1,4 +1,4 @@
-import type { DeletionStep } from '../../../backend/contracts';
+import type { DeletionStep, EventDeletion } from '../../../backend/contracts';
 import { bound, isAssertionFailure } from '../d1/assertions';
 import type { D1Connection, D1Statement } from '../d1/connection';
 import type { PrivateBucket } from './images';
@@ -191,6 +191,7 @@ export const DELETION_BUDGET = { milliseconds: 20_000, calls: 400 } as const;
 const LEASE_SECONDS = 55;
 // An issue image reservation lives 3,600 seconds. A later upload's Worker has died by then.
 const FILES_WAIT_SECONDS = 3900;
+export const DELETIONS_SHOWN = 50;
 const TARGET_PAGE = 50;
 const LIST_LIMIT = 1000;
 
@@ -346,4 +347,40 @@ export async function advanceDeletions(env: DeletionEnvironment, limits: { reado
     }
   }
   if (failed > 0) throw new Error('An event deletion requires another attempt.');
+}
+
+const DELETION_COLUMNS = `d.event_id, d.event_name, d.event_code, d.step, d.requested_at, d.requested_by_name, d.finished_at,
+  b.name AS blocked_name, b.handle AS blocked_handle, d.blocked,
+  strftime('%Y-%m-%dT%H:%M:%fZ', unixepoch(d.rows_done_at) + ${FILES_WAIT_SECONDS}, 'unixepoch') AS files_due_at,
+  (SELECT count(*) FROM event_deletion_targets t WHERE t.event_id = d.event_id AND t.done = 0
+    AND (t.kind <> 'avatar_owner' OR d.step = 'files')) AS remaining`;
+
+/** The open deletions, then the latest finished ones. A step's own targets are what remain in it. */
+export const DELETIONS_SQL = `SELECT * FROM (SELECT ${DELETION_COLUMNS} FROM event_deletions d LEFT JOIN accounts b ON b.id = d.blocked
+    WHERE d.finished_at IS NULL ORDER BY d.lease_until LIMIT ${DELETIONS_SHOWN})
+  UNION ALL SELECT * FROM (SELECT ${DELETION_COLUMNS} FROM event_deletions d LEFT JOIN accounts b ON b.id = d.blocked
+    WHERE d.finished_at IS NOT NULL ORDER BY d.finished_at DESC LIMIT ${DELETIONS_SHOWN})`;
+
+export interface DeletionRow {
+  event_id: string;
+  event_name: string;
+  event_code: string;
+  step: DeletionStep;
+  requested_at: string;
+  requested_by_name: string;
+  finished_at: string | null;
+  blocked: string | null;
+  blocked_name: string | null;
+  blocked_handle: string | null;
+  files_due_at: string | null;
+  remaining: number;
+}
+
+export function deletionFromRow(row: DeletionRow): EventDeletion {
+  return {
+    eventId: row.event_id, eventName: row.event_name, eventCode: row.event_code, step: row.step,
+    requestedAt: row.requested_at, requestedByName: row.requested_by_name, finishedAt: row.finished_at,
+    blockedBy: row.blocked !== null && row.blocked_name !== null ? { name: row.blocked_name, handle: row.blocked_handle } : null,
+    filesDueAt: row.files_due_at, remaining: row.remaining,
+  };
 }

@@ -20,6 +20,7 @@ import {
   notBeingDeletedSql,
 } from './authority';
 import { handleSchema, loginKeyFor, replaceCredentialStatements } from './credentials';
+import { DELETIONS_SQL, deletionFromRow, fenceStatements, type DeletionRow } from './eventDeletion';
 import { readablePassword, type PasswordHasher } from './password';
 import { intakeModeOf, intakeOpenSql, intakeStateSql, parseIntake, scheduleOf, type ScheduleColumns } from './schedule';
 
@@ -57,6 +58,8 @@ const commandSchema = z.discriminatedUnion('type', [
   z.strictObject({ type: z.literal('add_webmaster'), person: personSchema }),
   z.strictObject({ type: z.literal('remove_webmaster'), accountId: uuid }),
   z.strictObject({ type: z.literal('set_webmaster_reads'), restricted: z.boolean() }),
+  // The name stays as typed. It must equal the stored name exactly, so nothing trims it.
+  z.strictObject({ type: z.literal('delete_event'), eventId: uuid, confirmName: z.string().min(1).max(rosterTextMax) }),
   z.strictObject({
     type: z.literal('update_event'), eventId: uuid, name: nameSchema, code: eventCodeSchema, timeZone: timeZoneSchema,
   }),
@@ -141,6 +144,7 @@ export const requirementOf: {
   add_webmaster: site,
   remove_webmaster: site,
   set_webmaster_reads: site,
+  delete_event: site,
   update_event: (command) => event(command.eventId),
   set_event_admin: (command) => event(command.eventId),
   create_people: (command) => event(command.eventId),
@@ -322,13 +326,14 @@ export class D1ManageService {
   /** Null for a caller who is not a webmaster, so asking is not an error. */
   async site(caller: Caller): Promise<SiteOverview | null> {
     if (!(await resolveAuthority(this.db, caller, { scope: 'site' }))) return null;
-    const [webmasters, restricted, contests, events] = await Promise.all([
+    const [webmasters, restricted, contests, events, deletions] = await Promise.all([
       this.webmasters(),
       this.readsRestricted(),
       this.statement(contestsToJoinSql, caller.accountId).all<{ id: string; name: string; event_name: string }>(),
       this.statement(siteEventsSql).all<{
         id: string; name: string; code: string; time_zone: string; archived: number; contests: number; accounts: number;
       }>(),
+      this.statement(DELETIONS_SQL).all<DeletionRow>(),
     ]);
     return {
       webmasters: webmasters.map(({ id, name, handle, ready }) => ({ id, name, handle, ready: ready === 1 })),
@@ -338,6 +343,7 @@ export class D1ManageService {
         contests: row.contests, accounts: row.accounts,
       })),
       contestsToJoin: contests.results.map((row) => ({ id: row.id, name: row.name, eventName: row.event_name })),
+      deletions: deletions.results.map(deletionFromRow),
     };
   }
 
@@ -690,6 +696,23 @@ export class D1ManageService {
           notify: [{ contestId: command.contestId, audiences: ['staff'] }],
           receipt: {},
         };
+      case 'delete_event': {
+        const row = await this.statement(`SELECT e.name, e.code,
+            EXISTS (SELECT 1 FROM event_deletions d WHERE d.event_id = e.id) AS deleting,
+            (SELECT name FROM accounts WHERE id = ?) AS actor_name
+          FROM events e WHERE e.id = ?`, actor, command.eventId)
+          .first<{ name: string; code: string; deleting: number; actor_name: string | null }>();
+        if (!row) throw new AuthenticationError(409, 'That event no longer exists. Refresh the page.');
+        if (row.deleting === 1) throw new AuthenticationError(409, 'This event is already being deleted.');
+        if (row.name !== command.confirmName) throw new AuthenticationError(409, 'The name does not match. Type the event name exactly.');
+        return {
+          statements: fenceStatements(this.db, { id: actor, name: row.actor_name ?? '' }, command.eventId, command.confirmName, crypto.randomUUID()),
+          // The fence writes one staff row per contest, because each row closes every socket that lost its access.
+          audit: { action: 'delete_event', target: command.eventId, detail: { name: row.name, code: row.code } },
+          notify: [],
+          receipt: { eventId: command.eventId },
+        };
+      }
       case 'update_event': {
         const current = await this.statement('SELECT name, code, time_zone FROM events WHERE id = ?', command.eventId)
           .first<{ name: string; code: string; time_zone: string }>();

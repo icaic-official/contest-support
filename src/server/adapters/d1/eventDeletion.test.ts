@@ -710,8 +710,8 @@ describe('event deletion', () => {
       for (const [sql, values] of recorded) {
         const plan = await bound(db, `EXPLAIN QUERY PLAN ${sql}`, ...values).all<{ detail: string }>();
         for (const { detail } of plan.results) {
-          // A scan of the installation table reads its one row.
-          if (/^SCAN /.test(detail) && !/^SCAN (?:CONSTANT ROW|\(subquery-\d+\)|json_each|installation\b)/.test(detail)) {
+          // A scan of the installation table reads its one row. The receipts are matched by text, once per deletion.
+          if (/^SCAN /.test(detail) && !/^SCAN (?:CONSTANT ROW|\(subquery-\d+\)|json_each|installation\b|manage_receipts\b)/.test(detail)) {
             scans.push(`${detail}: ${sql.replace(/\s+/g, ' ').slice(0, 90)}`);
           }
         }

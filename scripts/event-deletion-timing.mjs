@@ -137,6 +137,8 @@ const CONTESTANTS = 300;
 const CONTESTS = 4;
 const CHUNK = 5000;
 const AUDIT_PER_ACCOUNT = 5;
+const RECEIPTS_OF_THE_NEIGHBOR = 20_000;
+const RECEIPTS_OF_THE_EVENT = 1000;
 const NOW = "strftime('%Y-%m-%dT%H:%M:%fZ', 'now')";
 
 /** Writes one event with `WITH RECURSIVE`, one bounded statement at a time. */
@@ -225,7 +227,21 @@ async function seedEvent(db, run, tag) {
   return event;
 }
 
-/** Rows of one event, per table. Each query starts from the event, so it never reads the neighbor. */
+/**
+ * The rows step reads every site receipt once. So B holds receipts of its own, and receipts that name A,
+ * as a webmaster's would. An account of B writes those, so that removing B also removes them.
+ */
+async function seedReceipts(db, run, eventA, eventB) {
+  const actor = `${eventB}-account-00001`;
+  const write = (count, tag, event) => db.prepare(`WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < ${count})
+    INSERT INTO manage_receipts (actor, request_id, command, result)
+    SELECT ?, printf('${run}-${tag}-%05d', i), json_object('type', 'create_people', 'eventId', ?, 'people',
+      json_array(json_object('handle', printf('p%05d', i), 'name', printf('Fictional person %05d', i)))), '{}' FROM n`).bind(actor, event).run();
+  await write(RECEIPTS_OF_THE_NEIGHBOR, 'neighbor', eventB);
+  await write(RECEIPTS_OF_THE_EVENT, 'event', eventA);
+}
+
+/** Rows of one event, per table. Each query starts from the event, so it never reads the neighbor, except for the receipts. */
 function countQueries(event) {
   const contests = `(SELECT id FROM sessions WHERE event_id = '${event}')`;
   const logged = `(SELECT id FROM accounts WHERE event_id = '${event}')`;
@@ -246,6 +262,7 @@ function countQueries(event) {
     command_receipts: `SELECT count(*) AS n FROM command_receipts WHERE session_id IN ${contests}`,
     notifications: `SELECT count(*) AS n FROM notifications WHERE session_id IN ${contests}`,
     admin_audit: `SELECT count(*) AS n FROM admin_audit WHERE session_id IN ${contests}`,
+    manage_receipts: `SELECT count(*) AS n FROM manage_receipts WHERE instr(command, '${event}') > 0`,
   };
 }
 
@@ -297,6 +314,7 @@ try {
   const seedDb = metered(db, seeding);
   const eventA = await seedEvent(seedDb, run, 'a');
   const eventB = await seedEvent(seedDb, run, 'b');
+  await seedReceipts(seedDb, run, eventA, eventB);
   console.log(`Seeded two events: ${options.issues} issues and ${options.history} history rows each, in ${Math.round(performance.now() - seedStart)} ms.`);
 
   const beforeB = await counts(db, eventB);

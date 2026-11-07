@@ -106,6 +106,17 @@ A full reload discards unsent drafts, queue filters, and uncertain requests.
 Browser Back and Forward restore the section.
 The desktop console and the contestant app change the password in place, in the **Security** section of `/account`. The phone **Me** tab opens a full-screen form instead. Completion and cancellation of that form retain `/account`.
 
+### The contest in the address
+
+A person with more than one contest has `?contest=<contest ID>` in the address.
+A person with one contest has no such parameter.
+The hook that holds the selection, `useSessionSnapshot`, is the only authority over the contest. The address never decides it.
+
+- **Read.** The hook reads `?contest=` once, when it starts. Its first read opens that contest only if the contest is in the list. Otherwise it opens the contest that takes reports now, or the next one. `defaultContest` in `src/connected/contestList.ts` makes that choice. An unlisted or malformed value never reaches a snapshot read or the live channel. The hook forgets the value after the first read succeeds. A failed first read keeps it, so a retry still uses it. A later loss of access then falls back to the default contest.
+- **Write.** After each change of contest, an effect copies the choice to the address. It uses `navigate` with `replace`, so it adds no history entry. It keeps the hash, the router state and every other parameter. The account page needs the hash and the state to place focus.
+- **Links.** A link or a redirect inside the app drops the parameter. The effect writes it again. Browser Back and Forward keep the current contest. The effect writes it to the address that they restore.
+- **Never removed.** The hook does not remove the parameter. A stale value is harmless, because the next load checks it against the list.
+
 Route checks wait for a loaded snapshot with current membership.
 An unavailable section returns to `/issues`.
 The backend independently checks every read and write. A URL grants no permission.
@@ -158,7 +169,7 @@ They call the `Backend` contracts through `backend`.
 | --- | --- |
 | `useAuthSession()` | Uses `requireBackend().auth`. Restores the stored session and follows sign-in and sign-out. Returns `user`, `loading`, `error` and `signOut`. |
 | `useAccountStatus(userId, live)` | Reads `account_status` on the refresh schedule and on focus. `live` is true while the live channel is connected. Returns `account`, `error` and `recheck()`. |
-| `useSessionSnapshot(userId)` | Loads memberships, the session list and the selected snapshot. Reads run in sequence. A generation counter discards responses for an earlier session. It refreshes on live changes, on focus, when the tab becomes visible and when the browser is online again. Its timer runs every 10 seconds while the live channel is down and every 60 seconds while it is connected. Each tick also adds one to `SessionData.updates`, so announcements and pictures read again. It clears the snapshot after an error. It records the server clock offset. |
+| `useSessionSnapshot(userId)` | Loads the session list in start order, the memberships and the selected snapshot. The first read opens the contest from `?contest=`, or the default contest. See [The contest in the address](#the-contest-in-the-address). Reads run in sequence. A generation counter discards responses for an earlier session. It refreshes on live changes, on focus, when the tab becomes visible and when the browser is online again. Its timer runs every 10 seconds while the live channel is down and every 60 seconds while it is connected. Each tick also adds one to `SessionData.updates`, so announcements and pictures read again. It clears the snapshot after an error. It records the server clock offset. |
 | `useCommand({ sessionId, refresh, onRecorded })` | Runs one workflow command at a time. It uses the actor-bound request from `WorkflowRetryProvider`. An explicit retry retains the original session, request ID, and command. `onSuccess` clears the originating form before refresh while that form remains mounted. `running` is the command that runs now, until its refresh ends, and `busy` is true while it is set. |
 | `useWorkflowState(data)` | Combines `useCommand` with the selected issue and the status filter. A recorded command selects its issue when the person did not choose an issue while it ran. An inline queue action does not select its issue. A reopened issue sets the filter to `claimed`. |
 | `useAvatarEditor()` | The steps of changing the caller's own profile picture: choose, preview, save and remove. See [Profile pictures](#profile-pictures). |
@@ -171,6 +182,26 @@ Show **Retry last request** while `command.pending` is set and `command.busy` is
 
 `src/connected/labels.ts` holds the status names, the resolution summaries, the award minute presets, and the parsers for the resolve comment and the custom award minutes.
 Use these values in every UI so that the text stays the same.
+
+## Contest picker
+
+`ContestPicker` (`src/connected/ContestPicker.tsx`) is the one list of the contests that a person may open. It has three shapes. A menu behind a trigger button serves the contestant top bar and the console sidebar. Radio rows serve the phone **Me** tab. A select serves the no-access screen.
+`src/connected/contestList.ts` holds the rules. They use no React, so the hook can use them too.
+
+- `orderContests` sorts by start time, then by ID. A contest with no schedule comes last, by name, then ID. `useSessionSnapshot` applies it once, so every consumer sees one order.
+- `contestRows` gives each row a name, a start time and a note. The name has the event name only when another listed contest has the same name. The start time is in the event's time zone. It gets a zone label only when the listed contests span more than one zone. A contest with no schedule has no start time.
+- The note comes from `intake.reason` of the contest list. The browser uses no clock for it. The list reads again at least every 60 seconds, so the note can be that old.
+
+| `intake.reason` | Note |
+| --- | --- |
+| `running`, `grace`, `override_open` | Running now |
+| `override_closed` | Closed by staff |
+| `awaiting_live_passwords` | Waiting for live passwords |
+| `ended` | Ended |
+| `before_start` | No note. The start time says it. |
+
+The menu and the radio rows show the name on one line, and the start time and the note on a second line. A contest that takes reports has a heavier second line. The select shows one line of text, for example `Live 1 · Tue 3 Nov, 13:00 · Running now`. The note is text in every shape, so color is never the only mark.
+Long names break at any letter, so a name cannot widen a 320 px phone screen. `tests/contest-picker-layout.spec.ts` measures this for every shape.
 
 ## Refresh schedule
 
@@ -438,7 +469,7 @@ npx playwright install chromium
 
 ## Client weight
 
-The app loads each role's screens on demand. `src/connected/lazyScreens.tsx` holds the lazy imports for the contestant app, the organizer app, the event console and the site page. `src/organiser/layouts.ts` does the same for the organizer desktop console and the phone app. A contestant does not download the staff console, and a phone does not download the desktop console.
+The app loads each role's screens on demand. `src/connected/lazyScreens.tsx` holds the lazy imports for the contestant app, the organizer app, the event console and the site page. `src/organiser/layouts.ts` does the same for the organizer desktop console and the phone app. A contestant does not download the staff console, and a phone does not download the desktop console. `tests/contestant-chunks.spec.ts` checks that a contestant downloads no staff screen.
 `Workspace` remembers the last role in `localStorage` (`minsky-screen`), and `src/main.tsx` starts that download while the session check runs.
 
 Every module that builds a zod schema imports `src/lib/zodConfig.ts` before it imports `zod`. The Content-Security-Policy forbids `eval`, and zod probes for it when it builds its first schema. With several chunks, the import order of `main.tsx` alone does not decide which chunk runs first. `npm run test:connector:ui:local` fails on a policy violation.

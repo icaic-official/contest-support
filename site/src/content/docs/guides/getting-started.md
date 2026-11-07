@@ -28,6 +28,9 @@ If you belong to more than one, select the session:
 - **Contestants:** the session menu in the top bar.
 - **Staff:** the switcher at the top of the sidebar, or the **Me** tab on a phone.
 
+Each contest shows its start time in the event's time zone. The contest that runs now says "Running now".
+Minsky opens that contest first, or the next one. A reload keeps your choice.
+
 An account with no session membership sees no data. Ask your organizer to add you.
 
 ## Find your screens

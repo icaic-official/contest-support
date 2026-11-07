@@ -30,7 +30,7 @@ If you belong to more than one, select the session:
 
 The list shows the sessions in the order of their start times. A session with a schedule shows its start time in the event's time zone. The start time has the year only when your sessions start in different years.
 
-Intake is the time when contestants can send new reports. A note under the name says what the session does now: "Running now", "Intake open (grace period)", "Intake open (set by staff)", "Intake closed (set by staff)", "Waiting for live passwords", or "Ended". A session that follows its schedule and has not started has no note, because its start time says it.
+Intake is the time when contestants can send new reports. A note under the name says what the session does now: "Running now", "Intake open (grace period)", "Intake open (set by staff)", "Intake closed (set by staff)", "Waiting for live passwords", or "Ended". A session that has not started has no note, because its start time says it. Two cases get a note anyway: staff hold its intake open or closed, or it waits for live passwords.
 
 Minsky opens the session whose intake is open. If no intake is open, it opens the first session that has not ended. If every session has ended, it opens the one that ended last. A reload keeps your choice.
 

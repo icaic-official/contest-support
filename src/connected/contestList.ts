@@ -4,8 +4,8 @@ import { formatInZone, zonedParts, zoneLabel } from "./zonedTime";
 
 /**
  * The note on a contest row. The server derives the reason, so the row needs
- * no clock. A row has no note before the start, because its start time already
- * says that.
+ * no clock. The reason `before_start` gives no note, because the start time
+ * already says that. A held or waiting contest keeps its note before the start.
  */
 function intakeNote(reason: IntakeReason): string | null {
   switch (reason) {

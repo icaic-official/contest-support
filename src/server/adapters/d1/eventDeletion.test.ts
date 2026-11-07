@@ -1122,6 +1122,25 @@ describe('event deletion', () => {
       await forget(other);
     });
 
+    it('blocks two deletions on each other through operations with no contest, until the statement in the operator guide removes them', async () => {
+      const [first, second] = [await seedEvent(db, webmaster), await seedEvent(db, webmaster)];
+      const [a, b] = [first.volunteer.accountId, second.volunteer.accountId];
+      await bound(db, `INSERT INTO account_operations (id, account_id, actor, session_id, action, state) VALUES
+        (?, ?, ?, NULL, 'set_username', 'completed'), (?, ?, ?, NULL, 'set_username', 'completed')`, randomUUID(), b, a, randomUUID(), a, b).run();
+      await fence(db, first);
+      await fence(db, second);
+      for (let round = 0; round < 2; round += 1) {
+        expect(await deleteRows(db, first)).toBe('blocked');
+        expect(await deleteRows(db, second)).toBe('blocked');
+      }
+      await bound(db, `DELETE FROM account_operations WHERE session_id IS NULL AND actor IN (SELECT id FROM accounts WHERE event_id IN (?1, ?2))
+        AND account_id IN (SELECT id FROM accounts WHERE event_id IN (?1, ?2))`, first.eventId, second.eventId).run();
+      expect(await deleteRows(db, first)).toBe('rows_done');
+      expect(await deleteRows(db, second)).toBe('rows_done');
+      await forget(first);
+      await forget(second);
+    });
+
     it('writes only one access row to the outbox of another event for an inert seat there', async () => {
       const event = await seedEvent(db, webmaster);
       const other = await seedEvent(db, webmaster);

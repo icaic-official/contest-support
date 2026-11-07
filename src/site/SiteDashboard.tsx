@@ -1,7 +1,7 @@
 import { type FormEvent, type ReactNode, useId, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { CalendarPlus, Clock, KeyRound, LogOut, ShieldCheck, Trash2, UserMinus, UserPlus } from "lucide-react";
-import { type AccountIdentity, type EventCode, type PersonInput, type SiteOverview, parseEventCode, parseHandle } from "@/backend/contracts";
+import { type AccountIdentity, type EventCode, type PersonInput, type SiteOverview, deletionConfirmation, parseEventCode, parseHandle } from "@/backend/contracts";
 import { BrandMark } from "@/components/brand";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -316,7 +316,7 @@ function Webmasters({
         ))}
       </ul>
       <p className="mt-2 text-xs text-muted-foreground">The last webmaster cannot be removed.</p>
-      <p role="status" className="mt-2 text-xs text-muted-foreground empty:hidden">
+      <p role="status" className="mt-2 text-xs break-words text-muted-foreground empty:hidden">
         {notice}
       </p>
       <AddWebmaster
@@ -532,7 +532,7 @@ function Events({ site, state }: { site: SiteOverview; state: SiteState }) {
             <li key={item.id} className="flex flex-wrap items-center gap-x-3 gap-y-2 py-2.5">
               <div className="min-w-0 flex-1 basis-36 leading-tight">
                 <p className="truncate text-sm font-medium">
-                  {item.name}
+                  {item.name || "Unnamed event"}
                   {item.archived && <span className="ml-1 text-xs font-normal text-muted-foreground">(archived)</span>}
                 </p>
                 <p className="truncate text-xs text-muted-foreground">
@@ -542,7 +542,7 @@ function Events({ site, state }: { site: SiteOverview; state: SiteState }) {
               </div>
               <div className="ml-auto flex flex-wrap gap-2">
                 <Button asChild variant="outline" className="h-11">
-                  <Link to={eventPath(item.id)} aria-label={`Open the console of ${item.name}`}>
+                  <Link to={eventPath(item.id)} aria-label={`Open the console of ${deletionConfirmation(item).text}`}>
                     Open console
                   </Link>
                 </Button>
@@ -550,7 +550,7 @@ function Events({ site, state }: { site: SiteOverview; state: SiteState }) {
                   type="button"
                   variant="outline"
                   className="h-11"
-                  aria-label={`Delete ${item.name}`}
+                  aria-label={`Delete ${deletionConfirmation(item).text}`}
                   onClick={() => {
                     state.clearError();
                     setDeleting(item);
@@ -564,7 +564,7 @@ function Events({ site, state }: { site: SiteOverview; state: SiteState }) {
           ))}
         </ul>
       )}
-      <p role="status" className="mt-2 text-xs text-muted-foreground empty:hidden">
+      <p role="status" className="mt-2 text-xs break-words text-muted-foreground empty:hidden">
         {notice}
       </p>
       <DeleteEventDialog
@@ -572,7 +572,8 @@ function Events({ site, state }: { site: SiteOverview; state: SiteState }) {
         busy={state.busy}
         error={state.error}
         onOpenChange={(open) => {
-          if (!open) setDeleting(undefined);
+          // The dialog stays open while its request runs, so its outcome closes it and places focus.
+          if (!open && !state.busy) setDeleting(undefined);
         }}
         onCloseAutoFocus={(event) => {
           if (!deleted.current) return;
@@ -584,7 +585,7 @@ function Events({ site, state }: { site: SiteOverview; state: SiteState }) {
           if (!deleting) return;
           const receipt = await state.execute({ type: "delete_event", eventId: deleting.id, confirmName });
           if (!receipt) return;
-          setNotice(`Deleting ${deleting.name}. Its progress is under Deletions.`);
+          setNotice(`Deleting ${deletionConfirmation(deleting).text}. Its progress is under Deletions.`);
           deleted.current = true;
           setDeleting(undefined);
         }}

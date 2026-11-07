@@ -47,7 +47,7 @@ export function Deletions({ deletions }: { deletions: readonly EventDeletion[] }
         return (
           <li key={deletion.eventId} className="space-y-1 py-2.5">
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-              <p className="min-w-0 text-sm font-medium break-words">{deletion.eventName}</p>
+              <p className="min-w-0 text-sm font-medium break-words">{deletion.eventName || "Unnamed event"}</p>
               <Badge variant={deletion.blockedBy ? "destructive" : "secondary"}>{label}</Badge>
             </div>
             <p className="text-xs break-words text-muted-foreground">

@@ -167,7 +167,7 @@ test.describe('deleting an event', () => {
     const held = new Promise<void>((resolve) => { release = resolve; });
     await page.route('**/api/manage', async (route) => {
       await held;
-      await route.continue();
+      await route.fallback();
     });
     await page.getByRole('button', { name: `Delete ${first}`, exact: true }).click();
     const dialog = page.getByRole('dialog', { name: `Delete ${first}?` });

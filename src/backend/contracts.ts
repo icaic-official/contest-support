@@ -55,6 +55,16 @@ export function parseHandle(text: string): Handle | undefined {
   return /^[a-z0-9][a-z0-9_-]{2,31}$/.test(handle) ? handle as Handle : undefined;
 }
 
+/**
+ * The text that a webmaster types to delete an event: its name. A legacy event can have an empty
+ * name and no code, so the code and then the ID stand in, and the text is never empty.
+ */
+export function deletionConfirmation(event: { readonly id: string; readonly name: string; readonly code: string | null }):
+  { readonly label: 'name' | 'code' | 'ID'; readonly text: string } {
+  if (event.name) return { label: 'name', text: event.name };
+  return event.code ? { label: 'code', text: event.code } : { label: 'ID', text: event.id };
+}
+
 export interface AccountIdentity {
   id: string;
   email?: string;

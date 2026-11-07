@@ -1,5 +1,5 @@
 import { type FormEvent, useId, useState } from "react";
-import type { SiteOverview } from "@/backend/contracts";
+import { deletionConfirmation, type SiteOverview } from "@/backend/contracts";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -20,8 +20,9 @@ function count(amount: number, one: string, many: string): string {
 }
 
 /**
- * Names what a deletion takes, and asks for the event's exact name. Only the
- * typed name enables the action, and the server checks that name again.
+ * Names what a deletion takes, and asks for the event's exact name, or for its
+ * code or ID when it has no name. Only that text enables the action, and the
+ * server checks it again. The dialog stays open while its request runs.
  */
 export function DeleteEventDialog({
   event,
@@ -41,7 +42,7 @@ export function DeleteEventDialog({
 }) {
   return (
     <Dialog open={!!event} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90dvh] max-w-md overflow-y-auto" onCloseAutoFocus={onCloseAutoFocus}>
+      <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-md" onCloseAutoFocus={onCloseAutoFocus}>
         {event && (
           <DeleteEventForm
             key={event.id}
@@ -72,18 +73,23 @@ function DeleteEventForm({
 }) {
   const inputId = useId();
   const [typed, setTyped] = useState("");
-  const matches = typed === event.name;
+  const { label, text } = deletionConfirmation(event);
+  const matches = typed === text;
   function submit(form: FormEvent<HTMLFormElement>) {
     form.preventDefault();
     if (matches && !busy) onDelete(typed);
   }
   return (
-    <form onSubmit={submit} className="space-y-4">
+    <form onSubmit={submit} className="min-w-0 space-y-4">
       <DialogHeader className="text-left">
-        <DialogTitle>Delete {event.name}?</DialogTitle>
+        <DialogTitle className="pr-6 leading-snug break-words">
+          Delete {label === "name" ? text : `the unnamed event ${text}`}?
+        </DialogTitle>
         <DialogDescription>
           This deletes {count(event.contests, "contest", "contests")} and {count(event.accounts, "account", "accounts")}{" "}
-          for good. Every issue, reply, note, award, image, and announcement of this event goes with them. You cannot undo this.
+          for good. Every issue, reply, note, award, image, and announcement of this event goes with them. Everyone in this
+          event is signed out at once, and a running contest stops. The event&apos;s name and code stay in the site record.
+          You cannot undo this.
         </DialogDescription>
       </DialogHeader>
       {error && (
@@ -92,12 +98,21 @@ function DeleteEventForm({
         </Alert>
       )}
       <div className="space-y-2">
-        <Label htmlFor={inputId}>Type the event name to confirm</Label>
-        <Input id={inputId} value={typed} autoComplete="off" onChange={(input) => setTyped(input.target.value)} className="h-11" />
-        <p className="text-xs break-words text-muted-foreground">The name is: {event.name}</p>
+        <Label htmlFor={inputId}>Type the event {label} to confirm</Label>
+        <Input
+          id={inputId}
+          value={typed}
+          autoComplete="off"
+          autoCorrect="off"
+          autoCapitalize="off"
+          spellCheck={false}
+          onChange={(input) => setTyped(input.target.value)}
+          className="h-11"
+        />
+        <p className="text-xs break-words text-muted-foreground">The {label} is: {text}</p>
       </div>
       <DialogFooter className="gap-2">
-        <Button type="button" variant="outline" className="h-11" onClick={onCancel}>
+        <Button type="button" variant="outline" className="h-11" disabled={busy} onClick={onCancel}>
           Cancel
         </Button>
         <Button type="submit" variant="destructive" className="h-11" disabled={!matches || busy}>

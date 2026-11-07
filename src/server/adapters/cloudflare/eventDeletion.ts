@@ -52,20 +52,20 @@ export interface DeletionActor {
 /**
  * The statements that fence one event, in one batch. From this batch on, the
  * resolvers, sign-in, the calendar, and the site list refuse the event. The
- * assertion fails the batch when the event is gone, when the name differs, or
- * when a journal row already exists, so a repeated fence changes nothing.
+ * assertion fails the batch when the event is gone, when its name is no longer
+ * `expectedName`, or when a journal row already exists, so a repeated fence changes nothing.
  * Revoking logins stops the account surfaces that read outside the resolver:
  * avatars, the password change, and the member calendar. A login revocation and
  * the staff row of each contest both reach `grants()`, which closes every socket
  * that lost its access, including those of webmasters.
  * The caller writes the site audit row, as `commit` in manage.ts does.
  */
-export function fenceStatements(db: D1Connection, actor: DeletionActor, eventId: string, confirmName: string, assertionId: string): D1Statement[] {
+export function fenceStatements(db: D1Connection, actor: DeletionActor, eventId: string, expectedName: string, assertionId: string): D1Statement[] {
   return [
     bound(db, `INSERT INTO command_assertions (id, valid) VALUES (?, CASE WHEN
       EXISTS (SELECT 1 FROM events WHERE id = ? AND name = ?)
       AND NOT EXISTS (SELECT 1 FROM event_deletions WHERE event_id = ?) THEN 1 ELSE 0 END)`,
-    assertionId, eventId, confirmName, eventId),
+    assertionId, eventId, expectedName, eventId),
     bound(db, `INSERT INTO event_deletions (event_id, event_name, event_code, requested_by, requested_by_name)
       SELECT id, name, COALESCE(code, ''), ?, ? FROM events WHERE id = ?`, actor.id, actor.name, eventId),
     bound(db, `INSERT INTO event_deletion_targets (event_id, kind, id)

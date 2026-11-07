@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import {
   GRACE_MINUTES_MAX, ISSUE_BATCH, parseEventCode, type ContestKind, type ContestType, type Schedule, type EntrantKind, type EventConsole, type IssuedCredential,
-  type LoginKey, type ManageCommand, type ManageLevel, type ManageReceipt, type SiteOverview,
+  type LoginKey, type ManageCommand, type ManageLevel, type ManageReceipt, type SiteOverview, deletionConfirmation,
 } from '../../../backend/contracts';
 import { categoriesMax, hasControlCharacter, rosterKey, rosterTextMax, teamsPerCommandMax } from '../../../connected/roster';
 import { roleSchema, type Role } from '../../../connected/model';
@@ -58,8 +58,8 @@ const commandSchema = z.discriminatedUnion('type', [
   z.strictObject({ type: z.literal('add_webmaster'), person: personSchema }),
   z.strictObject({ type: z.literal('remove_webmaster'), accountId: uuid }),
   z.strictObject({ type: z.literal('set_webmaster_reads'), restricted: z.boolean() }),
-  // The name stays as typed. It must equal the stored name exactly, so nothing trims it.
-  z.strictObject({ type: z.literal('delete_event'), eventId: uuid, confirmName: z.string().min(1).max(rosterTextMax) }),
+  // The text stays as typed. It must equal the stored text exactly, so nothing trims it. A legacy name can pass any limit on a new name.
+  z.strictObject({ type: z.literal('delete_event'), eventId: uuid, confirmName: z.string().min(1) }),
   z.strictObject({
     type: z.literal('update_event'), eventId: uuid, name: nameSchema, code: eventCodeSchema, timeZone: timeZoneSchema,
   }),
@@ -701,12 +701,13 @@ export class D1ManageService {
             EXISTS (SELECT 1 FROM event_deletions d WHERE d.event_id = e.id) AS deleting,
             (SELECT name FROM accounts WHERE id = ?) AS actor_name
           FROM events e WHERE e.id = ?`, actor, command.eventId)
-          .first<{ name: string; code: string; deleting: number; actor_name: string | null }>();
+          .first<{ name: string; code: string | null; deleting: number; actor_name: string | null }>();
         if (!row) throw new AuthenticationError(409, 'That event no longer exists. Refresh the page.');
         if (row.deleting === 1) throw new AuthenticationError(409, 'This event is already being deleted.');
-        if (row.name !== command.confirmName) throw new AuthenticationError(409, 'The name does not match. Type the event name exactly.');
+        const { label, text } = deletionConfirmation({ id: command.eventId, name: row.name, code: row.code });
+        if (text !== command.confirmName) throw new AuthenticationError(409, `The ${label} does not match. Type the event ${label} exactly.`);
         return {
-          statements: fenceStatements(this.db, { id: actor, name: row.actor_name ?? '' }, command.eventId, command.confirmName, crypto.randomUUID()),
+          statements: fenceStatements(this.db, { id: actor, name: row.actor_name ?? '' }, command.eventId, row.name, crypto.randomUUID()),
           // The fence writes one staff row per contest, because each row closes every socket that lost its access.
           audit: { action: 'delete_event', target: command.eventId, detail: { name: row.name, code: row.code } },
           notify: [],

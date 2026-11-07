@@ -144,16 +144,16 @@ A webmaster deletes an event permanently with **Delete event** on the **Site** p
 
 Two deletions can stop each other for good. This happens when two old account operations that name no contest run in both directions between an account of each event. Neither event's deletion can remove the operation that its own account performed on the other event's account. If two events show **Stopped** and each names an account of the other event, remove those operations. Both events are going, so no record that stays changes.
 
-1. Find the two event IDs. Replace `DATABASE_NAME` with the name of your database.
+1. Find the two event IDs. Use the database name that you chose earlier.
 
 	```sh
-	npx wrangler d1 execute DATABASE_NAME --remote --config="$MINSKY_INSTALL_CONFIG" --command "SELECT event_id, event_name FROM event_deletions WHERE blocked IS NOT NULL"
+	npx wrangler d1 execute "$MINSKY_INSTALL_DATABASE" --remote --config="$MINSKY_INSTALL_CONFIG" --command="SELECT event_id, event_name FROM event_deletions WHERE blocked IS NOT NULL"
 	```
 
 2. Delete the operations between the accounts of those two events. Replace `EVENT_A` and `EVENT_B` with the IDs.
 
 	```sh
-	npx wrangler d1 execute DATABASE_NAME --remote --config="$MINSKY_INSTALL_CONFIG" --command "DELETE FROM account_operations WHERE session_id IS NULL AND actor IN (SELECT id FROM accounts WHERE event_id IN ('EVENT_A', 'EVENT_B')) AND account_id IN (SELECT id FROM accounts WHERE event_id IN ('EVENT_A', 'EVENT_B'))"
+	npx wrangler d1 execute "$MINSKY_INSTALL_DATABASE" --remote --config="$MINSKY_INSTALL_CONFIG" --command="DELETE FROM account_operations WHERE session_id IS NULL AND actor IN (SELECT id FROM accounts WHERE event_id IN ('EVENT_A', 'EVENT_B')) AND account_id IN (SELECT id FROM accounts WHERE event_id IN ('EVENT_A', 'EVENT_B'))"
 	```
 
 	Expect both deletions to continue at their next hourly try.

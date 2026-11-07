@@ -84,8 +84,8 @@ export function useSessionSnapshot(userId: string): SessionData {
   // Server time of the newest snapshot shown. An older snapshot never replaces it.
   const shownAt = useRef(0);
   const generation = useRef(0);
-  // The session that the last successful read showed, so the subscribe effect
-  // does not read it again straight after the read that selected it.
+  // The session that the last read selected, so the subscribe effect does not
+  // read it again straight after that read.
   const readFor = useRef<string>(undefined);
   const [queue] = useState(createRefreshQueue);
   const refresh = useCallback(() => {
@@ -94,6 +94,8 @@ export function useSessionSnapshot(userId: string): SessionData {
     // revision. A write waits for its own refresh before enabling controls.
     // A read that has not started yet serves every caller that arrives before it starts.
     return queue.read(run, async () => {
+      // Set when the list arrives, so that a failed snapshot read can still show it.
+      let listed: { list: SessionSummary[]; nextSession: string } | undefined;
       try {
         const list = orderContests(await backend.workflows.contests());
         // Only a listed ID reaches the snapshot read and the live channel.
@@ -104,6 +106,7 @@ export function useSessionSnapshot(userId: string): SessionData {
           : seed !== undefined && isListed(seed)
             ? seed
             : (defaultContest(list, Date.now() + clockOffset.current)?.id ?? "");
+        listed = { list, nextSession };
         const next = nextSession
           ? await backend.workflows.snapshot(nextSession)
           : undefined;
@@ -120,6 +123,13 @@ export function useSessionSnapshot(userId: string): SessionData {
         setRefreshError("");
       } catch (cause) {
         if (run !== generation.current) return;
+        // The picker on the no-access screen is the way out of a contest that fails.
+        if (listed) {
+          const { list, nextSession } = listed;
+          readFor.current = nextSession;
+          setSessions((shown) => keepUnchanged(shown, list));
+          setSessionId(nextSession);
+        }
         // Clear cached data on access/network failure; never display stale permissions.
         setState(undefined);
         setRefreshError(errorMessage(cause));

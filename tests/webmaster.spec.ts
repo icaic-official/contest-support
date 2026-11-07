@@ -28,6 +28,35 @@ test('a promoted webmaster opens its contest as an admin, as before', async ({ p
   expect(unassigned.membership).toMatchObject({ team_id: null, is_admin: true, roles: [] });
 });
 
+test('a webmaster opens another contest from the site calendar and reaches its queue', async ({ page, local }) => {
+  const current = `Current ${crypto.randomUUID().slice(0, 8)}`;
+  const other = `Calendar ${crypto.randomUUID().slice(0, 8)}`;
+  await local.run('UPDATE sessions SET name = ? WHERE id = ?', current, local.sessions[0]);
+  await local.run(
+    `UPDATE sessions SET name = ?, starts_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '+1 hours'),
+      ends_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '+2 hours'), grace_minutes = 0 WHERE id = ?`,
+    other,
+    local.sessions[1],
+  );
+  await page.goto('/sign-in');
+  await page.getByRole('button', { name: 'Site sign-in', exact: true }).click();
+  await page.getByLabel('Username', { exact: true }).fill('admin');
+  await page.getByLabel('Password', { exact: true }).fill(crypto.randomUUID());
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+  // The site calendar offers Open on the selected contest too, so select another one first.
+  await page.getByRole('button', { name: /^Contest session: .*\. Change session$/ }).click();
+  await page.getByRole('menuitemradio', { name: current }).click();
+  await expect(page.getByRole('button', { name: `Contest session: ${current}. Change session`, exact: true })).toBeVisible();
+
+  await page.getByRole('complementary', { name: 'Console' }).getByRole('link', { name: 'Site', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Site', level: 1 })).toBeVisible();
+  await page.getByRole('button', { name: `Open ${other}`, exact: true }).click();
+
+  await expect(page.getByRole('button', { name: `Contest session: ${other}. Change session`, exact: true })).toBeVisible();
+  await expect(page).toHaveURL((url) => url.pathname === '/issues' && url.searchParams.get('contest') === local.sessions[1]);
+  await expect(page.getByRole('heading', { name: 'Site', level: 1 })).toHaveCount(0);
+});
+
 test('a webmaster turns the restriction on, joins a contest, and sees the join in its audit', async ({ page, local }) => {
   // The webmaster holds no membership in the second contest, so only the join opens it.
   const contest = `Join contest ${crypto.randomUUID().slice(0, 8)}`;

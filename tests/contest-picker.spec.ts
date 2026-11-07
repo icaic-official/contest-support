@@ -176,6 +176,41 @@ test.describe("a contestant with several contests", () => {
     await expect(triggerFor(page, "Delta")).toBeVisible();
     await expect(page.getByRole("heading", { name: "Your reports" })).toBeFocused();
   });
+
+  for (const search of ["", "?contest=bogus"]) {
+    test(`sends a page that the contestant cannot open to the queue from the address /administration${search}`, async ({ page, local }) => {
+      const ids = await three(local);
+      await signIn(page);
+      await page.goto(`/administration${search}`);
+      await at(page, "/issues", ids.running);
+      await expect(page.getByRole("heading", { name: "Your reports" })).toBeVisible();
+    });
+  }
+
+  test("keeps the address in step after the skip link writes its fragment", async ({ page, local }) => {
+    const ids = await three(local);
+    await signIn(page);
+    await at(page, "/issues", ids.running);
+    await page.getByRole("link", { name: "Skip to main content" }).focus();
+    await page.keyboard.press("Enter");
+    await expect(page).toHaveURL((url) => url.hash === "#main");
+    await choose(page, "Alpha");
+    await at(page, "/issues", ids.next);
+  });
+});
+
+test.describe("a staff member with several contests", () => {
+  test("goes to the queue when a lost contest leaves a page that the next contest cannot open", async ({ page, local }) => {
+    const ids = await three(local);
+    await signIn(page, "jury");
+    await page.goto(`/jury?contest=${ids.next}`);
+    await expect(page.getByRole("heading", { name: "Award review", exact: true })).toBeVisible();
+    await local.run("DELETE FROM membership_roles WHERE session_id = ? AND account_id = ?", ids.next, local.users.jury);
+    await local.run("DELETE FROM memberships WHERE session_id = ? AND account_id = ?", ids.next, local.users.jury);
+    await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+    await at(page, "/issues", ids.running);
+    await expect(page.locator('[data-ui="organiser-desktop"]')).toBeVisible();
+  });
 });
 
 test.describe("a contestant with one contest", () => {

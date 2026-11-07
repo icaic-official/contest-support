@@ -14,7 +14,7 @@ const sessionName = 'Provider primary';
 const phone = { width: 390, height: 844 };
 const desktop = { width: 1280, height: 900 };
 
-async function privateFill(locator: Locator, value: string) {
+export async function privateFill(locator: Locator, value: string) {
   try { await locator.fill(value); }
   catch { throw new Error('A credential field could not be filled. Its value was withheld.'); }
 }

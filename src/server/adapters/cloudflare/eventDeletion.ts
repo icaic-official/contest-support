@@ -165,7 +165,7 @@ async function tryDeleteAccounts(db: D1Connection, eventId: string, ids: readonl
 async function reconcileTargets(db: D1Connection, eventId: string): Promise<boolean> {
   const added = (kind: 'contest' | 'account', table: 'sessions' | 'accounts') => bound(db, `INSERT INTO event_deletion_targets (event_id, kind, id)
     SELECT event_id, '${kind}', id FROM ${table} WHERE event_id = ? AND ${inStep('rows')}
-    ON CONFLICT (event_id, kind, id) DO UPDATE SET done = 0 WHERE done = 1 RETURNING id`, eventId, eventId);
+    ON CONFLICT (event_id, kind, id) DO NOTHING RETURNING id`, eventId, eventId);
   // A D1 batch returns one result for each statement.
   const results = await db.batch([added('contest', 'sessions'), added('account', 'accounts')]) as Array<{ results: unknown[] }>;
   return results.some((result) => result.results.length > 0);

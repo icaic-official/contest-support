@@ -144,9 +144,12 @@ describe('event deletion', () => {
       const other = await seedEvent(db, webmaster);
       await bound(db, 'INSERT INTO installation (singleton, id, owner_account_id, event_id, session_id) VALUES (1, ?, ?, ?, ?)',
         randomUUID(), ...placement(event, other)).run();
-      await fence(db, event);
-      await check(event);
-      await bound(db, 'DELETE FROM installation').run();
+      try {
+        await fence(db, event);
+        await check(event);
+      } finally {
+        await bound(db, 'DELETE FROM installation').run();
+      }
       await deleteRows(db, event);
       await runToEnd(stores().env, other);
       await forget(event);

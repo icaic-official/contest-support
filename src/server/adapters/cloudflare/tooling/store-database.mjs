@@ -108,11 +108,14 @@ export function createD1ApiConnection(settings, dependencies = {}) {
 const bindable = (value) => value === null || typeof value === 'string' || typeof value === 'number';
 
 /**
- * A statement that stays in the test process. The Wrangler proxy makes one
- * blocking round trip for each statement object that a test prepares or binds
- * (five for a bound query), and these trips took most of the local suite's time.
- * This statement sends one batch call when it runs, and the batch returns the
- * same `results` and `meta` as the native `all`, `run`, and `first`.
+ * A statement that stays in the test process. A native statement blocks the test
+ * process while the Wrangler proxy answers. The `prepare`, `bind`, and `all` of one
+ * bound query block it five times. This statement does not block it once the runtime
+ * is warm. It sends one batch call when it runs. `all` and `run` return the same
+ * `results` and `meta` as the native ones, apart from the timing fields, and `first`
+ * returns the first row of `results`. Three things differ from a native statement.
+ * `first` takes no column name and throws when it gets one. There is no `raw`.
+ * Reading `statement` or `params` gives `undefined`.
  */
 class LocalStatement {
   #native;
@@ -144,7 +147,10 @@ class LocalStatement {
     return this.all();
   }
 
-  async first() {
+  async first(column) {
+    if (column !== undefined) {
+      throw new Error('LocalStatement: first takes no column name. Read the column from the row that first returns.');
+    }
     return (await this.all()).results[0] ?? null;
   }
 }

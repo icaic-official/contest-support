@@ -35,7 +35,7 @@ function RowLines({ row }: { row: ContestRow }) {
       {detail !== null && (
         <span
           className={cn(
-            "text-xs in-focus:text-accent-foreground",
+            "text-xs in-data-highlighted:text-accent-foreground",
             row.open ? "font-medium text-foreground" : "text-muted-foreground",
           )}
         >

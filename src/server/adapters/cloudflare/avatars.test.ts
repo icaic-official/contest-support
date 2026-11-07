@@ -320,11 +320,9 @@ describe('avatar reads match the reference rule for every caller, session, and a
   });
   afterAll(async () => { await dispose?.(); });
 
-  async function reference(caller: Caller, sessionId: string, avatarId?: string) {
+  async function reference(caller: Caller, sessionId: string) {
     const bindings = [...currentReadyLoginBindings(caller), ...contestDataBindings(caller, sessionId), sessionId];
-    const statement = avatarId === undefined
-      ? db.prepare(`${referenceVisibleSql} ORDER BY v.account_id`).bind(...bindings)
-      : db.prepare(`${referenceVisibleSql} AND v.id = ?`).bind(...bindings, avatarId);
+    const statement = db.prepare(`${referenceVisibleSql} ORDER BY v.account_id`).bind(...bindings);
     return (await statement.all<{ person_id: string; avatar_id: string; content_type: string }>()).results;
   }
 
@@ -352,12 +350,13 @@ describe('avatar reads match the reference rule for every caller, session, and a
     const avatars = new R2AvatarService(db, bucket);
     for (const [name, caller] of Object.entries(people)) {
       for (const [session, sessionId] of Object.entries(sessions)) {
+        // The reference asks for one avatar with one more AND, so its list for the caller holds the answer for each avatar.
+        const visible = new Map((await reference(caller, sessionId)).map((row) => [row.avatar_id, row.content_type]));
         await Promise.all(avatarIds.map(async (avatarId) => {
-          const [expected] = await reference(caller, sessionId, avatarId);
           const actual = await avatars.download(caller, sessionId, avatarId).then(
             async (result) => { await result.body.cancel(); return result.contentType; },
             (error: unknown) => { expect(error).toMatchObject({ validation: true }); return undefined; });
-          expect(actual, `${name} reads ${avatarId} in the ${session} session`).toBe(expected?.content_type);
+          expect(actual, `${name} reads ${avatarId} in the ${session} session`).toBe(visible.get(avatarId));
         }));
       }
     }

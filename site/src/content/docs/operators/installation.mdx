@@ -138,6 +138,8 @@ Then the webmaster opens the **Site** page and chooses **Create event**. The for
 The event admin runs the event in the **event console** (`/event`): **People**, **Entrants**, **Contests**, and **Assignments**. Staff and teams sign in with the event code. Their credential sheets carry the link `<origin>/?event=<code>`, which fills in the code. A person types the code only when they open the plain sign-in page. Choose a short code that people can read aloud.
 Only event admins and webmasters create accounts and assign people. A contest admin keeps the contest settings, announcements, and the issue workflow.
 
+A webmaster deletes an event permanently with **Delete event** on the **Site** page, after typing the event's exact name. You cannot undo this. Minsky stops the event's sign-ins and contests at once. The Worker then deletes its rows and its live state. About 65 minutes later, it deletes its files. The **Site** page shows the progress and keeps a **Deleted** record.
+
 | Problem | Do this |
 | --- | --- |
 | Settings or target rejected | Fix `provider.json` or the login. Configure again at a new path. |

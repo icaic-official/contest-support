@@ -994,6 +994,27 @@ describe('event deletion', () => {
       });
     }
 
+    it('blocks on a scoped operation between two of its accounts when no audit row names it, and the row stays', async () => {
+      const event = await seedEvent(db, webmaster);
+      const other = await seedEvent(db, webmaster);
+      // The actor sorts first, so its retry alone runs the delete of the operation.
+      const [actorId, accountId] = [event.volunteer.accountId, event.contestAdmin.accountId].sort() as [string, string];
+      const operation = randomUUID();
+      await bound(db, `INSERT INTO account_operations (id, account_id, actor, session_id, action, state)
+        VALUES (?, ?, ?, ?, 'set_username', 'completed')`, operation, accountId, actorId, other.practice).run();
+      // 0009 added the audit trigger with no backfill, so an older operation has no audit row.
+      await bound(db, 'DELETE FROM admin_audit WHERE id = ?', operation).run();
+      await fence(db, event);
+      expect(await deleteRows(db, event)).toBe('blocked');
+      expect(await blockedName(event)).toBe(actorId);
+      expect(await rows('SELECT session_id FROM account_operations WHERE id = ?', operation)).toEqual([{ session_id: other.practice }]);
+      await bound(db, 'DELETE FROM account_operations WHERE id = ?', operation).run();
+      expect(await deleteRows(db, event)).toBe('rows_done');
+      await runToEnd(stores().env, other);
+      await forget(event);
+      await forget(other);
+    });
+
     it('writes only one access row to the outbox of another event for an inert seat there', async () => {
       const event = await seedEvent(db, webmaster);
       const other = await seedEvent(db, webmaster);

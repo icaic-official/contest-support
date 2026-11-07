@@ -320,7 +320,7 @@ test.describe("the password form on the account page while the contests change",
     await three(local);
     await signIn(page);
     // The first read ends and writes ?contest= while the contestant screen still downloads.
-    await page.route(/\/src\/contestant\/ContestantApp\.tsx/, async (route) => {
+    await page.route(/\/ContestantApp[.-]/, async (route) => {
       await new Promise((done) => setTimeout(done, 1500));
       await route.fallback();
     });

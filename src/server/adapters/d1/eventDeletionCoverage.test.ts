@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import { advanceRows, CONTEST_ACTIVITY, fenceStatements } from '../cloudflare/eventDeletion';
+import { ACCOUNT_OWN_ROWS, ACCOUNT_ROWS_IN_A_CONTEST, advanceRows, CONTEST_ACTIVITY, fenceStatements } from '../cloudflare/eventDeletion';
 import { openStoreDatabase } from '../cloudflare/tooling/store-database.mjs';
 import { bound } from './assertions';
 import type { D1Connection } from './connection';
@@ -143,6 +143,13 @@ describe('event deletion coverage', () => {
   it('classifies every table that a contest delete cascades into, so a new one must choose', async () => {
     const classified = [...CONTEST_ACTIVITY.map(({ table }) => table), ...ROSTER_SIZED, ...CHUNKED_WITH_A_PARENT].sort();
     expect([...await cascadeChildren(db, tables, 'sessions')].sort()).toEqual(classified);
+  });
+
+  it('classifies every table that an account delete cascades into as a block or as its own data', async () => {
+    const classified = [...ACCOUNT_ROWS_IN_A_CONTEST.map(({ table }) => table), ...ACCOUNT_OWN_ROWS,
+      // A role belongs to a seat, and a seat blocks.
+      'membership_roles'].sort();
+    expect([...await cascadeChildren(db, tables, 'accounts')].sort()).toEqual(classified);
   });
 
   it('cascades a live contest with seats with and without scopes without a failed count', async () => {

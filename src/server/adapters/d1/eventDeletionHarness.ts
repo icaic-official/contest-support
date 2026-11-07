@@ -213,15 +213,16 @@ export async function seedEvent(db: D1Connection, webmaster: SeededWebmaster): P
 }
 
 /**
- * An account of `event` with a seat in a contest of another event, as 0017 left a
- * membership from before it. A trigger refuses that write now. A site grant lets an
- * account with no event hold the seat, and the account then takes its first event.
+ * An account of `event` with a live login and a seat in a contest of another event, as
+ * 0017 left a membership from before it. A trigger refuses that write now. A site grant
+ * lets an account with no event hold the seat, and the account then takes its first event.
  */
 export async function seedInertSeat(db: D1Connection, event: SeededEvent, otherContest: string): Promise<string> {
   const accountId = randomUUID();
   const handle = `inert-${accountId.slice(0, 8)}`;
   await db.batch([
     bound(db, 'INSERT INTO accounts (id, name, username, handle, must_change) VALUES (?, ?, ?, ?, 0)', accountId, 'Fictional legacy', handle, handle),
+    ...identityStatements(db, { accountId, loginId: randomUUID(), handle }, 'Fictional legacy'),
     bound(db, `INSERT INTO grants (account_id, scope, granted_by) VALUES (?, 'site', 'fixture')`, accountId),
     bound(db, 'INSERT INTO memberships (session_id, account_id) VALUES (?, ?)', otherContest, accountId),
     bound(db, `DELETE FROM grants WHERE account_id = ? AND scope = 'site'`, accountId),
@@ -272,6 +273,19 @@ export function rowsNaming(tables: ReadonlyMap<string, TableRows[]>, ids: readon
     if (naming.length > 0) found.set(table, naming);
   }
   return found;
+}
+
+/** The rows that differ between two readings, per table. */
+export function changedRows(before: ReadonlyMap<string, string[]>, after: ReadonlyMap<string, string[]>): Record<string, { removed: string[]; added: string[] }> {
+  const changes: Record<string, { removed: string[]; added: string[] }> = {};
+  for (const table of new Set([...before.keys(), ...after.keys()])) {
+    const old = before.get(table) ?? [];
+    const now = after.get(table) ?? [];
+    const removed = old.filter((row) => !now.includes(row));
+    const added = now.filter((row) => !old.includes(row));
+    if (removed.length > 0 || added.length > 0) changes[table] = { removed, added };
+  }
+  return changes;
 }
 
 /** An R2 bucket in memory. It can return short pages and an empty page, as R2 may. */

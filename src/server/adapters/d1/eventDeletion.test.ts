@@ -10,7 +10,8 @@ import { D1ManageService } from '../cloudflare/manage';
 import { passwordHasher, type PasswordHasher } from '../cloudflare/password';
 import { contestDataBindings, contestDataSql, resolveAuthority, signInAccountSql } from '../cloudflare/authority';
 import {
-  advanceDeletions, advanceRows, CLAIM_DELETION_SQL, CONTEST_ACTIVITY, fenceStatements, ROWS_UNIT_CALLS, type DeletionEnvironment, type RowsProgress,
+  ACCOUNT_ROWS_IN_A_CONTEST, advanceDeletions, advanceRows, CLAIM_DELETION_SQL, CONTEST_ACTIVITY, fenceStatements, ROWS_UNIT_CALLS,
+  type DeletionEnvironment, type RowsProgress,
 } from '../cloudflare/eventDeletion';
 import { removeFixtureEvent } from '../cloudflare/eventDeletionFixture';
 import { eraseLiveContest } from '../cloudflare/live';
@@ -18,7 +19,7 @@ import { openStoreDatabase } from '../cloudflare/tooling/store-database.mjs';
 import { bound } from './assertions';
 import type { D1Binding, D1Connection } from './connection';
 import {
-  crashingEnvironment, FakeBucket, FakeLiveNamespace, fillStores, interceptCalls, readTables, rowsNaming, seedEvent, seedInertSeat, seedWebmaster,
+  changedRows, crashingEnvironment, FakeBucket, FakeLiveNamespace, fillStores, interceptCalls, readTables, rowsNaming, seedEvent, seedInertSeat, seedWebmaster,
   tableNames, type CrashMode, type SeededEvent, type SeededWebmaster,
 } from './eventDeletionHarness';
 import { applyMigrations } from './testFixture';
@@ -745,6 +746,88 @@ describe('event deletion', () => {
       return (await rows<{ blocked: string | null }>('SELECT blocked FROM event_deletions WHERE event_id = ?', event.eventId))[0]?.blocked;
     }
 
+    const contestRowsOfAnAccount: Record<string, (accountId: string, other: SeededEvent) => Promise<void>> = {
+      announcement_receipts: async (accountId, other) => {
+        const announcement = (await rows<{ id: string }>('SELECT id FROM announcements WHERE session_id = ?', other.live))[0]!.id;
+        await bound(db, `INSERT INTO announcement_receipts (actor, request_id, session_id, command, announcement_id)
+          VALUES (?, ?, ?, '{}', ?)`, accountId, randomUUID(), other.live, announcement).run();
+      },
+      command_receipts: async (accountId, other) => {
+        const issue = (await rows<{ id: string }>('SELECT id FROM issues WHERE session_id = ? LIMIT 1', other.live))[0]!.id;
+        await bound(db, `INSERT INTO command_receipts (actor, request_id, session_id, command, issue_id)
+          VALUES (?, ?, ?, '{}', ?)`, accountId, randomUUID(), other.live, issue).run();
+      },
+      credential_scopes: async (accountId, other) => {
+        await bound(db, `INSERT INTO credential_scopes (account_id, session_id, operation_id, issued_from, issued_until)
+          VALUES (?, ?, ?, '2031-01-01T09:00:00.000Z', '2031-01-01T12:00:00.000Z')`, accountId, other.live, randomUUID()).run();
+      },
+      // Without its audit row, no key refuses the cascade, so only the check of the contest stops it.
+      account_operations: async (accountId, other) => {
+        const operation = randomUUID();
+        await bound(db, `INSERT INTO account_operations (id, account_id, actor, session_id, action, state)
+          VALUES (?, ?, ?, ?, 'reset_password', 'completed')`, operation, accountId, other.contestAdmin.accountId, other.practice).run();
+        await bound(db, 'DELETE FROM admin_audit WHERE id = ?', operation).run();
+      },
+    };
+
+    for (const { table, column } of ACCOUNT_ROWS_IN_A_CONTEST.filter((row) => row.table !== 'memberships')) {
+      it(`blocks on a row of ${table} in another event, without a cascade`, async () => {
+        const event = await seedEvent(db, webmaster);
+        const other = await seedEvent(db, webmaster);
+        await contestRowsOfAnAccount[table]!(event.volunteer.accountId, other);
+        const before = rowsNaming(await readTables(db, tables), other.ids);
+        await fence(db, event);
+        expect(await deleteRows(db, event)).toBe('blocked');
+        expect(await blockedName(event)).toBe(event.volunteer.accountId);
+        expect(Object.fromEntries(rowsNaming(await readTables(db, tables), other.ids))).toEqual(Object.fromEntries(before));
+        await bound(db, `DELETE FROM ${table} WHERE ${column} = ?`, event.volunteer.accountId).run();
+        expect(await deleteRows(db, event)).toBe('rows_done');
+        await runToEnd(stores().env, other);
+        await forget(event);
+        await forget(other);
+      });
+    }
+
+    it('writes only one access row to the outbox of another event for an inert seat there', async () => {
+      const event = await seedEvent(db, webmaster);
+      const other = await seedEvent(db, webmaster);
+      const legacy = await seedInertSeat(db, event, other.practice);
+      const before = rowsNaming(await readTables(db, tables), other.ids);
+      await fence(db, event);
+      const changes = changedRows(before, rowsNaming(await readTables(db, tables), other.ids));
+      expect(Object.keys(changes).sort()).toEqual(['audience_sequences', 'notifications']);
+      for (const { removed, added } of Object.values(changes)) {
+        expect(removed).toEqual([]);
+        expect(added).toEqual([expect.stringContaining(`"audience":"account:${legacy}"`)]);
+      }
+      await bound(db, 'DELETE FROM memberships WHERE account_id = ?', legacy).run();
+      await deleteRows(db, event);
+      await runToEnd(stores().env, other);
+      await forget(event);
+      await forget(other);
+    });
+
+    it('moves only the access version of an account of another event with an inert seat in this one', async () => {
+      const event = await seedEvent(db, webmaster);
+      const other = await seedEvent(db, webmaster);
+      const legacy = await seedInertSeat(db, other, event.practice);
+      const before = rowsNaming(await readTables(db, tables), other.ids);
+      const version = async () => (await rows<{ access_version: number }>('SELECT access_version FROM accounts WHERE id = ?', legacy))[0]?.access_version ?? 0;
+      const versionBefore = await version();
+      await fence(db, event);
+      expect(await deleteRows(db, event)).toBe('rows_done');
+      const changes = changedRows(before, rowsNaming(await readTables(db, tables), other.ids));
+      expect(Object.keys(changes)).toEqual(['accounts']);
+      const withoutVersion = (row: string) => row.replace(/"access_version":\d+/, '');
+      expect(changes.accounts?.added.map(withoutVersion)).toEqual(changes.accounts?.removed.map(withoutVersion));
+      expect(changes.accounts?.added).toEqual([expect.stringContaining(legacy)]);
+      expect(await version()).toBe(versionBefore + 1);
+      expect(await rows('SELECT revoked FROM logins WHERE account_id = ?', legacy)).toEqual([{ revoked: 0 }]);
+      await runToEnd(stores().env, other);
+      await forget(event);
+      await forget(other);
+    });
+
     for (const limit of [100, 1]) {
       it(`blocks on an actor outside the event and finishes after the blocker goes, with chunks of ${limit}`, async () => {
         const event = await seedEvent(db, webmaster);
@@ -776,8 +859,8 @@ describe('event deletion', () => {
         const event = await seedEvent(db, webmaster);
         const other = await seedEvent(db, webmaster);
         const legacy = await seedInertSeat(db, event, other.practice);
-        const before = rowsNaming(await readTables(db, tables), other.ids);
         await fence(db, event);
+        const before = rowsNaming(await readTables(db, tables), other.ids);
         expect(await deleteRows(db, event, limit)).toBe('blocked');
         expect(await blockedName(event)).toBe(legacy);
         expect(Object.fromEntries(rowsNaming(await readTables(db, tables), other.ids))).toEqual(Object.fromEntries(before));

@@ -92,6 +92,24 @@ export function fenceStatements(db: D1Connection, actor: DeletionActor, eventId:
 
 export type RowsProgress = 'more' | 'blocked' | 'rows_done';
 
+/**
+ * The rows that an account's delete would cascade into and that belong to a contest. The contests of this event
+ * are gone when its accounts go, so such a row is in another event, and no foreign key refuses its cascade.
+ */
+export const ACCOUNT_ROWS_IN_A_CONTEST = [
+  { table: 'memberships', column: 'account_id', scoped: '' },
+  { table: 'announcement_receipts', column: 'actor', scoped: '' },
+  { table: 'command_receipts', column: 'actor', scoped: '' },
+  { table: 'credential_scopes', column: 'account_id', scoped: '' },
+  { table: 'account_operations', column: 'account_id', scoped: ' AND session_id IS NOT NULL' },
+] as const;
+
+/**
+ * The rows that go with an account as its own data. A trigger holds an event grant to the account's own event,
+ * and only a webmaster holds a contest grant. A login and a site receipt name no contest.
+ */
+export const ACCOUNT_OWN_ROWS = ['grants', 'logins', 'manage_receipts'] as const;
+
 /** D1's foreign key error names no row, so the caller retries one account at a time to find it. */
 function isBlockingFailure(error: unknown): boolean {
   return isAssertionFailure(error) || (error instanceof Error && error.message.includes('FOREIGN KEY constraint failed'));

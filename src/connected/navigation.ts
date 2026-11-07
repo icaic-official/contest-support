@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useLocation } from "react-router";
+import type { ContestSummary } from "@/backend/contracts";
 import { can, seatOf } from "./capabilities";
 import type { Membership } from "./model";
 
@@ -82,6 +83,28 @@ export function canOpenPage(page: WorkspacePage, member: Membership): boolean {
   }
   if (page === "mine" || page === "handoffs") return can(seat, "claim");
   return true;
+}
+
+/**
+ * Whether the site page or an event console may open for this person, as far
+ * as the contest list tells. An event admin lists every contest of the event
+ * and a webmaster lists the contests that the site setting lets them read, each
+ * with the person's `manage` level. A list where no contest has the level
+ * `event` or `site` means that the person holds neither, so the page never
+ * downloads the staff screen. An empty list tells nothing: a webmaster who has
+ * joined no contest, or an event admin whose event has none, has one. The
+ * screen's own read decides then, and the server refuses everyone else.
+ *
+ * - `wait`: the first read of the list has not ended.
+ * - `deny`: the person has neither level.
+ * - `open`: show the screen.
+ */
+export function levelScreenAccess(
+  contests: readonly Pick<ContestSummary, "manage">[],
+  read: boolean,
+): "wait" | "deny" | "open" {
+  if (contests.length === 0) return read ? "open" : "wait";
+  return contests.some(({ manage }) => manage === "event" || manage === "site") ? "open" : "deny";
 }
 
 /** Router state that asks the next page to focus one control. */

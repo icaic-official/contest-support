@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { contestOfSearch, searchWithContest } from "./navigation";
+import type { ManageLevel } from "@/backend/contracts";
+import { contestOfSearch, levelScreenAccess, searchWithContest } from "./navigation";
 
 describe("contestOfSearch", () => {
   it("reads the contest parameter", () => {
@@ -39,5 +40,25 @@ describe("searchWithContest", () => {
     const search = searchWithContest("?a=1", "a b&c");
     expect(contestOfSearch(search)).toBe("a b&c");
     expect(new URLSearchParams(search).get("a")).toBe("1");
+  });
+});
+
+describe("levelScreenAccess", () => {
+  const list = (...levels: ManageLevel[]) => levels.map((manage) => ({ manage }));
+
+  it("waits for the first read of an empty list, and then leaves the decision to the screen", () => {
+    expect(levelScreenAccess([], false)).toBe("wait");
+    expect(levelScreenAccess([], true)).toBe("open");
+  });
+
+  it("opens for a person with the level event or site over any listed contest", () => {
+    expect(levelScreenAccess(list("none", "event"), true)).toBe("open");
+    expect(levelScreenAccess(list("site"), true)).toBe("open");
+    expect(levelScreenAccess(list("none", "contest", "site"), false)).toBe("open");
+  });
+
+  it("denies a person with no such level, even before the read of the snapshot ends", () => {
+    expect(levelScreenAccess(list("none"), true)).toBe("deny");
+    expect(levelScreenAccess(list("none", "contest"), false)).toBe("deny");
   });
 });

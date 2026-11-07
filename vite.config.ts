@@ -51,8 +51,8 @@ export default defineConfig({
     // A slow Workers Builds runner can pass Vitest's 5 s default. Longer explicit limits still apply.
     testTimeout: 30_000,
     hookTimeout: 30_000,
-    // Most test time waits on local Workers runtimes and password hashing.
-    // Use every CPU instead of Vitest's default of one fewer.
+    // Most test time waits on local Workers runtimes (each D1 call crosses the Wrangler
+    // proxy, about 5 ms) and password hashing. Use every CPU instead of Vitest's default of one fewer.
     maxWorkers: "100%",
     sequence: { sequencer: SlowFirstSequencer },
   },

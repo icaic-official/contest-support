@@ -1,6 +1,5 @@
 import { randomUUID } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { getPlatformProxy } from 'wrangler';
 import type { EventCode, Handle, ManageCommand, SignInTarget } from '../../../backend/contracts';
 import type { Caller } from '../../authentication';
 import type { D1Binding, D1Connection, D1Value } from '../d1/connection';
@@ -11,6 +10,7 @@ import { createBetterAuthIdentity } from './identity';
 import { loginKeyFor } from './credentials';
 import { D1ManageService, requirementOf } from './manage';
 import { passwordHasher, randomSecret, type PasswordHasher } from './password';
+import { openLocalPlatform } from './tooling/store-database.mjs';
 
 const testSchedule = { startsAt: '2030-01-01T09:00:00.000Z', endsAt: '2030-01-01T11:00:00.000Z', graceMinutes: 0 };
 
@@ -39,9 +39,7 @@ describe('site commands for webmasters', () => {
 
   beforeEach(async () => {
     // Every case owns a fresh local database, because the last-webmaster rule counts the whole site.
-    const platform = await getPlatformProxy<{ DB: D1Binding }>({
-      configPath: 'wrangler.auth-ci.jsonc', persist: false, remoteBindings: false, envFiles: [],
-    });
+    const platform = await openLocalPlatform<{ DB: D1Binding }>('wrangler.auth-ci.jsonc');
     db = platform.env.DB;
     dispose = platform.dispose;
     await applyMigrations(db);
@@ -277,9 +275,7 @@ describe('handle changes', () => {
   };
 
   beforeEach(async () => {
-    const platform = await getPlatformProxy<{ DB: D1Binding }>({
-      configPath: 'wrangler.auth-ci.jsonc', persist: false, remoteBindings: false, envFiles: [],
-    });
+    const platform = await openLocalPlatform<{ DB: D1Binding }>('wrangler.auth-ci.jsonc');
     db = platform.env.DB;
     dispose = platform.dispose;
     await applyMigrations(db);
@@ -492,9 +488,7 @@ describe('event, roster, and contest commands', () => {
     randomUUID(), contestId, entryId, caller('webmaster').accountId, category);
 
   beforeEach(async () => {
-    const platform = await getPlatformProxy<{ DB: D1Binding }>({
-      configPath: 'wrangler.auth-ci.jsonc', persist: false, remoteBindings: false, envFiles: [],
-    });
+    const platform = await openLocalPlatform<{ DB: D1Binding }>('wrangler.auth-ci.jsonc');
     db = platform.env.DB;
     dispose = platform.dispose;
     await applyMigrations(db);

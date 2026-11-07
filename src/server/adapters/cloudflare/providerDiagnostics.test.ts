@@ -1,9 +1,9 @@
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { getPlatformProxy } from 'wrangler';
 import type { D1Connection } from '../d1/connection';
 import { createDiagnostics, readD1AuthFlags, type AuthFlags } from '../../../../tests/providers/cloudflare/diagnostics';
 import { applyMigrations } from '../d1/testFixture';
+import { openLocalPlatform } from './tooling/store-database.mjs';
 
 const flags: AuthFlags = { accountExists: true, accountDisabled: false, accountMustChange: false, accountReady: true,
   wrapperCount: 1, wrapperExists: true, wrapperRevoked: false, wrapperUnexpired: true, credentialGenerationMatches: true,
@@ -78,8 +78,7 @@ describe('fixture-owned authentication flags with real local D1', () => {
   const loginId = randomUUID();
   const owned = new Set([accountId]);
   beforeAll(async () => {
-    const platform = await getPlatformProxy<{ DB: D1Connection }>({ configPath: 'wrangler.auth-ci.jsonc',
-      persist: false, remoteBindings: false, envFiles: [] });
+    const platform = await openLocalPlatform<{ DB: D1Connection }>('wrangler.auth-ci.jsonc');
     db = platform.env.DB;
     dispose = platform.dispose;
     await applyMigrations(db);

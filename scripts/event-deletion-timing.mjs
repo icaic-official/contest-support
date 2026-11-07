@@ -11,6 +11,7 @@ import { repositoryRoot } from '../src/server/adapters/cloudflare/tooling/config
 import { enforceWranglerEnvironment, safeWranglerEnvironment } from '../src/server/adapters/cloudflare/tooling/safe-environment.mjs';
 
 const usage = `Usage: node scripts/event-deletion-timing.mjs [--issues=2000] [--history=80000] [--remote --database=<name>]
+       node scripts/event-deletion-timing.mjs --remote --database=<name> --cleanup=<run>
 
 Seeds event A and an equally large neighbor event B. It then runs the real fence
 and rows step on A through an instrumented connection. It prints the wall time,
@@ -21,9 +22,18 @@ that B is intact, and it removes its own data at the end.
 The neighbor matters. Without B, a missing index costs nothing, because nothing
 else remains to scan. It runs on a temporary local database by default. With
 --remote, it uses Wrangler's credentials and refuses any database whose name does
-not start with minsky-preview.`;
+not start with minsky-preview.
 
-const options = { issues: 2000, history: 80_000, remote: false, database: '' };
+A Worker's minute cron can claim a journal whose lease has expired, and it would
+then delete rows that this script does not count. So the fence's batch also holds
+a lease of one day, and the script fails unless that lease stands at the end and
+its own deletes account for every outbox and audit row of A.
+
+After a failure or an interrupt, the script removes what it seeded, by its two
+event IDs, in bounded chunks. Interrupt it a second time to stop that. It prints
+the run's name at the start. Pass that name to --cleanup to remove the rest later.`;
+
+const options = { issues: 2000, history: 80_000, remote: false, database: '', cleanup: '' };
 const argv = process.argv.slice(2);
 for (let index = 0; index < argv.length; index += 1) {
   const argument = argv[index] ?? '';
@@ -38,10 +48,15 @@ for (let index = 0; index < argv.length; index += 1) {
   else if (key === 'history' && /^\d+$/.test(value ?? '')) options.history = Number(value);
   else if (key === 'remote' && value === undefined) options.remote = true;
   else if (key === 'database' && value) options.database = value;
+  else if (key === 'cleanup' && /^tm[0-9a-f-]{12}$/.test(value ?? '')) options.cleanup = value;
   else { console.error(usage); process.exit(1); }
 }
 if (options.remote && !options.database.startsWith('minsky-preview')) {
   console.error('A hosted run needs --database=<name>, and the name must start with minsky-preview.');
+  process.exit(1);
+}
+if (options.cleanup && !options.remote) {
+  console.error('A temporary local database leaves nothing to remove, so --cleanup needs --remote.');
   process.exit(1);
 }
 if (!options.remote) {
@@ -64,7 +79,7 @@ async function loadDeletion() {
     await build({
       stdin: { resolveDir: repositoryRoot, loader: 'ts', contents: `
         export { advanceRows, fenceStatements } from './src/server/adapters/cloudflare/eventDeletion.ts';
-        export { forgetFixtureEvent, removeFixtureEvent } from './src/server/adapters/cloudflare/eventDeletionFixture.ts';` },
+        export { removeFixtureEvent } from './src/server/adapters/cloudflare/eventDeletionFixture.ts';` },
       outfile, bundle: true, packages: 'external', platform: 'node', format: 'esm', target: 'node22', logLevel: 'silent',
     });
     return await import(pathToFileURL(outfile).href);
@@ -82,15 +97,21 @@ async function applyMigrations(db) {
   }
 }
 
+let interrupted = false;
+const stopIfInterrupted = () => {
+  if (interrupted) throw new Error('The run was interrupted.');
+};
+
 /** Runs each call on the real database and records what the server reports for each statement. */
 function metered(db, log) {
   const parts = new WeakMap();
   const note = (sql, meta, calls) => {
-    log.statements.push({ sql, duration: meta?.duration ?? 0, rowsRead: meta?.rows_read ?? 0, rowsWritten: meta?.rows_written ?? 0 });
+    log.statements.push({ sql, duration: meta?.duration ?? 0, rowsRead: meta?.rows_read ?? 0, rowsWritten: meta?.rows_written ?? 0, changes: meta?.changes ?? 0 });
     log.calls += calls;
   };
   const wrap = (inner, sql) => {
     const once = async (execute) => {
+      stopIfInterrupted();
       const started = performance.now();
       try {
         const result = await execute();
@@ -115,6 +136,7 @@ function metered(db, log) {
   return {
     prepare: (sql) => wrap(db.prepare(sql), sql),
     batch: async (statements) => {
+      stopIfInterrupted();
       const items = statements.map((statement) => parts.get(statement));
       const started = performance.now();
       try {
@@ -135,7 +157,9 @@ const newLog = () => ({ statements: [], calls: 0, wall: 0, errors: 0 });
 const STAFF = 100;
 const CONTESTANTS = 300;
 const CONTESTS = 4;
-const CHUNK = 5000;
+// D1 advises about 1,000 rows for each statement.
+const CHUNK = 1000;
+const HELD_LEASE_SECONDS = 86_400;
 const AUDIT_PER_ACCOUNT = 5;
 const RECEIPTS_OF_THE_NEIGHBOR = 20_000;
 const RECEIPTS_OF_THE_EVENT = 1000;
@@ -233,35 +257,44 @@ async function seedEvent(db, run, tag) {
  */
 async function seedReceipts(db, run, eventA, eventB) {
   const actor = `${eventB}-account-00001`;
-  const write = (count, tag, event) => db.prepare(`WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < ${count})
-    INSERT INTO manage_receipts (actor, request_id, command, result)
-    SELECT ?, printf('${run}-${tag}-%05d', i), json_object('type', 'create_people', 'eventId', ?, 'people',
-      json_array(json_object('handle', printf('p%05d', i), 'name', printf('Fictional person %05d', i)))), '{}' FROM n`).bind(actor, event).run();
+  const write = async (count, tag, event) => {
+    for (let from = 1; from <= count; from += CHUNK) {
+      await db.prepare(`WITH RECURSIVE n(i) AS (SELECT ${from} UNION ALL SELECT i + 1 FROM n WHERE i < ${Math.min(count, from + CHUNK - 1)})
+        INSERT INTO manage_receipts (actor, request_id, command, result)
+        SELECT ?, printf('${run}-${tag}-%05d', i), json_object('type', 'create_people', 'eventId', ?, 'people',
+          json_array(json_object('handle', printf('p%05d', i), 'name', printf('Fictional person %05d', i)))), '{}' FROM n`).bind(actor, event).run();
+    }
+  };
   await write(RECEIPTS_OF_THE_NEIGHBOR, 'neighbor', eventB);
   await write(RECEIPTS_OF_THE_EVENT, 'event', eventA);
 }
 
-/** Rows of one event, per table. Each query starts from the event, so it never reads the neighbor, except for the receipts. */
+/**
+ * Rows of one event, per table. Each query reads an index by the seeded IDs and never through a parent row,
+ * so a row whose parent went still counts. No query reads the neighbor, except for the receipts.
+ */
 function countQueries(event) {
-  const contests = `(SELECT id FROM sessions WHERE event_id = '${event}')`;
-  const logged = `(SELECT id FROM accounts WHERE event_id = '${event}')`;
-  const issues = `(SELECT id FROM issues WHERE session_id IN ${contests})`;
+  const seeded = (column, kind) => `${column} >= '${event}-${kind}-' AND ${column} < '${event}-${kind}.'`;
+  const inContests = seeded('session_id', 'contest');
   return {
     events: `SELECT count(*) AS n FROM events WHERE id = '${event}'`,
-    sessions: `SELECT count(*) AS n FROM sessions WHERE event_id = '${event}'`,
-    entrants: `SELECT count(*) AS n FROM entrants WHERE event_id = '${event}'`,
-    accounts: `SELECT count(*) AS n FROM accounts WHERE event_id = '${event}'`,
-    logins: `SELECT count(*) AS n FROM logins WHERE account_id IN ${logged}`,
-    ba_user: `SELECT count(*) AS n FROM ba_user WHERE id LIKE '${event}-%'`,
-    teams: `SELECT count(*) AS n FROM teams WHERE session_id IN ${contests}`,
-    memberships: `SELECT count(*) AS n FROM memberships WHERE session_id IN ${contests}`,
-    issues: `SELECT count(*) AS n FROM issues WHERE session_id IN ${contests}`,
-    history: `SELECT count(*) AS n, total(length(text)) AS size FROM history WHERE issue_id IN ${issues}`,
-    resolutions: `SELECT count(*) AS n FROM resolutions WHERE session_id IN ${contests}`,
-    awards: `SELECT count(*) AS n FROM awards WHERE session_id IN ${contests}`,
-    command_receipts: `SELECT count(*) AS n FROM command_receipts WHERE session_id IN ${contests}`,
-    notifications: `SELECT count(*) AS n FROM notifications WHERE session_id IN ${contests}`,
-    admin_audit: `SELECT count(*) AS n FROM admin_audit WHERE session_id IN ${contests}`,
+    sessions: `SELECT count(*) AS n FROM sessions WHERE ${seeded('id', 'contest')}`,
+    entrants: `SELECT count(*) AS n FROM entrants WHERE ${seeded('id', 'entrant')}`,
+    accounts: `SELECT count(*) AS n FROM accounts WHERE ${seeded('id', 'account')}`,
+    logins: `SELECT count(*) AS n FROM logins WHERE ${seeded('account_id', 'account')}`,
+    ba_user: `SELECT count(*) AS n FROM ba_user WHERE ${seeded('id', 'account')}`,
+    ba_session: `SELECT count(*) AS n FROM ba_session WHERE ${seeded('userId', 'account')}`,
+    teams: `SELECT count(*) AS n FROM teams WHERE ${inContests}`,
+    memberships: `SELECT count(*) AS n FROM memberships WHERE ${inContests}`,
+    membership_roles: `SELECT count(*) AS n FROM membership_roles WHERE ${inContests}`,
+    audience_sequences: `SELECT count(*) AS n FROM audience_sequences WHERE ${inContests}`,
+    issues: `SELECT count(*) AS n FROM issues WHERE ${inContests}`,
+    history: `SELECT count(*) AS n, total(length(text)) AS size FROM history WHERE ${seeded('issue_id', 'issue')}`,
+    resolutions: `SELECT count(*) AS n FROM resolutions WHERE ${inContests}`,
+    awards: `SELECT count(*) AS n FROM awards WHERE ${inContests}`,
+    command_receipts: `SELECT count(*) AS n FROM command_receipts WHERE ${inContests}`,
+    notifications: `SELECT count(*) AS n FROM notifications WHERE ${inContests}`,
+    admin_audit: `SELECT count(*) AS n FROM admin_audit WHERE ${inContests}`,
     manage_receipts: `SELECT count(*) AS n FROM manage_receipts WHERE instr(command, '${event}') > 0`,
   };
 }
@@ -306,18 +339,83 @@ async function openDatabase() {
   return { db: platform.env.DB, dispose: async () => { await platform.dispose(); await rm(directory, { recursive: true, force: true }); } };
 }
 
-const platform = await openDatabase();
-const { db } = platform;
+let platform = await openDatabase();
+
+/**
+ * Removes what a run seeded, by its two event IDs. The rows step keeps to its chunks, and it repeats safely from any
+ * point of the seed or the deletion. The receipts go first, because an account's delete would cascade them in one statement.
+ */
+async function removeRows(db, run) {
+  for (;;) {
+    const { meta } = await db.prepare(`DELETE FROM manage_receipts WHERE rowid IN
+      (SELECT rowid FROM manage_receipts WHERE actor = ? LIMIT ${CHUNK})`).bind(`${run}-b-account-00001`).run();
+    if (!meta.changes) break;
+  }
+  for (const tag of ['a', 'b']) await deletion.removeFixtureEvent(db, `${run}-${tag}`);
+  for (const tag of ['a', 'b']) {
+    const event = `${run}-${tag}`;
+    const left = Object.entries(await counts(db, event)).filter(([, row]) => row.n !== 0).map(([table]) => table);
+    if (left.length) throw new Error(`Rows of ${event} remain in ${left.join(', ')}.`);
+  }
+}
+
+/** A terminal's interrupt also reaches the local runtime that carries a hosted connection. So that connection may need a new runtime. */
+async function removeSeed(run) {
+  try {
+    console.log(`Removing the rows of ${run}.`);
+    await removeRows(platform.db, run);
+  } catch (error) {
+    if (!options.remote) {
+      if (!interrupted) throw error;
+      console.log('The temporary local database is gone, and its rows with it.');
+      return;
+    }
+    await platform.dispose().catch(() => undefined);
+    platform = await openDatabase();
+    await removeRows(platform.db, run);
+  }
+  console.log(`No row of ${run} remains.`);
+}
+
+if (options.cleanup) {
+  let status = 0;
+  try {
+    await removeSeed(options.cleanup);
+  } catch (error) {
+    status = 1;
+    console.error(error instanceof Error ? error.message : 'The cleanup failed.');
+  } finally {
+    await platform.dispose();
+  }
+  process.exit(status);
+}
+
 const run = `tm${randomUUID().slice(0, 12)}`;
+const onSignal = (signal) => {
+  if (interrupted) {
+    console.error(`Stopped during the cleanup. Rows can remain. Remove them with --cleanup=${run}.`);
+    process.exit(130);
+  }
+  interrupted = true;
+  console.error(`${signal}: the run stops at its next call and then removes its rows. Interrupt it again to stop that.`);
+};
+// Wrangler's runtime exits the process on these signals. Its exit hook still stops the runtime at the end.
+for (const signal of ['SIGINT', 'SIGTERM']) {
+  process.removeAllListeners(signal);
+  process.on(signal, onSignal);
+}
+console.log(`Run ${run}. If it stops before its cleanup ends, remove its rows with --cleanup=${run}.`);
+
 let failed = false;
 try {
+  const { db } = platform;
   const seedStart = performance.now();
   const seeding = newLog();
   const seedDb = metered(db, seeding);
   const eventA = await seedEvent(seedDb, run, 'a');
   const eventB = await seedEvent(seedDb, run, 'b');
   await seedReceipts(seedDb, run, eventA, eventB);
-  console.log(`Seeded two events: ${options.issues} issues and ${options.history} history rows each, in ${Math.round(performance.now() - seedStart)} ms.`);
+  console.log(`Seeded two events: ${options.issues} issues and ${options.history} history rows each, in ${Math.round(performance.now() - seedStart)} ms: ${seeding.calls} statements, ${Math.round(seeding.statements.reduce((total, entry) => total + entry.duration, 0))} ms of server time, at most ${Math.max(...seeding.statements.map((entry) => entry.changes))} rows in one statement, ${seeding.statements.reduce((total, entry) => total + entry.rowsWritten, 0)} rows written.`);
 
   const beforeB = await counts(db, eventB);
   const beforeA = await counts(db, eventA);
@@ -325,10 +423,18 @@ try {
 
   const parts = [];
   const fenceLog = newLog();
-  const started = performance.now();
   const fenceDb = metered(db, fenceLog);
-  await fenceDb.batch(deletion.fenceStatements(fenceDb, { id: 'timing', name: 'Deletion timing' }, eventA, `Timing ${eventA}`, randomUUID()));
+  // In the fence's own batch, so that no cron tick can claim the journal between the two.
+  await fenceDb.batch([
+    ...deletion.fenceStatements(fenceDb, { id: 'timing', name: 'Deletion timing' }, eventA, `Timing ${eventA}`, randomUUID()),
+    fenceDb.prepare(`UPDATE event_deletions SET lease_until = unixepoch() + ${HELD_LEASE_SECONDS} WHERE event_id = ?`).bind(eventA),
+  ]);
   parts.push(summary('fence', fenceLog));
+  const journal = () => db.prepare('SELECT step, lease_until FROM event_deletions WHERE event_id = ?').bind(eventA).first();
+  const heldLease = (await journal()).lease_until;
+  // After the fence, because the fence writes outbox rows of its own.
+  const fenced = await counts(db, eventA);
+  const started = performance.now();
   const contestLog = newLog();
   const accountLog = newLog();
   const eventLog = newLog();
@@ -346,7 +452,7 @@ try {
     if (progress === 'rows_done') break;
     if (progress === 'blocked') throw new Error('Event A is blocked.');
   }
-  const total = Math.round(performance.now() - started);
+  const total = Math.round(fenceLog.wall + performance.now() - started);
   parts.push(summary('contests', contestLog), summary('accounts', accountLog), summary('event row', eventLog));
   const all = newLog();
   for (const log of [fenceLog, contestLog, accountLog, eventLog]) {
@@ -364,16 +470,24 @@ try {
   const left = Object.entries(afterA).filter(([, row]) => row.n !== 0).map(([table]) => table);
   const changed = Object.keys(afterB).filter((table) => JSON.stringify(afterB[table]) !== JSON.stringify(beforeB[table]));
   console.log(`Event A rows left: ${left.length ? left.join(', ') : 'none'}. Event B tables changed: ${changed.length ? changed.join(', ') : 'none'}.`);
+  const deleted = (table) => all.statements.filter(({ sql }) => sql.startsWith(`DELETE FROM ${table} `)).reduce((sum, entry) => sum + entry.changes, 0);
+  // D1 counts a cascade's rows in a statement's changes, so only these two tables, which cascade nothing, can compare.
+  const elsewhere = ['notifications', 'admin_audit'].filter((table) => deleted(table) !== fenced[table].n);
+  const { step, lease_until: leaseAtEnd } = await journal();
+  const otherRunner = elsewhere.length > 0 || leaseAtEnd !== heldLease || step !== 'live';
+  console.log(`Another runner: ${otherRunner ? `yes, deletes differ in ${elsewhere.join(', ') || 'no table'}, step ${step}, lease ${leaseAtEnd} of ${heldLease}` : 'none, because the lease stood and this run deleted every counted row'}.`);
   console.log(`Errors: ${all.errors}. Work count: ${work}.`);
-  if (left.length || changed.length || all.errors) failed = true;
-  await deletion.forgetFixtureEvent(db, eventA);
-  await deletion.removeFixtureEvent(db, eventB);
-  const removed = await counts(db, eventB);
-  if (Object.values(removed).some((row) => row.n !== 0)) { failed = true; console.log('Event B was not removed.'); }
+  if (left.length || changed.length || all.errors || otherRunner) failed = true;
 } catch (error) {
   failed = true;
   console.error(error instanceof Error ? error.message : 'The timing run failed.');
 } finally {
+  try {
+    await removeSeed(run);
+  } catch (error) {
+    failed = true;
+    console.error(`${error instanceof Error ? error.message : 'The cleanup failed.'}${options.remote ? ` Remove the rest with --cleanup=${run}.` : ''}`);
+  }
   await platform.dispose();
 }
 process.exit(failed ? 1 : 0);

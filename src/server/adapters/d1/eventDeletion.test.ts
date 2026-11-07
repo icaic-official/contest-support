@@ -9,7 +9,9 @@ import { createBetterAuthIdentity } from '../cloudflare/identity';
 import { D1ManageService } from '../cloudflare/manage';
 import { passwordHasher, type PasswordHasher } from '../cloudflare/password';
 import { contestDataBindings, contestDataSql, resolveAuthority, signInAccountSql } from '../cloudflare/authority';
-import { advanceDeletions, advanceRows, CLAIM_DELETION_SQL, fenceStatements, type DeletionEnvironment, type RowsProgress } from '../cloudflare/eventDeletion';
+import {
+  advanceDeletions, advanceRows, CLAIM_DELETION_SQL, CONTEST_ACTIVITY, fenceStatements, ROWS_UNIT_CALLS, type DeletionEnvironment, type RowsProgress,
+} from '../cloudflare/eventDeletion';
 import { eraseLiveContest } from '../cloudflare/live';
 import { openStoreDatabase } from '../cloudflare/tooling/store-database.mjs';
 import { bound } from './assertions';
@@ -241,6 +243,71 @@ describe('event deletion', () => {
         expect(await rows(`SELECT key FROM authentication_limits WHERE key IN (?, ?)`,
           `handle:${event.eventId}:${event.contestant.handle}`, `change:${event.contestant.accountId}`)).toEqual([]);
         expect(await deleteRows(db, event, limit)).toBe('rows_done');
+        await forget(event);
+      });
+    }
+
+    /** What a long contest leaves: an outbox that nothing deletes, and an audit trail. */
+    async function seedLongContest(contest: string, actorId: string, count: number): Promise<void> {
+      const series = `WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < ${count})`;
+      await db.batch([
+        bound(db, `INSERT INTO audience_sequences (session_id, audience, sequence) VALUES (?, 'staff', 1)
+          ON CONFLICT (session_id, audience) DO NOTHING`, contest),
+        bound(db, `${series} INSERT INTO notifications (id, session_id, audience, sequence, delivered)
+          SELECT lower(hex(randomblob(16))), ?, 'staff', 1000 + i, 1 FROM n`, contest),
+        bound(db, `${series} INSERT INTO admin_audit (id, session_id, actor, action)
+          SELECT lower(hex(randomblob(16))), ?, ?, 'save_member' FROM n`, contest, actorId),
+      ]);
+    }
+
+    async function countInContest(table: string, contest: string): Promise<number> {
+      return (await rows<{ n: number }>(`SELECT count(*) AS n FROM ${table} WHERE session_id = ?`, contest))[0]?.n ?? 0;
+    }
+
+    it('removes a long contest in bounded statements, so the contest row cascades no outbox and no audit', async () => {
+      const event = await seedEvent(db, webmaster);
+      await seedLongContest(event.live, event.contestAdmin.accountId, 2500);
+      await fence(db, event);
+      const largest = { notifications: 0, admin_audit: 0 };
+      for (;;) {
+        const before = { notifications: await countInContest('notifications', event.live), admin_audit: await countInContest('admin_audit', event.live) };
+        const progress = await advanceRows(db, event.eventId);
+        largest.notifications = Math.max(largest.notifications, before.notifications - await countInContest('notifications', event.live));
+        largest.admin_audit = Math.max(largest.admin_audit, before.admin_audit - await countInContest('admin_audit', event.live));
+        if (progress === 'rows_done') break;
+        expect(progress).toBe('more');
+      }
+      expect(largest).toEqual({ notifications: 1000, admin_audit: 1000 });
+      await forget(event);
+    });
+
+    it('removes at most one row of each activity table in a unit with chunks of 1', async () => {
+      const event = await seedEvent(db, webmaster);
+      await seedLongContest(event.live, event.contestAdmin.accountId, 3);
+      await fence(db, event);
+      const counts = async () => Promise.all(CONTEST_ACTIVITY.map(async ({ table }) =>
+        await countInContest(table, event.practice) + await countInContest(table, event.live)));
+      for (;;) {
+        const before = await counts();
+        const progress = await advanceRows(db, event.eventId, 1);
+        const after = await counts();
+        expect(before.reduce((sum, count, index) => sum + count - (after[index] ?? 0), 0)).toBeLessThanOrEqual(1);
+        if (progress === 'rows_done') break;
+      }
+      await forget(event);
+    });
+
+    for (const limit of [undefined, 1]) {
+      it(`spends no more than ROWS_UNIT_CALLS in a unit with chunks of ${limit ?? 'the default'}`, async () => {
+        const event = await seedEvent(db, webmaster);
+        await fence(db, event);
+        const counter = crashingEnvironment(stores().env, Number.MAX_SAFE_INTEGER, 'never ran');
+        for (;;) {
+          const before = counter.calls();
+          const progress = await advanceRows(counter.env.DB, event.eventId, limit);
+          expect(counter.calls() - before).toBeLessThanOrEqual(ROWS_UNIT_CALLS);
+          if (progress === 'rows_done') break;
+        }
         await forget(event);
       });
     }
@@ -577,7 +644,8 @@ describe('event deletion', () => {
         },
         delete: (keys) => bucket.delete(keys),
       } })).rejects.toThrow('requires another attempt');
-      expect(logged.mock.calls.flat().join('')).toContain('deletion.advance_failed');
+      expect(logged.mock.calls.map(([line]) => JSON.parse(String(line)) as object))
+        .toContainEqual(expect.objectContaining({ event: 'deletion.advance_failed', eventId: failing.eventId }));
       logged.mockRestore();
       expect(await finished(other)).toBe(true);
       expect(await finished(failing)).toBe(false);

@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import { advanceRows, fenceStatements } from '../cloudflare/eventDeletion';
+import { advanceRows, CONTEST_ACTIVITY, fenceStatements } from '../cloudflare/eventDeletion';
 import { openStoreDatabase } from '../cloudflare/tooling/store-database.mjs';
 import { bound } from './assertions';
 import type { D1Connection } from './connection';
@@ -37,6 +37,31 @@ async function referencingTables(db: D1Connection, tables: readonly string[]): P
   }
   return reached;
 }
+
+/** The tables that an `ON DELETE CASCADE` chain reaches from one parent. */
+async function cascadeChildren(db: D1Connection, tables: readonly string[], parent: string): Promise<Set<string>> {
+  const edges: Array<{ child: string; parent: string }> = [];
+  for (const table of tables) {
+    const { results } = await db.prepare(`PRAGMA foreign_key_list("${table}")`).all<{ table: string; on_delete: string }>();
+    edges.push(...results.filter((row) => row.on_delete === 'CASCADE').map((row) => ({ child: table, parent: row.table })));
+  }
+  const reached = new Set<string>();
+  for (let grew = true; grew;) {
+    grew = false;
+    for (const edge of edges) {
+      if (!reached.has(edge.child) && (edge.parent === parent || reached.has(edge.parent))) {
+        reached.add(edge.child);
+        grew = true;
+      }
+    }
+  }
+  return reached;
+}
+
+/** Under a contest, the tables that stay the size of the roster. The contest row's own cascade removes them. */
+const ROSTER_SIZED = ['audience_sequences', 'credential_scopes', 'grants', 'membership_roles', 'memberships', 'session_issue_sequences', 'teams'];
+/** Under a contest, the tables whose rows go with a chunk of their parent, and not with the contest row. */
+const CHUNKED_WITH_A_PARENT = ['announcement_image_deletions', 'announcement_images', 'awards', 'command_receipts', 'history', 'image_deletions', 'issue_images', 'resolutions'];
 
 function rowSet(tables: ReadonlyMap<string, TableRows[]>): Map<string, Set<string>> {
   return new Map([...tables].map(([table, rows]) => [table, new Set(rows.map(maskedRow))]));
@@ -113,6 +138,11 @@ describe('event deletion coverage', () => {
 
     await deleteRows(kept);
     await forget(kept);
+  });
+
+  it('classifies every table that a contest delete cascades into, so a new one must choose', async () => {
+    const classified = [...CONTEST_ACTIVITY.map(({ table }) => table), ...ROSTER_SIZED, ...CHUNKED_WITH_A_PARENT].sort();
+    expect([...await cascadeChildren(db, tables, 'sessions')].sort()).toEqual(classified);
   });
 
   it('cascades a live contest with seats with and without scopes without a failed count', async () => {

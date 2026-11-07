@@ -268,12 +268,18 @@ test.describe('deleting an event', () => {
     const dialog = page.getByRole('dialog', { name: `Delete ${name}?` });
     await dialog.getByLabel('Type the event name to confirm').fill(name);
     const confirm = dialog.getByRole('button', { name: 'Delete event', exact: true });
+    // The trap of the dialog can pull focus back at once, so the test watches each move and not the end state.
+    await page.evaluate(() => {
+      const moves: string[] = [];
+      (window as unknown as { focusMoves: string[] }).focusMoves = moves;
+      document.addEventListener('focusin', (event) => moves.push((event.target as HTMLElement).tagName), true);
+    });
     await confirm.click();
     await expect(dialog.getByRole('alert')).toBeVisible();
     await expect(confirm).toBeEnabled();
     // keepFocus runs in the next frame.
     await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
-    expect(await page.evaluate(() => document.activeElement?.tagName)).not.toBe('H1');
+    expect(await page.evaluate(() => (window as unknown as { focusMoves: string[] }).focusMoves)).not.toContain('H1');
     await page.keyboard.press('Tab');
     expect(await dialog.evaluate((element) => element.contains(document.activeElement))).toBe(true);
     await confirm.click();

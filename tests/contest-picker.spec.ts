@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { Page } from "@playwright/test";
+import { contrastOf } from "./support/contrast";
 import { endRunningContest, seatThreeContests } from "./support/contests";
 import { type LocalWorker, expect, test } from "./support/localWorker";
 
@@ -337,6 +338,19 @@ test.describe("the rows of the picker", () => {
       /^Alpha · .*21:00$/,
     ]);
   });
+
+  for (const scheme of ["light", "dark"] as const) {
+    test(`keep the second line readable on a focused row, in ${scheme} mode`, async ({ page, local }) => {
+      await page.emulateMedia({ colorScheme: scheme });
+      await three(local);
+      await signIn(page);
+      await trigger(page).focus();
+      await page.keyboard.press("Enter");
+      const item = page.getByRole("menuitemradio").first();
+      await expect(item).toBeFocused();
+      expect(await contrastOf(item.getByText(/17:00 · Ended$/))).toBeGreaterThanOrEqual(4.5);
+    });
+  }
 
   test("open, move and choose with the keyboard, and close without a change on Escape", async ({ page, local }) => {
     const ids = await three(local);

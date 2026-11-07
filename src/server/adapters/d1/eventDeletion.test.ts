@@ -448,7 +448,7 @@ describe('event deletion', () => {
       const { bucket, live, env } = stores();
       fillStores(event, bucket, live);
       await fence(db, event);
-      await bound(db, 'DELETE FROM issues WHERE session_id IN (?, ?)', event.practice, event.live).run();
+      await db.batch(CONTEST_ACTIVITY.map(({ table }) => bound(db, `DELETE FROM ${table} WHERE session_id IN (?, ?)`, event.practice, event.live)));
       const stale = pausingAt(/^DELETE FROM sessions/);
       const running = advanceRows(stale.db, event.eventId);
       await stale.atCall;

@@ -11,6 +11,8 @@ export interface LogFields {
   readonly requestId?: string | null;
   readonly status?: number;
   readonly task?: string;
+  /** The event of a deletion that failed. An operator can read it, and it names no person. */
+  readonly eventId?: string;
   readonly delivered?: number;
   readonly failed?: number;
   readonly error?: unknown;

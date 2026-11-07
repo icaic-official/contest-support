@@ -5,8 +5,32 @@ import type { PrivateBucket } from './images';
 import { eraseLiveContest, type LiveNamespace } from './live';
 import { logEvent } from './log';
 
-/** Issues per statement and accounts per batch in the rows step. */
+/** Issues per statement and accounts per batch in the rows step. An issue takes its history with it. */
 const DELETE_CHUNK = 100;
+
+/** Rows per statement for a table without activity under it. D1 advises chunks of about 1,000. */
+const FLAT_CHUNK = 1000;
+
+/**
+ * The tables under a contest that grow with activity and not with the roster, in delete order.
+ * Each goes in chunks, so the contest row's own cascade removes only roster-sized rows.
+ * D1 runs one query at a time, so one long statement here would make every other event wait.
+ */
+export const CONTEST_ACTIVITY = [
+  { table: 'issues', chunk: DELETE_CHUNK },
+  { table: 'notifications', chunk: FLAT_CHUNK },
+  { table: 'admin_audit', chunk: FLAT_CHUNK },
+  { table: 'announcement_receipts', chunk: FLAT_CHUNK },
+  { table: 'announcements', chunk: DELETE_CHUNK },
+  { table: 'contest_awards', chunk: FLAT_CHUNK },
+  { table: 'account_operations', chunk: FLAT_CHUNK },
+] as const;
+
+type ActivityTable = (typeof CONTEST_ACTIVITY)[number]['table'];
+
+/** The first activity table that still holds a row of one contest. Bind the contest ID. */
+const NEXT_ACTIVITY_SQL = `SELECT CASE ${CONTEST_ACTIVITY.map(({ table }) =>
+  `WHEN EXISTS (SELECT 1 FROM ${table} WHERE session_id = ?1) THEN '${table}'`).join(' ')} END AS activity`;
 
 /** A blocked deletion looks again after this time, because another event's deletion can clear it. */
 const BLOCKED_RETRY_SECONDS = 3600;
@@ -129,20 +153,24 @@ async function deleteAccounts(db: D1Connection, eventId: string, ids: readonly s
  * One bounded, idempotent unit of the rows step. The caller repeats it until it
  * returns 'rows_done' or 'blocked'. It works from the journal and the targets,
  * so a repeat after a crash finds nothing left of what committed.
- *   contests: at most `limit` issues per statement, then the contest row, whose cascade removes
- *             its entries, seats, audit, outbox, announcements, and image rows.
- *   accounts: at most `limit` per batch. A key or seat in another event blocks the deletion,
- *             and nothing outside the targets is deleted.
+ *   contests: a chunk of one activity table per unit, then the contest row, whose cascade removes
+ *             its entries, seats, and other roster-sized rows.
+ *   accounts: a chunk per batch. A key or seat in another event blocks the deletion, and nothing
+ *             outside the targets is deleted.
  *   event:    the events row, whose cascade removes its entrants, event grants, and event audit.
+ * `limit` replaces every chunk size, so a test can stop between any two rows.
  */
-export async function advanceRows(db: D1Connection, eventId: string, limit: number = DELETE_CHUNK): Promise<RowsProgress> {
+export async function advanceRows(db: D1Connection, eventId: string, limit?: number): Promise<RowsProgress> {
   const state = await bound(db, `SELECT d.step, (SELECT t.id FROM event_deletion_targets t
     WHERE t.event_id = d.event_id AND t.kind = 'contest' AND t.done = 0 ORDER BY t.id LIMIT 1) AS contest
     FROM event_deletions d WHERE d.event_id = ?`, eventId).first<{ step: DeletionStep; contest: string | null }>();
   if (state?.step !== 'rows') return 'rows_done';
   if (state.contest) {
-    if (await bound(db, 'SELECT 1 FROM issues WHERE session_id = ? LIMIT 1', state.contest).first()) {
-      await bound(db, 'DELETE FROM issues WHERE id IN (SELECT id FROM issues WHERE session_id = ? LIMIT ?)', state.contest, limit).run();
+    const next = await bound(db, NEXT_ACTIVITY_SQL, state.contest).first<{ activity: ActivityTable | null }>();
+    const activity = CONTEST_ACTIVITY.find(({ table }) => table === next?.activity);
+    if (activity) {
+      await bound(db, `DELETE FROM ${activity.table} WHERE rowid IN (SELECT rowid FROM ${activity.table} WHERE session_id = ? LIMIT ?)`,
+        state.contest, limit ?? activity.chunk).run();
       return 'more';
     }
     await db.batch([
@@ -153,7 +181,7 @@ export async function advanceRows(db: D1Connection, eventId: string, limit: numb
     return 'more';
   }
   const accounts = await bound(db, `SELECT id FROM event_deletion_targets
-    WHERE event_id = ? AND kind = 'account' AND done = 0 ORDER BY id LIMIT ?`, eventId, limit).all<{ id: string }>();
+    WHERE event_id = ? AND kind = 'account' AND done = 0 ORDER BY id LIMIT ?`, eventId, limit ?? DELETE_CHUNK).all<{ id: string }>();
   if (accounts.results.length > 0) return deleteAccounts(db, eventId, accounts.results.map(({ id }) => id));
   await db.batch([
     bound(db, `DELETE FROM events WHERE id = ? AND ${inStep('rows')}`, eventId, eventId),
@@ -231,8 +259,8 @@ async function markDone(db: D1Connection, eventId: string, kind: 'contest' | 'av
     AND id IN (SELECT value FROM json_each(?)) AND ${inStep(step)}`, eventId, kind, JSON.stringify(ids), eventId).run();
 }
 
-// advanceRows makes at most three calls, except for a blocked chunk, which ends this run's work on the deletion.
-const ROWS_UNIT_CALLS = 3;
+/** advanceRows makes at most this many calls, except for a blocked chunk, which ends this run's work on the deletion. */
+export const ROWS_UNIT_CALLS = 3;
 
 const deleteRows: StepHandler = async ({ env, eventId, budget }) => {
   while (!budget.exhausted()) {
@@ -344,7 +372,7 @@ export async function advanceDeletions(env: DeletionEnvironment, limits: { reado
       while (step) step = await stepHandlers[step]({ env, eventId: claimed.event_id, budget });
     } catch (error) {
       failed += 1;
-      logEvent('error', 'deletion.advance_failed', { task: 'advance-deletions', error });
+      logEvent('error', 'deletion.advance_failed', { task: 'advance-deletions', eventId: claimed.event_id, error });
     }
   }
   if (failed > 0) throw new Error('An event deletion requires another attempt.');

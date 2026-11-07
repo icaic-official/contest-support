@@ -15,7 +15,7 @@ const usage = `Usage: node scripts/event-deletion-timing.mjs [--issues=2000] [--
 Seeds event A and an equally large neighbor event B. It then runs the real fence
 and rows step on A through an instrumented connection. It prints the wall time,
 the server-side duration, rows read and written, the statement count, and the
-largest statement, for each part of the deletion. It checks that A is gone and
+slowest statement and the largest write, for each part of the deletion. It checks that A is gone and
 that B is intact, and it removes its own data at the end.
 
 The neighbor matters. Without B, a missing index costs nothing, because nothing
@@ -136,6 +136,7 @@ const STAFF = 100;
 const CONTESTANTS = 300;
 const CONTESTS = 4;
 const CHUNK = 5000;
+const AUDIT_PER_ACCOUNT = 5;
 const NOW = "strftime('%Y-%m-%dT%H:%M:%fZ', 'now')";
 
 /** Writes one event with `WITH RECURSIVE`, one bounded statement at a time. */
@@ -186,6 +187,29 @@ async function seedEvent(db, run, tag) {
       SELECT ${id('history', 6)}, printf('%s-issue-%05d', '${event}', 1 + i % ${issues}), ${staff('i')}, 'Staff', ${NOW}, 'Timing history ' || i,
         CASE WHEN i % 4 = 0 THEN 'internal' ELSE 'public' END FROM n`);
   }
+  // store.ts queues one staff row for each action, and one more for the team when the action is public.
+  // Delivery keeps each row, and nothing deletes it, so 80,000 history rows imply 140,000 outbox rows.
+  const historyIssue = `(1 + i % ${issues})`;
+  for (let contest = 1; contest <= CONTESTS; contest += 1) {
+    const session = `${event}-contest-${String(contest).padStart(5, '0')}`;
+    await exec(`INSERT INTO audience_sequences (session_id, audience, sequence) VALUES (?, 'staff', ?)`, session, options.history);
+    await exec(`${series(1, CONTESTANTS)} INSERT INTO audience_sequences (session_id, audience, sequence)
+      SELECT ?, printf('team:%s-team-%d-%05d', '${event}', ${contest}, i), ? FROM n`, session, options.history);
+  }
+  for (let from = 1; from <= options.history; from += CHUNK) {
+    const to = Math.min(options.history, from + CHUNK - 1);
+    await exec(`${series(from, to)} INSERT INTO notifications (id, session_id, audience, sequence, delivered)
+      SELECT ${id('outbox-staff', 6)}, ${contestOf(historyIssue)}, 'staff', i, 1 FROM n`);
+    await exec(`${series(from, to)} INSERT INTO notifications (id, session_id, audience, sequence, delivered)
+      SELECT ${id('outbox-team', 6)}, ${contestOf(historyIssue)}, 'team:' || ${teamOf(historyIssue)}, i, 1 FROM n WHERE i % 4 <> 0`);
+  }
+  // Each contest admin action and each credential operation in a contest writes one audit row, and nothing deletes it.
+  const audit = accounts * AUDIT_PER_ACCOUNT;
+  for (let from = 1; from <= audit; from += CHUNK) {
+    const to = Math.min(audit, from + CHUNK - 1);
+    await exec(`${series(from, to)} INSERT INTO admin_audit (id, session_id, actor, action, target)
+      SELECT ${id('audit', 6)}, ${contestOf('i')}, ${staff('i')}, 'save_member', ${staff('i + 1')} FROM n`);
+  }
   const resolved = Math.floor(issues / 2);
   const awarded = Math.floor(issues / 10);
   for (let from = 1; from <= resolved; from += CHUNK) {
@@ -221,6 +245,7 @@ function countQueries(event) {
     awards: `SELECT count(*) AS n FROM awards WHERE session_id IN ${contests}`,
     command_receipts: `SELECT count(*) AS n FROM command_receipts WHERE session_id IN ${contests}`,
     notifications: `SELECT count(*) AS n FROM notifications WHERE session_id IN ${contests}`,
+    admin_audit: `SELECT count(*) AS n FROM admin_audit WHERE session_id IN ${contests}`,
   };
 }
 
@@ -236,7 +261,7 @@ function summary(name, log) {
   return {
     part: name, calls: log.calls, statements: log.statements.length, wallMs: Math.round(log.wall),
     serverMsSum: Math.round(sum('duration')), serverMsMax: Math.round((largest?.duration ?? 0) * 10) / 10,
-    rowsRead: sum('rowsRead'), rowsWritten: sum('rowsWritten'), errors: log.errors,
+    rowsRead: sum('rowsRead'), rowsWritten: sum('rowsWritten'), writtenMax: Math.max(0, ...log.statements.map((entry) => entry.rowsWritten)), errors: log.errors,
     largest: (largest?.sql ?? '').replace(/\s+/g, ' ').slice(0, 60),
   };
 }

@@ -307,6 +307,25 @@ describe('event deletion', () => {
       await removeFixtureEvent(db, kept.eventId);
     });
 
+    it('keeps a receipt of another event whose pasted text holds the deleted event ID, so its replay still answers', async () => {
+      const tag = randomUUID().slice(0, 8);
+      const created = (name: string) => manage().execute(webmaster, randomUUID(), {
+        type: 'create_event', name, code: `${name.toLowerCase()}-${tag}`, timeZone: 'UTC', firstAdmin: { handle: `${name.toLowerCase()}-${tag}` as Handle, name: 'Fictional admin' },
+      });
+      const doomed = (await created('Doomed')).eventId!;
+      const kept = (await created('Kept')).eventId!;
+      const requestId = randomUUID();
+      const pasted: ManageCommand = { type: 'create_people', eventId: kept, people: [{ handle: `pasted-${tag}` as Handle, name: `Pasted ${doomed}` }] };
+      const answer = await manage().execute(webmaster, requestId, pasted);
+      const removeRequest = randomUUID();
+      await manage().execute(webmaster, removeRequest, { type: 'delete_event', eventId: doomed, confirmName: 'Doomed' });
+      expect(await deleteRows(db, { eventId: doomed })).toBe('rows_done');
+      expect(await manage().execute(webmaster, requestId, pasted)).toEqual(answer);
+      await bound(db, 'DELETE FROM manage_receipts WHERE actor = ? AND request_id IN (?, ?)', webmaster.accountId, requestId, removeRequest).run();
+      await forget({ eventId: doomed });
+      await removeFixtureEvent(db, kept);
+    });
+
     it('gives a fenced event code the refusal of an unknown code', async () => {
       const event = await seedEvent(db, webmaster);
       const identity = createBetterAuthIdentity(db, { origin: 'http://127.0.0.1:8788', secret: 's'.repeat(64), secureCookies: false });

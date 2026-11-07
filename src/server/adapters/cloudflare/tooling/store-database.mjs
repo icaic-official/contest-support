@@ -165,8 +165,10 @@ export function localD1(native) {
 }
 
 /**
- * Local emulation of a Worker's bindings, in memory. The D1 binding batches
- * statements as `LocalStatement` does. Other bindings are the proxy's own.
+ * Local emulation of a Worker's bindings. `persist: false` keeps the state out of the
+ * project, but Miniflare still writes its SQLite files to a `miniflare-*` directory under
+ * the temp directory, and `dispose` removes it. The D1 binding batches statements as
+ * `LocalStatement` does. Other bindings are the proxy's own.
  */
 export async function openLocalPlatform(configPath) {
   const platform = await getPlatformProxy({ configPath, remoteBindings: false, persist: false, envFiles: [] });

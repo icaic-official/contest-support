@@ -69,7 +69,7 @@ export default defineConfig({
     testTimeout: 30_000,
     hookTimeout: 30_000,
     // Most test time waits on local Workers runtimes (each D1 call crosses the Wrangler
-    // proxy, about 5 ms) and password hashing. Use every CPU instead of Vitest's default of one fewer.
+    // proxy) and password hashing. Use every CPU instead of Vitest's default of one fewer.
     maxWorkers: "100%",
     ...(tempDirectory ? { env: { TMPDIR: tempDirectory } } : {}),
     sequence: { sequencer: SlowFirstSequencer },

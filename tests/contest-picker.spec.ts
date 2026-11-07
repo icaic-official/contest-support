@@ -220,6 +220,22 @@ test.describe("a staff member with several contests", () => {
     await at(page, "/issues", ids.running);
     await expect(page.locator('[data-ui="organiser-desktop"]')).toBeVisible();
   });
+
+  test("keeps the contest through the phone password form", async ({ page, local }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    const ids = await three(local);
+    await signIn(page, "jury");
+    await page.getByRole("navigation", { name: "Organizer sections" }).getByRole("button", { name: "Me", exact: true }).click();
+    const radios = page.getByRole("group", { name: "Choose a contest session" }).getByRole("radio");
+    await radios.nth(2).check();
+    await at(page, "/account", ids.next);
+    await page.getByRole("button", { name: "Change password" }).click();
+    await expect(page.getByLabel("Current password", { exact: true })).toBeVisible();
+    await at(page, "/account", ids.next);
+    await page.getByRole("button", { name: "Return to dashboard", exact: true }).click();
+    await expect(radios.nth(2)).toBeChecked();
+    await at(page, "/account", ids.next);
+  });
 });
 
 test.describe("a contestant with one contest", () => {

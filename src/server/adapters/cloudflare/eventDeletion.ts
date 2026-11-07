@@ -126,9 +126,10 @@ function accountStatements(db: D1Connection, eventId: string, ids: readonly stri
   const assertionId = crypto.randomUUID();
   return [
     bound(db, `INSERT INTO command_assertions (id, valid) VALUES (?1, CASE WHEN ${ROWS_IN_A_CONTEST_SQL} THEN 0 ELSE 1 END)`, assertionId, chunk),
-    // Without this, an admin in this chunk who reset a contestant in a later chunk fails its
-    // key and looks blocked. An operation on an account outside the targets still blocks.
-    bound(db, `DELETE FROM account_operations WHERE actor ${inChunk}
+    // Without this, an admin in this chunk who reset a contestant in a later chunk fails its key and looks blocked.
+    // An operation on an account outside the targets still blocks. So does one that names a contest: this event's
+    // contests are gone, so that contest is in another event, and the row belongs to that event.
+    bound(db, `DELETE FROM account_operations WHERE actor ${inChunk} AND session_id IS NULL
       AND account_id IN (SELECT id FROM event_deletion_targets WHERE event_id = ? AND kind = 'account')`, chunk, eventId),
     // A sign-in that read the account before the fence can reserve an avatar after it.
     bound(db, `INSERT INTO event_deletion_targets (event_id, kind, id)

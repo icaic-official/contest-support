@@ -207,6 +207,50 @@ test.describe('deleting an event', () => {
     await expect(dialog.getByRole('button', { name: 'Delete event', exact: true })).toBeEnabled();
   });
 
+  test('reads a rename while it is open, so the new name works after the refusal', async ({ page, local }) => {
+    const unique = crypto.randomUUID().slice(0, 8);
+    const [name, renamed, code] = [`Before ${unique}`, `After ${unique}`, `before-${unique}`];
+    const { eventId } = await local.manage(local.users.admin, {
+      type: 'create_event', name, code, timeZone: 'UTC', firstAdmin: { handle: `b-${unique}`, name: 'Fictional admin' },
+    });
+    await openSite(page);
+    await page.getByRole('button', { name: `Delete ${name}`, exact: true }).click();
+    const dialog = page.getByRole('dialog', { name: `Delete ${name}?` });
+    const typed = dialog.getByLabel('Type the event name to confirm');
+    await typed.fill(name);
+    await local.manage(local.users.admin, { type: 'update_event', eventId: eventId ?? '', name: renamed, code, timeZone: 'UTC' });
+    await dialog.getByRole('button', { name: 'Delete event', exact: true }).click();
+    const after = page.getByRole('dialog', { name: `Delete ${renamed}?` });
+    await expect(after.getByRole('alert')).toContainText('The name does not match');
+    await expect(after.getByText(`The name is: ${renamed}`, { exact: true })).toBeVisible();
+    const confirm = after.getByRole('button', { name: 'Delete event', exact: true });
+    await expect(confirm).toBeDisabled();
+    await typed.fill(renamed);
+    await confirm.click();
+    await expect(after).toHaveCount(0);
+    await expect(page.getByRole('heading', { name: /^Deletions/ })).toBeFocused();
+    await expect(page.getByRole('region', { name: /^Deletions/ }).getByText(renamed)).toBeVisible();
+    await expect(page.getByText(`Deleting ${renamed}. Its progress is under Deletions.`)).toBeVisible();
+  });
+
+  test('closes and moves focus to the progress when another webmaster deletes the event', async ({ page, local }) => {
+    const unique = crypto.randomUUID().slice(0, 8);
+    const name = `Taken ${unique}`;
+    const { eventId } = await local.manage(local.users.admin, {
+      type: 'create_event', name, code: `taken-${unique}`, timeZone: 'UTC', firstAdmin: { handle: `t-${unique}`, name: 'Fictional admin' },
+    });
+    await openSite(page);
+    await page.getByRole('button', { name: `Delete ${name}`, exact: true }).click();
+    const dialog = page.getByRole('dialog', { name: `Delete ${name}?` });
+    await expect(dialog).toBeVisible();
+    await local.manage(local.users.admin, { type: 'delete_event', eventId: eventId ?? '', confirmName: name });
+    // The site page reads again when its window regains focus.
+    await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+    await expect(dialog).toHaveCount(0);
+    await expect(page.getByRole('heading', { name: /^Deletions/ })).toBeFocused();
+    await expect(page.getByRole('region', { name: /^Deletions/ }).getByText(name)).toBeVisible();
+  });
+
   for (const width of [320, 390]) {
     test(`keeps a side gutter and wraps a long unbroken name at ${width} pixels`, async ({ page, local }, testInfo) => {
       await page.setViewportSize({ width, height: 720 });

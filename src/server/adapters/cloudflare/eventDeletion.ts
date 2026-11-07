@@ -77,7 +77,9 @@ export function fenceStatements(db: D1Connection, actor: DeletionActor, eventId:
       SELECT DISTINCT a.event_id, 'avatar_owner', v.account_id FROM accounts a
       JOIN account_avatars v ON v.account_id = a.id WHERE a.event_id = ?`, eventId),
     bound(db, 'UPDATE events SET archived = 1 WHERE id = ?', eventId),
-    bound(db, 'DELETE FROM installation WHERE event_id = ?', eventId),
+    // No runtime code reads this legacy row. 0017 placed its owner by majority, so it can name another event.
+    bound(db, `DELETE FROM installation WHERE event_id = ? OR session_id IN (SELECT id FROM sessions WHERE event_id = ?)
+      OR owner_account_id IN (SELECT id FROM accounts WHERE event_id = ?)`, eventId, eventId, eventId),
     bound(db, `UPDATE logins SET revoked = 1 WHERE revoked = 0
       AND account_id IN (SELECT id FROM accounts WHERE event_id = ?)`, eventId),
     bound(db, `INSERT INTO audience_sequences (session_id, audience, sequence)

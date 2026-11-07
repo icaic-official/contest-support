@@ -25,8 +25,9 @@ export interface SessionData {
    * The contests that the person may open. A read that starts with no chosen
    * contest fills it before the snapshot arrives, so it can be full while
    * `sessionId` is "", whether `loaded` is true or false. A screen that shows
-   * a picker waits for `sessionId`. Once a contest is chosen, a read changes
-   * `sessions` and `sessionId` together, so `sessionId` is "" or in this list.
+   * a picker waits for `sessionId`. Once a contest is chosen, a read fills it
+   * early only while that contest stays in the list, so `sessionId` is "" or
+   * in this list.
    */
   sessions: SessionSummary[];
   /** The selected session, or "" before the first refresh. */

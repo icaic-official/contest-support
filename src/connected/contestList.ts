@@ -1,20 +1,24 @@
 import type { ContestSummary, IntakeReason } from "@/backend/contracts";
+import { intakeHeadline } from "./intakeText";
 import { formatInZone, zoneLabel } from "./zonedTime";
 
 /**
- * The note on a contest row for each intake reason. The server derives the
- * reason, so the row needs no clock. A row has no note before the start,
- * because its start time already says that.
+ * The note on a contest row. The server derives the reason, so the row needs
+ * no clock. A row has no note before the start, because its start time already
+ * says that.
  */
-const intakeMarkers: Record<IntakeReason, string | null> = {
-  before_start: null,
-  running: "Running now",
-  grace: "Running now",
-  override_open: "Running now",
-  override_closed: "Closed by staff",
-  awaiting_live_passwords: "Waiting for live passwords",
-  ended: "Ended",
-};
+function intakeNote(reason: IntakeReason): string | null {
+  switch (reason) {
+    case "before_start":
+      return null;
+    case "running":
+      return "Running now";
+    case "ended":
+      return "Ended";
+    default:
+      return intakeHeadline(reason);
+  }
+}
 
 /** A contest's name, with its event when another listed contest has the same name. */
 export function contestLabel(contests: readonly ContestSummary[], contest: ContestSummary): string {
@@ -95,7 +99,7 @@ export function contestRows(contests: readonly ContestSummary[]): ContestRow[] {
       id: contest.id,
       name: contestLabel(contests, contest),
       start,
-      marker: intakeMarkers[contest.intake.reason],
+      marker: intakeNote(contest.intake.reason),
       open: contest.intake.open,
     };
   });

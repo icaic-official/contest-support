@@ -16,8 +16,8 @@ export interface ContestNames {
 /**
  * Gives the fixture event three contests and seats the contestant and the jury
  * member in all of them. The event is in Singapore, eight hours ahead of UTC.
- * Tests pick names that sort the other way round from the start times, so a
- * list that is still alphabetical fails them.
+ * The server lists contests by name. A test of the default contest picks names
+ * that put the contest it expects after the first.
  */
 export async function seatThreeContests(local: LocalWorker, names: ContestNames) {
   const ids = { next: local.sessions[0], ended: local.sessions[1], running: randomUUID() };

@@ -104,6 +104,8 @@ test.describe("a contestant with several contests", () => {
   test("opens the contest that the address names", async ({ page, local }) => {
     const ids = await three(local);
     await signIn(page);
+    // The page from the sign-in can still start a read, so leave it before counting.
+    await page.goto("about:blank");
     const reads = await watchReads(page);
     await page.goto(`/issues?contest=${ids.ended}`);
     await expect(triggerFor(page, "Delta")).toBeVisible();

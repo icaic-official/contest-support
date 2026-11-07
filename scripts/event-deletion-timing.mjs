@@ -275,11 +275,13 @@ async function counts(db, event) {
 function summary(name, log) {
   const sum = (field) => log.statements.reduce((total, entry) => total + entry[field], 0);
   const largest = log.statements.reduce((top, entry) => (entry.duration > (top?.duration ?? -1) ? entry : top), undefined);
+  const heaviest = log.statements.reduce((top, entry) => (entry.rowsWritten > (top?.rowsWritten ?? -1) ? entry : top), undefined);
   return {
     part: name, calls: log.calls, statements: log.statements.length, wallMs: Math.round(log.wall),
     serverMsSum: Math.round(sum('duration')), serverMsMax: Math.round((largest?.duration ?? 0) * 10) / 10,
-    rowsRead: sum('rowsRead'), rowsWritten: sum('rowsWritten'), writtenMax: Math.max(0, ...log.statements.map((entry) => entry.rowsWritten)), errors: log.errors,
-    largest: (largest?.sql ?? '').replace(/\s+/g, ' ').slice(0, 60),
+    rowsRead: sum('rowsRead'), rowsWritten: sum('rowsWritten'), writtenMax: heaviest?.rowsWritten ?? 0, errors: log.errors,
+    heaviest: (heaviest?.sql ?? '').replace(/\s+/g, ' ').slice(0, 40),
+    largest: (largest?.sql ?? '').replace(/\s+/g, ' ').slice(0, 40),
   };
 }
 

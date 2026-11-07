@@ -13,6 +13,10 @@ export interface LogFields {
   readonly task?: string;
   /** The event of a deletion that failed. An operator can read it, and it names no person. */
   readonly eventId?: string;
+  /** The part of a deletion that failed. */
+  readonly phase?: 'contests' | 'accounts' | 'event' | 'live' | 'files' | 'unknown';
+  /** What the error of a failed deletion says, as a fixed word and never as its text. */
+  readonly cause?: 'foreign_key' | 'internal' | 'other';
   readonly delivered?: number;
   readonly failed?: number;
   readonly error?: unknown;

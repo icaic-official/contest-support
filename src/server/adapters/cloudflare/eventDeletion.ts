@@ -3,7 +3,7 @@ import { bound, isAssertionFailure } from '../d1/assertions';
 import type { D1Connection, D1Statement } from '../d1/connection';
 import type { PrivateBucket } from './images';
 import { eraseLiveContest, type LiveNamespace } from './live';
-import { logEvent } from './log';
+import { logEvent, type LogFields } from './log';
 
 /** Issues per statement and accounts per batch in the rows step. An issue takes its history with it. */
 const DELETE_CHUNK = 100;
@@ -410,6 +410,24 @@ const stepHandlers: Record<DeletionStep, StepHandler> = {
   done: async () => null,
 };
 
+/** The part that ran when an attempt failed. It follows the order of advanceRows, which also reads only the journal. */
+const FAILED_PHASE_SQL = `SELECT CASE WHEN d.step <> 'rows' THEN d.step
+    WHEN EXISTS (SELECT 1 FROM event_deletion_targets t WHERE t.event_id = d.event_id AND t.kind = 'contest' AND t.done = 0) THEN 'contests'
+    WHEN EXISTS (SELECT 1 FROM event_deletion_targets t WHERE t.event_id = d.event_id AND t.kind = 'account' AND t.done = 0) THEN 'accounts'
+    ELSE 'event' END AS phase FROM event_deletions d WHERE d.event_id = ?`;
+
+/**
+ * The two facts that an operator needs, as fixed words, because an error's text can hold a person's data.
+ * A D1 message can name the key, or it can be `internal error; reference = ...`. A key that fails when a
+ * batch commits gives that second message locally, so the phase is the only certain fact.
+ */
+async function failureFields(db: D1Connection, eventId: string, error: unknown): Promise<Pick<LogFields, 'phase' | 'cause'>> {
+  const message = error instanceof Error ? error.message : '';
+  const cause = message.includes('FOREIGN KEY constraint failed') ? 'foreign_key' : message.includes('internal error') ? 'internal' : 'other';
+  const phase = await bound(db, FAILED_PHASE_SQL, eventId).first<Required<Pick<LogFields, 'phase'>>>().then((row) => row?.phase, () => undefined);
+  return { phase: phase ?? 'unknown', cause };
+}
+
 /** Claims one open deletion whose lease has expired. With none open, it reads no row. Bind the lease seconds. */
 export const CLAIM_DELETION_SQL = `UPDATE event_deletions SET lease_until = unixepoch() + ?
   WHERE event_id = (SELECT event_id FROM event_deletions WHERE finished_at IS NULL AND lease_until <= unixepoch()
@@ -434,7 +452,9 @@ export async function advanceDeletions(env: DeletionEnvironment, limits: { reado
       while (step) step = await stepHandlers[step]({ env, eventId: claimed.event_id, budget });
     } catch (error) {
       failed += 1;
-      logEvent('error', 'deletion.advance_failed', { task: 'advance-deletions', eventId: claimed.event_id, error });
+      logEvent('error', 'deletion.advance_failed', {
+        task: 'advance-deletions', eventId: claimed.event_id, ...await failureFields(env.DB, claimed.event_id, error), error,
+      });
     }
   }
   if (failed > 0) throw new Error('An event deletion requires another attempt.');

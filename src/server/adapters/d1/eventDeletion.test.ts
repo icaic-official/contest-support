@@ -12,6 +12,7 @@ import { contestDataBindings, contestDataSql, resolveAuthority, signInAccountSql
 import {
   advanceDeletions, advanceRows, CLAIM_DELETION_SQL, CONTEST_ACTIVITY, fenceStatements, ROWS_UNIT_CALLS, type DeletionEnvironment, type RowsProgress,
 } from '../cloudflare/eventDeletion';
+import { removeFixtureEvent } from '../cloudflare/eventDeletionFixture';
 import { eraseLiveContest } from '../cloudflare/live';
 import { openStoreDatabase } from '../cloudflare/tooling/store-database.mjs';
 import { bound } from './assertions';
@@ -54,7 +55,7 @@ describe('event deletion', () => {
     await connection.batch(fenceStatements(connection, actor(), event.eventId, typed, randomUUID()));
   }
 
-  async function deleteRows(connection: D1Connection, event: SeededEvent, limit?: number): Promise<RowsProgress> {
+  async function deleteRows(connection: D1Connection, event: Pick<SeededEvent, 'eventId'>, limit?: number): Promise<RowsProgress> {
     for (;;) {
       const progress = await advanceRows(connection, event.eventId, limit);
       if (progress !== 'more') return progress;
@@ -62,7 +63,7 @@ describe('event deletion', () => {
   }
 
   /** The journal and targets of one event, which a finished test no longer needs. */
-  async function forget(event: SeededEvent): Promise<void> {
+  async function forget(event: Pick<SeededEvent, 'eventId'>): Promise<void> {
     await db.batch([
       bound(db, 'DELETE FROM event_deletion_targets WHERE event_id = ?', event.eventId),
       bound(db, 'DELETE FROM event_deletions WHERE event_id = ?', event.eventId),
@@ -166,6 +167,45 @@ describe('event deletion', () => {
       await deleteRows(db, event);
       await bound(db, `DELETE FROM manage_receipts WHERE actor = ? AND request_id = ?`, webmaster.accountId, requestId).run();
       await forget(event);
+    });
+
+    it('removes the receipts that name the event or its contests, keeps the delete receipt, and leaves another event alone', async () => {
+      const createEvent = async (person: string): Promise<{ eventId: string; name: string; contestId: string }> => {
+        const tag = randomUUID().slice(0, 8);
+        const name = `Receipts ${tag}`;
+        const { eventId } = await manage().execute(webmaster, randomUUID(), {
+          type: 'create_event', name, code: `r-${tag}`, timeZone: 'UTC', firstAdmin: { handle: `first-${tag}` as Handle, name: person },
+        });
+        await manage().execute(webmaster, randomUUID(), { type: 'create_people', eventId: eventId!, people: [{ handle: `more-${tag}` as Handle, name: person }] });
+        const schedule = { startsAt: '2031-01-01T09:00:00.000Z', endsAt: '2031-01-01T12:00:00.000Z', graceMinutes: 0 };
+        const { contestId } = await manage().execute(webmaster, randomUUID(), {
+          type: 'create_contest', kind: 'practice', eventId: eventId!, name: 'Contest', contestType: 'teams', schedule, categories: ['Devices'],
+        });
+        await manage().execute(webmaster, randomUUID(), { type: 'update_contest', contestId: contestId!, name: `Renamed ${person}`, contestType: 'teams' });
+        return { eventId: eventId!, name, contestId: contestId! };
+      };
+      const receiptsNaming = (...ids: string[]) => rows(`SELECT actor, request_id, command, result, at FROM manage_receipts
+        WHERE ${ids.map(() => '(instr(command, ?) > 0 OR instr(result, ?) > 0)').join(' OR ')} ORDER BY request_id`, ...ids.flatMap((id) => [id, id]));
+      const doomed = await createEvent('Fictional Secret Person');
+      const kept = await createEvent('Fictional Kept Person');
+      const keptBefore = await receiptsNaming(kept.eventId, kept.contestId);
+      expect(keptBefore.length).toBeGreaterThanOrEqual(4);
+
+      const requestId = randomUUID();
+      const remove: ManageCommand = { type: 'delete_event', eventId: doomed.eventId, confirmName: doomed.name };
+      await manage().execute(webmaster, requestId, remove);
+      expect(await deleteRows(db, doomed)).toBe('rows_done');
+
+      expect(await rows(`SELECT request_id FROM manage_receipts WHERE instr(command, 'Fictional Secret Person') > 0`)).toEqual([]);
+      expect(await rows(`SELECT json_extract(command, '$.type') AS type FROM manage_receipts
+        WHERE instr(command, ?) > 0 OR instr(result, ?) > 0 OR instr(command, ?) > 0 OR instr(result, ?) > 0`,
+      doomed.eventId, doomed.eventId, doomed.contestId, doomed.contestId)).toEqual([{ type: 'delete_event' }]);
+      expect(await receiptsNaming(kept.eventId, kept.contestId)).toEqual(keptBefore);
+      expect(await manage().execute(webmaster, requestId, remove)).toEqual({ eventId: doomed.eventId });
+
+      await bound(db, 'DELETE FROM manage_receipts WHERE actor = ? AND request_id = ?', webmaster.accountId, requestId).run();
+      await forget(doomed);
+      await removeFixtureEvent(db, kept.eventId);
     });
 
     it('gives a fenced event code the refusal of an unknown code', async () => {

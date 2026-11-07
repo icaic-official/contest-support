@@ -157,6 +157,12 @@ export async function seedEvent(db: D1Connection, webmaster: SeededWebmaster): P
     write(`INSERT INTO authority_audit (id, event_id, actor, actor_name, action, target, detail) VALUES (?, ?, ?, 'Admin', 'set_event_admin', ?, '{}')`,
       id(), eventId, eventAdmin.accountId, contestAdmin.accountId),
     write(`INSERT INTO manage_receipts (actor, request_id, command, result) VALUES (?, ?, '{}', '{}')`, eventAdmin.accountId, id()),
+    // A webmaster's receipts outlive the event. A create_event receipt names the event only in its result.
+    write(`INSERT INTO manage_receipts (actor, request_id, command, result) VALUES (?, ?, ?, ?), (?, ?, ?, '{}'), (?, ?, ?, '{}')`,
+      site, id(), JSON.stringify({ type: 'create_event', name, code, firstAdmin: { handle: eventAdmin.handle, name: 'Fictional admin' } }),
+      JSON.stringify({ eventId, accountIds: [eventAdmin.accountId] }),
+      site, id(), JSON.stringify({ type: 'create_people', eventId, people: [{ handle: volunteer.handle, name: 'Fictional volunteer' }] }),
+      site, id(), JSON.stringify({ type: 'set_location', contestId: live, entrantId: entrant, location: 'Desk 1' })),
     write(`INSERT INTO issue_images (id, session_id, issue_id, uploader, request_id, uploader_name, uploaded_at, visibility, declared_bytes, byte_size,
         content_type, original_name, state, original_path, thumbnail_path, deleted_by, deleted_at)
       VALUES (?, ?, ?, ?, ?, 'Team one', ${NOW}, 'public', 10, 10, 'image/png', 'a.png', 'ready', ?, ?, NULL, NULL),

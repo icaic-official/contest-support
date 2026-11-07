@@ -264,9 +264,11 @@ export function finishStatements(db: D1Connection, eventId: string): D1Statement
 }
 
 /**
- * One run stops at this time, below the 30 seconds of `waitUntil`, and at this
- * count of D1, R2, and Durable Object calls, below the Workers subrequest limit,
- * because the cron shares that limit with its other tasks.
+ * One run stops at this time, and at this count of D1, R2, and Durable Object calls, below
+ * the Workers subrequest limit, because the cron shares that limit with its other tasks.
+ * After a management command, delivery runs first for about 10 seconds, so the 30 seconds of
+ * `waitUntil` can cut a run before its time ends. That cut is harmless, because each step is
+ * idempotent and a later tick continues from the current state.
  */
 export const DELETION_BUDGET = { milliseconds: 20_000, calls: 400 } as const;
 

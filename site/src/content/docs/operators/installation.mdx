@@ -138,7 +138,21 @@ Then the webmaster opens the **Site** page and chooses **Create event**. The for
 The event admin runs the event in the **event console** (`/event`): **People**, **Entrants**, **Contests**, and **Assignments**. Staff and teams sign in with the event code. Their credential sheets carry the link `<origin>/?event=<code>`, which fills in the code. A person types the code only when they open the plain sign-in page. Choose a short code that people can read aloud.
 Only event admins and webmasters create accounts and assign people. A contest admin keeps the contest settings, announcements, and the issue workflow.
 
-A webmaster deletes an event permanently with **Delete event** on the **Site** page, after typing the event's exact name. You cannot undo this. Minsky stops the event's sign-ins and contests at once. The Worker then deletes its rows and its live state. About 65 minutes later, it deletes its files. The **Site** page shows the progress and keeps a **Deleted** record.
+A webmaster deletes an event permanently with **Delete event** on the **Site** page, after typing the event's exact name. An event with no name asks for its code, or for its ID when it has no code. You cannot undo this. Minsky signs out everyone in the event and stops its contests at once. The Worker then deletes its rows and its live state. About 65 minutes later, it deletes its files. The **Site** page shows the progress and keeps a **Deleted** record with the event's name and code.
+
+**Stopped** on the **Site** page means that an account of the event also has activity in another event. Deleting that account would change the other event, so Minsky keeps it. The event stays closed. Minsky tries again every hour, and it continues when the other event no longer names the account, for example after that event's own deletion. Do not delete rows by hand.
+
+The Worker logs each failed attempt as `deletion.advance_failed`, with the `eventId` and the error's name, and it retries every minute. If the **Site** page shows no progress for an event:
+
+1. Watch the log. Replace `WORKER_NAME` with the name of your Worker.
+
+	```sh
+	npx wrangler tail WORKER_NAME --config="$MINSKY_INSTALL_CONFIG" --format json | grep deletion.advance_failed
+	```
+
+	Expect one line each minute for a deletion that keeps failing, and no line otherwise.
+2. Compare `eventId` with the event, and check the D1 and R2 status of your Cloudflare account. A provider failure clears by itself, and the deletion continues from its current step.
+3. If the same line stays after the provider recovers, keep the event's journal and report `errorName` and `errorCode` to the maintainers. Do not change `event_deletions` or `event_deletion_targets`, because each later step reads them.
 
 | Problem | Do this |
 | --- | --- |

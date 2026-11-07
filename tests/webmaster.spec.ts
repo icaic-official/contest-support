@@ -250,6 +250,38 @@ test.describe('deleting an event', () => {
     await expect(page.getByRole('region', { name: /^Deletions/ }).getByText(name)).toBeVisible();
   });
 
+  test('keeps focus out of the page behind it after a failed request, and a retry reuses its request', async ({ page, local }) => {
+    const name = await newEvent(local);
+    await openSite(page);
+    const requests: string[] = [];
+    await page.route('**/api/manage', async (route) => {
+      const body = route.request().postDataJSON() as { requestId: string; command: { type: string } };
+      if (body.command.type !== 'delete_event') {
+        await route.fallback();
+        return;
+      }
+      requests.push(body.requestId);
+      if (requests.length === 1) await route.abort('failed');
+      else await route.fallback();
+    });
+    await page.getByRole('button', { name: `Delete ${name}`, exact: true }).click();
+    const dialog = page.getByRole('dialog', { name: `Delete ${name}?` });
+    await dialog.getByLabel('Type the event name to confirm').fill(name);
+    const confirm = dialog.getByRole('button', { name: 'Delete event', exact: true });
+    await confirm.click();
+    await expect(dialog.getByRole('alert')).toBeVisible();
+    await expect(confirm).toBeEnabled();
+    // keepFocus runs in the next frame.
+    await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    expect(await page.evaluate(() => document.activeElement?.tagName)).not.toBe('H1');
+    await page.keyboard.press('Tab');
+    expect(await dialog.evaluate((element) => element.contains(document.activeElement))).toBe(true);
+    await confirm.click();
+    await expect(dialog).toHaveCount(0);
+    expect(requests).toEqual([requests[0], requests[0]]);
+    await expect(page.getByRole('heading', { name: /^Deletions/ })).toBeFocused();
+  });
+
   for (const width of [320, 390]) {
     test(`keeps a side gutter and wraps a long unbroken name at ${width} pixels`, async ({ page, local }, testInfo) => {
       await page.setViewportSize({ width, height: 720 });

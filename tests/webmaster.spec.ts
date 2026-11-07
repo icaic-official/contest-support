@@ -1,4 +1,4 @@
-import type { Page } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
 import type { ManageCommand } from '../src/backend/contracts';
 import { expect, test } from './support/localWorker';
 
@@ -83,15 +83,17 @@ test.describe('deleting an event', () => {
     await expect(page.getByRole('heading', { name: 'Site', level: 1 })).toBeVisible();
   }
 
-  const newEvent = async (local: { manage(user: string, command: ManageCommand): Promise<unknown>; users: { admin: string } }) => {
+  const newEvent = async (local: { manage(user: string, command: ManageCommand): Promise<unknown>; users: { admin: string } }, label = 'Doomed event') => {
     const unique = crypto.randomUUID().slice(0, 8);
-    const name = `Doomed event ${unique}`;
+    const name = `${label} ${unique}`;
     await local.manage(local.users.admin, {
       type: 'create_event', name, code: `doomed-${unique}`, timeZone: 'UTC',
       firstAdmin: { handle: `admin-${unique}`, name: 'Fictional admin' },
     });
     return name;
   };
+
+  const animationsDone = (locator: Locator) => locator.evaluate((element) => Promise.all(element.getAnimations().map((animation) => animation.finished)).then(() => undefined));
 
   test('names what is lost, needs the exact name, and shows progress, by keyboard', async ({ page, local }) => {
     const name = await newEvent(local);
@@ -103,9 +105,15 @@ test.describe('deleting an event', () => {
     await expect(dialog).toContainText('0 contests and 1 account');
     await expect(dialog).toContainText('Every issue, reply, note, award, image, and announcement');
     await expect(dialog).toContainText('You cannot undo this.');
+    await expect(dialog).toContainText('Everyone in this event is signed out at once');
+    await expect(dialog).toContainText('a running contest stops');
+    await expect(dialog).toContainText('name and code stay in the site record');
     const confirm = dialog.getByRole('button', { name: 'Delete event', exact: true });
     const typed = dialog.getByLabel('Type the event name to confirm');
     await expect(confirm).toBeDisabled();
+    await expect(typed).toHaveAttribute('autocorrect', 'off');
+    await expect(typed).toHaveAttribute('autocapitalize', 'off');
+    await expect(typed).toHaveAttribute('spellcheck', 'false');
     await typed.fill(name.toUpperCase());
     await expect(confirm).toBeDisabled();
     await page.keyboard.press('Escape');
@@ -124,7 +132,84 @@ test.describe('deleting an event', () => {
     await expect(page.getByText(`Deleting ${name}. Its progress is under Deletions.`)).toBeVisible();
   });
 
+  test('confirms an unnamed event with its code, and never enables the action on empty input', async ({ page, local }) => {
+    const unique = crypto.randomUUID().slice(0, 8);
+    const code = `unnamed-${unique}`;
+    const { eventId } = await local.manage(local.users.admin, {
+      type: 'create_event', name: `Soon unnamed ${unique}`, code, timeZone: 'UTC',
+      firstAdmin: { handle: `admin-${unique}`, name: 'Fictional admin' },
+    });
+    await local.run(`UPDATE events SET name = '' WHERE id = ?`, eventId ?? '');
+    await openSite(page);
+    await page.getByRole('button', { name: `Delete ${code}`, exact: true }).click();
+    const dialog = page.getByRole('dialog', { name: `Delete the unnamed event ${code}?` });
+    const confirm = dialog.getByRole('button', { name: 'Delete event', exact: true });
+    const typed = dialog.getByLabel('Type the event code to confirm');
+    await expect(typed).toHaveValue('');
+    await expect(confirm).toBeDisabled();
+    await typed.press('Enter');
+    await expect(dialog).toBeVisible();
+    await typed.fill(`${code}x`);
+    await expect(confirm).toBeDisabled();
+    await typed.fill(code);
+    await expect(confirm).toBeEnabled();
+    await confirm.click();
+    const deletions = page.getByRole('region', { name: /^Deletions/ });
+    await expect(deletions.getByText('Unnamed event', { exact: true })).toBeVisible();
+    await expect(deletions.getByText(code)).toBeVisible();
+  });
+
+  test('stays open while its request runs, so the next Cancel returns focus to its own button', async ({ page, local }) => {
+    const first = await newEvent(local);
+    const second = await newEvent(local);
+    await openSite(page);
+    let release = () => {};
+    const held = new Promise<void>((resolve) => { release = resolve; });
+    await page.route('**/api/manage', async (route) => {
+      await held;
+      await route.continue();
+    });
+    await page.getByRole('button', { name: `Delete ${first}`, exact: true }).click();
+    const dialog = page.getByRole('dialog', { name: `Delete ${first}?` });
+    const typed = dialog.getByLabel('Type the event name to confirm');
+    await typed.fill(first);
+    await typed.press('Enter');
+    await expect(dialog.getByRole('button', { name: 'Delete event', exact: true })).toBeDisabled();
+    await page.keyboard.press('Escape');
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByRole('button', { name: 'Cancel', exact: true })).toBeDisabled();
+    release();
+    await expect(dialog).toHaveCount(0);
+    await expect(page.getByRole('heading', { name: /^Deletions/ })).toBeFocused();
+    await page.unroute('**/api/manage');
+
+    const next = page.getByRole('button', { name: `Delete ${second}`, exact: true });
+    await next.click();
+    await page.getByRole('dialog', { name: `Delete ${second}?` }).getByRole('button', { name: 'Cancel', exact: true }).click();
+    await expect(next).toBeFocused();
+  });
+
   for (const width of [320, 390]) {
+    test(`keeps a side gutter and wraps a long unbroken name at ${width} pixels`, async ({ page, local }, testInfo) => {
+      await page.setViewportSize({ width, height: 720 });
+      const name = await newEvent(local, `Long${'x'.repeat(180)}`);
+      await openSite(page);
+      await page.getByRole('button', { name: `Delete ${name}`, exact: true }).click();
+      const dialog = page.getByRole('dialog', { name: `Delete ${name}?` });
+      await animationsDone(dialog);
+      await page.screenshot({ path: testInfo.outputPath(`delete-dialog-${width}.png`) });
+      const box = await dialog.boundingBox();
+      expect(box?.x).toBeGreaterThanOrEqual(16);
+      expect(width - (box?.x ?? 0) - (box?.width ?? 0)).toBeGreaterThanOrEqual(16);
+      expect(await dialog.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
+      const title = await dialog.getByRole('heading', { name: `Delete ${name}?` }).boundingBox();
+      expect((title?.x ?? 0) + (title?.width ?? 0)).toBeLessThanOrEqual((box?.x ?? 0) + (box?.width ?? 0));
+      await dialog.getByLabel('Type the event name to confirm').fill(name);
+      await dialog.getByRole('button', { name: 'Delete event', exact: true }).click();
+      await expect(page.getByRole('region', { name: /^Deletions/ }).getByText(name)).toBeVisible();
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    });
+
     test(`fits a phone of ${width} pixels`, async ({ page, local }) => {
       await page.setViewportSize({ width, height: 720 });
       const name = await newEvent(local);

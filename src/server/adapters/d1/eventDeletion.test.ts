@@ -214,6 +214,45 @@ describe('event deletion', () => {
       await forget(event);
     });
 
+    describe('a legacy event', () => {
+      const deleteLegacy = async (eventId: string, confirmName: string): Promise<void> => {
+        const requestId = randomUUID();
+        expect(await manage().execute(webmaster, requestId, { type: 'delete_event', eventId, confirmName })).toEqual({ eventId });
+        expect(await deleteRows(db, { eventId })).toBe('rows_done');
+        await bound(db, 'DELETE FROM manage_receipts WHERE actor = ? AND request_id = ?', webmaster.accountId, requestId).run();
+        await forget({ eventId });
+      };
+      const legacyEvent = async (name: string | null): Promise<{ eventId: string; code: string }> => {
+        const eventId = randomUUID();
+        await bound(db, name === null ? 'INSERT INTO events (id) VALUES (?)' : 'INSERT INTO events (id, name) VALUES (?, ?)', ...(name === null ? [eventId] : [eventId, name])).run();
+        const row = (await rows<{ code: string }>('SELECT code FROM events WHERE id = ?', eventId))[0];
+        return { eventId, code: row?.code ?? '' };
+      };
+
+      it('with an empty name confirms with its code, and never with nothing', async () => {
+        const { eventId, code } = await legacyEvent(null);
+        await expect(manage().execute(webmaster, randomUUID(), { type: 'delete_event', eventId, confirmName: '' }))
+          .rejects.toMatchObject({ status: 400 });
+        await expect(manage().execute(webmaster, randomUUID(), { type: 'delete_event', eventId, confirmName: `${code}x` }))
+          .rejects.toMatchObject({ status: 409, message: 'The code does not match. Type the event code exactly.' });
+        await deleteLegacy(eventId, code);
+      });
+
+      it('with neither a name nor a code confirms with its ID', async () => {
+        const { eventId } = await legacyEvent(null);
+        await bound(db, 'UPDATE events SET code = NULL WHERE id = ?', eventId).run();
+        await expect(manage().execute(webmaster, randomUUID(), { type: 'delete_event', eventId, confirmName: 'something' }))
+          .rejects.toMatchObject({ status: 409, message: 'The ID does not match. Type the event ID exactly.' });
+        await deleteLegacy(eventId, eventId);
+      });
+
+      it('with a name longer than a new name may be confirms with that name', async () => {
+        const name = `Legacy ${'x'.repeat(300)}`;
+        const { eventId } = await legacyEvent(name);
+        await deleteLegacy(eventId, name);
+      });
+    });
+
     it('removes the receipts that name the event or its contests, keeps the delete receipt, and leaves another event alone', async () => {
       const createEvent = async (person: string): Promise<{ eventId: string; name: string; contestId: string }> => {
         const tag = randomUUID().slice(0, 8);

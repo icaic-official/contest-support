@@ -22,9 +22,10 @@ export type SessionSummary = ContestSummary;
 /** Shared session data for every UI. Read it; do not copy it into state. */
 export interface SessionData {
   /**
-   * The contests that the person may open. The list arrives before the
-   * snapshot, so it can be filled while `snapshot` is undefined and `loaded`
-   * is false.
+   * The contests that the person may open. The first read fills it before the
+   * snapshot arrives, so it can be full while `sessionId` is "" and `loaded`
+   * is false. A later read changes it with `sessionId`, so `sessionId` is
+   * either "" or in this list.
    */
   sessions: SessionSummary[];
   /** The selected session, or "" before the first refresh. */
@@ -99,8 +100,8 @@ export function useSessionSnapshot(userId: string): SessionData {
     // revision. A write waits for its own refresh before enabling controls.
     // A read that has not started yet serves every caller that arrives before it starts.
     return queue.read(run, async () => {
-      // Set when the list arrives, so that a failed snapshot read can still select it.
-      let selected: string | undefined;
+      // Set when the list arrives, so that a failed snapshot read can still show it.
+      let listed: { list: SessionSummary[]; nextSession: string } | undefined;
       try {
         const list = orderContests(await backend.workflows.contests());
         // Only a listed ID reaches the snapshot read and the live channel.
@@ -111,18 +112,23 @@ export function useSessionSnapshot(userId: string): SessionData {
           : seed !== undefined && isListed(seed)
             ? seed
             : (defaultContest(list, Date.now() + clockOffset.current)?.id ?? "");
-        selected = nextSession;
-        // The list goes out before the snapshot read. A screen that needs only
-        // the list, such as the site page, then never waits on the snapshot.
-        // The selected ID waits for the snapshot. A change of it restarts the
-        // effect below, which drops this read.
-        if (run === generation.current) setSessions((shown) => keepUnchanged(shown, list));
+        listed = { list, nextSession };
+        // The first list goes out before the snapshot read, so that a screen
+        // that needs only the list, such as the site page, never waits on the
+        // snapshot. A later list goes out early only when the open contest
+        // stays in it. Otherwise the picker would have no open row for one read.
+        // The selected ID always waits for the snapshot. A change of it
+        // restarts the effect below, which drops this read.
+        if (run === generation.current && (sessionId === "" || nextSession === sessionId)) {
+          setSessions((shown) => keepUnchanged(shown, list));
+        }
         const next = nextSession
           ? await backend.workflows.snapshot(nextSession)
           : undefined;
         if (run !== generation.current) return;
         readFor.current = nextSession;
         addressed.current = undefined;
+        setSessions((shown) => keepUnchanged(shown, list));
         setSessionId(nextSession);
         setState((shown) => (next?.membership ? keepUnchanged(shown, next) : undefined));
         if (next) {
@@ -133,9 +139,11 @@ export function useSessionSnapshot(userId: string): SessionData {
       } catch (cause) {
         if (run !== generation.current) return;
         // The picker on the no-access screen is the way out of a contest that fails.
-        if (selected !== undefined) {
-          readFor.current = selected;
-          setSessionId(selected);
+        if (listed) {
+          const { list, nextSession } = listed;
+          readFor.current = nextSession;
+          setSessions((shown) => keepUnchanged(shown, list));
+          setSessionId(nextSession);
         }
         // Clear cached data on access/network failure; never display stale permissions.
         setState(undefined);

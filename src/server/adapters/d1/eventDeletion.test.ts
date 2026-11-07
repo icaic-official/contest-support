@@ -427,6 +427,69 @@ describe('event deletion', () => {
     throw new Error('The deletion did not finish.');
   }
 
+  describe('rows that arrive after the fence', () => {
+    const lateContest = (event: SeededEvent, id: string) =>
+      bound(db, `INSERT INTO sessions (id, event_id, name) VALUES (?, ?, 'Late contest')`, id, event.eventId).run();
+
+    it('take a contest through every step, so its live state and its files go', async () => {
+      const event = await seedEvent(db, webmaster);
+      const { bucket, live, env } = stores();
+      fillStores(event, bucket, live);
+      await fence(db, event);
+      const late = randomUUID();
+      await lateContest(event, late);
+      bucket.add([`${late}/file`]);
+      live.state(late).fill(late);
+      await runToEnd(env, event);
+      expect(await rows('SELECT 1 FROM sessions WHERE id = ?', late)).toEqual([]);
+      expect(bucket.objects.size).toBe(0);
+      expect(live.state(late).empty).toBe(true);
+      await forget(event);
+    });
+
+    it('take an account, so the last batch does not fail for ever', async () => {
+      const event = await seedEvent(db, webmaster);
+      await fence(db, event);
+      const late = randomUUID();
+      await bound(db, `INSERT INTO accounts (id, name, username, handle, event_id, must_change) VALUES (?, 'Late', ?, ?, ?, 0)`,
+        late, `late-${late.slice(0, 12)}`, `late-${late.slice(0, 12)}`, event.eventId).run();
+      expect(await deleteRows(db, event)).toBe('rows_done');
+      expect(await rows('SELECT 1 FROM accounts WHERE id = ?', late)).toEqual([]);
+      await forget(event);
+    });
+
+    it('do not make a seat in a late contest look like a seat in another event', async () => {
+      const event = await seedEvent(db, webmaster);
+      await fence(db, event);
+      const late = randomUUID();
+      await lateContest(event, late);
+      await bound(db, 'INSERT INTO memberships (session_id, account_id) VALUES (?, ?)', late, event.volunteer.accountId).run();
+      expect(await deleteRows(db, event)).toBe('rows_done');
+      expect(await rows('SELECT 1 FROM sessions WHERE id = ?', late)).toEqual([]);
+      expect(await rows('SELECT 1 FROM accounts WHERE id = ?', event.volunteer.accountId)).toEqual([]);
+      await forget(event);
+    });
+
+    it('fail the last batch when they arrive after the check, and the next unit adds them', async () => {
+      const event = await seedEvent(db, webmaster);
+      await fence(db, event);
+      const late = randomUUID();
+      let arrived = false;
+      const racing = interceptCalls(db, async (sql) => {
+        if (!arrived && sql.some((text) => text.startsWith('DELETE FROM events'))) {
+          arrived = true;
+          await lateContest(event, late);
+        }
+      });
+      expect(await deleteRows(racing, event)).toBe('rows_done');
+      expect(arrived).toBe(true);
+      expect(await rows('SELECT 1 FROM sessions WHERE id = ?', late)).toEqual([]);
+      expect(await rows(`SELECT done FROM event_deletion_targets WHERE event_id = ? AND kind = 'contest' AND id = ?`, event.eventId, late))
+        .toEqual([{ done: 0 }]);
+      await forget(event);
+    });
+  });
+
   describe('a crash', () => {
     const modes: CrashMode[] = ['never ran', 'response lost'];
 

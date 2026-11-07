@@ -3,10 +3,10 @@ import type { Page } from "@playwright/test";
 import { endRunningContest, seatThreeContests } from "./support/contests";
 import { type LocalWorker, expect, test } from "./support/localWorker";
 
-// The contestant sees three contests. Alpha starts in 2031, Delta ended in
-// 2020, and Charlie runs now. The names sort the other way round from the
-// start times, so a test that passes on the old alphabetical list cannot pass
-// here by luck.
+// The contestant sees three contests. One starts in 2031, one ended in 2020,
+// and one runs now. The server lists contests by name, so a test of the default
+// contest names them so that the contest it expects is not first by name. Then
+// the test fails if the hook takes the first contest of the server's list.
 test.use({ seedIssues: false, viewport: { width: 1280, height: 800 } });
 
 const three = (local: LocalWorker) =>
@@ -70,10 +70,19 @@ test.describe("a contestant with several contests", () => {
   });
 
   test("opens the next contest when none runs", async ({ page, local }) => {
-    const ids = await three(local);
+    const ids = await seatThreeContests(local, { next: "Mike", ended: "Alpha", running: "Zulu" });
     await endRunningContest(local, ids.running);
     await signIn(page);
-    await expect(triggerFor(page, "Alpha")).toBeVisible();
+    await expect(triggerFor(page, "Mike")).toBeVisible();
+    await at(page, "/issues", ids.next);
+  });
+
+  test("opens the next contest, not a past one that staff hold closed", async ({ page, local }) => {
+    const ids = await seatThreeContests(local, { next: "Mike", ended: "Alpha", running: "Zulu" });
+    await endRunningContest(local, ids.running);
+    await local.run("UPDATE sessions SET intake_follows_schedule = 0, intake_open = 0 WHERE id = ?", ids.ended);
+    await signIn(page);
+    await expect(triggerFor(page, "Mike")).toBeVisible();
     await at(page, "/issues", ids.next);
   });
 

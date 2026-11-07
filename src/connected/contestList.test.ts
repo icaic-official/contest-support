@@ -104,7 +104,7 @@ describe("orderContests", () => {
 
 describe("defaultContest", () => {
   it("is undefined for an empty list", () => {
-    expect(defaultContest([])).toBeUndefined();
+    expect(defaultContest([], base)).toBeUndefined();
   });
 
   it("prefers the first contest that takes reports now", () => {
@@ -113,19 +113,47 @@ describe("defaultContest", () => {
       contest("now", { hours: [-1, 3], reason: "running" }),
       contest("next", { hours: [24, 28] }),
     ]);
-    expect(defaultContest(list)?.id).toBe("now");
+    expect(defaultContest(list, base)?.id).toBe("now");
   });
 
   it.each<IntakeReason>(["running", "grace", "override_open"])(
-    "counts %s as running now",
+    "opens a contest with the reason %s before a later one that has not started",
     (reason) => {
       const list = orderContests([
         contest("next", { hours: [24, 28] }),
         contest("now", { hours: [30, 34], reason }),
       ]);
-      expect(defaultContest(list)?.id).toBe("now");
+      expect(defaultContest(list, base)?.id).toBe("now");
     },
   );
+
+  it.each<[IntakeReason, IntakeReason]>([
+    ["override_open", "running"],
+    ["grace", "running"],
+    ["override_open", "grace"],
+  ])("opens the later contest when the earlier one has the reason %s and the later one has %s", (first, second) => {
+    const list = orderContests([
+      contest("first", { hours: [-5, -4], reason: first }),
+      contest("second", { hours: [-1, 3], reason: second }),
+    ]);
+    expect(defaultContest(list, base)?.id).toBe("second");
+  });
+
+  it("opens the earlier of two contests with the same open reason", () => {
+    const list = orderContests([
+      contest("later", { hours: [-1, 3], reason: "running" }),
+      contest("earlier", { hours: [-2, 3], reason: "running" }),
+    ]);
+    expect(defaultContest(list, base)?.id).toBe("earlier");
+  });
+
+  it("opens a contest from last month that staff hold open when nothing runs", () => {
+    const list = orderContests([
+      contest("held-open", { hours: [-720, -716], reason: "override_open" }),
+      contest("next", { hours: [24, 28] }),
+    ]);
+    expect(defaultContest(list, base)?.id).toBe("held-open");
+  });
 
   it("opens the next scheduled contest when none takes reports", () => {
     const list = orderContests([
@@ -133,20 +161,47 @@ describe("defaultContest", () => {
       contest("next", { hours: [24, 28] }),
       contest("later", { hours: [48, 52] }),
     ]);
-    expect(defaultContest(list)?.id).toBe("next");
+    expect(defaultContest(list, base)?.id).toBe("next");
   });
 
-  it("treats a contest that staff closed or that waits for passwords as not ended", () => {
+  it.each<IntakeReason>(["override_closed", "awaiting_live_passwords"])(
+    "keeps a contest with the reason %s while its window lasts",
+    (reason) => {
+      const list = orderContests([
+        contest("past", { hours: [-30, -26], reason: "ended" }),
+        contest("held", { hours: [-1, 3], reason }),
+        contest("next", { hours: [24, 28] }),
+      ]);
+      expect(defaultContest(list, base)?.id).toBe("held");
+    },
+  );
+
+  it.each<IntakeReason>(["override_closed", "awaiting_live_passwords"])(
+    "skips a contest with the reason %s after its window for a future one",
+    (reason) => {
+      const list = orderContests([
+        contest("past", { hours: [-720, -716], reason }),
+        contest("next", { hours: [24, 28] }),
+      ]);
+      expect(defaultContest(list, base)?.id).toBe("next");
+    },
+  );
+
+  it("treats a window that ends exactly now as past", () => {
     const list = orderContests([
-      contest("past", { hours: [-30, -26], reason: "ended" }),
-      contest("held", { hours: [-1, 3], reason: "override_closed" }),
+      contest("past", { hours: [-1, 0], reason: "override_closed" }),
+      contest("next", { hours: [24, 28] }),
     ]);
-    expect(defaultContest(list)?.id).toBe("held");
-    const waiting = orderContests([
-      contest("past", { hours: [-30, -26], reason: "ended" }),
-      contest("live", { hours: [-1, 3], reason: "awaiting_live_passwords" }),
+    expect(defaultContest(list, base)?.id).toBe("next");
+  });
+
+  it("uses the clock it is given, and no clock of its own", () => {
+    const list = orderContests([
+      contest("first", { hours: [-1, 3], reason: "override_closed" }),
+      contest("second", { hours: [24, 28], reason: "override_closed" }),
     ]);
-    expect(defaultContest(waiting)?.id).toBe("live");
+    expect(defaultContest(list, base)?.id).toBe("first");
+    expect(defaultContest(list, base + 4 * hour)?.id).toBe("second");
   });
 
   it("opens the contest that ended last when every scheduled contest has ended", () => {
@@ -155,7 +210,16 @@ describe("defaultContest", () => {
       contest("short", { hours: [-50, -20], reason: "ended" }),
       contest("first", { hours: [-120, -90], reason: "ended" }),
     ]);
-    expect(defaultContest(list)?.id).toBe("long");
+    expect(defaultContest(list, base)?.id).toBe("long");
+  });
+
+  it("opens the contest that ended last when past contests are held closed or wait for passwords", () => {
+    const list = orderContests([
+      contest("held", { hours: [-720, -716], reason: "override_closed" }),
+      contest("waiting", { hours: [-30, -26], reason: "awaiting_live_passwords" }),
+      contest("ended", { hours: [-100, -96], reason: "ended" }),
+    ]);
+    expect(defaultContest(list, base)?.id).toBe("waiting");
   });
 
   it("falls back to the first listed contest when none has a schedule or an open intake", () => {
@@ -163,7 +227,7 @@ describe("defaultContest", () => {
       contest("b", { name: "Beta", reason: "override_closed" }),
       contest("a", { name: "Alpha", reason: "override_closed" }),
     ]);
-    expect(defaultContest(list)?.id).toBe("a");
+    expect(defaultContest(list, base)?.id).toBe("a");
   });
 
   it("opens an unscheduled contest that staff opened before a scheduled one that has not started", () => {
@@ -171,7 +235,7 @@ describe("defaultContest", () => {
       contest("next", { hours: [24, 28] }),
       contest("held-open", { name: "Held open", reason: "override_open" }),
     ]);
-    expect(defaultContest(list)?.id).toBe("held-open");
+    expect(defaultContest(list, base)?.id).toBe("held-open");
   });
 });
 

@@ -63,9 +63,9 @@ function inBackground(): boolean {
  * the choice. The hook reads the address once, when it starts.
  *
  * It refreshes on live changes, on focus, when the tab becomes visible and
- * when the browser comes back online. A timer refreshes every 10 seconds
- * while the live channel is down, and every 60 seconds while it is connected.
- * The timer also drives the independent reads: each tick adds one to `updates`.
+ * when the browser comes back online. A timer refreshes every 60 seconds, with
+ * the live channel down or connected. The timer also drives the independent
+ * reads: each tick adds one to `updates`.
  */
 export function useSessionSnapshot(userId: string): SessionData {
   const [sessions, setSessions] = useState<SessionSummary[]>([]);

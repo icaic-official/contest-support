@@ -50,11 +50,11 @@ function endsAt(contest: ContestSummary): number {
 /**
  * The contest to open when the person has chosen none. A contest that takes
  * reports comes first: `running`, then `grace`, then any other open reason.
- * Next comes the first scheduled contest whose window has not ended at `now`.
- * The window decides here because a held or waiting reason never expires, so
- * a contest from last month can still carry one. Last comes the scheduled
- * contest that ends latest, then the first listed. `ordered` comes from
- * `orderContests`.
+ * Next comes the first scheduled contest whose reason is not `ended` and whose
+ * `endsAt` is after `now`. The end time decides here because a held or waiting
+ * reason never expires, so a contest from last month can still carry one. The
+ * grace period is not part of `endsAt`. Last comes the scheduled contest that
+ * ends latest, then the first listed. `ordered` comes from `orderContests`.
  */
 export function defaultContest(ordered: readonly ContestSummary[], now: number): ContestSummary | undefined {
   const open = ordered.filter((contest) => contest.intake.open);

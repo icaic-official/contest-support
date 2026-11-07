@@ -173,7 +173,7 @@ describe("defaultContest", () => {
   });
 
   it.each<IntakeReason>(["override_closed", "awaiting_live_passwords"])(
-    "keeps a contest with the reason %s while its window lasts",
+    "keeps a contest with the reason %s until its end time",
     (reason) => {
       const list = orderContests([
         contest("past", { hours: [-30, -26], reason: "ended" }),
@@ -185,7 +185,7 @@ describe("defaultContest", () => {
   );
 
   it.each<IntakeReason>(["override_closed", "awaiting_live_passwords"])(
-    "skips a contest with the reason %s after its window for a future one",
+    "skips a contest with the reason %s after its end time, for a future one",
     (reason) => {
       const list = orderContests([
         contest("past", { hours: [-720, -716], reason }),
@@ -203,7 +203,7 @@ describe("defaultContest", () => {
     expect(defaultContest(list, base - 100 * hour)?.id).toBe("next");
   });
 
-  it("treats a window that ends exactly now as past", () => {
+  it("treats a contest that ends exactly now as past", () => {
     const list = orderContests([
       contest("past", { hours: [-1, 0], reason: "override_closed" }),
       contest("next", { hours: [24, 28] }),

@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 import type { ContestSummary, IntakeReason } from "@/backend/contracts";
 import {
+  type ContestRow,
   contestLabel,
   contestRows,
   defaultContest,
   orderContests,
+  rowDetail,
   rowText,
 } from "./contestList";
 
@@ -205,19 +207,34 @@ describe("contestRows", () => {
     expect(mixed[0]?.start).toContain("21:00");
   });
 
+  it("marks a row open exactly when the intake takes reports", () => {
+    const rows = contestRows(notes.map(([reason], index) => contest(String(index), { reason })));
+    expect(rows.map((row) => row.open)).toEqual(notes.map(([reason]) => OPEN.has(reason)));
+  });
+
   it("keeps the order of its input", () => {
     const rows = contestRows([contest("b"), contest("a")]);
     expect(rows.map((row) => row.id)).toEqual(["b", "a"]);
   });
 });
 
+const row = (start: string | null, marker: string | null): ContestRow =>
+  ({ id: "1", name: "Live 1", start, marker, open: false });
+
+describe("rowDetail", () => {
+  it("joins the start and the note, and is null when a row has neither", () => {
+    expect(rowDetail(row("Tue 3 Nov, 13:00", "Running now"))).toBe("Tue 3 Nov, 13:00 · Running now");
+    expect(rowDetail(row("Tue 3 Nov, 13:00", null))).toBe("Tue 3 Nov, 13:00");
+    expect(rowDetail(row(null, "Closed by staff"))).toBe("Closed by staff");
+    expect(rowDetail(row(null, null))).toBeNull();
+  });
+});
+
 describe("rowText", () => {
-  it("joins the name, the start and the note, and skips what a row lacks", () => {
-    expect(rowText({ id: "1", name: "Live 1", start: "Tue 3 Nov, 13:00", marker: "Running now" }))
-      .toBe("Live 1 · Tue 3 Nov, 13:00 · Running now");
-    expect(rowText({ id: "1", name: "Live 1", start: "Tue 3 Nov, 13:00", marker: null }))
-      .toBe("Live 1 · Tue 3 Nov, 13:00");
-    expect(rowText({ id: "1", name: "Old one", start: null, marker: "Closed by staff" }))
-      .toBe("Old one · Closed by staff");
+  it("puts the name first and skips what a row lacks", () => {
+    expect(rowText(row("Tue 3 Nov, 13:00", "Running now"))).toBe("Live 1 · Tue 3 Nov, 13:00 · Running now");
+    expect(rowText(row("Tue 3 Nov, 13:00", null))).toBe("Live 1 · Tue 3 Nov, 13:00");
+    expect(rowText(row(null, "Closed by staff"))).toBe("Live 1 · Closed by staff");
+    expect(rowText(row(null, null))).toBe("Live 1");
   });
 });

@@ -14,7 +14,7 @@ test('a promoted webmaster opens its contest as an admin, as before', async ({ p
   await page.getByLabel('Password', { exact: true }).fill(crypto.randomUUID());
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
   await page.getByRole('button', { name: /^Contest session: .*\. Change session$/ }).click();
-  await page.getByRole('menuitemradio', { name: contest, exact: true }).click();
+  await page.getByRole('menuitemradio', { name: contest }).click();
   await expect(page.getByRole('button', { name: `Contest session: ${contest}. Change session`, exact: true })).toBeVisible();
 
   const pages = page.getByRole('navigation', { name: 'Console pages' });

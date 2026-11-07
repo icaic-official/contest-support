@@ -68,6 +68,8 @@ export interface ContestRow {
   start: string | null;
   /** The intake note, or null when the start time says enough. */
   marker: string | null;
+  /** True while the contest takes reports. The row stands out then. */
+  open: boolean;
 }
 
 /** The rows of the contest picker, in the order given. */
@@ -86,11 +88,19 @@ export function contestRows(contests: readonly ContestSummary[]): ContestRow[] {
       name: contestLabel(contests, contest),
       start,
       marker: intakeMarkers[contest.intake.reason],
+      open: contest.intake.open,
     };
   });
 }
 
+/** The start and the intake note of a row, for example `Tue 3 Nov, 13:00 · Running now`. Null for neither. */
+export function rowDetail(row: ContestRow): string | null {
+  const parts = [row.start, row.marker].filter((part): part is string => part !== null);
+  return parts.length > 0 ? parts.join(" · ") : null;
+}
+
 /** The row as one line of text, for example `Live 1 · Tue 3 Nov, 13:00 · Running now`. */
 export function rowText(row: ContestRow): string {
-  return [row.name, row.start, row.marker].filter((part): part is string => part !== null).join(" · ");
+  const detail = rowDetail(row);
+  return detail === null ? row.name : `${row.name} · ${detail}`;
 }

@@ -63,8 +63,48 @@ const ROSTER_SIZED = ['audience_sequences', 'credential_scopes', 'grants', 'memb
 /** Under a contest, the tables whose rows go with a chunk of their parent, and not with the contest row. */
 const CHUNKED_WITH_A_PARENT = ['announcement_image_deletions', 'announcement_images', 'awards', 'command_receipts', 'history', 'image_deletions', 'issue_images', 'resolutions'];
 
-function rowSet(tables: ReadonlyMap<string, TableRows[]>): Map<string, Set<string>> {
-  return new Map([...tables].map(([table, rows]) => [table, new Set(rows.map(maskedRow))]));
+/** A column that names an event, a contest, or an account. */
+const NAMING_COLUMN = /^(?:event_id|session_id|contest_id|account_id|owner_account_id|actor|owner|reporter|author|uploader|target|userId|\w+_by)$/;
+
+/** Tables with such a column that no foreign key chain reaches, and that a deletion still covers. */
+const OUTSIDE_THE_CHAINS = new Set([
+  // The account batch deletes `ba_user` by ID, and these two cascade from it.
+  'ba_account', 'ba_session',
+  // The journal stays, and it holds no row before the fence.
+  'event_deletions', 'event_deletion_targets',
+  // One row for the site. It names a webmaster, and no event owns it.
+  'site_settings',
+]);
+const NO_SEED_NEEDED = new Set(['event_deletions', 'event_deletion_targets', 'site_settings']);
+
+async function namingTables(db: D1Connection, tables: readonly string[]): Promise<string[]> {
+  const named: string[] = [];
+  for (const table of tables) {
+    const { results } = await db.prepare(`PRAGMA table_info("${table}")`).all<{ name: string }>();
+    if (results.some(({ name }) => NAMING_COLUMN.test(name))) named.push(table);
+  }
+  return named;
+}
+
+/** Why the coverage test would miss each table: no chain reaches it, or the seed leaves it empty. */
+function coverageGaps(named: readonly string[], reached: ReadonlySet<string>, seeded: ReadonlySet<string>): string[] {
+  return named.flatMap((table) => [
+    ...(reached.has(table) || OUTSIDE_THE_CHAINS.has(table) ? [] : [`${table}: no chain reaches it`]),
+    ...(seeded.has(table) || NO_SEED_NEEDED.has(table) ? [] : [`${table}: the seed leaves it empty`]),
+  ]);
+}
+
+/**
+ * Each row, as a string, without what the seeding itself moves. Seeding an event toggles the site setting,
+ * which moves its version, and each join and removed join moves the webmaster's access version.
+ */
+function rowSet(tables: ReadonlyMap<string, TableRows[]>, webmasterId: string): Map<string, Set<string>> {
+  const steady = (table: string, row: TableRows): TableRows => {
+    if (table === 'site_settings') return { ...row, version: '<moved>' };
+    if (table === 'accounts' && row.id === webmasterId) return { ...row, access_version: '<moved>' };
+    return row;
+  };
+  return new Map([...tables].map(([table, rows]) => [table, new Set(rows.map((row) => maskedRow(steady(table, row))))]));
 }
 
 describe('event deletion coverage', () => {
@@ -101,7 +141,7 @@ describe('event deletion coverage', () => {
 
   it('leaves only the site records of a deleted event, and every table that names one holds a seeded row', async () => {
     const kept = await seedEvent(db, webmaster);
-    const alone = rowSet(await readTables(db, tables));
+    const alone = rowSet(await readTables(db, tables), webmaster.accountId);
 
     const deleted = await seedEvent(db, webmaster);
     const heldInstallation = await seedInstallation(db, deleted);
@@ -111,11 +151,14 @@ describe('event deletion coverage', () => {
     // The singleton names the site's first event, so only a database without one can seed it.
     if (!heldInstallation) required.delete('installation');
     expect([...required].filter((table) => !seeded.has(table))).toEqual([]);
+    const named = (await namingTables(db, tables)).filter((table) => heldInstallation || table !== 'installation');
+    expect(named.length).toBeGreaterThan(25);
+    expect(coverageGaps(named, required, new Set(seeded.keys()))).toEqual([]);
     expect((await bound(db, 'SELECT unready_seats FROM sessions WHERE id = ?', deleted.live).first<{ unready_seats: number }>())?.unready_seats).toBe(1);
 
     await deleteRows(deleted);
 
-    const after = rowSet(await readTables(db, tables));
+    const after = rowSet(await readTables(db, tables), webmaster.accountId);
     const differences: string[] = [];
     const ours = [...kept.ids, ...deleted.ids, webmaster.accountId];
     for (const table of tables) {
@@ -124,20 +167,30 @@ describe('event deletion coverage', () => {
       const changed = [...[...before].filter((row) => !now.has(row)), ...[...now].filter((row) => !before.has(row))];
       differences.push(...changed.filter((row) => !remote || ours.some((id) => row.includes(id))).map((row) => `${table}: ${row}`));
     }
-    const allowed = [
-      new RegExp(`^event_deletions: .*"event_id":"${deleted.eventId}"`),
-      new RegExp(`^event_deletion_targets: .*"event_id":"${deleted.eventId}"`),
+    const expected: Array<[string, RegExp]> = [
+      ['journal', new RegExp(`^event_deletions: .*"event_id":"${deleted.eventId}"`)],
+      ['target', new RegExp(`^event_deletion_targets: .*"event_id":"${deleted.eventId}"`)],
       // The audited join of the deleted event's contest is a site record.
-      /^authority_audit: \{[^{]*"event_id":null/,
-      // Seeding moved the site setting's version, and each join and each removed join moves the webmaster's.
-      /^site_settings: /,
-      new RegExp(`^accounts: .*"id":"${webmaster.accountId}"`),
+      ['audit', new RegExp(`^authority_audit: .*"event_id":null.*"action":"webmaster_join","target":"${deleted.live}"`)],
     ];
-    expect(differences.filter((row) => !allowed.some((rule) => rule.test(row)))).toEqual([]);
+    const kindOf = (row: string) => expected.find(([, rule]) => rule.test(row))?.[0] ?? `unexpected ${row}`;
+    const counts = differences.reduce<Record<string, number>>((tally, row) => ({ ...tally, [kindOf(row)]: (tally[kindOf(row)] ?? 0) + 1 }), {});
+    expect(counts).toEqual({ journal: 1, target: 2 + deleted.accounts.length + 1, audit: 1 });
     await forget(deleted);
 
     await deleteRows(kept);
     await forget(kept);
+  });
+
+  it('reports a table that names an event, a contest, or an account when no chain reaches it or the seed leaves it empty', () => {
+    expect(coverageGaps(['new_table'], new Set(), new Set()))
+      .toEqual(['new_table: no chain reaches it', 'new_table: the seed leaves it empty']);
+    expect(coverageGaps(['new_table'], new Set(['new_table']), new Set())).toEqual(['new_table: the seed leaves it empty']);
+    expect(coverageGaps(['new_table'], new Set(), new Set(['new_table']))).toEqual(['new_table: no chain reaches it']);
+    expect(coverageGaps(['new_table'], new Set(['new_table']), new Set(['new_table']))).toEqual([]);
+    expect(NAMING_COLUMN.test('session_id')).toBe(true);
+    expect(NAMING_COLUMN.test('deleted_by')).toBe(true);
+    expect(NAMING_COLUMN.test('name')).toBe(false);
   });
 
   it('classifies every table that a contest delete cascades into, so a new one must choose', async () => {

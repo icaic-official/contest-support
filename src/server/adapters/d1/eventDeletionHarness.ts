@@ -387,41 +387,45 @@ export type CrashMode = 'never ran' | 'response lost';
 /**
  * The process dies at call `at` of the D1, R2, and Durable Object calls together:
  * that call throws, with or without its effect, and every later call throws.
+ * `writes` lists the calls so far that can change state.
  */
-export function crashingEnvironment(env: DeletionEnvironment, at: number, mode: CrashMode): { env: DeletionEnvironment; calls: () => number } {
+export function crashingEnvironment(env: DeletionEnvironment, at: number, mode: CrashMode): { env: DeletionEnvironment; calls: () => number; writes: () => readonly number[] } {
   let calls = 0;
-  const enter = async <T>(run: () => Promise<T>): Promise<T> => {
+  const writes: number[] = [];
+  const enter = async <T>(write: boolean, run: () => Promise<T>): Promise<T> => {
     calls += 1;
+    if (write) writes.push(calls);
     if (calls > at) throw new Error('The process is gone.');
     if (calls < at) return run();
     if (mode === 'response lost') await run();
     throw new Error('The process died at this call.');
   };
   const inner = new WeakMap<D1Statement, D1Statement>();
-  const wrap = (statement: D1Statement): D1Statement => {
+  const wrap = (statement: D1Statement, write: boolean): D1Statement => {
     const wrapped: D1Statement = {
-      bind: (...values) => wrap(statement.bind(...values)),
-      first: <T>() => enter(() => statement.first<T>()),
-      all: <T>() => enter(() => statement.all<T>()),
-      run: () => enter(() => statement.run()),
+      bind: (...values) => wrap(statement.bind(...values), write),
+      first: <T>() => enter(write, () => statement.first<T>()),
+      all: <T>() => enter(write, () => statement.all<T>()),
+      run: () => enter(write, () => statement.run()),
     };
     inner.set(wrapped, statement);
     return wrapped;
   };
   return {
     calls: () => calls,
+    writes: () => writes,
     env: {
       DB: {
-        prepare: (sql) => wrap(env.DB.prepare(sql)),
-        batch: (statements) => enter(() => env.DB.batch(statements.map((statement) => inner.get(statement) ?? statement))),
+        prepare: (sql) => wrap(env.DB.prepare(sql), !/^\s*SELECT\b/i.test(sql)),
+        batch: (statements) => enter(true, () => env.DB.batch(statements.map((statement) => inner.get(statement) ?? statement))),
       },
       IMAGES: {
-        list: (options) => enter(() => env.IMAGES.list(options)),
-        delete: (keys) => enter(() => env.IMAGES.delete(keys)),
+        list: (options) => enter(false, () => env.IMAGES.list(options)),
+        delete: (keys) => enter(true, () => env.IMAGES.delete(keys)),
       },
       LIVE_UPDATES: {
         idFromName: (name) => env.LIVE_UPDATES.idFromName(name),
-        get: (id) => ({ fetch: (request) => enter(() => env.LIVE_UPDATES.get(id).fetch(request)) }),
+        get: (id) => ({ fetch: (request) => enter(true, () => env.LIVE_UPDATES.get(id).fetch(request)) }),
       },
     },
   };

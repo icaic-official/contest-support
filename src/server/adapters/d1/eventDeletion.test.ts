@@ -8,7 +8,7 @@ import { D1AuthenticationService } from '../cloudflare/authentication';
 import { createBetterAuthIdentity } from '../cloudflare/identity';
 import { D1ManageService } from '../cloudflare/manage';
 import { passwordHasher, type PasswordHasher } from '../cloudflare/password';
-import { contestDataBindings, contestDataSql, resolveAuthority, signInAccountSql } from '../cloudflare/authority';
+import { authorityGuard, contestDataBindings, contestDataSql, resolveAuthority, signInAccountSql } from '../cloudflare/authority';
 import {
   ACCOUNT_ROWS_IN_A_CONTEST, advanceDeletions, advanceRows, CLAIM_DELETION_SQL, CONTEST_ACTIVITY, fenceStatements, ROWS_UNIT_CALLS,
   type DeletionEnvironment, type RowsProgress,
@@ -86,6 +86,21 @@ describe('event deletion', () => {
       await expect(fence(db, event, `${event.name} `)).rejects.toThrow(/valid = 1/);
       expect(await footprint(event)).toEqual(before);
       await fence(db, event);
+      await deleteRows(db, event);
+      await forget(event);
+    });
+
+    it('refuses a write whose authority read came before the fence', async () => {
+      const event = await seedEvent(db, webmaster);
+      const authority = await resolveAuthority(db, webmaster, { scope: 'event', eventId: event.eventId });
+      if (!authority) throw new Error('The webmaster has no authority over the event.');
+      await fence(db, event);
+      const late = randomUUID();
+      await expect(db.batch([
+        authorityGuard(db, randomUUID(), authority),
+        bound(db, `INSERT INTO sessions (id, event_id, name) VALUES (?, ?, 'Late contest')`, late, event.eventId),
+      ])).rejects.toThrow(/valid = 1/);
+      expect(await rows('SELECT 1 FROM sessions WHERE id = ?', late)).toEqual([]);
       await deleteRows(db, event);
       await forget(event);
     });
@@ -444,26 +459,31 @@ describe('event deletion', () => {
     return { bucket, live, env: { DB: db, IMAGES: bucket, LIVE_UPDATES: live } };
   }
 
-  async function finished(event: SeededEvent): Promise<boolean> {
+  async function finished(event: Pick<SeededEvent, 'eventId'>): Promise<boolean> {
     return (await rows(`SELECT 1 FROM event_deletions WHERE event_id = ? AND step = 'done'`, event.eventId)).length > 0;
   }
 
   /** What a passing hour and an expired lease do, which a test cannot wait for. */
-  async function passTime(event: SeededEvent): Promise<void> {
+  async function passTime(event: Pick<SeededEvent, 'eventId'>): Promise<void> {
     await bound(db, `UPDATE event_deletions SET lease_until = 0,
       rows_done_at = CASE WHEN rows_done_at IS NULL THEN NULL ELSE strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-66 minutes') END
       WHERE event_id = ? AND finished_at IS NULL`, event.eventId).run();
   }
 
-  /** Fences unless a journal row exists, then runs ticks until the deletion is done. Every step starts from the current state. */
-  async function runToEnd(env: DeletionEnvironment, event: SeededEvent): Promise<void> {
-    if (!(await rows('SELECT 1 FROM event_deletions WHERE event_id = ?', event.eventId)).length) await fence(env.DB, event);
+  /** Runs ticks until the deletion is done. Every step starts from the current state. */
+  async function runTicks(env: DeletionEnvironment, event: Pick<SeededEvent, 'eventId'>): Promise<void> {
     for (let tick = 0; tick < 100; tick += 1) {
       await passTime(event);
       await advanceDeletions(env);
       if (await finished(event)) return;
     }
     throw new Error('The deletion did not finish.');
+  }
+
+  /** Fences unless a journal row exists, then runs ticks until the deletion is done. */
+  async function runToEnd(env: DeletionEnvironment, event: SeededEvent): Promise<void> {
+    if (!(await rows('SELECT 1 FROM event_deletions WHERE event_id = ?', event.eventId)).length) await fence(env.DB, event);
+    await runTicks(env, event);
   }
 
   describe('rows that arrive after the fence', () => {
@@ -530,7 +550,13 @@ describe('event deletion', () => {
   });
 
   describe('a crash', () => {
-    const modes: CrashMode[] = ['never ran', 'response lost'];
+    /**
+     * The states that a crash can leave: the start, and the state after each write. A crash before a read, or a
+     * write that never ran, leaves the same state as a lost response from the write before it. Later calls then
+     * start from that state, so a repeat of the same state proves nothing and only spends time.
+     */
+    const crashPoints = (writes: readonly number[]): Array<{ at: number; mode: CrashMode }> =>
+      [{ at: 1, mode: 'never ran' }, ...writes.map((at) => ({ at, mode: 'response lost' as const }))];
 
     it('at any D1, R2, or Durable Object call converges to the same state', async () => {
       const clean = await seedEvent(db, webmaster);
@@ -538,26 +564,57 @@ describe('event deletion', () => {
       fillStores(clean, cleanStores.bucket, cleanStores.live);
       const counter = crashingEnvironment(cleanStores.env, Number.MAX_SAFE_INTEGER, 'never ran');
       await runToEnd(counter.env, clean);
-      const total = counter.calls();
       const expected = await footprint(clean);
       expect(Object.keys(expected).sort()).toEqual(['authority_audit', 'event_deletions']);
       expect(cleanStores.bucket.objects.size).toBe(0);
       await forget(clean);
-      expect(total).toBeGreaterThan(30);
-      for (let at = 1; at <= total; at += 1) {
-        for (const mode of modes) {
-          const label = `call ${at}, ${mode}`;
-          const event = await seedEvent(db, webmaster);
-          const { bucket, live, env } = stores();
-          fillStores(event, bucket, live);
-          bucket.add(['control/other-event/file']);
-          await expect(runToEnd(crashingEnvironment(env, at, mode).env, event), label).rejects.toThrow();
-          await runToEnd(env, event);
-          expect(await footprint(event), label).toEqual(expected);
-          expect([...bucket.objects], label).toEqual(['control/other-event/file']);
-          expect([event.practice, event.live].every((contest) => live.state(contest).empty), label).toBe(true);
-          await forget(event);
-        }
+      expect(counter.writes().length).toBeGreaterThan(20);
+      for (const { at, mode } of crashPoints(counter.writes())) {
+        const label = `call ${at}, ${mode}`;
+        const event = await seedEvent(db, webmaster);
+        const { bucket, live, env } = stores();
+        fillStores(event, bucket, live);
+        bucket.add(['control/other-event/file']);
+        await expect(runToEnd(crashingEnvironment(env, at, mode).env, event), label).rejects.toThrow();
+        await runToEnd(env, event);
+        expect(await footprint(event), label).toEqual(expected);
+        expect([...bucket.objects], label).toEqual(['control/other-event/file']);
+        expect([event.practice, event.live].every((contest) => live.state(contest).empty), label).toBe(true);
+        await forget(event);
+      }
+    });
+
+    it('at any call of a multi-page file listing leaves no file of the event, and no other file goes', async () => {
+      // A journal already in the files step, because the other crash tests cover the steps before it.
+      const inFilesStep = async () => {
+        const event = { eventId: randomUUID() };
+        const [contest, emptyPage, owner] = [randomUUID(), randomUUID(), randomUUID()];
+        const { bucket, env } = stores();
+        await db.batch([
+          bound(db, `INSERT INTO event_deletions (event_id, event_name, event_code, requested_by, requested_by_name, step, rows_done_at)
+            VALUES (?, 'Fictional', 'fictional', 'fixture', 'Fixture', 'files', strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-66 minutes'))`, event.eventId),
+          bound(db, `INSERT INTO event_deletion_targets (event_id, kind, id) VALUES (?, 'contest', ?), (?, 'contest', ?), (?, 'avatar_owner', ?)`,
+            event.eventId, contest, event.eventId, emptyPage, event.eventId, owner),
+        ]);
+        bucket.pageSize = 2;
+        bucket.add([1, 2, 3, 4, 5].map((n) => `${contest}/many/${n}`));
+        bucket.add([`${emptyPage}/file`, `accounts/${owner}/avatar`, 'control/other-event/file']);
+        bucket.emptyFirstPage.add(`${emptyPage}/`);
+        return { event, bucket, env };
+      };
+      const clean = await inFilesStep();
+      const counter = crashingEnvironment(clean.env, Number.MAX_SAFE_INTEGER, 'never ran');
+      await runTicks(counter.env, clean.event);
+      expect(counter.writes().length).toBeGreaterThan(8);
+      expect([...clean.bucket.objects]).toEqual(['control/other-event/file']);
+      await forget(clean.event);
+      for (const { at, mode } of crashPoints(counter.writes())) {
+        const label = `call ${at}, ${mode}`;
+        const { event, bucket, env } = await inFilesStep();
+        await expect(runTicks(crashingEnvironment(env, at, mode).env, event), label).rejects.toThrow();
+        await runTicks(env, event);
+        expect([...bucket.objects], label).toEqual(['control/other-event/file']);
+        await forget(event);
       }
     });
 
@@ -569,17 +626,14 @@ describe('event deletion', () => {
       const clean = await seedEvent(db, webmaster);
       const counter = crashingEnvironment(stores().env, Number.MAX_SAFE_INTEGER, 'never ran');
       await converge(counter.env.DB, clean);
-      const total = counter.calls();
       const expected = await footprint(clean);
       await forget(clean);
-      for (let at = 1; at <= total; at += 1) {
-        for (const mode of modes) {
-          const event = await seedEvent(db, webmaster);
-          await expect(converge(crashingEnvironment(stores().env, at, mode).env.DB, event), `call ${at}, ${mode}`).rejects.toThrow();
-          await converge(db, event);
-          expect(await footprint(event), `call ${at}, ${mode}`).toEqual(expected);
-          await forget(event);
-        }
+      for (const { at, mode } of crashPoints(counter.writes())) {
+        const event = await seedEvent(db, webmaster);
+        await expect(converge(crashingEnvironment(stores().env, at, mode).env.DB, event), `call ${at}, ${mode}`).rejects.toThrow();
+        await converge(db, event);
+        expect(await footprint(event), `call ${at}, ${mode}`).toEqual(expected);
+        await forget(event);
       }
     });
   });
@@ -853,6 +907,7 @@ describe('event deletion', () => {
       }) };
       await runToEnd(recording, event);
       expect(recorded.size).toBeGreaterThan(15);
+      for (const { table } of CONTEST_ACTIVITY) expect([...recorded.keys()]).toContainEqual(expect.stringContaining(`DELETE FROM ${table} WHERE rowid IN`));
       const scans: string[] = [];
       for (const [sql, values] of recorded) {
         const plan = await bound(db, `EXPLAIN QUERY PLAN ${sql}`, ...values).all<{ detail: string }>();
@@ -880,7 +935,12 @@ describe('event deletion', () => {
       const after = rowsNaming(await readTables(db, tables), other.ids);
       expect(Object.fromEntries(after)).toEqual(Object.fromEntries(before));
       expect([...bucket.objects].sort()).toEqual([...other.objects].sort());
-      for (const contest of [other.practice, other.live]) expect(live.state(contest).empty).toBe(false);
+      for (const contest of [other.practice, other.live]) {
+        const state = live.state(contest);
+        expect([...state.data]).toEqual([[`sequence:${contest}:staff`, 1]]);
+        expect(state.alarmAt).toBe(1);
+        expect(state.getWebSockets()).toHaveLength(1);
+      }
       await runToEnd(env, other);
       await forget(event);
       await forget(other);

@@ -255,6 +255,18 @@ test.describe("the rows of the picker", () => {
     await expect(menu.getByText("Running now")).toHaveCount(1);
   });
 
+  test("say Running now only for the contest that runs", async ({ page, local }) => {
+    const ids = await three(local);
+    await local.run("UPDATE sessions SET intake_follows_schedule = 0, intake_open = 1 WHERE id = ?", ids.ended);
+    await signIn(page);
+    await trigger(page).click();
+    const menu = page.getByRole("menu");
+    const items = menu.getByRole("menuitemradio");
+    await expect(items.nth(0)).toHaveAccessibleName(/^Delta \S.*17:00 · Intake open \(set by staff\)$/);
+    await expect(items.nth(1)).toHaveAccessibleName(running);
+    await expect(menu.getByText("Running now")).toHaveCount(1);
+  });
+
   test("say the same in the phone rows and in the select of the no-access screen", async ({ page, local }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await three(local);

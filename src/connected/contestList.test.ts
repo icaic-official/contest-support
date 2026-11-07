@@ -243,9 +243,9 @@ describe("contestRows", () => {
   const notes: Array<[IntakeReason, string | null]> = [
     ["before_start", null],
     ["running", "Running now"],
-    ["grace", "Running now"],
-    ["override_open", "Running now"],
-    ["override_closed", "Closed by staff"],
+    ["grace", "Intake open (grace period)"],
+    ["override_open", "Intake open (set by staff)"],
+    ["override_closed", "Intake closed (set by staff)"],
     ["awaiting_live_passwords", "Waiting for live passwords"],
     ["ended", "Ended"],
   ];
@@ -296,7 +296,7 @@ describe("rowDetail", () => {
   it("joins the start and the note, and is null when a row has neither", () => {
     expect(rowDetail(row("Tue 3 Nov, 13:00", "Running now"))).toBe("Tue 3 Nov, 13:00 · Running now");
     expect(rowDetail(row("Tue 3 Nov, 13:00", null))).toBe("Tue 3 Nov, 13:00");
-    expect(rowDetail(row(null, "Closed by staff"))).toBe("Closed by staff");
+    expect(rowDetail(row(null, "Ended"))).toBe("Ended");
     expect(rowDetail(row(null, null))).toBeNull();
   });
 });
@@ -305,7 +305,7 @@ describe("rowText", () => {
   it("puts the name first and skips what a row lacks", () => {
     expect(rowText(row("Tue 3 Nov, 13:00", "Running now"))).toBe("Live 1 · Tue 3 Nov, 13:00 · Running now");
     expect(rowText(row("Tue 3 Nov, 13:00", null))).toBe("Live 1 · Tue 3 Nov, 13:00");
-    expect(rowText(row(null, "Closed by staff"))).toBe("Live 1 · Closed by staff");
+    expect(rowText(row(null, "Ended"))).toBe("Live 1 · Ended");
     expect(rowText(row(null, null))).toBe("Live 1");
   });
 });

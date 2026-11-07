@@ -140,7 +140,7 @@ Only event admins and webmasters create accounts and assign people. A contest ad
 
 A webmaster deletes an event permanently with **Delete event** on the **Site** page, after typing the event's exact name. An event with no name asks for its code, or for its ID when it has no code. You cannot undo this. Minsky signs out everyone in the event and stops its contests at once. The Worker then deletes its rows and its live state. About 65 minutes later, it deletes its files. The **Site** page shows the progress and keeps a **Deleted** record with the event's name and code.
 
-**Stopped** on the **Site** page means that an account of the event also has activity in another event. Deleting that account would change the other event, so Minsky keeps it. The event stays closed. Minsky tries again every hour, and it continues when the other event no longer names the account, for example after that event's own deletion. Do not delete rows by hand.
+**Stopped** on the **Site** page means that an account of the event also has activity in another event. Deleting that account would change the other event, so Minsky keeps it. The event stays closed. Its contests are already gone. The accounts that Minsky has not reached, all of the event's files, and its live updates stay until the deletion continues. Minsky tries again every hour, and it continues when the other event no longer names the account, for example after that event's own deletion. Do not delete rows by hand.
 
 The Worker logs each failed attempt as `deletion.advance_failed`, with the `eventId` and the error's name, and it retries every minute. If the **Site** page shows no progress for an event:
 

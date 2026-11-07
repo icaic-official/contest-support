@@ -16,7 +16,7 @@ export function deletionProgress(deletion: EventDeletion, now: number): { label:
     const { name, handle } = deletion.blockedBy;
     return {
       label: "Stopped",
-      detail: `The account ${name}${handle ? ` (${handle})` : ""} also has activity in another event. Deleting it would change that event, so Minsky keeps it. Minsky tries again every hour and continues when the other event no longer names this account.`,
+      detail: `The account ${name}${handle ? ` (${handle})` : ""} also has activity in another event. Deleting it would change that event, so Minsky keeps it. The contests are already gone. The rest of the event's accounts, its files, and its live updates stay until the deletion continues. Minsky tries again every hour and continues when the other event no longer names this account.`,
     };
   }
   switch (deletion.step) {

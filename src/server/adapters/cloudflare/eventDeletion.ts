@@ -67,7 +67,7 @@ export function fenceStatements(db: D1Connection, actor: DeletionActor, eventId:
       AND NOT EXISTS (SELECT 1 FROM event_deletions WHERE event_id = ?) THEN 1 ELSE 0 END)`,
     assertionId, eventId, expectedName, eventId),
     bound(db, `INSERT INTO event_deletions (event_id, event_name, event_code, requested_by, requested_by_name)
-      SELECT id, name, COALESCE(code, ''), ?, ? FROM events WHERE id = ?`, actor.id, actor.name, eventId),
+      SELECT id, name, code, ?, ? FROM events WHERE id = ?`, actor.id, actor.name, eventId),
     bound(db, `INSERT INTO event_deletion_targets (event_id, kind, id)
       SELECT event_id, 'contest', id FROM sessions WHERE event_id = ?`, eventId),
     // Never a NULL-event account: webmasters and orphans are outside every event.

@@ -21,8 +21,8 @@ function count(amount: number, one: string, many: string): string {
 
 /**
  * Names what a deletion takes, and asks for the event's exact name, or for its
- * code or ID when it has no name. Only that text enables the action, and the
- * server checks it again. The dialog stays open while its request runs.
+ * code when it has no name. Only that text enables the action, and the server
+ * checks it again. The dialog stays open while its request runs.
  */
 export function DeleteEventDialog({
   event,

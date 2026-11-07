@@ -253,14 +253,6 @@ describe('event deletion', () => {
         await deleteLegacy(eventId, code);
       });
 
-      it('with neither a name nor a code confirms with its ID', async () => {
-        const { eventId } = await legacyEvent(null);
-        await bound(db, 'UPDATE events SET code = NULL WHERE id = ?', eventId).run();
-        await expect(manage().execute(webmaster, randomUUID(), { type: 'delete_event', eventId, confirmName: 'something' }))
-          .rejects.toMatchObject({ status: 409, message: 'The ID does not match. Type the event ID exactly.' });
-        await deleteLegacy(eventId, eventId);
-      });
-
       it('with a name longer than a new name may be confirms with that name', async () => {
         const name = `Legacy ${'x'.repeat(300)}`;
         const { eventId } = await legacyEvent(name);

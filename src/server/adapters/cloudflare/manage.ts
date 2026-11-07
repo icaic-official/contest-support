@@ -701,10 +701,10 @@ export class D1ManageService {
             EXISTS (SELECT 1 FROM event_deletions d WHERE d.event_id = e.id) AS deleting,
             (SELECT name FROM accounts WHERE id = ?) AS actor_name
           FROM events e WHERE e.id = ?`, actor, command.eventId)
-          .first<{ name: string; code: string | null; deleting: number; actor_name: string | null }>();
+          .first<{ name: string; code: string; deleting: number; actor_name: string | null }>();
         if (!row) throw new AuthenticationError(409, 'That event no longer exists. Refresh the page.');
         if (row.deleting === 1) throw new AuthenticationError(409, 'This event is already being deleted.');
-        const { label, text } = deletionConfirmation({ id: command.eventId, name: row.name, code: row.code });
+        const { label, text } = deletionConfirmation(row);
         if (text !== command.confirmName) throw new AuthenticationError(409, `The ${label} does not match. Type the event ${label} exactly.`);
         return {
           statements: fenceStatements(this.db, { id: actor, name: row.actor_name ?? '' }, command.eventId, row.name, crypto.randomUUID()),

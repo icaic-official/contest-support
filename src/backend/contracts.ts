@@ -56,13 +56,12 @@ export function parseHandle(text: string): Handle | undefined {
 }
 
 /**
- * The text that a webmaster types to delete an event: its name. A legacy event can have an empty
- * name and no code, so the code and then the ID stand in, and the text is never empty.
+ * The text that a webmaster types to delete an event: its name. An event from before `0006` can have
+ * an empty name, so its code stands in. A trigger gives every event a code, so the text is never empty.
  */
-export function deletionConfirmation(event: { readonly id: string; readonly name: string; readonly code: string | null }):
-  { readonly label: 'name' | 'code' | 'ID'; readonly text: string } {
-  if (event.name) return { label: 'name', text: event.name };
-  return event.code ? { label: 'code', text: event.code } : { label: 'ID', text: event.id };
+export function deletionConfirmation(event: { readonly name: string; readonly code: string }):
+  { readonly label: 'name' | 'code'; readonly text: string } {
+  return event.name ? { label: 'name', text: event.name } : { label: 'code', text: event.code };
 }
 
 export interface AccountIdentity {

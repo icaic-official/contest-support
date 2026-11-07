@@ -118,7 +118,7 @@ Phase 7 differs from this page and the sketches in these points:
 - Test cleanups call `removeFixtureEvent` in `eventDeletionFixture.ts`, or its three parts when a fixture must also clear R2 and Durable Objects. `D1Fixture` accounts have an explicit `event_id`, and the fixture accepts contests that a test added to its event. A site account in a local test stays in the temporary database. The hosted fixtures create no site account. `liveCredentials.test.ts` loses its test of a direct account delete, because `0024` refuses that delete. `eventDeletionCoverage.test.ts` covers the same cascade through the journal.
 - The new files that the module map does not list are `src/site/DeleteEventDialog.tsx`, `src/site/Deletions.tsx`, `src/server/adapters/cloudflare/eventDeletionFixture.ts`, `src/server/adapters/d1/eventDeletionHarness.ts`, `src/server/adapters/d1/foreignKeyIndexes.test.ts`, and `scripts/event-deletion-timing.mjs`.
 - The fence also deletes the `installation` row when it names the event's owner or contest, and not only the event. `0017` placed an owner by the majority of its memberships, so the row can name another event. No runtime code reads the row. `installation.ts` checks only that the table exists.
-- An event with an empty name confirms its deletion with its code, or with its ID when it has no code. A stored name has no length limit in the command.
+- An event with an empty name confirms its deletion with its code. An event can have an empty name, because `0006` added the column with an empty default. Every event has a code, because `0018` backfilled the column and a trigger fills it on insert. A stored name has no length limit in the command.
 - TODO(lead): the rehearsal of `0023` on an empty D1 database and on a `minsky-preview` copy.
 - TODO(lead): `PrivateBucket.list` on `minsky-preview-images`, and a real `/erase` on a Durable Object, as Delivery item 7 requires.
 - TODO(lead): the hosted timing of a 2,000-issue event with 80,000 history rows on `minsky-preview`, with `npm run perf:deletion -- --remote --database=<name>`.
@@ -496,7 +496,7 @@ The rule has these consequences:
 
 The goal is a deletion that is complete across D1, R2, and Durable Objects, safe to repeat after a crash at any point, and unable to remove or rewrite another event's records. A legacy seat that crosses events can cause two small writes outside the event. Item 4 names them.
 
-1. **Fence.** One batch, run by a webmaster after a typed confirmation of the event's name, or of its code or ID when it has no name (`fenceStatements` in the [type sketch](event-platform-sketches.md#type-sketch)):
+1. **Fence.** One batch, run by a webmaster after a typed confirmation of the event's name, or of its code when it has no name (`fenceStatements` in the [type sketch](event-platform-sketches.md#type-sketch)):
    - It inserts the journal row (`event_deletions`, step `rows`) and captures the targets by `event_id`. The targets are the contests, the accounts (never a NULL-event account), and the avatar owners.
    - It sets `events.archived = 1`. Both Workers already refuse writes for archived events (`src/server/adapters/cloudflare/application.ts:222`, `src/server/adapters/d1/store.ts:143`).
    - It deletes the legacy `installation` row when the row names this event, its contest, or its account, because the row would otherwise block the delete (`src/server/adapters/d1/migrations/0008_installation.sql:5-7`).

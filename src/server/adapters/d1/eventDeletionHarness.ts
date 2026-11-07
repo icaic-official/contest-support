@@ -1,12 +1,16 @@
 import { randomUUID } from 'node:crypto';
+import { afterAll, beforeAll, vi } from 'vitest';
 import { attachmentPath } from '../../../connected/imageFile';
 import type { Caller } from '../../authentication';
 import { avatarKey } from '../cloudflare/avatars';
-import type { DeletionEnvironment } from '../cloudflare/eventDeletion';
+import { advanceDeletions, advanceRows, fenceStatements, type DeletionEnvironment, type RowsProgress } from '../cloudflare/eventDeletion';
+import { removeFixtureEvent } from '../cloudflare/eventDeletionFixture';
 import type { PrivateBucket } from '../cloudflare/images';
 import { SessionLiveCoordinator, type LiveNamespace } from '../cloudflare/live';
+import { openStoreDatabase } from '../cloudflare/tooling/store-database.mjs';
 import { bound } from './assertions';
-import type { D1Connection, D1Statement, D1Value } from './connection';
+import type { D1Binding, D1Connection, D1Statement, D1Value } from './connection';
+import { applyMigrations } from './testFixture';
 
 const NOW = "strftime('%Y-%m-%dT%H:%M:%fZ', 'now')";
 const LATER = "strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '+1 hour')";
@@ -70,9 +74,10 @@ function identityStatements(db: D1Connection, account: SeededAccount, name: stri
 /**
  * Seeds one event through the columns that the Worker writes. The webmaster
  * acts in both contests, joins one, and holds a seat in another, as a promoted
- * development account can.
+ * development account can. Without `activity`, the event holds only its roster,
+ * for a test that activity cannot change. It then costs a third of the rows step.
  */
-export async function seedEvent(db: D1Connection, webmaster: SeededWebmaster): Promise<SeededEvent> {
+export async function seedEvent(db: D1Connection, webmaster: SeededWebmaster, activity = true): Promise<SeededEvent> {
   const ids: string[] = [];
   const id = (): string => {
     const value = randomUUID();
@@ -129,6 +134,7 @@ export async function seedEvent(db: D1Connection, webmaster: SeededWebmaster): P
     write(`INSERT INTO membership_roles (session_id, account_id, role) VALUES (?, ?, 'volunteer'), (?, ?, 'jury')`, practice, staff, live, staff),
     write(`INSERT INTO grants (account_id, scope, event_id, granted_by) VALUES (?, 'event', ?, ?)`, eventAdmin.accountId, eventId, site),
     write('INSERT INTO memberships (session_id, account_id, is_admin) VALUES (?, ?, 1)', practice, site),
+    ...(!activity ? [] : [
     write(`INSERT INTO issues (id, session_id, team_id, status, number, reporter, reporter_name, category, description, created_at, owner, owner_name)
       VALUES (?, ?, ?, 'claimed', 1, ?, 'Team one', 'Devices', 'Fictional issue', ${NOW}, ?, 'Volunteer'),
         (?, ?, ?, 'open', 2, ?, 'Team one', 'Devices', 'Fictional issue', ${NOW}, NULL, NULL),
@@ -200,6 +206,7 @@ export async function seedEvent(db: D1Connection, webmaster: SeededWebmaster): P
     write(`INSERT INTO audience_sequences (session_id, audience, sequence) VALUES (?, ?, 1) ON CONFLICT (session_id, audience) DO NOTHING`,
       practice, `team:${entry}`),
     write(`INSERT INTO notifications (id, session_id, audience, sequence) VALUES (?, ?, ?, 1)`, id(), practice, `team:${entry}`),
+    ]),
     // Set, join, and restore in one batch, so another test never reads the setting on.
     write(`INSERT INTO site_settings (singleton, restrict_webmaster_reads, changed_by) VALUES (1, 1, ?)
       ON CONFLICT (singleton) DO UPDATE SET restrict_webmaster_reads = 1`, site),
@@ -290,6 +297,9 @@ export function changedRows(before: ReadonlyMap<string, string[]>, after: Readon
   }
   return changes;
 }
+
+/** An event that holds only its roster. */
+export const seedRoster = (db: D1Connection, webmaster: SeededWebmaster): Promise<SeededEvent> => seedEvent(db, webmaster, false);
 
 /** An R2 bucket in memory. It can return short pages and an empty page, as R2 may. */
 export class FakeBucket implements Pick<PrivateBucket, 'list' | 'delete'> {
@@ -458,5 +468,119 @@ export function interceptCalls(db: D1Connection, hook: (sql: readonly string[], 
       await hook(items.map((item) => item.sql), items.map((item) => item.values));
       return db.batch(items.map((item) => item.statement));
     },
+  };
+}
+
+/**
+ * The states that a crash can leave: the start, and the state after each write. A crash before a read, or a
+ * write that never ran, leaves the same state as a lost response from the write before it. Later calls then
+ * start from that state, so a repeat of the same state proves nothing and only spends time.
+ */
+export const crashPoints = (writes: readonly number[]): Array<{ at: number; mode: CrashMode }> =>
+  [{ at: 1, mode: 'never ran' }, ...writes.map((at) => ({ at, mode: 'response lost' as const }))];
+
+const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/g;
+
+/**
+ * The database of one test file, and the steps of a deletion that its tests share. It registers the
+ * hooks that open and close the database, so read `db`, `webmaster`, and `tables` from `opened()` in a hook or a test.
+ */
+export function deletionSuite() {
+  const connectorConfig = process.env.MINSKY_CONNECTOR_D1_CONFIG;
+  const remote = Boolean(connectorConfig);
+  const configPath = connectorConfig ?? 'src/server/adapters/cloudflare/deploy/connector-store-ci.wrangler.jsonc';
+  // Each hosted request waits for the runner's reviewed interval.
+  vi.setConfig({ testTimeout: remote ? 3_600_000 : 300_000, hookTimeout: remote ? 600_000 : 120_000 });
+
+  let db: D1Binding;
+  let dispose: () => Promise<void>;
+  let webmaster: SeededWebmaster;
+  let tables: string[];
+
+  beforeAll(async () => {
+    const platform = await openStoreDatabase({ configPath, remoteBindings: remote });
+    db = platform.db;
+    dispose = platform.dispose;
+    if (!remote) await applyMigrations(db);
+    webmaster = await seedWebmaster(db);
+    tables = await tableNames(db);
+  });
+  afterAll(async () => { await dispose?.(); });
+
+  const actor = () => ({ id: webmaster.accountId, name: webmaster.name });
+  const rows = async <T>(sql: string, ...values: Array<string | number | null>) => (await bound(db, sql, ...values).all<T>()).results;
+
+  async function fence(connection: D1Connection, event: SeededEvent, typed = event.name): Promise<void> {
+    await connection.batch(fenceStatements(connection, actor(), event.eventId, typed, randomUUID()));
+  }
+
+  async function deleteRows(connection: D1Connection, event: Pick<SeededEvent, 'eventId'>, limit?: number): Promise<RowsProgress> {
+    for (;;) {
+      const progress = await advanceRows(connection, event.eventId, limit);
+      if (progress !== 'more') return progress;
+    }
+  }
+
+  /** The journal and targets of one event, which a finished test no longer needs. */
+  async function forget(event: Pick<SeededEvent, 'eventId'>): Promise<void> {
+    await db.batch([
+      bound(db, 'DELETE FROM event_deletion_targets WHERE event_id = ?', event.eventId),
+      bound(db, 'DELETE FROM event_deletions WHERE event_id = ?', event.eventId),
+    ]);
+  }
+
+  /**
+   * Ends a test's use of its events. A hosted database is shared and must not grow, so its rows go through the product's
+   * steps. A local database goes with its test file, so only the journal goes, because a tick claims any open journal.
+   */
+  async function cleanUp(...events: ReadonlyArray<Pick<SeededEvent, 'eventId'>>): Promise<void> {
+    for (const event of events) await (remote ? removeFixtureEvent(db, event.eventId) : forget(event));
+  }
+
+  /** The rows that still name this event, with each ID replaced by its seed position, so two seeds compare equal. */
+  async function footprint(event: SeededEvent): Promise<Record<string, string[]>> {
+    const found = rowsNaming(await readTables(db, tables), event.ids, maskedRow);
+    const position = new Map(event.ids.map((id, index) => [id, `<${index}>`]));
+    return Object.fromEntries([...found].map(([table, table_rows]) => [table, table_rows.map((row) =>
+      row.replaceAll(event.code, '<code>').replace(UUID, (id) => position.get(id) ?? '<uuid>')).sort()]));
+  }
+
+  /** One environment per test, so that each test reads its own files and live state. */
+  function stores(): { bucket: FakeBucket; live: FakeLiveNamespace; env: DeletionEnvironment } {
+    const bucket = new FakeBucket();
+    const live = new FakeLiveNamespace(db);
+    return { bucket, live, env: { DB: db, IMAGES: bucket, LIVE_UPDATES: live } };
+  }
+
+  async function finished(event: Pick<SeededEvent, 'eventId'>): Promise<boolean> {
+    return (await rows(`SELECT 1 FROM event_deletions WHERE event_id = ? AND step = 'done'`, event.eventId)).length > 0;
+  }
+
+  /** What a passing hour and an expired lease do, which a test cannot wait for. */
+  async function passTime(event: Pick<SeededEvent, 'eventId'>): Promise<void> {
+    await bound(db, `UPDATE event_deletions SET lease_until = 0,
+      rows_done_at = CASE WHEN rows_done_at IS NULL THEN NULL ELSE strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-66 minutes') END
+      WHERE event_id = ? AND finished_at IS NULL`, event.eventId).run();
+  }
+
+  /** Runs ticks until the deletion is done. Every step starts from the current state. */
+  async function runTicks(env: DeletionEnvironment, event: Pick<SeededEvent, 'eventId'>): Promise<void> {
+    for (let tick = 0; tick < 100; tick += 1) {
+      await passTime(event);
+      await advanceDeletions(env);
+      if (await finished(event)) return;
+    }
+    throw new Error('The deletion did not finish.');
+  }
+
+  /** Fences unless a journal row exists, then runs ticks until the deletion is done. */
+  async function runToEnd(env: DeletionEnvironment, event: SeededEvent): Promise<void> {
+    if (!(await rows('SELECT 1 FROM event_deletions WHERE event_id = ?', event.eventId)).length) await fence(env.DB, event);
+    await runTicks(env, event);
+  }
+
+  return {
+    opened: () => ({ db, webmaster, tables }),
+    actor, rows, fence, deleteRows, forget, cleanUp, footprint, stores, finished, passTime, runTicks, runToEnd,
   };
 }

@@ -212,6 +212,13 @@ export function useSessionSnapshot(userId: string): SessionData {
   useEffect(() => {
     if (!sessionId || !several) return;
     if (contestOfSearch(location.search) === sessionId) return;
+    // `BrowserRouter` renders a navigation in a transition, after `history` has
+    // written it. A replace from this older location would overwrite that entry,
+    // so wait: the `location` dependency runs this again when it commits. The hash
+    // stays out, because the skip link writes one that the router never sees.
+    if (location.pathname !== window.location.pathname || location.search !== window.location.search) {
+      return;
+    }
     const state: unknown = location.state;
     void navigate(
       {

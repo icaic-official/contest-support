@@ -110,6 +110,9 @@ export const ACCOUNT_ROWS_IN_A_CONTEST = [
  */
 export const ACCOUNT_OWN_ROWS = ['grants', 'logins', 'manage_receipts'] as const;
 
+const ROWS_IN_A_CONTEST_SQL = ACCOUNT_ROWS_IN_A_CONTEST.map(({ table, column, scoped }) =>
+  `EXISTS (SELECT 1 FROM ${table} WHERE ${column} IN (SELECT value FROM json_each(?2))${scoped})`).join(' OR ');
+
 /** D1's foreign key error names no row, so the caller retries one account at a time to find it. */
 function isBlockingFailure(error: unknown): boolean {
   return isAssertionFailure(error) || (error instanceof Error && error.message.includes('FOREIGN KEY constraint failed'));
@@ -120,10 +123,7 @@ function accountStatements(db: D1Connection, eventId: string, ids: readonly stri
   const inChunk = 'IN (SELECT value FROM json_each(?))';
   const assertionId = crypto.randomUUID();
   return [
-    // The contests of this event are gone, so a remaining seat is in another event.
-    // The account's delete would cascade into that seat, and no foreign key refuses it.
-    bound(db, `INSERT INTO command_assertions (id, valid) VALUES (?, CASE WHEN
-      EXISTS (SELECT 1 FROM memberships WHERE account_id ${inChunk}) THEN 0 ELSE 1 END)`, assertionId, chunk),
+    bound(db, `INSERT INTO command_assertions (id, valid) VALUES (?1, CASE WHEN ${ROWS_IN_A_CONTEST_SQL} THEN 0 ELSE 1 END)`, assertionId, chunk),
     // Without this, an admin in this chunk who reset a contestant in a later chunk fails its
     // key and looks blocked. An operation on an account outside the targets still blocks.
     bound(db, `DELETE FROM account_operations WHERE actor ${inChunk}
@@ -143,7 +143,7 @@ function accountStatements(db: D1Connection, eventId: string, ids: readonly stri
   ];
 }
 
-/** True when the batch committed. False when a key or a seat in another event refused it. */
+/** True when the batch committed. False when a key or a contest row in another event refused it. */
 async function tryDeleteAccounts(db: D1Connection, eventId: string, ids: readonly string[]): Promise<boolean> {
   try {
     await db.batch(accountStatements(db, eventId, ids));
@@ -173,8 +173,8 @@ async function deleteAccounts(db: D1Connection, eventId: string, ids: readonly s
  * so a repeat after a crash finds nothing left of what committed.
  *   contests: a chunk of one activity table per unit, then the contest row, whose cascade removes
  *             its entries, seats, and other roster-sized rows.
- *   accounts: a chunk per batch. A key or seat in another event blocks the deletion, and nothing
- *             outside the targets is deleted.
+ *   accounts: a chunk per batch. A key or a contest row in another event blocks the deletion, and
+ *             nothing outside the targets is deleted.
  *   event:    the events row, whose cascade removes its entrants, event grants, and event audit.
  * `limit` replaces every chunk size, so a test can stop between any two rows.
  */

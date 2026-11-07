@@ -147,7 +147,8 @@ export function ConnectedApp() {
         canChangeUsername={status.can_change_handle}
         refreshAccount={account.refresh}
         changePassword={() => {
-          navigate("/account");
+          // This unmounts the workspace. Its hook reads the contest from the address when it mounts again.
+          navigate({ pathname: "/account", search });
           setPasswordSetup(true);
         }}
         signOut={auth.signOut}

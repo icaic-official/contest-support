@@ -23,6 +23,15 @@ async function signIn(page: Page, username = "contestant") {
 
 const focusEvent = (page: Page) => page.evaluate(() => window.dispatchEvent(new Event("focus")));
 
+/**
+ * The router commits a replace after the address changes. The wait gives the
+ * commit a few frames, so that any focus move it causes happens before the check.
+ */
+const settle = (page: Page) =>
+  page.evaluate(
+    () => new Promise<void>((done) => requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(done, 250)))),
+  );
+
 const trigger = (page: Page) =>
   page.getByRole("button", { name: /^Contest session: .* Change session$/ });
 const triggerFor = (page: Page, name: string) =>
@@ -263,6 +272,61 @@ test.describe("a contestant with several contests", () => {
     await expect(page).toHaveURL((url) => url.hash === "#main");
     await choose(page, "Alpha");
     await expect(page).toHaveURL((url) => url.pathname === "/issues" && url.searchParams.get("contest") === ids.next);
+  });
+});
+
+test.describe("the password form on the account page while the contests change", () => {
+  async function typeInNewPassword(page: Page) {
+    await page.getByRole("button", { name: /^Account menu for/ }).click();
+    await page.getByRole("menuitem", { name: "Change password" }).click();
+    const current = page.getByLabel("Current password", { exact: true });
+    await expect(current).toBeFocused();
+    const fresh = page.getByLabel("New password", { exact: true });
+    await fresh.click();
+    await fresh.pressSequentially("abc");
+    return { current, fresh };
+  }
+
+  async function typeMore({ current, fresh }: Awaited<ReturnType<typeof typeInNewPassword>>, page: Page) {
+    await settle(page);
+    await expect(fresh).toBeFocused();
+    await page.keyboard.type("XYZ");
+    await expect(fresh).toHaveValue("abcXYZ");
+    await expect(current).toHaveValue("");
+  }
+
+  test("keeps the focus in New password when a second contest adds the contest to the address", async ({ page, local }) => {
+    await signIn(page);
+    await expect(page).toHaveURL((url) => url.search === "");
+    const fields = await typeInNewPassword(page);
+    await local.seatContestantInSecondSession();
+    await focusEvent(page);
+    await expect(page).toHaveURL((url) => url.searchParams.has("contest"));
+    await typeMore(fields, page);
+  });
+
+  test("keeps the focus in New password when the selected contest is lost and the address changes", async ({ page, local }) => {
+    const ids = await three(local);
+    await signIn(page);
+    await at(page, "/issues", ids.running);
+    const fields = await typeInNewPassword(page);
+    await local.run("DELETE FROM memberships WHERE session_id = ? AND account_id = ?", ids.running, local.users.contestant);
+    await focusEvent(page);
+    await at(page, "/account", ids.next, "#security");
+    await typeMore(fields, page);
+  });
+
+  test("places the focus on the section of a deep link, although the screen arrives after the address is written", async ({ page, local }) => {
+    await three(local);
+    await signIn(page);
+    // The first read ends and writes ?contest= while the contestant screen still downloads.
+    await page.route(/\/src\/contestant\/ContestantApp\.tsx/, async (route) => {
+      await new Promise((done) => setTimeout(done, 1500));
+      await route.fallback();
+    });
+    await page.goto("/account#security");
+    await expect(page.locator("#security")).toBeFocused();
+    await expect(page).toHaveURL((url) => url.hash === "#security" && url.searchParams.has("contest"));
   });
 });
 

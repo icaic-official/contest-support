@@ -63,8 +63,14 @@ const ROSTER_SIZED = ['audience_sequences', 'credential_scopes', 'grants', 'memb
 /** Under a contest, the tables whose rows go with a chunk of their parent, and not with the contest row. */
 const CHUNKED_WITH_A_PARENT = ['announcement_image_deletions', 'announcement_images', 'awards', 'command_receipts', 'history', 'image_deletions', 'issue_images', 'resolutions'];
 
-/** A column that names an event, a contest, or an account. */
-const NAMING_COLUMN = /^(?:event_id|session_id|contest_id|account_id|owner_account_id|actor|owner|reporter|author|uploader|target|userId|\w+_by)$/;
+/**
+ * Directly under an event, the tables that the event row's own cascade removes in one statement.
+ * Their size follows the roster and the commands that people send, and not the activity of a contest.
+ */
+const UNDER_THE_EVENT_ROW = ['authority_audit', 'entrants'];
+
+/** A column that names an event, a contest, an account, or a row that lives under one of those. */
+const NAMING_COLUMN = /^(?:event_id|session_id|contest_id|account_id|owner_account_id|issue_id|team_id|entrant_id|resolution_id|announcement_id|actor|owner|reporter|author|uploader|target|userId|\w+_by)$/;
 
 /** Tables with such a column that no foreign key chain reaches, and that a deletion still covers. */
 const OUTSIDE_THE_CHAINS = new Set([
@@ -189,6 +195,8 @@ describe('event deletion coverage', () => {
     expect(coverageGaps(['new_table'], new Set(), new Set(['new_table']))).toEqual(['new_table: no chain reaches it']);
     expect(coverageGaps(['new_table'], new Set(['new_table']), new Set(['new_table']))).toEqual([]);
     expect(NAMING_COLUMN.test('session_id')).toBe(true);
+    expect(NAMING_COLUMN.test('issue_id')).toBe(true);
+    expect(NAMING_COLUMN.test('team_id')).toBe(true);
     expect(NAMING_COLUMN.test('deleted_by')).toBe(true);
     expect(NAMING_COLUMN.test('name')).toBe(false);
   });
@@ -196,6 +204,12 @@ describe('event deletion coverage', () => {
   it('classifies every table that a contest delete cascades into, so a new one must choose', async () => {
     const classified = [...CONTEST_ACTIVITY.map(({ table }) => table), ...ROSTER_SIZED, ...CHUNKED_WITH_A_PARENT].sort();
     expect([...await cascadeChildren(db, tables, 'sessions')].sort()).toEqual(classified);
+  });
+
+  it('classifies every table that an event delete cascades into, so a new one must choose', async () => {
+    const underContests = await cascadeChildren(db, tables, 'sessions');
+    const underEvents = [...await cascadeChildren(db, tables, 'events')].filter((table) => table !== 'sessions' && !underContests.has(table)).sort();
+    expect(underEvents).toEqual(UNDER_THE_EVENT_ROW);
   });
 
   it('classifies every table that an account delete cascades into as a block or as its own data', async () => {

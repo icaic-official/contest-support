@@ -23,7 +23,9 @@ interface PickerProps {
 /**
  * A row's name on the first line, and its start time and intake note on the
  * second. The note is text, so a screen reader reads it too. The name breaks
- * anywhere, because a long name must not widen a narrow phone screen.
+ * anywhere, because a long name must not widen a narrow phone screen. The
+ * second line takes the text color of a focused menu row, because the muted
+ * color falls below 4.5:1 on that row's background.
  */
 function RowLines({ row }: { row: ContestRow }) {
   const detail = rowDetail(row);
@@ -33,7 +35,7 @@ function RowLines({ row }: { row: ContestRow }) {
       {detail !== null && (
         <span
           className={cn(
-            "text-xs",
+            "text-xs in-focus:text-accent-foreground",
             row.open ? "font-medium text-foreground" : "text-muted-foreground",
           )}
         >

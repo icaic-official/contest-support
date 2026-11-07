@@ -189,6 +189,24 @@ test.describe('deleting an event', () => {
     await expect(next).toBeFocused();
   });
 
+  test('shows two spaces in a row, so typing the name as shown enables the action', async ({ page, local }) => {
+    const name = await newEvent(local, 'Two  spaces');
+    await openSite(page);
+    await page.getByRole('button', { name: new RegExp(`^Delete Two\\s+spaces ${name.slice(-8)}$`) }).click();
+    const dialog = page.getByRole('dialog');
+    await expect(dialog).toBeVisible();
+    expect(await dialog.getByRole('heading').innerText()).toBe(`Delete ${name}?`);
+    const hint = dialog.getByText(/^The name is:/);
+    const selected = await hint.evaluate((element) => {
+      const selection = window.getSelection();
+      selection?.selectAllChildren(element);
+      return selection?.toString() ?? '';
+    });
+    expect(selected).toBe(`The name is: ${name}`);
+    await dialog.getByLabel('Type the event name to confirm').fill(selected.replace('The name is: ', ''));
+    await expect(dialog.getByRole('button', { name: 'Delete event', exact: true })).toBeEnabled();
+  });
+
   for (const width of [320, 390]) {
     test(`keeps a side gutter and wraps a long unbroken name at ${width} pixels`, async ({ page, local }, testInfo) => {
       await page.setViewportSize({ width, height: 720 });

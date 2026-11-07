@@ -87,19 +87,20 @@ export function canOpenPage(page: WorkspacePage, member: Membership): boolean {
 /** Router state that asks the next page to focus one control. */
 interface FocusRequest {
   focusId: string;
+  /** Tells two requests for the same control apart. */
+  token: string;
 }
 
 /** The state to pass to `navigate` so that the page focuses the control with this ID. */
 export function focusRequest(focusId: string): FocusRequest {
-  return { focusId };
+  return { focusId, token: crypto.randomUUID() };
 }
 
-/** The control that the location asks the page to focus, if any. */
-export function requestedFocusId(state: unknown): string | undefined {
-  if (typeof state !== "object" || state === null || !("focusId" in state)) {
-    return undefined;
-  }
-  return typeof state.focusId === "string" ? state.focusId : undefined;
+/** The focus request that the location asks for, if any. */
+export function requestedFocus(state: unknown): FocusRequest | undefined {
+  if (typeof state !== "object" || state === null) return undefined;
+  const { focusId, token } = state as Partial<Record<keyof FocusRequest, unknown>>;
+  return typeof focusId === "string" && typeof token === "string" ? { focusId, token } : undefined;
 }
 
 /**

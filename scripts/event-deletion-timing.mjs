@@ -4,6 +4,7 @@ import { spawnSync } from 'node:child_process';
 import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
+import { performance } from 'node:perf_hooks';
 import process from 'node:process';
 import { pathToFileURL } from 'node:url';
 import { repositoryRoot } from '../src/server/adapters/cloudflare/tooling/configuration.mjs';

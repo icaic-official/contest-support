@@ -41,6 +41,9 @@ export function NoSessionAccess({
   onRetry?: (() => void) | undefined;
 }) {
   const { sessions, sessionId, loaded, refreshError } = data;
+  // A read that has chosen no contest can already hold the list. A select with
+  // no matching row shows its first row, which the person did not choose.
+  const canChoose = sessions.length > 1 && sessionId !== "";
   const [refreshing, setRefreshing] = useState(false);
   const access = (
     <Card className="w-full max-w-md">
@@ -56,7 +59,7 @@ export function NoSessionAccess({
             : "No session data is available. If your account was just created, ask an organizer to assign your membership."}
         </CardDescription>
       </CardHeader>
-      {(refreshError || error || sessions.length > 1) && (
+      {(refreshError || error || canChoose) && (
         <CardContent className="grid gap-4">
           {refreshError && (
             <Alert variant="destructive">
@@ -68,7 +71,7 @@ export function NoSessionAccess({
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}
-          {sessions.length > 1 && (
+          {canChoose && (
             <ContestPicker
               variant="select"
               label="Contest session"

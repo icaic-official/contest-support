@@ -117,11 +117,14 @@ test.describe("a webmaster", () => {
     const release = await holdContestList(page);
     const scripts = watchScripts(page);
     await page.goto("/site");
-    await expect(page.getByRole("status").filter({ hasText: "Loading…" })).toBeVisible();
+    await expect(page.getByRole("status").filter({ hasText: /^Loading/ })).toBeVisible();
     expect(new URL(page.url()).pathname).toBe("/site");
     expect(scripts.filter((script) => levelScreens.test(script))).toEqual([]);
     release();
+    // The refusal page has the same heading, so only the page's own sentence tells the two apart.
     await expect(page.getByRole("heading", { level: 1, name: "Site" })).toBeVisible();
+    await expect(page.getByText("The events, the webmasters, and the site setting.")).toBeVisible();
+    await expect(page.getByText("Only a webmaster can open the site page.")).toHaveCount(0);
     expect(new URL(page.url()).pathname).toBe("/site");
   });
 });
@@ -139,7 +142,7 @@ test.describe("an event admin", () => {
     const release = await holdContestList(page);
     const scripts = watchScripts(page);
     await page.goto("/event");
-    await expect(page.getByRole("status").filter({ hasText: "Loading…" })).toBeVisible();
+    await expect(page.getByRole("status").filter({ hasText: /^Loading/ })).toBeVisible();
     expect(new URL(page.url()).pathname).toBe("/event");
     expect(scripts.filter((script) => levelScreens.test(script))).toEqual([]);
     release();

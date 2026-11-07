@@ -837,6 +837,10 @@ describe('event deletion', () => {
   });
 
   describe('the budget', () => {
+    /** The log lines of failed attempts. The local runtime also writes its own text to the console. */
+    const failureLines = (logged: { mock: { calls: unknown[][] } }): object[] => logged.mock.calls.map(([line]) => String(line))
+      .filter((line) => line.startsWith('{')).map((line) => JSON.parse(line) as object);
+
     it('stops at its count of calls, and later ticks finish', async () => {
       const event = await seedEvent(db, webmaster);
       const { bucket, live, env } = stores();
@@ -885,14 +889,74 @@ describe('event deletion', () => {
         },
         delete: (keys) => bucket.delete(keys),
       } })).rejects.toThrow('requires another attempt');
-      expect(logged.mock.calls.map(([line]) => JSON.parse(String(line)) as object))
-        .toContainEqual(expect.objectContaining({ event: 'deletion.advance_failed', eventId: failing.eventId }));
+      expect(failureLines(logged)).toContainEqual(expect.objectContaining({ eventId: failing.eventId, phase: 'files', cause: 'other' }));
       logged.mockRestore();
       expect(await finished(other)).toBe(true);
       expect(await finished(failing)).toBe(false);
       await runToEnd(env, failing);
       await forget(failing);
       await forget(other);
+    });
+
+    it('logs fixed words for a key failure that D1 hides, and no text of the error', async () => {
+      const event = await seedEvent(db, webmaster);
+      const other = await seedEvent(db, webmaster);
+      const historyId = randomUUID();
+      const issue = (await rows<{ id: string }>('SELECT id FROM issues WHERE session_id = ? LIMIT 1', other.live))[0]!.id;
+      await bound(db, `INSERT INTO history (id, issue_id, actor, actor_name, at, text, visibility)
+        VALUES (?, ?, ?, 'Legacy', strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), 'Legacy', 'public')`, historyId, issue, event.volunteer.accountId).run();
+      await fence(db, event);
+      // Hosted D1 can answer any failure with this message, so nothing here names the key.
+      const hiding: D1Connection = {
+        prepare: (sql) => db.prepare(sql),
+        batch: async (statements) => {
+          try {
+            return await db.batch(statements);
+          } catch (error) {
+            if ((error as Error).message.includes('FOREIGN KEY')) throw new Error('internal error; reference = Fictional Person');
+            throw error;
+          }
+        },
+      };
+      const logged = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      await expect(advanceDeletions({ ...stores().env, DB: hiding })).rejects.toThrow('requires another attempt');
+      const lines = failureLines(logged);
+      logged.mockRestore();
+      expect(lines).toEqual([{
+        level: 'error', event: 'deletion.advance_failed', task: 'advance-deletions', eventId: event.eventId,
+        phase: 'accounts', cause: 'internal', errorName: 'Error',
+      }]);
+      expect(await rows('SELECT blocked FROM event_deletions WHERE event_id = ?', event.eventId)).toEqual([{ blocked: null }]);
+      await bound(db, 'DELETE FROM history WHERE id = ?', historyId).run();
+      await passTime(event);
+      expect(await deleteRows(db, event)).toBe('rows_done');
+      await runToEnd(stores().env, other);
+      await forget(event);
+      await forget(other);
+    });
+
+    it('logs the last batch for a key that fails when that batch commits, and sets no block', async () => {
+      const [eventId, otherId, contest, entrant] = [randomUUID(), randomUUID(), randomUUID(), randomUUID()];
+      await db.batch([
+        bound(db, `INSERT INTO events (id, name) VALUES (?, 'Deferred'), (?, 'Deferred other')`, eventId, otherId),
+        bound(db, `INSERT INTO sessions (id, event_id, name) VALUES (?, ?, 'Moved')`, contest, eventId),
+        bound(db, `INSERT INTO entrants (id, event_id, kind, name) VALUES (?, ?, 'team', 'Team')`, entrant, eventId),
+        bound(db, `INSERT INTO teams (id, session_id, name, entrant_id) VALUES (?, ?, 'Team', ?)`, randomUUID(), contest, entrant),
+        // No Worker command does this. It stands for a team of another event that names this event's entrant.
+        bound(db, 'UPDATE sessions SET event_id = ? WHERE id = ?', otherId, contest),
+      ]);
+      await db.batch(fenceStatements(db, actor(), eventId, 'Deferred', randomUUID()));
+      const logged = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      await expect(advanceDeletions(stores().env)).rejects.toThrow('requires another attempt');
+      const lines = failureLines(logged);
+      logged.mockRestore();
+      expect(lines).toEqual([expect.objectContaining({ eventId, phase: 'event', cause: expect.stringMatching(/^(?:foreign_key|internal)$/) as string })]);
+      expect(await rows('SELECT step, blocked FROM event_deletions WHERE event_id = ?', eventId)).toEqual([{ step: 'rows', blocked: null }]);
+      await bound(db, 'UPDATE sessions SET event_id = ? WHERE id = ?', eventId, contest).run();
+      await passTime({ eventId });
+      expect(await deleteRows(db, { eventId })).toBe('rows_done');
+      await removeFixtureEvent(db, otherId);
+      await forget({ eventId });
     });
   });
 

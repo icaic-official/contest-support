@@ -236,7 +236,7 @@ export function useSessionSnapshot(userId: string): SessionData {
         search: searchWithContest(location.search, sessionId),
         hash: location.hash,
       },
-      { replace: true, state, preventScrollReset: true },
+      { replace: true, state },
     );
   }, [location, navigate, sessionId, several]);
   const selectSession = useCallback((next: string) => {

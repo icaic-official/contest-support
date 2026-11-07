@@ -61,9 +61,7 @@ export function defaultContest(ordered: readonly ContestSummary[], now: number):
   const withReason = (reason: IntakeReason) => open.find((contest) => contest.intake.reason === reason);
   const taking = withReason("running") ?? withReason("grace") ?? open[0];
   if (taking) return taking;
-  const next = ordered.find(
-    (contest) => contest.schedule && contest.intake.reason !== "ended" && endsAt(contest) > now,
-  );
+  const next = ordered.find((contest) => contest.intake.reason !== "ended" && endsAt(contest) > now);
   if (next) return next;
   let latest: ContestSummary | undefined;
   for (const contest of ordered) {

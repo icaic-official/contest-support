@@ -222,6 +222,14 @@ describe("defaultContest", () => {
     expect(defaultContest(list, base)?.id).toBe("waiting");
   });
 
+  it("opens the scheduled contest that ended last, not an unscheduled one, when nothing is left to wait for", () => {
+    const list = orderContests([
+      contest("past", { hours: [-30, -26], reason: "ended" }),
+      contest("bare", { name: "Bare", reason: "override_closed" }),
+    ]);
+    expect(defaultContest(list, base)?.id).toBe("past");
+  });
+
   it("falls back to the first listed contest when none has a schedule or an open intake", () => {
     const list = orderContests([
       contest("b", { name: "Beta", reason: "override_closed" }),

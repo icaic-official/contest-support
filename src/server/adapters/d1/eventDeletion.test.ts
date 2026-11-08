@@ -905,4 +905,39 @@ describe('event deletion', () => {
       await forget(event);
     });
   });
+
+  describe('the delete guards', () => {
+    const adHocDeletes = (event: SeededEvent) => [
+      ['DELETE FROM events WHERE id = ?', event.eventId, /event is deleted only through its deletion record/],
+      ['DELETE FROM sessions WHERE id = ?', event.live, /contest is deleted only through the deletion of its event/],
+      ['DELETE FROM accounts WHERE id = ?', event.contestant.accountId, /account is deleted only through the deletion of its event/],
+    ] as const;
+
+    it('refuses an ad hoc delete of an event, a contest, or an event account', async () => {
+      const event = await seedRoster(db, webmaster);
+      for (const [sql, id, refusal] of adHocDeletes(event)) await expect(bound(db, sql, id).run()).rejects.toThrow(refusal);
+      expect(await rows('SELECT 1 FROM accounts WHERE id = ?', event.contestant.accountId)).toHaveLength(1);
+      await fence(db, event);
+      await deleteRows(db, event);
+      expect(await rows('SELECT 1 FROM accounts WHERE event_id = ?', event.eventId)).toEqual([]);
+      await forget(event);
+    });
+
+    it('never deletes a site account, even while a deletion is in step rows', async () => {
+      const event = await seedRoster(db, webmaster);
+      await fence(db, event);
+      await expect(bound(db, 'DELETE FROM accounts WHERE id = ?', webmaster.accountId).run())
+        .rejects.toThrow(/account is deleted only through the deletion of its event/);
+      expect(await rows('SELECT 1 FROM accounts WHERE id = ?', webmaster.accountId)).toHaveLength(1);
+      await cleanUp(event);
+    });
+
+    it('keeps refusing deletes in another event while one event is in step rows', async () => {
+      const event = await seedRoster(db, webmaster);
+      const other = await seedRoster(db, webmaster);
+      await fence(db, event);
+      for (const [sql, id, refusal] of adHocDeletes(other)) await expect(bound(db, sql, id).run()).rejects.toThrow(refusal);
+      await cleanUp(event, other);
+    });
+  });
 });

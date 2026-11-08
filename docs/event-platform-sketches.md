@@ -1084,7 +1084,7 @@ export function recoverWebmaster(db: D1Connection, input: { handle: string }):
 
 ## Migration sketch
 
-This SQL file is a sketch of D1 migrations `0017` to `0024`, with a marker line before each file, and no migration in the repository holds it yet.
+This SQL file is a sketch of D1 migrations `0017` to `0024`, with a marker line before each file. The repository migrations `0017` to `0024` implement it, and where they differ, the repository files are authoritative.
 
 ```sql
 -- D1 migration sketch for the webmaster, event, and contest platform. Not implemented.

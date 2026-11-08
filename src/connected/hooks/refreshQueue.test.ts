@@ -10,6 +10,22 @@ function gate() {
   return { open, opened };
 }
 
+/** Waits until every callback that is already pending has run. */
+function flush() {
+  return new Promise<void>((resolve) => setTimeout(resolve, 0));
+}
+
+/** True when `promise` settles without anything else happening first. */
+async function settles(promise: Promise<unknown>) {
+  let settled = false;
+  void promise.then(
+    () => (settled = true),
+    () => (settled = true),
+  );
+  await flush();
+  return settled;
+}
+
 describe("refresh queue", () => {
   it("runs reads one at a time, in order", async () => {
     const queue = createRefreshQueue();
@@ -59,18 +75,38 @@ describe("refresh queue", () => {
     expect(reads).toBe(2);
   });
 
-  it("does not share a read across scopes", async () => {
+  it("runs a read of a newer scope while a read of an older scope hangs", async () => {
     const queue = createRefreshQueue();
-    const first = gate();
+    const hung = gate();
     const reads: number[] = [];
-    const blocker = queue.read(1, () => first.opened);
+    const blocker = queue.read(1, () => hung.opened);
     await Promise.resolve();
     const old = queue.read(1, async () => void reads.push(1));
     const next = queue.read(2, async () => void reads.push(2));
     expect(next).not.toBe(old);
+    expect(await settles(next)).toBe(true);
+    expect(reads).toEqual([2]);
+    hung.open();
+    await Promise.all([blocker, old]);
+    expect(reads).toEqual([2, 1]);
+  });
+
+  it("keeps the reads of a newer scope in order while a read of an older scope hangs", async () => {
+    const queue = createRefreshQueue();
+    void queue.read(1, () => gate().opened);
+    const log: string[] = [];
+    const first = gate();
+    const a = queue.read(2, async () => {
+      log.push("a start");
+      await first.opened;
+      log.push("a end");
+    });
+    await flush();
+    const b = queue.read(2, async () => void log.push("b start"));
+    expect(log).toEqual(["a start"]);
     first.open();
-    await Promise.all([blocker, old, next]);
-    expect(reads).toEqual([1, 2]);
+    await Promise.all([a, b]);
+    expect(log).toEqual(["a start", "a end", "b start"]);
   });
 
   it("runs queued work after the reads that came before it", async () => {
@@ -81,16 +117,22 @@ describe("refresh queue", () => {
       await first.opened;
       log.push("read");
     });
-    const applied = queue.after(() => log.push("apply"));
+    const applied = queue.after(1, () => log.push("apply"));
     first.open();
     await applied;
     expect(log).toEqual(["read", "apply"]);
   });
 
+  it("runs work of a newer scope while a read of an older scope hangs", async () => {
+    const queue = createRefreshQueue();
+    void queue.read(1, () => gate().opened);
+    expect(await settles(queue.after(2, () => undefined))).toBe(true);
+  });
+
   it("keeps running after work throws", async () => {
     const queue = createRefreshQueue();
     await expect(
-      queue.after(() => {
+      queue.after(1, () => {
         throw new Error("boom");
       }),
     ).rejects.toThrow("boom");

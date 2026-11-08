@@ -104,18 +104,18 @@ export function useSessionSnapshot(userId: string): SessionData {
   const [queue] = useState(createRefreshQueue);
   const refresh = useCallback(() => {
     const run = generation.current;
-    // Serialize reads so an older Realtime response cannot overwrite a newer
-    // revision. A write waits for its own refresh before enabling controls.
-    // A read that has not started yet serves every caller that arrives before it starts.
+    // Serialize the reads of one generation so an older Realtime response
+    // cannot overwrite a newer revision. A read of a newer generation does not
+    // wait for an older one. A write waits for its own refresh before enabling
+    // controls. A read that has not started yet serves every caller that
+    // arrives before it starts.
     return queue.read(run, async () => {
       // Set when the list arrives, so that a failed snapshot read can still show it.
       let listed: { list: SessionSummary[]; nextSession: string } | undefined;
       try {
         const list = orderContests(await backend.workflows.contests());
         // A read that a change of contest or a remount has made stale reads no
-        // snapshot. The queue runs the next read only when this one ends, and a
-        // snapshot read that hangs would hold the list of that next read. A read
-        // that goes stale during its snapshot read still holds the queue.
+        // snapshot, because nothing would show it.
         if (run !== generation.current) return;
         // Only a listed ID reaches the snapshot read and the live channel.
         const isListed = (id: string) => list.some((s) => s.id === id);
@@ -168,7 +168,7 @@ export function useSessionSnapshot(userId: string): SessionData {
   const applySnapshot = useCallback(
     (forSession: string, next: Snapshot) => {
       const run = generation.current;
-      return queue.after(() => {
+      return queue.after(run, () => {
         if (run !== generation.current || forSession !== sessionId) return false;
         if (!next.membership) return false;
         const at = Date.parse(next.server_time);

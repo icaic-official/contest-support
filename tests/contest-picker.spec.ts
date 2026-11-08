@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { Locator, Page } from "@playwright/test";
+import type { Locator, Page, Request } from "@playwright/test";
 import { contrastOf } from "./support/contrast";
 import { addContestAt, addLaterContest, confirmExtraTime, endRunningContest, seatThreeContests } from "./support/contests";
 import { type LocalWorker, expect, test } from "./support/localWorker";
@@ -240,33 +240,64 @@ test.describe("a contestant with several contests", () => {
     await expect(trigger(page)).toBeVisible();
   });
 
-  // The person picks another contest while a list read of the open contest is in
-  // flight. That read is stale when its list arrives. It must read no snapshot of
-  // the contest that the person left, because the next read waits behind it.
-  // The test counts from the release, so a read that ran before the pick adds nothing.
-  test("reads no snapshot of the contest that the person left while a list read was in flight", async ({ page, local }) => {
+  // The person picks another contest while a list read of the open contest hangs.
+  // The read of the picked contest must not wait for it. The held read is stale
+  // when its list arrives, so it must read no snapshot of the contest that the
+  // person left. The count starts after the picked contest has loaded.
+  test("opens the picked contest while a list read hangs, and reads no snapshot of the contest that the person left", async ({ page, local }) => {
     const ids = await three(local);
     await signIn(page);
     await at(page, "/issues", ids.running);
-    let held = 0;
+    const held: Request[] = [];
     let release: () => void = () => undefined;
     const gate = new Promise<void>((resolve) => (release = resolve));
     await page.route("**/api/contests*", async (route) => {
-      if (held++ === 0) await gate;
+      if (held.length === 0) {
+        held.push(route.request());
+        await gate;
+      }
       await route.fallback();
     });
     const reads = await watchReads(page);
     await focusEvent(page);
-    await expect.poll(() => held).toBeGreaterThan(0);
+    await expect.poll(() => held.length).toBe(1);
     await trigger(page).click();
     await page.getByRole("menuitemradio", { name: /^Alpha/ }).click();
-    await expect(page.getByText("Loading your contest session…")).toBeVisible();
+    await expect(triggerFor(page, "Alpha")).toBeVisible();
+    await expect(page.getByText("Loading your contest session…")).toBeHidden();
     const before = reads.snapshots.length;
     release();
+    await (await held[0]?.response())?.finished();
+    await settle(page);
+    expect(reads.snapshots.slice(before)).not.toContain(ids.running);
     await expect(triggerFor(page, "Alpha")).toBeVisible();
-    const after = reads.snapshots.slice(before);
-    expect(after).toContain(ids.next);
-    expect(after).not.toContain(ids.running);
+  });
+
+  // The person picks another contest while a snapshot read of the open contest
+  // hangs. The read of the picked contest must not wait for it, and the held
+  // read must show nothing when it ends.
+  test("opens the picked contest while a snapshot read of the open contest hangs", async ({ page, local }) => {
+    const ids = await three(local);
+    await signIn(page);
+    await at(page, "/issues", ids.running);
+    const reads = await holdSnapshotReads(page, ids.running);
+    await focusEvent(page);
+    await expect.poll(reads.held).toBeGreaterThan(0);
+    await trigger(page).click();
+    await page.getByRole("menuitemradio", { name: /^Alpha/ }).click();
+    await expect(triggerFor(page, "Alpha")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "No reports yet" })).toBeVisible();
+    await expect(page.getByText("Loading your contest session…")).toBeHidden();
+    await at(page, "/issues", ids.next);
+    const stale = page.waitForResponse((response) => {
+      const url = new URL(response.url());
+      return url.pathname === "/api/snapshot" && url.searchParams.get("sessionId") === ids.running;
+    });
+    reads.release();
+    await (await stale).finished();
+    await settle(page);
+    await expect(triggerFor(page, "Alpha")).toBeVisible();
+    await at(page, "/issues", ids.next);
   });
 
   test("keeps another parameter of the address when it writes the contest", async ({ page, local }) => {

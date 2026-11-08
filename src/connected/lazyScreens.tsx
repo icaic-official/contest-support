@@ -40,28 +40,40 @@ export function WithScreen({ children }: { children: ReactNode }) {
 
 const screenKey = "minsky-screen";
 
-/** Remembers which screens this device used, so the next visit can download them early. */
-export function rememberScreen(kind: UiKind): void {
+/**
+ * Remembers which screens this account used last on this device, so its next
+ * visit can download them early. The record names its account, because a
+ * device can pass from an organiser to a contestant.
+ */
+export function rememberScreen(account: string, kind: UiKind): void {
   try {
-    window.localStorage.setItem(screenKey, kind);
+    window.localStorage.setItem(screenKey, JSON.stringify({ account, kind }));
   } catch {
     // Without storage the next visit downloads the screens after the sign-in check.
   }
 }
 
-/**
- * Starts the download of the screens that the last visit used. The code is
- * public, so a wrong guess only costs bytes: Workspace still loads what the
- * membership needs. The download then runs while the browser checks the
- * session, not after.
- */
-export function preloadRememberedScreen(): void {
-  let kind: string | null;
+/** The screens that `account` used last, or nothing when the record is another person's or is not a record. */
+function rememberedKind(account: string): unknown {
   try {
-    kind = window.localStorage.getItem(screenKey);
+    const record: unknown = JSON.parse(window.localStorage.getItem(screenKey) ?? "null");
+    if (typeof record === "object" && record !== null && "account" in record && record.account === account && "kind" in record) {
+      return record.kind;
+    }
   } catch {
-    return;
+    // Storage is unavailable, or an earlier release wrote a bare word that is not JSON.
   }
+  return undefined;
+}
+
+/**
+ * Starts the download of the screens that `account` used last. Call it when the
+ * session check names the account, so the download runs while the browser
+ * checks the account and reads the session, not after. Before that the device
+ * knows nobody: the screens of an earlier person would reach the next one.
+ */
+export function preloadRememberedScreen(account: string): void {
+  const kind = rememberedKind(account);
   if (kind === "contestant") void loadContestantApp();
   else if (kind === "organiser") {
     void loadOrganiserApp();

@@ -21,6 +21,7 @@ import { PasswordForm } from "@/screens/PasswordForm";
 import { SignIn } from "@/screens/SignIn";
 import { useAccountStatus } from "./hooks/useAccountStatus";
 import { useAuthSession } from "./hooks/useAuthSession";
+import { preloadRememberedScreen } from "./lazyScreens";
 import { searchWithoutContest } from "./navigation";
 import { Workspace } from "./Workspace";
 import { WorkflowRetryProvider } from "./WorkflowRetry";
@@ -72,6 +73,11 @@ export function ConnectedApp() {
   const routerState: unknown = location.state;
   const auth = useAuthSession();
   const { user } = auth;
+  const userId = user?.id;
+  // The session check names the person. Only then does the device's record tell which screens to download early.
+  useEffect(() => {
+    if (userId) preloadRememberedScreen(userId);
+  }, [userId]);
   // The address holds the contest that the signed-in person chose. After a
   // sign-out, the next person who signs in on this tab starts from the default
   // contest. A visit that was never signed in keeps the contest of a shared link.

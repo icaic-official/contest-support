@@ -423,8 +423,9 @@ test("the admin overview reads a one-minute total in the singular", async ({
   local,
 }) => {
   await local.run(
-    "UPDATE awards SET minutes = CASE WHEN issue_id = ? THEN 1 ELSE 0 END",
+    "UPDATE awards SET minutes = CASE WHEN issue_id = ? THEN 1 ELSE 0 END WHERE session_id = ?",
     local.issues[3]!,
+    local.sessions[0],
   );
   await login(page, "admin", desktop);
   await consolePages(page).getByRole("button", { name: "Overview" }).click();

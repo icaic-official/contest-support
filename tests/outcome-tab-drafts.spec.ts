@@ -95,10 +95,10 @@ test("the external application tick survives a visit to the Activity tab", async
     .click();
   const sheet = page.getByRole("dialog", { name: /^ISS-1: Keyboard stopped/ });
   await sheet.getByRole("tab", { name: "Outcome & award" }).click();
-  await sheet.getByRole("checkbox").check();
+  await sheet.getByRole("checkbox", { name: /^I confirm this award/ }).check();
 
   await sheet.getByRole("tab", { name: /^Activity/ }).click();
-  await expect(sheet.getByRole("checkbox")).toBeHidden();
+  await expect(sheet.getByRole("checkbox", { name: /^I confirm this award/ })).toBeHidden();
   await sheet
     .getByRole("button", { name: "Confirm applied", exact: true })
     .click();
@@ -106,7 +106,7 @@ test("the external application tick survives a visit to the Activity tab", async
     sheet.getByRole("tab", { name: "Outcome & award" }),
   ).toHaveAttribute("aria-selected", "true");
 
-  await expect(sheet.getByRole("checkbox")).toBeChecked();
+  await expect(sheet.getByRole("checkbox", { name: /^I confirm this award/ })).toBeChecked();
   await expect(
     sheet.getByRole("button", { name: "Confirm applied externally" }),
   ).toBeEnabled();

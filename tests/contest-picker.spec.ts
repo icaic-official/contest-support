@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { Locator, Page } from "@playwright/test";
 import { contrastOf } from "./support/contrast";
-import { addLaterContest, endRunningContest, seatThreeContests } from "./support/contests";
+import { addLaterContest, confirmExtraTime, endRunningContest, seatThreeContests } from "./support/contests";
 import { type LocalWorker, expect, test } from "./support/localWorker";
 
 // The contestant sees three contests. One starts in 2031, one ended in 2020,
@@ -98,6 +98,22 @@ test.describe("a contestant with several contests", () => {
     await expect(triggerFor(page, "Charlie")).toBeVisible();
     await at(page, "/issues", ids.running);
     expect(new Set(reads.snapshots)).toEqual(new Set([ids.running]));
+  });
+
+  // Charlie's scheduled end has passed, but staff confirmed extra time for every contestant. The
+  // contest's own page says that reporting is open, so the row and the default must agree with it.
+  test("opens the contest that confirmed extra time keeps open, and calls it running", async ({ page, local }) => {
+    const ids = await three(local);
+    await endRunningContest(local, ids.running, 10);
+    await confirmExtraTime(local, ids.running, 60);
+    await signIn(page);
+    await expect(triggerFor(page, "Charlie")).toBeVisible();
+    await at(page, "/issues", ids.running);
+    await expect(page.getByRole("button", { name: "Report an issue" })).toBeEnabled();
+    await trigger(page).click();
+    await expect(page.getByRole("menuitemradio", { name: /^Charlie/ })).toHaveAccessibleName(
+      /^Charlie \S.*\d{2}:\d{2} · Running now$/,
+    );
   });
 
   // The 2032 contest ends later than the 2031 one. The rule for the next contest

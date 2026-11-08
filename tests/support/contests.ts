@@ -66,6 +66,24 @@ export async function endRunningContest(local: LocalWorker, contestId: string, a
 }
 
 /**
+ * Gives every contestant of the contest `extra` confirmed minutes, as a
+ * contest-wide award that the jury member granted and applied.
+ */
+export async function confirmExtraTime(local: LocalWorker, contestId: string, extra: number) {
+  await local.run(
+    `INSERT INTO contest_awards (id, session_id, request_id, minutes, explanation, actor, actor_name, at, applied_at, applied_by, applied_name, applied_request)
+     SELECT ?, ?, ?, ?, 'Power cut', id, name, ${minutes(0)}, ${minutes(0)}, id, name, ?
+     FROM accounts WHERE id = ?`,
+    randomUUID(),
+    contestId,
+    randomUUID(),
+    extra,
+    randomUUID(),
+    local.users.jury,
+  );
+}
+
+/**
  * Adds a contest that starts in 2032, after every contest that `seatThreeContests`
  * makes, and seats the contestant in it. It has not started, so its intake is
  * closed, and it ends later than any other contest.

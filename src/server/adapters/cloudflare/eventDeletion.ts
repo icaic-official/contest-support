@@ -55,7 +55,8 @@ export interface DeletionActor {
  * assertion fails the batch when the event is gone, when its name is no longer
  * `expectedName`, or when a journal row already exists, so a repeated fence changes nothing.
  * Revoking logins stops the account surfaces that read outside the resolver:
- * avatars, the password change, and the member calendar. A login revocation and
+ * avatars, the password change, and the member calendar. The batch that writes
+ * a login checks the fence again, so no login starts after it. A login revocation and
  * the staff row of each contest both reach `grants()`, which closes every socket
  * that lost its access, including those of webmasters.
  * The caller writes the site audit row, as `commit` in manage.ts does.
@@ -131,7 +132,7 @@ function accountStatements(db: D1Connection, eventId: string, ids: readonly stri
     // contests are gone, so that contest is in another event, and the row belongs to that event.
     bound(db, `DELETE FROM account_operations WHERE actor ${inChunk} AND session_id IS NULL
       AND account_id IN (SELECT id FROM event_deletion_targets WHERE event_id = ? AND kind = 'account')`, chunk, eventId),
-    // A sign-in that read the account before the fence can reserve an avatar after it.
+    // The previous Worker after a revert signs in without the fence, so its login can reserve an avatar after it.
     bound(db, `INSERT INTO event_deletion_targets (event_id, kind, id)
       SELECT DISTINCT ?, 'avatar_owner', account_id FROM account_avatars WHERE account_id ${inChunk}
       ON CONFLICT (event_id, kind, id) DO NOTHING`, eventId, chunk),

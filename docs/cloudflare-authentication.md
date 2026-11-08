@@ -155,6 +155,7 @@ A committed change with a lost response allows login with the new password. Try 
 The browser receives a fresh session only after the credential commit.
 The final self-change guard retains both original session deadlines while the batch deliberately revokes and deletes the old sessions.
 Login creation also rechecks the captured credential generation and both current session expiries before completion.
+In the same batch, it checks that no event deletion has fenced the account's event. A sign-in or a password change that ends after the fence gets 409 and no login.
 
 Scheduled maintenance removes password-attempt counters and expired login records after a one-day retention period.
 The application Worker runs it every minute. The isolated authentication CI Worker runs it daily.

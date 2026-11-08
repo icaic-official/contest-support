@@ -206,7 +206,7 @@ Use these values in every UI so that the text stays the same.
 | `ended` | Ended |
 | `before_start` | No note. The start time says it. |
 
-The menu and the radio rows show the name on one line, and the start time and the note on a second line. A contest that takes reports has a heavier second line. The select shows one line of text, for example `Live 1 · Tue 3 Nov, 13:00 · Running now`. The note is text in every shape, so color is never the only mark.
+The menu and the radio rows show the name on one line, and the start time and the note on a second line. The contest that runs now, which is the reason `running`, has a heavier second line. A contest in its grace period or one that staff hold open does not, although it takes reports, because its note says so in words. The select shows one line of text, for example `Live 1 · Tue 3 Nov, 13:00 · Running now`. The note is text in every shape, so color is never the only mark.
 Long names break at any letter, so a name cannot widen a 320 px phone screen. `tests/contest-picker-layout.spec.ts` measures this for every shape.
 
 ## Refresh schedule

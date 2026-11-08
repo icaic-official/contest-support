@@ -78,8 +78,8 @@ export interface ContestRow {
   start: string | null;
   /** The intake note, or null when the start time says enough. */
   marker: string | null;
-  /** True while the contest takes reports. The row stands out then. */
-  open: boolean;
+  /** True while the contest runs, which is the reason `running`. The row stands out then, and no other open reason does. */
+  running: boolean;
 }
 
 /** The rows of the contest picker, in the order given. */
@@ -102,7 +102,7 @@ export function contestRows(contests: readonly ContestSummary[]): ContestRow[] {
       name: contestLabel(contests, contest),
       start,
       marker: intakeNote(contest.intake.reason),
-      open: contest.intake.open,
+      running: contest.intake.reason === "running",
     };
   });
 }

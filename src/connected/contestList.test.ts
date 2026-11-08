@@ -324,9 +324,9 @@ describe("contestRows", () => {
     expect(rows[1]?.start).not.toContain("2027");
   });
 
-  it("marks a row open exactly when the intake takes reports", () => {
+  it("marks a row as running only for the reason running, not for a grace period or a staff hold", () => {
     const rows = contestRows(notes.map(([reason], index) => contest(String(index), { reason })));
-    expect(rows.map((row) => row.open)).toEqual(notes.map(([reason]) => OPEN.has(reason)));
+    expect(rows.map((row) => row.running)).toEqual(notes.map(([reason]) => reason === "running"));
   });
 
   it("keeps the order of its input", () => {
@@ -336,7 +336,7 @@ describe("contestRows", () => {
 });
 
 const row = (start: string | null, marker: string | null): ContestRow =>
-  ({ id: "1", name: "Live 1", start, marker, open: false });
+  ({ id: "1", name: "Live 1", start, marker, running: false });
 
 describe("rowDetail", () => {
   it("joins the start and the note, and is null when a row has neither", () => {

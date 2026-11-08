@@ -663,7 +663,7 @@ test.describe("the rows of the picker", () => {
     await expect(menu.getByText("Running now")).toHaveCount(1);
   });
 
-  test("set the second line of a contest that takes reports in a heavier weight", async ({ page, local }) => {
+  test("set the second line of the contest that runs in a heavier weight", async ({ page, local }) => {
     await three(local);
     await signIn(page);
     await trigger(page).click();

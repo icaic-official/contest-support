@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import type { Locator, Page } from "@playwright/test";
-import { seatThreeContests } from "./support/contests";
+import { addContestAt, seatThreeContests } from "./support/contests";
 import { type LocalWorker, expect, test } from "./support/localWorker";
 
 // The picker has three shapes: a menu (contestant top bar and console
@@ -21,6 +21,17 @@ const longName =
 async function longContests(local: LocalWorker) {
   await local.run("UPDATE events SET name = ? WHERE id = ?", eventName, local.event);
   await seatThreeContests(local, { next: longName, ended: longName, running: "Short" });
+}
+
+/**
+ * One row of every kind: ended, held open by staff, in its grace period, running
+ * and upcoming. Only the running row has the heavier second line.
+ */
+async function everyKindOfRow(local: LocalWorker) {
+  const ids = await seatThreeContests(local, { next: "Echo", ended: "Delta", running: "Charlie" });
+  await local.run("UPDATE sessions SET intake_follows_schedule = 0, intake_open = 1 WHERE id = ?", ids.ended);
+  await addContestAt(local, "Bravo", -35, -5, 30);
+  await addContestAt(local, "Alpha", -300, -200);
 }
 
 async function signIn(page: Page, username: string) {
@@ -116,6 +127,17 @@ for (const width of widths) {
         const menu = page.getByRole("menu");
         await expect(menu.getByRole("menuitemradio")).toHaveCount(3);
         await shot(page, `menu-${width}-${scheme}`);
+        await expectFits(menu);
+      });
+
+      test(`the menu with a row of every kind fits, in ${scheme} mode`, async ({ page, local }) => {
+        await everyKindOfRow(local);
+        await page.emulateMedia({ colorScheme: scheme });
+        await signIn(page, "contestant");
+        await page.getByRole("button", { name: /^Contest session: .* Change session$/ }).click();
+        const menu = page.getByRole("menu");
+        await expect(menu.getByRole("menuitemradio")).toHaveCount(5);
+        await shot(page, `kinds-${width}-${scheme}`);
         await expectFits(menu);
       });
 

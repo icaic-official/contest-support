@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ManageLevel } from "@/backend/contracts";
-import { contestOfSearch, levelScreenAccess, searchWithContest } from "./navigation";
+import { contestOfSearch, levelScreenAccess, searchWithContest, searchWithoutContest } from "./navigation";
 
 describe("contestOfSearch", () => {
   it("reads the contest parameter", () => {
@@ -20,6 +20,26 @@ describe("contestOfSearch", () => {
 
   it("reads the first of two parameters", () => {
     expect(contestOfSearch("?contest=a&contest=b")).toBe("a");
+  });
+});
+
+describe("searchWithoutContest", () => {
+  it("drops the parameter and keeps every other one", () => {
+    expect(searchWithoutContest("?a=1&contest=old&b=2")).toBe("?a=1&b=2");
+  });
+
+  it("returns an empty search when the parameter was the only one", () => {
+    expect(searchWithoutContest("?contest=old")).toBe("");
+    expect(searchWithoutContest("?contest=")).toBe("");
+  });
+
+  it("leaves a search without the parameter as it is", () => {
+    expect(searchWithoutContest("")).toBe("");
+    expect(searchWithoutContest("?a=1")).toBe("?a=1");
+  });
+
+  it("drops every copy of the parameter", () => {
+    expect(searchWithoutContest("?contest=a&x=1&contest=b")).toBe("?x=1");
   });
 });
 

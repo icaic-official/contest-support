@@ -1,4 +1,4 @@
-import { type MouseEvent, type ReactNode, useState } from "react";
+import { type MouseEvent, type ReactNode, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 import { BrandMark } from "@/components/brand";
 import { BuildId } from "@/components/build-id";
@@ -21,6 +21,7 @@ import { PasswordForm } from "@/screens/PasswordForm";
 import { SignIn } from "@/screens/SignIn";
 import { useAccountStatus } from "./hooks/useAccountStatus";
 import { useAuthSession } from "./hooks/useAuthSession";
+import { searchWithoutContest } from "./navigation";
 import { Workspace } from "./Workspace";
 import { WorkflowRetryProvider } from "./WorkflowRetry";
 
@@ -66,9 +67,26 @@ const mainClasses: Record<Layout, string> = {
  */
 export function ConnectedApp() {
   const navigate = useNavigate();
-  const { pathname, search } = useLocation();
+  const location = useLocation();
+  const { pathname, search, hash } = location;
+  const routerState: unknown = location.state;
   const auth = useAuthSession();
   const { user } = auth;
+  // The address holds the contest that the signed-in person chose. After a
+  // sign-out, the next person who signs in on this tab starts from the default
+  // contest. A visit that was never signed in keeps the contest of a shared link.
+  const wasSignedIn = useRef(false);
+  useEffect(() => {
+    if (user) {
+      wasSignedIn.current = true;
+      return;
+    }
+    if (!wasSignedIn.current) return;
+    wasSignedIn.current = false;
+    const cleared = searchWithoutContest(search);
+    if (cleared === search) return;
+    void navigate({ pathname, search: cleared, hash }, { replace: true, state: routerState });
+  }, [user, navigate, pathname, search, hash, routerState]);
   const [live, setLive] = useState(false);
   const account = useAccountStatus(user?.id, live);
   const [passwordSetup, setPasswordSetup] = useState(false);

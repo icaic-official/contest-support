@@ -53,6 +53,14 @@ export function searchWithContest(search: string, contestId: string): string {
   return `?${params}`;
 }
 
+/** The search text without `?contest=`. Every other parameter stays. */
+export function searchWithoutContest(search: string): string {
+  const params = new URLSearchParams(search);
+  params.delete(contestParam);
+  const rest = params.toString();
+  return rest === "" ? "" : `?${rest}`;
+}
+
 /** True for the signed-out entry addresses, which a signed-in person leaves for the queue. */
 export function isEntryPath(pathname: string): boolean {
   const path = pathname.replace(/\/+$/u, "");

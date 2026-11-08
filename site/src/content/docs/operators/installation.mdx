@@ -138,6 +138,52 @@ Then the webmaster opens the **Site** page and chooses **Create event**. The for
 The event admin runs the event in the **event console** (`/event`): **People**, **Entrants**, **Contests**, and **Assignments**. Staff and teams sign in with the event code. Their credential sheets carry the link `<origin>/?event=<code>`, which fills in the code. A person types the code only when they open the plain sign-in page. Choose a short code that people can read aloud.
 Only event admins and webmasters create accounts and assign people. A contest admin keeps the contest settings, announcements, and the issue workflow.
 
+A webmaster deletes an event permanently with **Delete event** on the **Site** page, after typing the event's exact name. An event with no name asks for its code. You cannot undo this. Minsky signs out everyone in the event and stops its contests at once. The Worker then deletes its rows and its live state. About 65 minutes later, it deletes its files. The **Site** page shows the progress and keeps a **Deleted** record with the event's name and code.
+
+**Stopped** on the **Site** page means that an account of the event also has activity in another event. Deleting that account would change the other event, so Minsky keeps it. The event stays closed. Its contests are already gone. The accounts that Minsky has not reached, all of the event's files, and its live updates stay until the deletion continues. Minsky tries again every hour, and it continues when the other event no longer names the account, for example after that event's own deletion. Do not delete rows by hand, except in the case that follows.
+
+Two deletions can stop each other for good. This happens when two old account operations that name no contest run in both directions between an account of each event. Neither event's deletion can remove the operation that its own account performed on the other event's account. If two events show **Stopped** and each names an account of the other event, remove those operations. Both events are going, so no record that stays changes.
+
+1. Find the two event IDs. Use the database name that you chose earlier.
+
+	```sh
+	npx wrangler d1 execute "$MINSKY_INSTALL_DATABASE" --remote --config="$MINSKY_INSTALL_CONFIG" --command="SELECT event_id, event_name FROM event_deletions WHERE blocked IS NOT NULL"
+	```
+
+2. Delete the operations between the accounts of those two events. Replace `EVENT_A` and `EVENT_B` with the IDs.
+
+	```sh
+	npx wrangler d1 execute "$MINSKY_INSTALL_DATABASE" --remote --config="$MINSKY_INSTALL_CONFIG" --command="DELETE FROM account_operations WHERE session_id IS NULL AND actor IN (SELECT id FROM accounts WHERE event_id IN ('EVENT_A', 'EVENT_B')) AND account_id IN (SELECT id FROM accounts WHERE event_id IN ('EVENT_A', 'EVENT_B'))"
+	```
+
+	Expect both deletions to continue at their next hourly try.
+
+The Worker logs each failed attempt as `deletion.advance_failed`, with the `eventId`, a `phase`, a `cause`, and the error's name, and it retries every minute. The line holds fixed words and IDs. It never holds an error's text, because that text can hold a person's data.
+
+| Field | Value | Meaning |
+| --- | --- | --- |
+| `phase` | `contests` | D1 refused a delete under a contest. |
+| `phase` | `accounts` | D1 refused a batch of accounts. |
+| `phase` | `event` | D1 refused the last batch, which deletes the `events` row. |
+| `phase` | `live` | A Durable Object erase failed. |
+| `phase` | `files` | An R2 list or delete failed. |
+| `phase` | `unknown` | D1 also refused the read that finds the phase. |
+| `cause` | `foreign_key` | D1 says that a foreign key refused the write. A row outside the event names a row of the event. |
+| `cause` | `internal` | D1 gives no reason. A provider failure looks like this. A foreign key that fails when a batch commits can also look like this. |
+| `cause` | `other` | Any other error. |
+
+If the **Site** page shows no progress for an event:
+
+1. Watch the log. Replace `WORKER_NAME` with the name of your Worker.
+
+	```sh
+	npx wrangler tail WORKER_NAME --config="$MINSKY_INSTALL_CONFIG" --format json | grep deletion.advance_failed
+	```
+
+	Expect one line each minute for a deletion that keeps failing, and no line otherwise.
+2. Compare `eventId` with the event, and check the D1 and R2 status of your Cloudflare account. A provider failure clears by itself, and the deletion continues from its current step.
+3. If the same line stays after the provider recovers, keep the event's journal and report `phase`, `cause`, `errorName`, and `errorCode` to the maintainers. A foreign key refusal stays until someone changes the row that holds the key, and **Stopped** does not appear for it when D1 hides the reason. Do not change `event_deletions` or `event_deletion_targets`, because each later step reads them.
+
 | Problem | Do this |
 | --- | --- |
 | Settings or target rejected | Fix `provider.json` or the login. Configure again at a new path. |

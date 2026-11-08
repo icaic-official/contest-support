@@ -27,6 +27,13 @@ const siteSchema = z.object({
     contests: z.number(), accounts: z.number(),
   })),
   contestsToJoin: z.array(z.object({ id: z.uuid(), name: z.string(), eventName: z.string() })),
+  deletions: z.array(z.object({
+    eventId: z.string(), eventName: z.string(), eventCode: z.string(),
+    step: z.enum(['rows', 'live', 'files', 'done']),
+    requestedAt: z.string(), requestedByName: z.string(),
+    blockedBy: z.object({ name: z.string(), handle: z.string().nullable() }).nullable(),
+    filesDueAt: z.string().nullable(), remaining: z.number(), finishedAt: z.string().nullable(),
+  })),
 });
 const receiptSchema = z.object({
   eventId: z.uuid().exactOptional(), contestId: z.uuid().exactOptional(),

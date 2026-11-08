@@ -75,8 +75,8 @@ function grantKey({ sessionId, accountId, loginId }: Grantee): string {
   return `${sessionId}:${accountId}:${loginId}`;
 }
 
-const cleanupSchema = z.object({ sessionId: uuid, eventId: uuid, runId: uuid }).strict();
-type CleanupTarget = z.infer<typeof cleanupSchema>;
+const eraseSchema = z.object({ sessionId: uuid, eventId: uuid }).strict();
+type EraseTarget = z.infer<typeof eraseSchema>;
 
 function close(socket: LiveSocket, code = 1008, reason = 'Access changed. Sign in again.') {
   try { socket.close(code, reason); } catch { /* A peer can close before this event. */ }
@@ -161,10 +161,10 @@ export class SessionLiveCoordinator {
     try {
       const path = new URL(request.url).pathname;
       if (path === '/connect' && request.method === 'GET') return await this.serialize(() => this.connect(request));
-      if (['/prepare-cleanup', '/finish-cleanup'].includes(path) && request.method === 'POST') {
-        const parsed = cleanupSchema.safeParse(await request.json());
+      if (path === '/erase' && request.method === 'POST') {
+        const parsed = eraseSchema.safeParse(await request.json());
         if (!parsed.success) return new Response(null, { status: 400 });
-        return await this.serialize(() => this.cleanup(parsed.data, path === '/prepare-cleanup'));
+        return await this.serialize(() => this.erase(parsed.data));
       }
       if (path === '/notify' && request.method === 'POST') {
         const parsed = signalSchema.safeParse(await request.json());
@@ -190,7 +190,6 @@ export class SessionLiveCoordinator {
     if (!parsed.success || request.headers.get('Upgrade')?.toLowerCase() !== 'websocket') {
       return new Response(null, { status: 400 });
     }
-    if (await this.state.storage.get('fixtureCleanup')) return new Response(null, { status: 403 });
     const row = (await this.access([parsed.data])).get(grantKey(parsed.data));
     if (!row) return new Response(null, { status: 403 });
     const pair = new WebSocketPair();
@@ -210,9 +209,9 @@ export class SessionLiveCoordinator {
   }
 
   private async notify({ sessionId, audiences }: Signal): Promise<void> {
-    // A notification can outlive its D1 transaction and race fixture cleanup.
-    // Missing sessions and cleanup-fenced sessions must never recreate cursors.
-    if (await this.state.storage.get('fixtureCleanup') || !await this.sessionExists(sessionId)) return;
+    // A notification can outlive its D1 transaction and race an erase. A missing
+    // session must never recreate cursors.
+    if (!await this.sessionExists(sessionId)) return;
     const fresh = new Map<string, number>();
     for (const { audience, sequence } of audiences) {
       const prior = await this.state.storage.get<number>(`sequence:${sessionId}:${audience}`) ?? 0;
@@ -233,7 +232,6 @@ export class SessionLiveCoordinator {
 
   async alarm(): Promise<void> {
     await this.serialize(async () => {
-      if (await this.state.storage.get('fixtureCleanup')) return;
       await this.grants();
       await this.scheduleAlarm();
     }).catch((error: unknown) => {
@@ -242,32 +240,16 @@ export class SessionLiveCoordinator {
     });
   }
 
-  private async cleanup(target: CleanupTarget, prepare: boolean): Promise<Response> {
-    const stored = await this.state.storage.get<CleanupTarget>('fixtureCleanup');
-    if (stored && (stored.sessionId !== target.sessionId || stored.eventId !== target.eventId || stored.runId !== target.runId)) {
-      return new Response(null, { status: 409 });
-    }
-    const records = await this.state.storage.list();
-    if ([...records.keys()].some((key) => key !== 'fixtureCleanup' && !key.startsWith(`sequence:${target.sessionId}:`))) {
-      return new Response(null, { status: 409 });
-    }
-    if (this.state.getWebSockets().some((socket) => {
-      const attachment = this.attachment(socket);
-      return attachment && attachment.sessionId !== target.sessionId;
-    })) return new Response(null, { status: 409 });
-    const present = await this.sessionExists(target.sessionId);
-    if (prepare && present) {
-      const owned = await this.env.DB.prepare(`SELECT 1 FROM sessions s JOIN events e ON e.id = s.event_id
-        WHERE s.id = ? AND e.id = ? AND e.name = ?
-          AND NOT EXISTS (SELECT 1 FROM installation WHERE event_id = e.id)`)
-        .bind(target.sessionId, target.eventId, `Provider contract ${target.runId}`).first();
-      if (!owned) return new Response(null, { status: 409 });
-      await this.state.storage.put('fixtureCleanup', target);
-    } else if (present || !stored && records.size > 0) {
-      // A retry after a successful wipe is empty. A nonempty object without its
-      // prepared ownership grant cannot be erased after D1 ownership is gone.
-      return new Response(null, { status: 409 });
-    }
+  /**
+   * Closes the sockets and deletes the alarm and all storage. It runs only after
+   * the journal holds this contest as a target and its row is gone, so no request
+   * can wipe a running contest. A repeat finds nothing left and answers the same.
+   */
+  private async erase({ sessionId, eventId }: EraseTarget): Promise<Response> {
+    const allowed = await this.env.DB.prepare(`SELECT 1 FROM event_deletion_targets t
+      WHERE t.event_id = ? AND t.kind = 'contest' AND t.id = ? AND NOT EXISTS (SELECT 1 FROM sessions s WHERE s.id = t.id)`)
+      .bind(eventId, sessionId).first();
+    if (!allowed) return new Response(null, { status: 409 });
     for (const socket of this.state.getWebSockets()) {
       socket.serializeAttachment(null);
       close(socket, 1008, 'The session is no longer available.');
@@ -276,7 +258,6 @@ export class SessionLiveCoordinator {
       return new Response(null, { status: 503 });
     }
     await this.state.storage.deleteAlarm();
-    if (prepare && present) return Response.json({ prepared: true });
     await this.state.storage.deleteAll();
     if ((await this.state.storage.list()).size || await this.state.storage.getAlarm() !== null) {
       return new Response(null, { status: 503 });
@@ -361,27 +342,37 @@ export async function dispatchNotifications(env: LiveEnvironment, requested = cl
   }
 }
 
-/** Binding-only maintenance. The public application fetch handler never calls this. */
+/** Erases the live state of one contest that the journal of `eventId` names. Throws unless the object verified that it is empty. */
+export async function eraseLiveContest(env: Pick<LiveEnvironment, 'LIVE_UPDATES'>, eventId: string, sessionId: string): Promise<void> {
+  const coordinator = env.LIVE_UPDATES.get(env.LIVE_UPDATES.idFromName(sessionId));
+  const response = await coordinator.fetch(new Request('https://live.internal/erase', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId, eventId }),
+  }));
+  const result = response.ok ? await response.json() as { empty?: boolean } : undefined;
+  if (result?.empty !== true) throw new Error('The live state of a contest was not erased.');
+}
+
+/**
+ * Binding-only maintenance. The public application fetch handler never calls this.
+ * A hosted fixture has no reach to the application's Durable Objects, so it asks
+ * here for the contests of its own event's journal, after its rows step.
+ */
 export async function maintainFixtureSessions(request: Request, env: LiveEnvironment): Promise<Response> {
   if (request.method === 'GET' && new URL(request.url).pathname === '/capabilities') {
-    return Response.json({ fixtureSessionCleanup: 1 });
+    return Response.json({ eventLiveErase: 1 });
   }
   if (request.method !== 'POST') return new Response(null, { status: 405 });
   let input: unknown;
   try { input = await request.json(); } catch { return new Response(null, { status: 400 }); }
-  const parsed = z.object({ phase: z.enum(['prepare', 'finish']), eventId: uuid, runId: uuid,
-    sessionIds: z.tuple([uuid, uuid]).refine((ids) => ids[0] !== ids[1]) }).strict().safeParse(input);
+  const parsed = z.object({ eventId: uuid }).strict().safeParse(input);
   if (!parsed.success) return new Response(null, { status: 400 });
-  for (const sessionId of parsed.data.sessionIds) {
-    const coordinator = env.LIVE_UPDATES.get(env.LIVE_UPDATES.idFromName(sessionId));
-    const response = await coordinator.fetch(new Request(`https://live.internal/${parsed.data.phase}-cleanup`, {
-      method: 'POST', body: JSON.stringify({ sessionId, eventId: parsed.data.eventId, runId: parsed.data.runId }),
-    }));
-    if (!response.ok) return new Response(null, { status: 409 });
-    const result = await response.json() as { prepared?: boolean; empty?: boolean };
-    if (parsed.data.phase === 'finish' ? result.empty !== true : result.prepared !== true && result.empty !== true) {
-      return new Response(null, { status: 503 });
-    }
+  const { eventId } = parsed.data;
+  const { results } = await env.DB.prepare(`SELECT id FROM event_deletion_targets WHERE event_id = ? AND kind = 'contest'`)
+    .bind(eventId).all<{ id: string }>();
+  try {
+    for (const { id } of results) await eraseLiveContest(env, eventId, id);
+  } catch {
+    return new Response(null, { status: 409 });
   }
   return Response.json({ verified: true });
 }

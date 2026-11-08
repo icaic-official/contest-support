@@ -1,9 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-  CONNECTED_REFRESH_MS,
-  DISCONNECTED_REFRESH_MS,
-  startRefreshSchedule,
-} from "./refreshSchedule";
+import { startRefreshSchedule } from "./refreshSchedule";
 
 function setup(connected: boolean) {
   const window = new EventTarget();
@@ -21,16 +17,22 @@ describe("refresh schedule", () => {
   it("refreshes every 10 seconds while the live channel is down", () => {
     vi.useFakeTimers();
     const { refresh, stop } = setup(false);
-    vi.advanceTimersByTime(60_000);
-    expect(refresh).toHaveBeenCalledTimes(60_000 / DISCONNECTED_REFRESH_MS);
+    vi.advanceTimersByTime(9_999);
+    expect(refresh).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(1);
+    expect(refresh).toHaveBeenCalledTimes(1);
+    vi.advanceTimersByTime(50_000);
+    expect(refresh).toHaveBeenCalledTimes(6);
     stop();
   });
 
   it("refreshes once a minute while the live channel is connected", () => {
     vi.useFakeTimers();
     const { refresh, stop } = setup(true);
-    vi.advanceTimersByTime(60_000);
-    expect(refresh).toHaveBeenCalledTimes(60_000 / CONNECTED_REFRESH_MS);
+    vi.advanceTimersByTime(59_999);
+    expect(refresh).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(1);
+    expect(refresh).toHaveBeenCalledTimes(1);
     stop();
   });
 

@@ -12,6 +12,7 @@ import { D1AnnouncementService } from './announcements';
 import { R2AnnouncementImageService } from './announcementImages';
 import { R2AvatarService } from './avatars';
 import { D1ContestAwardService } from './contestAwards';
+import { advanceDeletions } from './eventDeletion';
 import { D1ManageService } from './manage';
 import { createApplicationHandler, privateJson } from './http';
 import { logEvent, requestFields } from './log';
@@ -87,7 +88,13 @@ export default {
       }
       // A credential operation can commit its restriction before returning an
       // error. Dispatch after every mutation. Cron retries after process loss.
-      if (request.method === 'POST' || request.method === 'PUT') context.waitUntil(deliver(env).catch(() => { /* Already logged. Cron retries. */ }));
+      if (request.method === 'POST' || request.method === 'PUT') {
+        const delivered = deliver(env).catch(() => { /* Already logged. Cron retries. */ });
+        // Delivery goes first, so open sockets learn of a fence before its contests go.
+        context.waitUntil(path === '/api/manage'
+          ? delivered.then(() => advanceDeletions(env)).catch(() => { /* Already logged. Cron retries. */ })
+          : delivered);
+      }
       return response;
     } catch (error) {
       logEvent('error', 'worker.unhandled_error', { ...requestFields(request), status: 503, error });
@@ -101,6 +108,7 @@ export default {
       'recover-avatars': new R2AvatarService(env.DB, env.IMAGES).recover(),
       'deliver-notifications': deliver(env),
       'expire-sessions': authenticationWorker.scheduled(event, env),
+      'advance-deletions': advanceDeletions(env),
     };
     // Every task settles before any failure is logged, in task order.
     const outcomes = await Promise.all(Object.entries(tasks).map(([task, run]) =>

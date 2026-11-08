@@ -15,9 +15,14 @@ export function useRefreshOnReturn(reload: () => Promise<void>, running: RefObje
   }, [reload, running]);
 }
 
-/** After a change removed the focused control, moves focus to the page heading instead of the page body. */
+/**
+ * After a change removed the focused control, moves focus to the page heading instead of the page body.
+ * An open dialog hides that heading from assistive technology, and its own focus trap handles the next Tab.
+ */
 export function keepFocus(): void {
   requestAnimationFrame(() => {
-    if (document.activeElement === document.body) document.querySelector<HTMLElement>("h1[tabindex]")?.focus();
+    if (document.activeElement !== document.body) return;
+    if (document.querySelector('[role="dialog"][data-state="open"], [role="alertdialog"][data-state="open"]')) return;
+    document.querySelector<HTMLElement>("h1[tabindex]")?.focus();
   });
 }

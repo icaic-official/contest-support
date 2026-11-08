@@ -1,12 +1,13 @@
 import { randomUUID } from 'node:crypto';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { getPlatformProxy } from 'wrangler';
 import type { D1Connection, D1Statement } from '../d1/connection';
 import { D1Fixture, applyMigrations } from '../d1/testFixture';
+import { deleteFixtureRows, fenceFixtureEvent, forgetFixtureEvent } from './eventDeletionFixture';
 import type { Caller } from '../../authentication';
 import { notificationStatements } from './application';
 import { type ContestAuthorityRow, contestDataBindings, contestDataSql } from './authority';
 import { connectLive, dispatchNotifications, maintainFixtureSessions, SessionLiveCoordinator, type LiveEnvironment } from './live';
+import { openLocalPlatform } from './tooling/store-database.mjs';
 
 class FakeSocket {
   messages: string[] = [];
@@ -43,7 +44,8 @@ class FakeState {
 
 class FakeDatabase implements D1Connection {
   access = new Map<string, ContestAuthorityRow>();
-  sessions = new Map<string, { eventId: string; runId: string }>();
+  sessions = new Set<string>();
+  targets = new Set<string>();
   reads = 0;
   unavailable = false;
   prepare(sql: string): D1Statement {
@@ -53,9 +55,9 @@ class FakeDatabase implements D1Connection {
       first: async <T>() => {
         if (this.unavailable) throw new Error('Database is unavailable.');
         if (sql === 'SELECT id FROM sessions WHERE id = ?') return (this.sessions.has(String(values[0])) ? { id: values[0] } : null) as T | null;
-        if (sql.includes('FROM sessions s JOIN events e')) {
-          const session = this.sessions.get(String(values[0]));
-          return (session?.eventId === values[1] && `Provider contract ${session!.runId}` === values[2] ? { owned: 1 } : null) as T | null;
+        if (sql.includes('FROM event_deletion_targets t')) {
+          const contest = String(values[1]);
+          return (this.targets.has(contest) && !this.sessions.has(contest) ? { allowed: 1 } : null) as T | null;
         }
         throw new Error(`Unexpected first: ${sql}`);
       },
@@ -67,6 +69,7 @@ class FakeDatabase implements D1Connection {
           return { results: [...this.access].filter(([key, row]) => logins.has(row.login_id) &&
             key === [row.account_id, row.login_id, sessionId].join(':')).map(([, row]) => row) as T[] };
         }
+        if (sql.includes('FROM event_deletion_targets')) return { results: [...this.targets].map((id) => ({ id })) as T[] };
         throw new Error(`Unexpected all: ${sql}`);
       },
       run: async () => { throw new Error(`Unexpected run: ${sql}`); },
@@ -97,9 +100,7 @@ describe('outbox retry fairness with real local D1', () => {
   let dispose: () => Promise<void>;
 
   beforeAll(async () => {
-    const platform = await getPlatformProxy<{ DB: D1Connection }>({
-      configPath: 'wrangler.auth-ci.jsonc', persist: false, remoteBindings: false, envFiles: [],
-    });
+    const platform = await openLocalPlatform<{ DB: D1Connection }>('wrangler.auth-ci.jsonc');
     db = platform.env.DB;
     dispose = platform.dispose;
     await applyMigrations(db);
@@ -296,8 +297,7 @@ function fixture() {
   const otherTeamId = randomUUID();
   const db = new FakeDatabase();
   const eventId = randomUUID();
-  const runId = randomUUID();
-  db.sessions.set(sessionId, { eventId, runId });
+  db.sessions.add(sessionId);
   const state = new FakeState();
   const coordinator = new SessionLiveCoordinator(state, { DB: db });
   const account = (staff: boolean, team: string | null) => {
@@ -327,7 +327,7 @@ function fixture() {
   const signal = async (audience: string, sequence = 1) => coordinator.fetch(new Request('https://live.internal/notify', {
     method: 'POST', body: JSON.stringify({ sessionId, audiences: [{ audience, sequence }] }),
   }));
-  return { sessionId, eventId, runId, teamId, otherTeamId, staff, contestant, otherContestant, db, state, coordinator, env, connect, signal, account };
+  return { sessionId, eventId, teamId, otherTeamId, staff, contestant, otherContestant, db, state, coordinator, env, connect, signal, account };
 }
 
 describe('Durable Object live updates', () => {
@@ -481,106 +481,98 @@ describe('Durable Object live updates', () => {
 });
 
 
-describe('binding-only fixture Durable Object cleanup', () => {
-  async function cleanup(test: ReturnType<typeof fixture>, phase: 'prepare' | 'finish', changes = {}) {
-    return test.coordinator.fetch(new Request(`https://live.internal/${phase}-cleanup`, {
-      method: 'POST', body: JSON.stringify({ sessionId: test.sessionId, eventId: test.eventId, runId: test.runId, ...changes }),
+describe('erasing the live state of a deleted contest', () => {
+  function erase(test: ReturnType<typeof fixture>) {
+    return test.coordinator.fetch(new Request('https://live.internal/erase', {
+      method: 'POST', body: JSON.stringify({ sessionId: test.sessionId, eventId: test.eventId }),
     }));
   }
 
-  it('requires an owned fixture before preparing and an absent session before erasing storage', async () => {
+  it('refuses while the contest exists and while the journal does not name it', async () => {
     const test = fixture();
     const socket = await test.connect();
     await test.signal('staff');
     const stored = new Map(test.state.data);
-    expect((await cleanup(test, 'prepare', { runId: randomUUID() })).status).toBe(409);
+    expect((await erase(test)).status).toBe(409);
+    test.db.targets.add(test.sessionId);
+    expect((await erase(test)).status).toBe(409);
+    test.db.targets.delete(test.sessionId);
+    test.db.sessions.delete(test.sessionId);
+    expect((await erase(test)).status).toBe(409);
     expect(test.state.data).toEqual(stored);
     expect(socket.closed).toBe(false);
-    expect((await cleanup(test, 'finish')).status).toBe(409);
-    expect((await cleanup(test, 'prepare')).status).toBe(200);
-    expect(socket.closed).toBe(true);
-    expect(socket.deserializeAttachment()).toBeNull();
-    expect(test.state.alarmAt).toBeUndefined();
-    expect((await cleanup(test, 'finish')).status).toBe(409);
-    expect(test.state.data.size).toBeGreaterThan(0);
-    test.db.sessions.delete(test.sessionId);
-    test.db.access.clear();
-    expect(await (await cleanup(test, 'finish')).json()).toEqual({ empty: true });
-    expect(test.state.data.size).toBe(0);
-    expect(test.state.alarmAt).toBeUndefined();
   });
 
-  it('survives lost responses, fences late messages, and does not recreate deleted-session cursors', async () => {
+  it('closes every socket, empties the storage and the alarm, and answers the same on a repeat', async () => {
+    const test = fixture();
+    const socket = await test.connect();
+    await test.signal('staff');
+    expect(test.state.alarmAt).toBeDefined();
+    test.db.targets.add(test.sessionId);
+    test.db.sessions.delete(test.sessionId);
+    test.db.access.clear();
+    expect(await (await erase(test)).json()).toEqual({ empty: true });
+    expect(socket.closed).toBe(true);
+    expect(socket.deserializeAttachment()).toBeNull();
+    expect(test.state.data.size).toBe(0);
+    expect(test.state.alarmAt).toBeUndefined();
+    expect(await (await erase(test)).json()).toEqual({ empty: true });
+  });
+
+  it('keeps nothing from a late signal or alarm after the erase', async () => {
     const test = fixture();
     await test.connect();
     await test.signal('staff');
-    expect((await cleanup(test, 'prepare')).status).toBe(200);
-    const fenced = new Map(test.state.data);
-    await test.signal('staff', 2);
-    expect(test.state.data).toEqual(fenced);
-    const denied = await connectLive(new Request('https://example.invalid', { headers: { Upgrade: 'websocket' } }), test.env, test.staff, test.sessionId);
-    expect(denied.status).toBe(403);
-    expect((await cleanup(test, 'prepare', { eventId: randomUUID() })).status).toBe(409);
+    test.db.targets.add(test.sessionId);
     test.db.sessions.delete(test.sessionId);
     test.db.access.clear();
-    // A resumed coordinator reads the persisted ownership grant.
-    const resumed = new SessionLiveCoordinator(test.state, { DB: test.db });
-    test.coordinator = resumed;
-    expect((await cleanup(test, 'finish')).status).toBe(200);
-    expect((await cleanup(test, 'finish')).status).toBe(200);
+    expect((await erase(test)).status).toBe(200);
     await test.signal('staff', 99);
+    const resumed = new SessionLiveCoordinator(test.state, { DB: test.db });
     await resumed.alarm();
     expect(test.state.data.size).toBe(0);
     expect(test.state.alarmAt).toBeUndefined();
   });
 
-  it('refuses foreign cursor or attachment state and requires a successful socket close', async () => {
+  it('answers 503 and keeps the storage while a socket stays open', async () => {
     const test = fixture();
     const socket = await test.connect();
-    test.state.data.set(`sequence:${randomUUID()}:staff`, 1);
-    expect((await cleanup(test, 'prepare')).status).toBe(409);
-    expect(socket.closed).toBe(false);
-    test.state.data.clear();
-    socket.serializeAttachment({ ...test.staff, sessionId: randomUUID(), expiresAt: Date.now() + 1000 });
-    expect((await cleanup(test, 'prepare')).status).toBe(409);
-    socket.serializeAttachment({ ...test.staff, sessionId: test.sessionId, expiresAt: Date.now() + 1000 });
-    socket.failClose = true;
-    expect((await cleanup(test, 'prepare')).status).toBe(503);
-    expect(test.state.data.has('fixtureCleanup')).toBe(true);
-    socket.failClose = false;
-    expect((await cleanup(test, 'prepare')).status).toBe(200);
-  });
-
-  it('does not erase nonempty absent-session state without a prepared ownership grant', async () => {
-    const test = fixture();
     await test.signal('staff');
+    test.db.targets.add(test.sessionId);
     test.db.sessions.delete(test.sessionId);
-    expect((await cleanup(test, 'finish')).status).toBe(409);
-    expect(test.state.data.size).toBe(1);
+    socket.failClose = true;
+    expect((await erase(test)).status).toBe(503);
+    expect(test.state.data.size).toBeGreaterThan(0);
+    socket.failClose = false;
+    expect((await erase(test)).status).toBe(200);
+    expect(test.state.data.size).toBe(0);
   });
 
-  it('verifies both exact session objects through the internal maintenance binding', async () => {
+  it('erases the contests of one journal through the internal maintenance binding', async () => {
     const calls: Array<{ name: unknown; body: unknown }> = [];
+    const db = new FakeDatabase();
     const sessions = [randomUUID(), randomUUID()];
+    for (const id of sessions) db.targets.add(id);
+    const eventId = randomUUID();
     let selected: unknown;
-    const env: LiveEnvironment = { DB: new FakeDatabase(), LIVE_UPDATES: {
+    const env: LiveEnvironment = { DB: db, LIVE_UPDATES: {
       idFromName: (name) => name,
       get: (name) => { selected = name; return { fetch: async (request) => {
         calls.push({ name: selected, body: await request.json() });
         return Response.json({ empty: true });
       } }; },
     } };
-    const request = () => new Request('https://maintenance.internal/sessions', { method: 'POST',
-      body: JSON.stringify({ phase: 'finish', eventId: randomUUID(), runId: randomUUID(), sessionIds: sessions }) });
-    expect(await (await maintainFixtureSessions(request(), env)).json()).toEqual({ verified: true });
-    expect(calls.map((call) => call.name)).toEqual(sessions);
-    expect((await maintainFixtureSessions(new Request('https://maintenance.internal/capabilities'), env)).status).toBe(200);
+    const request = (body: object) => new Request('https://maintenance.internal/sessions', { method: 'POST', body: JSON.stringify(body) });
+    expect(await (await maintainFixtureSessions(request({ eventId }), env)).json()).toEqual({ verified: true });
+    expect(calls).toEqual(sessions.map((sessionId) => ({ name: sessionId, body: { sessionId, eventId } })));
+    expect((await maintainFixtureSessions(request({ phase: 'finish', eventId, runId: randomUUID(), sessionIds: sessions }), env)).status).toBe(400);
+    expect(await (await maintainFixtureSessions(new Request('https://maintenance.internal/capabilities'), env)).json()).toEqual({ eventLiveErase: 1 });
     expect((await maintainFixtureSessions(new Request('https://maintenance.internal/sessions'), env)).status).toBe(405);
   });
 });
 
 describe('real local named maintenance service binding', () => {
-  it('uses the internal entrypoint to erase only prepared fixture objects and rejects late persistence', async () => {
+  it('uses the internal entrypoint to erase only the objects of a deleted event', async () => {
     const { createTestHarness } = await import('wrangler');
     const { mkdtemp, rm, writeFile } = await import('node:fs/promises');
     const { tmpdir } = await import('node:os');
@@ -608,33 +600,33 @@ describe('real local named maintenance service binding', () => {
       const env = await application.getEnv();
       await applyMigrations(env.DB);
       const eventId = randomUUID();
-      const runId = randomUUID();
       const sessionIds: [string, string] = [randomUUID(), randomUUID()];
       const controlEvent = randomUUID();
       const controlSession = randomUUID();
       await env.DB.batch([
-        env.DB.prepare('INSERT INTO events (id, name) VALUES (?, ?), (?, ?)').bind(eventId, `Provider contract ${runId}`, controlEvent, 'Unrelated control'),
+        env.DB.prepare('INSERT INTO events (id, name) VALUES (?, ?), (?, ?)').bind(eventId, 'Fictional event', controlEvent, 'Unrelated control'),
         env.DB.prepare('INSERT INTO sessions (id, event_id) VALUES (?, ?), (?, ?), (?, ?)')
           .bind(sessionIds[0], eventId, sessionIds[1], eventId, controlSession, controlEvent),
       ]);
-      const signal = (sessionId: string) => env.LIVE_UPDATES.get(env.LIVE_UPDATES.idFromName(sessionId)).fetch(
+      const object = (sessionId: string) => env.LIVE_UPDATES.get(env.LIVE_UPDATES.idFromName(sessionId));
+      const signal = (sessionId: string) => object(sessionId).fetch(
         new Request('https://live.internal/notify', { method: 'POST',
           body: JSON.stringify({ sessionId, audiences: [{ audience: 'staff', sequence: 1 }] }) }));
       expect((await signal(sessionIds[0])).status).toBe(204);
       expect((await signal(controlSession)).status).toBe(204);
-      const maintenance = (phase: string) => client.fetch('https://maintenance.internal/sessions', {
-        method: 'POST', body: JSON.stringify({ phase, eventId, runId, sessionIds }),
-      });
-      expect((await client.fetch('https://maintenance.internal/capabilities')).status).toBe(200);
-      expect(await (await maintenance('prepare')).json()).toEqual({ verified: true });
-      expect((await maintenance('finish')).status).toBe(409);
-      await env.DB.prepare('DELETE FROM events WHERE id = ?').bind(eventId).run();
-      expect(await (await maintenance('finish')).json()).toEqual({ verified: true });
-      expect(await (await maintenance('finish')).json()).toEqual({ verified: true });
+      const maintenance = () => client.fetch('https://maintenance.internal/sessions', { method: 'POST', body: JSON.stringify({ eventId }) });
+      expect(await (await client.fetch('https://maintenance.internal/capabilities')).json()).toEqual({ eventLiveErase: 1 });
+      await fenceFixtureEvent(env.DB, eventId);
+      expect((await maintenance()).status).toBe(409);
+      await deleteFixtureRows(env.DB, eventId);
+      expect(await (await maintenance()).json()).toEqual({ verified: true });
+      expect(await (await maintenance()).json()).toEqual({ verified: true });
       expect((await signal(sessionIds[0])).status).toBe(204);
-      // Finalization itself verifies the real storage list and alarm. An
-      // unexpected cursor recreated by the late signal has no grant and fails.
-      expect(await (await maintenance('finish')).json()).toEqual({ verified: true });
+      // A second erase verifies the real storage list and alarm, so a cursor that the late signal recreated would fail it.
+      expect(await (await maintenance()).json()).toEqual({ verified: true });
+      expect((await object(controlSession).fetch(new Request('https://live.internal/erase', { method: 'POST',
+        body: JSON.stringify({ sessionId: controlSession, eventId: controlEvent }) }))).status).toBe(409);
+      await forgetFixtureEvent(env.DB, eventId);
       expect(await env.DB.prepare('SELECT id FROM sessions WHERE id = ?').bind(controlSession).first()).not.toBeNull();
     } finally {
       await harness.close();

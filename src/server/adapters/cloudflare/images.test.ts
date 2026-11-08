@@ -3,7 +3,6 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { getPlatformProxy } from 'wrangler';
 import type { StartedImage } from '../../../backend/contracts';
 import { MIB, THUMBNAIL_BYTES } from '../../../connected/imageFile';
 import type { Caller } from '../../authentication';
@@ -11,6 +10,7 @@ import type { D1Connection, D1Statement } from '../d1/connection';
 import { D1Fixture, applyMigrations } from '../d1/testFixture';
 import { D1ApplicationService } from './application';
 import { R2ImageService, type PrivateBucket } from './images';
+import { openLocalPlatform } from './tooling/store-database.mjs';
 
 vi.setConfig({ testTimeout: 120_000, hookTimeout: 120_000 });
 const png = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
@@ -19,7 +19,6 @@ const sha256 = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest(
 
 interface TestBucket extends Omit<PrivateBucket, 'put'> {
   put(key: string, body: Uint8Array | ReadableStream<Uint8Array>, options?: Parameters<PrivateBucket['put']>[2]): Promise<unknown | null>;
-  list(options: { prefix: string }): Promise<{ objects: Array<{ key: string }> }>;
 }
 
 describe('Cloudflare private images with local D1 and R2 bindings', () => {
@@ -47,9 +46,7 @@ describe('Cloudflare private images with local D1 and R2 bindings', () => {
       d1_databases: [{ binding: 'DB', database_name: 'minsky-image-tests', database_id: randomUUID() }],
       r2_buckets: [{ binding: 'IMAGES', bucket_name: 'minsky-image-tests' }],
     }));
-    const platform = await getPlatformProxy<{ DB: D1Connection; IMAGES: TestBucket }>({
-      configPath, persist: false, remoteBindings: false, envFiles: [],
-    });
+    const platform = await openLocalPlatform<{ DB: D1Connection; IMAGES: TestBucket }>(configPath);
     db = platform.env.DB;
     bucket = platform.env.IMAGES;
     dispose = platform.dispose;
@@ -138,7 +135,7 @@ describe('Cloudflare private images with local D1 and R2 bindings', () => {
     return {
       get: (key, options) => bucket.get(key, options),
       put: (key, body, options) => bucket.put(key, body, options),
-      delete: (keys) => bucket.delete(keys), ...overrides,
+      delete: (keys) => bucket.delete(keys), list: (options) => bucket.list(options), ...overrides,
     };
   }
 

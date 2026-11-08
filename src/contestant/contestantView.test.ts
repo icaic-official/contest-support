@@ -274,6 +274,19 @@ describe("conversation", () => {
       "staff:Resolved: typed by hand",
     ]);
   });
+
+  it("shows a withdrawn award as two events and never its minutes or explanation", () => {
+    const text = (award: boolean) => conversation(
+      [
+        entry({ text: "5 minutes awarded: Judge outage" }),
+        ...(award ? [] : [entry({ text: "Time award withdrawn. It gives no time." })]),
+      ],
+      { issue: issue(), resolutions: [], award: undefined, userId: TEAM_USER },
+    ).map((item) => (item.kind === "event" ? `event:${item.text}` : `message:${item.entry.text}`));
+    expect(text(false)).toEqual(["event:The jury decided a time award", "event:The jury withdrew the time award"]);
+    // Without a withdrawal, typed award text stays a message.
+    expect(text(true)).toEqual(["message:5 minutes awarded: Judge outage"]);
+  });
 });
 
 describe("reportBlocker", () => {

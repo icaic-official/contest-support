@@ -1,5 +1,5 @@
 import { Fragment, type ReactNode, useCallback, useEffect } from "react";
-import { useLocation, useNavigate } from "react-router";
+import { Link, useLocation, useNavigate } from "react-router";
 import {
   Activity,
   Camera,
@@ -40,6 +40,7 @@ import { useAvatarEditor } from "./hooks/useAvatarEditor";
 import type { Membership, Snapshot } from "./model";
 import {
   focusRequest,
+  keepContest,
   requestedFocus,
   workspacePaths,
 } from "./navigation";
@@ -128,7 +129,8 @@ export function AccountPage({
   /** Clears the caller's selection after the session changes. */
   onSessionChange: () => void;
 }) {
-  const { hash } = useLocation();
+  const location = useLocation();
+  const { hash } = location;
   useSectionFocus();
   const kind = accountKind(state, member);
   const picture = useAvatarEditor();
@@ -229,10 +231,13 @@ export function AccountPage({
           <ul className="flex flex-wrap gap-1.5 @3xl:flex-col @3xl:gap-0.5">
             {accountSections.map(({ id, label }) => {
               const Icon = sectionIcons[id];
+              // The focus request lets a second click on the open section scroll to it again.
+              const entry = keepContest(location, location.pathname, focusRequest(id));
               return (
                 <li key={id}>
-                  <a
-                    href={`#${id}`}
+                  <Link
+                    to={{ ...entry.to, hash: `#${id}` }}
+                    state={entry.state}
                     aria-current={hash === `#${id}` ? "location" : undefined}
                     className={cn(
                       "flex items-center gap-2 rounded-md px-3 py-1.5 text-sm text-muted-foreground outline-none max-lg:min-h-11 hover:bg-accent hover:text-accent-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50",
@@ -241,7 +246,7 @@ export function AccountPage({
                   >
                     <Icon aria-hidden="true" className="size-4 shrink-0" />
                     {label}
-                  </a>
+                  </Link>
                 </li>
               );
             })}

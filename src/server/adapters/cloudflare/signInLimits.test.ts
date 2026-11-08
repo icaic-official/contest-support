@@ -1,10 +1,10 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import { getPlatformProxy } from 'wrangler';
 import type { D1Binding } from '../d1/connection';
 import { applyMigrations } from '../d1/testFixture';
 import applicationWorker, { type ApplicationEnvironment } from './applicationWorker';
 import { signInFailureLimits } from './authentication';
+import { openLocalPlatform } from './tooling/store-database.mjs';
 
 vi.mock('cloudflare:workers', () => ({ WorkerEntrypoint: class {} }));
 // The maintained scrypt hasher takes about 100 ms per password. A fast
@@ -68,9 +68,7 @@ describe('sign-in failure limits at the Worker boundary with real local D1', () 
   const counter = async (key: string) => (await counters()).filter((row) => row.key === key);
 
   beforeAll(async () => {
-    const platform = await getPlatformProxy<{ DB: D1Binding }>({
-      configPath: 'wrangler.auth-ci.jsonc', persist: false, remoteBindings: false, envFiles: [],
-    });
+    const platform = await openLocalPlatform<{ DB: D1Binding }>('wrangler.auth-ci.jsonc');
     db = platform.env.DB;
     dispose = platform.dispose;
     await applyMigrations(db);
@@ -79,7 +77,7 @@ describe('sign-in failure limits at the Worker boundary with real local D1', () 
     env = {
       DB: db, AUTH_ORIGIN: origin, AUTH_SECRET: randomUUID() + randomUUID(),
       ASSETS: { fetch: async () => new Response(null, { status: 404 }) },
-      IMAGES: { get: async () => null, put: async () => null, delete: async () => {} },
+      IMAGES: { get: async () => null, put: async () => null, delete: async () => {}, list: async () => ({ objects: [], truncated: false }) },
       LIVE_UPDATES: { idFromName: (name) => name, get: () => ({ fetch: async () => new Response(null, { status: 204 }) }) },
     };
   }, timeout);

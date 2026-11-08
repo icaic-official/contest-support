@@ -1,4 +1,4 @@
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -83,9 +83,13 @@ describe("admin key", () => {
   it("prefers the environment and otherwise reads only CLOUDFLARE_TOKEN_ADMIN from .env.local", () => {
     expect(readAdminKey({ CLOUDFLARE_TOKEN_ADMIN: "from-env" }, tmpdir())).toBe("from-env");
     const dir = mkdtempSync(join(tmpdir(), "minsky-token-"));
-    writeFileSync(join(dir, ".env.local"), "CLOUDFLARE_API_TOKEN=wrangler\nCLOUDFLARE_TOKEN_ADMIN=admin\n");
-    expect(readAdminKey({}, dir)).toBe("admin");
-    writeFileSync(join(dir, ".env.local"), "CLOUDFLARE_API_TOKEN=wrangler\n");
-    expect(() => readAdminKey({}, dir)).toThrow(/CLOUDFLARE_TOKEN_ADMIN/);
+    try {
+      writeFileSync(join(dir, ".env.local"), "CLOUDFLARE_API_TOKEN=wrangler\nCLOUDFLARE_TOKEN_ADMIN=admin\n");
+      expect(readAdminKey({}, dir)).toBe("admin");
+      writeFileSync(join(dir, ".env.local"), "CLOUDFLARE_API_TOKEN=wrangler\n");
+      expect(() => readAdminKey({}, dir)).toThrow(/CLOUDFLARE_TOKEN_ADMIN/);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

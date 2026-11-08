@@ -134,19 +134,13 @@ describe('isolated hosted Cloudflare authentication HTTP', () => {
     try {
       if (created) {
         const ids = [fixture.staff.accountId, fixture.contestant.accountId];
-        await db.batch([
-          ...ids.map((id) => stmt('DELETE FROM account_operations WHERE account_id = ?', id)),
-          ...ids.map((id) => stmt('DELETE FROM ba_user WHERE id = ?', id)),
-          stmt('DELETE FROM authentication_limits WHERE key IN (?, ?, ?, ?)',
-            `handle:${fixture.eventId}:${username}`, `handle:${fixture.eventId}:${adminUsername}`, `change:${fixture.staff.accountId}`, `change:${fixture.contestant.accountId}`),
-        ]);
+        await fixture.cleanup();
         const checks = await db.batch(ids.map((id) => stmt(`SELECT
             (SELECT count(*) FROM ba_user WHERE id = ?) +
             (SELECT count(*) FROM ba_account WHERE userId = ?) +
             (SELECT count(*) FROM ba_session WHERE userId = ?) +
             (SELECT count(*) FROM account_operations WHERE account_id = ?) AS n`).bind(id, id, id, id))) as Array<{ results: Array<{ n: number }> }>;
         for (const check of checks) expect(check.results).toEqual([{ n: 0 }]);
-        await fixture.cleanup();
       }
     } finally {
       await dispose?.();

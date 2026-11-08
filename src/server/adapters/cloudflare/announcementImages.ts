@@ -137,6 +137,10 @@ export class R2AnnouncementImageService {
     }
     try {
       await putVerifiedImage(this.bucket, path, body, { contentType, digest, length }, 'Select the image again.');
+      // An event deletion can remove the row and finish its file pass while the body arrives.
+      if (!usable(await this.image(caller, sessionId, id))) {
+        throw new ImageRequestError('Upload reservation expired. Select the image again.', { restart: true });
+      }
     } catch (error) {
       // Inspect the stored state independently so a late transfer cannot outlive its reservation.
       const current = await bound(this.db, `SELECT state, expires_at <= unixepoch() AS expired

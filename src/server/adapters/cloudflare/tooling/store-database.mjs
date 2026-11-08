@@ -104,12 +104,85 @@ export function createD1ApiConnection(settings, dependencies = {}) {
   };
 }
 
-/** Select only the requested hosted transport. Local checks keep native D1. */
+/** A value that D1 binds as it is. Any other value goes to the native statement, which rejects or converts it. */
+const bindable = (value) => value === null || typeof value === 'string' || typeof value === 'number';
+
+/**
+ * A statement that stays in the test process. A native statement blocks the test
+ * process while the Wrangler proxy answers. The `prepare`, `bind`, and `all` of one
+ * bound query block it five times. This statement does not block it once the runtime
+ * is warm. It sends one batch call when it runs. `all` and `run` return the same
+ * `results` and `meta` as the native ones, apart from the timing fields, and `first`
+ * returns the first row of `results`. Three things differ from a native statement.
+ * `first` takes no column name and throws when it gets one. There is no `raw`.
+ * Reading `statement` or `params` gives `undefined`.
+ */
+class LocalStatement {
+  #native;
+  #sql;
+  #params;
+
+  constructor(native, sql, params = []) {
+    this.#native = native;
+    this.#sql = sql;
+    this.#params = params;
+  }
+
+  bind(...values) {
+    return values.every(bindable)
+      ? new LocalStatement(this.#native, this.#sql, values)
+      : this.#native.prepare(this.#sql).bind(...values);
+  }
+
+  /** The plain object that the D1 binding reads from a statement in `batch`. */
+  get query() {
+    return { statement: this.#sql, params: this.#params };
+  }
+
+  async all() {
+    return (await this.#native.batch([this.query]))[0];
+  }
+
+  async run() {
+    return this.all();
+  }
+
+  async first(column) {
+    if (column !== undefined) {
+      throw new Error('LocalStatement: first takes no column name. Read the column from the row that first returns.');
+    }
+    return (await this.all()).results[0] ?? null;
+  }
+}
+
+/** The D1 binding of a local platform, with its statements kept in the test process. Exported for its test. */
+export function localD1(native) {
+  return {
+    prepare: (sql) => new LocalStatement(native, sql),
+    batch: (statements) => native.batch(statements.map((statement) => statement instanceof LocalStatement ? statement.query : statement)),
+    exec: (sql) => native.exec(sql),
+  };
+}
+
+/**
+ * Local emulation of a Worker's bindings. `persist: false` keeps the state out of the
+ * project, but Miniflare still writes its SQLite files to a `miniflare-*` directory under
+ * the temp directory, and `dispose` removes it. The D1 binding batches statements as
+ * `LocalStatement` does. Other bindings are the proxy's own.
+ */
+export async function openLocalPlatform(configPath) {
+  const platform = await getPlatformProxy({ configPath, remoteBindings: false, persist: false, envFiles: [] });
+  return { env: { ...platform.env, DB: localD1(platform.env.DB) }, dispose: platform.dispose };
+}
+
+/** Select only the requested hosted transport. Local checks open a local platform. */
 export async function openStoreDatabase({ configPath, remoteBindings }, environment = process.env) {
   const transport = environment.MINSKY_CONNECTOR_D1_TRANSPORT ?? 'binding';
   if (!['binding', 'api'].includes(transport)) throw new Error('Select the binding or api store transport.');
   if (transport === 'binding') {
-    const platform = await getPlatformProxy({ configPath, remoteBindings, persist: false, envFiles: [] });
+    const platform = remoteBindings
+      ? await getPlatformProxy({ configPath, remoteBindings, persist: false, envFiles: [] })
+      : await openLocalPlatform(configPath);
     return { db: platform.env.DB, dispose: platform.dispose };
   }
   if (!remoteBindings || configPath !== environment.MINSKY_CONNECTOR_D1_CONFIG) {

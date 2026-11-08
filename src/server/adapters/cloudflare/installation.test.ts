@@ -1,12 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { getPlatformProxy } from 'wrangler';
 import type { D1Binding, D1Connection, D1Statement } from '../d1/connection';
 import { applyMigrations } from '../d1/testFixture';
 import { D1AuthenticationService } from './authentication';
 import { createBetterAuthIdentity } from './identity';
 import { bootstrapSite, recoverWebmaster, validateSiteConfiguration } from './installation';
 import { passwordHasher, randomSecret, type PasswordHasher } from './password';
+import { openLocalPlatform } from './tooling/store-database.mjs';
 
 const site = { webmasterHandle: 'site_owner', webmasterName: 'Site webmaster' };
 const fastPasswords: PasswordHasher = {
@@ -47,9 +47,7 @@ describe('trusted Cloudflare site bootstrap and webmaster recovery', () => {
 
   beforeEach(async () => {
     // Every case owns a fresh local database. These tests cannot select hosted data.
-    const platform = await getPlatformProxy<{ DB: D1Binding }>({
-      configPath: 'wrangler.auth-ci.jsonc', persist: false, remoteBindings: false, envFiles: [],
-    });
+    const platform = await openLocalPlatform<{ DB: D1Binding }>('wrangler.auth-ci.jsonc');
     db = platform.env.DB;
     dispose = platform.dispose;
     await applyMigrations(db);

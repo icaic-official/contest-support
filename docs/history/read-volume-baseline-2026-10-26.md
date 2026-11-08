@@ -318,6 +318,7 @@ These statements no longer match `main` at `f978488`. The page is not changed in
 ## Other findings not fixed here
 
 - **A likely bug in the refresh period.** `src/connected/hooks/refreshSchedule.ts` sets both `DISCONNECTED_REFRESH_MS` and `CONNECTED_REFRESH_MS` to 60,000. The commit that added them, `448f52c`, says "While it is down the timer runs every 10 seconds as before". `docs/cloudflare-backend-design.md` line 335 and `docs/frontend-architecture.md` lines 175 and 196 also say 10 seconds. `refreshSchedule.test.ts` divides by the constant, so it passes for any value. A screen with a dropped socket therefore refreshes every 60 seconds, not every 10 (inferred from the code). A fix makes each disconnected screen send its refresh reads 6 times as often.
+  - 2026-11-08: This was a bug. `DISCONNECTED_REFRESH_MS` is now `10_000`, and `refreshSchedule.test.ts` pins both periods by their timing. This record keeps the finding as written.
 - The installed packages differ from the lockfile. See [machine and versions](#machine-and-versions).
 
 ## Limits of this baseline

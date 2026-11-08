@@ -100,6 +100,7 @@ test('complete local React UI journey uses real HTTPS, D1, R2, and Durable Objec
     fixture = await createLocalUiFixture(env, origin, secret);
     await runUiJourney(browser, fixture, { ignoreHTTPSErrors: true });
     await checkContestRedirects(browser, fixture, env.DB);
+    await fixture.deleteEventInBrowser(browser);
   } catch (error) {
     if (fixture) throw error;
     // eslint-disable-next-line preserve-caught-error -- Configuration errors can contain the in-memory auth secret.

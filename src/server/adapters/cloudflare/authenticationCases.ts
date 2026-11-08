@@ -9,6 +9,7 @@ import { D1ApplicationService } from './application';
 import { D1AuthenticationService, signInFailureLimits } from './authentication';
 import { D1ManageService } from './manage';
 import { loginKeyFor } from './credentials';
+import { removeFixtureEvent } from './eventDeletionFixture';
 import { createBetterAuthIdentity, type IdentityProvider } from './identity';
 import { passwordHasher, randomSecret, type PasswordHasher } from './password';
 import { createAuthenticationHandler } from '../../authenticationHttp';
@@ -185,16 +186,7 @@ export function registerAuthenticationCases(group: AuthenticationCases) {
       usernames.push(...extra.results.map((row) => row.username));
       const uniqueUsernames = [...new Set(usernames)];
       const ids = [fixture.staff.accountId, fixture.contestant.accountId, ...extraIds];
-      await db.batch([
-        // Full local schemas also retain account audit targets. Remove only the
-        // owned event's audit rows before deleting its extra fixture accounts.
-        ...(fullApplication ? [stmt('DELETE FROM admin_audit WHERE session_id IN (?, ?)', fixture.sessionId, fixture.secondSessionId)] : []),
-        ...ids.map((id) => stmt('DELETE FROM account_operations WHERE account_id = ?', id)),
-        ...extraIds.map((id) => stmt('DELETE FROM accounts WHERE id = ? AND name = ?', id, `auth-fixture:${fixture.eventId}`)),
-        ...ids.map((id) => stmt('DELETE FROM ba_user WHERE id = ?', id)),
-        stmt('DELETE FROM authentication_limits WHERE key IN (?, ?, ?, ?)', limitKey(username), limitKey(`${username}_a`), `change:${fixture.staff.accountId}`, `change:${fixture.contestant.accountId}`),
-        ...uniqueUsernames.map((name) => stmt('DELETE FROM authentication_limits WHERE key = ?', limitKey(name))),
-      ]);
+      await fixture.cleanup();
       const checks = await rowsBatch([
         ...ids.flatMap((id) => [
           stmt('SELECT count(*) AS n FROM ba_user WHERE id = ?', id),
@@ -209,7 +201,6 @@ export function registerAuthenticationCases(group: AuthenticationCases) {
         expect(checks[index * 3 + 2]![0]?.n).toBe(0);
       }
       for (const rows of checks.slice(ids.length * 3)) expect(rows[0] ?? null).toBeNull();
-      await fixture.cleanup();
     }, 120_000);
 
     /**
@@ -232,12 +223,7 @@ export function registerAuthenticationCases(group: AuthenticationCases) {
       const { code } = (await stmt('SELECT code FROM events WHERE id = ?', ids.event).first<{ code: EventCode }>())!;
       return {
         ...ids, code,
-        remove: () => db.batch([
-          stmt('DELETE FROM ba_user WHERE id = ?', ids.account),
-          stmt('DELETE FROM accounts WHERE id = ?', ids.account),
-          stmt('DELETE FROM events WHERE id = ?', ids.event),
-          stmt('DELETE FROM authentication_limits WHERE key = ?', limitKey(handle, ids.event)),
-        ]),
+        remove: () => removeFixtureEvent(db, ids.event),
       };
     }
 

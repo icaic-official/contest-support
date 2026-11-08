@@ -260,7 +260,7 @@ async function measureShape(name, shape) {
     };
     const env = {
       DB: meter(metrics.db, 'worker', log, clock), AUTH_ORIGIN: origin, AUTH_SECRET: 'r'.repeat(64),
-      IMAGES: { get: async () => null, put: async () => null, delete: async () => {} },
+      IMAGES: { get: async () => null, put: async () => null, delete: async () => {}, list: async () => ({ objects: [], truncated: false }) },
       ASSETS: { fetch: async () => new NativeResponse(null, { status: 404 }) },
       LIVE_UPDATES: { idFromName: (value) => value, get: (value) => ({ fetch: (request) => coordinator(value).object.fetch(request) }) },
     };

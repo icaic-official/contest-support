@@ -226,3 +226,85 @@ test("a contestant who types /site while the snapshot read is held gets the refu
   expect(scripts.filter(isStaffScreen)).toEqual([]);
   release();
 });
+
+// The device remembers the last screen so that the next visit can download it early.
+// That record must not outlive the person who made it. The tests below make the record
+// with a real organiser sign-in, so they hold for any format that the app stores.
+const rememberedScreen = "minsky-screen";
+const desktopConsole = '[data-ui="organiser-desktop"]';
+
+const remembered = (page: Page) => page.evaluate((key) => window.localStorage.getItem(key), rememberedScreen);
+
+/** An organiser opens the console. Returns the record that the app left on the device. */
+async function signInOrganiser(page: Page): Promise<string> {
+  await signIn(page, "jury");
+  await expect(page.locator(desktopConsole)).toBeVisible();
+  await expect.poll(() => remembered(page), { message: "the app wrote its record" }).not.toBeNull();
+  return (await remembered(page))!;
+}
+
+async function signOutOrganiser(page: Page) {
+  await page.getByRole("button", { name: /^Account settings for/ }).click();
+  await page.getByRole("button", { name: "Sign out", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Sign in", exact: true })).toBeVisible();
+}
+
+test.describe("on a device that last showed the organiser screen", () => {
+  test.beforeEach(async ({ local }) => {
+    await seatThreeContests(local, { next: "Alpha", ended: "Delta", running: "Charlie" });
+  });
+
+  test("a contestant who signs in after the organiser signed out downloads no staff screen", async ({ page }) => {
+    await signInOrganiser(page);
+    await signOutOrganiser(page);
+    const scripts = watchScripts(page);
+    await signIn(page, "contestant");
+    expect(scripts.some((path) => /ContestantApp/.test(path)), "the contestant screen was recorded").toBe(true);
+    expect(scripts.filter(isStaffScreen)).toEqual([]);
+  });
+
+  test("a contestant on a new tab downloads no staff screen after the organiser's session ended", async ({ page, context }) => {
+    await signInOrganiser(page);
+    await context.clearCookies();
+    await page.close();
+    const tab = await context.newPage();
+    const scripts = watchScripts(tab);
+    await tab.goto("/sign-in");
+    await expect(tab.getByRole("heading", { name: "Sign in", exact: true })).toBeVisible();
+    expect(scripts.filter(isStaffScreen), "the signed-out page").toEqual([]);
+    await signIn(tab, "contestant");
+    expect(scripts.some((path) => /ContestantApp/.test(path)), "the contestant screen was recorded").toBe(true);
+    expect(scripts.filter(isStaffScreen)).toEqual([]);
+  });
+
+  const opened: Array<{ path: string; ready: (page: Page) => Promise<void> }> = [
+    { path: "/issues", ready: (page) => expect(page.getByRole("heading", { name: "Your reports" })).toBeVisible() },
+    { path: "/site", ready: (page) => expect(page.getByText(siteRefusal)).toBeVisible() },
+    { path: "/event", ready: (page) => expect(page.getByText(eventRefusal)).toBeVisible() },
+  ];
+
+  for (const { path, ready } of opened) {
+    test(`a contestant who opens ${path} downloads no staff screen`, async ({ page, context }) => {
+      const record = await signInOrganiser(page);
+      await context.clearCookies();
+      await signIn(page, "contestant");
+      // The contestant's own visit replaced the record. Put back what the organiser left.
+      await page.evaluate(([key, value]) => window.localStorage.setItem(key!, value!), [rememberedScreen, record]);
+      const scripts = watchScripts(page);
+      await page.goto(path);
+      await ready(page);
+      expect(scripts.filter(isStaffScreen)).toEqual([]);
+    });
+  }
+
+  test("the organiser's next visit still starts the staff download before the session read ends", async ({ page }) => {
+    await signInOrganiser(page);
+    const release = await holdSnapshot(page);
+    const scripts = watchScripts(page);
+    await page.goto("/issues");
+    await expect.poll(() => scripts.filter(isStaffScreen).length, { message: "staff screens requested while the read is held" })
+      .toBeGreaterThan(0);
+    release();
+    await expect(page.locator(desktopConsole)).toBeVisible();
+  });
+});

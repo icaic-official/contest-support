@@ -16,7 +16,7 @@ import { eraseLiveContest } from '../cloudflare/live';
 import { bound } from './assertions';
 import type { D1Binding, D1Connection } from './connection';
 import {
-  crashingEnvironment, deletionSuite, fillStores, interceptCalls, readTables, rowsNaming, seedEvent, seedInertSeat, seedRoster,
+  crashingEnvironment, deletionSuite, fillStores, interceptCalls, readTables, rowsNaming, seedEvent, seedInertSeat, seedRoster, seedWebmaster,
   type SeededEvent, type SeededWebmaster,
 } from './eventDeletionHarness';
 
@@ -89,6 +89,78 @@ describe('event deletion', () => {
       await expect(fence(db, event)).rejects.toThrow(/valid = 1/);
       expect(await footprint(event)).toEqual(fenced);
       await cleanUp(event);
+    });
+  });
+
+  describe('a login whose batch commits after the fence', () => {
+    const password = 'a-fictional-password-123';
+    const identity = () => createBetterAuthIdentity(db, { origin: 'http://127.0.0.1:8788', secret: 's'.repeat(64), secureCookies: false });
+    const auth = (connection: D1Connection = db) => new D1AuthenticationService(connection, identity(), passwordHasher);
+    const cookieHeaders = (cookie: string) => new Headers({ cookie: cookie.split(';')[0]! });
+    const signIn = (service: D1AuthenticationService, event: SeededEvent) =>
+      service.signIn({ kind: 'event', code: event.code as EventCode }, event.contestant.handle as Handle, password);
+    const liveLogins = (accountId: string) => rows('SELECT id FROM logins WHERE account_id = ? AND revoked = 0', accountId);
+    const setPassword = async (accountId: string) =>
+      bound(db, 'UPDATE ba_account SET password = ? WHERE userId = ?', await passwordHasher.hash(password), accountId).run();
+
+    /** The sign-in has read its account and checked the password. The fence commits, then the login batch runs. */
+    function fenceAtLoginBatch(event: SeededEvent): { connection: D1Connection; fenced: () => boolean } {
+      let fenced = false;
+      const connection = interceptCalls(db, async (sql) => {
+        if (!fenced && sql.some((text) => text.includes('INSERT INTO logins'))) {
+          fenced = true;
+          await fence(db, event);
+        }
+      });
+      return { connection, fenced: () => fenced };
+    }
+
+    it('refuses a sign-in, and the rows step removes the identity session that it left', async () => {
+      const event = await seedEvent(db, webmaster, false);
+      await setPassword(event.contestant.accountId);
+      const racing = fenceAtLoginBatch(event);
+      const outcome = await signIn(auth(racing.connection), event).catch((caught: unknown) => caught);
+      expect(racing.fenced()).toBe(true);
+      expect(outcome).toBeInstanceOf(AuthenticationError);
+      expect((outcome as AuthenticationError).status).toBe(409);
+      expect(await liveLogins(event.contestant.accountId)).toEqual([]);
+      expect(await deleteRows(db, event)).toBe('rows_done');
+      expect(await rows('SELECT 1 FROM ba_session WHERE userId = ?', event.contestant.accountId)).toEqual([]);
+      await forget(event);
+    });
+
+    it('refuses the new login of a password change, so the change signs the account out', async () => {
+      const event = await seedEvent(db, webmaster, false);
+      await setPassword(event.contestant.accountId);
+      const headers = cookieHeaders((await signIn(auth(), event)).cookie);
+      expect(await auth().current(headers)).toBeDefined();
+      const racing = fenceAtLoginBatch(event);
+      const outcome = await auth(racing.connection).changePassword(headers, password, 'another-fictional-pass-456')
+        .catch((caught: unknown) => caught);
+      expect(racing.fenced()).toBe(true);
+      expect(outcome).toBeInstanceOf(AuthenticationError);
+      expect((outcome as AuthenticationError).status).toBe(409);
+      expect(await auth().current(headers)).toBeUndefined();
+      expect(await liveLogins(event.contestant.accountId)).toEqual([]);
+      await cleanUp(event);
+    });
+
+    it('still signs in an account of another event and a webmaster', async () => {
+      const doomed = await seedEvent(db, webmaster, false);
+      const kept = await seedEvent(db, webmaster, false);
+      await setPassword(kept.contestant.accountId);
+      const racing = fenceAtLoginBatch(doomed);
+      const signed = await signIn(auth(racing.connection), kept);
+      expect(racing.fenced()).toBe(true);
+      expect((await auth().current(cookieHeaders(signed.cookie)))?.user.id).toBe(kept.contestant.accountId);
+      expect(await liveLogins(kept.contestant.accountId)).toHaveLength(2);
+
+      const other = await seedWebmaster(db);
+      const [site] = await rows<{ handle: string }>('SELECT handle FROM accounts WHERE id = ?', other.accountId);
+      await setPassword(other.accountId);
+      const siteSigned = await auth().signIn({ kind: 'site' }, site!.handle as Handle, password);
+      expect((await auth().current(cookieHeaders(siteSigned.cookie)))?.user.id).toBe(other.accountId);
+      await cleanUp(doomed, kept);
     });
   });
 

@@ -932,7 +932,7 @@ describe('event deletion', () => {
       await cleanUp(event);
     });
 
-    it('lets the rows step of one event delete nothing in another', async () => {
+    it('keeps refusing deletes in another event while one event is in step rows', async () => {
       const event = await seedRoster(db, webmaster);
       const other = await seedRoster(db, webmaster);
       await fence(db, event);

@@ -153,8 +153,7 @@ describe('the previous Worker on the scoped authority schema', () => {
 
     it('never leaves an account without its event, and the deletion journal removes both', async () => {
       const { first, run } = writer(db);
-      // The key is checked at commit. Local D1 then reports an internal error, not the constraint name.
-      await expect(run('DELETE FROM events WHERE id = ?', ids.other)).rejects.toThrow();
+      await expect(run('DELETE FROM events WHERE id = ?', ids.other)).rejects.toThrow(/deleted only through its deletion record/);
       expect(await first('SELECT event_id FROM accounts WHERE id = ?', ids.otherStaff)).toEqual({ event_id: ids.other });
       await removeFixtureEvent(db, ids.other);
       expect(await first('SELECT id FROM events WHERE id = ?', ids.other)).toBeNull();

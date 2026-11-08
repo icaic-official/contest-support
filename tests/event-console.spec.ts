@@ -420,12 +420,14 @@ test.describe("the console's roster editor", () => {
   });
 
   test("a removed entrant passes focus to the next row, and a long name fits a narrow phone", async ({ page, local }) => {
+    test.setTimeout(120_000);
     expect(local.eventCode).not.toBe("");
     await page.setViewportSize(narrow);
     await openConsole(page);
     await tab(page, "Entrants").click();
-    await box(page).fill(`${"Long".repeat(40)}, long-team\nTeam Eta, team-eta`);
-    await page.getByRole("button", { name: "Import entrants (2)", exact: true }).click();
+    const more = Array.from({ length: 7 }, (_, index) => `Team ${index + 1}, team-${index + 1}`);
+    await box(page).fill([`${"Long".repeat(40)}, long-team`, "Team Eta, team-eta", ...more].join("\n"));
+    await page.getByRole("button", { name: "Import entrants (9)", exact: true }).click();
     await closeSheet(page);
     await tab(page, "Assignments").click();
     await page.getByLabel("Contest", { exact: true }).selectOption({ label: "Primary" });
@@ -435,11 +437,29 @@ test.describe("the console's roster editor", () => {
     const list = page.getByRole("list", { name: /^Entrants in Primary/ });
     await expect(list.getByText("Team Eta", { exact: true })).toBeVisible();
     const removes = list.getByRole("button", { name: /^Remove / });
-    const before = await removes.count();
-    await removes.first().focus();
-    await page.keyboard.press("Enter");
-    await expect(removes).toHaveCount(before - 1);
-    await expect(removes.first()).toBeFocused();
+    await expect(removes).toHaveCount(12);
+
+    // Press Enter on the first or last Remove button. Focus must then rest on the button of the
+    // neighbour that takes its place, or on the page heading when the list empties.
+    const removeWithKeyboard = async (position: "first" | "last") => {
+      const labels = await removes.evaluateAll((buttons) => buttons.map((button) => button.getAttribute("aria-label")));
+      const heir = position === "first" ? labels[1] : labels.at(-2);
+      await (position === "first" ? removes.first() : removes.last()).focus();
+      await page.keyboard.press("Enter");
+      await expect(removes).toHaveCount(labels.length - 1, { timeout: 15_000 });
+      if (heir === undefined) await expect(page.getByRole("heading", { level: 1, name: "Jury verification" })).toBeFocused();
+      else await expect.poll(() => page.evaluate(() => document.activeElement?.getAttribute("aria-label") ?? document.activeElement?.tagName)).toBe(heir);
+    };
+    await removeWithKeyboard("first");
+
+    // On a slow CPU, React renders a removal after the next frame. Focus must not depend on that order.
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send("Emulation.setCPUThrottlingRate", { rate: 4 });
+    for (let round = 0; round < 8; round++) await removeWithKeyboard("first");
+    await removeWithKeyboard("last");
+    await removeWithKeyboard("first");
+    await removeWithKeyboard("first");
+    await cdp.send("Emulation.setCPUThrottlingRate", { rate: 1 });
   });
 });
 

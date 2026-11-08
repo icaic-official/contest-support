@@ -18,7 +18,7 @@ import { viewerNote } from "@/connected/zonedTime";
 import { staffRoles } from "@/organiser/admin/adminModel";
 import { ConfirmDialog } from "@/organiser/admin/AccountAccess";
 import { acceptsKind, alsoOpens, contestTypeLabels, seatedEntrants, voidedBy } from "./eventModel";
-import { CommandError, Panel, fieldClass, focusAfterRemoval } from "./forms";
+import { CommandError, Panel, fieldClass, heirOfRemovedRow } from "./forms";
 import { ScheduleFields } from "./ScheduleFields";
 import {
   type ScheduleDraft,
@@ -513,10 +513,10 @@ function EntrantAssignments({
                     data-removes
                     aria-label={`Remove ${entrant.name} from ${contest.name}`}
                     onClick={(event) => {
-                      const button = event.currentTarget;
+                      const heir = heirOfRemovedRow(event.currentTarget);
                       void state
                         .execute({ type: "unassign_entrant", contestId: contest.id, entrantId: entrant.id })
-                        .then((receipt) => receipt && focusAfterRemoval(button));
+                        .then((receipt) => receipt && heir?.focus());
                     }}
                   >
                     Remove

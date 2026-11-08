@@ -240,11 +240,11 @@ test.describe("a contestant with several contests", () => {
     await expect(trigger(page)).toBeVisible();
   });
 
-  // The person picks another contest while a list read of the open contest is in
-  // flight. That read is stale when its list arrives. It must read no snapshot of
-  // the contest that the person left, because the next read waits behind it.
-  // The test counts from the release, so a read that ran before the pick adds nothing.
-  test("reads no snapshot of the contest that the person left while a list read was in flight", async ({ page, local }) => {
+  // The person picks another contest while a list read of the open contest hangs.
+  // The read of the picked contest must not wait for it. The held read is stale
+  // when its list arrives, so it must read no snapshot of the contest that the
+  // person left. The count starts after the picked contest has loaded.
+  test("opens the picked contest while a list read hangs, and reads no snapshot of the contest that the person left", async ({ page, local }) => {
     const ids = await three(local);
     await signIn(page);
     await at(page, "/issues", ids.running);
@@ -260,13 +260,39 @@ test.describe("a contestant with several contests", () => {
     await expect.poll(() => held).toBeGreaterThan(0);
     await trigger(page).click();
     await page.getByRole("menuitemradio", { name: /^Alpha/ }).click();
-    await expect(page.getByText("Loading your contest session…")).toBeVisible();
-    const before = reads.snapshots.length;
-    release();
     await expect(triggerFor(page, "Alpha")).toBeVisible();
-    const after = reads.snapshots.slice(before);
-    expect(after).toContain(ids.next);
-    expect(after).not.toContain(ids.running);
+    await expect(page.getByText("Loading your contest session…")).toBeHidden();
+    const before = reads.snapshots.length;
+    const stale = page.waitForResponse((response) => new URL(response.url()).pathname === "/api/contests");
+    release();
+    await (await stale).finished();
+    await settle(page);
+    expect(reads.snapshots.slice(before)).not.toContain(ids.running);
+    await expect(triggerFor(page, "Alpha")).toBeVisible();
+  });
+
+  // The person picks another contest while a snapshot read of the open contest
+  // hangs. The read of the picked contest must not wait for it, and the held
+  // read must show nothing when it ends.
+  test("opens the picked contest while a snapshot read of the open contest hangs", async ({ page, local }) => {
+    const ids = await three(local);
+    await signIn(page);
+    await at(page, "/issues", ids.running);
+    const reads = await holdSnapshotReads(page, ids.running);
+    await focusEvent(page);
+    await expect.poll(reads.held).toBeGreaterThan(0);
+    await trigger(page).click();
+    await page.getByRole("menuitemradio", { name: /^Alpha/ }).click();
+    await expect(triggerFor(page, "Alpha")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "No reports yet" })).toBeVisible();
+    await expect(page.getByText("Loading your contest session…")).toBeHidden();
+    await at(page, "/issues", ids.next);
+    const stale = page.waitForResponse((response) => new URL(response.url()).pathname === "/api/snapshot");
+    reads.release();
+    await (await stale).finished();
+    await settle(page);
+    await expect(triggerFor(page, "Alpha")).toBeVisible();
+    await at(page, "/issues", ids.next);
   });
 
   test("keeps another parameter of the address when it writes the contest", async ({ page, local }) => {

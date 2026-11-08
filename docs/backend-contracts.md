@@ -277,7 +277,7 @@ The UI fetches a new authorized snapshot when that connection opens or reconnect
 
 The cleanup function can run more than once and stops subsequent callbacks.
 Subscriptions on the same `Backend` are independent, including when an earlier subscription is still closing.
-The UI also refreshes every ten seconds and on focus or network restoration.
+The UI also refreshes every 10 seconds while the live channel is down, every 60 seconds while it is connected, and on focus or network restoration.
 Those reads detect revoked access even when the subscriber receives no more events.
 Live notifications do not authorize reads or writes.
 

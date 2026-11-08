@@ -79,7 +79,7 @@ On 2026-10-02, the user prioritized working cloud features and deferred resilien
 Assume connectivity during development. Outage planning does not block backend work.
 Start with free tiers. Necessary paid services are acceptable after the need and cost are identified.
 A developer pilot and production capacity validation are separate milestones.
-Session admins edit teams and categories in the app. Event editors remain future work. Under the agreed direction of 2026-10-27, event admins and webmasters create accounts and assign people to contests, and contest admins keep categories and team locations. That direction is not implemented.
+Under the agreed direction of 2026-10-27, event admins and webmasters create accounts and assign people to contests, and contest admins keep categories and team locations. The [event platform](event-platform-design.md) implements this direction. The [event admin guide](../site/src/content/docs/guides/event-admin.md) describes it. An editor for the name, code, and time zone of an event remains future work.
 
 Production targets on a healthy venue connection are:
 

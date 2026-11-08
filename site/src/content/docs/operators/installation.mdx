@@ -134,11 +134,11 @@ npm run cloudflare:install -- bootstrap --config="$MINSKY_INSTALL_CONFIG" --acco
 Bootstrap is atomic and refuses a database that already has data.
 The webmaster types the handle with **Site sign-in**.
 
-Then the webmaster opens the **Site** page and chooses **Create event**. The form takes the event name, an event code, a time zone, and the first event admin. Minsky shows that admin's temporary password once.
-The event admin runs the event in the **event console** (`/event`): **People**, **Entrants**, **Contests**, and **Assignments**. Staff and teams sign in with the event code. Their credential sheets carry the link `<origin>/?event=<code>`, which fills in the code. A person types the code only when they open the plain sign-in page. Choose a short code that people can read aloud.
-Only event admins and webmasters create accounts and assign people. A contest admin keeps the contest settings, announcements, and the issue workflow.
+Then the webmaster signs in and creates the first event. See [Run the site as a webmaster](/guides/webmaster/). The event admin builds the event with [Run an event](/guides/event-admin/).
 
-A webmaster deletes an event permanently with **Delete event** on the **Site** page, after typing the event's exact name. An event with no name asks for its code. You cannot undo this. Minsky signs out everyone in the event and stops its contests at once. The Worker then deletes its rows and its live state. About 65 minutes later, it deletes its files. The **Site** page shows the progress and keeps a **Deleted** record with the event's name and code.
+## Repair an event deletion
+
+A webmaster deletes an event on the **Site** page. See [Delete an event permanently](/guides/webmaster/#delete-an-event-permanently). The Worker then deletes its rows and its live state. About 65 minutes later, it deletes its files. This section is for the operator when a deletion does not finish.
 
 **Stopped** on the **Site** page means that an account of the event also has activity in another event. Deleting that account would change the other event, so Minsky keeps it. The event stays closed. Its contests are already gone. The accounts that Minsky has not reached, all of the event's files, and its live updates stay until the deletion continues. Minsky tries again every hour, and it continues when the other event no longer names the account, for example after that event's own deletion. Do not delete rows by hand, except in the case that follows.
 
@@ -183,6 +183,8 @@ If the **Site** page shows no progress for an event:
 	Expect one line each minute for a deletion that keeps failing, and no line otherwise.
 2. Compare `eventId` with the event, and check the D1 and R2 status of your Cloudflare account. A provider failure clears by itself, and the deletion continues from its current step.
 3. If the same line stays after the provider recovers, keep the event's journal and report `phase`, `cause`, `errorName`, and `errorCode` to the maintainers. A foreign key refusal stays until someone changes the row that holds the key, and **Stopped** does not appear for it when D1 hides the reason. Do not change `event_deletions` or `event_deletion_targets`, because each later step reads them.
+
+## Fix installation problems
 
 | Problem | Do this |
 | --- | --- |

@@ -3,7 +3,7 @@ title: Post announcements
 description: Publish, edit, expire, and remove session announcements.
 ---
 
-Session admins and jury members manage announcements. Roles combine, so either role is enough.
+Contest admins and jury members manage announcements. Roles combine, so either role is enough.
 Every current member of the session reads the active announcements.
 
 The **Announcements** list is above the issue workspace on every screen.

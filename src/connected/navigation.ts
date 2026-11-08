@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { type MouseEvent, useEffect, useRef } from "react";
 import { useLocation } from "react-router";
 import type { ContestSummary } from "@/backend/contracts";
 import { can, seatOf } from "./capabilities";
@@ -71,6 +71,49 @@ export function contestOwnerOf(state: unknown): string | undefined {
 export function withContestOwner(state: unknown, owner: string | undefined): unknown {
   if (owner === undefined) return state;
   return { ...(typeof state === "object" && state !== null ? state : {}), [ownerField]: owner };
+}
+
+/**
+ * A new history entry on `pathname` that keeps the search of `from`, with its
+ * `?contest=`, and the owner of that contest. `state` holds the other fields of
+ * the entry. Every in-app navigation that keeps `?contest=` builds its target
+ * here, and a lint rule in `eslint.config.js` sends other writers here. An
+ * entry with the contest and no owner reads as a link from outside the app, so
+ * the next person on the tab would open that contest.
+ */
+export function keepContest(
+  from: { search: string; state: unknown },
+  pathname: string,
+  state?: object,
+): { to: { pathname: string; search: string }; state: unknown } {
+  return {
+    // eslint-disable-next-line no-restricted-syntax -- This is the target that keeps the owner.
+    to: { pathname, search: from.search },
+    state: withContestOwner(state, contestOwnerOf(from.state)),
+  };
+}
+
+/**
+ * Moves keyboard focus to the target of a skip link, such as `#main`.
+ *
+ * A native link to a fragment fires popstate. The hosted staff check then
+ * focused the page heading, so the target did not keep focus. Its new entry
+ * also has no router state, so its `?contest=` would lose the owner. This
+ * writes the fragment without the event and keeps the owner.
+ */
+export function skipToFragment(event: MouseEvent<HTMLAnchorElement>): void {
+  if (event.button !== 0 || event.metaKey || event.altKey || event.ctrlKey || event.shiftKey) return;
+  const { hash } = event.currentTarget;
+  const target = document.getElementById(hash.slice(1));
+  if (!(target instanceof HTMLElement)) return;
+  event.preventDefault();
+  target.focus();
+  if (window.location.hash === hash) return;
+  // React Router keeps its own fields, such as the entry index, beside `usr`.
+  // Only the owner goes into the new `usr`. The phone report screen marks its
+  // entry in `usr`, and this entry is not that one.
+  const current = window.history.state as { usr?: unknown } | null;
+  window.history.pushState({ ...current, usr: withContestOwner(undefined, contestOwnerOf(current?.usr)) }, "", hash);
 }
 
 /** True for the signed-out entry addresses, which a signed-in person leaves for the queue. */

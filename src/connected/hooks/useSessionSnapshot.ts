@@ -262,6 +262,7 @@ export function useSessionSnapshot(userId: string): SessionData {
     void navigate(
       {
         pathname: location.pathname,
+        // eslint-disable-next-line no-restricted-syntax -- This write makes the signed-in account the owner.
         search: searchWithContest(location.search, sessionId),
         hash: location.hash,
       },

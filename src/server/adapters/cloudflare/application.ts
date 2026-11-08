@@ -4,7 +4,7 @@ import { snapshotSchema, type Snapshot } from '../../../connected/model';
 import type { Caller } from '../../authentication';
 import { AuthenticationError } from '../../authentication';
 import type { D1Connection, D1Statement, D1Value } from '../d1/connection';
-import { calendarEventSql, calendarWebmasterSql, contestDataBindings, contestDataSql, contestListBindings, contestSeatsSql } from './authority';
+import { calendarEventSql, calendarWebmasterSql, contestDataBindings, contestDataSql, contestListBindings, contestSeatsSql, notBeingDeletedSql } from './authority';
 import { clockSql, intakeOpenSql, intakeStateSql, parseIntake, scheduleOf, viewerExtraSql, type ScheduleColumns } from './schedule';
 
 /** Bind accountId, loginId. This check also works after an authorized self-removal. */
@@ -165,7 +165,7 @@ const calendarRow = (from: string, scope: string) => `SELECT s.id, s.name, s.eve
   WHERE ${scope} AND s.ends_at > ? AND s.starts_at < ?`;
 export const calendarSql = `WITH login AS (${currentReadyLoginSql}), webmaster AS MATERIALIZED (${calendarWebmasterSql}),
   reach AS MATERIALIZED (SELECT c.session_id, c.manage FROM (${contestDataSql('contests')}) c)
-SELECT * FROM (${calendarRow('login', calendarEventSql)} UNION ALL ${calendarRow('webmaster CROSS JOIN login', '1')})
+SELECT * FROM (${calendarRow('login', calendarEventSql)} UNION ALL ${calendarRow('webmaster CROSS JOIN login', notBeingDeletedSql('s.event_id'))})
 ORDER BY starts_at, id LIMIT ${CALENDAR_LIMIT}`;
 
 interface ContestRow extends ScheduleColumns {

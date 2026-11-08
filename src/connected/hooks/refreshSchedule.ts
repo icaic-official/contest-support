@@ -1,5 +1,5 @@
 /** Refresh period while no live channel reports changes. */
-export const DISCONNECTED_REFRESH_MS = 60_000;
+export const DISCONNECTED_REFRESH_MS = 10_000;
 /**
  * Safety refresh period while the live channel is connected. Live hints carry
  * every issue and announcement change. This period only bounds how late the

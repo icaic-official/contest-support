@@ -82,7 +82,7 @@ Anyone who can read that log can sign in as that admin. Use only fictional data 
 | `npm run typecheck` | Check TypeScript. |
 | `npm run lint` | Run ESLint. |
 | `npm run ci` | Run the Workers Builds check: installs, type checking, lint, unit tests, both builds, audits, and the Gitleaks scan. |
-| `npm test` | Run unit and script tests without cloud credentials. |
+| `npm test` | Run unit and script tests without cloud credentials. Local D1 keeps its files in `/dev/shm` when `TMPDIR` is unset and `/dev/shm` has 512 MiB free, so commits do not wait for the disk. |
 | `npm run test:d1` | Run every D1 workflow case with local emulation and current identity guards. |
 | `node scripts/rollback-check.mjs` | Run the previous release's `npm run test:d1` against this checkout's D1 migrations. The script checks out `origin/main` into a temporary Git worktree outside the repository, adds this checkout's new migration files, and installs packages there. Add `--base=<revision>` to name another previous release. It uses only temporary local resources. |
 | `npm run test:connector:runtime` | Run the complete connector through a temporary local HTTPS Worker, D1, R2, and Durable Objects. |
@@ -100,6 +100,7 @@ Anyone who can read that log can sign in as that admin. Use only fictional data 
 | `npm run perf:reads` | Count the D1 calls, statements, rows read and rows written of each API request at several data sizes. It uses a temporary local database with fictional data and no Cloudflare credentials. Add `-- --plan=base` for the 1,200-account shape only, `-- --explain` for query plans, and `-- --out=<file.json>` for the raw records. Compare saved records with `node scripts/compare-read-volume.mjs --base=<files> --head=<files>`. |
 | `npm run perf:client` | Build the app and measure first load at 4x CPU slowdown on slow 4G, heap, component renders, and snapshot reads, with a 500-issue queue on the local fixture. Set `PERF_RUNS` and `PERF_OUT=<file.json>`. See [Client weight](docs/frontend-architecture.md#client-weight). |
 | `npm run perf:size` | Print the raw, gzip and Brotli size of each script and stylesheet in `dist/assets`. |
+| `npm run perf:deletion` | Time the fence and rows step of a 2,000-issue event with 80,000 history rows and 140,000 outbox rows beside an equally large event, on a temporary local database. `-- --remote --database=<name>` accepts only a database whose name starts with `minsky-preview`. A failure or an interrupt removes the seeded rows. `-- --remote --database=<name> --cleanup=<run>` removes what an earlier run left. |
 | `npm run test:e2e:smoke` | Run the critical-path browser files `tests/landing.spec.ts` and `tests/journey.spec.ts`. |
 | `npm run test:e2e` | Run every mocked browser test, including the smoke files. The specs use the Cloudflare client. They serve the real Worker routes from the test process. See [the browser suite](#the-mocked-browser-suite). |
 | `npm run test:providers:list` | List the shared provider scenarios without hosted credentials. |

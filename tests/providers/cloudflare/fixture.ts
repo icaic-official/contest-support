@@ -9,6 +9,7 @@ import { attachmentPath } from '../../../src/connected/imageFile';
 import type { EventCode, SignInTarget } from '../../../src/backend/contracts';
 import { avatarKey } from '../../../src/server/adapters/cloudflare/avatars';
 import { loginKeyFor } from '../../../src/server/adapters/cloudflare/credentials';
+import { deleteFixtureRows, fenceFixtureEvent, forgetFixtureEvent } from '../../../src/server/adapters/cloudflare/eventDeletionFixture';
 import { passwordHasher, randomSecret } from '../../../src/server/adapters/cloudflare/password';
 import { createdAccountMarkers, type Actor, type ScenarioData, type TestAccount } from '../contracts';
 import { confirmFixtureTarget, readFixtureTarget, type FixtureTarget } from './target.mjs';
@@ -94,8 +95,8 @@ async function open(target: FixtureTarget, dependencies: Dependencies): Promise<
       } };
     }
     const response = await platform.env.MAINTENANCE.fetch('https://maintenance.internal/capabilities');
-    const result = response.ok ? await response.json() as { fixtureSessionCleanup?: number } : undefined;
-    if (result?.fixtureSessionCleanup !== 1) throw new Error('Unsupported maintenance entrypoint.');
+    const result = response.ok ? await response.json() as { eventLiveErase?: number } : undefined;
+    if (result?.eventLiveErase !== 1) throw new Error('Unsupported maintenance entrypoint.');
     return platform;
   } catch {
     if (platform) await platform.dispose().catch(() => undefined);
@@ -342,9 +343,9 @@ async function ownedAvatars(db: D1Connection, journal: Journal): Promise<OwnedAv
   return [...owned.values()];
 }
 
-async function maintain(platform: Platform, journal: Journal, phase: 'prepare' | 'finish'): Promise<void> {
+async function eraseLiveState(platform: Platform, journal: Journal): Promise<void> {
   const response = await platform.env.MAINTENANCE.fetch('https://maintenance.internal/sessions', {
-    method: 'POST', body: JSON.stringify({ phase, runId: journal.runId, eventId: journal.eventId, sessionIds: journal.sessionIds }),
+    method: 'POST', body: JSON.stringify({ eventId: journal.eventId }),
   });
   const result = response.ok ? await response.json() as { verified?: boolean } : undefined;
   if (result?.verified !== true) throw new Error('Fixture Durable Object cleanup is unverified. Retain the recovery journal.');
@@ -354,7 +355,9 @@ async function cleanupOnPlatform(path: string, platform: Platform, target: Fixtu
   const journal = await readJournal(path, target);
   const db = platform.env.DB;
   await discoverCreatedAccounts(db, journal);
-  await validateOwnership(db, journal);
+  // A minute cron can delete rows from the fence on, so the journal keeps the file identities from before it.
+  journal.images = (await validateOwnership(db, journal)).map(({ id, session_id, issue_id }) => ({ id, session_id, issue_id }));
+  journal.avatars = await ownedAvatars(db, journal);
   // Retain discovered UUIDs before any deletion, including a lost create response.
   const discoveredPath = `${path}.${crypto.randomUUID()}.next`;
   await writeFile(discoveredPath, JSON.stringify(journal), { flag: 'wx', mode: 0o600 });
@@ -362,10 +365,7 @@ async function cleanupOnPlatform(path: string, platform: Platform, target: Fixtu
   const ids = ownedAccountIds(journal);
   // Fence new commands and reservations before collecting the final object IDs.
   // These UUID-owned accounts have no membership outside the validated fixture.
-  await db.batch([
-    statement(db, 'UPDATE events SET archived = 1 WHERE id = ?', journal.eventId),
-    statement(db, `UPDATE accounts SET disabled = 1 WHERE id IN (${marks(ids.length)})`, ...ids),
-  ]);
+  await fenceFixtureEvent(db, journal.eventId);
   const images = await validateOwnership(db, journal);
   journal.images = images.map(({ id, session_id, issue_id }) => ({ id, session_id, issue_id }));
   const avatars = await ownedAvatars(db, journal);
@@ -375,7 +375,6 @@ async function cleanupOnPlatform(path: string, platform: Platform, target: Fixtu
   const nextPath = `${path}.${crypto.randomUUID()}.next`;
   await writeFile(nextPath, JSON.stringify(journal), { flag: 'wx', mode: 0o600 });
   await rename(nextPath, path);
-  await maintain(platform, journal, 'prepare');
   const keys = [...images.flatMap((image) => [image.original_path, image.thumbnail_path]),
     ...avatars.map((avatar) => avatarKey(avatar.account_id, avatar.id))];
   // No list or prefix deletion can reach another fixture's objects.
@@ -383,15 +382,7 @@ async function cleanupOnPlatform(path: string, platform: Platform, target: Fixtu
   for (const key of keys) if (await platform.env.IMAGES.head(key)) throw new Error('Fixture image cleanup is incomplete.');
   const rateKeys = [...actors.map((actor) => `handle:${journal.eventId}:${username(journal, actor)}`),
     ...journal.createdAccounts.filter((account) => account.id).map((account) => `handle:${journal.eventId}:${account.username}`), ...ids.map((id) => `change:${id}`)];
-  await db.batch([
-    statement(db, 'DELETE FROM events WHERE id = ?', journal.eventId),
-    statement(db, `DELETE FROM authority_audit WHERE actor IN (${marks(ids.length)})`, ...ids),
-    statement(db, `DELETE FROM account_operations WHERE account_id IN (${marks(ids.length)}) OR actor IN (${marks(ids.length)})`, ...ids, ...ids),
-    statement(db, `DELETE FROM ba_user WHERE id IN (${marks(ids.length)})`, ...ids),
-    statement(db, `DELETE FROM authentication_limits WHERE key IN (${marks(rateKeys.length)})`, ...rateKeys),
-    statement(db, `DELETE FROM account_avatars WHERE account_id IN (${marks(ids.length)})`, ...ids),
-    statement(db, `DELETE FROM accounts WHERE id IN (${marks(ids.length)})`, ...ids),
-  ]);
+  await deleteFixtureRows(db, journal.eventId);
   const checks: D1Statement[] = [
     statement(db, 'SELECT count(*) AS count FROM events WHERE id = ?', journal.eventId),
     statement(db, 'SELECT count(*) AS count FROM sessions WHERE id IN (?, ?)', ...journal.sessionIds),
@@ -413,9 +404,10 @@ async function cleanupOnPlatform(path: string, platform: Platform, target: Fixtu
   // after DB commit to remove a transfer that finished during the first pass.
   for (let index = 0; index < keys.length; index += 1000) await platform.env.IMAGES.delete(keys.slice(index, index + 1000));
   for (const key of keys) if (await platform.env.IMAGES.head(key)) throw new Error('Fixture image cleanup is incomplete.');
-  // The grant was checked against owned D1 rows before deletion. Finalization
-  // rechecks absence, clears cursors/attachments/alarms, and proves empty storage.
-  await maintain(platform, journal, 'finish');
+  // Each object rechecks the journal and the contest's absence, clears its
+  // cursors, attachments, and alarm, and proves its storage empty.
+  await eraseLiveState(platform, journal);
+  await forgetFixtureEvent(db, journal.eventId);
   // Shared IP rate counters belong to the hosted service, not to this UUID run.
   await unlink(path);
 }

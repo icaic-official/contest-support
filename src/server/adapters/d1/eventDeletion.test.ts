@@ -1,0 +1,908 @@
+import { randomUUID } from 'node:crypto';
+import { attachmentPath } from '../../../connected/imageFile';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
+import type { EventCode, Handle, ManageCommand } from '../../../backend/contracts';
+import { AuthenticationError } from '../../authentication';
+import { D1ApplicationService } from '../cloudflare/application';
+import { D1AuthenticationService } from '../cloudflare/authentication';
+import { createBetterAuthIdentity } from '../cloudflare/identity';
+import { D1ManageService } from '../cloudflare/manage';
+import { passwordHasher, type PasswordHasher } from '../cloudflare/password';
+import { authorityGuard, contestDataBindings, contestDataSql, resolveAuthority, signInAccountSql } from '../cloudflare/authority';
+import {
+  advanceDeletions, advanceRows, CLAIM_DELETION_SQL, CONTEST_ACTIVITY, fenceStatements, ROWS_UNIT_CALLS, type DeletionEnvironment,
+} from '../cloudflare/eventDeletion';
+import { eraseLiveContest } from '../cloudflare/live';
+import { bound } from './assertions';
+import type { D1Binding, D1Connection } from './connection';
+import {
+  crashingEnvironment, deletionSuite, fillStores, interceptCalls, readTables, rowsNaming, seedEvent, seedInertSeat, seedRoster, seedWebmaster,
+  type SeededEvent, type SeededWebmaster,
+} from './eventDeletionHarness';
+
+const fastPasswords: PasswordHasher = { hash: async () => 'fictional-test-hash', verify: async () => false };
+
+describe('event deletion', () => {
+  const suite = deletionSuite();
+  const { actor, rows, fence, deleteRows, forget, cleanUp, footprint, stores, finished, passTime, runToEnd } = suite;
+  let db: D1Binding;
+  let webmaster: SeededWebmaster;
+  let tables: string[];
+  beforeAll(() => { ({ db, webmaster, tables } = suite.opened()); });
+
+  describe('the fence', () => {
+    it('refuses a wrong name and changes nothing', async () => {
+      const event = await seedRoster(db, webmaster);
+      const before = await footprint(event);
+      await expect(fence(db, event, `${event.name} `)).rejects.toThrow(/valid = 1/);
+      expect(await footprint(event)).toEqual(before);
+      await fence(db, event);
+      await cleanUp(event);
+    });
+
+    it('refuses a write whose authority read came before the fence', async () => {
+      const event = await seedRoster(db, webmaster);
+      const authority = await resolveAuthority(db, webmaster, { scope: 'event', eventId: event.eventId });
+      if (!authority) throw new Error('The webmaster has no authority over the event.');
+      await fence(db, event);
+      const late = randomUUID();
+      await expect(db.batch([
+        authorityGuard(db, randomUUID(), authority),
+        bound(db, `INSERT INTO sessions (id, event_id, name) VALUES (?, ?, 'Late contest')`, late, event.eventId),
+      ])).rejects.toThrow(/valid = 1/);
+      expect(await rows('SELECT 1 FROM sessions WHERE id = ?', late)).toEqual([]);
+      await cleanUp(event);
+    });
+
+    it('stops every reader of the event at once, and a repeat changes nothing', async () => {
+      const event = await seedEvent(db, webmaster);
+      const signInRow = () => bound(db, signInAccountSql.event, event.contestant.handle, event.code).first();
+      const application = new D1ApplicationService(db);
+      const window = { from: '2031-01-01T00:00:00.000Z', to: '2031-01-02T00:00:00.000Z' };
+      expect(await signInRow()).not.toBeNull();
+      expect((await application.contests(webmaster, { window })).map((contest) => contest.id)).toContain(event.live);
+      expect(await resolveAuthority(db, event.volunteer, { scope: 'contest', contestId: event.live })).toBeDefined();
+      expect(await resolveAuthority(db, webmaster, { scope: 'event', eventId: event.eventId })).toBeDefined();
+
+      await fence(db, event);
+
+      expect(await signInRow()).toBeNull();
+      expect((await application.contests(webmaster, { window })).map((contest) => contest.id)).not.toContain(event.live);
+      expect(await application.contests(event.volunteer, { window })).toEqual([]);
+      expect(await resolveAuthority(db, event.volunteer, { scope: 'contest', contestId: event.live })).toBeUndefined();
+      expect(await resolveAuthority(db, webmaster, { scope: 'contest', contestId: event.live })).toBeUndefined();
+      expect(await resolveAuthority(db, webmaster, { scope: 'event', eventId: event.eventId })).toBeUndefined();
+      expect(await resolveAuthority(db, event.eventAdmin, { scope: 'event', eventId: event.eventId })).toBeUndefined();
+      expect(await bound(db, contestDataSql('caller'), ...contestDataBindings(event.contestant, event.live)).first()).toBeNull();
+
+      expect(await rows('SELECT DISTINCT revoked FROM logins WHERE account_id IN (SELECT id FROM accounts WHERE event_id = ?)', event.eventId))
+        .toEqual([{ revoked: 1 }]);
+      expect(await rows('SELECT revoked FROM logins WHERE account_id = ?', webmaster.accountId)).toEqual([{ revoked: 0 }]);
+      expect(await rows('SELECT archived FROM events WHERE id = ?', event.eventId)).toEqual([{ archived: 1 }]);
+      expect(await rows(`SELECT kind, count(*) AS n FROM event_deletion_targets WHERE event_id = ? GROUP BY kind ORDER BY kind`, event.eventId))
+        .toEqual([{ kind: 'account', n: event.accounts.length }, { kind: 'avatar_owner', n: 1 }, { kind: 'contest', n: 2 }]);
+      expect(await rows(`SELECT DISTINCT session_id FROM notifications WHERE audience = 'staff' AND delivered = 0
+        AND session_id IN (?, ?) ORDER BY session_id`, event.practice, event.live))
+        .toEqual([event.practice, event.live].sort().map((session_id) => ({ session_id })));
+
+      const fenced = await footprint(event);
+      await expect(fence(db, event)).rejects.toThrow(/valid = 1/);
+      expect(await footprint(event)).toEqual(fenced);
+      await cleanUp(event);
+    });
+  });
+
+  describe('a login whose batch commits after the fence', () => {
+    const password = 'a-fictional-password-123';
+    const identity = () => createBetterAuthIdentity(db, { origin: 'http://127.0.0.1:8788', secret: 's'.repeat(64), secureCookies: false });
+    const auth = (connection: D1Connection = db) => new D1AuthenticationService(connection, identity(), passwordHasher);
+    const cookieHeaders = (cookie: string) => new Headers({ cookie: cookie.split(';')[0]! });
+    const signIn = (service: D1AuthenticationService, event: SeededEvent) =>
+      service.signIn({ kind: 'event', code: event.code as EventCode }, event.contestant.handle as Handle, password);
+    const liveLogins = (accountId: string) => rows('SELECT id FROM logins WHERE account_id = ? AND revoked = 0', accountId);
+    const setPassword = async (accountId: string) =>
+      bound(db, 'UPDATE ba_account SET password = ? WHERE userId = ?', await passwordHasher.hash(password), accountId).run();
+
+    /** The sign-in has read its account and checked the password. The fence commits, then the login batch runs. */
+    function fenceAtLoginBatch(event: SeededEvent): { connection: D1Connection; fenced: () => boolean } {
+      let fenced = false;
+      const connection = interceptCalls(db, async (sql) => {
+        if (!fenced && sql.some((text) => text.includes('INSERT INTO logins'))) {
+          fenced = true;
+          await fence(db, event);
+        }
+      });
+      return { connection, fenced: () => fenced };
+    }
+
+    it('refuses a sign-in, and the rows step removes the identity session that it left', async () => {
+      const event = await seedEvent(db, webmaster, false);
+      await setPassword(event.contestant.accountId);
+      const racing = fenceAtLoginBatch(event);
+      const outcome = await signIn(auth(racing.connection), event).catch((caught: unknown) => caught);
+      expect(racing.fenced()).toBe(true);
+      expect(outcome).toBeInstanceOf(AuthenticationError);
+      expect((outcome as AuthenticationError).status).toBe(409);
+      expect(await liveLogins(event.contestant.accountId)).toEqual([]);
+      expect(await deleteRows(db, event)).toBe('rows_done');
+      expect(await rows('SELECT 1 FROM ba_session WHERE userId = ?', event.contestant.accountId)).toEqual([]);
+      await forget(event);
+    });
+
+    it('refuses the new login of a password change, so the change signs the account out', async () => {
+      const event = await seedEvent(db, webmaster, false);
+      await setPassword(event.contestant.accountId);
+      const headers = cookieHeaders((await signIn(auth(), event)).cookie);
+      expect(await auth().current(headers)).toBeDefined();
+      const racing = fenceAtLoginBatch(event);
+      const outcome = await auth(racing.connection).changePassword(headers, password, 'another-fictional-pass-456')
+        .catch((caught: unknown) => caught);
+      expect(racing.fenced()).toBe(true);
+      expect(outcome).toBeInstanceOf(AuthenticationError);
+      expect((outcome as AuthenticationError).status).toBe(409);
+      expect(await auth().current(headers)).toBeUndefined();
+      expect(await liveLogins(event.contestant.accountId)).toEqual([]);
+      await cleanUp(event);
+    });
+
+    it('still signs in an account of another event and a webmaster', async () => {
+      const doomed = await seedEvent(db, webmaster, false);
+      const kept = await seedEvent(db, webmaster, false);
+      await setPassword(kept.contestant.accountId);
+      const racing = fenceAtLoginBatch(doomed);
+      const signed = await signIn(auth(racing.connection), kept);
+      expect(racing.fenced()).toBe(true);
+      expect((await auth().current(cookieHeaders(signed.cookie)))?.user.id).toBe(kept.contestant.accountId);
+      expect(await liveLogins(kept.contestant.accountId)).toHaveLength(2);
+
+      const other = await seedWebmaster(db);
+      const [site] = await rows<{ handle: string }>('SELECT handle FROM accounts WHERE id = ?', other.accountId);
+      await setPassword(other.accountId);
+      try {
+        const siteSigned = await auth().signIn({ kind: 'site' }, site!.handle as Handle, password);
+        expect((await auth().current(cookieHeaders(siteSigned.cookie)))?.user.id).toBe(other.accountId);
+      } finally {
+        // A hosted database keeps this site account, so it must not keep a password that this file shows.
+        await db.batch([
+          bound(db, `UPDATE ba_account SET password = 'fictional-test-hash' WHERE userId = ?`, other.accountId),
+          bound(db, 'UPDATE logins SET revoked = 1 WHERE account_id = ?', other.accountId),
+        ]);
+      }
+      await cleanUp(doomed, kept);
+    });
+  });
+
+  describe('the delete_event command', () => {
+    const manage = () => new D1ManageService(db, fastPasswords);
+    const command = (event: SeededEvent, confirmName = event.name): ManageCommand =>
+      ({ type: 'delete_event', eventId: event.eventId, confirmName });
+
+    it('refuses everyone but a webmaster, and a wrong name, without a change', async () => {
+      const event = await seedRoster(db, webmaster);
+      const before = await footprint(event);
+      for (const caller of [event.eventAdmin, event.contestAdmin, event.volunteer, event.contestant]) {
+        await expect(manage().execute(caller, randomUUID(), command(event))).rejects.toMatchObject({ status: 403 });
+      }
+      await expect(manage().execute(webmaster, randomUUID(), command(event, `${event.name}x`)))
+        .rejects.toMatchObject({ status: 409, message: 'The name does not match. Type the event name exactly.' });
+      await expect(manage().execute(webmaster, randomUUID(), { type: 'delete_event', eventId: randomUUID(), confirmName: 'Nobody' }))
+        .rejects.toMatchObject({ status: 409, message: 'That event no longer exists. Refresh the page.' });
+      await expect(manage().execute(webmaster, randomUUID(), { type: 'delete_event', eventId: 'not-an-event', confirmName: 'Nobody' }))
+        .rejects.toMatchObject({ status: 400 });
+      expect(await footprint(event)).toEqual(before);
+      await cleanUp(event);
+    });
+
+    it('fences once, writes one site audit row, and answers a replay with its receipt', async () => {
+      const event = await seedRoster(db, webmaster);
+      const requestId = randomUUID();
+      const receipt = await manage().execute(webmaster, requestId, command(event));
+      expect(receipt).toEqual({ eventId: event.eventId });
+      expect(await manage().execute(webmaster, requestId, command(event))).toEqual(receipt);
+      await expect(manage().execute(webmaster, randomUUID(), command(event)))
+        .rejects.toMatchObject({ status: 409, message: 'This event is already being deleted.' });
+      expect(await rows(`SELECT event_id, actor, actor_name, detail FROM authority_audit WHERE action = 'delete_event' AND target = ?`, event.eventId))
+        .toEqual([{ event_id: null, actor: webmaster.accountId, actor_name: webmaster.name,
+          detail: JSON.stringify({ name: event.name, code: event.code }) }]);
+      expect(await rows('SELECT requested_by, requested_by_name, step, lease_until FROM event_deletions WHERE event_id = ?', event.eventId))
+        .toEqual([{ requested_by: webmaster.accountId, requested_by_name: webmaster.name, step: 'rows', lease_until: 0 }]);
+      await bound(db, `DELETE FROM manage_receipts WHERE actor = ? AND request_id = ?`, webmaster.accountId, requestId).run();
+      await cleanUp(event);
+    });
+
+    describe('a legacy event', () => {
+      const deleteLegacy = async (eventId: string, confirmName: string): Promise<void> => {
+        const requestId = randomUUID();
+        expect(await manage().execute(webmaster, requestId, { type: 'delete_event', eventId, confirmName })).toEqual({ eventId });
+        expect(await deleteRows(db, { eventId })).toBe('rows_done');
+        await bound(db, 'DELETE FROM manage_receipts WHERE actor = ? AND request_id = ?', webmaster.accountId, requestId).run();
+        await forget({ eventId });
+      };
+      const legacyEvent = async (name: string | null): Promise<{ eventId: string; code: string }> => {
+        const eventId = randomUUID();
+        await bound(db, name === null ? 'INSERT INTO events (id) VALUES (?)' : 'INSERT INTO events (id, name) VALUES (?, ?)', ...(name === null ? [eventId] : [eventId, name])).run();
+        const row = (await rows<{ code: string }>('SELECT code FROM events WHERE id = ?', eventId))[0];
+        return { eventId, code: row?.code ?? '' };
+      };
+
+      it('with an empty name confirms with its code, and never with nothing', async () => {
+        const { eventId, code } = await legacyEvent(null);
+        await expect(manage().execute(webmaster, randomUUID(), { type: 'delete_event', eventId, confirmName: '' }))
+          .rejects.toMatchObject({ status: 400 });
+        await expect(manage().execute(webmaster, randomUUID(), { type: 'delete_event', eventId, confirmName: `${code}x` }))
+          .rejects.toMatchObject({ status: 409, message: 'The code does not match. Type the event code exactly.' });
+        await deleteLegacy(eventId, code);
+      });
+
+      it('with a name longer than a new name may be confirms with that name', async () => {
+        const name = `Legacy ${'x'.repeat(300)}`;
+        const { eventId } = await legacyEvent(name);
+        await deleteLegacy(eventId, name);
+      });
+    });
+
+    it('removes the receipts that name the event or its contests, keeps the delete receipt, and leaves another event alone', async () => {
+      const createEvent = async (person: string): Promise<{ eventId: string; name: string; contestId: string }> => {
+        const tag = randomUUID().slice(0, 8);
+        const name = `Receipts ${tag}`;
+        const { eventId } = await manage().execute(webmaster, randomUUID(), {
+          type: 'create_event', name, code: `r-${tag}`, timeZone: 'UTC', firstAdmin: { handle: `first-${tag}` as Handle, name: person },
+        });
+        await manage().execute(webmaster, randomUUID(), { type: 'create_people', eventId: eventId!, people: [{ handle: `more-${tag}` as Handle, name: person }] });
+        const schedule = { startsAt: '2031-01-01T09:00:00.000Z', endsAt: '2031-01-01T12:00:00.000Z', graceMinutes: 0 };
+        const { contestId } = await manage().execute(webmaster, randomUUID(), {
+          type: 'create_contest', kind: 'practice', eventId: eventId!, name: 'Contest', contestType: 'teams', schedule, categories: ['Devices'],
+        });
+        await manage().execute(webmaster, randomUUID(), { type: 'update_contest', contestId: contestId!, name: `Renamed ${person}`, contestType: 'teams' });
+        return { eventId: eventId!, name, contestId: contestId! };
+      };
+      // A Record, so that a new command must name itself here and show that its receipt goes.
+      const everyOtherCommand = async ({ eventId, contestId }: { eventId: string; contestId: string }, person: string): Promise<void> => {
+        const send = (command: ManageCommand) => manage().execute(webmaster, randomUUID(), command);
+        const tag = randomUUID().slice(0, 8);
+        const staff = (await send({ type: 'create_people', eventId, people: [{ handle: `staff-${tag}` as Handle, name: person }] })).accountIds![0]!;
+        const entrantId = (await send({ type: 'create_entrants', eventId, entrants: [{ kind: 'team', name: person, handle: `team-${tag}` as Handle }] })).entrantIds![0]!;
+        const noSignIn = randomUUID();
+        await bound(db, `INSERT INTO entrants (id, event_id, kind, name) VALUES (?, ?, 'team', 'Legacy team')`, noSignIn, eventId).run();
+        const rest: Record<Exclude<ManageCommand['type'], 'add_webmaster' | 'remove_webmaster' | 'set_webmaster_reads' | 'delete_event' | 'create_event' | 'create_people' | 'create_entrants' | 'create_contest' | 'update_contest' | 'join_contest'>, ManageCommand> = {
+          update_event: { type: 'update_event', eventId, name: `Receipts ${tag}`, code: `r-${tag}`, timeZone: 'UTC' },
+          rename_entrant: { type: 'rename_entrant', eventId, entrantId, name: `${person} two` },
+          add_entrant_sign_in: { type: 'add_entrant_sign_in', eventId, entrantId: noSignIn, handle: `second-${tag}` as Handle },
+          assign_entrants: { type: 'assign_entrants', contestId, entries: [{ entrantId, location: person }] },
+          set_location: { type: 'set_location', contestId, entrantId, location: `${person} two` },
+          assign_staff: { type: 'assign_staff', contestId, accountId: staff, admin: true, roles: ['volunteer'] },
+          set_event_admin: { type: 'set_event_admin', eventId, accountId: staff, admin: true },
+          set_intake: { type: 'set_intake', contestId, mode: 'open' },
+          set_image_limits: { type: 'set_image_limits', contestId, fileMegabytes: 1, count: 1, totalMegabytes: 2 },
+          set_categories: { type: 'set_categories', contestId, categories: [person] },
+          set_handle: { type: 'set_handle', eventId, accountId: staff, handle: `renamed-${tag}` as Handle },
+          unassign_staff: { type: 'unassign_staff', contestId, accountId: staff },
+          unassign_entrant: { type: 'unassign_entrant', contestId, entrantId },
+        };
+        for (const command of Object.values(rest)) await send(command);
+        // A webmaster joins only while the site setting is on, and these test files run one at a time.
+        await send({ type: 'set_webmaster_reads', restricted: true });
+        await send({ type: 'join_contest', contestId });
+        await send({ type: 'set_webmaster_reads', restricted: false });
+        await manage().issueCredentials(webmaster, randomUUID(), { eventId, accountIds: [staff], contestId: null, voidLivePasswords: false });
+      };
+      const receiptsNaming = (...ids: string[]) => rows(`SELECT actor, request_id, command, result, at FROM manage_receipts
+        WHERE ${ids.map(() => '(instr(command, ?) > 0 OR instr(result, ?) > 0)').join(' OR ')} ORDER BY request_id`, ...ids.flatMap((id) => [id, id]));
+      const doomed = await createEvent('Fictional Secret Person');
+      await everyOtherCommand(doomed, 'Fictional Secret Person');
+      const doomedName = (await rows<{ name: string }>('SELECT name FROM events WHERE id = ?', doomed.eventId))[0]!.name;
+      const kept = await createEvent('Fictional Kept Person');
+      const keptBefore = await receiptsNaming(kept.eventId, kept.contestId);
+      expect(keptBefore.length).toBeGreaterThanOrEqual(4);
+
+      const requestId = randomUUID();
+      const remove: ManageCommand = { type: 'delete_event', eventId: doomed.eventId, confirmName: doomedName };
+      await manage().execute(webmaster, requestId, remove);
+      expect(await deleteRows(db, doomed)).toBe('rows_done');
+
+      expect(await rows(`SELECT request_id FROM manage_receipts WHERE instr(command, 'Fictional Secret Person') > 0`)).toEqual([]);
+      expect(await rows(`SELECT json_extract(command, '$.type') AS type FROM manage_receipts
+        WHERE instr(command, ?) > 0 OR instr(result, ?) > 0 OR instr(command, ?) > 0 OR instr(result, ?) > 0`,
+      doomed.eventId, doomed.eventId, doomed.contestId, doomed.contestId)).toEqual([{ type: 'delete_event' }]);
+      expect(await receiptsNaming(kept.eventId, kept.contestId)).toEqual(keptBefore);
+      expect(await manage().execute(webmaster, requestId, remove)).toEqual({ eventId: doomed.eventId });
+
+      await bound(db, 'DELETE FROM manage_receipts WHERE actor = ? AND request_id = ?', webmaster.accountId, requestId).run();
+      await forget(doomed);
+      await cleanUp(kept);
+    });
+
+    it('keeps a receipt of another event whose pasted text holds the deleted event ID, so its replay still answers', async () => {
+      const tag = randomUUID().slice(0, 8);
+      const created = (name: string) => manage().execute(webmaster, randomUUID(), {
+        type: 'create_event', name, code: `${name.toLowerCase()}-${tag}`, timeZone: 'UTC', firstAdmin: { handle: `${name.toLowerCase()}-${tag}` as Handle, name: 'Fictional admin' },
+      });
+      const doomed = (await created('Doomed')).eventId!;
+      const kept = (await created('Kept')).eventId!;
+      const requestId = randomUUID();
+      const pasted: ManageCommand = { type: 'create_people', eventId: kept, people: [{ handle: `pasted-${tag}` as Handle, name: `Pasted ${doomed}` }] };
+      const answer = await manage().execute(webmaster, requestId, pasted);
+      const removeRequest = randomUUID();
+      await manage().execute(webmaster, removeRequest, { type: 'delete_event', eventId: doomed, confirmName: 'Doomed' });
+      expect(await deleteRows(db, { eventId: doomed })).toBe('rows_done');
+      expect(await manage().execute(webmaster, requestId, pasted)).toEqual(answer);
+      await bound(db, 'DELETE FROM manage_receipts WHERE actor = ? AND request_id IN (?, ?)', webmaster.accountId, requestId, removeRequest).run();
+      await forget({ eventId: doomed });
+      await cleanUp({ eventId: kept });
+    });
+
+    it('gives a fenced event code the refusal of an unknown code', async () => {
+      const event = await seedRoster(db, webmaster);
+      const identity = createBetterAuthIdentity(db, { origin: 'http://127.0.0.1:8788', secret: 's'.repeat(64), secureCookies: false });
+      const auth = new D1AuthenticationService(db, identity, passwordHasher);
+      const refusal = async (code: string) => {
+        const error = await auth.signIn({ kind: 'event', code: code as EventCode }, event.contestant.handle as Handle, 'a-wrong-password').catch((caught: unknown) => caught);
+        expect(error).toBeInstanceOf(AuthenticationError);
+        return { status: (error as AuthenticationError).status, message: (error as AuthenticationError).message };
+      };
+      const unknown = await refusal(`unknown-${randomUUID().slice(0, 8)}`);
+      await fence(db, event);
+      expect(await refusal(event.code)).toEqual(unknown);
+      await bound(db, `DELETE FROM authentication_limits WHERE key LIKE ?`, `handle:code:%:${event.contestant.handle}`).run();
+      await cleanUp(event);
+    });
+
+    it('shows progress on the site page, and omits the event from its list', async () => {
+      const event = await seedEvent(db, webmaster);
+      const shown = async () => (await manage().site(webmaster))?.deletions.find((deletion) => deletion.eventId === event.eventId);
+      expect(await shown()).toBeUndefined();
+      expect((await manage().site(webmaster))?.events.map((item) => item.id)).toContain(event.eventId);
+      await fence(db, event);
+      expect((await manage().site(webmaster))?.events.map((item) => item.id)).not.toContain(event.eventId);
+      expect(await shown()).toMatchObject({
+        eventName: event.name, eventCode: event.code, step: 'rows', requestedByName: webmaster.name, blockedBy: null,
+        filesDueAt: null, finishedAt: null, remaining: 2 + event.accounts.length,
+      });
+      const { bucket, live, env } = stores();
+      fillStores(event, bucket, live);
+      await advanceDeletions(env);
+      const waiting = await shown();
+      expect(waiting).toMatchObject({ step: 'files', remaining: 3, finishedAt: null });
+      expect(Date.parse(waiting?.filesDueAt ?? '') - Date.now()).toBeGreaterThan(60 * 60_000);
+      await runToEnd(env, event);
+      expect(await shown()).toMatchObject({ step: 'done', remaining: 0 });
+      expect((await shown())?.finishedAt).toEqual(expect.any(String));
+      await forget(event);
+    });
+
+    it('names the blocking account on the site page', async () => {
+      const event = await seedRoster(db, webmaster);
+      const other = await seedRoster(db, webmaster);
+      const legacy = await seedInertSeat(db, event, other.practice);
+      await fence(db, event);
+      const { env } = stores();
+      await advanceDeletions(env);
+      const deletion = (await manage().site(webmaster))?.deletions.find((item) => item.eventId === event.eventId);
+      const blockedAccount = (await rows<{ handle: string }>('SELECT handle FROM accounts WHERE id = ?', legacy))[0];
+      expect(deletion?.blockedBy).toEqual({ name: 'Fictional legacy', handle: blockedAccount?.handle });
+      await bound(db, 'DELETE FROM memberships WHERE account_id = ?', legacy).run();
+      await cleanUp(event, other);
+    });
+  });
+
+  describe('the rows step', () => {
+    /** What a long contest leaves: an outbox that nothing deletes, and an audit trail. */
+    async function seedLongContest(contest: string, actorId: string, count: number): Promise<void> {
+      const series = `WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < ${count})`;
+      await db.batch([
+        bound(db, `INSERT INTO audience_sequences (session_id, audience, sequence) VALUES (?, 'staff', 1)
+          ON CONFLICT (session_id, audience) DO NOTHING`, contest),
+        bound(db, `${series} INSERT INTO notifications (id, session_id, audience, sequence, delivered)
+          SELECT lower(hex(randomblob(16))), ?, 'staff', 1000 + i, 1 FROM n`, contest),
+        bound(db, `${series} INSERT INTO admin_audit (id, session_id, actor, action)
+          SELECT lower(hex(randomblob(16))), ?, ?, 'save_member' FROM n`, contest, actorId),
+      ]);
+    }
+
+    /** The rows of each activity table in the event's two contests, in one request. */
+    async function activityCounts(event: SeededEvent): Promise<Record<string, number>> {
+      const counts = CONTEST_ACTIVITY.map(({ table }) => `(SELECT count(*) FROM ${table} WHERE session_id IN (?1, ?2)) AS ${table}`);
+      return (await rows<Record<string, number>>(`SELECT ${counts.join(', ')}`, event.practice, event.live))[0]!;
+    }
+
+    // One seed and one run carry each assertion, because each needs only that a full deletion runs unit by unit.
+    for (const limit of [undefined, 1]) {
+      it(`leaves only the journal and the site records, within ROWS_UNIT_CALLS a unit, with chunks of ${limit ?? 'the default'}`, async () => {
+        const event = await seedEvent(db, webmaster);
+        await seedLongContest(event.live, event.contestAdmin.accountId, 3);
+        await fence(db, event);
+        const counter = crashingEnvironment(stores().env, Number.MAX_SAFE_INTEGER, 'never ran');
+        const total = (counts: Record<string, number>) => Object.values(counts).reduce((sum, count) => sum + count, 0);
+        let before = await activityCounts(event);
+        for (;;) {
+          const called = counter.calls();
+          const progress = await advanceRows(counter.env.DB, event.eventId, limit);
+          expect(counter.calls() - called).toBeLessThanOrEqual(ROWS_UNIT_CALLS);
+          const after = await activityCounts(event);
+          expect(total(before) - total(after)).toBeLessThanOrEqual(limit ?? Number.POSITIVE_INFINITY);
+          before = after;
+          if (progress === 'rows_done') break;
+        }
+        const left = await footprint(event);
+        expect(Object.keys(left).sort()).toEqual(['authority_audit', 'event_deletion_targets', 'event_deletions']);
+        expect(left.authority_audit!.every((row) => row.includes('"event_id":null'))).toBe(true);
+        expect(await rows('SELECT step, blocked FROM event_deletions WHERE event_id = ?', event.eventId))
+          .toEqual([{ step: 'live', blocked: null }]);
+        expect(await rows('SELECT DISTINCT done FROM event_deletion_targets WHERE event_id = ? AND kind = ?', event.eventId, 'contest'))
+          .toEqual([{ done: 0 }]);
+        expect(await rows(`SELECT key FROM authentication_limits WHERE key IN (?, ?)`,
+          `handle:${event.eventId}:${event.contestant.handle}`, `change:${event.contestant.accountId}`)).toEqual([]);
+        expect(await deleteRows(db, event, limit)).toBe('rows_done');
+        await forget(event);
+      });
+    }
+
+    it('removes a long contest in bounded statements, so the contest row cascades no outbox and no audit', async () => {
+      const event = await seedRoster(db, webmaster);
+      await seedLongContest(event.live, event.contestAdmin.accountId, 2500);
+      await fence(db, event);
+      const largest = { notifications: 0, admin_audit: 0 };
+      let before = await activityCounts(event);
+      for (;;) {
+        const progress = await advanceRows(db, event.eventId);
+        const after = await activityCounts(event);
+        largest.notifications = Math.max(largest.notifications, before.notifications! - after.notifications!);
+        largest.admin_audit = Math.max(largest.admin_audit, before.admin_audit! - after.admin_audit!);
+        before = after;
+        if (progress === 'rows_done') break;
+        expect(progress).toBe('more');
+      }
+      expect(largest).toEqual({ notifications: 1000, admin_audit: 1000 });
+      await forget(event);
+    });
+  });
+
+  describe('rows that arrive after the fence', () => {
+    const lateContest = (event: SeededEvent, id: string) =>
+      bound(db, `INSERT INTO sessions (id, event_id, name) VALUES (?, ?, 'Late contest')`, id, event.eventId).run();
+
+    it('take a contest through every step, so its live state and its files go', async () => {
+      const event = await seedRoster(db, webmaster);
+      const { bucket, live, env } = stores();
+      fillStores(event, bucket, live);
+      await fence(db, event);
+      const late = randomUUID();
+      await lateContest(event, late);
+      bucket.add([`${late}/file`]);
+      live.state(late).fill(late);
+      await runToEnd(env, event);
+      expect(await rows('SELECT 1 FROM sessions WHERE id = ?', late)).toEqual([]);
+      expect(bucket.objects.size).toBe(0);
+      expect(live.state(late).empty).toBe(true);
+      await forget(event);
+    });
+
+    it('take an account, so the last batch does not fail for ever', async () => {
+      const event = await seedRoster(db, webmaster);
+      await fence(db, event);
+      const late = randomUUID();
+      await bound(db, `INSERT INTO accounts (id, name, username, handle, event_id, must_change) VALUES (?, 'Late', ?, ?, ?, 0)`,
+        late, `late-${late.slice(0, 12)}`, `late-${late.slice(0, 12)}`, event.eventId).run();
+      expect(await deleteRows(db, event)).toBe('rows_done');
+      expect(await rows('SELECT 1 FROM accounts WHERE id = ?', late)).toEqual([]);
+      await forget(event);
+    });
+
+    it('do not make a seat in a late contest look like a seat in another event', async () => {
+      const event = await seedRoster(db, webmaster);
+      await fence(db, event);
+      const late = randomUUID();
+      await lateContest(event, late);
+      await bound(db, 'INSERT INTO memberships (session_id, account_id) VALUES (?, ?)', late, event.volunteer.accountId).run();
+      expect(await deleteRows(db, event)).toBe('rows_done');
+      expect(await rows('SELECT 1 FROM sessions WHERE id = ?', late)).toEqual([]);
+      expect(await rows('SELECT 1 FROM accounts WHERE id = ?', event.volunteer.accountId)).toEqual([]);
+      await forget(event);
+    });
+
+    it('fail the last batch when they arrive after the check, and the next unit adds them', async () => {
+      const event = await seedRoster(db, webmaster);
+      await fence(db, event);
+      const late = randomUUID();
+      let arrived = false;
+      const racing = interceptCalls(db, async (sql) => {
+        if (!arrived && sql.some((text) => text.startsWith('DELETE FROM events'))) {
+          arrived = true;
+          await lateContest(event, late);
+        }
+      });
+      expect(await deleteRows(racing, event)).toBe('rows_done');
+      expect(arrived).toBe(true);
+      expect(await rows('SELECT 1 FROM sessions WHERE id = ?', late)).toEqual([]);
+      expect(await rows(`SELECT done FROM event_deletion_targets WHERE event_id = ? AND kind = 'contest' AND id = ?`, event.eventId, late))
+        .toEqual([{ done: 0 }]);
+      await forget(event);
+    });
+  });
+
+  describe('concurrent runners', () => {
+    it('reach the same end when two run at once', async () => {
+      const clean = await seedEvent(db, webmaster);
+      await runToEnd(stores().env, clean);
+      const expected = await footprint(clean);
+      await forget(clean);
+      const event = await seedEvent(db, webmaster);
+      const { bucket, live, env } = stores();
+      fillStores(event, bucket, live);
+      await fence(db, event);
+      for (let tick = 0; tick < 20 && !await finished(event); tick += 1) {
+        await passTime(event);
+        await Promise.all([advanceDeletions(env), advanceDeletions(env)]);
+      }
+      expect(await footprint(event)).toEqual(expected);
+      expect(bucket.objects.size).toBe(0);
+      await forget(event);
+    });
+
+    it('reach the same end when two share the rows step', async () => {
+      const event = await seedEvent(db, webmaster);
+      await fence(db, event);
+      expect(await Promise.all([deleteRows(db, event, 1), deleteRows(db, event, 1)])).toEqual(['rows_done', 'rows_done']);
+      await forget(event);
+    });
+
+    /** A runner that stops just before the first call that matches, until the test releases it. */
+    function pausingAt(pattern: RegExp) {
+      let entered: () => void = () => undefined;
+      let release: () => void = () => undefined;
+      const atCall = new Promise<void>((resolve) => { entered = resolve; });
+      const released = new Promise<void>((resolve) => { release = resolve; });
+      let paused = false;
+      return {
+        atCall,
+        release,
+        db: interceptCalls(db, async (sql) => {
+          if (!paused && sql.some((text) => pattern.test(text))) {
+            paused = true;
+            entered();
+            await released;
+          }
+        }),
+      };
+    }
+
+    it('do not let a stale rows runner skip the files of a contest', async () => {
+      const event = await seedRoster(db, webmaster);
+      const { bucket, live, env } = stores();
+      fillStores(event, bucket, live);
+      await fence(db, event);
+      await db.batch(CONTEST_ACTIVITY.map(({ table }) => bound(db, `DELETE FROM ${table} WHERE session_id IN (?, ?)`, event.practice, event.live)));
+      const stale = pausingAt(/^DELETE FROM sessions/);
+      const running = advanceRows(stale.db, event.eventId);
+      await stale.atCall;
+      await passTime(event);
+      await advanceDeletions(env);
+      expect((await rows<{ step: string }>('SELECT step FROM event_deletions WHERE event_id = ?', event.eventId))[0]?.step).toBe('files');
+      stale.release();
+      await running;
+      expect(await rows(`SELECT id FROM event_deletion_targets WHERE event_id = ? AND kind = 'contest' AND done = 1`, event.eventId)).toEqual([]);
+      await runToEnd(env, event);
+      expect(bucket.objects.size).toBe(0);
+      await forget(event);
+    });
+
+    it('do not let a stale live runner skip the files of a contest', async () => {
+      const event = await seedRoster(db, webmaster);
+      const { bucket, live, env } = stores();
+      fillStores(event, bucket, live);
+      await fence(db, event);
+      await deleteRows(db, event);
+      const stale = pausingAt(/SET done = 1/);
+      const running = advanceDeletions({ ...env, DB: stale.db });
+      await stale.atCall;
+      await passTime(event);
+      await advanceDeletions(env);
+      expect((await rows<{ step: string }>('SELECT step FROM event_deletions WHERE event_id = ?', event.eventId))[0]?.step).toBe('done');
+      await forget(event);
+      stale.release();
+      await running;
+      expect(bucket.objects.size).toBe(0);
+    });
+  });
+
+  describe('a stale live runner', () => {
+    it('stops erasing once the step has moved', async () => {
+      const event = await seedRoster(db, webmaster);
+      const { bucket, live, env } = stores();
+      fillStores(event, bucket, live);
+      await fence(db, event);
+      await deleteRows(db, event);
+      let entered: () => void = () => undefined;
+      let release: () => void = () => undefined;
+      const atRead = new Promise<void>((resolve) => { entered = resolve; });
+      const released = new Promise<void>((resolve) => { release = resolve; });
+      let paused = false;
+      const holding = interceptCalls(db, async (sql) => {
+        if (!paused && sql.some((text) => text.includes("kind = 'contest' AND done = 0"))) {
+          paused = true;
+          entered();
+          await released;
+        }
+      });
+      const counter = crashingEnvironment({ ...env, DB: holding }, Number.MAX_SAFE_INTEGER, 'never ran');
+      const running = advanceDeletions(counter.env);
+      await atRead;
+      await passTime(event);
+      await advanceDeletions(env);
+      release();
+      await running;
+      expect(counter.calls()).toBeLessThan(12);
+      await cleanUp(event);
+    });
+  });
+
+  describe('the live step', () => {
+    it('refuses to erase a contest that exists, or that no journal names', async () => {
+      const event = await seedRoster(db, webmaster);
+      const { live } = stores();
+      live.state(event.live).fill(event.live);
+      await expect(eraseLiveContest({ LIVE_UPDATES: live }, event.eventId, event.live)).rejects.toThrow('not erased');
+      await fence(db, event);
+      await expect(eraseLiveContest({ LIVE_UPDATES: live }, event.eventId, event.live)).rejects.toThrow('not erased');
+      expect(live.state(event.live).empty).toBe(false);
+      await deleteRows(db, event);
+      await eraseLiveContest({ LIVE_UPDATES: live }, event.eventId, event.live);
+      expect(live.state(event.live).empty).toBe(true);
+      await forget(event);
+      await expect(eraseLiveContest({ LIVE_UPDATES: live }, event.eventId, event.live)).rejects.toThrow('not erased');
+    });
+  });
+
+  describe('the files step', () => {
+    it('makes no R2 call and no claim for 65 minutes after the rows go', async () => {
+      const event = await seedRoster(db, webmaster);
+      const { bucket, live, env } = stores();
+      fillStores(event, bucket, live);
+      await fence(db, event);
+      const calls: string[] = [];
+      const counted: DeletionEnvironment = { ...env, IMAGES: {
+        list: (options) => { calls.push(options.prefix); return bucket.list(options); },
+        delete: (keys) => bucket.delete(keys),
+      } };
+      await advanceDeletions(counted);
+      expect(calls).toEqual([]);
+      const row = (await rows<{ step: string; wait: number }>(`SELECT step, lease_until - unixepoch(rows_done_at) AS wait FROM event_deletions WHERE event_id = ?`, event.eventId))[0];
+      expect(row).toEqual({ step: 'files', wait: 3900 });
+      expect(await bound(db, CLAIM_DELETION_SQL, 55).first()).toBeNull();
+      await runToEnd(env, event);
+      await forget(event);
+    });
+
+    it('covers the keys of issue images, announcement images, and avatars, and follows every page', async () => {
+      const event = await seedEvent(db, webmaster);
+      const { bucket, live, env } = stores();
+      fillStores(event, bucket, live);
+      expect(event.objects).toContainEqual(attachmentPath(event.practice, event.objects[0]!.split('/')[1]!, event.objects[0]!.split('/')[2]!, 'original'));
+      expect(event.objects.filter((key) => key.startsWith(`${event.live}/announcements/`))).toHaveLength(1);
+      expect(event.objects.filter((key) => key.startsWith(`accounts/${event.eventAdmin.accountId}/`))).toHaveLength(1);
+      bucket.pageSize = 2;
+      bucket.add([1, 2, 3, 4, 5].map((n) => `${event.practice}/many/${n}`));
+      bucket.emptyFirstPage.add(`${event.live}/`);
+      bucket.add(['control/file', `${event.practice}-not-this-contest/file`]);
+      await runToEnd(env, event);
+      expect([...bucket.objects].sort()).toEqual([`${event.practice}-not-this-contest/file`, 'control/file'].sort());
+      await forget(event);
+    });
+
+    it('marks a prefix done only after a complete listing finds no object', async () => {
+      const event = await seedEvent(db, webmaster);
+      const { bucket, live, env } = stores();
+      fillStores(event, bucket, live);
+      await fence(db, event);
+      await advanceDeletions(env);
+      await passTime(event);
+      bucket.pageSize = 1;
+      const marksBeforeEmpty: number[] = [];
+      const watching: DeletionEnvironment = { ...env, IMAGES: {
+        list: async (options) => {
+          const page = await bucket.list(options);
+          if (page.objects.length > 0) {
+            marksBeforeEmpty.push((await rows(`SELECT 1 FROM event_deletion_targets WHERE event_id = ? AND done = 1 AND kind = 'contest' AND ? LIKE id || '/%'`,
+              event.eventId, options.prefix)).length);
+          }
+          return page;
+        },
+        delete: (keys) => bucket.delete(keys),
+      } };
+      await advanceDeletions(watching);
+      expect(marksBeforeEmpty.every((marked) => marked === 0)).toBe(true);
+      expect(marksBeforeEmpty.length).toBeGreaterThan(0);
+      expect(await finished(event)).toBe(true);
+      await forget(event);
+    });
+  });
+
+  describe('the budget', () => {
+    /** The log lines of failed attempts. The local runtime also writes its own text to the console. */
+    const failureLines = (logged: { mock: { calls: unknown[][] } }): object[] => logged.mock.calls.map(([line]) => String(line))
+      .filter((line) => line.startsWith('{')).map((line) => JSON.parse(line) as object);
+
+    it('stops at its count of calls, and later ticks finish', async () => {
+      const event = await seedRoster(db, webmaster);
+      const { bucket, live, env } = stores();
+      fillStores(event, bucket, live);
+      await fence(db, event);
+      const counter = crashingEnvironment(env, Number.MAX_SAFE_INTEGER, 'never ran');
+      await advanceDeletions(counter.env, { milliseconds: 20_000, calls: 4 });
+      expect(counter.calls()).toBeLessThan(12);
+      expect(await finished(event)).toBe(false);
+      for (let tick = 0; tick < 100 && !await finished(event); tick += 1) {
+        await passTime(event);
+        await advanceDeletions(env, { milliseconds: 20_000, calls: 4 });
+      }
+      expect(await finished(event)).toBe(true);
+      await forget(event);
+    });
+
+    it('stops at its time, and leaves the lease for a later tick', async () => {
+      const event = await seedRoster(db, webmaster);
+      const { env } = stores();
+      await fence(db, event);
+      await advanceDeletions(env, { milliseconds: 0, calls: 400 });
+      expect(await rows('SELECT lease_until FROM event_deletions WHERE event_id = ?', event.eventId)).toEqual([{ lease_until: 0 }]);
+      await runToEnd(env, event);
+      await forget(event);
+    });
+
+    it('lets one failing deletion leave the others to finish, and then reports the failure', async () => {
+      const failing = await seedRoster(db, webmaster);
+      const other = await seedRoster(db, webmaster);
+      const { bucket, live, env } = stores();
+      fillStores(failing, bucket, live);
+      fillStores(other, bucket, live);
+      await fence(db, failing);
+      await fence(db, other);
+      await advanceDeletions(env);
+      await passTime(failing);
+      await passTime(other);
+      const logged = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      await expect(advanceDeletions({ ...env, IMAGES: {
+        list: async (options) => {
+          if (options.prefix.startsWith(failing.practice) || options.prefix.startsWith(failing.live) || options.prefix.includes(failing.eventAdmin.accountId)) {
+            throw new Error('Storage unavailable.');
+          }
+          return bucket.list(options);
+        },
+        delete: (keys) => bucket.delete(keys),
+      } })).rejects.toThrow('requires another attempt');
+      expect(failureLines(logged)).toContainEqual(expect.objectContaining({ eventId: failing.eventId, phase: 'files', cause: 'other' }));
+      logged.mockRestore();
+      expect(await finished(other)).toBe(true);
+      expect(await finished(failing)).toBe(false);
+      await runToEnd(env, failing);
+      await forget(failing);
+      await forget(other);
+    });
+
+    it('logs fixed words for a key failure that D1 hides, and no text of the error', async () => {
+      const event = await seedRoster(db, webmaster);
+      const other = await seedEvent(db, webmaster);
+      const historyId = randomUUID();
+      const issue = (await rows<{ id: string }>('SELECT id FROM issues WHERE session_id = ? LIMIT 1', other.live))[0]!.id;
+      await bound(db, `INSERT INTO history (id, issue_id, actor, actor_name, at, text, visibility)
+        VALUES (?, ?, ?, 'Legacy', strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), 'Legacy', 'public')`, historyId, issue, event.volunteer.accountId).run();
+      await fence(db, event);
+      // Hosted D1 can answer any failure with this message, so nothing here names the key.
+      const hiding: D1Connection = {
+        prepare: (sql) => db.prepare(sql),
+        batch: async (statements) => {
+          try {
+            return await db.batch(statements);
+          } catch (error) {
+            if ((error as Error).message.includes('FOREIGN KEY')) throw new Error('internal error; reference = Fictional Person', { cause: error });
+            throw error;
+          }
+        },
+      };
+      const logged = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      await expect(advanceDeletions({ ...stores().env, DB: hiding })).rejects.toThrow('requires another attempt');
+      const lines = failureLines(logged);
+      logged.mockRestore();
+      expect(lines).toEqual([{
+        level: 'error', event: 'deletion.advance_failed', task: 'advance-deletions', eventId: event.eventId,
+        phase: 'accounts', cause: 'internal', errorName: 'Error',
+      }]);
+      expect(await rows('SELECT blocked FROM event_deletions WHERE event_id = ?', event.eventId)).toEqual([{ blocked: null }]);
+      await bound(db, 'DELETE FROM history WHERE id = ?', historyId).run();
+      await passTime(event);
+      expect(await deleteRows(db, event)).toBe('rows_done');
+      await forget(event);
+      await cleanUp(other);
+    });
+
+    it('logs the last batch for a key that fails when that batch commits, and sets no block', async () => {
+      const [eventId, otherId, contest, entrant] = [randomUUID(), randomUUID(), randomUUID(), randomUUID()];
+      await db.batch([
+        bound(db, `INSERT INTO events (id, name) VALUES (?, 'Deferred'), (?, 'Deferred other')`, eventId, otherId),
+        bound(db, `INSERT INTO sessions (id, event_id, name) VALUES (?, ?, 'Moved')`, contest, eventId),
+        bound(db, `INSERT INTO entrants (id, event_id, kind, name) VALUES (?, ?, 'team', 'Team')`, entrant, eventId),
+        bound(db, `INSERT INTO teams (id, session_id, name, entrant_id) VALUES (?, ?, 'Team', ?)`, randomUUID(), contest, entrant),
+        // No Worker command does this. It stands for a team of another event that names this event's entrant.
+        bound(db, 'UPDATE sessions SET event_id = ? WHERE id = ?', otherId, contest),
+      ]);
+      await db.batch(fenceStatements(db, actor(), eventId, 'Deferred', randomUUID()));
+      const logged = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      await expect(advanceDeletions(stores().env)).rejects.toThrow('requires another attempt');
+      const lines = failureLines(logged);
+      logged.mockRestore();
+      expect(lines).toEqual([expect.objectContaining({ eventId, phase: 'event', cause: expect.stringMatching(/^(?:foreign_key|internal)$/) as string })]);
+      expect(await rows('SELECT step, blocked FROM event_deletions WHERE event_id = ?', eventId)).toEqual([{ step: 'rows', blocked: null }]);
+      await bound(db, 'UPDATE sessions SET event_id = ? WHERE id = ?', eventId, contest).run();
+      await passTime({ eventId });
+      expect(await deleteRows(db, { eventId })).toBe('rows_done');
+      await cleanUp({ eventId: otherId });
+      await forget({ eventId });
+    });
+  });
+
+  describe('statement plans', () => {
+    it('searches every statement of a complete deletion through an index', async () => {
+      const event = await seedEvent(db, webmaster);
+      const { bucket, live, env } = stores();
+      fillStores(event, bucket, live);
+      const recorded = new Map<string, readonly (string | number | null)[]>();
+      const recording: DeletionEnvironment = { ...env, DB: interceptCalls(db, async (sql, values) => {
+        sql.forEach((text, index) => recorded.set(text, values[index] ?? []));
+      }) };
+      await runToEnd(recording, event);
+      expect(recorded.size).toBeGreaterThan(15);
+      for (const { table } of CONTEST_ACTIVITY) expect([...recorded.keys()]).toContainEqual(expect.stringContaining(`DELETE FROM ${table} WHERE rowid IN`));
+      const scans: string[] = [];
+      for (const [sql, values] of recorded) {
+        const plan = await bound(db, `EXPLAIN QUERY PLAN ${sql}`, ...values).all<{ detail: string }>();
+        for (const { detail } of plan.results) {
+          // A scan of the installation table reads its one row. The receipts are matched by their fields, once per deletion.
+          if (/^SCAN /.test(detail) && !/^SCAN (?:CONSTANT ROW|\(subquery-\d+\)|json_each|installation\b|manage_receipts\b)/.test(detail)) {
+            scans.push(`${detail}: ${sql.replace(/\s+/g, ' ').slice(0, 90)}`);
+          }
+        }
+      }
+      expect(scans).toEqual([]);
+      await forget(event);
+    });
+  });
+
+  describe('a second event', () => {
+    it('keeps every row that names it, its files, and its live state', async () => {
+      const event = await seedEvent(db, webmaster);
+      const other = await seedEvent(db, webmaster);
+      const { bucket, live, env } = stores();
+      fillStores(event, bucket, live);
+      fillStores(other, bucket, live);
+      const before = rowsNaming(await readTables(db, tables), other.ids);
+      await runToEnd(env, event);
+      const after = rowsNaming(await readTables(db, tables), other.ids);
+      expect(Object.fromEntries(after)).toEqual(Object.fromEntries(before));
+      expect([...bucket.objects].sort()).toEqual([...other.objects].sort());
+      for (const contest of [other.practice, other.live]) {
+        const state = live.state(contest);
+        expect([...state.data]).toEqual([[`sequence:${contest}:staff`, 1]]);
+        expect(state.alarmAt).toBe(1);
+        expect(state.getWebSockets()).toHaveLength(1);
+      }
+      await cleanUp(event, other);
+    });
+  });
+
+  describe('the journal triggers', () => {
+    it('moves forward one step at a time and keeps naming the same event', async () => {
+      const event = await seedRoster(db, webmaster);
+      await fence(db, event);
+      for (const step of ['files', 'done', 'rows']) {
+        await expect(bound(db, `UPDATE event_deletions SET step = ?, rows_done_at = 'x', finished_at = CASE WHEN ? = 'done' THEN 'x' END WHERE event_id = ?`,
+          step, step, event.eventId).run()).rejects.toThrow();
+      }
+      for (const column of ['event_id', 'event_name', 'event_code', 'requested_by']) {
+        await expect(bound(db, `UPDATE event_deletions SET ${column} = 'other' WHERE event_id = ?`, event.eventId).run()).rejects.toThrow(/names its event for good/);
+      }
+      await deleteRows(db, event);
+      await expect(bound(db, `UPDATE event_deletions SET step = 'rows', rows_done_at = NULL WHERE event_id = ?`, event.eventId).run()).rejects.toThrow(/forward one step/);
+      await forget(event);
+    });
+  });
+});

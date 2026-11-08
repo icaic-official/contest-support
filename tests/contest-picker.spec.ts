@@ -109,7 +109,9 @@ test.describe("a contestant with several contests", () => {
     await signIn(page);
     await expect(triggerFor(page, "Charlie")).toBeVisible();
     await at(page, "/issues", ids.running);
-    await expect(page.getByRole("button", { name: "Report an issue" })).toBeEnabled();
+    await expect(
+      page.getByRole("button", { name: "Report an issue", description: "A helper comes to your table." }),
+    ).toBeEnabled();
     await trigger(page).click();
     await expect(page.getByRole("menuitemradio", { name: /^Charlie/ })).toHaveAccessibleName(
       /^Charlie \S.*\d{2}:\d{2} · Running now$/,

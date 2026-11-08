@@ -28,6 +28,15 @@ export function extraMinutesSql(s: string, entry: string): string {
       WHERE c.session_id = ${s}.id AND c.applied_at IS NOT NULL), 0)) END`;
 }
 
+/**
+ * SQL number: the extra minutes of the entry for a reader that shows the
+ * viewer's own intake, as the snapshot and the contest list do. A contest with
+ * no schedule has no end to extend, so it reads no award.
+ */
+export function viewerExtraSql(s: string, entry: string): string {
+  return `CASE WHEN ${s}.ends_at IS NULL THEN 0 ELSE ${extraMinutesSql(s, entry)} END`;
+}
+
 /** SQL instant: the scheduled end plus the extra minutes. NULL without a schedule. */
 export function personalEndSql(s: string, extra: string): string {
   return `strftime('%Y-%m-%dT%H:%M:%fZ', ${s}.ends_at, '+' || (${extra}) || ' minutes')`;

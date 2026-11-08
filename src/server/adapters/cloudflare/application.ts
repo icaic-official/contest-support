@@ -5,7 +5,7 @@ import type { Caller } from '../../authentication';
 import { AuthenticationError } from '../../authentication';
 import type { D1Connection, D1Statement, D1Value } from '../d1/connection';
 import { calendarEventSql, calendarWebmasterSql, contestDataBindings, contestDataSql, contestListBindings, contestSeatsSql } from './authority';
-import { clockSql, extraMinutesSql, intakeOpenSql, intakeStateSql, parseIntake, scheduleOf, type ScheduleColumns } from './schedule';
+import { clockSql, intakeOpenSql, intakeStateSql, parseIntake, scheduleOf, viewerExtraSql, type ScheduleColumns } from './schedule';
 
 /** Bind accountId, loginId. This check also works after an authorized self-removal. */
 export const currentReadyLoginSql = `SELECT a.id FROM accounts a JOIN logins l ON l.account_id = a.id
@@ -32,7 +32,7 @@ export function currentReadyLoginBindings(caller: Caller): D1Value[] {
 // both use it. The contest keeps today's reads without a schedule.
 const extra = 'x.minutes';
 export const snapshotSql = `WITH login AS (${currentReadyLoginSql}), access AS MATERIALIZED (${contestDataSql('caller')}),
-  extra_minutes AS MATERIALIZED (SELECT CASE WHEN s.ends_at IS NULL THEN 0 ELSE ${extraMinutesSql('s', 'a.team_id')} END AS minutes
+  extra_minutes AS MATERIALIZED (SELECT ${viewerExtraSql('s', 'a.team_id')} AS minutes
     FROM access a JOIN sessions s ON s.id = a.session_id),
   visible_issues AS MATERIALIZED (SELECT i.* FROM access a CROSS JOIN issues i
     WHERE (i.session_id = ? AND i.team_id = a.team_id) OR (a.staff = 1 AND i.session_id = ?))
@@ -123,16 +123,27 @@ export function notificationStatements(db: D1Connection, sessionId: string, audi
   ]);
 }
 
-const contestColumns = `c.session_id AS id, c.session_name AS name, c.event_id, c.manage, e.name AS event_name, e.time_zone,
+const contestColumns = (extraSql: string) => `c.session_id AS id, c.session_name AS name, c.event_id, c.manage, e.name AS event_name, e.time_zone,
   s.contest_type, s.starts_at, s.ends_at, s.grace_minutes, s.intake_follows_schedule, s.intake_open,
-  ${intakeStateSql('s')} AS intake`;
+  ${intakeStateSql('s', extraSql)} AS intake`;
 
-/** Every contest that the caller can open. Bind with contestListBindings. */
-export const contestsListSql = `SELECT ${contestColumns}, 1 AS can_open FROM (${contestDataSql('contests')}) c
+/**
+ * Every contest that the caller can open, each with the caller's own intake: a
+ * contestant's confirmed extra time keeps a contest open past its scheduled end,
+ * as the contest's own clock says. `viewer` reads the minutes once for each
+ * contest, because `intakeStateSql` uses them several times. Bind with contestListBindings.
+ */
+export const contestsListSql = `WITH viewer AS MATERIALIZED (SELECT c.session_id, c.session_name, c.event_id, c.manage,
+    ${viewerExtraSql('s', 'c.team_id')} AS extra
+    FROM (${contestDataSql('contests')}) c JOIN sessions s ON s.id = c.session_id)
+  SELECT ${contestColumns('c.extra')}, 1 AS can_open FROM viewer c
   JOIN sessions s ON s.id = c.session_id JOIN events e ON e.id = s.event_id ORDER BY c.session_name, c.session_id`;
 
-/** The contests of one event that the caller can open. Bind with contestListBindings, then the event ID. */
-export const eventContestsSql = `SELECT ${contestColumns}, 1 AS can_open FROM (${contestDataSql('contests')}) c
+/**
+ * The contests of one event that the caller can open, with the intake of the
+ * contest alone, for the event console. Bind with contestListBindings, then the event ID.
+ */
+export const eventContestsSql = `SELECT ${contestColumns('0')}, 1 AS can_open FROM (${contestDataSql('contests')}) c
   JOIN sessions s ON s.id = c.session_id JOIN events e ON e.id = s.event_id WHERE c.event_id = ?
   ORDER BY c.session_name, c.session_id`;
 

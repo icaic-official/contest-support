@@ -335,6 +335,40 @@ test.describe("a contestant with several contests", () => {
     await expect(triggerFor(page, "Delta")).toBeVisible();
   });
 
+  // React Router opens a link to the page that is already open by replacing the entry, but only
+  // when the link's address equals the current one. The address holds `?contest=`, so a link
+  // without it adds an entry per click, and Back lands on the page it left.
+  test("adds no history entry when the brand link opens the page that is already open", async ({ page, local }) => {
+    const ids = await three(local);
+    await signIn(page);
+    await at(page, "/issues", ids.running);
+    await settle(page);
+    const entries = () => page.evaluate(() => history.length);
+    const before = await entries();
+    for (let i = 0; i < 3; i++) {
+      await page.getByRole("link", { name: "Minsky, your reports" }).click();
+      await settle(page);
+    }
+    expect(await entries()).toBe(before);
+    await at(page, "/issues", ids.running);
+  });
+
+  test("goes back to the page before, after My account opens the account page again", async ({ page, local }) => {
+    const ids = await three(local);
+    await signIn(page);
+    await at(page, "/issues", ids.running);
+    for (let i = 0; i < 3; i++) {
+      await page.getByRole("button", { name: /^Account menu for/ }).click();
+      await page.getByRole("menuitem", { name: "My account" }).click();
+      await expect(page.getByRole("heading", { name: "My account", exact: true })).toBeVisible();
+      await at(page, "/account", ids.running);
+      await settle(page);
+    }
+    await page.goBack();
+    await expect(page.getByRole("heading", { name: "Your reports" })).toBeVisible();
+    await at(page, "/issues", ids.running);
+  });
+
   const unlisted = ["6f1c0d1a-2b3c-4d5e-8f90-a1b2c3d4e5f6", "not-a-contest", "x'; DROP TABLE sessions;--"];
   for (const unknown of unlisted) {
     test(`ignores the unlisted contest ${JSON.stringify(unknown)} in the address`, async ({ page, local }) => {

@@ -527,6 +527,25 @@ test.describe("a tab that signed out", () => {
     await nextPersonGetsTheDefault(page, ids.running);
   });
 
+  // Some browsers deny page storage, for example with every cookie blocked. The page must still clear.
+  test("shows no contest after a sign-out when the browser denies page storage, and the next sign-in opens the default", async ({ page, local }) => {
+    await page.addInitScript(() => {
+      Object.defineProperty(window, "sessionStorage", {
+        get() {
+          throw new DOMException("Storage is denied.", "SecurityError");
+        },
+      });
+    });
+    const ids = await three(local);
+    await signIn(page);
+    await choose(page, "Delta");
+    await at(page, "/issues", ids.ended);
+    await signOut(page);
+    await settle(page);
+    await withoutContest(page);
+    await nextPersonGetsTheDefault(page, ids.running);
+  });
+
   // A link that the person opens by a page load is a new visit, not a return to an older address.
   test("keeps the contest of a link that the person opens after a sign-out", async ({ page, local }) => {
     const ids = await three(local);

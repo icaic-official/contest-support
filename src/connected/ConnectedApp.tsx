@@ -1,4 +1,4 @@
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 import { BrandMark } from "@/components/brand";
 import { BuildId } from "@/components/build-id";
@@ -24,6 +24,7 @@ import { useAuthSession } from "./hooks/useAuthSession";
 import { keepContest, skipToFragment } from "./navigation";
 import { Workspace } from "./Workspace";
 import { WorkflowRetryProvider } from "./WorkflowRetry";
+import { preloadRememberedScreen } from "./lazyScreens";
 
 /** The page chrome around the main landmark. */
 type Layout = "dashboard" | "centered" | "landing";
@@ -50,6 +51,11 @@ export function ConnectedApp() {
   const [passwordSetup, setPasswordSetup] = useState(false);
   // A voluntary password change ends when the person signs out.
   if (!user && passwordSetup) setPasswordSetup(false);
+  const userId = user?.id;
+  // The session check names the person. Only then does the device's record tell which screens to download early.
+  useEffect(() => {
+    if (userId) preloadRememberedScreen(userId);
+  }, [userId]);
   const status = account.account;
   const dashboardReady =
     !!user &&

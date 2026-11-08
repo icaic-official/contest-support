@@ -54,9 +54,10 @@ export function Workspace({
   }, [connected, onLiveChange]);
   const membership = data.snapshot?.membership;
   const current = membership ? uiKindFor(membership) : undefined;
+  const accountId = props.user.id;
   useEffect(() => {
-    if (current) rememberScreen(current);
-  }, [current]);
+    if (current) rememberScreen(accountId, current);
+  }, [accountId, current]);
   const [kind, setKind] = useState<UiKind>();
   if (current && current !== kind) setKind(current);
   const page = pageForPath(pathname);
